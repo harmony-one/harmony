@@ -43,7 +43,7 @@ type Options struct {
 // canonical chain.
 type BlockChain interface {
 	// ValidateNewBlock validates new block.
-	ValidateNewBlock(block *types.Block) error
+	ValidateNewBlock(block *types.Block, beaconChain BlockChain) error
 	// SetHead rewinds the local chain to a new head. In the case of headers, everything
 	// above the new head will be deleted and the new one set. In the case of blocks
 	// though, the head may be further rewound if block bodies are missing (non-archive

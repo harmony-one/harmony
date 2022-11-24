@@ -7,7 +7,10 @@ import (
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/chain"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
@@ -30,16 +33,21 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
+	engine := chain.NewEngine()
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), decider,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), nil, decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, testDBFactory, nil, nil, nil, nil, nil)
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
+	collection := shardchain.NewCollection(
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
+	)
+	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}
@@ -203,20 +211,27 @@ func TestAddBeaconPeer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+	engine := chain.NewEngine()
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
+	collection := shardchain.NewCollection(
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
 	)
-	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), decider,
-	)
+	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+	)
+
+	consensus, err := consensus.New(
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), blockchain, decider, 3, false,
+	)
 
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, testDBFactory, nil, nil, nil, archiveMode, nil)
+	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil)
 	for _, p := range peers1 {
 		ret := node.AddBeaconPeer(p)
 		if ret {

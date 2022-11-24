@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
@@ -647,17 +648,6 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 }
 
 func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType) *node.Node {
-	// Consensus object.
-	// TODO: consensus object shouldn't start here
-	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(hc.General.ShardID))
-	currentConsensus, err := consensus.New(
-		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, decider)
-
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
-		os.Exit(1)
-	}
-
 	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
 	var aggregateSig bool
@@ -668,8 +658,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		minPeers = defaultConsensusConfig.MinPeers
 		aggregateSig = defaultConsensusConfig.AggregateSig
 	}
-	currentConsensus.MinPeers = minPeers
-	currentConsensus.AggregateSig = aggregateSig
 
 	blacklist, err := setupBlacklist(hc)
 	if err != nil {
@@ -701,7 +689,30 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc)
+	engine := chain.NewEngine()
+
+	chainConfig := nodeConfig.GetNetworkType().ChainConfig()
+	collection := shardchain.NewCollection(
+		&hc, chainDBFactory, &core.GenesisInitializer{NetworkType: nodeConfig.GetNetworkType()}, engine, &chainConfig,
+	)
+
+	blockchain, err := collection.ShardChain(nodeConfig.ShardID)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		os.Exit(1)
+	}
+
+	// Consensus object.
+	decider := quorum.NewDecider(quorum.SuperMajorityVote, nodeConfig.ShardID)
+	currentConsensus, err := consensus.New(
+		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, blockchain, decider, minPeers, aggregateSig)
+
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		os.Exit(1)
+	}
+
+	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
@@ -724,9 +735,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	} else {
 		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.DNSSync.Zone, strconv.Itoa(hc.DNSSync.Port))
 	}
-
-	// TODO: refactor the creation of blockchain out of node.New()
-	currentConsensus.Blockchain = currentNode.Blockchain()
 	currentNode.NodeConfig.DNSZone = hc.DNSSync.Zone
 
 	currentNode.NodeConfig.SetBeaconGroupID(
@@ -755,7 +763,8 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object
-	currentConsensus.SetBlockVerifier(currentNode.VerifyNewBlock)
+	currentConsensus.SetBlockVerifier(
+		node.VerifyNewBlock(currentNode.NodeConfig, currentNode.Blockchain(), currentNode.Beaconchain()))
 	currentConsensus.PostConsensusJob = currentNode.PostConsensusProcessing
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())

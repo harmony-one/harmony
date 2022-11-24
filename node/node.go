@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
@@ -43,7 +44,6 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/chain"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
@@ -987,7 +987,8 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(
 	host p2p.Host,
 	consensusObj *consensus.Consensus,
-	chainDBFactory shardchain.DBFactory,
+	engine engine.Engine,
+	collection *shardchain.CollectionImpl,
 	blacklist map[common.Address]struct{},
 	allowedTxs map[common.Address]core.AllowedTxData,
 	localAccounts []common.Address,
@@ -1015,12 +1016,6 @@ func New(
 	networkType := node.NodeConfig.GetNetworkType()
 	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
-
-	engine := chain.NewEngine()
-
-	collection := shardchain.NewCollection(
-		harmonyconfig, chainDBFactory, &core.GenesisInitializer{NetworkType: node.NodeConfig.GetNetworkType()}, engine, &chainConfig,
-	)
 
 	for shardID, archival := range isArchival {
 		if archival {
