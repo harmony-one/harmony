@@ -12,7 +12,7 @@ import (
 // configuration schedule.
 var TestnetSchedule testnetSchedule
 
-var ShardReductionEpoch = params.EpochTBD
+var ShardReductionEpoch = big.NewInt(486)
 
 type testnetSchedule struct{}
 
