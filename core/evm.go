@@ -305,7 +305,7 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 			db.AddLog(&types.Log{
 				Address:     collectRewards.DelegatorAddress,
 				Topics:      []common.Hash{staking.CollectRewardsTopicV2},
-				Data:        totalRewards.Bytes(),
+				Data:        common.LeftPadBytes(totalRewards.Bytes(), 32),
 				BlockNumber: ref.Number().Uint64(),
 			})
 		} else {
