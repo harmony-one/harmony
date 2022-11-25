@@ -120,11 +120,13 @@ func (d *Downloader) NumPeers() int {
 
 // IsSyncing return the current sync status
 func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
+	current := d.bc.CurrentBlock().NumberU64()
 	syncing, target := d.status.get()
-	if !syncing {
-		target = d.bc.CurrentBlock().NumberU64()
+	if !syncing { // means synced
+		target = current
 	}
-	return syncing, target, 0
+	// isSyncing, target, blocks to target
+	return syncing, target, target - current
 }
 
 // SubscribeDownloadStarted subscribe download started
