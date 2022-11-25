@@ -70,6 +70,12 @@ type ProcessorResult struct {
 func NewStateProcessor(
 	config *params.ChainConfig, bc BlockChain, beacon BlockChain, engine consensus_engine.Engine,
 ) *StateProcessor {
+	if bc == nil {
+		panic("bc is nil")
+	}
+	if beacon == nil {
+		panic("beacon is nil")
+	}
 	resultCache, _ := lru.New(resultCacheLimit)
 	return &StateProcessor{
 		config:      config,

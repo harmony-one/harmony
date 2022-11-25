@@ -273,8 +273,6 @@ func newBlockChainWithOptions(
 		maxGarbCollectedBlkNum:        -1,
 		options:                       options,
 	}
-	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
-	bc.SetProcessor(NewStateProcessor(chainConfig, bc, beaconChain, engine))
 
 	var err error
 	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.getProcInterrupt)
@@ -292,6 +290,13 @@ func newBlockChainWithOptions(
 		return nil, err
 	}
 	bc.shardID = bc.CurrentBlock().ShardID()
+	if beaconChain == nil && bc.shardID == shard.BeaconChainShardID {
+		beaconChain = bc
+	}
+
+	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
+	bc.SetProcessor(NewStateProcessor(chainConfig, bc, beaconChain, engine))
+
 	// Take ownership of this particular state
 	go bc.update()
 	return bc, nil
