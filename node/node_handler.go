@@ -249,8 +249,8 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 	if privToSing == nil {
 		return
 	}
-
-	for _, shardID := range []uint32{1, 2, 3} {
+	instance := shard.Schedule.InstanceForEpoch(curBlock.Epoch())
+	for shardID := uint32(1); shardID < instance.NumShards(); shardID++ {
 		lastLink, err := node.Blockchain().ReadShardLastCrossLink(shardID)
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get crosslinks")
