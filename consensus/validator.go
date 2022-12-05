@@ -62,12 +62,15 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.switchPhase("Announce", FBFTPrepare)
 
 	if len(recvMsg.Block) > 0 {
-		_, err := consensus.validateNewBlock(recvMsg)
-		if err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Failed to validate new block")
-			consensus.startViewChange()
-			return
-		}
+		go func() {
+			// Best effort check, no need to error out.
+			_, err := consensus.validateNewBlock(recvMsg)
+
+			if err == nil {
+				consensus.getLogger().Info().
+					Msg("[Announce] Block verified")
+			}
+		}()
 	}
 }
 
