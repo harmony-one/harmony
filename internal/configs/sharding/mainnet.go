@@ -55,7 +55,7 @@ var (
 func mustAddress(addrStr string) ethCommon.Address {
 	addr, err := common.ParseAddr(addrStr)
 	if err != nil {
-		panic("invalid feeCollector")
+		panic("invalid address")
 	}
 	return addr
 }

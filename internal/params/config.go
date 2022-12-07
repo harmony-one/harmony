@@ -150,6 +150,7 @@ var (
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
 	// All features except for CrossLink are enabled at launch.
+	// This is the Devnet config
 	PartnerChainConfig = &ChainConfig{
 		ChainID:                       PartnerChainID,
 		EthCompatibleChainID:          EthPartnerShard0ChainID,
