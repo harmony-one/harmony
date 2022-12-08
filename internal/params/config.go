@@ -258,7 +258,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		FeeCollectEpoch:               EpochTBD,
+		FeeCollectEpoch:               big.NewInt(5),
 	}
 
 	// AllProtocolChanges ...
