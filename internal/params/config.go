@@ -149,7 +149,6 @@ var (
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
-	// All features except for CrossLink are enabled at launch.
 	// This is the Devnet config
 	PartnerChainConfig = &ChainConfig{
 		ChainID:                       PartnerChainID,
@@ -185,7 +184,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		FeeCollectEpoch:               EpochTBD,
+		FeeCollectEpoch:               big.NewInt(573),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
