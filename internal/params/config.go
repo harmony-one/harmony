@@ -69,6 +69,7 @@ var (
 		SlotsLimitedEpoch:             big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
 		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -106,8 +107,8 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
+		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
 	}
-
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
@@ -296,6 +297,7 @@ var (
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
+		big.NewInt(0),                      // FeeCollectEpoch
 	}
 
 	// TestChainConfig ...
@@ -335,6 +337,7 @@ var (
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
+		big.NewInt(0),        // FeeCollectEpoch
 	}
 
 	// TestRules ...
@@ -464,6 +467,8 @@ type ChainConfig struct {
 
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
+	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
+	FeeCollectEpoch *big.Int
 }
 
 // String implements the fmt.Stringer interface.
@@ -645,6 +650,11 @@ func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
 // IsAllowlistEpoch determines whether IsAllowlist of HIP18 is enabled
 func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 	return isForked(c.AllowlistEpoch, epoch)
+}
+
+// IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.
+func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
+	return isForked(c.FeeCollectEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
