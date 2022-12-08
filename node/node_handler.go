@@ -52,11 +52,6 @@ func (node *Node) processSkippedMsgTypeByteValue(
 	}
 }
 
-var (
-	errInvalidPayloadSize = errors.New("invalid payload size")
-	errWrongBlockMsgSize  = errors.New("invalid block message size")
-)
-
 // HandleNodeMessage parses the message and dispatch the actions.
 func (node *Node) HandleNodeMessage(
 	ctx context.Context,
@@ -254,8 +249,8 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 	if privToSing == nil {
 		return
 	}
-
-	for _, shardID := range []uint32{1, 2, 3} {
+	instance := shard.Schedule.InstanceForEpoch(curBlock.Epoch())
+	for shardID := uint32(1); shardID < instance.NumShards(); shardID++ {
 		lastLink, err := node.Blockchain().ReadShardLastCrossLink(shardID)
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get crosslinks")
@@ -334,101 +329,34 @@ func getCrosslinkHeadersForShards(shardChain core.BlockChain, curBlock *types.Bl
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are
 // running consensus on.
-func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
-	if newBlock == nil || newBlock.Header() == nil {
-		return errors.New("nil header or block asked to verify")
-	}
-
-	if newBlock.ShardID() != node.Blockchain().ShardID() {
-		utils.Logger().Error().
-			Uint32("my shard ID", node.Blockchain().ShardID()).
-			Uint32("new block's shard ID", newBlock.ShardID()).
-			Msg("[VerifyNewBlock] Wrong shard ID of the new block")
-		return errors.New("[VerifyNewBlock] Wrong shard ID of the new block")
-	}
-
-	if newBlock.NumberU64() <= node.Blockchain().CurrentBlock().NumberU64() {
-		return errors.Errorf("block with the same block number is already committed: %d", newBlock.NumberU64())
-	}
-	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot validate header for the new block")
-		return err
-	}
-
-	if err := node.Blockchain().Engine().VerifyVRF(
-		node.Blockchain(), newBlock.Header(),
-	); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot verify vrf for the new block")
-		return errors.Wrap(err,
-			"[VerifyNewBlock] Cannot verify vrf for the new block",
-		)
-	}
-
-	if err := node.Blockchain().Engine().VerifyShardState(
-		node.Blockchain(), node.Beaconchain(), newBlock.Header(),
-	); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot verify shard state for the new block")
-		return errors.Wrap(err,
-			"[VerifyNewBlock] Cannot verify shard state for the new block",
-		)
-	}
-
-	if err := node.Blockchain().ValidateNewBlock(newBlock); err != nil {
-		if hooks := node.NodeConfig.WebHooks.Hooks; hooks != nil {
-			if p := hooks.ProtocolIssues; p != nil {
-				url := p.OnCannotCommit
-				go func() {
-					webhooks.DoPost(url, map[string]interface{}{
-						"bad-header": newBlock.Header(),
-						"reason":     err.Error(),
-					})
-				}()
+func VerifyNewBlock(nodeConfig *nodeconfig.ConfigType, blockChain core.BlockChain, beaconChain core.BlockChain) func(*types.Block) error {
+	return func(newBlock *types.Block) error {
+		if err := blockChain.ValidateNewBlock(newBlock, beaconChain); err != nil {
+			if hooks := nodeConfig.WebHooks.Hooks; hooks != nil {
+				if p := hooks.ProtocolIssues; p != nil {
+					url := p.OnCannotCommit
+					go func() {
+						webhooks.DoPost(url, map[string]interface{}{
+							"bad-header": newBlock.Header(),
+							"reason":     err.Error(),
+						})
+					}()
+				}
 			}
+			utils.Logger().Error().
+				Str("blockHash", newBlock.Hash().Hex()).
+				Int("numTx", len(newBlock.Transactions())).
+				Int("numStakingTx", len(newBlock.StakingTransactions())).
+				Err(err).
+				Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
+			return errors.Errorf(
+				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
+				newBlock.Hash().Hex(),
+				len(newBlock.Transactions()),
+			)
 		}
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Int("numTx", len(newBlock.Transactions())).
-			Int("numStakingTx", len(newBlock.StakingTransactions())).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
-		return errors.Errorf(
-			"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
-			newBlock.Hash().Hex(),
-			len(newBlock.Transactions()),
-		)
+		return nil
 	}
-
-	// Verify cross links
-	// TODO: move into ValidateNewBlock
-	if node.IsRunningBeaconChain() {
-		err := node.VerifyBlockCrossLinks(newBlock)
-		if err != nil {
-			utils.Logger().Debug().Err(err).Msg("ops2 VerifyBlockCrossLinks Failed")
-			return err
-		}
-	}
-
-	// TODO: move into ValidateNewBlock
-	if err := node.verifyIncomingReceipts(newBlock); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Int("numIncomingReceipts", len(newBlock.IncomingReceipts())).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot ValidateNewBlock")
-		return errors.Wrapf(
-			err, "[VerifyNewBlock] Cannot ValidateNewBlock",
-		)
-	}
-	return nil
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:

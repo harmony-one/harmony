@@ -69,7 +69,7 @@ var (
 		SlotsLimitedEpoch:             big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
 		AllowlistEpoch:                EpochTBD,
-		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
+		FeeCollectEpoch:               EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -107,7 +107,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
-		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
+		FeeCollectEpoch:               EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -145,7 +145,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
+		FeeCollectEpoch:               EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -184,7 +184,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
+		FeeCollectEpoch:               EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -223,7 +223,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
+		FeeCollectEpoch:               EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -239,7 +239,7 @@ var (
 		PreStakingEpoch:               big.NewInt(0),
 		QuickUnlockEpoch:              big.NewInt(0),
 		FiveSecondsEpoch:              big.NewInt(0),
-		TwoSecondsEpoch:               big.NewInt(3),
+		TwoSecondsEpoch:               big.NewInt(0),
 		SixtyPercentEpoch:             EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		RedelegationEpoch:             big.NewInt(0),
 		NoEarlyUnlockEpoch:            big.NewInt(0),
@@ -513,10 +513,14 @@ func (c *ChainConfig) mustValid() {
 			panic(err)
 		}
 	}
-	require(c.PreStakingEpoch.Cmp(c.StakingEpoch) < 0, "must satisfy: PreStakingEpoch < StakingEpoch")
-	require(c.StakingPrecompileEpoch.Cmp(c.PreStakingEpoch) >= 0, "must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
-	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0, "must satisfy: FeeCollectEpoch >= StakingEpoch")
-	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0, "must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
+	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0,
+		"must satisfy: FeeCollectEpoch >= StakingEpoch")
+	require(c.PreStakingEpoch.Cmp(c.StakingEpoch) < 0,
+		"must satisfy: PreStakingEpoch < StakingEpoch")
+	require(c.StakingPrecompileEpoch.Cmp(c.PreStakingEpoch) >= 0,
+		"must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
+	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0,
+		"must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -738,11 +742,17 @@ func isForked(s, epoch *big.Int) bool {
 type Rules struct {
 	ChainID    *big.Int
 	EthChainID *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
-	IsStakingPrecompile, IsCrossShardXferPrecompile, IsChainIdFix bool
+	// gas
+	IsS3,
+	// precompiles
+	IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
+	IsStakingPrecompile, IsCrossShardXferPrecompile,
+	// eip-155 chain id fix
+	IsChainIdFix bool
 }
 
 // Rules ensures c's ChainID is not nil.
+// The Rules object is only used by The EVM
 func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 	chainID := c.ChainID
 	if chainID == nil {
@@ -755,16 +765,13 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 	return Rules{
 		ChainID:                    new(big.Int).Set(chainID),
 		EthChainID:                 new(big.Int).Set(ethChainID),
-		IsCrossLink:                c.IsCrossLink(epoch),
-		IsEIP155:                   c.IsEIP155(epoch),
 		IsS3:                       c.IsS3(epoch),
-		IsReceiptLog:               c.IsReceiptLog(epoch),
 		IsIstanbul:                 c.IsIstanbul(epoch),
 		IsVRF:                      c.IsVRF(epoch),
 		IsPrevVRF:                  c.IsPrevVRF(epoch),
 		IsSHA3:                     c.IsSHA3(epoch),
 		IsStakingPrecompile:        c.IsStakingPrecompile(epoch),
-		IsChainIdFix:               c.IsChainIdFix(epoch),
 		IsCrossShardXferPrecompile: c.IsCrossShardXferPrecompile(epoch),
+		IsChainIdFix:               c.IsChainIdFix(epoch),
 	}
 }

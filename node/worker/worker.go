@@ -223,6 +223,11 @@ func (w *Worker) commitStakingTransaction(
 	return nil
 }
 
+// ApplyTestnetShardReduction only used to reduce shards of Testnet
+func (w *Worker) ApplyTestnetShardReduction() {
+	core.MayTestnetShardReduction(w.chain, w.current.state, w.current.header)
+}
+
 var (
 	errNilReceipt = errors.New("nil receipt")
 )

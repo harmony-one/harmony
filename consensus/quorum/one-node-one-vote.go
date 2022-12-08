@@ -19,8 +19,6 @@ import (
 )
 
 type uniformVoteWeight struct {
-	DependencyInjectionWriter
-	DependencyInjectionReader
 	SignatureReader
 
 	lastPowerSignersCountCache map[Phase]int64
@@ -108,23 +106,6 @@ func (v *uniformVoteWeight) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(t{v.Policy().String(), len(keys), keys})
-}
-
-func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
-	pubKeyFunc := v.MyPublicKey()
-	if pubKeyFunc == nil {
-		return false
-	}
-	identity, _ := pubKeyFunc()
-	everyone := v.Participants()
-	for _, key := range identity {
-		for i := range everyone {
-			if key.Object.IsEqual(everyone[i].Object) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func (v *uniformVoteWeight) ResetPrepareAndCommitVotes() {

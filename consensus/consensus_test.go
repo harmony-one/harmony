@@ -87,12 +87,10 @@ func GenerateConsensusForTesting() (p2p.Host, multibls.PrivateKeys, *Consensus, 
 		return nil, nil, nil, nil, err
 	}
 
-	peer := host.GetSelfPeer()
-
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
 	multiBLSPrivateKey := multibls.GetPrivateKeys(bls.RandPrivateKey())
 
-	consensus, err := New(host, shard.BeaconChainShardID, peer, multiBLSPrivateKey, decider)
+	consensus, err := New(host, shard.BeaconChainShardID, multiBLSPrivateKey, nil, decider, 3, false)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

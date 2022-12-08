@@ -105,21 +105,10 @@ type SignatureReader interface {
 	AggregateVotes(p Phase) *bls_core.Sign
 }
 
-// DependencyInjectionWriter ..
-type DependencyInjectionWriter interface {
-	SetMyPublicKeyProvider(func() (multibls.PublicKeys, error))
-}
-
-// DependencyInjectionReader ..
-type DependencyInjectionReader interface {
-	MyPublicKey() func() (multibls.PublicKeys, error)
-}
-
 // Decider ..
 type Decider interface {
 	fmt.Stringer
 	SignatureReader
-	DependencyInjectionWriter
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
 	AddNewVote(
@@ -130,7 +119,6 @@ type Decider interface {
 	IsQuorumAchieved(Phase) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
 	QuorumThreshold() numeric.Dec
-	AmIMemberOfCommitee() bool
 	IsAllSigsCollected() bool
 	ResetPrepareAndCommitVotes()
 	ResetViewChangeVotes()
@@ -169,10 +157,6 @@ type cIdentities struct {
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewChange *votepower.Round
-}
-
-type depInject struct {
-	publicKeyProvider func() (multibls.PublicKeys, error)
 }
 
 func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
@@ -432,41 +416,20 @@ func newBallotsBackedSignatureReader() *cIdentities {
 	}
 }
 
-type composite struct {
-	DependencyInjectionWriter
-	DependencyInjectionReader
-	SignatureReader
-}
-
-func (d *depInject) SetMyPublicKeyProvider(p func() (multibls.PublicKeys, error)) {
-	d.publicKeyProvider = p
-}
-
-func (d *depInject) MyPublicKey() func() (multibls.PublicKeys, error) {
-	return d.publicKeyProvider
-}
-
 // NewDecider ..
 func NewDecider(p Policy, shardID uint32) Decider {
-	signatureStore := newBallotsBackedSignatureReader()
-	deps := &depInject{}
-	c := &composite{deps, deps, signatureStore}
 	switch p {
 	case SuperMajorityVote:
 		return &uniformVoteWeight{
-			DependencyInjectionWriter:  c.DependencyInjectionWriter,
-			DependencyInjectionReader:  c.DependencyInjectionReader,
-			SignatureReader:            c,
+			SignatureReader:            newBallotsBackedSignatureReader(),
 			lastPowerSignersCountCache: make(map[Phase]int64),
 		}
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
-			SignatureReader:           c.SignatureReader,
-			DependencyInjectionWriter: c.DependencyInjectionWriter,
-			DependencyInjectionReader: c.DependencyInjectionWriter.(DependencyInjectionReader),
-			roster:                    *votepower.NewRoster(shardID),
-			voteTally:                 newVoteTally(),
-			lastPower:                 make(map[Phase]numeric.Dec),
+			SignatureReader: newBallotsBackedSignatureReader(),
+			roster:          *votepower.NewRoster(shardID),
+			voteTally:       newVoteTally(),
+			lastPower:       make(map[Phase]numeric.Dec),
 		}
 	default:
 		// Should not be possible

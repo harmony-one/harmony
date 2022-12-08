@@ -29,7 +29,7 @@ type Stub struct {
 	Name string
 }
 
-func (a Stub) ValidateNewBlock(block *types.Block) error {
+func (a Stub) ValidateNewBlock(block *types.Block, beaconChain BlockChain) error {
 	return errors.Errorf("method ValidateNewBlock not implemented for %s", a.Name)
 }
 

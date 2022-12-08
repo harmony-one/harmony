@@ -106,7 +106,7 @@ func (s *PublicPoolService) SendRawTransaction(
 	// Submit transaction
 	if err := s.hmy.SendTx(ctx, tx); err != nil {
 		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
-		return txHash, err
+		return common.Hash{}, err
 	}
 
 	// Log submission

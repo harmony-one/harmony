@@ -2,9 +2,11 @@ package redis_helper
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -15,7 +17,13 @@ import (
 // BlockUpdate block update event
 type BlockUpdate struct {
 	BlkNum uint64
-	Logs   []*types.Log
+	Logs   []*types.LogForStorage // types.Log will cut some fields when rpl encoding/decoding look at core/types/log.go:83
+}
+
+// NewFilterUpdated new filter update event
+type NewFilterUpdated struct {
+	ID             string
+	FilterCriteria ethereum.FilterQuery
 }
 
 // SubscribeShardUpdate subscribe block update event
@@ -25,23 +33,80 @@ func SubscribeShardUpdate(shardID uint32, cb func(blkNum uint64, logs []*types.L
 		block := &BlockUpdate{}
 		err := rlp.DecodeBytes([]byte(message.Payload), block)
 		if err != nil {
-			utils.Logger().Info().Err(err).Msg("redis subscribe shard update error")
+			utils.Logger().Warn().Err(err).Msg("redis subscribe shard update error")
 			continue
 		}
-		cb(block.BlkNum, block.Logs)
+		logs := make([]*types.Log, len(block.Logs))
+		for i, l := range block.Logs {
+			if l != nil {
+				ls := types.Log(*l)
+				logs[i] = &ls
+			} else {
+				logs[i] = nil
+			}
+		}
+
+		cb(block.BlkNum, logs)
 	}
 }
 
 // PublishShardUpdate publish block update event
 func PublishShardUpdate(shardID uint32, blkNum uint64, logs []*types.Log) error {
+	logsForStorage := make([]*types.LogForStorage, len(logs))
+	for i, l := range logs {
+		if l != nil {
+			ls := types.LogForStorage(*l)
+			logsForStorage[i] = &ls
+		} else {
+			logsForStorage[i] = nil
+		}
+	}
 	msg, err := rlp.EncodeToBytes(&BlockUpdate{
 		BlkNum: blkNum,
-		Logs:   logs,
+		Logs:   logsForStorage,
 	})
 	if err != nil {
 		return err
 	}
 	return redisInstance.Publish(context.Background(), fmt.Sprintf("shard_update_%d", shardID), msg).Err()
+}
+
+// SubscribeNewFilterLogEvent subscribe new filter log event from other readers
+func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id string, crit ethereum.FilterQuery)) {
+	if redisInstance == nil {
+		return
+	}
+	pubsub := redisInstance.
+		Subscribe(context.Background(), fmt.Sprintf("%s_new_filter_log_%d", namespace, shardID))
+	for message := range pubsub.Channel() {
+		query := NewFilterUpdated{}
+
+		if err := json.Unmarshal([]byte(message.Payload), &query); err != nil {
+			utils.Logger().Warn().Err(err).Msg("redis subscribe new_filter_log error")
+			continue
+		}
+
+		cb(query.ID, query.FilterCriteria)
+	}
+}
+
+// PublishNewFilterLogEvent publish new filter log event from other readers
+func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereum.FilterQuery) error {
+	if redisInstance == nil {
+		return nil
+	}
+
+	ev := NewFilterUpdated{
+		ID:             id,
+		FilterCriteria: crit,
+	}
+	msg, err := json.Marshal(ev)
+	if err != nil {
+		return err
+	}
+
+	return redisInstance.
+		Publish(context.Background(), fmt.Sprintf("%s_new_filter_log_%d", namespace, shardID), msg).Err()
 }
 
 //TxPoolUpdate tx pool update event
@@ -112,7 +177,7 @@ func SubscribeTxPoolUpdate(shardID uint32, cb func(tx types.PoolTransaction, loc
 		txu := &TxPoolUpdate{}
 		err := rlp.DecodeBytes([]byte(message.Payload), &txu)
 		if err != nil {
-			utils.Logger().Info().Err(err).Msg("redis subscribe shard update error")
+			utils.Logger().Warn().Err(err).Msg("redis subscribe txpool update error")
 			continue
 		}
 		cb(txu.Tx, txu.Local)

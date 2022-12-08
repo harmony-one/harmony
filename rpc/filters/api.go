@@ -6,6 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
@@ -42,15 +46,17 @@ type PublicFilterAPI struct {
 	filtersMu sync.Mutex
 	filters   map[rpc.ID]*filter
 	namespace string
+	shardID   uint32
 }
 
 // NewPublicFilterAPI returns a new PublicFilterAPI instance.
-func NewPublicFilterAPI(backend Backend, lightMode bool, namespace string) rpc.API {
+func NewPublicFilterAPI(backend Backend, lightMode bool, namespace string, shardID uint32) rpc.API {
 	api := &PublicFilterAPI{
 		backend:   backend,
 		events:    NewEventSystem(backend, lightMode, namespace == "eth"),
 		filters:   make(map[rpc.ID]*filter),
 		namespace: namespace,
+		shardID:   shardID,
 	}
 	go api.timeoutLoop()
 
@@ -306,7 +312,7 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 		matchedLogs = make(chan []*types.Log)
 	)
 
-	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
+	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -349,14 +355,30 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.NewFilter)
 	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.NewFilter, timer)
 
+	id := rpc.NewID()
+	if err := redis_helper.PublishNewFilterLogEvent(api.shardID, api.namespace, string(id), ethereum.FilterQuery(crit)); err != nil {
+		return "", fmt.Errorf("sending filter logs to other readers: %w", err)
+	}
+
+	time.Sleep(time.Millisecond * 70) // to give time to the other readers to catch up
+	return api.createFilter(ethereum.FilterQuery(crit), id)
+}
+
+func (api *PublicFilterAPI) createFilter(crit ethereum.FilterQuery, customId rpc.ID) (rpc.ID, error) {
 	logs := make(chan []*types.Log)
-	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), logs)
+	logsSub, err := api.events.SubscribeLogs(crit, logs, &customId)
 	if err != nil {
-		return rpc.ID(""), err
+		return "", err
 	}
 
 	api.filtersMu.Lock()
-	api.filters[logsSub.ID] = &filter{typ: LogsSubscription, crit: crit, deadline: time.NewTimer(deadline), logs: make([]*types.Log, 0), s: logsSub}
+	api.filters[logsSub.ID] = &filter{
+		typ:      LogsSubscription,
+		crit:     FilterCriteria(crit),
+		deadline: time.NewTimer(deadline),
+		logs:     make([]*types.Log, 0),
+		s:        logsSub,
+	}
 	api.filtersMu.Unlock()
 
 	go func() {
@@ -378,6 +400,17 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	}()
 
 	return logsSub.ID, nil
+}
+
+func (api *PublicFilterAPI) SyncNewFilterFromOtherReaders() {
+	go redis_helper.SubscribeNewFilterLogEvent(api.shardID, api.namespace, func(id string, crit ethereum.FilterQuery) {
+		if _, err := api.createFilter(crit, rpc.ID(id)); err != nil {
+			utils.Logger().Warn().
+				Uint32("shardID", api.shardID).
+				Err(err).
+				Msg("unable to sync filters from other readers")
+		}
+	})
 }
 
 // GetLogs returns logs matching the given argument that are stored within the state.
