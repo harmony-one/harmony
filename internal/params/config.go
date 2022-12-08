@@ -184,7 +184,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		FeeCollectEpoch:               big.NewInt(573),
+		FeeCollectEpoch:               big.NewInt(574),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
