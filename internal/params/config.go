@@ -145,6 +145,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -183,6 +184,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -221,6 +223,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               EpochTBD, // FeeCollectEpoch
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -348,6 +351,9 @@ var (
 func init() {
 	MainnetChainConfig.mustValid()
 	TestnetChainConfig.mustValid()
+	PangaeaChainConfig.mustValid()
+	PartnerChainConfig.mustValid()
+	StressnetChainConfig.mustValid()
 	LocalnetChainConfig.mustValid()
 }
 
@@ -510,6 +516,7 @@ func (c *ChainConfig) mustValid() {
 	require(c.PreStakingEpoch.Cmp(c.StakingEpoch) < 0, "must satisfy: PreStakingEpoch < StakingEpoch")
 	require(c.StakingPrecompileEpoch.Cmp(c.PreStakingEpoch) >= 0, "must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
 	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0, "must satisfy: FeeCollectEpoch >= StakingEpoch")
+	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0, "must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -737,16 +744,6 @@ type Rules struct {
 
 // Rules ensures c's ChainID is not nil.
 func (c *ChainConfig) Rules(epoch *big.Int) Rules {
-	if c.IsStakingPrecompile(epoch) {
-		if !c.IsPreStaking(epoch) {
-			panic("cannot have staking precompile epoch if not prestaking epoch")
-		}
-	}
-	if c.IsCrossShardXferPrecompile(epoch) {
-		if !c.AcceptsCrossTx(epoch) {
-			panic("cannot have cross shard xfer precompile epoch if not accepting cross tx")
-		}
-	}
 	chainID := c.ChainID
 	if chainID == nil {
 		chainID = new(big.Int)
