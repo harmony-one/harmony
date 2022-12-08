@@ -258,6 +258,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -343,6 +344,12 @@ var (
 	// TestRules ...
 	TestRules = TestChainConfig.Rules(new(big.Int))
 )
+
+func init() {
+	MainnetChainConfig.mustValid()
+	TestnetChainConfig.mustValid()
+	LocalnetChainConfig.mustValid()
+}
 
 // TrustedCheckpoint represents a set of post-processed trie roots (CHT and
 // BloomTrie) associated with the appropriate section index and head hash. It is
@@ -467,7 +474,12 @@ type ChainConfig struct {
 
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
+
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
+	// It should >= StakingEpoch.
+	// Before StakingEpoch, txn fees are paid to miner/leader.
+	// Then before FeeCollectEpoch, txn fees are burned.
+	// After FeeCollectEpoch, txn fees paid to FeeCollector account.
 	FeeCollectEpoch *big.Int
 }
 
@@ -486,6 +498,18 @@ func (c *ChainConfig) String() string {
 		c.ChainIdFixEpoch,
 		c.CrossShardXferPrecompileEpoch,
 	)
+}
+
+// check if ChainConfig is valid, it will panic if config is invalid. it should only be called in init()
+func (c *ChainConfig) mustValid() {
+	require := func(cond bool, err string) {
+		if !cond {
+			panic(err)
+		}
+	}
+	require(c.PreStakingEpoch.Cmp(c.StakingEpoch) < 0, "must satisfy: PreStakingEpoch < StakingEpoch")
+	require(c.StakingPrecompileEpoch.Cmp(c.PreStakingEpoch) >= 0, "must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
+	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0, "must satisfy: FeeCollectEpoch >= StakingEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
