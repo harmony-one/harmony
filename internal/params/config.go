@@ -69,7 +69,7 @@ var (
 		SlotsLimitedEpoch:             big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
 		AllowlistEpoch:                EpochTBD,
-		TesnetNinetyPercentEpoch:      EpochTBD, // never enabled
+		FeeCollectEpoch:               EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -107,9 +107,8 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
-		TesnetNinetyPercentEpoch:      big.NewInt(399),
+		FeeCollectEpoch:               EpochTBD,
 	}
-
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
@@ -146,11 +145,11 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		TesnetNinetyPercentEpoch:      EpochTBD,
+		FeeCollectEpoch:               EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
-	// All features except for CrossLink are enabled at launch.
+	// This is the Devnet config
 	PartnerChainConfig = &ChainConfig{
 		ChainID:                       PartnerChainID,
 		EthCompatibleChainID:          EthPartnerShard0ChainID,
@@ -185,7 +184,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		TesnetNinetyPercentEpoch:      EpochTBD,
+		FeeCollectEpoch:               big.NewInt(574),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -224,7 +223,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		TesnetNinetyPercentEpoch:      EpochTBD,
+		FeeCollectEpoch:               EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -262,7 +261,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		TesnetNinetyPercentEpoch:      EpochTBD,
+		FeeCollectEpoch:               big.NewInt(5),
 	}
 
 	// AllProtocolChanges ...
@@ -302,7 +301,7 @@ var (
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
-		big.NewInt(0),                      // TesnetNinetyPercentEpoch
+		big.NewInt(0),                      // FeeCollectEpoch
 	}
 
 	// TestChainConfig ...
@@ -342,7 +341,7 @@ var (
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
-		big.NewInt(0),        // TesnetNinetyPercentEpoch
+		big.NewInt(0),        // FeeCollectEpoch
 	}
 
 	// TestRules ...
@@ -482,9 +481,12 @@ type ChainConfig struct {
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
 
-	// Testnet only ninety percent epoch to restore internal voting power to 90%
-	// keeps the tesnet stable
-	TesnetNinetyPercentEpoch *big.Int `json:"testnet-ninety-percent-epoch,omitempty"`
+	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
+	// It should >= StakingEpoch.
+	// Before StakingEpoch, txn fees are paid to miner/leader.
+	// Then before FeeCollectEpoch, txn fees are burned.
+	// After FeeCollectEpoch, txn fees paid to FeeCollector account.
+	FeeCollectEpoch *big.Int
 }
 
 // String implements the fmt.Stringer interface.
@@ -504,20 +506,21 @@ func (c *ChainConfig) String() string {
 	)
 }
 
+// check if ChainConfig is valid, it will panic if config is invalid. it should only be called in init()
 func (c *ChainConfig) mustValid() {
 	require := func(cond bool, err string) {
 		if !cond {
 			panic(err)
 		}
 	}
+	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0,
+		"must satisfy: FeeCollectEpoch >= StakingEpoch")
 	require(c.PreStakingEpoch.Cmp(c.StakingEpoch) < 0,
 		"must satisfy: PreStakingEpoch < StakingEpoch")
 	require(c.StakingPrecompileEpoch.Cmp(c.PreStakingEpoch) >= 0,
 		"must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
 	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0,
 		"must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
-	require(c.TesnetNinetyPercentEpoch.Cmp(EpochTBD) >= 0 || c == TestnetChainConfig,
-		"must satisfy: TesnetNinetyPercentEpoch >= EpochTBD for non testnet chains")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -684,8 +687,9 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 	return isForked(c.AllowlistEpoch, epoch)
 }
 
-func (c *ChainConfig) IsTestnetNinetyPercent(epoch *big.Int) bool {
-	return isForked(c.TesnetNinetyPercentEpoch, epoch) && c == TestnetChainConfig
+// IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.
+func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
+	return isForked(c.FeeCollectEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
