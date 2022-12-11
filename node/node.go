@@ -26,7 +26,7 @@ import (
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	lru "github.com/hashicorp/golang-lru"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"

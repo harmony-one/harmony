@@ -10,7 +10,7 @@ import (
 	hmy_rpc "github.com/harmony-one/harmony/rpc"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/rpc/filters"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // IsCurrentlyLeader exposes if node is currently the leader node

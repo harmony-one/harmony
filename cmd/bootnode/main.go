@@ -9,7 +9,7 @@ import (
 	"path"
 
 	"github.com/ethereum/go-ethereum/log"
-	net "github.com/libp2p/go-libp2p-core/network"
+	net "github.com/libp2p/go-libp2p/core/network"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/harmony-one/harmony/internal/utils"

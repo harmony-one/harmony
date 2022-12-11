@@ -9,7 +9,7 @@ import (
 	"time"
 
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 const (
