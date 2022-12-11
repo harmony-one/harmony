@@ -141,7 +141,10 @@ type BlockChainImpl struct {
 	// This can improve the cache hit rate of redis
 	latestCleanCacheNum uint64      // The most recently cleaned cache of block num
 	cleanCacheChan      chan uint64 // Used to notify blocks that will be cleaned up
-
+	lastWrite           uint64
+	statePruneEnable    bool
+	statePruneRunning   sync.WaitGroup
+	statePruneAbortChan chan struct{}
 	// redisPreempt used in tikv mode, write nodes preempt for write permissions and publish updates to reader nodes
 	redisPreempt *redis_helper.RedisPreempt
 
@@ -221,7 +224,7 @@ func newBlockChainWithOptions(
 	engine consensus_engine.Engine, vmConfig vm.Config, options Options) (*BlockChainImpl, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
-			TrieNodeLimit: 256 * 1024 * 1024,
+			TrieNodeLimit: 256,
 			TrieTimeLimit: 2 * time.Minute,
 		}
 	}
@@ -248,6 +251,7 @@ func newBlockChainWithOptions(
 		db:                            db,
 		triegc:                        prque.New(nil),
 		stateCache:                    stateCache,
+		statePruneAbortChan:           make(chan struct{}),
 		quit:                          make(chan struct{}),
 		bodyCache:                     bodyCache,
 		bodyRLPCache:                  bodyRLPCache,
@@ -291,6 +295,7 @@ func newBlockChainWithOptions(
 		return nil, err
 	}
 	bc.shardID = bc.CurrentBlock().ShardID()
+	bc.lastWrite = bc.CurrentBlock().NumberU64()
 	// Take ownership of this particular state
 	go bc.update()
 	return bc, nil
@@ -1059,7 +1064,8 @@ func (bc *BlockChainImpl) Stop() {
 	bc.scope.Close()
 	close(bc.quit)
 	atomic.StoreInt32(&bc.procInterrupt, 1)
-
+	// wait pruning completed
+	bc.waitPruning(false)
 	// Ensure the state of a recent block is also stored to disk before exiting.
 	// We're writing three different states to catch different restart scenarios:
 	//  - HEAD:     So we don't need to reprocess any blocks in the general case
@@ -1334,8 +1340,6 @@ func (bc *BlockChainImpl) InsertReceiptChain(blockChain types.Blocks, receiptCha
 	return 0, nil
 }
 
-var lastWrite uint64
-
 func (bc *BlockChainImpl) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
@@ -1374,7 +1378,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 
 	// Flush trie state into disk if it's archival node or the block is epoch block
 	triedb := bc.stateCache.TrieDB()
-	if bc.cacheConfig.Disabled || block.IsLastBlockInEpoch() {
+	if bc.cacheConfig.Disabled {
 		if err := triedb.Commit(root, false); err != nil {
 			if isUnrecoverableErr(err) {
 				fmt.Printf("Unrecoverable error when committing triedb: %v\nExitting\n", err)
@@ -1383,7 +1387,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 			return NonStatTy, err
 		}
 
-		// clean block tire info in redis, used for tikv mode
+		// clean block trie info in redis, used for tikv mode
 		if block.NumberU64() > triesInRedis {
 			select {
 			case bc.cleanCacheChan <- block.NumberU64() - triesInRedis:
@@ -1413,16 +1417,21 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 				if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
 					// If we're exceeding limits but haven't reached a large enough memory gap,
 					// warn the user that the system is becoming unstable.
-					if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
+					if chosen < bc.lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
 						utils.Logger().Info().
 							Dur("time", bc.gcproc).
 							Dur("allowance", bc.cacheConfig.TrieTimeLimit).
-							Float64("optimum", float64(chosen-lastWrite)/triesInMemory).
+							Float64("optimum", float64(chosen-bc.lastWrite)/triesInMemory).
 							Msg("State in memory for too long, committing")
 					}
+					// before flush next state trie, must ensure pre-pruning finished
+					bc.waitPruning(true)
 					// Flush an entire trie and restart the counters
 					triedb.Commit(header.Root(), true)
-					lastWrite = chosen
+					if bc.statePruneEnable {
+						bc.pruneOldTrieAsync(bc.lastWrite, chosen)
+					}
+					bc.lastWrite = chosen
 					bc.gcproc = 0
 				}
 				// Garbage collect anything below our required write retention
@@ -1499,6 +1508,45 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 
 	bc.futureBlocks.Remove(block.Hash())
 	return CanonStatTy, nil
+}
+
+// pruneOldTrieAsync prune old trie in async.
+// The task must be completed before the next call, or it will be aborted.
+// Example of why:
+// At State-1, A=1.
+// At State-2, A=0. This means A will be removed from the trie.
+// At State-3, A=1.
+// Assuming that the pruning of (State-1, State-2) is performed after State-3 is flushed to disk, the A will be removed. State-3 will have the wrong value for A.
+func (bc *BlockChainImpl) pruneOldTrieAsync(old, new uint64) error {
+	oldHeader := bc.GetHeaderByNumber(old)
+	newHeader := bc.GetHeaderByNumber(new)
+	oldStateDB, err := bc.StateAt(oldHeader.Root())
+	if err != nil {
+		return err
+	}
+	newStateDB, err := bc.StateAt(newHeader.Root())
+	if err != nil {
+		return err
+	}
+	bc.statePruneRunning.Add(1)
+	go func() {
+		batch := bc.ChainDb().NewBatch()
+		if _, err := state.DiffAndPruneSync(oldStateDB, newStateDB, batch, bc.statePruneAbortChan); err == nil {
+			batch.Write()
+		}
+		bc.statePruneRunning.Done()
+	}()
+	return nil
+}
+
+func (bc *BlockChainImpl) waitPruning(abort bool) {
+	if abort {
+		select {
+		case bc.statePruneAbortChan <- struct{}{}:
+		default:
+		}
+	}
+	bc.statePruneRunning.Wait()
 }
 
 func (bc *BlockChainImpl) GetMaxGarbageCollectedBlockNumber() int64 {
@@ -3257,6 +3305,10 @@ func (bc *BlockChainImpl) IsEnablePruneBeaconChainFeature() bool {
 	return bc.pruneBeaconChainEnable
 }
 
+func (bc *BlockChainImpl) EnableStatePrune() {
+	bc.statePruneEnable = true
+}
+
 // SyncFromTiKVWriter used for tikv mode, all reader or follower writer used to sync block from master writer
 func (bc *BlockChainImpl) SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log) error {
 	head := rawdb.ReadHeadBlockHash(bc.db)
@@ -3294,7 +3346,7 @@ func (bc *BlockChainImpl) SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log
 	return nil
 }
 
-// tikvCleanCache used for tikv mode, clean block tire data from redis
+// tikvCleanCache used for tikv mode, clean block trie data from redis
 func (bc *BlockChainImpl) tikvCleanCache() {
 	var count int
 	for to := range bc.cleanCacheChan {
@@ -3305,11 +3357,16 @@ func (bc *BlockChainImpl) tikvCleanCache() {
 			if err != nil {
 				continue
 			}
-
-			// build current block statedb
-			toBlock := bc.GetBlockByNumber(i + 1)
-			toTrie, err := state.New(toBlock.Root(), bc.stateCache)
-			if err != nil {
+			var toTrie *state.DB
+			// find next state trie
+			for j := i + 1; j <= to+1; j++ {
+				toBlock := bc.GetBlockByNumber(j)
+				toTrie, err = state.New(toBlock.Root(), bc.stateCache)
+				if err != nil {
+					continue
+				}
+			}
+			if toTrie == nil {
 				continue
 			}
 
@@ -3425,7 +3482,7 @@ func (bc *BlockChainImpl) InitTiKV(conf *harmonyconfig.TiKVConfig) {
 		}
 	}
 
-	// start clean block tire data process
+	// start clean block trie data process
 	go bc.tikvCleanCache()
 }
 
@@ -3442,6 +3499,7 @@ var (
 //  3. Corrupted db data. (leveldb.errors.ErrCorrupted)
 //  4. OS error when open file (too many open files, ...)
 //  5. OS error when write file (read-only, not enough disk space, ...)
+//
 // Among all the above leveldb errors, only `too many open files` error is known to be recoverable,
 // thus the unrecoverable errors refers to error that is
 //  1. The error is from the lower storage level (from module leveldb)

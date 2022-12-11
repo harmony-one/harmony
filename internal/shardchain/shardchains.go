@@ -128,6 +128,9 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		bc, err = core.NewBlockChainWithOptions(
 			db, stateCache, cacheConfig, &chainConfig, sc.engine, vm.Config{}, opts,
 		)
+		if sc.harmonyconfig != nil && sc.harmonyconfig.General.StatePruneEnable {
+			bc.EnableStatePrune()
+		}
 	}
 
 	if err != nil {

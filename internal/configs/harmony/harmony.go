@@ -67,6 +67,7 @@ type GeneralConfig struct {
 	IsOffline              bool
 	DataDir                string
 	TraceEnable            bool
+	StatePruneEnable       bool
 	EnablePruneBeaconChain bool
 	RunElasticMode         bool
 }
