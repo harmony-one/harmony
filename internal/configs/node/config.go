@@ -68,6 +68,7 @@ var peerID peer.ID // PeerID of the node
 
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
+	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
 	beacon          GroupID             // the beacon group ID
 	group           GroupID             // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
 	client          GroupID             // the client group ID of the shard
