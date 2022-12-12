@@ -124,10 +124,20 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		if err != nil {
 			return nil, err
 		}
+		if shardID == shard.BeaconChainShardID {
+			bc, err = core.NewBlockChainWithOptions(
+				db, stateCache, bc, cacheConfig, &chainConfig, sc.engine, vm.Config{}, opts,
+			)
+		} else {
+			beacon, ok := sc.pool[shard.BeaconChainShardID]
+			if !ok {
+				return nil, errors.New("beacon chain is not initialized")
+			}
 
-		bc, err = core.NewBlockChainWithOptions(
-			db, stateCache, cacheConfig, &chainConfig, sc.engine, vm.Config{}, opts,
-		)
+			bc, err = core.NewBlockChainWithOptions(
+				db, stateCache, beacon, cacheConfig, &chainConfig, sc.engine, vm.Config{}, opts,
+			)
+		}
 	}
 
 	if err != nil {

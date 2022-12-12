@@ -57,6 +57,7 @@ type Worker struct {
 	config   *params.ChainConfig
 	factory  blockfactory.Factory
 	chain    core.BlockChain
+	beacon   core.BlockChain
 	current  *environment // An environment for current running cycle.
 	engine   consensus_engine.Engine
 	gasFloor uint64
@@ -558,7 +559,9 @@ func (w *Worker) FinalizeNewBlock(
 	}()
 
 	block, payout, err := w.engine.Finalize(
-		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
+		w.chain,
+		w.beacon,
+		copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
 		w.current.slashes, sigsReady, viewID,
 	)
@@ -571,12 +574,13 @@ func (w *Worker) FinalizeNewBlock(
 
 // New create a new worker object.
 func New(
-	config *params.ChainConfig, chain core.BlockChain, engine consensus_engine.Engine,
+	config *params.ChainConfig, chain core.BlockChain, beacon core.BlockChain, engine consensus_engine.Engine,
 ) *Worker {
 	worker := &Worker{
 		config:  config,
 		factory: blockfactory.NewFactory(config),
 		chain:   chain,
+		beacon:  beacon,
 		engine:  engine,
 	}
 	worker.gasFloor = 80000000

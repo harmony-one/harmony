@@ -1081,7 +1081,7 @@ func New(
 
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
-		node.Worker = worker.New(node.Blockchain().Config(), blockchain, engine)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, beaconChain, engine)
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
@@ -1089,7 +1089,6 @@ func New(
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
-		engine.SetBeaconchain(beaconChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)

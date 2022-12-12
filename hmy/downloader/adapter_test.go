@@ -147,7 +147,7 @@ func (e *dummyEngine) VerifyShardState(engine.ChainReader, engine.ChainReader, *
 func (e *dummyEngine) Beaconchain() engine.ChainReader   { return nil }
 func (e *dummyEngine) SetBeaconchain(engine.ChainReader) {}
 func (e *dummyEngine) Finalize(
-	chain engine.ChainReader, header *block.Header,
+	chain engine.ChainReader, beacon engine.ChainReader, header *block.Header,
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
