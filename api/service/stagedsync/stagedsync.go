@@ -195,7 +195,7 @@ func (s *StagedSync) IsAfter(stage1, stage2 SyncStageID) bool {
 	return idx1 > idx2
 }
 
-// RevertTo reverts the stage to a specific height 
+// RevertTo reverts the stage to a specific height
 func (s *StagedSync) RevertTo(revertPoint uint64, invalidBlock common.Hash) {
 	utils.Logger().Info().
 		Interface("invalidBlock", invalidBlock).
