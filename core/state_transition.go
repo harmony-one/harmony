@@ -25,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -56,8 +57,10 @@ The state transitioning model does all the necessary work to work out a valid ne
 3) Create a new state object if the recipient is \0*32
 4) Value transfer
 == If contract creation ==
-  4a) Attempt to run transaction data
-  4b) If valid, use result as code for the new state object
+
+	4a) Attempt to run transaction data
+	4b) If valid, use result as code for the new state object
+
 == end ==
 5) Run Script section
 6) Derive new state root
@@ -251,12 +254,7 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 		}
 	}
 	st.refundGas()
-
-	// Burn Txn Fees after staking epoch
-	if !st.evm.ChainConfig().IsStaking(st.evm.EpochNumber) {
-		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
-		st.state.AddBalance(st.evm.Coinbase, txFee)
-	}
+	st.collectGas()
 
 	return ExecutionResult{
 		ReturnData: ret,
@@ -280,6 +278,18 @@ func (st *StateTransition) refundGas() {
 	// Also return remaining gas to the block gas counter so it is
 	// available for the next transaction.
 	st.gp.AddGas(st.gas)
+}
+
+func (st *StateTransition) collectGas() {
+	// Burn Txn Fees after staking epoch
+	if config := st.evm.ChainConfig(); !config.IsStaking(st.evm.EpochNumber) {
+		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
+		st.state.AddBalance(st.evm.Coinbase, txFee)
+	} else if config.IsFeeCollectEpoch(st.evm.EpochNumber) { // collect Txn Fees to community-managed account.
+		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
+		txFeeCollector := shard.Schedule.InstanceForEpoch(st.evm.EpochNumber).FeeCollector()
+		st.state.AddBalance(txFeeCollector, txFee)
+	}
 }
 
 // gasUsed returns the amount of gas used up by the state transition.
@@ -374,10 +384,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		return 0, stakingTypes.ErrInvalidStakingKind
 	}
 	st.refundGas()
-
-	// Burn Txn Fees
-	//txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
-	//st.state.AddBalance(st.evm.Coinbase, txFee)
+	st.collectGas()
 
 	return st.gasUsed(), err
 }

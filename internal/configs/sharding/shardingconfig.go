@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -81,6 +82,9 @@ type Instance interface {
 
 	// ExternalAllowlistLimit returns the maximum number of external leader keys on each shard(HIP18)
 	ExternalAllowlistLimit() int
+
+	// FeeCollector returns a address to receive txn fees
+	FeeCollector() ethCommon.Address
 }
 
 // genShardingStructure return sharding structure, given shard number and its patterns.

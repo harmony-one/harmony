@@ -31,9 +31,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	blsPriKey := bls.RandPrivateKey()
-	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
-	)
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
@@ -65,9 +63,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	blsPriKey := bls.RandPrivateKey()
-	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
-	)
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -147,7 +143,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 	)
 
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey1), decider,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey1), nil, decider, 3, false,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
@@ -238,9 +234,7 @@ func TestConstructCommitMessage(test *testing.T) {
 		quorum.SuperMajorityStake, shard.BeaconChainShardID,
 	)
 
-	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey1), decider,
-	)
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey1), nil, decider, 3, false)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
@@ -322,7 +316,7 @@ func TestPopulateMessageFields(t *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

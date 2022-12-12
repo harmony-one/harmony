@@ -90,6 +90,8 @@ var (
 	// errExceedMaxPendingSlashes ..
 	errExceedMaxPendingSlashes = errors.New("exceeed max pending slashes")
 	errNilEpoch                = errors.New("nil epoch for voting power computation")
+	errAlreadyExist            = errors.New("crosslink already exist")
+	errDoubleSpent             = errors.New("[verifyIncomingReceipts] Double Spent")
 )
 
 const (
@@ -294,7 +296,165 @@ func newBlockChainWithOptions(
 	return bc, nil
 }
 
-func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block) error {
+// VerifyBlockCrossLinks verifies the crosslinks of the block.
+// This function should be called from beacon chain.
+func VerifyBlockCrossLinks(blockchain BlockChain, block *types.Block) error {
+	cxLinksData := block.Header().CrossLinks()
+	if len(cxLinksData) == 0 {
+		utils.Logger().Debug().Msgf("[CrossLinkVerification] Zero CrossLinks in the header")
+		return nil
+	}
+
+	crossLinks := types.CrossLinks{}
+	err := rlp.DecodeBytes(cxLinksData, &crossLinks)
+	if err != nil {
+		return errors.Wrapf(
+			err, "[CrossLinkVerification] failed to decode cross links",
+		)
+	}
+
+	if !crossLinks.IsSorted() {
+		return errors.New("[CrossLinkVerification] cross links are not sorted")
+	}
+
+	for _, crossLink := range crossLinks {
+		// ReadCrossLink beacon chain usage.
+		cl, err := blockchain.ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
+		if err == nil && cl != nil {
+			utils.Logger().Err(errAlreadyExist).
+				Uint64("beacon-block-number", block.NumberU64()).
+				Interface("remote", crossLink).
+				Interface("local", cl).
+				Msg("[CrossLinkVerification]")
+			// TODO Add slash for exist same blocknum but different crosslink
+			return errors.Wrapf(
+				errAlreadyExist,
+				"[CrossLinkVerification] shard: %d block: %d on beacon block %d",
+				crossLink.ShardID(),
+				crossLink.BlockNum(),
+				block.NumberU64(),
+			)
+		}
+		if err := VerifyCrossLink(blockchain, crossLink); err != nil {
+			return errors.Wrapf(err, "cannot VerifyBlockCrossLinks")
+		}
+	}
+	return nil
+}
+
+// VerifyCrossLink verifies the header is valid
+func VerifyCrossLink(blockchain BlockChain, cl types.CrossLink) error {
+	if blockchain.ShardID() != shard.BeaconChainShardID {
+		return errors.New("[VerifyCrossLink] Shard chains should not verify cross links")
+	}
+	engine := blockchain.Engine()
+
+	if err := engine.VerifyCrossLink(blockchain, cl); err != nil {
+		return errors.Wrap(err, "[VerifyCrossLink]")
+	}
+	return nil
+}
+
+func VerifyIncomingReceipts(blockchain BlockChain, block *types.Block) error {
+	m := make(map[common.Hash]struct{})
+	cxps := block.IncomingReceipts()
+	for _, cxp := range cxps {
+		// double spent
+		if blockchain.IsSpent(cxp) {
+			return errDoubleSpent
+		}
+		hash := cxp.MerkleProof.BlockHash
+		// duplicated receipts
+		if _, ok := m[hash]; ok {
+			return errDoubleSpent
+		}
+		m[hash] = struct{}{}
+
+		for _, item := range cxp.Receipts {
+			if s := blockchain.ShardID(); item.ToShardID != s {
+				return errors.Errorf(
+					"[verifyIncomingReceipts] Invalid ToShardID %d expectShardID %d",
+					s, item.ToShardID,
+				)
+			}
+		}
+
+		if err := blockchain.Validator().ValidateCXReceiptsProof(cxp); err != nil {
+			return errors.Wrapf(err, "[verifyIncomingReceipts] verification failed")
+		}
+	}
+
+	incomingReceiptHash := types.EmptyRootHash
+	if len(cxps) > 0 {
+		incomingReceiptHash = types.DeriveSha(cxps)
+	}
+	if incomingReceiptHash != block.Header().IncomingReceiptHash() {
+		return errors.New("[verifyIncomingReceipts] Invalid IncomingReceiptHash in block header")
+	}
+
+	return nil
+}
+
+func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block, beaconChain BlockChain) error {
+	if block == nil || block.Header() == nil {
+		return errors.New("nil header or block asked to verify")
+	}
+
+	if block.ShardID() != bc.ShardID() {
+		utils.Logger().Error().
+			Uint32("my shard ID", bc.ShardID()).
+			Uint32("new block's shard ID", block.ShardID()).
+			Msg("[ValidateNewBlock] Wrong shard ID of the new block")
+		return errors.New("[ValidateNewBlock] Wrong shard ID of the new block")
+	}
+
+	if block.NumberU64() <= bc.CurrentBlock().NumberU64() {
+		return errors.Errorf("block with the same block number is already committed: %d", block.NumberU64())
+	}
+	if err := bc.Validator().ValidateHeader(block, true); err != nil {
+		utils.Logger().Error().
+			Str("blockHash", block.Hash().Hex()).
+			Err(err).
+			Msg("[ValidateNewBlock] Cannot validate header for the new block")
+		return err
+	}
+	if err := bc.Engine().VerifyVRF(
+		bc, block.Header(),
+	); err != nil {
+		utils.Logger().Error().
+			Str("blockHash", block.Hash().Hex()).
+			Err(err).
+			Msg("[ValidateNewBlock] Cannot verify vrf for the new block")
+		return errors.Wrap(err,
+			"[ValidateNewBlock] Cannot verify vrf for the new block",
+		)
+	}
+	err := bc.Engine().VerifyShardState(bc, beaconChain, block.Header())
+	if err != nil {
+		utils.Logger().Error().
+			Str("blockHash", block.Hash().Hex()).
+			Err(err).
+			Msg("[ValidateNewBlock] Cannot verify shard state for the new block")
+		return errors.Wrap(err,
+			"[ValidateNewBlock] Cannot verify shard state for the new block",
+		)
+	}
+	err = bc.validateNewBlock(block)
+	if err != nil {
+		return err
+	}
+	if bc.shardID == shard.BeaconChainShardID {
+		err = VerifyBlockCrossLinks(bc, block)
+		if err != nil {
+			utils.Logger().Debug().Err(err).Msg("ops2 VerifyBlockCrossLinks Failed")
+			return err
+		}
+	}
+
+	return VerifyIncomingReceipts(bc, block)
+}
+
+func (bc *BlockChainImpl) validateNewBlock(block *types.Block) error {
 	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
 	if err != nil {
 		return err

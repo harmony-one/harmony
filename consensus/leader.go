@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -156,7 +157,13 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 		}
 	}
 	if !sign.VerifyHash(signerPubKey, blockHash) {
-		consensus.getLogger().Error().Msg("[OnPrepare] Received invalid BLS signature")
+		consensus.getLogger().
+			Error().
+			Msgf(
+				"[OnPrepare] Received invalid BLS signature: hash %s, key %s",
+				common.BytesToHash(blockHash).Hex(),
+				signerPubKey.SerializeToHexStr(),
+			)
 		return
 	}
 

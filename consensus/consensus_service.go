@@ -19,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/pkg/errors"
@@ -299,9 +298,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
-		decider.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
-			return consensus.GetPublicKeys(), nil
-		})
 		consensus.Decider = decider
 	}
 
