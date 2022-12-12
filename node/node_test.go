@@ -2,7 +2,6 @@ package node
 
 import (
 	"errors"
-	"sync"
 	"testing"
 
 	"github.com/harmony-one/harmony/consensus"
@@ -59,59 +58,6 @@ func TestNewNode(t *testing.T) {
 	if node.Blockchain().CurrentBlock() == nil {
 		t.Error("Genesis block is not initialized for the node")
 	}
-}
-
-func TestLegacySyncingPeerProvider(t *testing.T) {
-	t.Run("ShardChain", func(t *testing.T) {
-		p := makeLegacySyncingPeerProvider()
-		expectedPeers := []p2p.Peer{
-			{IP: "127.0.0.1", Port: "6001"},
-			{IP: "127.0.0.1", Port: "6003"},
-		}
-		actualPeers, err := p.SyncingPeers(1)
-		if assert.NoError(t, err) {
-			assert.ElementsMatch(t, actualPeers, expectedPeers)
-		}
-	})
-	t.Run("BeaconChain", func(t *testing.T) {
-		p := makeLegacySyncingPeerProvider()
-		expectedPeers := []p2p.Peer{
-			{IP: "127.0.0.1", Port: "6000"},
-			{IP: "127.0.0.1", Port: "6002"},
-		}
-		actualPeers, err := p.SyncingPeers(0)
-		if assert.NoError(t, err) {
-			assert.ElementsMatch(t, actualPeers, expectedPeers)
-		}
-	})
-	t.Run("NoMatch", func(t *testing.T) {
-		p := makeLegacySyncingPeerProvider()
-		_, err := p.SyncingPeers(999)
-		assert.Error(t, err)
-	})
-}
-
-func makeLegacySyncingPeerProvider() *LegacySyncingPeerProvider {
-	node := makeSyncOnlyNode()
-	p := NewLegacySyncingPeerProvider(node)
-	p.shardID = func() uint32 { return 1 }
-	return p
-}
-
-func makeSyncOnlyNode() *Node {
-	node := &Node{
-		Neighbors:       sync.Map{},
-		BeaconNeighbors: sync.Map{},
-	}
-	node.Neighbors.Store(
-		"127.0.0.1:9001:omg", p2p.Peer{IP: "127.0.0.1", Port: "9001"})
-	node.Neighbors.Store(
-		"127.0.0.1:9003:wtf", p2p.Peer{IP: "127.0.0.1", Port: "9003"})
-	node.BeaconNeighbors.Store(
-		"127.0.0.1:9000:bbq", p2p.Peer{IP: "127.0.0.1", Port: "9000"})
-	node.BeaconNeighbors.Store(
-		"127.0.0.1:9002:cakes", p2p.Peer{IP: "127.0.0.1", Port: "9002"})
-	return node
 }
 
 func TestDNSSyncingPeerProvider(t *testing.T) {
@@ -180,68 +126,4 @@ func TestLocalSyncingPeerProvider(t *testing.T) {
 
 func makeLocalSyncingPeerProvider() *LocalSyncingPeerProvider {
 	return NewLocalSyncingPeerProvider(6000, 6001, 2, 3)
-}
-
-func TestAddBeaconPeer(t *testing.T) {
-	pubKey1 := bls.RandPrivateKey().GetPublicKey()
-	pubKey2 := bls.RandPrivateKey().GetPublicKey()
-
-	peers1 := []*p2p.Peer{
-		{
-			IP:              "127.0.0.1",
-			Port:            "8888",
-			ConsensusPubKey: pubKey1,
-			PeerID:          "1234",
-		},
-		{
-			IP:              "127.0.0.1",
-			Port:            "9999",
-			ConsensusPubKey: pubKey2,
-			PeerID:          "4567",
-		},
-	}
-	blsKey := bls.RandPrivateKey()
-	pubKey := blsKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(p2p.HostConfig{
-		Self:   &leader,
-		BLSKey: priKey,
-	})
-	if err != nil {
-		t.Fatalf("newhost failure: %v", err)
-	}
-	engine := chain.NewEngine()
-	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
-	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
-	)
-	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
-	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
-	}
-	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
-	)
-
-	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), blockchain, decider, 3, false,
-	)
-
-	archiveMode := make(map[uint32]bool)
-	archiveMode[0] = true
-	archiveMode[1] = false
-	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil)
-	for _, p := range peers1 {
-		ret := node.AddBeaconPeer(p)
-		if ret {
-			t.Errorf("AddBeaconPeer Failed, expecting false, got %v, peer %v", ret, p)
-		}
-	}
-	for _, p := range peers1 {
-		ret := node.AddBeaconPeer(p)
-		if !ret {
-			t.Errorf("AddBeaconPeer Failed, expecting true, got %v, peer %v", ret, p)
-		}
-	}
 }

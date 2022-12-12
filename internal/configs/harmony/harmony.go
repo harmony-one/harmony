@@ -33,12 +33,11 @@ type HarmonyConfig struct {
 }
 
 type DnsSync struct {
-	Port          int    // replaces: Network.DNSSyncPort
-	Zone          string // replaces: Network.DNSZone
-	LegacySyncing bool   // replaces: Network.LegacySyncing
-	Client        bool   // replaces: Sync.LegacyClient
-	Server        bool   // replaces: Sync.LegacyServer
-	ServerPort    int
+	Port       int    // replaces: Network.DNSSyncPort
+	Zone       string // replaces: Network.DNSZone
+	Client     bool   // replaces: Sync.LegacyClient
+	Server     bool   // replaces: Sync.LegacyServer
+	ServerPort int
 }
 
 type NetworkConfig struct {

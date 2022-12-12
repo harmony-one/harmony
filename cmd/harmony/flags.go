@@ -497,10 +497,6 @@ func applyDNSSyncFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	} else if cli.IsFlagChanged(cmd, legacyDNSZoneFlag) {
 		cfg.DNSSync.Zone = cli.GetStringFlagValue(cmd, legacyDNSZoneFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDNSFlag) {
-		val := cli.GetBoolFlagValue(cmd, legacyDNSFlag)
-		if !val {
-			cfg.DNSSync.LegacySyncing = true
-		}
 	}
 
 	if cli.IsFlagChanged(cmd, dnsPortFlag) {
