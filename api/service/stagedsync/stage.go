@@ -11,16 +11,20 @@ type ExecFunc func(firstCycle bool, invalidBlockRevert bool, s *StageState, reve
 
 type StageHandler interface {
 	// Exec is the execution function for the stage to move forward.
+	// * firstCycle - is it the first cycle of syncing.
+	// * invalidBlockRevert - whether the execution is to solve the invalid block
 	// * s - is the current state of the stage and contains stage data.
 	// * reverter - if the stage needs to cause reverting, `reverter` methods can be used.
 	Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error
 
 	// Revert is the reverting logic of the stage.
+	// * firstCycle - is it the first cycle of syncing.
 	// * u - contains information about the revert itself.
 	// * s - represents the state of this stage at the beginning of revert.
 	Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) error
 
 	// CleanUp is the execution function for the stage to prune old data.
+	// * firstCycle - is it the first cycle of syncing.
 	// * p - is the current state of the stage and contains stage data.
 	CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) error
 }

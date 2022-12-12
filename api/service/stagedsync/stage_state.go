@@ -153,7 +153,6 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 						return err
 					} else if err != nil {
 						utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] failed verifying signatures for new block %d", block.NumberU64())
-
 						if !verifyAllSig {
 							utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last 99 blocks!")
 							for i := uint64(0); i < s.state.VerifyHeaderBatchSize-1; i++ {
@@ -162,7 +161,6 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 									return err
 								}
 							}
-
 							currProgress = stg.configs.bc.CurrentBlock().NumberU64()
 						}
 						return err
@@ -262,6 +260,7 @@ func (stg *StageStates) verifyBlockSignatures(bc core.BlockChain, block *types.B
 	return nil
 }
 
+// saveProgress saves the stage progress
 func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 
 	useInternalTx := tx == nil

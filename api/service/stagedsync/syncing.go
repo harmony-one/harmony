@@ -132,7 +132,7 @@ func CreateStagedSync(
 	), nil
 }
 
-// init sync loop main database and create buckets
+// initDB inits sync loop main database and create buckets
 func initDB(ctx context.Context, db kv.RwDB) error {
 	tx, errRW := db.BeginRw(ctx)
 	if errRW != nil {

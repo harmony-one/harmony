@@ -336,7 +336,7 @@ func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx, isBeacon bool) er
 	return nil
 }
 
-// saves block hashes to db (map from block heigh to block hash)
+// saveDownloadedBlockHashes saves block hashes to db (map from block heigh to block hash)
 func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress uint64, startHash common.Hash, tx kv.RwTx) (p uint64, h common.Hash, err error) {
 	p = progress
 	h.SetBytes(startHash.Bytes())
@@ -408,7 +408,7 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 	return p, h, nil
 }
 
-// save block hashes to cache db (map from block heigh to block hash)
+// saveBlockHashesInCacheDB saves block hashes to cache db (map from block heigh to block hash)
 func (bh *StageBlockHashes) saveBlockHashesInCacheDB(s *StageState, progress uint64, startHash common.Hash) (p uint64, h common.Hash, err error) {
 	p = progress
 	h.SetBytes(startHash[:])
@@ -527,7 +527,7 @@ func (bh *StageBlockHashes) getHashFromCache(height uint64) (h []byte, err error
 	return cacheHash[:], nil
 }
 
-// load block hashes from cache db to main sync db and update the progress
+// loadBlockHashesFromCache loads block hashes from cache db to main sync db and update the progress
 func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHash []byte, startHeight uint64, targetHeight uint64, tx kv.RwTx) (p uint64, h common.Hash, err error) {
 
 	p = startHeight

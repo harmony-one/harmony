@@ -43,10 +43,8 @@ type StagedSync struct {
 	syncStatus         syncStatus
 	lockBlocks         sync.RWMutex
 
-	ctx context.Context
-	bc  core.BlockChain
-	// consensus *consensus.Consensus
-	// worker    *worker.Worker
+	ctx      context.Context
+	bc       core.BlockChain
 	isBeacon bool
 	db       kv.RwDB
 
@@ -62,12 +60,12 @@ type StagedSync struct {
 	logPrefixes  []string
 
 	// if set to true, it will double check the block hashes
-	//so, only blocks are sent by 2/3 of peers are considered as valid
+	// so, only blocks are sent by 2/3 of peers are considered as valid
 	DoubleCheckBlockHashes bool
 	// Maximum number of blocks per each cycle. if set to zero, all blocks will be
 	// downloaded and synced in one full cycle.
 	MaxBlocksPerSyncCycle uint64
-	// Maximum number of blocks which can be downloaded in background.
+	// maximum number of blocks which can be downloaded in background.
 	MaxBackgroundBlocks uint64
 	// max number of blocks to use a single transaction for staged sync
 	MaxMemSyncCycleSize uint64
@@ -99,13 +97,10 @@ type Timing struct {
 	took      time.Duration
 }
 
-func (s *StagedSync) Len() int                 { return len(s.stages) }
-func (s *StagedSync) Context() context.Context { return s.ctx }
-func (s *StagedSync) IsBeacon() bool           { return s.isBeacon }
-func (s *StagedSync) IsExplorer() bool         { return s.isExplorer }
-
-// func (s *StagedSync) Consensus() *consensus.Consensus { return s.consensus }
-// func (s *StagedSync) Worker() *worker.Worker          { return s.worker }
+func (s *StagedSync) Len() int                    { return len(s.stages) }
+func (s *StagedSync) Context() context.Context    { return s.ctx }
+func (s *StagedSync) IsBeacon() bool              { return s.isBeacon }
+func (s *StagedSync) IsExplorer() bool            { return s.isExplorer }
 func (s *StagedSync) Blockchain() core.BlockChain { return s.bc }
 func (s *StagedSync) DB() kv.RwDB                 { return s.db }
 func (s *StagedSync) PrevRevertPoint() *uint64    { return s.prevRevertPoint }
@@ -200,6 +195,7 @@ func (s *StagedSync) IsAfter(stage1, stage2 SyncStageID) bool {
 	return idx1 > idx2
 }
 
+// RevertTo reverts the stage to a specific height 
 func (s *StagedSync) RevertTo(revertPoint uint64, invalidBlock common.Hash) {
 	utils.Logger().Info().
 		Interface("invalidBlock", invalidBlock).
@@ -635,7 +631,7 @@ func (ss *StagedSync) purgeOldBlocksFromCache() {
 	})
 }
 
-// AddLastMileBlock add the latest a few block into queue for syncing
+// AddLastMileBlock adds the latest a few block into queue for syncing
 // only keep the latest blocks with size capped by LastMileBlocksSize
 func (ss *StagedSync) AddLastMileBlock(block *types.Block) {
 	ss.lastMileMux.Lock()
@@ -821,7 +817,7 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode b
 	return bgModeError
 }
 
-// analyze block hashes and detects invalid peers
+// getInvalidPeersByBlockHashes analyzes block hashes and detects invalid peers
 func (ss *StagedSync) getInvalidPeersByBlockHashes(tx kv.RwTx) (map[string]bool, int, error) {
 	invalidPeers := make(map[string]bool)
 	if len(ss.syncConfig.peers) < 3 {
@@ -927,7 +923,7 @@ func (ss *StagedSync) generateStateSyncTaskQueue(bc core.BlockChain, tx kv.RwTx)
 	return nil
 }
 
-// RlpDecodeBlockOrBlockWithSig decode payload to types.Block or BlockWithSig.
+// RlpDecodeBlockOrBlockWithSig decodes payload to types.Block or BlockWithSig.
 // Return the block with commitSig if set.
 func RlpDecodeBlockOrBlockWithSig(payload []byte) (*types.Block, error) {
 	var block *types.Block
@@ -1032,7 +1028,7 @@ func (ss *StagedSync) getBlockFromLastMileBlocksByParentHash(parentHash common.H
 	return nil
 }
 
-// UpdateBlockAndStatus ...
+// UpdateBlockAndStatus updates block and its status in db
 func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Debug().
@@ -1151,7 +1147,7 @@ func (ss *StagedSync) RegisterNodeInfo() int {
 	return count
 }
 
-// getMaxPeerHeight gets the maximum blockchain heights from peers
+// getMaxPeerHeight returns the maximum blockchain heights from peers
 func (ss *StagedSync) getMaxPeerHeight() (uint64, error) {
 	maxHeight := uint64(math.MaxUint64)
 	var (
@@ -1203,7 +1199,7 @@ func (ss *StagedSync) IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool) 
 	return otherHeight, currentHeight == otherHeight
 }
 
-// GetMaxPeerHeight ..
+// GetMaxPeerHeight returns maximum block height of connected peers
 func (ss *StagedSync) GetMaxPeerHeight() uint64 {
 	mph, _ := ss.getMaxPeerHeight()
 	return mph
@@ -1263,7 +1259,7 @@ func (ss *StagedSync) IsSynchronized() bool {
 	return result.IsSynchronized
 }
 
-// GetSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
+// GetSyncStatusDoubleChecked returns the sync status when enforcing a immediate query on DNS nodes
 // with a double check to avoid false alarm.
 func (ss *StagedSync) GetSyncStatusDoubleChecked() SyncCheckResult {
 	result := ss.isSynchronized(true)
@@ -1275,8 +1271,7 @@ func (ss *StagedSync) GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, O
 	return ParseResult(result)
 }
 
-// isSynchronized query the remote DNS node for the latest height to check what is the current
-// sync status
+// isSynchronized queries the remote DNS node for the latest height to check what is the current sync status
 func (ss *StagedSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync

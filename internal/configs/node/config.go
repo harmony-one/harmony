@@ -91,7 +91,7 @@ type ConfigType struct {
 	InsertChainBatchSize   int    // number of blocks to build a batch and insert to chain in staged sync
 	VerifyAllSig           bool   // verify signatures for all blocks regardless of height and batch size
 	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
-	LogProgress            bool   // log the full sync progress in console  
+	LogProgress            bool   // log the full sync progress in console
 	NtpServer              string
 	StringRole             string
 	P2PPriKey              p2p_crypto.PrivKey   `json:"-"`

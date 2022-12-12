@@ -190,7 +190,8 @@ func (sc *SyncConfig) SelectRandomPeers(peers []p2p.Peer, randSeed int64) int {
 	return targetSize
 }
 
-// Peers are expected to limited at half of the size, capped between lowBound and highBound.
+// calcNumPeersWithBound calculates the number of connected peers with bound
+// peers are expected to limited at half of the size, capped between lowBound and highBound.
 func calcNumPeersWithBound(size int, lowBound, highBound int) int {
 	if size < lowBound {
 		return size
@@ -239,7 +240,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 		Msg("[STAGED_SYNC] remove GRPC peer")
 }
 
-// RemovePeer removes a peer from SyncConfig
+// ReplacePeerWithReserved tries to replace a peer from reserved peer list
 func (sc *SyncConfig) ReplacePeerWithReserved(peer *SyncPeerConfig, reason string) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
