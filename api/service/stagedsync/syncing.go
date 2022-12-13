@@ -11,6 +11,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 
 	"github.com/ledgerwatch/erigon-lib/kv/mdbx"
@@ -64,7 +65,7 @@ func CreateStagedSync(
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
-	isBeacon := bc.ShardID() == bc.Engine().Beaconchain().ShardID()
+	isBeacon := bc.ShardID() == shard.BeaconChainShardID
 
 	var db kv.RwDB
 	if UseMemDB {
