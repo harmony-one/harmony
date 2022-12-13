@@ -1064,9 +1064,6 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		ss.RegisterNodeInfo()
 	}
 
-	startTime := time.Now()
-	startHead := bc.CurrentBlock().NumberU64()
-	fmt.Print("\033[s") // save the cursor position
 	for {
 		otherHeight := getMaxPeerHeight(ss.syncConfig)
 		currentHeight := bc.CurrentBlock().NumberU64()
@@ -1094,16 +1091,6 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 			break
 		}
 		ss.purgeOldBlocksFromCache()
-		//calculating block speed
-		currHead := bc.CurrentBlock().NumberU64()
-		dt := time.Now().Sub(startTime).Seconds()
-		speed := float64(0)
-		if dt > 0 {
-			speed = float64(currHead-startHead) / dt
-		}
-		blockSpeed := fmt.Sprintf("%.2f", speed)
-		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-		fmt.Println("sync block speed:", blockSpeed, "blocks/s")
 	}
 	if consensus != nil {
 		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
