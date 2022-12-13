@@ -161,7 +161,7 @@ func createBlockChain() *BlockChainImpl {
 	genesis := gspec.MustCommit(database)
 	_ = genesis
 	engine := chain2.NewEngine()
-	blockchain, _ := NewBlockChain(database, state.NewDatabase(database), nil, gspec.Config, engine, vm.Config{})
+	blockchain, _ := NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, engine, vm.Config{})
 	return blockchain
 }
 

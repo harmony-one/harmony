@@ -81,10 +81,9 @@ func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 	zone := nodeconfig.GetDefaultDNSZone(nt)
 	port := nodeconfig.GetDefaultDNSPort(nt)
 	dnsSync := harmonyconfig.DnsSync{
-		Port:          port,
-		Zone:          zone,
-		LegacySyncing: false,
-		ServerPort:    nodeconfig.DefaultDNSPort,
+		Port:       port,
+		Zone:       zone,
+		ServerPort: nodeconfig.DefaultDNSPort,
 	}
 	switch nt {
 	case nodeconfig.Mainnet:

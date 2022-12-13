@@ -292,6 +292,12 @@ func init() {
 		confTree.Set("Version", "2.5.7")
 		return confTree
 	}
+	migrations["2.5.7"] = func(confTree *toml.Tree) *toml.Tree {
+		confTree.Delete("DNSSync.LegacySyncing")
+
+		confTree.Set("Version", "2.5.8")
+		return confTree
+	}
 
 	migrations["2.5.7"] = func(confTree *toml.Tree) *toml.Tree {
 		if confTree.Get("Sync.StagedSync") == nil {

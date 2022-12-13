@@ -200,24 +200,25 @@ type BlockChainImpl struct {
 
 // NewBlockChainWithOptions same as NewBlockChain but can accept additional behaviour options.
 func NewBlockChainWithOptions(
-	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	db ethdb.Database, stateCache state.Database, beaconChain BlockChain, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config, options Options,
 ) (*BlockChainImpl, error) {
-	return newBlockChainWithOptions(db, stateCache, cacheConfig, chainConfig, engine, vmConfig, options)
+	return newBlockChainWithOptions(db, stateCache, beaconChain, cacheConfig, chainConfig, engine, vmConfig, options)
 }
 
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum validator and
 // Processor.
 func NewBlockChain(
-	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	db ethdb.Database, stateCache state.Database, beaconChain BlockChain, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
 ) (*BlockChainImpl, error) {
-	return newBlockChainWithOptions(db, stateCache, cacheConfig, chainConfig, engine, vmConfig, Options{})
+	return newBlockChainWithOptions(db, stateCache, beaconChain, cacheConfig, chainConfig, engine, vmConfig, Options{})
 }
 
 func newBlockChainWithOptions(
-	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	db ethdb.Database, stateCache state.Database, beaconChain BlockChain,
+	cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config, options Options) (*BlockChainImpl, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
@@ -272,8 +273,6 @@ func newBlockChainWithOptions(
 		maxGarbCollectedBlkNum:        -1,
 		options:                       options,
 	}
-	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
-	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
 
 	var err error
 	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.getProcInterrupt)
@@ -291,6 +290,13 @@ func newBlockChainWithOptions(
 		return nil, err
 	}
 	bc.shardID = bc.CurrentBlock().ShardID()
+	if beaconChain == nil && bc.shardID == shard.BeaconChainShardID {
+		beaconChain = bc
+	}
+
+	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
+	bc.SetProcessor(NewStateProcessor(chainConfig, bc, beaconChain, engine))
+
 	// Take ownership of this particular state
 	go bc.update()
 	return bc, nil

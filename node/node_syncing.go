@@ -149,36 +149,6 @@ type SyncingPeerProvider interface {
 	SyncingPeers(shardID uint32) (peers []p2p.Peer, err error)
 }
 
-// LegacySyncingPeerProvider uses neighbor lists stored in a Node to serve
-// syncing peer list query.
-type LegacySyncingPeerProvider struct {
-	node    *Node
-	shardID func() uint32
-}
-
-// NewLegacySyncingPeerProvider creates and returns a new node-based syncing
-// peer provider.
-func NewLegacySyncingPeerProvider(node *Node) *LegacySyncingPeerProvider {
-	var shardID func() uint32
-	if node.shardChains != nil {
-		shardID = node.Blockchain().ShardID
-	}
-	return &LegacySyncingPeerProvider{node: node, shardID: shardID}
-}
-
-// SyncingPeers returns peers stored in neighbor maps in the node structure.
-func (p *LegacySyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Peer, err error) {
-	switch shardID {
-	case p.shardID():
-		peers = getNeighborPeers(&p.node.Neighbors)
-	case 0:
-		peers = getNeighborPeers(&p.node.BeaconNeighbors)
-	default:
-		return nil, errors.Errorf("unsupported shard ID %v", shardID)
-	}
-	return peers, nil
-}
-
 // DNSSyncingPeerProvider uses the given DNS zone to resolve syncing peers.
 type DNSSyncingPeerProvider struct {
 	zone, port string
