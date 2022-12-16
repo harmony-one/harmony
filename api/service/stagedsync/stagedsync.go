@@ -689,7 +689,7 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32) error {
 
 	var connectedPeers int
 	for _, peer := range peers {
-		client := downloader.ClientSetup(peer.IP, peer.Port)
+		client := downloader.ClientSetup(peer.IP, peer.Port, true)
 		if client == nil {
 			continue
 		}

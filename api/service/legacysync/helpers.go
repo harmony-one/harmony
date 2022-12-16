@@ -74,7 +74,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) 
 		wg.Add(1)
 		go func(peer p2p.Peer) {
 			defer wg.Done()
-			client := downloader.ClientSetup(peer.IP, peer.Port)
+			client := downloader.ClientSetup(peer.IP, peer.Port, false)
 			if client == nil {
 				return
 			}

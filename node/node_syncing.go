@@ -569,7 +569,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		} else {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
 			syncPort := legacysync.GetSyncingPort(port)
-			client := legdownloader.ClientSetup(ip, syncPort)
+			client := legdownloader.ClientSetup(ip, syncPort, false)
 			if client == nil {
 				utils.Logger().Warn().
 					Str("ip", ip).
