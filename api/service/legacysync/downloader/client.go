@@ -55,6 +55,11 @@ func (client *Client) State() connectivity.State {
 func (client *Client) WaitForConnection(t time.Duration) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), t)
 	defer cancel()
+	
+	if client.conn.GetState() == connectivity.Ready {
+		return true
+	}
+
 	if ready := client.conn.WaitForStateChange(ctx, client.conn.GetState()); !ready {
 		return false
 	} else {
