@@ -125,7 +125,7 @@ func (node *Node) stakingMessageHandler(msgPayload []byte) {
 	switch txMessageType {
 	case proto_node.Send:
 		txs := staking.StakingTransactions{}
-		err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send messge type
+		err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send message type
 		if err != nil {
 			utils.Logger().Error().
 				Err(err).
