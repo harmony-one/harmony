@@ -78,6 +78,7 @@ require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/OpenPeeDeeP/depguard v1.0.1 // indirect
 	github.com/VictoriaMetrics/metrics v1.23.0 // indirect
+	github.com/VictoriaMetrics/metrics v1.23.0 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20190607111240-52c2a7864a08 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

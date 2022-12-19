@@ -187,7 +187,9 @@ var (
 
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
-		Downloader:     true,
+		Downloader:     false,
+		StagedSync:     false,
+		StagedSyncCfg:  defaultStagedSyncConfig,
 		StagedSync:     false,
 		StagedSyncCfg:  defaultStagedSyncConfig,
 		Concurrency:    4,
