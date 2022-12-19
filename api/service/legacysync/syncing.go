@@ -588,7 +588,7 @@ func (ss *StateSync) downloadBlocks(bc core.BlockChain) {
 					ss.syncConfig.RemovePeer(peerConfig, fmt.Sprintf("StateSync %d: error returned for GetBlocks: %s", ss.blockChain.ShardID(), err.Error()))
 					return
 				}
-				if err != nil || len(payload) == 0 {
+				if len(payload) == 0 {
 					count++
 					utils.Logger().Error().Int("failNumber", count).
 						Msg("[SYNC] downloadBlocks: no more retrievable blocks")
@@ -855,7 +855,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
 	// Verify block signatures
 	if block.NumberU64() > 1 {
-		// Verify signature every 100 blocks
+		// Verify signature every N blocks (which N is verifyHeaderBatchSize and can be adjusted in configs)
 		verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
 		verifyCurrentSig := verifyAllSig && haveCurrentSig
 		if verifyCurrentSig {
@@ -894,7 +894,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 		utils.Logger().Error().
 			Err(err).
 			Msgf(
-				"[SYNC] UpdateBlockAndStatus: Error adding newck to blockchain %d %d",
+				"[SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d",
 				block.NumberU64(),
 				block.ShardID(),
 			)
@@ -1058,10 +1058,12 @@ func (ss *StateSync) GetMaxPeerHeight() uint64 {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
+func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration) {
+	utils.Logger().Info().Msgf("legacy sync is executing ...")
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
+
 	for {
 		otherHeight := getMaxPeerHeight(ss.syncConfig)
 		currentHeight := bc.CurrentBlock().NumberU64()
@@ -1099,6 +1101,7 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 			consensus.UpdateConsensusInformation()
 		}
 	}
+	utils.Logger().Info().Msgf("legacy sync is executed")
 	ss.purgeAllBlocksFromCache()
 }
 
@@ -1149,11 +1152,18 @@ type (
 	}
 
 	SyncCheckResult struct {
-		IsInSync    bool
-		OtherHeight uint64
-		HeightDiff  uint64
+		IsSynchronized bool
+		OtherHeight    uint64
+		HeightDiff     uint64
 	}
 )
+
+func ParseResult(res SyncCheckResult) (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
+	IsSynchronized = res.IsSynchronized
+	OtherHeight = res.OtherHeight
+	HeightDiff = res.HeightDiff
+	return IsSynchronized, OtherHeight, HeightDiff
+}
 
 func newSyncStatus(role nodeconfig.Role) syncStatus {
 	expiration := getSyncStatusExpiration(role)
@@ -1200,6 +1210,11 @@ func (status *syncStatus) Clone() syncStatus {
 	}
 }
 
+func (ss *StateSync) IsSynchronized() bool {
+	result := ss.GetSyncStatus()
+	return result.IsSynchronized
+}
+
 func (status *syncStatus) expired() bool {
 	return time.Since(status.lastUpdateTime) > status.expiration
 }
@@ -1214,20 +1229,32 @@ func (status *syncStatus) update(result SyncCheckResult) {
 // If the last result is expired, ask the remote DNS nodes for latest height and return the result.
 func (ss *StateSync) GetSyncStatus() SyncCheckResult {
 	return ss.syncStatus.Get(func() SyncCheckResult {
-		return ss.isInSync(false)
+		return ss.isSynchronized(false)
 	})
+}
+
+func (ss *StateSync) GetParsedSyncStatus() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
+	res := ss.syncStatus.Get(func() SyncCheckResult {
+		return ss.isSynchronized(false)
+	})
+	return ParseResult(res)
 }
 
 // GetSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
 // with a double check to avoid false alarm.
 func (ss *StateSync) GetSyncStatusDoubleChecked() SyncCheckResult {
-	result := ss.isInSync(true)
+	result := ss.isSynchronized(true)
 	return result
 }
 
-// isInSync query the remote DNS node for the latest height to check what is the current
+func (ss *StateSync) GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
+	result := ss.isSynchronized(true)
+	return ParseResult(result)
+}
+
+// isSynchronized query the remote DNS node for the latest height to check what is the current
 // sync status
-func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
+func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
@@ -1245,9 +1272,9 @@ func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
 			Uint64("lastHeight", lastHeight).
 			Msg("[SYNC] Checking sync status")
 		return SyncCheckResult{
-			IsInSync:    !wasOutOfSync,
-			OtherHeight: otherHeight1,
-			HeightDiff:  heightDiff,
+			IsSynchronized: !wasOutOfSync,
+			OtherHeight:    otherHeight1,
+			HeightDiff:     heightDiff,
 		}
 	}
 	// double check the sync status after 1 second to confirm (avoid false alarm)
@@ -1269,8 +1296,8 @@ func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
 		heightDiff = 0 // overflow
 	}
 	return SyncCheckResult{
-		IsInSync:    !(wasOutOfSync && isOutOfSync && lastHeight == currentHeight),
-		OtherHeight: otherHeight2,
-		HeightDiff:  heightDiff,
+		IsSynchronized: !(wasOutOfSync && isOutOfSync && lastHeight == currentHeight),
+		OtherHeight:    otherHeight2,
+		HeightDiff:     heightDiff,
 	}
 }

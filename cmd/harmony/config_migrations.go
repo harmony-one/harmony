@@ -260,6 +260,7 @@ func init() {
 		confTree.Set("Version", "2.5.3")
 		return confTree
 	}
+
 	migrations["2.5.3"] = func(confTree *toml.Tree) *toml.Tree {
 		if confTree.Get("TxPool.AllowedTxsFile") == nil {
 			confTree.Set("TxPool.AllowedTxsFile", defaultConfig.TxPool.AllowedTxsFile)
@@ -267,6 +268,7 @@ func init() {
 		confTree.Set("Version", "2.5.4")
 		return confTree
 	}
+
 	migrations["2.5.4"] = func(confTree *toml.Tree) *toml.Tree {
 		if confTree.Get("TxPool.GlobalSlots") == nil {
 			confTree.Set("TxPool.GlobalSlots", defaultConfig.TxPool.GlobalSlots)
@@ -274,6 +276,7 @@ func init() {
 		confTree.Set("Version", "2.5.5")
 		return confTree
 	}
+
 	migrations["2.5.5"] = func(confTree *toml.Tree) *toml.Tree {
 		if confTree.Get("Log.Console") == nil {
 			confTree.Set("Log.Console", defaultConfig.Log.Console)
@@ -281,6 +284,7 @@ func init() {
 		confTree.Set("Version", "2.5.6")
 		return confTree
 	}
+
 	migrations["2.5.6"] = func(confTree *toml.Tree) *toml.Tree {
 		if confTree.Get("P2P.MaxPeers") == nil {
 			confTree.Set("P2P.MaxPeers", defaultConfig.P2P.MaxPeers)
@@ -292,6 +296,15 @@ func init() {
 		confTree.Delete("DNSSync.LegacySyncing")
 
 		confTree.Set("Version", "2.5.8")
+		return confTree
+	}
+
+	migrations["2.5.8"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("Sync.StagedSync") == nil {
+			confTree.Set("Sync.StagedSync", defaultConfig.Sync.StagedSync)
+			confTree.Set("Sync.StagedSyncCfg", defaultConfig.Sync.StagedSyncCfg)
+		}
+		confTree.Set("Version", "2.5.9")
 		return confTree
 	}
 
