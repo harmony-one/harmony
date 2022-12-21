@@ -971,18 +971,16 @@ func GetHowManyMaxConsensus(blocks []*types.Block) (int, int) {
 }
 
 func (ss *StagedSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) *types.Block {
-	var (
-		candidateBlocks []*types.Block
-		candidateLock   sync.Mutex
-	)
+	var candidateBlocks []*types.Block
 
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
+		peerConfig.mux.Lock()
+		defer peerConfig.mux.Unlock()
+
 		for _, block := range peerConfig.newBlocks {
 			ph := block.ParentHash()
 			if bytes.Equal(ph[:], parentHash[:]) {
-				candidateLock.Lock()
 				candidateBlocks = append(candidateBlocks, block)
-				candidateLock.Unlock()
 				break
 			}
 		}
