@@ -406,7 +406,7 @@ func CreateView(ctx context.Context, db kv.RwDB, tx kv.Tx, f func(tx kv.Tx) erro
 	if tx != nil {
 		return f(tx)
 	}
-	return db.View(context.Background(), func(etx kv.Tx) error {
+	return db.View(ctx, func(etx kv.Tx) error {
 		return f(etx)
 	})
 }
@@ -977,9 +977,6 @@ func (ss *StagedSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash)
 	)
 
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
-		peerConfig.mux.Lock()
-		defer peerConfig.mux.Unlock()
-
 		for _, block := range peerConfig.newBlocks {
 			ph := block.ParentHash()
 			if bytes.Equal(ph[:], parentHash[:]) {

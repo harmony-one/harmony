@@ -44,6 +44,9 @@ const (
 	numPeersHighBound = 5
 
 	downloadTaskBatch = 5
+
+	//LoopMinTime sync loop must take at least as this value, otherwise it waits for it
+	LoopMinTime = 0
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -1065,6 +1068,7 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 	}
 
 	for {
+		start := time.Now()
 		otherHeight := getMaxPeerHeight(ss.syncConfig)
 		currentHeight := bc.CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
@@ -1091,6 +1095,14 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 			break
 		}
 		ss.purgeOldBlocksFromCache()
+
+		if loopMinTime != 0 {
+			waitTime := loopMinTime - time.Since(start)
+			c := time.After(waitTime)
+			select {
+			case <-c:
+			}
+		}
 	}
 	if consensus != nil {
 		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
