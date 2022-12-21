@@ -311,7 +311,7 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
 		}
-		syncInstance.SyncLoop(bc, worker, false, node.Consensus, 0)
+		syncInstance.SyncLoop(bc, worker, false, node.Consensus, legacysync.LoopMinTime)
 		if willJoinConsensus {
 			node.IsSynchronized.Set()
 			node.Consensus.BlocksSynchronized()
