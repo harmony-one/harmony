@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
-	libp2p_host "github.com/libp2p/go-libp2p-core/host"
-	libp2p_network "github.com/libp2p/go-libp2p-core/network"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
+	libp2p_host "github.com/libp2p/go-libp2p/core/host"
+	libp2p_network "github.com/libp2p/go-libp2p/core/network"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
+	libp2p_peerstore "github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -117,7 +117,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	p2pHost, err := libp2p.New(ctx,
+	p2pHost, err := libp2p.New(
 		libp2p.ListenAddrs(listenAddr),
 		libp2p.Identity(key),
 		libp2p.EnableNATService(),
