@@ -40,8 +40,6 @@ const (
 )
 
 type engineImpl struct {
-	beacon engine.ChainReader
-
 	// Caching field
 	epochCtxCache    *lru.Cache // epochCtxKey -> epochCtx
 	verifiedSigCache *lru.Cache // verifiedSigKey -> struct{}{}
@@ -52,19 +50,9 @@ func NewEngine() *engineImpl {
 	sigCache, _ := lru.New(verifiedSigCache)
 	epochCtxCache, _ := lru.New(epochCtxCache)
 	return &engineImpl{
-		beacon:           nil,
 		epochCtxCache:    epochCtxCache,
 		verifiedSigCache: sigCache,
 	}
-}
-
-func (e *engineImpl) Beaconchain() engine.ChainReader {
-	return e.beacon
-}
-
-// SetBeaconchain assigns the beaconchain handle used
-func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
-	e.beacon = beaconchain
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
@@ -274,7 +262,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 // setting the final state and assembling the block.
 // sigsReady signal indicates whether the commit sigs are populated in the header object.
 func (e *engineImpl) Finalize(
-	chain engine.ChainReader, header *block.Header,
+	chain engine.ChainReader, beacon engine.ChainReader, header *block.Header,
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
@@ -324,7 +312,7 @@ func (e *engineImpl) Finalize(
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewardsAndCountSigs(
-		chain, state, header, e.Beaconchain(), sigsReady,
+		chain, state, header, beacon, sigsReady,
 	)
 	if err != nil {
 		return nil, nil, err
