@@ -3,7 +3,6 @@ package legacysync
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
@@ -56,9 +55,6 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) 
 	if err := checkPeersDuplicity(peers); err != nil {
 		return syncConfig, err
 	}
-	// limit the number of dns peers to connect
-	randSeed := time.Now().UnixNano()
-	peers = limitNumPeers(peers, randSeed)
 
 	utils.Logger().Debug().
 		Int("len", len(peers)).
@@ -78,7 +74,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) 
 		wg.Add(1)
 		go func(peer p2p.Peer) {
 			defer wg.Done()
-			client := downloader.ClientSetup(peer.IP, peer.Port)
+			client := downloader.ClientSetup(peer.IP, peer.Port, false)
 			if client == nil {
 				return
 			}

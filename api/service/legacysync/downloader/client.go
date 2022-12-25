@@ -8,6 +8,7 @@ import (
 	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 )
 
 // Client is the client model for downloader package.
@@ -18,9 +19,12 @@ type Client struct {
 }
 
 // ClientSetup setups a Client given ip and port.
-func ClientSetup(ip, port string) *Client {
+func ClientSetup(ip, port string, withBlock bool) *Client {
 	client := Client{}
 	client.opts = append(client.opts, grpc.WithInsecure())
+	if withBlock {
+		client.opts = append(client.opts, grpc.WithBlock())
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -33,6 +37,37 @@ func ClientSetup(ip, port string) *Client {
 	utils.Logger().Debug().Str("ip", ip).Msg("[SYNC] grpc connect successfully")
 	client.dlClient = pb.NewDownloaderClient(client.conn)
 	return &client
+}
+
+// IsReady returns true if client is ready
+func (client *Client) IsReady() bool {
+	return client.conn.GetState() == connectivity.Ready
+}
+
+// IsConnecting returns true if client is connecting
+func (client *Client) IsConnecting() bool {
+	return client.conn.GetState() == connectivity.Connecting
+}
+
+// State returns current Connecting state
+func (client *Client) State() connectivity.State {
+	return client.conn.GetState()
+}
+
+// WaitForConnection waits for client to connect
+func (client *Client) WaitForConnection(t time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), t)
+	defer cancel()
+
+	if client.conn.GetState() == connectivity.Ready {
+		return true
+	}
+
+	if ready := client.conn.WaitForStateChange(ctx, client.conn.GetState()); !ready {
+		return false
+	} else {
+		return client.conn.GetState() == connectivity.Ready
+	}
 }
 
 // Close closes the Client.
