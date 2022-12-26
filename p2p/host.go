@@ -80,14 +80,15 @@ const (
 
 // HostConfig is the config structure to create a new host
 type HostConfig struct {
-	Self                 *Peer
-	BLSKey               libp2p_crypto.PrivKey
-	BootNodes            []string
-	DataStoreFile        *string
-	DiscConcurrency      int
-	MaxConnPerIP         int
-	DisablePrivateIPScan bool
-	MaxPeers             int64
+	Self                     *Peer
+	BLSKey                   libp2p_crypto.PrivKey
+	BootNodes                []string
+	DataStoreFile            *string
+	DiscConcurrency          int
+	MaxConnPerIP             int
+	DisablePrivateIPScan     bool
+	MaxPeers                 int64
+	WaitForEachPeerToConnect bool
 }
 
 func init() {

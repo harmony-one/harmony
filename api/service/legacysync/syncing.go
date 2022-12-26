@@ -174,7 +174,8 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 
-	peer.client.Close()
+	closeReason := fmt.Sprintf("remove peer (reason: %s)", reason)
+	peer.client.Close(closeReason)
 	for i, p := range sc.peers {
 		if p == peer {
 			sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
@@ -288,7 +289,7 @@ func (sc *SyncConfig) CloseConnections() {
 	sc.mtx.RLock()
 	defer sc.mtx.RUnlock()
 	for _, pc := range sc.peers {
-		pc.client.Close()
+		pc.client.Close("close all connections")
 	}
 }
 
@@ -363,9 +364,9 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32) error {
+func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error {
 	var err error
-	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID)
+	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, waitForEachPeerToConnect)
 	return err
 }
 
@@ -387,16 +388,16 @@ func checkPeersDuplicity(ps []p2p.Peer) error {
 }
 
 // limitNumPeers limits number of peers to release some server end sources.
-func limitNumPeers(ps []p2p.Peer, randSeed int64) []p2p.Peer {
+func limitNumPeers(ps []p2p.Peer, randSeed int64) (int, []p2p.Peer) {
 	targetSize := calcNumPeersWithBound(len(ps), NumPeersLowBound, numPeersHighBound)
 	if len(ps) <= targetSize {
-		return ps
+		return len(ps), ps
 	}
 
 	r := rand.New(rand.NewSource(randSeed))
 	r.Shuffle(len(ps), func(i, j int) { ps[i], ps[j] = ps[j], ps[i] })
 
-	return ps[:targetSize]
+	return targetSize, ps
 }
 
 // Peers are expected to limited at half of the size, capped between lowBound and highBound.
@@ -462,19 +463,20 @@ func (sc *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]
 func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	fixedPeer := sc.peers[maxFirstID]
 
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[SYNC] before cleanUpPeers")
+	var removedPeers int
 	for i := 0; i < len(sc.peers); i++ {
 		if CompareSyncPeerConfigByblockHashes(fixedPeer, sc.peers[i]) != 0 {
 			// TODO: move it into a util delete func.
 			// See tip https://github.com/golang/go/wiki/SliceTricks
 			// Close the client and remove the peer out of the
-			sc.peers[i].client.Close()
+			sc.peers[i].client.Close("cleanup peers")
 			copy(sc.peers[i:], sc.peers[i+1:])
 			sc.peers[len(sc.peers)-1] = nil
 			sc.peers = sc.peers[:len(sc.peers)-1]
+			removedPeers++
 		}
 	}
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[SYNC] post cleanUpPeers")
+	utils.Logger().Info().Int("removed peers", removedPeers).Msg("[SYNC] post cleanUpPeers")
 }
 
 // GetBlockHashesConsensusAndCleanUp selects the most common peer config based on their block hashes to download/sync.

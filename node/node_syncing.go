@@ -253,7 +253,7 @@ func (node *Node) doBeaconSyncing() {
 				continue
 			}
 
-			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID); err != nil {
+			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
 				utils.Logger().Warn().Err(err).Msg("[EPOCHSYNC] cannot create beacon sync config")
 				continue
 			}
@@ -296,7 +296,7 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 				Msg("cannot retrieve syncing peers")
 			return
 		}
-		if err := syncInstance.CreateSyncConfig(peers, shardID); err != nil {
+		if err := node.stateSync.CreateSyncConfig(peers, shardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Interface("peers", peers).
@@ -416,7 +416,7 @@ func (node *Node) SendNewBlockToUnsync() {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
 				utils.Logger().Warn().Str("peerID", peerID).Msg("[SYNC] SendNewBlockToUnsync to peer timeout")
-				node.peerRegistrationRecord[peerID].client.Close()
+				node.peerRegistrationRecord[peerID].client.Close("send new block to peer timeout")
 				delete(node.peerRegistrationRecord, peerID)
 				continue
 			}
@@ -425,13 +425,13 @@ func (node *Node) SendNewBlockToUnsync() {
 				sendBytes = blockWithSigBytes
 			}
 			response, err := config.client.PushNewBlock(node.GetSyncID(), sendBytes, false)
-			// close the connection if cannot push new block to unsync node
+			// close the connection if cannot push new block to not synchronized node
 			if err != nil {
-				node.peerRegistrationRecord[peerID].client.Close()
+				node.peerRegistrationRecord[peerID].client.Close("cannot push new block to not synchronized node")
 				delete(node.peerRegistrationRecord, peerID)
 			}
 			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
-				node.peerRegistrationRecord[peerID].client.Close()
+				node.peerRegistrationRecord[peerID].client.Close("node is synchronized")
 				delete(node.peerRegistrationRecord, peerID)
 			}
 		}

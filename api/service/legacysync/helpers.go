@@ -3,6 +3,7 @@ package legacysync
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
@@ -50,18 +51,22 @@ func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
 	return maxHeight
 }
 
-func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) (*SyncConfig, error) {
+func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) (*SyncConfig, error) {
 	// sanity check to ensure no duplicate peers
 	if err := checkPeersDuplicity(peers); err != nil {
 		return syncConfig, err
 	}
+	// limit the number of dns peers to connect
+	randSeed := time.Now().UnixNano()
+	targetSize, peers := limitNumPeers(peers, randSeed)
 
 	utils.Logger().Debug().
-		Int("len", len(peers)).
+		Int("peers count", len(peers)).
+		Int("target size", targetSize).
 		Uint32("shardID", shardID).
 		Msg("[SYNC] CreateSyncConfig: len of peers")
 
-	if len(peers) == 0 {
+	if targetSize == 0 {
 		return syncConfig, errors.New("[SYNC] no peers to connect to")
 	}
 	if syncConfig != nil {
@@ -69,14 +74,32 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) 
 	}
 	syncConfig = NewSyncConfig(shardID, nil)
 
-	var wg sync.WaitGroup
-	for _, peer := range peers {
-		wg.Add(1)
-		go func(peer p2p.Peer) {
-			defer wg.Done()
-			client := downloader.ClientSetup(peer.IP, peer.Port, false)
-			if client == nil {
-				return
+	if !waitForEachPeerToConnect {
+		var wg sync.WaitGroup
+		ps := peers[:targetSize]
+		for _, peer := range ps {
+			wg.Add(1)
+			go func(peer p2p.Peer) {
+				defer wg.Done()
+				client := downloader.ClientSetup(peer.IP, peer.Port, false)
+				if client == nil {
+					return
+				}
+				peerConfig := &SyncPeerConfig{
+					ip:     peer.IP,
+					port:   peer.Port,
+					client: client,
+				}
+				syncConfig.AddPeer(peerConfig)
+			}(peer)
+		}
+		wg.Wait()
+	} else {
+		var connectedPeers int
+		for _, peer := range peers {
+			client := downloader.ClientSetup(peer.IP, peer.Port, true)
+			if client == nil || !client.IsReady() {
+				continue
 			}
 			peerConfig := &SyncPeerConfig{
 				ip:     peer.IP,
@@ -84,9 +107,13 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) 
 				client: client,
 			}
 			syncConfig.AddPeer(peerConfig)
-		}(peer)
+			connectedPeers++
+			if connectedPeers >= targetSize {
+				break
+			}
+		}
 	}
-	wg.Wait()
+
 	utils.Logger().Info().
 		Int("len", len(syncConfig.peers)).
 		Uint32("shardID", shardID).

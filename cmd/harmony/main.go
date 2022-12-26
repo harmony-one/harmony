@@ -624,14 +624,15 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
 	myHost, err = p2p.NewHost(p2p.HostConfig{
-		Self:                 &selfPeer,
-		BLSKey:               nodeConfig.P2PPriKey,
-		BootNodes:            hc.Network.BootNodes,
-		DataStoreFile:        hc.P2P.DHTDataStore,
-		DiscConcurrency:      hc.P2P.DiscConcurrency,
-		MaxConnPerIP:         hc.P2P.MaxConnsPerIP,
-		DisablePrivateIPScan: hc.P2P.DisablePrivateIPScan,
-		MaxPeers:             hc.P2P.MaxPeers,
+		Self:                     &selfPeer,
+		BLSKey:                   nodeConfig.P2PPriKey,
+		BootNodes:                hc.Network.BootNodes,
+		DataStoreFile:            hc.P2P.DHTDataStore,
+		DiscConcurrency:          hc.P2P.DiscConcurrency,
+		MaxConnPerIP:             hc.P2P.MaxConnsPerIP,
+		DisablePrivateIPScan:     hc.P2P.DisablePrivateIPScan,
+		MaxPeers:                 hc.P2P.MaxPeers,
+		WaitForEachPeerToConnect: hc.P2P.WaitForEachPeerToConnect,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")

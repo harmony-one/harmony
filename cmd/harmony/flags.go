@@ -579,6 +579,11 @@ var (
 		Usage:    "maximum number of peers allowed, 0 means no limit",
 		DefValue: defaultConfig.P2P.MaxConnsPerIP,
 	}
+	waitForEachPeerToConnectFlag = cli.BoolFlag{
+		Name:     "p2p.wait-for-connections",
+		Usage:    "node waits for each single peer to connect and it doesn't add them to peers list after timeout",
+		DefValue: defaultConfig.P2P.WaitForEachPeerToConnect,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -613,6 +618,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, maxPeersFlag) {
 		config.P2P.MaxPeers = int64(cli.GetIntFlagValue(cmd, maxPeersFlag))
+	}
+
+	if cli.IsFlagChanged(cmd, waitForEachPeerToConnectFlag) {
+		config.P2P.WaitForEachPeerToConnect = cli.GetBoolFlagValue(cmd, waitForEachPeerToConnectFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {
