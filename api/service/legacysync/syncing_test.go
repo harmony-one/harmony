@@ -29,34 +29,46 @@ func TestSyncPeerConfig_IsEqual(t *testing.T) {
 	}{
 		{
 			p1: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "1",
+				},
 			},
 			p2: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "2",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "2",
+				},
 			},
 			exp: false,
 		},
 		{
 			p1: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "1",
+				},
 			},
 			p2: &SyncPeerConfig{
-				ip:   "0.0.0.2",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.2",
+					Port: "1",
+				},
 			},
 			exp: false,
 		},
 		{
 			p1: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "1",
+				},
 			},
 			p2: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "1",
+				},
 			},
 			exp: true,
 		},

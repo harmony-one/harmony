@@ -259,7 +259,7 @@ func (node *Node) doBeaconSyncing() {
 			}
 		}
 
-		<-time.After(node.epochSync.SyncLoop(node.EpochChain(), true, nil))
+		<-time.After(node.epochSync.SyncLoop(node.EpochChain(), nil))
 	}
 }
 
