@@ -663,7 +663,7 @@ func (ss *StagedSync) AddNewBlock(peerHash []byte, block *types.Block) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32) error {
+func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error {
 	// sanity check to ensure no duplicate peers
 	if err := checkPeersDuplicity(peers); err != nil {
 		return err

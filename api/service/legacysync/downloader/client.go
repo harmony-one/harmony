@@ -16,6 +16,7 @@ type Client struct {
 	dlClient pb.DownloaderClient
 	opts     []grpc.DialOption
 	conn     *grpc.ClientConn
+	addr     string
 }
 
 // ClientSetup setups a Client given ip and port.
@@ -28,8 +29,9 @@ func ClientSetup(ip, port string, withBlock bool) *Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	client.addr = fmt.Sprintf("%s:%s", ip, port)
 	var err error
-	client.conn, err = grpc.DialContext(ctx, fmt.Sprintf(ip+":"+port), client.opts...)
+	client.conn, err = grpc.DialContext(ctx, client.addr, client.opts...)
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("ip", ip).Msg("[SYNC] client.go:ClientSetup fail to dial")
 		return nil
@@ -71,11 +73,18 @@ func (client *Client) WaitForConnection(t time.Duration) bool {
 }
 
 // Close closes the Client.
-func (client *Client) Close() {
+func (client *Client) Close(reason string) {
 	err := client.conn.Close()
 	if err != nil {
-		utils.Logger().Info().Msg("[SYNC] unable to close connection")
+		utils.Logger().Info().
+			Str("peerAddress", client.addr).
+			Msg("[SYNC] unable to close peer connection")
+		return
 	}
+	utils.Logger().Info().
+		Str("peerAddress", client.addr).
+		Str("reason", reason).
+		Msg("[SYNC] peer connection closed")
 }
 
 // GetBlockHashes gets block hashes from all the peers by calling grpc request.

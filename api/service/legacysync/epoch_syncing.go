@@ -95,7 +95,7 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 	for {
 		if maxHeight == 0 || maxHeight == math.MaxUint64 {
 			utils.Logger().Info().
-				Msgf("[EPOCHSYNC] No peers to sync (isBeacon: %t, ShardID: %d, peerscount: %d)",
+				Msgf("[EPOCHSYNC] No peers to sync (isBeacon: %t, ShardID: %d, peersCount: %d)",
 					isBeacon, bc.ShardID(), syncConfig.PeersCount())
 			return 10
 		}
@@ -110,7 +110,7 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 		}
 		if otherEpoch < curEpoch {
 			for _, peerCfg := range syncConfig.GetPeers() {
-				syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: current height is higher that others, removve peers: %s", peerCfg.String()))
+				syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: current height is higher that others, remove peers: %s", peerCfg.String()))
 			}
 			return 2
 		}
@@ -202,8 +202,8 @@ func processWithPayload(payload [][]byte, bc core.BlockChain) error {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *EpochSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32) error {
+func (ss *EpochSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error {
 	var err error
-	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID)
+	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, waitForEachPeerToConnect)
 	return err
 }

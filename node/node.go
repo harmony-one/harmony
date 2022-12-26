@@ -86,7 +86,7 @@ type ISync interface {
 	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error
 	AddLastMileBlock(block *types.Block)
 	GetActivePeerNumber() int
-	CreateSyncConfig(peers []p2p.Peer, shardID uint32) error
+	CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error
 	SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration)
 	IsSynchronized() bool
 	IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool)

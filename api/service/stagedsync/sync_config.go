@@ -226,7 +226,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 
-	peer.client.Close()
+	peer.client.Close(reason)
 	for i, p := range sc.peers {
 		if p == peer {
 			sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
@@ -245,7 +245,7 @@ func (sc *SyncConfig) ReplacePeerWithReserved(peer *SyncPeerConfig, reason strin
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 
-	peer.client.Close()
+	peer.client.Close(reason)
 	for i, p := range sc.peers {
 		if p == peer {
 			if len(sc.reservedPeers) > 0 {
@@ -277,7 +277,7 @@ func (sc *SyncConfig) CloseConnections() {
 	sc.mtx.RLock()
 	defer sc.mtx.RUnlock()
 	for _, pc := range sc.peers {
-		pc.client.Close()
+		pc.client.Close("close all connections")
 	}
 }
 
@@ -334,7 +334,7 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 			// TODO: move it into a util delete func.
 			// See tip https://github.com/golang/go/wiki/SliceTricks
 			// Close the client and remove the peer out of the
-			sc.peers[i].client.Close()
+			sc.peers[i].client.Close("close by cleanup function, because blockHashes is not equal to consensus block hashes")
 			copy(sc.peers[i:], sc.peers[i+1:])
 			sc.peers[len(sc.peers)-1] = nil
 			sc.peers = sc.peers[:len(sc.peers)-1]
@@ -347,7 +347,7 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	}
 }
 
-// cleanUpInvalidPeers cleans up all peers whose missed any required block hash or sent any invalid block hash
+// cleanUpInvalidPeers cleans up all peers whose missed a few required block hash or sent an invalid block hash
 // Caller shall ensure mtx is locked for RW.
 func (sc *SyncConfig) cleanUpInvalidPeers(ipm map[string]bool) {
 	sc.mtx.Lock()
@@ -355,7 +355,7 @@ func (sc *SyncConfig) cleanUpInvalidPeers(ipm map[string]bool) {
 	countBeforeCleanUp := len(sc.peers)
 	for i := 0; i < len(sc.peers); i++ {
 		if ipm[string(sc.peers[i].peerHash)] == true {
-			sc.peers[i].client.Close()
+			sc.peers[i].client.Close("cleanup invalid peers, it may missed a few required block hashes or sent an invalid block hash")
 			copy(sc.peers[i:], sc.peers[i+1:])
 			sc.peers[len(sc.peers)-1] = nil
 			sc.peers = sc.peers[:len(sc.peers)-1]
