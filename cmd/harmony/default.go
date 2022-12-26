@@ -190,8 +190,6 @@ var (
 		Downloader:     false,
 		StagedSync:     false,
 		StagedSyncCfg:  defaultStagedSyncConfig,
-		StagedSync:     false,
-		StagedSyncCfg:  defaultStagedSyncConfig,
 		Concurrency:    4,
 		MinPeers:       5,
 		InitStreams:    5,
