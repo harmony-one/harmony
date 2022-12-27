@@ -122,7 +122,7 @@ func (st *testStream) AddFailedTimes() {
 	return
 }
 
-func (st *testStream) ResetFailedRimes() {
+func (st *testStream) ResetFailedTimes() {
 	return
 }
 
