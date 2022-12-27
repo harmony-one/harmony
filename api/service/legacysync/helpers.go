@@ -3,6 +3,7 @@ package legacysync
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
@@ -100,8 +101,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, 
 				continue
 			}
 			peerConfig := &SyncPeerConfig{
-				ip:     peer.IP,
-				port:   peer.Port,
+				peer:   peer,
 				client: client,
 			}
 			syncConfig.AddPeer(peerConfig)
