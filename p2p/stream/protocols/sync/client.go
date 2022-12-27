@@ -43,6 +43,36 @@ func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...
 	return
 }
 
+func (p *Protocol) GetRawBlocksByNumber(ctx context.Context, bns []uint64, opts ...Option) (blockBytes [][]byte, sigBytes [][]byte, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getBlocksByNumber")
+	defer p.doMetricPostClientRequest("getBlocksByNumber", err, timer)
+
+	if len(bns) == 0 {
+		err = fmt.Errorf("zero block numbers requested")
+		return
+	}
+	if len(bns) > GetBlocksByNumAmountCap {
+		err = fmt.Errorf("number of blocks exceed cap of %v", GetBlocksByNumAmountCap)
+		return
+	}
+	req := newGetBlocksByNumberRequest(bns)
+	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
+	if err != nil {
+		// At this point, error can be context canceled, context timed out, or waiting queue
+		// is already full.
+		return
+	}
+
+	// Parse and return blocks
+	sResp, ok := resp.(*syncResponse)
+	if !ok || sResp == nil {
+		err = errors.New("not sync response")
+		return
+	}
+	blockBytes, sigBytes, err = req.parseBlockBytesAndSigs(sResp)
+	return
+}
+
 // GetCurrentBlockNumber get the current block number from remote node
 func (p *Protocol) GetCurrentBlockNumber(ctx context.Context, opts ...Option) (bn uint64, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getBlockNumber")
