@@ -65,8 +65,8 @@ type StagedStreamSync struct {
 	inserted   int
 	config     Config
 	logger     zerolog.Logger
-	status     status //TODO: merge this with currentSyncCycle
-	initSync   bool   // if sets to true, node start long range syncing
+	status     *status //TODO: merge this with currentSyncCycle
+	initSync   bool    // if sets to true, node start long range syncing
 	UseMemDB   bool
 
 	revertPoint     *uint64 // used to run stages
@@ -294,7 +294,7 @@ func New(ctx context.Context,
 		db:           db,
 		protocol:     protocol,
 		gbm:          nil,
-		status:       status,
+		status:       &status,
 		inserted:     0,
 		config:       config,
 		logger:       logger,

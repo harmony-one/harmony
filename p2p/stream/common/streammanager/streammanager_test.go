@@ -209,7 +209,7 @@ func TestStreamSet_numStreamsWithMinProtoID(t *testing.T) {
 		pid1    = testProtoID
 		numPid1 = 5
 
-		pid2    = sttypes.ProtoID("harmony/sync/unitest/0/1.0.1")
+		pid2    = sttypes.ProtoID("harmony/sync/unitest/0/1.0.1/1")
 		numPid2 = 10
 	)
 
