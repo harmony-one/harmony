@@ -17,7 +17,7 @@ var _ StreamManager = &streamManager{}
 
 var (
 	myPeerID    = makePeerID(0)
-	testProtoID = sttypes.ProtoID("harmony/sync/unitest/0/1.0.0")
+	testProtoID = sttypes.ProtoID("harmony/sync/unitest/0/1.0.0/1")
 )
 
 const (
