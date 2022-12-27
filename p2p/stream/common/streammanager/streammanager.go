@@ -410,7 +410,7 @@ func (ss *streamSet) get(id sttypes.StreamID) (sttypes.Stream, bool) {
 	if id == "" {
 		return nil, false
 	}
-	
+
 	st, ok := ss.streams[id]
 	return st, ok
 }

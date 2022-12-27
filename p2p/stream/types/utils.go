@@ -49,8 +49,12 @@ type ProtoSpec struct {
 
 // ToProtoID convert a ProtoSpec to ProtoID.
 func (spec ProtoSpec) ToProtoID() ProtoID {
+	var versionStr string
+	if spec.Version != nil {
+		versionStr = spec.Version.String()
+	}
 	s := fmt.Sprintf(ProtoIDFormat, ProtoIDCommonPrefix, spec.Service,
-		spec.NetworkType, spec.ShardID, spec.Version.String(), bool2int(spec.BeaconNode))
+		spec.NetworkType, spec.ShardID, versionStr, bool2int(spec.BeaconNode))
 	return ProtoID(s)
 }
 
