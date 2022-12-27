@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -78,6 +79,10 @@ type (
 func NewProtocol(config Config) *Protocol {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	isBeaconNode := config.Chain.ShardID() == shard.BeaconChainShardID
+	if _, ok := config.Chain.(*core.EpochChain); ok {
+		isBeaconNode = false
+	}
 	sp := &Protocol{
 		chain:      config.Chain,
 		beaconNode: config.BeaconNode,
