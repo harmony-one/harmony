@@ -74,11 +74,8 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
 
-	// if it is a beacon node or shard node, print the peer id and proto id
-	if protoSpec.BeaconNode || protoSpec.ShardID != shard.BeaconChainShardID {
-		fmt.Println("My peer id: ", host.ID().String())
-		fmt.Println("My proto id: ", pid)
-	}
+	fmt.Println("my peer id: ", host.ID().String())
+	fmt.Println("my proto id: ", pid)
 
 	return &streamManager{
 		myProtoID:     pid,
@@ -240,6 +237,9 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 	}
 	if mySpec.ShardID != rmSpec.ShardID {
 		return fmt.Errorf("unexpected shard ID: %v/%v", rmSpec.ShardID, mySpec.ShardID)
+	}
+	if mySpec.ShardID == shard.BeaconChainShardID && !rmSpec.BeaconNode {
+		return fmt.Errorf("unexpected beacon node with shard ID: %v/%v", rmSpec.ShardID, mySpec.ShardID)
 	}
 	return nil
 }
@@ -417,7 +417,7 @@ func (ss *streamSet) get(id sttypes.StreamID) (sttypes.Stream, bool) {
 	if id == "" {
 		return nil, false
 	}
-
+	
 	st, ok := ss.streams[id]
 	return st, ok
 }

@@ -2,6 +2,7 @@ package stagedstreamsync
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -46,6 +47,9 @@ type Stage struct {
 	// Disabled defines if the stage is disabled. It sets up when the stage is build by its `StageBuilder`.
 	Disabled bool
 }
+
+var ErrStopped = errors.New("stopped")
+var ErrRevert = errors.New("unwound")
 
 // StageState is the state of the stage.
 type StageState struct {
@@ -92,7 +96,6 @@ func (u *RevertState) Done(db kv.Putter) error {
 	return SaveStageProgress(db, u.ID, u.state.isBeacon, u.RevertPoint)
 }
 
-// CleanUpState contains states of cleanup process for a specific stage
 type CleanUpState struct {
 	ID              SyncStageID
 	ForwardProgress uint64 // progress of stage forward move

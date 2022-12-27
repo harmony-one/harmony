@@ -908,22 +908,21 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 
 func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyConfig) {
 	blockchains := []core.BlockChain{node.Blockchain()}
-	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-		blockchains = append(blockchains, node.EpochChain())
+	if !node.IsRunningBeaconChain() {
+		blockchains = append(blockchains, node.Beaconchain())
 	}
 
 	sConfig := stagedstreamsync.Config{
-		ServerOnly:           !hc.Sync.Downloader,
-		Network:              nodeconfig.NetworkType(hc.Network.NetworkType),
-		Concurrency:          hc.Sync.Concurrency,
-		MinStreams:           hc.Sync.MinPeers,
-		InitStreams:          hc.Sync.InitStreams,
-		MaxAdvertiseWaitTime: hc.Sync.MaxAdvertiseWaitTime,
-		SmSoftLowCap:         hc.Sync.DiscSoftLowCap,
-		SmHardLowCap:         hc.Sync.DiscHardLowCap,
-		SmHiCap:              hc.Sync.DiscHighCap,
-		SmDiscBatch:          hc.Sync.DiscBatch,
-		LogProgress:          node.NodeConfig.LogProgress,
+		ServerOnly:   !hc.Sync.Downloader,
+		Network:      nodeconfig.NetworkType(hc.Network.NetworkType),
+		Concurrency:  hc.Sync.Concurrency,
+		MinStreams:   hc.Sync.MinPeers,
+		InitStreams:  hc.Sync.InitStreams,
+		SmSoftLowCap: hc.Sync.DiscSoftLowCap,
+		SmHardLowCap: hc.Sync.DiscHardLowCap,
+		SmHiCap:      hc.Sync.DiscHighCap,
+		SmDiscBatch:  hc.Sync.DiscBatch,
+		LogProgress:  node.NodeConfig.LogProgress,
 	}
 
 	// If we are running side chain, we will need to do some extra works for beacon

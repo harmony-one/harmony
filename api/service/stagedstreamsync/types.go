@@ -270,7 +270,7 @@ func (q priorityQueue) Swap(i, j int) {
 func (q *priorityQueue) Push(x interface{}) {
 	item, ok := x.(bnPrioritizedItem)
 	if !ok {
-		panic(ErrWrongGetBlockNumberType)
+		panic("wrong type of getBlockNumber interface")
 	}
 	*q = append(*q, item)
 }

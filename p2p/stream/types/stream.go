@@ -23,7 +23,7 @@ type Stream interface {
 	CloseOnExit() error
 	FailedTimes() int
 	AddFailedTimes()
-	ResetFailedTimes()
+	ResetFailedRimes()
 }
 
 // BaseStream is the wrapper around
@@ -86,7 +86,7 @@ func (st *BaseStream) AddFailedTimes() {
 	st.failedTimes++
 }
 
-func (st *BaseStream) ResetFailedTimes() {
+func (st *BaseStream) ResetFailedRimes() {
 	st.failedTimes = 0
 }
 

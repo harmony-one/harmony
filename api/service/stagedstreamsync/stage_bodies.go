@@ -170,7 +170,7 @@ func (b *StageBodies) runBlockWorkerLoop(gbm *blockDownloadManager, wg *sync.Wai
 			gbm.HandleRequestError(batch, err, stid)
 		} else {
 			if err = b.saveBlocks(gbm.tx, batch, blockBytes, sigBytes, loopID, stid); err != nil {
-				panic(ErrSaveBlocksToDbFailed)
+				panic("[STAGED_STREAM_SYNC] saving downloaded blocks to db failed.")
 			}
 			gbm.HandleRequestResult(batch, blockBytes, sigBytes, loopID, stid)
 			if b.configs.logProgress {

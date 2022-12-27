@@ -6,7 +6,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 )
@@ -51,7 +50,12 @@ func (sr *StageShortRange) Exec(firstCycle bool, invalidBlockRevert bool, s *Sta
 		return nil
 	}
 
-	if sr.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+	if _, ok := sr.configs.bc.(*core.EpochChain); ok {
+		return nil
+	}
+
+	curBN := sr.configs.bc.CurrentBlock().NumberU64()
+	if curBN >= s.state.status.targetBN {
 		return nil
 	}
 
@@ -105,7 +109,8 @@ func (sr *StageShortRange) doShortRangeSync(s *StageState) (int, error) {
 		return 0, errors.Wrap(err, "prerequisite")
 	}
 	curBN := sr.configs.bc.CurrentBlock().NumberU64()
-	blkNums := sh.prepareBlockHashNumbers(curBN)
+	blkCount := int(s.state.status.targetBN) - int(curBN)
+	blkNums := sh.prepareBlockHashNumbers(curBN, blkCount)
 	hashChain, whitelist, err := sh.getHashChain(blkNums)
 	if err != nil {
 		return 0, errors.Wrap(err, "getHashChain")

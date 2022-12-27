@@ -38,7 +38,6 @@ var Buckets = []string{
 func CreateStagedSync(ctx context.Context,
 	bc core.BlockChain,
 	UseMemDB bool,
-	isBeaconNode bool,
 	protocol syncProtocol,
 	config Config,
 	logger zerolog.Logger,
@@ -88,7 +87,6 @@ func CreateStagedSync(ctx context.Context,
 		stages,
 		isBeacon,
 		protocol,
-		isBeaconNode,
 		UseMemDB,
 		config,
 		logger,
@@ -136,7 +134,6 @@ func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB, concurrency int)
 	return nil
 }
 
-// GetBlockDbPath returns the path of the cache database which stores blocks
 func GetBlockDbPath(beacon bool, loopID int) string {
 	if beacon {
 		if loopID >= 0 {
@@ -316,7 +313,7 @@ func (s *StagedStreamSync) estimateCurrentNumber() (uint64, error) {
 			return 0, s.ctx.Err()
 		default:
 		}
-		return 0, ErrZeroBlockResponse
+		return 0, errors.New("zero block number response from remote nodes")
 	}
 	bn := computeBlockNumberByMaxVote(cnResults)
 	return bn, nil

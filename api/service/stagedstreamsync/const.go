@@ -21,11 +21,11 @@ const (
 	SoftQueueCap int = 100
 
 	// DefaultConcurrency is the default settings for concurrency
-	DefaultConcurrency int = 4
+	DefaultConcurrency = 4
 
 	// ShortRangeTimeout is the timeout for each short range sync, which allow short range sync
 	// to restart automatically when stuck in `getBlockHashes`
-	ShortRangeTimeout time.Duration = 1 * time.Minute
+	ShortRangeTimeout = 1 * time.Minute
 )
 
 type (
@@ -36,11 +36,11 @@ type (
 		ServerOnly bool
 
 		// parameters
-		Network              nodeconfig.NetworkType
-		Concurrency          int // Number of concurrent sync requests
-		MinStreams           int // Minimum number of streams to do sync
-		InitStreams          int // Number of streams requirement for initial bootstrap
-		MaxAdvertiseWaitTime int // maximum time duration between protocol advertisements
+		Network     nodeconfig.NetworkType
+		Concurrency int // Number of concurrent sync requests
+		MinStreams  int // Minimum number of streams to do sync
+		InitStreams int // Number of streams requirement for initial bootstrap
+
 		// stream manager config
 		SmSoftLowCap int
 		SmHardLowCap int

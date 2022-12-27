@@ -16,7 +16,6 @@ const (
 	Finish      SyncStageID = "Finish"      // Nominal stage after all other stages
 )
 
-// GetStageName returns the stage name in string
 func GetStageName(stage string, isBeacon bool, prune bool) string {
 	name := stage
 	if isBeacon {
@@ -28,9 +27,16 @@ func GetStageName(stage string, isBeacon bool, prune bool) string {
 	return name
 }
 
-// GetStageID returns the stage name in bytes
 func GetStageID(stage SyncStageID, isBeacon bool, prune bool) []byte {
 	return []byte(GetStageName(string(stage), isBeacon, prune))
+}
+
+func GetBucketName(bucketName string, isBeacon bool) string {
+	name := bucketName
+	if isBeacon {
+		name = "Beacon" + name
+	}
+	return name
 }
 
 // GetStageProgress retrieves saved progress of a given sync stage from the database
@@ -59,7 +65,6 @@ func GetStageCleanUpProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (ui
 	return unmarshalData(v)
 }
 
-// SaveStageCleanUpProgress stores the progress of the clean up for a given sync stage to the database
 func SaveStageCleanUpProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
 	stgID := GetStageID(stage, isBeacon, true)
 	return db.Put(kv.SyncStageProgress, stgID, marshalData(progress))
