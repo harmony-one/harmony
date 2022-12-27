@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -78,9 +79,13 @@ type (
 func NewProtocol(config Config) *Protocol {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	isBeaconNode := config.Chain.ShardID() == shard.BeaconChainShardID
+	if _, ok := config.Chain.(*core.EpochChain); ok {
+		isBeaconNode = false
+	}
 	sp := &Protocol{
 		chain:      config.Chain,
-		beaconNode: config.BeaconNode,
+		beaconNode: isBeaconNode,
 		disc:       config.Discovery,
 		config:     config,
 		ctx:        ctx,
@@ -180,7 +185,7 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 			Msg("failed to add new stream")
 		return
 	}
-	fmt.Println("Connected to", raw.Conn().RemotePeer().String(), "(", st.ProtoID(), ")")
+	fmt.Println("Node connected to", raw.Conn().RemotePeer().String(), "(", st.ProtoID(), ")")
 	st.run()
 }
 
@@ -248,17 +253,6 @@ func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 		ShardID:     p.config.ShardID,
 		Version:     v,
 		BeaconNode:  p.beaconNode,
-	}
-	return spec.ToProtoID()
-}
-
-func (p *Protocol) protoIDByVersionForShardNodes(v *version.Version) sttypes.ProtoID {
-	spec := sttypes.ProtoSpec{
-		Service:     serviceSpecifier,
-		NetworkType: p.config.Network,
-		ShardID:     p.config.ShardID,
-		Version:     v,
-		BeaconNode:  false,
 	}
 	return spec.ToProtoID()
 }

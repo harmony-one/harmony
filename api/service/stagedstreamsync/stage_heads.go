@@ -73,6 +73,8 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockRevert bool, s *Stage
 	}
 
 	if currentHeight >= maxHeight {
+		utils.Logger().Info().Uint64("current number", currentHeight).Uint64("target number", maxHeight).
+			Msg(WrapStagedSyncMsg("early return of long range sync"))
 		return nil
 	}
 

@@ -6,9 +6,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -24,12 +28,11 @@ type (
 		syncProtocol       syncProtocol
 		bh                 *beaconHelper
 		stagedSyncInstance *StagedStreamSync
-		isBeaconNode       bool
 
 		downloadC chan struct{}
 		closeC    chan struct{}
 		ctx       context.Context
-		cancel    context.CancelFunc
+		cancel    func()
 
 		config Config
 		logger zerolog.Logger
@@ -37,21 +40,20 @@ type (
 )
 
 // NewDownloader creates a new downloader
-func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config Config) *Downloader {
+func NewDownloader(host p2p.Host, bc core.BlockChain, config Config) *Downloader {
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{
-		Chain:                bc,
-		Host:                 host.GetP2PHost(),
-		Discovery:            host.GetDiscovery(),
-		ShardID:              nodeconfig.ShardID(bc.ShardID()),
-		Network:              config.Network,
-		BeaconNode:           isBeaconNode,
-		MaxAdvertiseWaitTime: config.MaxAdvertiseWaitTime,
-		SmSoftLowCap:         config.SmSoftLowCap,
-		SmHardLowCap:         config.SmHardLowCap,
-		SmHiCap:              config.SmHiCap,
-		DiscBatch:            config.SmDiscBatch,
+		Chain:     bc,
+		Host:      host.GetP2PHost(),
+		Discovery: host.GetDiscovery(),
+		ShardID:   nodeconfig.ShardID(bc.ShardID()),
+		Network:   config.Network,
+
+		SmSoftLowCap: config.SmSoftLowCap,
+		SmHardLowCap: config.SmHardLowCap,
+		SmHiCap:      config.SmHiCap,
+		DiscBatch:    config.SmDiscBatch,
 	})
 
 	host.AddStreamProtocol(sp)
@@ -61,16 +63,13 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config 
 		bh = newBeaconHelper(bc, config.BHConfig.BlockC, config.BHConfig.InsertHook)
 	}
 
-	logger := utils.Logger().With().
-		Str("module", "staged stream sync").
-		Uint32("ShardID", bc.ShardID()).Logger()
+	logger := utils.Logger().With().Str("module", "StagedStreamSync").Uint32("ShardID", bc.ShardID()).Logger()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	//TODO: use mem db should be in config file
-	stagedSyncInstance, err := CreateStagedSync(ctx, bc, false, isBeaconNode, sp, config, logger, config.LogProgress)
+	stagedSyncInstance, err := CreateStagedSync(ctx, bc, false, sp, config, logger, config.LogProgress)
 	if err != nil {
-		cancel()
 		return nil
 	}
 
@@ -79,7 +78,6 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config 
 		syncProtocol:       sp,
 		bh:                 bh,
 		stagedSyncInstance: stagedSyncInstance,
-		isBeaconNode:       isBeaconNode,
 
 		downloadC: make(chan struct{}),
 		closeC:    make(chan struct{}),
@@ -95,6 +93,7 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config 
 func (d *Downloader) Start() {
 	go func() {
 		d.waitForBootFinish()
+		fmt.Printf("boot completed for shard %d, %d streams are connected\n", d.bc.ShardID(), d.syncProtocol.NumStreams())
 		d.loop()
 	}()
 
@@ -128,7 +127,7 @@ func (d *Downloader) NumPeers() int {
 	return d.syncProtocol.NumStreams()
 }
 
-// SyncStatus returns the current sync status
+// IsSyncing returns the current sync status
 func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
 	syncing, target := d.stagedSyncInstance.status.get()
 	if !syncing {
@@ -177,7 +176,6 @@ func (d *Downloader) waitForBootFinish() {
 
 		case <-checkCh:
 			if d.syncProtocol.NumStreams() >= d.config.InitStreams {
-				fmt.Printf("boot completed for shard %d ( %d streams are connected )\n", d.bc.ShardID(), d.syncProtocol.NumStreams())
 				return
 			}
 		case <-d.closeC:
@@ -189,11 +187,7 @@ func (d *Downloader) waitForBootFinish() {
 func (d *Downloader) loop() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	// for shard chain and beacon chain node, first we start with initSync=true to
-	// make sure it goes through the long range sync first.
-	// for epoch chain we do only need to go through epoch sync process
-	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
-
+	initSync := d.bc.ShardID() != shard.BeaconChainShardID
 	trigger := func() {
 		select {
 		case d.downloadC <- struct{}{}:
@@ -223,7 +217,7 @@ func (d *Downloader) loop() {
 					}
 				}
 
-				// If any error happens, sleep 5 seconds and retry
+				// If error happens, sleep 5 seconds and retry
 				d.logger.Error().
 					Err(err).
 					Bool("initSync", initSync).
@@ -233,28 +227,77 @@ func (d *Downloader) loop() {
 					trigger()
 				}()
 				time.Sleep(1 * time.Second)
-				break
+				continue
 			}
-			if initSync {
-				d.logger.Info().Int("block added", addedBN).
-					Uint64("current height", d.bc.CurrentBlock().NumberU64()).
-					Bool("initSync", initSync).
-					Uint32("shard", d.bc.ShardID()).
-					Msg(WrapStagedSyncMsg("sync finished"))
-			}
+			d.logger.Info().Int("block added", addedBN).
+				Uint64("current height", d.bc.CurrentBlock().NumberU64()).
+				Bool("initSync", initSync).
+				Uint32("shard", d.bc.ShardID()).
+				Msg(WrapStagedSyncMsg("sync finished"))
 
 			if addedBN != 0 {
 				// If block number has been changed, trigger another sync
+				// and try to add last mile from pub-sub (blocking)
 				go trigger()
+				if d.bh != nil {
+					d.bh.insertSync()
+				}
 			}
-			// try to add last mile from pub-sub (blocking)
-			if d.bh != nil {
-				d.bh.insertSync()
-			}
+			d.stagedSyncInstance.initSync = false
 			initSync = false
 
 		case <-d.closeC:
 			return
 		}
 	}
+}
+
+var emptySigVerifyErr *sigVerifyErr
+
+type sigVerifyErr struct {
+	err error
+}
+
+func (e *sigVerifyErr) Error() string {
+	return fmt.Sprintf("[VerifyHeaderSignature] %v", e.err.Error())
+}
+
+func verifyAndInsertBlocks(bc blockChain, blocks types.Blocks) (int, error) {
+	for i, block := range blocks {
+		if err := verifyAndInsertBlock(bc, block, blocks[i+1:]...); err != nil {
+			return i, err
+		}
+	}
+	return len(blocks), nil
+}
+
+func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*types.Block) error {
+	var (
+		sigBytes bls.SerializedSignature
+		bitmap   []byte
+		err      error
+	)
+	if len(nextBlocks) > 0 {
+		// get commit sig from the next block
+		next := nextBlocks[0]
+		sigBytes = next.Header().LastCommitSignature()
+		bitmap = next.Header().LastCommitBitmap()
+	} else {
+		// get commit sig from current block
+		sigBytes, bitmap, err = chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
+		if err != nil {
+			return errors.Wrap(err, "parse commitSigAndBitmap")
+		}
+	}
+
+	if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sigBytes, bitmap); err != nil {
+		return &sigVerifyErr{err}
+	}
+	if err := bc.Engine().VerifyHeader(bc, block.Header(), true); err != nil {
+		return errors.Wrap(err, "[VerifyHeader]")
+	}
+	if _, err := bc.InsertChain(types.Blocks{block}, false); err != nil {
+		return errors.Wrap(err, "[InsertChain]")
+	}
+	return nil
 }
