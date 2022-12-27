@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	syncproto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -85,13 +84,6 @@ type StagedStreamSync struct {
 	evtDownloadFinishedSubscribed bool
 	evtDownloadStarted            event.Feed // channel for each download has started
 	evtDownloadStartedSubscribed  bool
-}
-
-// BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
-// The block is encoded as block + commit signature
-type BlockWithSig struct {
-	Block              *types.Block
-	CommitSigAndBitmap []byte
 }
 
 type Timing struct {
@@ -185,7 +177,7 @@ func (s *StagedStreamSync) IsAfter(stage1, stage2 SyncStageID) bool {
 
 func (s *StagedStreamSync) RevertTo(revertPoint uint64, invalidBlockNumber uint64, invalidBlockHash common.Hash, invalidBlockStreamID sttypes.StreamID) {
 	utils.Logger().Info().
-		Interface("invalidBlockNumber", invalidBlockNumber).
+		Uint64("invalidBlockNumber", invalidBlockNumber).
 		Interface("invalidBlockHash", invalidBlockHash).
 		Interface("invalidBlockStreamID", invalidBlockStreamID).
 		Uint64("revertPoint", revertPoint).
