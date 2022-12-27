@@ -39,6 +39,7 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/pprof"
 	"github.com/harmony-one/harmony/api/service/prometheus"
+	"github.com/harmony-one/harmony/api/service/stagedstreamsync"
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/common/ntp"
@@ -415,7 +416,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 
 	// Setup services
 	if hc.Sync.Enabled {
-		setupSyncService(currentNode, myHost, hc)
+		if hc.Sync.StagedSync {
+			setupStagedSyncService(currentNode, myHost, hc)
+		} else {
+			setupSyncService(currentNode, myHost, hc)
+		}
 	}
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		currentNode.RegisterValidatorServices()
@@ -899,6 +904,45 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 	s := synchronize.NewService(host, blockchains, dConfig)
 
 	node.RegisterService(service.Synchronize, s)
+
+	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
+	if hc.Sync.Downloader && hc.General.NodeType != nodeTypeExplorer {
+		node.Consensus.SetDownloader(d) // Set downloader when stream client is active
+	}
+}
+
+func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyConfig) {
+	blockchains := []core.BlockChain{node.Blockchain()}
+	if !node.IsRunningBeaconChain() {
+		blockchains = append(blockchains, node.Beaconchain())
+	}
+
+	sConfig := stagedstreamsync.Config{
+		ServerOnly:   !hc.Sync.Downloader,
+		Network:      nodeconfig.NetworkType(hc.Network.NetworkType),
+		Concurrency:  hc.Sync.Concurrency,
+		MinStreams:   hc.Sync.MinPeers,
+		InitStreams:  hc.Sync.InitStreams,
+		SmSoftLowCap: hc.Sync.DiscSoftLowCap,
+		SmHardLowCap: hc.Sync.DiscHardLowCap,
+		SmHiCap:      hc.Sync.DiscHighCap,
+		SmDiscBatch:  hc.Sync.DiscBatch,
+		LogProgress:  node.NodeConfig.LogProgress,
+	}
+
+	// If we are running side chain, we will need to do some extra works for beacon
+	// sync.
+	if !node.IsRunningBeaconChain() {
+		sConfig.BHConfig = &stagedstreamsync.BeaconHelperConfig{
+			BlockC:     node.BeaconBlockChannel,
+			InsertHook: node.BeaconSyncHook,
+		}
+	}
+
+	//Setup stream sync service
+	s := stagedstreamsync.NewService(host, blockchains, sConfig)
+
+	node.RegisterService(service.StagedStreamSync, s)
 
 	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
 	if hc.Sync.Downloader && hc.General.NodeType != nodeTypeExplorer {
