@@ -22,11 +22,11 @@ import (
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	legdownloader "github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
+	"github.com/harmony-one/harmony/api/service/stagedstreamsync"
 	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy/downloader"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -811,7 +811,7 @@ func (node *Node) legacySyncStatus(shardID uint32) (bool, uint64, uint64) {
 	}
 }
 
-// IsOutOfSync return whether the node is out of sync of the given hsardID
+// IsOutOfSync return whether the node is out of sync of the given shardID
 func (node *Node) IsOutOfSync(shardID uint32) bool {
 	ds := node.getDownloaders()
 	if ds == nil || !ds.IsActive() {
@@ -859,14 +859,36 @@ func (node *Node) SyncPeers() map[string]int {
 	return res
 }
 
-func (node *Node) getDownloaders() *downloader.Downloaders {
-	syncService := node.serviceManager.GetService(service.Synchronize)
-	if syncService == nil {
-		return nil
+type Downloaders interface {
+	Start()
+	Close()
+	DownloadAsync(shardID uint32)
+	// GetShardDownloader(shardID uint32) *Downloader
+	NumPeers() map[uint32]int
+	SyncStatus(shardID uint32) (bool, uint64, uint64)
+	IsActive() bool
+}
+
+func (node *Node) getDownloaders() Downloaders {
+	if node.NodeConfig.StagedSync {
+		syncService := node.serviceManager.GetService(service.StagedStreamSync)
+		if syncService == nil {
+			return nil
+		}
+		dsService, ok := syncService.(*stagedstreamsync.StagedStreamSyncService)
+		if !ok {
+			return nil
+		}
+		return dsService.Downloaders
+	} else {
+		syncService := node.serviceManager.GetService(service.Synchronize)
+		if syncService == nil {
+			return nil
+		}
+		dsService, ok := syncService.(*synchronize.Service)
+		if !ok {
+			return nil
+		}
+		return dsService.Downloaders
 	}
-	dsService, ok := syncService.(*synchronize.Service)
-	if !ok {
-		return nil
-	}
-	return dsService.Downloaders
 }

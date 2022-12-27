@@ -94,3 +94,6 @@ explorer_storage_*
 
 # pprof profiles
 profiles/*.pb.gz
+
+# cache db
+cache_*_db

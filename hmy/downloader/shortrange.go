@@ -20,7 +20,7 @@ import (
 // doShortRangeSync does the short range sync.
 // Compared with long range sync, short range sync is more focused on syncing to the latest block.
 // It consist of 3 steps:
-// 1. Obtain the block hashes and ompute the longest hash chain..
+// 1. Obtain the block hashes and compute the longest hash chain..
 // 2. Get blocks by hashes from computed hash chain.
 // 3. Insert the blocks to blockchain.
 func (d *Downloader) doShortRangeSync() (int, error) {

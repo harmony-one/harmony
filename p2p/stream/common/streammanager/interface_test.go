@@ -70,6 +70,18 @@ func (st *testStream) ReadBytes() ([]byte, error) {
 	return nil, nil
 }
 
+func (st *testStream) FailedTimes() int {
+	return 0
+}
+
+func (st *testStream) AddFailedTimes() {
+	return
+}
+
+func (st *testStream) ResetFailedRimes() {
+	return
+}
+
 func (st *testStream) Close() error {
 	if st.closed {
 		return errors.New("already closed")
