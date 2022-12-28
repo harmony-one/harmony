@@ -175,6 +175,7 @@ func (s *StagedStreamSync) IsAfter(stage1, stage2 SyncStageID) bool {
 	return idx1 > idx2
 }
 
+// RevertTo sets the revert point
 func (s *StagedStreamSync) RevertTo(revertPoint uint64, invalidBlockNumber uint64, invalidBlockHash common.Hash, invalidBlockStreamID sttypes.StreamID) {
 	utils.Logger().Info().
 		Uint64("invalidBlockNumber", invalidBlockNumber).
@@ -195,10 +196,12 @@ func (s *StagedStreamSync) Done() {
 	s.revertPoint = nil
 }
 
+// IsDone returns true if last stage have been done
 func (s *StagedStreamSync) IsDone() bool {
 	return s.currentStage >= uint(len(s.stages)) && s.revertPoint == nil
 }
 
+// SetCurrentStage sets the current stage to a given stage id
 func (s *StagedStreamSync) SetCurrentStage(id SyncStageID) error {
 	for i, stage := range s.stages {
 		if stage.ID == id {
@@ -210,6 +213,7 @@ func (s *StagedStreamSync) SetCurrentStage(id SyncStageID) error {
 	return ErrStageNotFound
 }
 
+// StageState retrieves the latest stage state from db
 func (s *StagedStreamSync) StageState(stage SyncStageID, tx kv.Tx, db kv.RwDB) (*StageState, error) {
 	var blockNum uint64
 	var err error
@@ -226,6 +230,7 @@ func (s *StagedStreamSync) StageState(stage SyncStageID, tx kv.Tx, db kv.RwDB) (
 	return &StageState{s, stage, blockNum}, nil
 }
 
+// cleanUp cleans up the stage by calling pruneStage
 func (s *StagedStreamSync) cleanUp(fromStage int, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	found := false
 	for i := 0; i < len(s.pruningOrder); i++ {
@@ -242,6 +247,7 @@ func (s *StagedStreamSync) cleanUp(fromStage int, db kv.RwDB, tx kv.RwTx, firstC
 	return nil
 }
 
+// New creates a new StagedStreamSync instance
 func New(ctx context.Context,
 	bc core.BlockChain,
 	db kv.RwDB,
@@ -299,6 +305,7 @@ func New(ctx context.Context,
 	}
 }
 
+// doGetCurrentNumberRequest returns estimated current block number and corresponding stream
 func (s *StagedStreamSync) doGetCurrentNumberRequest() (uint64, sttypes.StreamID, error) {
 	ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
 	defer cancel()
@@ -310,11 +317,13 @@ func (s *StagedStreamSync) doGetCurrentNumberRequest() (uint64, sttypes.StreamID
 	return bn, stid, nil
 }
 
+// promLabels returns a prometheus labels for current shard id
 func (s *StagedStreamSync) promLabels() prometheus.Labels {
 	sid := s.bc.ShardID()
 	return prometheus.Labels{"ShardID": fmt.Sprintf("%d", sid)}
 }
 
+// checkHaveEnoughStreams checks whether node is connected to certain number of streams
 func (s *StagedStreamSync) checkHaveEnoughStreams() error {
 	numStreams := s.protocol.NumStreams()
 	if numStreams < s.config.MinStreams {
@@ -324,6 +333,7 @@ func (s *StagedStreamSync) checkHaveEnoughStreams() error {
 	return nil
 }
 
+// SetNewContext sets a new context for all stages
 func (s *StagedStreamSync) SetNewContext(ctx context.Context) error {
 	for _, s := range s.stages {
 		s.Handler.SetStageContext(ctx)
@@ -331,6 +341,7 @@ func (s *StagedStreamSync) SetNewContext(ctx context.Context) error {
 	return nil
 }
 
+// Run runs a full cycle of stages
 func (s *StagedStreamSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	s.prevRevertPoint = nil
 	s.timings = s.timings[:0]
@@ -395,6 +406,7 @@ func (s *StagedStreamSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	return nil
 }
 
+// CreateView creates a view for a given db
 func CreateView(ctx context.Context, db kv.RwDB, tx kv.Tx, f func(tx kv.Tx) error) error {
 	if tx != nil {
 		return f(tx)
@@ -404,20 +416,7 @@ func CreateView(ctx context.Context, db kv.RwDB, tx kv.Tx, f func(tx kv.Tx) erro
 	})
 }
 
-func ByteCount(b uint64) string {
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%dB", b)
-	}
-	div, exp := uint64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f%cB",
-		float64(b)/float64(div), "KMGTPE"[exp])
-}
-
+// printLogs prints all timing logs
 func printLogs(tx kv.RwTx, timings []Timing) error {
 	var logCtx []interface{}
 	count := 0
@@ -463,6 +462,7 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 	return nil
 }
 
+// runStage executes stage
 func (s *StagedStreamSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, invalidBlockRevert bool) (err error) {
 	start := time.Now()
 	stageState, err := s.StageState(stage.ID, tx, db)
@@ -489,6 +489,7 @@ func (s *StagedStreamSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstC
 	return nil
 }
 
+// revertStage reverts stage
 func (s *StagedStreamSync) revertStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
 	stageState, err := s.StageState(stage.ID, tx, db)
@@ -521,6 +522,7 @@ func (s *StagedStreamSync) revertStage(firstCycle bool, stage *Stage, db kv.RwDB
 	return nil
 }
 
+// pruneStage cleans up the stage and logs the timing
 func (s *StagedStreamSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
 
@@ -566,6 +568,7 @@ func (s *StagedStreamSync) DisableAllStages() []SyncStageID {
 	return backupEnabledIds
 }
 
+// DisableStages disables stages by a set of given stage IDs
 func (s *StagedStreamSync) DisableStages(ids ...SyncStageID) {
 	for i := range s.stages {
 		for _, id := range ids {
@@ -577,6 +580,7 @@ func (s *StagedStreamSync) DisableStages(ids ...SyncStageID) {
 	}
 }
 
+// EnableStages enables stages by a set of given stage IDs
 func (s *StagedStreamSync) EnableStages(ids ...SyncStageID) {
 	for i := range s.stages {
 		for _, id := range ids {
