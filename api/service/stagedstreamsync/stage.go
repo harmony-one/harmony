@@ -96,6 +96,7 @@ func (u *RevertState) Done(db kv.Putter) error {
 	return SaveStageProgress(db, u.ID, u.state.isBeacon, u.RevertPoint)
 }
 
+// CleanUpState contains states of cleanup process for a specific stage
 type CleanUpState struct {
 	ID              SyncStageID
 	ForwardProgress uint64 // progress of stage forward move
