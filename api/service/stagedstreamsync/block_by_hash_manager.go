@@ -34,7 +34,7 @@ func (m *getBlocksByHashManager) getNextHashes() ([]common.Hash, []sttypes.Strea
 	num := m.numBlocksPerRequest()
 	hashes := make([]common.Hash, 0, num)
 	if len(m.whitelist) == 0 {
-		return nil, nil, errors.New("empty white list")
+		return nil, nil, ErrEmptyWhitelist
 	}
 
 	for _, hash := range m.hashes {
