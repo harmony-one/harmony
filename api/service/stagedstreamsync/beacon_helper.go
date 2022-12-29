@@ -42,7 +42,7 @@ func newBeaconHelper(bc blockChain, blockC <-chan *types.Block, insertHook func(
 		insertC:       make(chan insertTask, 1),
 		closeC:        make(chan struct{}),
 		logger: utils.Logger().With().
-			Str("module", "downloader").
+			Str("module", "staged stream sync").
 			Str("sub-module", "beacon helper").
 			Logger(),
 	}
@@ -78,7 +78,8 @@ func (bh *beaconHelper) loop() {
 			inserted, bn, err := bh.insertLastMileBlocks()
 			numBlocksInsertedBeaconHelperCounter.Add(float64(inserted))
 			if err != nil {
-				bh.logger.Error().Err(err).Msg(WrapStagedSyncMsg("insert last mile blocks error"))
+				bh.logger.Error().Err(err).
+					Msg(WrapStagedSyncMsg("insert last mile blocks error"))
 				continue
 			}
 			bh.logger.Info().Int("inserted", inserted).
@@ -127,7 +128,9 @@ func (bh *beaconHelper) insertLastMileBlocks() (inserted int, bn uint64, err err
 			bn--
 			return
 		}
-		bh.logger.Info().Uint64("number", b.NumberU64()).Msg(WrapStagedSyncMsg("Inserted block from beacon pub-sub"))
+		bh.logger.Info().
+			Uint64("number", b.NumberU64()).
+			Msg(WrapStagedSyncMsg("Inserted block from beacon pub-sub"))
 
 		if bh.insertHook != nil {
 			bh.insertHook()

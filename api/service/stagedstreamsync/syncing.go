@@ -314,7 +314,7 @@ func (s *StagedStreamSync) estimateCurrentNumber() (uint64, error) {
 			return 0, s.ctx.Err()
 		default:
 		}
-		return 0, errors.New("zero block number response from remote nodes")
+		return 0, ErrZeroBlockResponse
 	}
 	bn := computeBlockNumberByMaxVote(cnResults)
 	return bn, nil
