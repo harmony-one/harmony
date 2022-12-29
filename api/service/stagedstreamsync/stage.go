@@ -2,7 +2,6 @@ package stagedstreamsync
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -47,9 +46,6 @@ type Stage struct {
 	// Disabled defines if the stage is disabled. It sets up when the stage is build by its `StageBuilder`.
 	Disabled bool
 }
-
-var ErrStopped = errors.New("stopped")
-var ErrRevert = errors.New("unwound")
 
 // StageState is the state of the stage.
 type StageState struct {
