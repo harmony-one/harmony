@@ -259,7 +259,7 @@ func (node *Node) doBeaconSyncing() {
 			}
 		}
 
-		<-time.After(node.epochSync.SyncLoop(node.EpochChain(), true, nil))
+		<-time.After(node.epochSync.SyncLoop(node.EpochChain(), nil))
 	}
 }
 
@@ -296,7 +296,7 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 				Msg("cannot retrieve syncing peers")
 			return
 		}
-		if err := node.stateSync.CreateSyncConfig(peers, shardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
+		if err := syncInstance.CreateSyncConfig(peers, shardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Interface("peers", peers).

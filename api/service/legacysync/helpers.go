@@ -28,11 +28,11 @@ func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
 			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
-				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
+				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.peer.IP).Str("peerPort", peerConfig.peer.Port).Msg("[Sync]GetBlockChainHeight failed")
 				syncConfig.RemovePeer(peerConfig, fmt.Sprintf("failed getMaxPeerHeight for shard %d with message: %s", syncConfig.ShardID(), err.Error()))
 				return
 			}
-			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
+			utils.Logger().Info().Str("peerIP", peerConfig.peer.IP).Uint64("blockHeight", response.BlockHeight).
 				Msg("[SYNC] getMaxPeerHeight")
 
 			lock.Lock()
@@ -86,8 +86,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, 
 					return
 				}
 				peerConfig := &SyncPeerConfig{
-					ip:     peer.IP,
-					port:   peer.Port,
+					peer:   peer,
 					client: client,
 				}
 				syncConfig.AddPeer(peerConfig)
@@ -102,8 +101,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, 
 				continue
 			}
 			peerConfig := &SyncPeerConfig{
-				ip:     peer.IP,
-				port:   peer.Port,
+				peer:   peer,
 				client: client,
 			}
 			syncConfig.AddPeer(peerConfig)
@@ -113,7 +111,6 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, 
 			}
 		}
 	}
-
 	utils.Logger().Info().
 		Int("len", len(syncConfig.peers)).
 		Uint32("shardID", shardID).

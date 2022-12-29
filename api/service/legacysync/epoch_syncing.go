@@ -85,17 +85,18 @@ func (ss *EpochSync) GetActivePeerNumber() int {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *EpochSync) SyncLoop(bc core.BlockChain, isBeacon bool, consensus *consensus.Consensus) time.Duration {
-	return time.Duration(ss.syncLoop(bc, isBeacon, consensus)) * time.Second
+func (ss *EpochSync) SyncLoop(bc core.BlockChain, consensus *consensus.Consensus) time.Duration {
+	return time.Duration(syncLoop(bc, ss.syncConfig)) * time.Second
 }
 
-func (ss *EpochSync) syncLoop(bc core.BlockChain, isBeacon bool, _ *consensus.Consensus) (timeout int) {
-	maxHeight := getMaxPeerHeight(ss.syncConfig)
+func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
+	isBeacon := bc.ShardID() == 0
+	maxHeight := getMaxPeerHeight(syncConfig)
 	for {
 		if maxHeight == 0 || maxHeight == math.MaxUint64 {
 			utils.Logger().Info().
 				Msgf("[EPOCHSYNC] No peers to sync (isBeacon: %t, ShardID: %d, peersCount: %d)",
-					isBeacon, bc.ShardID(), ss.syncConfig.PeersCount())
+					isBeacon, bc.ShardID(), syncConfig.PeersCount())
 			return 10
 		}
 
@@ -104,19 +105,19 @@ func (ss *EpochSync) syncLoop(bc core.BlockChain, isBeacon bool, _ *consensus.Co
 		if otherEpoch == curEpoch+1 {
 			utils.Logger().Info().
 				Msgf("[EPOCHSYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d, peersCount: %d)",
-					isBeacon, bc.ShardID(), otherEpoch, curEpoch, ss.syncConfig.PeersCount())
+					isBeacon, bc.ShardID(), otherEpoch, curEpoch, syncConfig.PeersCount())
 			return 60
 		}
 		if otherEpoch < curEpoch {
-			for _, peerCfg := range ss.syncConfig.GetPeers() {
-				ss.syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: current height is higher that others, remove peers: %s", peerCfg.String()))
+			for _, peerCfg := range syncConfig.GetPeers() {
+				syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: current height is higher that others, remove peers: %s", peerCfg.String()))
 			}
 			return 2
 		}
 
 		utils.Logger().Info().
 			Msgf("[EPOCHSYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d, peers count %d)",
-				isBeacon, bc.ShardID(), otherEpoch, curEpoch, ss.syncConfig.PeersCount())
+				isBeacon, bc.ShardID(), otherEpoch, curEpoch, syncConfig.PeersCount())
 
 		var heights []uint64
 		loopEpoch := curEpoch + 1
@@ -133,7 +134,7 @@ func (ss *EpochSync) syncLoop(bc core.BlockChain, isBeacon bool, _ *consensus.Co
 			return 10
 		}
 
-		err := ss.ProcessStateSync(heights, bc)
+		err := ProcessStateSync(syncConfig, heights, bc)
 		if err != nil {
 			utils.Logger().Error().Err(err).
 				Msgf("[EPOCHSYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d)",
@@ -144,11 +145,11 @@ func (ss *EpochSync) syncLoop(bc core.BlockChain, isBeacon bool, _ *consensus.Co
 }
 
 // ProcessStateSync processes state sync from the blocks received but not yet processed so far
-func (ss *EpochSync) ProcessStateSync(heights []uint64, bc core.BlockChain) error {
+func ProcessStateSync(syncConfig *SyncConfig, heights []uint64, bc core.BlockChain) error {
 	var payload [][]byte
 	var peerCfg *SyncPeerConfig
 
-	peers := ss.syncConfig.GetPeers()
+	peers := syncConfig.GetPeers()
 	if len(peers) == 0 {
 		return errors.New("no peers to sync")
 	}
@@ -156,11 +157,11 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc core.BlockChain) erro
 	for index, peerConfig := range peers {
 		resp := peerConfig.GetClient().GetBlocksByHeights(heights)
 		if resp == nil {
-			ss.syncConfig.RemovePeer(peerConfig, fmt.Sprintf("[EPOCHSYNC]: no response from peer: #%d %s, count %d", index, peerConfig.String(), len(peers)))
+			syncConfig.RemovePeer(peerConfig, fmt.Sprintf("[EPOCHSYNC]: no response from peer: #%d %s, count %d", index, peerConfig.String(), len(peers)))
 			continue
 		}
 		if len(resp.Payload) == 0 {
-			ss.syncConfig.RemovePeer(peerConfig, fmt.Sprintf("[EPOCHSYNC]: empty payload response from peer: #%d %s, count %d", index, peerConfig.String(), len(peers)))
+			syncConfig.RemovePeer(peerConfig, fmt.Sprintf("[EPOCHSYNC]: empty payload response from peer: #%d %s, count %d", index, peerConfig.String(), len(peers)))
 			continue
 		}
 		payload = resp.Payload
@@ -168,12 +169,12 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc core.BlockChain) erro
 		break
 	}
 	if len(payload) == 0 {
-		return errors.Errorf("empty payload: no blocks were returned by GetBlocksByHeights for all peers, currentPeersCount %d", ss.syncConfig.PeersCount())
+		return errors.Errorf("empty payload: no blocks were returned by GetBlocksByHeights for all peers, currentPeersCount %d", syncConfig.PeersCount())
 	}
-	err := ss.processWithPayload(payload, bc)
+	err := processWithPayload(payload, bc)
 	if err != nil {
 		// Assume that node sent us invalid data.
-		ss.syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: failed to process with payload from peer: %s", err.Error()))
+		syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: failed to process with payload from peer: %s", err.Error()))
 		utils.Logger().Error().Err(err).
 			Msgf("[EPOCHSYNC] Removing peer %s for invalid data", peerCfg.String())
 		return err
@@ -181,7 +182,7 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc core.BlockChain) erro
 	return nil
 }
 
-func (ss *EpochSync) processWithPayload(payload [][]byte, bc core.BlockChain) error {
+func processWithPayload(payload [][]byte, bc core.BlockChain) error {
 	decoded := make([]*types.Block, 0, len(payload))
 	for idx, blockBytes := range payload {
 		block, err := RlpDecodeBlockOrBlockWithSig(blockBytes)

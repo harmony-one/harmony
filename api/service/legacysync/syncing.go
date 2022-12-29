@@ -51,8 +51,7 @@ const (
 
 // SyncPeerConfig is peer config to sync.
 type SyncPeerConfig struct {
-	ip          string
-	port        string
+	peer        p2p.Peer
 	peerHash    []byte
 	client      *downloader.Client
 	blockHashes [][]byte       // block hashes before node doing sync
@@ -67,7 +66,7 @@ func (peerConfig *SyncPeerConfig) GetClient() *downloader.Client {
 
 // IsEqual checks the equality between two sync peers
 func (peerConfig *SyncPeerConfig) IsEqual(pc2 *SyncPeerConfig) bool {
-	return peerConfig.ip == pc2.ip && peerConfig.port == pc2.port
+	return peerConfig.peer.IP == pc2.peer.IP && peerConfig.peer.Port == pc2.peer.Port
 }
 
 // SyncBlockTask is the task struct to sync a specific block.
@@ -164,6 +163,9 @@ func (sc *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
 }
 
 func (sc *SyncConfig) PeersCount() int {
+	if sc == nil {
+		return 0
+	}
 	sc.mtx.RLock()
 	defer sc.mtx.RUnlock()
 	return len(sc.peers)
@@ -183,8 +185,8 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 		}
 	}
 	utils.Logger().Info().
-		Str("peerIP", peer.ip).
-		Str("peerPortMsg", peer.port).
+		Str("peerIP", peer.peer.IP).
+		Str("peerPortMsg", peer.peer.Port).
 		Str("reason", reason).
 		Msg("[SYNC] remove GRPC peer")
 }
@@ -497,7 +499,7 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() error {
 	}
 	utils.Logger().Info().
 		Int("maxFirstID", maxFirstID).
-		Str("targetPeerIP", sc.peers[maxFirstID].ip).
+		Str("targetPeerIP", sc.peers[maxFirstID].peer.IP).
 		Int("maxCount", maxCount).
 		Int("hashSize", len(sc.peers[maxFirstID].blockHashes)).
 		Msg("[SYNC] block consensus hashes")
@@ -517,15 +519,15 @@ func (ss *StateSync) getConsensusHashes(startHash []byte, size uint32) error {
 			response := peerConfig.client.GetBlockHashes(startHash, size, ss.selfip, ss.selfport)
 			if response == nil {
 				utils.Logger().Warn().
-					Str("peerIP", peerConfig.ip).
-					Str("peerPort", peerConfig.port).
+					Str("peerIP", peerConfig.peer.IP).
+					Str("peerPort", peerConfig.peer.Port).
 					Msg("[SYNC] getConsensusHashes Nil Response")
 				ss.syncConfig.RemovePeer(peerConfig, fmt.Sprintf("StateSync %d: nil response for GetBlockHashes", ss.blockChain.ShardID()))
 				return
 			}
 			utils.Logger().Info().Uint32("queried blockHash size", size).
 				Int("got blockHashSize", len(response.Payload)).
-				Str("PeerIP", peerConfig.ip).
+				Str("PeerIP", peerConfig.peer.IP).
 				Msg("[SYNC] GetBlockHashes")
 			if len(response.Payload) > int(size+1) {
 				utils.Logger().Warn().
@@ -587,8 +589,8 @@ func (ss *StateSync) downloadBlocks(bc core.BlockChain) {
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
 				if err != nil {
 					utils.Logger().Warn().Err(err).
-						Str("peerID", peerConfig.ip).
-						Str("port", peerConfig.port).
+						Str("peerID", peerConfig.peer.IP).
+						Str("port", peerConfig.peer.Port).
 						Msg("[SYNC] downloadBlocks: GetBlocks failed")
 					ss.syncConfig.RemovePeer(peerConfig, fmt.Sprintf("StateSync %d: error returned for GetBlocks: %s", ss.blockChain.ShardID(), err.Error()))
 					return
@@ -1009,7 +1011,7 @@ func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte, ip, port 
 }
 
 func (peerConfig *SyncPeerConfig) String() interface{} {
-	return fmt.Sprintf("peer: %s:%s ", peerConfig.ip, peerConfig.port)
+	return fmt.Sprintf("peer: %s:%s ", peerConfig.peer.IP, peerConfig.peer.Port)
 }
 
 // RegisterNodeInfo will register node to peers to accept future new block broadcasting
@@ -1023,12 +1025,12 @@ func (ss *StateSync) RegisterNodeInfo() int {
 
 	count := 0
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
-		logger := utils.Logger().With().Str("peerPort", peerConfig.port).Str("peerIP", peerConfig.ip).Logger()
+		logger := utils.Logger().With().Str("peerPort", peerConfig.peer.Port).Str("peerIP", peerConfig.peer.IP).Logger()
 		if count >= registrationNumber {
 			brk = true
 			return
 		}
-		if peerConfig.ip == ss.selfip && peerConfig.port == GetSyncingPort(ss.selfport) {
+		if peerConfig.peer.IP == ss.selfip && peerConfig.peer.Port == GetSyncingPort(ss.selfport) {
 			logger.Debug().
 				Str("selfport", ss.selfport).
 				Str("selfsyncport", GetSyncingPort(ss.selfport)).
