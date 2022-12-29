@@ -449,7 +449,10 @@ func eposStakedCommittee(
 		// If the shard-reduction happens, we cannot use the old committee.
 		if isTestnet && isShardReduction {
 			utils.Logger().Warn().Msg("No elected validators in the new epoch!!! But use the new committee due to Testnet Shard Reduction.")
-			return shardState, nil
+			return &shard.State{
+				Epoch:  nil,
+				Shards: shards,
+			}, nil
 		}
 		utils.Logger().Warn().Msg("No elected validators in the new epoch!!! Reuse old shard state.")
 		return stakerReader.ReadShardState(big.NewInt(0).Sub(epoch, big.NewInt(1)))
