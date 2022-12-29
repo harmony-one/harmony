@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/pkg/errors"
 )
 
 func marshalData(blockNumber uint64) []byte {
@@ -61,11 +60,11 @@ func computeBlockNumberByMaxVote(votes map[sttypes.StreamID]uint64) uint64 {
 
 func checkGetBlockByHashesResult(blocks []*types.Block, hashes []common.Hash) error {
 	if len(blocks) != len(hashes) {
-		return errors.New("unexpected number of getBlocksByHashes result")
+		return ErrUnexpectedNumberOfBlockHashes
 	}
 	for i, block := range blocks {
 		if block == nil {
-			return errors.New("nil block found")
+			return ErrNilBlock
 		}
 		if block.Hash() != hashes[i] {
 			return fmt.Errorf("unexpected block hash: %x / %x", block.Hash(), hashes[i])
