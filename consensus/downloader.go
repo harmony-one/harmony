@@ -90,7 +90,7 @@ func (dh *downloadHelper) downloadFinishedLoop() {
 }
 
 func (consensus *Consensus) addConsensusLastMile() error {
-	curBN := consensus.Blockchain.CurrentBlock().NumberU64()
+	curBN := consensus.Blockchain().CurrentBlock().NumberU64()
 	blockIter, err := consensus.GetLastMileBlockIter(curBN + 1)
 	if err != nil {
 		return err
@@ -100,7 +100,7 @@ func (consensus *Consensus) addConsensusLastMile() error {
 		if block == nil {
 			break
 		}
-		if _, err := consensus.Blockchain.InsertChain(types.Blocks{block}, true); err != nil {
+		if _, err := consensus.Blockchain().InsertChain(types.Blocks{block}, true); err != nil {
 			return errors.Wrap(err, "failed to InsertChain")
 		}
 	}

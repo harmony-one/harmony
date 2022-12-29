@@ -166,7 +166,7 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 	priKeys := consensus.getPriKeysInCommittee()
 
 	// Sign commit signature on the received block and construct the p2p messages
-	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain(),
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 
 	p2pMsgs := consensus.constructP2pMessages(msg_pb.MessageType_COMMIT, commitPayload, priKeys)
@@ -336,7 +336,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 			Msg("[OnCommitted] Failed to parse commit sigBytes and bitmap")
 		return
 	}
-	if err := consensus.Blockchain.Engine().VerifyHeaderSignature(consensus.Blockchain, blockObj.Header(),
+	if err := consensus.Blockchain().Engine().VerifyHeaderSignature(consensus.Blockchain(), blockObj.Header(),
 		sigBytes, bitmap); err != nil {
 		consensus.getLogger().Error().
 			Uint64("blockNum", recvMsg.BlockNum).
@@ -358,17 +358,17 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	// If we already have a committed signature received before, check whether the new one
 	// has more signatures and if yes, override the old data.
 	// Otherwise, simply write the commit signature in db.
-	commitSigBitmap, err := consensus.Blockchain.ReadCommitSig(blockObj.NumberU64())
+	commitSigBitmap, err := consensus.Blockchain().ReadCommitSig(blockObj.NumberU64())
 	// Need to check whether this block actually was committed, because it could be another block
 	// with the same number that's committed and overriding its commit sigBytes is wrong.
-	blk := consensus.Blockchain.GetBlockByHash(blockObj.Hash())
+	blk := consensus.Blockchain().GetBlockByHash(blockObj.Hash())
 	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) && blk != nil {
 		new := mask.CountEnabled()
 		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
 		cur := mask.CountEnabled()
 		if new > cur {
 			consensus.getLogger().Info().Hex("old", commitSigBitmap).Hex("new", recvMsg.Payload).Msg("[OnCommitted] Overriding commit signatures!!")
-			consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
+			consensus.Blockchain().WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
 		}
 	}
 

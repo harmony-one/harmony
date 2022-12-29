@@ -264,7 +264,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
-	curHeader := consensus.Blockchain.CurrentHeader()
+	curHeader := consensus.Blockchain().CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
 
@@ -286,13 +286,13 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.BlockPeriod = 5 * time.Second
 
 	// Enable 2s block time at the twoSecondsEpoch
-	if consensus.Blockchain.Config().IsTwoSeconds(nextEpoch) {
+	if consensus.Blockchain().Config().IsTwoSeconds(nextEpoch) {
 		consensus.BlockPeriod = 2 * time.Second
 	}
 
-	isFirstTimeStaking := consensus.Blockchain.Config().IsStaking(nextEpoch) &&
-		curHeader.IsLastBlockInEpoch() && !consensus.Blockchain.Config().IsStaking(curEpoch)
-	haventUpdatedDecider := consensus.Blockchain.Config().IsStaking(curEpoch) &&
+	isFirstTimeStaking := consensus.Blockchain().Config().IsStaking(nextEpoch) &&
+		curHeader.IsLastBlockInEpoch() && !consensus.Blockchain().Config().IsStaking(curEpoch)
+	haventUpdatedDecider := consensus.Blockchain().Config().IsStaking(curEpoch) &&
 		consensus.Decider.Policy() != quorum.SuperMajorityStake
 
 	// Only happens once, the flip-over to a new Decider policy
@@ -305,7 +305,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	epochToSet := curEpoch
 	hasError := false
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
-		curEpoch, consensus.Blockchain,
+		curEpoch, consensus.Blockchain(),
 	)
 	if err != nil {
 		consensus.getLogger().Error().
@@ -321,7 +321,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if curHeader.IsLastBlockInEpoch() && isNotGenesisBlock {
 
 		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
-			nextEpoch, consensus.Blockchain,
+			nextEpoch, consensus.Blockchain(),
 		)
 		if err != nil {
 			consensus.getLogger().Error().
@@ -389,7 +389,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	// a solution to take care of this case because the coinbase of the latest block doesn't really represent the
 	// the real current leader in case of M1 view change.
 	if !curHeader.IsLastBlockInEpoch() && curHeader.Number().Uint64() != 0 {
-		leaderPubKey, err := chain.GetLeaderPubKeyFromCoinbase(consensus.Blockchain, curHeader)
+		leaderPubKey, err := chain.GetLeaderPubKeyFromCoinbase(consensus.Blockchain(), curHeader)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Error().Err(err).
 				Msg("[UpdateConsensusInformation] Unable to get leaderPubKey from coinbase")
@@ -527,7 +527,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 	consensus.switchPhase("selfCommit", FBFTCommit)
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
-	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain(),
 		block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
 	for i, key := range consensus.priKey {
 		if err := consensus.commitBitmap.SetKey(key.Pub.Bytes, true); err != nil {

@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
@@ -47,7 +48,7 @@ func TestAddNewBlock(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
-	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil)
+	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, registry.New())
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -101,7 +102,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil)
+	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, registry.New())
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -148,7 +149,7 @@ func TestVerifyVRF(t *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), blockchain, decider, 3, false,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), registry.New().SetBlockchain(blockchain), decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -156,7 +157,7 @@ func TestVerifyVRF(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil)
+	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, registry.New())
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
