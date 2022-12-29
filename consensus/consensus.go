@@ -143,6 +143,7 @@ func (consensus *Consensus) Blockchain() core.BlockChain {
 	return consensus.registry.GetBlockchain()
 }
 
+// VerifyBlock is a function used to verify the block and keep trace of verified blocks
 func (consensus *Consensus) VerifyBlock(block *types.Block) error {
 	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
