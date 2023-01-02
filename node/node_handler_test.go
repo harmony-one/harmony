@@ -41,14 +41,19 @@ func TestAddNewBlock(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
+	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
+	if err != nil {
+		t.Fatal("cannot get blockchain")
+	}
+	reg := registry.New().SetBlockchain(blockchain)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), nil, decider, 3, false,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
-	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, registry.New())
+	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -93,8 +98,13 @@ func TestVerifyNewBlock(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
+	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
+	if err != nil {
+		t.Fatal("cannot get blockchain")
+	}
+	reg := registry.New().SetBlockchain(blockchain)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), nil, decider, 3, false,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -102,7 +112,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, registry.New())
+	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -148,8 +158,9 @@ func TestVerifyVRF(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
+	reg := registry.New().SetBlockchain(blockchain)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), registry.New().SetBlockchain(blockchain), decider, 3, false,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -157,7 +168,7 @@ func TestVerifyVRF(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, registry.New())
+	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
