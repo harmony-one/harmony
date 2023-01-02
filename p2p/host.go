@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/routing"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
@@ -19,6 +22,10 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+
+	"github.com/libp2p/go-libp2p/p2p/security/noise"
+	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -111,19 +118,56 @@ func NewHost(cfg HostConfig) (Host, error) {
 		self = cfg.Self
 		key  = cfg.BLSKey
 	)
-	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
-	if err != nil {
-		return nil, errors.Wrapf(err,
-			"cannot create listen multiaddr from port %#v", self.Port)
-	}
+	// listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err,
+	// 		"cannot create listen multiaddr from port %#v", self.Port)
+	// }
+
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port)
+	listenAddr := libp2p.ListenAddrStrings(
+		addr,         // regular tcp connections
+		addr+"/quic", // a UDP endpoint for the QUIC transport
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	connmgr, err := connmgr.NewConnManager(
+		int(cfg.MaxPeers),                  // Lowwater
+		int(cfg.MaxPeers)*cfg.MaxConnPerIP, // HighWater,
+		connmgr.WithGracePeriod(time.Minute),
+	)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	var idht *dht.IpfsDHT
+
 	p2pHost, err := libp2p.New(
-		libp2p.ListenAddrs(listenAddr),
+		listenAddr,
 		libp2p.Identity(key),
+		// support TLS connections
+		libp2p.Security(libp2ptls.ID, libp2ptls.New),
+		// support noise connections
+		libp2p.Security(noise.ID, noise.New),
+		// support any other default transports (TCP)
+		libp2p.DefaultTransports,
+		// Let's prevent our peer from having too many
+		// connections by attaching a connection manager.
+		libp2p.ConnectionManager(connmgr),
+		// Attempt to open ports using uPNP for NATed hosts.
+		libp2p.NATPortMap(),
+		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+			idht, err = dht.New(ctx, h)
+			return idht, err
+		}),
+		// to help other peers to figure out if they are behind
+		// NATs, launch the server-side of AutoNAT too (AutoRelay
+		// already runs the client)
+		// This service is highly rate-limited and should not cause any
+		// performance issues.
 		libp2p.EnableNATService(),
-		libp2p.ForceReachabilityPublic(),
 		libp2p.BandwidthReporter(newCounter()),
+		libp2p.ForceReachabilityPublic(),
 		// prevent dialing of public addresses
 		libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)),
 	)

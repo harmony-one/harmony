@@ -419,9 +419,13 @@ func (ss *streamSet) addStream(st sttypes.Stream) {
 	ss.lock.Lock()
 	defer ss.lock.Unlock()
 
-	ss.streams[st.ID()] = st
-	spec, _ := st.ProtoSpec()
-	ss.numByProto[spec]++
+	if spec, err := st.ProtoSpec(); err != nil {
+		return
+	} else {
+		ss.streams[st.ID()] = st
+		ss.numByProto[spec]++
+	}
+
 }
 
 func (ss *streamSet) deleteStream(st sttypes.Stream) {

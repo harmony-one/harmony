@@ -28,6 +28,7 @@ const (
 
 // ProtoID is the protocol id for streaming, an alias of libp2p stream protocol ID。
 // The stream protocol ID is composed of following components:
+// ex: harmony/sync/partner/0/1.0.0/1
 // 1. Service - Currently, only sync service is supported.
 // 2. NetworkType - mainnet, testnet, stn, e.t.c.
 // 3. ShardID - shard ID of the current protocol.
@@ -37,8 +38,7 @@ type ProtoID libp2p_proto.ID
 
 // ProtoSpec is the un-serialized stream proto id specification
 // TODO: move this to service wise module since different protocol might have different
-//
-//	protoID information
+// protoID information
 type ProtoSpec struct {
 	Service     string
 	NetworkType nodeconfig.NetworkType
