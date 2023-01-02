@@ -122,6 +122,11 @@ func NewHost(cfg HostConfig) (Host, error) {
 		self = cfg.Self
 		key  = cfg.BLSKey
 	)
+	// listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err,
+	// 		"cannot create listen multiaddr from port %#v", self.Port)
+	// }
 
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port)
 	listenAddr := libp2p.ListenAddrStrings(
@@ -130,74 +135,46 @@ func NewHost(cfg HostConfig) (Host, error) {
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// create connection manager
-	low := cfg.ConnManagerLowWatermark
-	high := cfg.ConnManagerHighWatermark
-	if high < low {
+	connmgr, err := connmgr.NewConnManager(
+		int(cfg.MaxPeers),                  // Lowwater
+		int(cfg.MaxPeers)*cfg.MaxConnPerIP, // HighWater,
+		connmgr.WithGracePeriod(time.Minute),
+	)
+	if err != nil {
 		cancel()
-		utils.Logger().Error().
-			Int("low", cfg.ConnManagerLowWatermark).
-			Int("high", cfg.ConnManagerHighWatermark).
-			Msg("connection manager watermarks are invalid")
-		return nil, errors.New("invalid connection manager watermarks")
+		return nil, err
 	}
-
-	// prepare host options
 	var idht *dht.IpfsDHT
-	var opt discovery.DHTConfig
-	p2pHostConfig := []libp2p.Option{
+
+	p2pHost, err := libp2p.New(
 		listenAddr,
 		libp2p.Identity(key),
-		// Support TLS connections
+		// support TLS connections
 		libp2p.Security(libp2ptls.ID, libp2ptls.New),
-		// Support noise connections
+		// support noise connections
 		libp2p.Security(noise.ID, noise.New),
-		// Support any other default transports (TCP)
+		// support any other default transports (TCP)
 		libp2p.DefaultTransports,
-		// Prevent the peer from having too many
+		// Let's prevent our peer from having too many
 		// connections by attaching a connection manager.
-		connectionManager(low, high),
+		libp2p.ConnectionManager(connmgr),
 		// Attempt to open ports using uPNP for NATed hosts.
 		libp2p.NATPortMap(),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			opt = discovery.DHTConfig{
-				BootNodes:       cfg.BootNodes,
-				DataStoreFile:   cfg.DataStoreFile,
-				DiscConcurrency: cfg.DiscConcurrency,
-			}
-			opts, err := opt.GetLibp2pRawOptions()
-			if err != nil {
-				return nil, err
-			}
-			idht, err = dht.New(ctx, h, opts...)
+			idht, err = dht.New(ctx, h)
 			return idht, err
 		}),
-		// To help other peers to figure out if they are behind
+		// to help other peers to figure out if they are behind
 		// NATs, launch the server-side of AutoNAT too (AutoRelay
 		// already runs the client)
 		// This service is highly rate-limited and should not cause any
 		// performance issues.
 		libp2p.EnableNATService(),
-		// Bandwidth Reporter
 		libp2p.BandwidthReporter(newCounter()),
-		// Enable relay service, to disable relay we can use libp2p.DisableRelay()
-		libp2p.EnableRelayService(),
-	}
-
-	if cfg.ForceReachabilityPublic {
-		// ForceReachabilityPublic overrides automatic reachability detection in the AutoNAT subsystem,
-		// forcing the local node to believe it is reachable externally
-		p2pHostConfig = append(p2pHostConfig, libp2p.ForceReachabilityPublic())
-	}
-
-	if cfg.DisablePrivateIPScan {
-		// Prevent dialing of public addresses
-		p2pHostConfig = append(p2pHostConfig, libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)))
-	}
-
-	// create p2p host
-	p2pHost, err := libp2p.New(p2pHostConfig...)
+		libp2p.ForceReachabilityPublic(),
+		// prevent dialing of public addresses
+		libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)),
+	)
 	if err != nil {
 		cancel()
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
