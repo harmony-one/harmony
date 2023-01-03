@@ -171,7 +171,7 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 			Msg("failed to add new stream")
 		return
 	}
-	fmt.Println("Node connected to", raw.Conn().RemotePeer().String(), "(", st.ProtoID(), ")")
+	fmt.Println("Connected to", raw.Conn().RemotePeer().String(), "(", st.ProtoID(), ")")
 	st.run()
 }
 
