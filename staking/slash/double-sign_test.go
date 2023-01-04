@@ -16,7 +16,6 @@ import (
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
@@ -35,6 +34,8 @@ var (
 	thirtyKOnes     = new(big.Int).Mul(big.NewInt(30000), bigOne)
 	thirtyFiveKOnes = new(big.Int).Mul(big.NewInt(35000), bigOne)
 	fourtyKOnes     = new(big.Int).Mul(big.NewInt(40000), bigOne)
+	fiftyKOnes      = new(big.Int).Mul(big.NewInt(50000), bigOne)
+	hundredKOnes    = new(big.Int).Mul(big.NewInt(100000), bigOne)
 	thousandKOnes   = new(big.Int).Mul(big.NewInt(1000000), bigOne)
 )
 
@@ -307,7 +308,7 @@ func makeSimpleRecords(indexes []int) Records {
 	return rs
 }
 
-func TestPayDownAsMuchAsCan(t *testing.T) {
+func TestPayDown(t *testing.T) {
 	tests := []struct {
 		debt, amt *big.Int
 		diff      *Application
@@ -346,17 +347,7 @@ func TestPayDownAsMuchAsCan(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		vwSnap := defaultValidatorWrapper()
-		vwCur := defaultCurrentValidatorWrapper()
-
-		err := payDownAsMuchAsCan(vwSnap, vwCur, test.debt, test.amt, test.diff)
-		if assErr := assertError(err, test.expErr); assErr != nil {
-			t.Errorf("Test %v: %v", i, assErr)
-		}
-		if err != nil || test.expErr != nil {
-			continue
-		}
-
+		payDown(test.amt, test.debt, test.diff.TotalSlashed)
 		if test.debt.Cmp(test.expDebt) != 0 {
 			t.Errorf("Test %v: unexpected debt %v / %v", i, test.debt, test.expDebt)
 		}
@@ -374,99 +365,95 @@ func TestPayDownAsMuchAsCan(t *testing.T) {
 	}
 }
 
-func TestDelegatorSlashApply(t *testing.T) {
-	tests := []slashApplyTestCase{
+func TestApplySlashingToDelegator(t *testing.T) {
+	tests := []applySlashingToDelegatorTestCase{
 		{
-			rate:     numeric.ZeroDec(),
-			snapshot: defaultSnapValidatorWrapper(),
-			current:  defaultCurrentValidatorWrapper(),
-			expDels: []expDelegation{
-				{
-					expAmt:      twentyKOnes,
-					expReward:   tenKOnes,
-					expUndelAmt: []*big.Int{tenKOnes, tenKOnes},
-				},
-				{
-					expAmt:      fourtyKOnes,
-					expReward:   tenKOnes,
-					expUndelAmt: []*big.Int{},
-				},
+			snapshot:      defaultSnapValidatorWrapper(),
+			current:       defaultCurrentValidatorWrapper(),
+			delegationIdx: 0,
+			debt:          big.NewInt(0),
+			expDel: expDelegation{
+				expAmt:      twentyKOnes,
+				expReward:   tenKOnes,
+				expUndelAmt: []*big.Int{tenKOnes, tenKOnes},
 			},
 			expSlashed:           common.Big0,
 			expBeneficiaryReward: common.Big0,
 		},
 		{
-			rate:     numeric.NewDecWithPrec(25, 2),
-			snapshot: defaultSnapValidatorWrapper(),
-			current:  defaultCurrentValidatorWrapper(),
-			expDels: []expDelegation{
-				{
-					expAmt:      tenKOnes,
-					expReward:   tenKOnes,
-					expUndelAmt: []*big.Int{tenKOnes, tenKOnes},
-				},
-				{
-					expAmt:      fourtyKOnes,
-					expReward:   tenKOnes,
-					expUndelAmt: []*big.Int{},
-				},
+			snapshot:      defaultSnapValidatorWrapper(),
+			current:       defaultCurrentValidatorWrapper(),
+			delegationIdx: 0,
+			debt:          twentyKOnes,
+			expDel: expDelegation{
+				expAmt:      big.NewInt(0),
+				expReward:   tenKOnes,
+				expUndelAmt: []*big.Int{tenKOnes, tenKOnes},
 			},
-			expSlashed:           tenKOnes,
-			expBeneficiaryReward: fiveKOnes,
+			expSlashed:           twentyKOnes,
+			expBeneficiaryReward: tenKOnes,
 		},
 		{
-			rate:     numeric.NewDecWithPrec(625, 3),
-			snapshot: defaultSnapValidatorWrapper(),
-			current:  defaultCurrentValidatorWrapper(),
-			expDels: []expDelegation{
-				{
-					expAmt:      common.Big0,
-					expReward:   tenKOnes,
-					expUndelAmt: []*big.Int{tenKOnes, fiveKOnes},
-				},
-				{
-					expAmt:      fourtyKOnes,
-					expReward:   tenKOnes,
-					expUndelAmt: []*big.Int{},
-				},
+			snapshot:      defaultSnapValidatorWrapper(),
+			current:       defaultCurrentValidatorWrapper(),
+			delegationIdx: 0,
+			debt:          twentyFiveKOnes,
+			expDel: expDelegation{
+				expAmt:      big.NewInt(0),
+				expReward:   tenKOnes,
+				expUndelAmt: []*big.Int{tenKOnes, fiveKOnes},
 			},
 			expSlashed:           twentyFiveKOnes,
 			expBeneficiaryReward: new(big.Int).Div(twentyFiveKOnes, common.Big2),
 		},
 		{
-			rate:     numeric.NewDecWithPrec(875, 3),
-			snapshot: defaultSnapValidatorWrapper(),
-			current:  defaultCurrentValidatorWrapper(),
-			expDels: []expDelegation{
-				{
-					expAmt:      common.Big0,
-					expReward:   fiveKOnes,
-					expUndelAmt: []*big.Int{tenKOnes, common.Big0},
-				},
-				{
-					expAmt:      fourtyKOnes,
-					expReward:   tenKOnes,
-					expUndelAmt: []*big.Int{},
-				},
+			snapshot:      defaultSnapValidatorWrapper(),
+			current:       defaultCurrentValidatorWrapper(),
+			delegationIdx: 0,
+			debt:          thirtyKOnes,
+			expDel: expDelegation{
+				expAmt:      big.NewInt(0),
+				expReward:   tenKOnes,
+				expUndelAmt: []*big.Int{tenKOnes, big.NewInt(0)},
+			},
+			expSlashed:           thirtyKOnes,
+			expBeneficiaryReward: new(big.Int).Div(thirtyKOnes, common.Big2),
+		},
+		{
+			snapshot:      defaultSnapValidatorWrapper(),
+			current:       defaultCurrentValidatorWrapper(),
+			delegationIdx: 0,
+			debt:          thirtyFiveKOnes,
+			expDel: expDelegation{
+				expAmt:      big.NewInt(0),
+				expReward:   fiveKOnes,
+				expUndelAmt: []*big.Int{tenKOnes, big.NewInt(0)},
 			},
 			expSlashed:           thirtyFiveKOnes,
 			expBeneficiaryReward: new(big.Int).Div(thirtyFiveKOnes, common.Big2),
 		},
 		{
-			rate:     numeric.NewDecWithPrec(150, 2),
-			snapshot: defaultSnapValidatorWrapper(),
-			current:  defaultCurrentValidatorWrapper(),
-			expDels: []expDelegation{
-				{
-					expAmt:      common.Big0,
-					expReward:   common.Big0,
-					expUndelAmt: []*big.Int{tenKOnes, common.Big0},
-				},
-				{
-					expAmt:      fourtyKOnes,
-					expReward:   tenKOnes,
-					expUndelAmt: []*big.Int{},
-				},
+			snapshot:      defaultSnapValidatorWrapper(),
+			current:       defaultCurrentValidatorWrapper(),
+			delegationIdx: 0,
+			debt:          fourtyKOnes,
+			expDel: expDelegation{
+				expAmt:      big.NewInt(0),
+				expReward:   big.NewInt(0),
+				expUndelAmt: []*big.Int{tenKOnes, big.NewInt(0)},
+			},
+			expSlashed:           fourtyKOnes,
+			expBeneficiaryReward: twentyKOnes,
+		},
+		{
+			snapshot:      defaultSnapValidatorWrapper(),
+			current:       defaultCurrentValidatorWrapper(),
+			delegationIdx: 0,
+			debt:          fiftyKOnes,
+			expDel: expDelegation{
+				expAmt:      big.NewInt(0),
+				expReward:   big.NewInt(0),
+				expUndelAmt: []*big.Int{tenKOnes, big.NewInt(0)},
 			},
 			expSlashed:           fourtyKOnes,
 			expBeneficiaryReward: twentyKOnes,
@@ -482,9 +469,198 @@ func TestDelegatorSlashApply(t *testing.T) {
 	}
 }
 
+func TestDelegatorSlashApply(t *testing.T) {
+	tests := []slashApplyTestCase{
+		{
+			snapshot: generateValidatorWrapper([]testDelegation{
+				{
+					address: "off",
+					amount:  fourtyKOnes,
+				},
+			}),
+			current: generateValidatorWrapper([]testDelegation{
+				{
+					address: "off",
+					amount:  fourtyKOnes,
+				},
+			}),
+			expDels: []expDelegation{
+				{
+					expAmt:      twentyKOnes,
+					expReward:   tenKOnes,
+					expUndelAmt: []*big.Int{},
+				},
+			},
+			expSlashed:           twentyKOnes,
+			expBeneficiaryReward: tenKOnes,
+		},
+		{
+			snapshot: generateValidatorWrapper([]testDelegation{
+				{
+					address: "off",
+					amount:  fourtyKOnes,
+				},
+				{
+					address: "del1",
+					amount:  fourtyKOnes,
+				},
+			}),
+			current: generateValidatorWrapper([]testDelegation{
+				{
+					address: "off",
+					amount:  fourtyKOnes,
+				},
+				{
+					address: "del1",
+					amount:  fourtyKOnes,
+				},
+			}),
+			expDels: []expDelegation{
+				{
+					expAmt:      twentyKOnes,
+					expReward:   tenKOnes,
+					expUndelAmt: []*big.Int{},
+				},
+				{
+					expAmt:      new(big.Int).Mul(big.NewInt(24000), bigOne),
+					expReward:   tenKOnes,
+					expUndelAmt: []*big.Int{},
+				},
+			},
+			expSlashed:           new(big.Int).Mul(big.NewInt(36000), bigOne),
+			expBeneficiaryReward: new(big.Int).Mul(big.NewInt(18000), bigOne),
+		},
+		{
+			snapshot: generateValidatorWrapper([]testDelegation{
+				{
+					address: "off",
+					amount:  fiftyKOnes,
+				},
+				{
+					address: "del1",
+					amount:  fourtyKOnes,
+				},
+				{
+					address: "del2",
+					amount:  tenKOnes,
+				},
+			}),
+			current: generateValidatorWrapper([]testDelegation{
+				{
+					address: "off",
+					amount:  fiftyKOnes,
+				},
+				{
+					address: "del1",
+					amount:  fourtyKOnes,
+				},
+				{
+					address: "del2",
+					amount:  tenKOnes,
+				},
+			}),
+			expDels: []expDelegation{
+				{
+					expAmt:      twentyFiveKOnes,
+					expReward:   tenKOnes,
+					expUndelAmt: []*big.Int{},
+				},
+				{
+					expAmt:      new(big.Int).Mul(big.NewInt(24000), bigOne),
+					expReward:   tenKOnes,
+					expUndelAmt: []*big.Int{},
+				},
+				{
+					expAmt:      new(big.Int).Mul(big.NewInt(6000), bigOne),
+					expReward:   tenKOnes,
+					expUndelAmt: []*big.Int{},
+				},
+			},
+			expSlashed:           new(big.Int).Mul(big.NewInt(45000), bigOne),
+			expBeneficiaryReward: new(big.Int).Mul(big.NewInt(22500), bigOne),
+		},
+		{
+			snapshot: generateValidatorWrapper([]testDelegation{
+				{
+					address: "off",
+					amount:  hundredKOnes,
+				},
+				{
+					address: "del1",
+					amount:  twentyKOnes,
+				},
+				{
+					address: "del2",
+					amount:  twentyKOnes,
+				},
+			}),
+			current: generateValidatorWrapper([]testDelegation{
+				{
+					address: "off",
+					amount:  hundredKOnes,
+				},
+				{
+					address:        "del1",
+					amount:         common.Big0,
+					historyUndel:   twentyKOnes,
+					afterSignUndel: common.Big0,
+				},
+				{
+					address:        "del2",
+					amount:         common.Big0,
+					historyUndel:   common.Big0,
+					afterSignUndel: twentyKOnes,
+				},
+			}),
+			expDels: []expDelegation{
+				{
+					expAmt:      fiftyKOnes,
+					expReward:   tenKOnes,
+					expUndelAmt: []*big.Int{},
+				},
+				{
+					expAmt:      common.Big0,
+					expReward:   common.Big0,
+					expUndelAmt: []*big.Int{twentyKOnes, common.Big0},
+				},
+				{
+					expAmt:      common.Big0,
+					expReward:   tenKOnes,
+					expUndelAmt: []*big.Int{common.Big0, common.Big0},
+				},
+			},
+			expSlashed:           new(big.Int).Mul(big.NewInt(80000), bigOne),
+			expBeneficiaryReward: fourtyKOnes,
+		},
+	}
+
+	for i, tc := range tests {
+		tc.makeData()
+		tc.apply()
+
+		if err := tc.checkResult(); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
+type applySlashingToDelegatorTestCase struct {
+	snapshot, current *staking.ValidatorWrapper
+	state             *state.DB
+	beneficiary       common.Address
+	slashTrack        *Application
+	debt              *big.Int
+	delegationIdx     int
+
+	gotErr error
+
+	expDel                           expDelegation
+	expSlashed, expBeneficiaryReward *big.Int
+	expErr                           error
+}
+
 type slashApplyTestCase struct {
 	snapshot, current *staking.ValidatorWrapper
-	rate              numeric.Dec
 
 	beneficiary common.Address
 	state       *state.DB
@@ -494,6 +670,41 @@ type slashApplyTestCase struct {
 	expDels                          []expDelegation
 	expSlashed, expBeneficiaryReward *big.Int
 	expErr                           error
+}
+
+func (tc *applySlashingToDelegatorTestCase) makeData() {
+	tc.beneficiary = leaderAddr
+	tc.state = makeTestStateDB()
+	tc.slashTrack = &Application{
+		TotalSlashed:           new(big.Int).Set(common.Big0),
+		TotalBeneficiaryReward: new(big.Int).Set(common.Big0),
+	}
+}
+
+func (tc *applySlashingToDelegatorTestCase) apply() {
+	tc.gotErr = delegatorSlashApplyDebt(tc.snapshot, tc.current, tc.state, tc.debt, tc.beneficiary,
+		big.NewInt(doubleSignEpoch), tc.slashTrack)
+}
+
+func (tc *applySlashingToDelegatorTestCase) checkResult() error {
+	if err := assertError(tc.gotErr, tc.expErr); err != nil {
+		return err
+	}
+	if err := tc.expDel.checkDelegation(tc.current.Delegations[tc.delegationIdx]); err != nil {
+		return fmt.Errorf("delegations[%v]: %v", tc.delegationIdx, err)
+	}
+	if tc.slashTrack.TotalSlashed.Cmp(tc.expSlashed) != 0 {
+		return fmt.Errorf("unexpected total slash %v / %v", tc.slashTrack.TotalSlashed,
+			tc.expSlashed)
+	}
+	if tc.slashTrack.TotalBeneficiaryReward.Cmp(tc.expBeneficiaryReward) != 0 {
+		return fmt.Errorf("unexpected beneficiary reward %v / %v", tc.slashTrack.TotalBeneficiaryReward,
+			tc.expBeneficiaryReward)
+	}
+	if bal := tc.state.GetBalance(tc.beneficiary); bal.Cmp(tc.expBeneficiaryReward) != 0 {
+		return fmt.Errorf("unexpected balance for beneficiary %v / %v", bal, tc.expBeneficiaryReward)
+	}
+	return nil
 }
 
 func (tc *slashApplyTestCase) makeData() {
@@ -506,8 +717,7 @@ func (tc *slashApplyTestCase) makeData() {
 }
 
 func (tc *slashApplyTestCase) apply() {
-	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.rate, tc.state, tc.beneficiary,
-		big.NewInt(doubleSignEpoch), tc.slashTrack)
+	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.state, tc.beneficiary, big.NewInt(doubleSignEpoch), tc.slashTrack)
 }
 
 func (tc *slashApplyTestCase) checkResult() error {
@@ -542,6 +752,13 @@ type expDelegation struct {
 	expUndelAmt       []*big.Int
 }
 
+type testDelegation struct {
+	address        string
+	amount         *big.Int
+	historyUndel   *big.Int
+	afterSignUndel *big.Int
+}
+
 func (ed expDelegation) checkDelegation(d staking.Delegation) error {
 	if d.Amount.Cmp(ed.expAmt) != 0 {
 		return fmt.Errorf("unexpected amount %v / %v", d.Amount, ed.expAmt)
@@ -569,16 +786,14 @@ func TestApply(t *testing.T) {
 			snapshot: defaultSnapValidatorWrapper(),
 			current:  defaultCurrentValidatorWrapper(),
 			slashes:  Records{defaultSlashRecord()},
-			rate:     numeric.NewDecWithPrec(625, 3),
 
-			expSlashed:           twentyFiveKOnes,
-			expBeneficiaryReward: new(big.Int).Div(twentyFiveKOnes, common.Big2),
+			expSlashed:           twentyKOnes,
+			expBeneficiaryReward: tenKOnes,
 		},
 		{
 			// missing snapshot in chain
 			current: defaultCurrentValidatorWrapper(),
 			slashes: Records{defaultSlashRecord()},
-			rate:    numeric.NewDecWithPrec(625, 3),
 
 			expErr: errors.New("could not find validator"),
 		},
@@ -586,7 +801,6 @@ func TestApply(t *testing.T) {
 			// missing vWrapper in state
 			snapshot: defaultSnapValidatorWrapper(),
 			slashes:  Records{defaultSlashRecord()},
-			rate:     numeric.NewDecWithPrec(625, 3),
 
 			expErr: errValidatorNotFoundDuringSlash,
 		},
@@ -605,7 +819,6 @@ func TestApply(t *testing.T) {
 type applyTestCase struct {
 	snapshot, current *staking.ValidatorWrapper
 	slashes           Records
-	rate              numeric.Dec
 
 	chain            *fakeBlockChain
 	state, stateSnap *state.DB
@@ -636,7 +849,7 @@ func (tc *applyTestCase) makeData(t *testing.T) {
 }
 
 func (tc *applyTestCase) apply() {
-	tc.gotDiff, tc.gotErr = Apply(tc.chain, tc.state, tc.slashes, tc.rate, leaderAddr)
+	tc.gotDiff, tc.gotErr = Apply(tc.chain, tc.state, tc.slashes, leaderAddr)
 }
 
 func (tc *applyTestCase) checkResult() error {
@@ -646,13 +859,13 @@ func (tc *applyTestCase) checkResult() error {
 	if (tc.gotErr != nil) || (tc.expErr != nil) {
 		return nil
 	}
-	if tc.gotDiff.TotalBeneficiaryReward.Cmp(tc.expBeneficiaryReward) != 0 {
-		return fmt.Errorf("unexpected beneficiry reward %v / %v", tc.gotDiff.TotalBeneficiaryReward,
-			tc.expBeneficiaryReward)
-	}
 	if tc.gotDiff.TotalSlashed.Cmp(tc.expSlashed) != 0 {
 		return fmt.Errorf("unexpected total slash %v / %v", tc.gotDiff.TotalSlashed,
 			tc.expSlashed)
+	}
+	if tc.gotDiff.TotalBeneficiaryReward.Cmp(tc.expBeneficiaryReward) != 0 {
+		return fmt.Errorf("unexpected beneficiary reward %v / %v", tc.gotDiff.TotalBeneficiaryReward,
+			tc.expBeneficiaryReward)
 	}
 	if err := tc.checkState(); err != nil {
 		return fmt.Errorf("state check: %v", err)
@@ -675,85 +888,10 @@ func (tc *applyTestCase) checkState() error {
 	if err != nil {
 		return err
 	}
-	if tc.rate != numeric.ZeroDec() && reflect.DeepEqual(vwSnap.Delegations, vw.Delegations) {
+	if reflect.DeepEqual(vwSnap.Delegations, vw.Delegations) {
 		return fmt.Errorf("status still unchanged")
 	}
 	return nil
-}
-
-func TestRate(t *testing.T) {
-	tests := []struct {
-		votingPower *votepower.Roster
-		records     Records
-		expRate     numeric.Dec
-	}{
-		{
-			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{
-				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
-				keyPairs[1].Pub(): numeric.NewDecWithPrec(2, 2),
-				keyPairs[2].Pub(): numeric.NewDecWithPrec(3, 2),
-			}),
-			records: Records{
-				makeEmptyRecordWithSignerKey(keyPairs[0].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[1].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[2].Pub()),
-			},
-			expRate: numeric.NewDecWithPrec(6, 2),
-		},
-		{
-			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{
-				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
-			}),
-			records: Records{
-				makeEmptyRecordWithSignerKey(keyPairs[0].Pub()),
-			},
-			expRate: oneDoubleSignerRate,
-		},
-		{
-			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{}),
-			records:     Records{},
-			expRate:     oneDoubleSignerRate,
-		},
-		{
-			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{
-				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
-				keyPairs[1].Pub(): numeric.NewDecWithPrec(2, 2),
-				keyPairs[3].Pub(): numeric.NewDecWithPrec(3, 2),
-			}),
-			records: Records{
-				makeEmptyRecordWithSignerKey(keyPairs[0].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[1].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[2].Pub()),
-			},
-			expRate: numeric.NewDecWithPrec(3, 2),
-		},
-	}
-	for i, test := range tests {
-		rate := Rate(test.votingPower, test.records)
-		if rate.IsNil() || !rate.Equal(test.expRate) {
-			t.Errorf("Test %v: unexpected rate %v / %v", i, rate, test.expRate)
-		}
-	}
-
-}
-
-func makeEmptyRecordWithSignerKey(pub bls.SerializedPublicKey) Record {
-	var r Record
-	r.Evidence.SecondVote.SignerPubKeys = []bls.SerializedPublicKey{pub}
-	r.Evidence.FirstVote.SignerPubKeys = []bls.SerializedPublicKey{pub}
-	return r
-}
-
-func makeVotingPower(m map[bls.SerializedPublicKey]numeric.Dec) *votepower.Roster {
-	r := &votepower.Roster{
-		Voters: make(map[bls.SerializedPublicKey]*votepower.AccommodateHarmonyVote),
-	}
-	for pub, pct := range m {
-		r.Voters[pub] = &votepower.AccommodateHarmonyVote{
-			PureStakedVote: votepower.PureStakedVote{GroupPercent: pct},
-		}
-	}
-	return r
 }
 
 func defaultSlashRecord() Record {
@@ -856,6 +994,45 @@ func defaultTestValidator(pubKeys []bls.SerializedPublicKey) staking.Validator {
 	}
 }
 
+func generateValidatorWrapper(delData []testDelegation) *staking.ValidatorWrapper {
+	pubKeys := []bls.SerializedPublicKey{offPub}
+	v := defaultTestValidator(pubKeys)
+	ds := generateDelegations(delData)
+
+	return &staking.ValidatorWrapper{
+		Validator:   v,
+		Delegations: ds,
+	}
+}
+
+func generateDelegations(delData []testDelegation) staking.Delegations {
+	delegations := make(staking.Delegations, len(delData))
+	for i, del := range delData {
+		delegations[i] = makeDelegation(makeTestAddress(del.address), new(big.Int).Set(del.amount))
+
+		if del.historyUndel != nil {
+			delegations[i].Undelegations = append(
+				delegations[i].Undelegations,
+				staking.Undelegation{
+					Amount: new(big.Int).Set(del.historyUndel),
+					Epoch:  big.NewInt(doubleSignEpoch - 1),
+				},
+			)
+		}
+		if del.afterSignUndel != nil {
+			delegations[i].Undelegations = append(
+				delegations[i].Undelegations,
+				staking.Undelegation{
+					Amount: new(big.Int).Set(del.afterSignUndel),
+					Epoch:  big.NewInt(doubleSignEpoch + 1),
+				},
+			)
+		}
+	}
+
+	return delegations
+}
+
 func defaultTestDelegations() staking.Delegations {
 	return staking.Delegations{
 		makeDelegation(offAddr, new(big.Int).Set(fourtyKOnes)),
@@ -897,8 +1074,8 @@ func makeHistoryUndelegation() staking.Undelegation {
 }
 
 // makeCommitteeFromKeyPairs makes a shard state for testing.
-//  address is generated by makeTestAddress
-//  bls key is get from the variable keyPairs []blsKeyPair
+// address is generated by makeTestAddress
+// bls key is get from the variable keyPairs []blsKeyPair
 func makeDefaultCommittee() shard.State {
 	epoch := big.NewInt(doubleSignEpoch)
 	maker := newShardSlotMaker(keyPairs)
