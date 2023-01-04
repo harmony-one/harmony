@@ -7,6 +7,7 @@ import (
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
@@ -90,7 +91,7 @@ func GenerateConsensusForTesting() (p2p.Host, multibls.PrivateKeys, *Consensus, 
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
 	multiBLSPrivateKey := multibls.GetPrivateKeys(bls.RandPrivateKey())
 
-	consensus, err := New(host, shard.BeaconChainShardID, multiBLSPrivateKey, nil, decider, 3, false)
+	consensus, err := New(host, shard.BeaconChainShardID, multiBLSPrivateKey, registry.New(), decider, 3, false)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

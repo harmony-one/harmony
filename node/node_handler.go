@@ -209,7 +209,7 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	err = node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
 		p2p.ConstructMessage(
-			proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain, headers)),
+			proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain(), headers)),
 	)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msgf("[BroadcastCrossLink] failed to broadcast message")

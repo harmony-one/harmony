@@ -129,10 +129,10 @@ func (consensus *Consensus) fallbackNextViewID() (uint64, time.Duration) {
 // viewID is only used as the fallback mechansim to determine the nextViewID
 func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 	// handle corner case at first
-	if consensus.Blockchain == nil {
+	if consensus.Blockchain() == nil {
 		return consensus.fallbackNextViewID()
 	}
-	curHeader := consensus.Blockchain.CurrentHeader()
+	curHeader := consensus.Blockchain().CurrentHeader()
 	if curHeader == nil {
 		return consensus.fallbackNextViewID()
 	}
@@ -172,12 +172,13 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 	}
 	var lastLeaderPubKey *bls.PublicKeyWrapper
 	var err error
+	blockchain := consensus.Blockchain()
 	epoch := big.NewInt(0)
-	if consensus.Blockchain == nil {
+	if blockchain == nil {
 		consensus.getLogger().Error().Msg("[getNextLeaderKey] Blockchain is nil. Use consensus.LeaderPubKey")
 		lastLeaderPubKey = consensus.LeaderPubKey
 	} else {
-		curHeader := consensus.Blockchain.CurrentHeader()
+		curHeader := blockchain.CurrentHeader()
 		if curHeader == nil {
 			consensus.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
 			lastLeaderPubKey = consensus.LeaderPubKey
@@ -185,7 +186,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
 			gap = int(viewID - stuckBlockViewID)
 			// this is the truth of the leader based on blockchain blocks
-			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(consensus.Blockchain, curHeader)
+			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(blockchain, curHeader)
 			if err != nil || lastLeaderPubKey == nil {
 				consensus.getLogger().Error().Err(err).
 					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
@@ -215,7 +216,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 	// FIXME: rotate leader on harmony nodes only before fully externalization
 	var wasFound bool
 	var next *bls.PublicKeyWrapper
-	if consensus.Blockchain != nil && consensus.Blockchain.Config().IsAllowlistEpoch(epoch) {
+	if blockchain != nil && blockchain.Config().IsAllowlistEpoch(epoch) {
 		wasFound, next = consensus.Decider.NthNextHmyExt(
 			shard.Schedule.InstanceForEpoch(epoch),
 			lastLeaderPubKey,

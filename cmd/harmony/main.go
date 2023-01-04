@@ -17,6 +17,7 @@ import (
 
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/chain"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
@@ -310,7 +311,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	// Update ethereum compatible chain ids
 	params.UpdateEthChainIDByShard(nodeConfig.ShardID)
 
-	currentNode := setupConsensusAndNode(hc, nodeConfig)
+	currentNode := setupConsensusAndNode(hc, nodeConfig, registry.New())
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 	nodeconfig.GetDefaultConfig().Downloader = nodeConfig.Downloader
@@ -659,7 +660,7 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	return nodeConfig, nil
 }
 
-func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType) *node.Node {
+func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType, registry *registry.Registry) *node.Node {
 	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
 	var aggregateSig bool
@@ -733,14 +734,14 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	// Consensus object.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, nodeConfig.ShardID)
 	currentConsensus, err := consensus.New(
-		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, blockchain, decider, minPeers, aggregateSig)
+		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, registry.SetBlockchain(blockchain), decider, minPeers, aggregateSig)
 
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
 
-	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc)
+	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc, registry)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn

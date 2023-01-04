@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
@@ -154,19 +155,12 @@ type Node struct {
 	// context control for pub-sub handling
 	psCtx    context.Context
 	psCancel func()
+	registry *registry.Registry
 }
 
 // Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() core.BlockChain {
-	shardID := node.NodeConfig.ShardID
-	bc, err := node.shardChains.ShardChain(shardID)
-	if err != nil {
-		utils.Logger().Error().
-			Uint32("shardID", shardID).
-			Err(err).
-			Msg("cannot get shard chain")
-	}
-	return bc
+	return node.registry.GetBlockchain()
 }
 
 func (node *Node) SyncInstance() ISync {
@@ -1031,11 +1025,15 @@ func New(
 	localAccounts []common.Address,
 	isArchival map[uint32]bool,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
+	registry *registry.Registry,
 ) *Node {
-	node := Node{}
-	node.unixTimeAtNodeStart = time.Now().Unix()
-	node.TransactionErrorSink = types.NewTransactionErrorSink()
-	node.crosslinks = crosslinks.New()
+	node := Node{
+		registry:             registry,
+		unixTimeAtNodeStart:  time.Now().Unix(),
+		TransactionErrorSink: types.NewTransactionErrorSink(),
+		crosslinks:           crosslinks.New(),
+	}
+
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -1214,7 +1212,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
 	shardState, err := committee.WithStakingEnabled.Compute(
-		epoch, node.Consensus.Blockchain,
+		epoch, node.Consensus.Blockchain(),
 	)
 	if err != nil {
 		utils.Logger().Err(err).
@@ -1336,7 +1334,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 	node.keysToAddrsEpoch = epoch
 
 	shardID := node.Consensus.ShardID
-	shardState, err := node.Consensus.Blockchain.ReadShardState(epoch)
+	shardState, err := node.Consensus.Blockchain().ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Int64("epoch", epoch.Int64()).
