@@ -7,7 +7,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.5.7
 	github.com/Workiva/go-datastructures v1.0.50
 	github.com/allegro/bigcache v1.2.1
-	github.com/aws/aws-sdk-go v1.30.1
+	github.com/aws/aws-sdk-go v1.33.0
 	github.com/beevik/ntp v0.3.0
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/cespare/cp v1.1.1
