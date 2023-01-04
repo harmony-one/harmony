@@ -54,11 +54,6 @@ func (sr *StageShortRange) Exec(firstCycle bool, invalidBlockRevert bool, s *Sta
 		return nil
 	}
 
-	curBN := sr.configs.bc.CurrentBlock().NumberU64()
-	if curBN >= s.state.status.targetBN {
-		return nil
-	}
-
 	// do short range sync
 	n, err := sr.doShortRangeSync(s)
 	s.state.inserted = n
@@ -109,8 +104,7 @@ func (sr *StageShortRange) doShortRangeSync(s *StageState) (int, error) {
 		return 0, errors.Wrap(err, "prerequisite")
 	}
 	curBN := sr.configs.bc.CurrentBlock().NumberU64()
-	blkCount := int(s.state.status.targetBN) - int(curBN)
-	blkNums := sh.prepareBlockHashNumbers(curBN, blkCount)
+	blkNums := sh.prepareBlockHashNumbers(curBN)
 	hashChain, whitelist, err := sh.getHashChain(blkNums)
 	if err != nil {
 		return 0, errors.Wrap(err, "getHashChain")
