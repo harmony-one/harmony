@@ -707,6 +707,11 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	collection := shardchain.NewCollection(
 		&hc, chainDBFactory, &core.GenesisInitializer{NetworkType: nodeConfig.GetNetworkType()}, engine, &chainConfig,
 	)
+	for shardID, archival := range nodeConfig.ArchiveModes() {
+		if archival {
+			collection.DisableCache(shardID)
+		}
+	}
 
 	var blockchain core.BlockChain
 
