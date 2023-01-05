@@ -44,15 +44,16 @@ type (
 )
 
 // NewDownloader creates a new downloader
-func NewDownloader(host p2p.Host, bc core.BlockChain, config Config) *Downloader {
+func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config Config) *Downloader {
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{
-		Chain:     bc,
-		Host:      host.GetP2PHost(),
-		Discovery: host.GetDiscovery(),
-		ShardID:   nodeconfig.ShardID(bc.ShardID()),
-		Network:   config.Network,
+		Chain:      bc,
+		Host:       host.GetP2PHost(),
+		Discovery:  host.GetDiscovery(),
+		ShardID:    nodeconfig.ShardID(bc.ShardID()),
+		Network:    config.Network,
+		BeaconNode: isBeaconNode,
 
 		SmSoftLowCap: config.SmSoftLowCap,
 		SmHardLowCap: config.SmHardLowCap,
