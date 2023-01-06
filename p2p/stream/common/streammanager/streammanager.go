@@ -327,7 +327,7 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			// The ctx here is using the module context instead of discover context
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
 			if err != nil {
-				sm.coolDownCache.Add(pid)
+				sm.coolDownCache.Add(peer.ID)
 				sm.logger.Warn().Err(err).Str("peerID", string(pid)).Msg("failed to setup stream with peer")
 				return
 			}
