@@ -315,12 +315,16 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			// If the peer has the same ID and was just connected, skip.
 			continue
 		}
+		if _, ok := sm.streams.get(sttypes.StreamID(peer.ID)); ok {
+			continue
+		}
 		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		connecting += 1
 		go func(pid libp2p_peer.ID) {
 			// The ctx here is using the module context instead of discover context
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
 			if err != nil {
+				sm.coolDownCache.Add(peer.ID)
 				sm.logger.Warn().Err(err).Str("peerID", string(pid)).Msg("failed to setup stream with peer")
 				return
 			}
