@@ -117,11 +117,7 @@ func (c Computed) String() string {
 }
 
 // NewComputed ..
-func NewComputed(
-	signed, toSign *big.Int,
-	blocksLeft uint64,
-	percent numeric.Dec,
-	isBelowNow bool) *Computed {
+func NewComputed(signed, toSign *big.Int, blocksLeft uint64, percent numeric.Dec, isBelowNow bool) *Computed {
 	return &Computed{signed, toSign, blocksLeft, percent, isBelowNow}
 }
 
@@ -217,6 +213,15 @@ type ValidatorStats struct {
 func (s ValidatorStats) String() string {
 	str, _ := json.Marshal(s)
 	return string(str)
+}
+
+// DecodeValidatorStats decode validator stats from bytes.
+func DecodeValidatorStats(data []byte) (*ValidatorStats, error) {
+	stats := ValidatorStats{}
+	if err := rlp.DecodeBytes(data, &stats); err != nil {
+		return nil, err
+	}
+	return &stats, nil
 }
 
 // Validator - data fields for a validator

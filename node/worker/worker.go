@@ -524,12 +524,11 @@ func (w *Worker) FinalizeNewBlock(
 		}
 		// NOTE: Besides genesis, this is the only place where the shard state is encoded.
 		shardStateData, err := shard.EncodeWrapper(*shardState, isStaking)
-		if err == nil {
-			w.current.header.SetShardState(shardStateData)
-		} else {
+		if err != nil {
 			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed shard state")
 			return nil, err
 		}
+		w.current.header.SetShardState(shardStateData)
 	}
 	state := w.current.state
 	copyHeader := types.CopyHeader(w.current.header)

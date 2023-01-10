@@ -107,9 +107,8 @@ func (cs CXReceipts) ComputeMerkleRoot() common.Hash {
 
 // GetToShardReceipts filters the cross shard receipts with given destination shardID
 func (cs CXReceipts) GetToShardReceipts(shardID uint32) CXReceipts {
-	cxs := CXReceipts{}
-	for i := range cs {
-		cx := cs[i]
+	cxs := make(CXReceipts, 0, len(cs)/2)
+	for _, cx := range cs {
 		if cx.ToShardID == shardID {
 			cxs = append(cxs, cx)
 		}

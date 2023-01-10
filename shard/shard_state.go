@@ -19,7 +19,6 @@ import (
 )
 
 var (
-	emptyBLSPubKey = bls.SerializedPublicKey{}
 	// ErrShardIDNotInSuperCommittee ..
 	ErrShardIDNotInSuperCommittee = errors.New("shardID not in super committee")
 )
@@ -36,6 +35,7 @@ type Slot struct {
 	BLSPublicKey bls.SerializedPublicKey `json:"bls-pubkey"`
 	// nil means our node, 0 means not active, > 0 means staked node
 	EffectiveStake *numeric.Dec `json:"effective-stake" rlp:"nil"`
+	RawStake       numeric.Dec  `json:"-" rlp:"nil"`
 }
 
 // SlotList is a list of Slot.
@@ -99,7 +99,7 @@ func DecodeWrapper(shardState []byte) (*State, error) {
 			newSS.Shards[i] = Committee{ShardID: oldSS[i].ShardID, Slots: SlotList{}}
 			for _, slot := range oldSS[i].Slots {
 				newSS.Shards[i].Slots = append(newSS.Shards[i].Slots, Slot{
-					slot.EcdsaAddress, slot.BLSPublicKey, nil,
+					slot.EcdsaAddress, slot.BLSPublicKey, nil, numeric.ZeroDec(),
 				})
 			}
 		}
