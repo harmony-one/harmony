@@ -12,7 +12,7 @@ RPMBUILD=$(HOME)/rpmbuild
 DEBBUILD=$(HOME)/debbuild
 SHELL := bash
 
-.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean
+.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
@@ -157,3 +157,6 @@ go-vet:
 
 go-test:
 	go test -vet=all -race ./...
+
+docker:
+	docker build --pull -t harmonyone/$(PKGNAME):latest -f scripts/docker/Dockerfile .

@@ -1,31 +1,67 @@
-FROM alpine
+ARG GOPATH_DEFAULT=/root/go
+ARG SRC_PATH=src/github.com/harmony-one
 
-RUN apk add --no-cache bash libstdc++ gmp-dev libc6-compat bind-tools jq && ln -s libcrypto.so.1.1 /lib/libcrypto.so.10
+FROM golang:1.18-bullseye as builder
+
+ARG GOPATH_DEFAULT
+ARG SRC_PATH
+
+ENV GOPATH=${GOPATH_DEFAULT}
+ENV GO111MODULE=on
+ENV HMY_PATH=${GOPATH}/${SRC_PATH}
+
+ENV PACKAGES libgmp-dev libssl-dev curl git \
+	psmisc dnsutils jq make gcc g++ bash tig tree
+
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y $PACKAGES --no-install-recommends
+
+WORKDIR ${HMY_PATH}
+
+RUN git clone https://github.com/harmony-one/harmony.git harmony \
+  && git clone https://github.com/harmony-one/bls.git bls \
+  && git clone https://github.com/harmony-one/mcl.git mcl \
+  && git clone https://github.com/harmony-one/go-sdk.git go-sdk
+
+WORKDIR ${HMY_PATH}/harmony
+RUN make linux_static
+
+# Pull harmony into a second stage deploy alpine container
+FROM alpine:3.16.0
+
+ARG GOPATH_DEFAULT
+ARG SRC_PATH
+
+ARG HARMONY_USER=harmony
+ARG HARMONY_USER_UID=1000
+ARG HARMONY_USER_GID=1000
+
+ENV HARMONY_HOME=/harmony
+ENV HOME=${HARMONY_HOME}
+
+RUN apk add --no-cache bash~=5.1.16-r2 bind-tools~=9.16.29-r0 tini~=0.19.0 curl==7.83.1-r2 sed~=4.8-r0 \
+    && rm -rf /var/cache/apk/* \
+    && addgroup -g ${HARMONY_USER_GID} ${HARMONY_USER} \
+    && adduser -u ${HARMONY_USER_UID} -G ${HARMONY_USER} --shell /sbin/nologin --no-create-home -D ${HARMONY_USER} \
+    && addgroup ${HARMONY_USER} tty \
+    && sed -i -e "s/bin\/sh/bin\/bash/" /etc/passwd
+
+RUN echo "[ ! -z \"\$TERM\" -a -r /etc/motd ] && cat /etc/motd" >> /etc/bash/bashrc
+
+WORKDIR ${HARMONY_HOME}
+
+COPY --from=builder ${GOPATH_DEFAULT}/${SRC_PATH}/harmony/bin/harmony /usr/local/bin/
+
+RUN chmod +x  /usr/local/bin/harmony  \
+    && mkdir -p /data \
+    && chown -R ${HARMONY_USER_UID}:${HARMONY_USER_GID} ${HARMONY_HOME} /data
+
+VOLUME /data
+
+USER ${HARMONY_USER_UID}:${HARMONY_USER_GID}
 
 # default base port, rpc port and rest port
 EXPOSE 9000/tcp 9500/tcp 9800/tcp 6000/tcp
 
-VOLUME ["/harmony/harmony_db_0","/harmony/harmony_db_1","/harmony/harmony_db_2","/harmony/harmony_db_3","/harmony/log","/harmony/.hmy"]
-
-# Default BN for S3/mainnet
-ENV NODE_BN_MNET "/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX,/ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj"
-
-# Long Running Test Net
-ENV NODE_BN_LRTN "/ip4/54.213.43.194/tcp/9868/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/100.26.90.187/tcp/9868/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/13.113.101.219/tcp/12018/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX"
-
-# Open Staking Test Net
-ENV NODE_BN_OSTN "/ip4/54.86.126.90/tcp/9880/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/52.40.84.2/tcp/9880/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29"
-
-ENV NODE_PORT "9000"
-ENV NODE_BLSKEY ""
-ENV NODE_BLSPASS ""
-ENV NODE_DNS_ZONE "t.hmny.io"
-ENV NODE_RPC "true"
-ENV NODE_BLACKLIST ""
-ENV NODE_NETWORK_TYPE "mainnet"
-
-ENTRYPOINT ["/bin/run"]
-WORKDIR /harmony
-
-COPY run /bin/run
-COPY harmony /bin/
+ENTRYPOINT ["tini", "--"]
+CMD ["harmony", "-c", "harmony.conf"]
