@@ -218,6 +218,7 @@ var (
 	syncFlags = []cli.Flag{
 		syncStreamEnabledFlag,
 		syncDownloaderFlag,
+		syncStagedSyncFlag,
 		syncConcurrencyFlag,
 		syncMinPeersFlag,
 		syncInitStreamsFlag,
@@ -578,6 +579,11 @@ var (
 		Usage:    "maximum number of peers allowed, 0 means no limit",
 		DefValue: defaultConfig.P2P.MaxConnsPerIP,
 	}
+	waitForEachPeerToConnectFlag = cli.BoolFlag{
+		Name:     "p2p.wait-for-connections",
+		Usage:    "node waits for each single peer to connect and it doesn't add them to peers list after timeout",
+		DefValue: defaultConfig.P2P.WaitForEachPeerToConnect,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -612,6 +618,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, maxPeersFlag) {
 		config.P2P.MaxPeers = int64(cli.GetIntFlagValue(cmd, maxPeersFlag))
+	}
+
+	if cli.IsFlagChanged(cmd, waitForEachPeerToConnectFlag) {
+		config.P2P.WaitForEachPeerToConnect = cli.GetBoolFlagValue(cmd, waitForEachPeerToConnectFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {
@@ -1661,6 +1671,12 @@ var (
 		Hidden:   true,
 		DefValue: false,
 	}
+	syncStagedSyncFlag = cli.BoolFlag{
+		Name:     "sync.stagedsync",
+		Usage:    "Enable the staged sync",
+		Hidden:   false,
+		DefValue: false,
+	}
 	syncConcurrencyFlag = cli.IntFlag{
 		Name:   "sync.concurrency",
 		Usage:  "Concurrency when doing p2p sync requests",
@@ -1706,6 +1722,10 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
 		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncStagedSyncFlag) {
+		config.Sync.StagedSync = cli.GetBoolFlagValue(cmd, syncStagedSyncFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, syncConcurrencyFlag) {

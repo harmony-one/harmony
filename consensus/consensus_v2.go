@@ -169,7 +169,7 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
-	consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
+	consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
 
 	// Send committed message before block insertion.
 	// if leader successfully finalizes the block, send committed message to validators
@@ -267,7 +267,7 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 	if consensus.BlockNum() <= 1 {
 		return nil, nil
 	}
-	lastCommits, err := consensus.Blockchain.ReadCommitSig(blockNum)
+	lastCommits, err := consensus.Blockchain().ReadCommitSig(blockNum)
 	if err != nil ||
 		len(lastCommits) < bls.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
@@ -363,9 +363,9 @@ func (consensus *Consensus) Start(
 			case <-consensus.syncReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
 				consensus.mutex.Lock()
-				if consensus.BlockNum() < consensus.Blockchain.CurrentHeader().Number().Uint64()+1 {
-					consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
-					consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
+				if consensus.BlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
+					consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
+					consensus.SetViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
 					mode := consensus.UpdateConsensusInformation()
 					consensus.current.SetMode(mode)
 					consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
@@ -386,7 +386,7 @@ func (consensus *Consensus) Start(
 			// TODO: Refactor this piece of code to consensus/downloader.go after DNS legacy sync is removed
 			case <-consensus.syncNotReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
-				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
+				consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
 				consensus.current.SetMode(Syncing)
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 				consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
@@ -574,7 +574,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 				Msg("[preCommitAndPropose] Sent Committed Message")
 		}
 
-		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
+		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
 			return
 		}
@@ -606,7 +606,7 @@ func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types
 	}
 	aggPubKey := consensus.commitBitmap.AggregatePublic
 
-	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain(),
 		blk.Epoch(), blk.Hash(), blk.NumberU64(), blk.Header().ViewID().Uint64())
 
 	if !aggSig.VerifyHash(aggPubKey, commitPayload) {
@@ -658,8 +658,8 @@ func (consensus *Consensus) tryCatchup() error {
 }
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
-	if consensus.Blockchain.CurrentBlock().NumberU64() < blk.NumberU64() {
-		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
+	if consensus.Blockchain().CurrentBlock().NumberU64() < blk.NumberU64() {
+		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
 			return err
 		}
@@ -716,7 +716,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newHeader *block.Header) error {
 		return errors.New("[GenerateVrfAndProof] no leader private key provided")
 	}
 	sk := vrf_bls.NewVRFSigner(key.Pri)
-	previousHeader := consensus.Blockchain.GetHeaderByNumber(
+	previousHeader := consensus.Blockchain().GetHeaderByNumber(
 		newHeader.Number().Uint64() - 1,
 	)
 	if previousHeader == nil {
@@ -745,7 +745,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 	//derive VDF seed from VRFs generated in the current epoch
 	seed := [32]byte{}
 	for i := 0; i < consensus.VdfSeedSize(); i++ {
-		previousVrf := consensus.Blockchain.GetVrfByNumber(vrfBlockNumbers[i])
+		previousVrf := consensus.Blockchain().GetVrfByNumber(vrfBlockNumbers[i])
 		for j := 0; j < len(seed); j++ {
 			seed[j] = seed[j] ^ previousVrf[j]
 		}
@@ -779,7 +779,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 
 // ValidateVdfAndProof validates the VDF/proof in the current epoch
 func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
-	vrfBlockNumbers, err := consensus.Blockchain.ReadEpochVrfBlockNums(headerObj.Epoch())
+	vrfBlockNumbers, err := consensus.Blockchain().ReadEpochVrfBlockNums(headerObj.Epoch())
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Str("MsgBlockNum", headerObj.Number().String()).
@@ -794,7 +794,7 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
 
 	seed := [32]byte{}
 	for i := 0; i < consensus.VdfSeedSize(); i++ {
-		previousVrf := consensus.Blockchain.GetVrfByNumber(vrfBlockNumbers[i])
+		previousVrf := consensus.Blockchain().GetVrfByNumber(vrfBlockNumbers[i])
 		for j := 0; j < len(seed); j++ {
 			seed[j] = seed[j] ^ previousVrf[j]
 		}

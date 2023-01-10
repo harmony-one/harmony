@@ -3,14 +3,13 @@ package discovery
 // TODO: test this module
 
 import (
-	"context"
 	"testing"
 
 	"github.com/libp2p/go-libp2p"
 )
 
 func TestNewDHTDiscovery(t *testing.T) {
-	host, err := libp2p.New(context.Background())
+	host, err := libp2p.New()
 	if err != nil {
 		t.Fatal(err)
 	}

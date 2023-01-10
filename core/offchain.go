@@ -167,6 +167,8 @@ func (bc *BlockChainImpl) CommitOffChainData(
 
 			cl0, _ := bc.ReadShardLastCrossLink(crossLink.ShardID())
 			if cl0 == nil {
+				// make sure it is written at least once, so that it is overwritten below
+				// under "Roll up latest crosslinks"
 				rawdb.WriteShardLastCrossLink(batch, crossLink.ShardID(), crossLink.Serialize())
 			}
 		}

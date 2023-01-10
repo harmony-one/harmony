@@ -6,12 +6,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/registry"
 
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -62,8 +63,8 @@ type Consensus struct {
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
 	multiSigMutex  sync.RWMutex
 
-	// The blockchain this consensus is working on
-	Blockchain core.BlockChain
+	// Registry for services.
+	registry *registry.Registry
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers   int
@@ -137,7 +138,12 @@ type Consensus struct {
 	dHelper *downloadHelper
 }
 
-// VerifyBlock is a function used to verify the block and keep trace of verified blocks
+// Blockchain returns the blockchain.
+func (consensus *Consensus) Blockchain() core.BlockChain {
+	return consensus.registry.GetBlockchain()
+}
+
+// VerifyBlock is a function used to verify the block and keep trace of verified blocks.
 func (consensus *Consensus) VerifyBlock(block *types.Block) error {
 	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
@@ -211,12 +217,12 @@ func (consensus *Consensus) BlockNum() uint64 {
 // New create a new Consensus record
 func New(
 	host p2p.Host, shard uint32, multiBLSPriKey multibls.PrivateKeys,
-	blockchain core.BlockChain,
+	registry *registry.Registry,
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.Decider = Decider
-	consensus.Blockchain = blockchain
+	consensus.registry = registry
 	consensus.MinPeers = minPeers
 	consensus.AggregateSig = aggregateSig
 	consensus.host = host

@@ -17,6 +17,7 @@ import (
 
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/chain"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
@@ -310,10 +311,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	// Update ethereum compatible chain ids
 	params.UpdateEthChainIDByShard(nodeConfig.ShardID)
 
-	currentNode := setupConsensusAndNode(hc, nodeConfig)
+	currentNode := setupConsensusAndNode(hc, nodeConfig, registry.New())
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 	nodeconfig.GetDefaultConfig().Downloader = nodeConfig.Downloader
+	nodeconfig.GetDefaultConfig().StagedSync = nodeConfig.StagedSync
 
 	// Check NTP configuration
 	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
@@ -599,7 +601,17 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	nodeConfig.SetArchival(hc.General.IsBeaconArchival, hc.General.IsArchival)
 	nodeConfig.IsOffline = hc.General.IsOffline
 	nodeConfig.Downloader = hc.Sync.Downloader
-
+	nodeConfig.StagedSync = hc.Sync.StagedSync
+	nodeConfig.StagedSyncTurboMode = hc.Sync.StagedSyncCfg.TurboMode
+	nodeConfig.UseMemDB = hc.Sync.StagedSyncCfg.UseMemDB
+	nodeConfig.DoubleCheckBlockHashes = hc.Sync.StagedSyncCfg.DoubleCheckBlockHashes
+	nodeConfig.MaxBlocksPerSyncCycle = hc.Sync.StagedSyncCfg.MaxBlocksPerSyncCycle
+	nodeConfig.MaxBackgroundBlocks = hc.Sync.StagedSyncCfg.MaxBackgroundBlocks
+	nodeConfig.MaxMemSyncCycleSize = hc.Sync.StagedSyncCfg.MaxMemSyncCycleSize
+	nodeConfig.VerifyAllSig = hc.Sync.StagedSyncCfg.VerifyAllSig
+	nodeConfig.VerifyHeaderBatchSize = hc.Sync.StagedSyncCfg.VerifyHeaderBatchSize
+	nodeConfig.InsertChainBatchSize = hc.Sync.StagedSyncCfg.InsertChainBatchSize
+	nodeConfig.LogProgress = hc.Sync.StagedSyncCfg.LogProgress
 	// P2P private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(hc.P2P.KeyFile)
 	if err != nil {
@@ -613,14 +625,15 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
 	myHost, err = p2p.NewHost(p2p.HostConfig{
-		Self:                 &selfPeer,
-		BLSKey:               nodeConfig.P2PPriKey,
-		BootNodes:            hc.Network.BootNodes,
-		DataStoreFile:        hc.P2P.DHTDataStore,
-		DiscConcurrency:      hc.P2P.DiscConcurrency,
-		MaxConnPerIP:         hc.P2P.MaxConnsPerIP,
-		DisablePrivateIPScan: hc.P2P.DisablePrivateIPScan,
-		MaxPeers:             hc.P2P.MaxPeers,
+		Self:                     &selfPeer,
+		BLSKey:                   nodeConfig.P2PPriKey,
+		BootNodes:                hc.Network.BootNodes,
+		DataStoreFile:            hc.P2P.DHTDataStore,
+		DiscConcurrency:          hc.P2P.DiscConcurrency,
+		MaxConnPerIP:             hc.P2P.MaxConnsPerIP,
+		DisablePrivateIPScan:     hc.P2P.DisablePrivateIPScan,
+		MaxPeers:                 hc.P2P.MaxPeers,
+		WaitForEachPeerToConnect: hc.P2P.WaitForEachPeerToConnect,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
@@ -647,7 +660,7 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	return nodeConfig, nil
 }
 
-func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType) *node.Node {
+func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType, registry *registry.Registry) *node.Node {
 	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
 	var aggregateSig bool
@@ -695,6 +708,11 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	collection := shardchain.NewCollection(
 		&hc, chainDBFactory, &core.GenesisInitializer{NetworkType: nodeConfig.GetNetworkType()}, engine, &chainConfig,
 	)
+	for shardID, archival := range nodeConfig.ArchiveModes() {
+		if archival {
+			collection.DisableCache(shardID)
+		}
+	}
 
 	var blockchain core.BlockChain
 
@@ -716,14 +734,14 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	// Consensus object.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, nodeConfig.ShardID)
 	currentConsensus, err := consensus.New(
-		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, blockchain, decider, minPeers, aggregateSig)
+		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, registry.SetBlockchain(blockchain), decider, minPeers, aggregateSig)
 
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
 
-	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc)
+	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc, registry)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn

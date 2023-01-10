@@ -46,14 +46,15 @@ type NetworkConfig struct {
 }
 
 type P2pConfig struct {
-	Port                 int
-	IP                   string
-	KeyFile              string
-	DHTDataStore         *string `toml:",omitempty"`
-	DiscConcurrency      int     // Discovery Concurrency value
-	MaxConnsPerIP        int
-	DisablePrivateIPScan bool
-	MaxPeers             int64
+	Port                     int
+	IP                       string
+	KeyFile                  string
+	DHTDataStore             *string `toml:",omitempty"`
+	DiscConcurrency          int     // Discovery Concurrency value
+	MaxConnsPerIP            int
+	DisablePrivateIPScan     bool
+	MaxPeers                 int64
+	WaitForEachPeerToConnect bool
 }
 
 type GeneralConfig struct {
@@ -221,13 +222,28 @@ type PrometheusConfig struct {
 
 type SyncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
-	Enabled        bool // enable the stream sync protocol
-	Downloader     bool // start the sync downloader client
-	Concurrency    int  // concurrency used for stream sync protocol
-	MinPeers       int  // minimum streams to start a sync task.
-	InitStreams    int  // minimum streams in bootstrap to start sync loop.
-	DiscSoftLowCap int  // when number of streams is below this value, spin discover during check
-	DiscHardLowCap int  // when removing stream, num is below this value, spin discovery immediately
-	DiscHighCap    int  // upper limit of streams in one sync protocol
-	DiscBatch      int  // size of each discovery
+	Enabled        bool             // enable the stream sync protocol
+	Downloader     bool             // start the sync downloader client
+	StagedSync     bool             // use staged sync
+	StagedSyncCfg  StagedSyncConfig // staged sync configurations
+	Concurrency    int              // concurrency used for stream sync protocol
+	MinPeers       int              // minimum streams to start a sync task.
+	InitStreams    int              // minimum streams in bootstrap to start sync loop.
+	DiscSoftLowCap int              // when number of streams is below this value, spin discover during check
+	DiscHardLowCap int              // when removing stream, num is below this value, spin discovery immediately
+	DiscHighCap    int              // upper limit of streams in one sync protocol
+	DiscBatch      int              // size of each discovery
+}
+
+type StagedSyncConfig struct {
+	TurboMode              bool   // turn on turbo mode
+	DoubleCheckBlockHashes bool   // double check all block hashes before download blocks
+	MaxBlocksPerSyncCycle  uint64 // max number of blocks per each sync cycle, if set to zero, all blocks will be synced in one full cycle
+	MaxBackgroundBlocks    uint64 // max number of background blocks in turbo mode
+	InsertChainBatchSize   int    // number of blocks to build a batch and insert to chain in staged sync
+	MaxMemSyncCycleSize    uint64 // max number of blocks to use a single transaction for staged sync
+	VerifyAllSig           bool   // verify signatures for all blocks regardless of height and batch size
+	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
+	UseMemDB               bool   // it uses memory by default. set it to false to use disk
+	LogProgress            bool   // log the full sync progress in console
 }

@@ -7,25 +7,25 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	ic "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	ic "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	libp2p_network "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
 )
 
-type ConnectCallback func(net network.Network, conn network.Conn) error
-type DisconnectCallback func(conn network.Conn) error
+type ConnectCallback func(net libp2p_network.Network, conn libp2p_network.Conn) error
+type DisconnectCallback func(conn libp2p_network.Conn) error
 
 type fakeHost struct {
 	onConnections []ConnectCallback
 	onDisconnects []DisconnectCallback
 }
 
-func (fh *fakeHost) Listen(network.Network, ma.Multiaddr)      {}
-func (fh *fakeHost) ListenClose(network.Network, ma.Multiaddr) {}
-func (fh *fakeHost) Connected(net network.Network, conn network.Conn) {
+func (fh *fakeHost) Listen(libp2p_network.Network, ma.Multiaddr)      {}
+func (fh *fakeHost) ListenClose(libp2p_network.Network, ma.Multiaddr) {}
+func (fh *fakeHost) Connected(net libp2p_network.Network, conn libp2p_network.Conn) {
 	for _, function := range fh.onConnections {
 		if err := function(net, conn); err != nil {
 			fmt.Println("failed on peer connected callback")
@@ -33,7 +33,7 @@ func (fh *fakeHost) Connected(net network.Network, conn network.Conn) {
 	}
 }
 
-func (fh *fakeHost) Disconnected(net network.Network, conn network.Conn) {
+func (fh *fakeHost) Disconnected(net libp2p_network.Network, conn libp2p_network.Conn) {
 	for _, function := range fh.onDisconnects {
 		if err := function(conn); err != nil {
 			fmt.Println("failed on peer disconnected callback")
@@ -41,8 +41,8 @@ func (fh *fakeHost) Disconnected(net network.Network, conn network.Conn) {
 	}
 }
 
-func (mh *fakeHost) OpenedStream(network.Network, network.Stream) {}
-func (mh *fakeHost) ClosedStream(network.Network, network.Stream) {}
+func (mh *fakeHost) OpenedStream(libp2p_network.Network, libp2p_network.Stream) {}
+func (mh *fakeHost) ClosedStream(libp2p_network.Network, libp2p_network.Stream) {}
 func (mh *fakeHost) SetConnectCallback(callback ConnectCallback) {
 	mh.onConnections = append(mh.onConnections, callback)
 }
@@ -135,7 +135,7 @@ func newPeer(port int) (host.Host, error) {
 	}
 
 	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)
-	host, err := libp2p.New(context.Background(), libp2p.ListenAddrStrings(listenAddr), libp2p.DisableRelay(), libp2p.Identity(priv), libp2p.NoSecurity)
+	host, err := libp2p.New(libp2p.ListenAddrStrings(listenAddr), libp2p.DisableRelay(), libp2p.Identity(priv), libp2p.NoSecurity)
 	if err != nil {
 		return nil, err
 	}
@@ -145,20 +145,25 @@ func newPeer(port int) (host.Host, error) {
 
 type fakeConn struct{}
 
-func (conn *fakeConn) Close() error                 { return nil }
-func (conn *fakeConn) LocalPeer() peer.ID           { return "" }
-func (conn *fakeConn) LocalPrivateKey() ic.PrivKey  { return nil }
-func (conn *fakeConn) RemotePeer() peer.ID          { return "" }
-func (conn *fakeConn) RemotePublicKey() ic.PubKey   { return nil }
+func (conn *fakeConn) ID() string                                               { return "" }
+func (conn *fakeConn) NewStream(context.Context) (libp2p_network.Stream, error) { return nil, nil }
+func (conn *fakeConn) GetStreams() []libp2p_network.Stream                      { return nil }
+func (conn *fakeConn) Close() error                                             { return nil }
+func (conn *fakeConn) LocalPeer() peer.ID                                       { return "" }
+func (conn *fakeConn) LocalPrivateKey() ic.PrivKey                              { return nil }
+func (conn *fakeConn) RemotePeer() peer.ID                                      { return "" }
+func (conn *fakeConn) RemotePublicKey() ic.PubKey                               { return nil }
+func (conn *fakeConn) ConnState() libp2p_network.ConnectionState {
+	return libp2p_network.ConnectionState{}
+}
 func (conn *fakeConn) LocalMultiaddr() ma.Multiaddr { return nil }
 func (conn *fakeConn) RemoteMultiaddr() ma.Multiaddr {
 	addr, _ := ma.NewMultiaddr("/ip6/fe80::7802:31ff:fee9:c093/tcp/50550")
 	return addr
 }
-func (conn *fakeConn) ID() string                                        { return "" }
-func (conn *fakeConn) NewStream(context.Context) (network.Stream, error) { return nil, nil }
-func (conn *fakeConn) GetStreams() []network.Stream                      { return nil }
-func (conn *fakeConn) Stat() network.Stat                                { return network.Stat{} }
+func (conn *fakeConn) Stat() libp2p_network.ConnStats  { return libp2p_network.ConnStats{} }
+func (conn *fakeConn) Scope() libp2p_network.ConnScope { return nil }
+
 func TestGetRemoteIP(t *testing.T) {
 	ip, err := getRemoteIP(&fakeConn{})
 	assert.Nil(t, err)

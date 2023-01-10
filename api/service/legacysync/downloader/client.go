@@ -8,6 +8,7 @@ import (
 	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 )
 
 // Client is the client model for downloader package.
@@ -15,17 +16,22 @@ type Client struct {
 	dlClient pb.DownloaderClient
 	opts     []grpc.DialOption
 	conn     *grpc.ClientConn
+	addr     string
 }
 
 // ClientSetup setups a Client given ip and port.
-func ClientSetup(ip, port string) *Client {
+func ClientSetup(ip, port string, withBlock bool) *Client {
 	client := Client{}
 	client.opts = append(client.opts, grpc.WithInsecure())
+	if withBlock {
+		client.opts = append(client.opts, grpc.WithBlock())
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	client.addr = fmt.Sprintf("%s:%s", ip, port)
 	var err error
-	client.conn, err = grpc.DialContext(ctx, fmt.Sprintf(ip+":"+port), client.opts...)
+	client.conn, err = grpc.DialContext(ctx, client.addr, client.opts...)
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("ip", ip).Msg("[SYNC] client.go:ClientSetup fail to dial")
 		return nil
@@ -35,12 +41,50 @@ func ClientSetup(ip, port string) *Client {
 	return &client
 }
 
+// IsReady returns true if client is ready
+func (client *Client) IsReady() bool {
+	return client.conn.GetState() == connectivity.Ready
+}
+
+// IsConnecting returns true if client is connecting
+func (client *Client) IsConnecting() bool {
+	return client.conn.GetState() == connectivity.Connecting
+}
+
+// State returns current Connecting state
+func (client *Client) State() connectivity.State {
+	return client.conn.GetState()
+}
+
+// WaitForConnection waits for client to connect
+func (client *Client) WaitForConnection(t time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), t)
+	defer cancel()
+
+	if client.conn.GetState() == connectivity.Ready {
+		return true
+	}
+
+	if ready := client.conn.WaitForStateChange(ctx, client.conn.GetState()); !ready {
+		return false
+	} else {
+		return client.conn.GetState() == connectivity.Ready
+	}
+}
+
 // Close closes the Client.
-func (client *Client) Close() {
+func (client *Client) Close(reason string) {
 	err := client.conn.Close()
 	if err != nil {
-		utils.Logger().Info().Msg("[SYNC] unable to close connection")
+		utils.Logger().Info().
+			Str("peerAddress", client.addr).
+			Msg("[SYNC] unable to close peer connection")
+		return
 	}
+	utils.Logger().Info().
+		Str("peerAddress", client.addr).
+		Str("reason", reason).
+		Msg("[SYNC] peer connection closed")
 }
 
 // GetBlockHashes gets block hashes from all the peers by calling grpc request.

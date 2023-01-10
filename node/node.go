@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
@@ -26,8 +27,8 @@ import (
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	lru "github.com/hashicorp/golang-lru"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rcrowley/go-metrics"
@@ -39,6 +40,7 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -81,6 +83,20 @@ type syncConfig struct {
 	withSig bool
 }
 
+type ISync interface {
+	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error
+	AddLastMileBlock(block *types.Block)
+	GetActivePeerNumber() int
+	CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error
+	SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration)
+	IsSynchronized() bool
+	IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool)
+	AddNewBlock(peerHash []byte, block *types.Block)
+	RegisterNodeInfo() int
+	GetParsedSyncStatus() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
+	GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
+}
+
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
@@ -102,6 +118,7 @@ type Node struct {
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	stateSync              *legacysync.StateSync
 	epochSync              *legacysync.EpochSync
+	stateStagedSync        *stagedsync.StagedSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
@@ -127,8 +144,8 @@ type Node struct {
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
 	BroadcastInvalidTx bool
 	// InSync flag indicates the node is in-sync or not
-	IsInSync      *abool.AtomicBool
-	proposedBlock map[uint64]*types.Block
+	IsSynchronized *abool.AtomicBool
+	proposedBlock  map[uint64]*types.Block
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
@@ -138,22 +155,40 @@ type Node struct {
 	// context control for pub-sub handling
 	psCtx    context.Context
 	psCancel func()
+	registry *registry.Registry
 }
 
 // Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() core.BlockChain {
-	shardID := node.NodeConfig.ShardID
-	bc, err := node.shardChains.ShardChain(shardID)
-	if err != nil {
-		utils.Logger().Error().
-			Uint32("shardID", shardID).
-			Err(err).
-			Msg("cannot get shard chain")
-	}
-	return bc
+	return node.registry.GetBlockchain()
 }
 
-// Beaconchain returns the beaconchain from node.
+func (node *Node) SyncInstance() ISync {
+	return node.GetOrCreateSyncInstance(true)
+}
+
+func (node *Node) CurrentSyncInstance() bool {
+	return node.GetOrCreateSyncInstance(false) != nil
+}
+
+// GetOrCreateSyncInstance returns an instance of state sync, either legacy or staged
+// if initiate sets to true, it generates a new instance
+func (node *Node) GetOrCreateSyncInstance(initiate bool) ISync {
+	if node.NodeConfig.StagedSync {
+		if initiate && node.stateStagedSync == nil {
+			utils.Logger().Info().Msg("initializing staged state sync")
+			node.stateStagedSync = node.createStagedSync(node.Blockchain())
+		}
+		return node.stateStagedSync
+	}
+	if initiate && node.stateSync == nil {
+		utils.Logger().Info().Msg("initializing legacy state sync")
+		node.stateSync = node.createStateSync(node.Beaconchain())
+	}
+	return node.stateSync
+}
+
+// Beaconchain returns the beacon chain from node.
 func (node *Node) Beaconchain() core.BlockChain {
 	// tikv mode not have the BeaconChain storage
 	if node.HarmonyConfig != nil && node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.General.ShardID != shard.BeaconChainShardID {
@@ -990,11 +1025,15 @@ func New(
 	localAccounts []common.Address,
 	isArchival map[uint32]bool,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
+	registry *registry.Registry,
 ) *Node {
-	node := Node{}
-	node.unixTimeAtNodeStart = time.Now().Unix()
-	node.TransactionErrorSink = types.NewTransactionErrorSink()
-	node.crosslinks = crosslinks.New()
+	node := Node{
+		registry:             registry,
+		unixTimeAtNodeStart:  time.Now().Unix(),
+		TransactionErrorSink: types.NewTransactionErrorSink(),
+		crosslinks:           crosslinks.New(),
+	}
+
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -1012,14 +1051,8 @@ func New(
 	networkType := node.NodeConfig.GetNetworkType()
 	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
-
-	for shardID, archival := range isArchival {
-		if archival {
-			collection.DisableCache(shardID)
-		}
-	}
 	node.shardChains = collection
-	node.IsInSync = abool.NewBool(false)
+	node.IsSynchronized = abool.NewBool(false)
 
 	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
@@ -1179,7 +1212,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
 	shardState, err := committee.WithStakingEnabled.Compute(
-		epoch, node.Consensus.Blockchain,
+		epoch, node.Consensus.Blockchain(),
 	)
 	if err != nil {
 		utils.Logger().Err(err).
@@ -1301,7 +1334,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 	node.keysToAddrsEpoch = epoch
 
 	shardID := node.Consensus.ShardID
-	shardState, err := node.Consensus.Blockchain.ReadShardState(epoch)
+	shardState, err := node.Consensus.Blockchain().ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Int64("epoch", epoch.Int64()).

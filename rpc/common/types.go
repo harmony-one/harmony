@@ -7,7 +7,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // BlockArgs is struct to include optional block formatting params.

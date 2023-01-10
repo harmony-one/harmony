@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	libp2p_network "github.com/libp2p/go-libp2p-core/network"
+	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	"github.com/stretchr/testify/require"
 )
 

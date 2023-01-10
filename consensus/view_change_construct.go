@@ -109,6 +109,10 @@ func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog) ([]byte, []byte) {
 	// First 32 bytes of m1 payload is the correct block hash
 	copy(blockHash[:], vc.GetM1Payload())
 
+	if !fbftlog.IsBlockVerified(blockHash) {
+		return nil, nil
+	}
+
 	if block := fbftlog.GetBlockByHash(blockHash); block != nil {
 		encodedBlock, err := rlp.EncodeToBytes(block)
 		if err != nil || len(encodedBlock) == 0 {

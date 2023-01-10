@@ -1,9 +1,9 @@
-//package p2p
+// package p2p
 package p2p
 
 import (
 	eth_metrics "github.com/ethereum/go-ethereum/metrics"
-	"github.com/libp2p/go-libp2p-core/metrics"
+	"github.com/libp2p/go-libp2p/core/metrics"
 )
 
 const (

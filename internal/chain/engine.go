@@ -471,43 +471,24 @@ func applySlashes(
 	// Do the slashing by groups in the sorted order
 	for _, key := range sortedKeys {
 		records := groupedRecords[key]
-		superCommittee, err := chain.ReadShardState(big.NewInt(int64(key.epoch)))
 
-		if err != nil {
-			return errors.New("could not read shard state")
-		}
-
-		subComm, err := superCommittee.FindCommitteeByID(key.shardID)
-
-		if err != nil {
-			return errors.New("could not find shard committee")
-		}
-
-		// Apply the slashes, invariant: assume been verified as legit slash by this point
-		var slashApplied *slash.Application
-		votingPower, err := lookupVotingPower(
-			big.NewInt(int64(key.epoch)), subComm,
-		)
-		if err != nil {
-			return errors.Wrapf(err, "could not lookup cached voting power in slash application")
-		}
-		rate := slash.Rate(votingPower, records)
 		utils.Logger().Info().
-			Str("rate", rate.String()).
 			RawJSON("records", []byte(records.String())).
 			Msg("now applying slash to state during block finalization")
-		if slashApplied, err = slash.Apply(
+
+		// Apply the slashes, invariant: assume been verified as legit slash by this point
+		slashApplied, err := slash.Apply(
 			chain,
 			state,
 			records,
-			rate,
 			slashRewardBeneficiary,
-		); err != nil {
+		)
+
+		if err != nil {
 			return errors.New("[Finalize] could not apply slash")
 		}
 
 		utils.Logger().Info().
-			Str("rate", rate.String()).
 			RawJSON("records", []byte(records.String())).
 			RawJSON("applied", []byte(slashApplied.String())).
 			Msg("slash applied successfully")

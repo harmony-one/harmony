@@ -15,12 +15,14 @@ import (
 	ethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/cli"
+	"github.com/harmony-one/harmony/shard"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
@@ -276,14 +278,18 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 		latestNumber := block.NumberU64() - uint64(i)
 		latestBlock := db.GetBlockByNumber(latestNumber)
 		db.GetBlockByHash(latestBlock.Hash())
-		db.GetHeaderByHash(latestBlock.Hash())
+		header := db.GetHeaderByHash(latestBlock.Hash())
 		db.GetBlockByHash(latestBlock.Hash())
 		rawdb.ReadBlockRewardAccumulator(db, latestNumber)
 		rawdb.ReadBlockCommitSig(db, latestNumber)
-		epoch := block.Epoch()
-		epochInstance := shardSchedule.InstanceForEpoch(epoch)
-		for shard := 0; shard < int(epochInstance.NumShards()); shard++ {
-			rawdb.ReadCrossLinkShardBlock(db, uint32(shard), latestNumber)
+		// for each header, read (and write) the cross links in it
+		if block.ShardID() == shard.BeaconChainShardID {
+			crossLinks := &types.CrossLinks{}
+			if err := rlp.DecodeBytes(header.CrossLinks(), crossLinks); err == nil {
+				for _, cl := range *crossLinks {
+					rawdb.ReadCrossLinkShardBlock(db, cl.ShardID(), cl.BlockNum())
+				}
+			}
 		}
 	}
 	headEpoch := block.Epoch()

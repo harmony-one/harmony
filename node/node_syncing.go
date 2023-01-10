@@ -22,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	legdownloader "github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
+	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -84,10 +85,7 @@ func (node *Node) DoSyncWithoutConsensus() {
 
 // IsSameHeight tells whether node is at same bc height as a peer
 func (node *Node) IsSameHeight() (uint64, bool) {
-	if node.stateSync == nil {
-		node.stateSync = node.createStateSync(node.Blockchain())
-	}
-	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
+	return node.SyncInstance().IsSameBlockchainHeight(node.Blockchain())
 }
 
 func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
@@ -108,6 +106,42 @@ func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
 	role := node.NodeConfig.Role()
 	return legacysync.CreateStateSync(bc, node.SelfPeer.IP, mutatedPort,
 		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode, role)
+}
+
+func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
+	// Temp hack: The actual port used in dns sync is node.downloaderServer.Port.
+	// But registration is done through an old way of port arithmetics (syncPort + 3000).
+	// Thus for compatibility, we are doing the arithmetics here, and not to change the
+	// protocol itself. This is just the temporary hack and will not be a concern after
+	// state sync.
+	var mySyncPort int
+	if node.downloaderServer != nil {
+		mySyncPort = node.downloaderServer.Port
+	} else {
+		// If local sync server is not started, the port field in protocol is actually not
+		// functional, simply set it to default value.
+		mySyncPort = nodeconfig.DefaultDNSPort
+	}
+	mutatedPort := strconv.Itoa(mySyncPort + legacysync.SyncingPortDifference)
+	role := node.NodeConfig.Role()
+	isExplorer := node.NodeConfig.Role() == nodeconfig.ExplorerNode
+
+	if s, err := stagedsync.CreateStagedSync(node.SelfPeer.IP, mutatedPort,
+		node.GetSyncID(), bc, role, isExplorer,
+		node.NodeConfig.StagedSyncTurboMode,
+		node.NodeConfig.UseMemDB,
+		node.NodeConfig.DoubleCheckBlockHashes,
+		node.NodeConfig.MaxBlocksPerSyncCycle,
+		node.NodeConfig.MaxBackgroundBlocks,
+		node.NodeConfig.MaxMemSyncCycleSize,
+		node.NodeConfig.VerifyAllSig,
+		node.NodeConfig.VerifyHeaderBatchSize,
+		node.NodeConfig.InsertChainBatchSize,
+		node.NodeConfig.LogProgress); err != nil {
+		return nil
+	} else {
+		return s
+	}
 }
 
 // SyncingPeerProvider is an interface for getting the peers in the given shard.
@@ -219,13 +253,13 @@ func (node *Node) doBeaconSyncing() {
 				continue
 			}
 
-			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID); err != nil {
+			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
 				utils.Logger().Warn().Err(err).Msg("[EPOCHSYNC] cannot create beacon sync config")
 				continue
 			}
 		}
 
-		<-time.After(node.epochSync.SyncLoop(node.EpochChain(), true, nil))
+		<-time.After(node.epochSync.SyncLoop(node.EpochChain(), nil))
 	}
 }
 
@@ -250,7 +284,9 @@ func (node *Node) DoSyncing(bc core.BlockChain, worker *worker.Worker, willJoinC
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
-	if node.stateSync.GetActivePeerNumber() < legacysync.NumPeersLowBound {
+
+	syncInstance := node.SyncInstance()
+	if syncInstance.GetActivePeerNumber() < legacysync.NumPeersLowBound {
 		shardID := bc.ShardID()
 		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
 		if err != nil {
@@ -260,28 +296,28 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 				Msg("cannot retrieve syncing peers")
 			return
 		}
-		if err := node.stateSync.CreateSyncConfig(peers, shardID); err != nil {
+		if err := syncInstance.CreateSyncConfig(peers, shardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Interface("peers", peers).
 				Msg("[SYNC] create peers error")
 			return
 		}
-		utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
+		utils.Logger().Debug().Int("len", syncInstance.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 	}
 	// TODO: treat fake maximum height
-	if result := node.stateSync.GetSyncStatusDoubleChecked(); !result.IsInSync {
-		node.IsInSync.UnSet()
+	if isSynchronized, _, _ := syncInstance.GetParsedSyncStatusDoubleChecked(); !isSynchronized {
+		node.IsSynchronized.UnSet()
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
 		}
-		node.stateSync.SyncLoop(bc, worker, false, node.Consensus)
+		syncInstance.SyncLoop(bc, worker, false, node.Consensus, legacysync.LoopMinTime)
 		if willJoinConsensus {
-			node.IsInSync.Set()
+			node.IsSynchronized.Set()
 			node.Consensus.BlocksSynchronized()
 		}
 	}
-	node.IsInSync.Set()
+	node.IsSynchronized.Set()
 }
 
 // SupportGRPCSyncServer do gRPC sync server
@@ -331,9 +367,14 @@ func (node *Node) supportSyncing() {
 		go node.SendNewBlockToUnsync()
 	}
 
-	if node.stateSync == nil {
+	if !node.NodeConfig.StagedSync && node.stateSync == nil {
 		node.stateSync = node.createStateSync(node.Blockchain())
 		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
+	}
+
+	if node.NodeConfig.StagedSync && node.stateStagedSync == nil {
+		node.stateStagedSync = node.createStagedSync(node.Blockchain())
+		utils.Logger().Debug().Msg("[SYNC] initialized state for staged sync")
 	}
 
 	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
@@ -356,6 +397,7 @@ func (node *Node) StartSyncingServer(port int) {
 
 // SendNewBlockToUnsync send latest verified block to unsync, registered nodes
 func (node *Node) SendNewBlockToUnsync() {
+
 	for {
 		block := <-node.Consensus.VerifiedNewBlock
 		blockBytes, err := rlp.EncodeToBytes(block)
@@ -374,7 +416,7 @@ func (node *Node) SendNewBlockToUnsync() {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
 				utils.Logger().Warn().Str("peerID", peerID).Msg("[SYNC] SendNewBlockToUnsync to peer timeout")
-				node.peerRegistrationRecord[peerID].client.Close()
+				node.peerRegistrationRecord[peerID].client.Close("send new block to peer timeout")
 				delete(node.peerRegistrationRecord, peerID)
 				continue
 			}
@@ -383,13 +425,13 @@ func (node *Node) SendNewBlockToUnsync() {
 				sendBytes = blockWithSigBytes
 			}
 			response, err := config.client.PushNewBlock(node.GetSyncID(), sendBytes, false)
-			// close the connection if cannot push new block to unsync node
+			// close the connection if cannot push new block to not synchronized node
 			if err != nil {
-				node.peerRegistrationRecord[peerID].client.Close()
+				node.peerRegistrationRecord[peerID].client.Close("cannot push new block to not synchronized node")
 				delete(node.peerRegistrationRecord, peerID)
 			}
 			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
-				node.peerRegistrationRecord[peerID].client.Close()
+				node.peerRegistrationRecord[peerID].client.Close("node is synchronized")
 				delete(node.peerRegistrationRecord, peerID)
 			}
 		}
@@ -403,7 +445,6 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	if node.NodeConfig.IsOffline {
 		return response, nil
 	}
-
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_BLOCKHASH:
 		dnsServerRequestCounterVec.With(dnsReqMetricLabel("block_hash")).Inc()
@@ -493,7 +534,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	// this is the out of sync node acts as grpc server side
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
 		dnsServerRequestCounterVec.With(dnsReqMetricLabel("new block")).Inc()
-		if node.IsInSync.IsSet() {
+		if node.IsSynchronized.IsSet() {
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
@@ -502,7 +543,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			utils.Logger().Warn().Err(err).Msg("[SYNC] unable to decode received new block")
 			return response, err
 		}
-		node.stateSync.AddNewBlock(request.PeerHash, block)
+		node.SyncInstance().AddNewBlock(request.PeerHash, block)
 
 	case downloader_pb.DownloaderRequest_REGISTER:
 		peerID := string(request.PeerHash[:])
@@ -528,7 +569,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		} else {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
 			syncPort := legacysync.GetSyncingPort(port)
-			client := legdownloader.ClientSetup(ip, syncPort)
+			client := legdownloader.ClientSetup(ip, syncPort, false)
 			if client == nil {
 				utils.Logger().Warn().
 					Str("ip", ip).
@@ -546,8 +587,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
-		if !node.IsInSync.IsSet() {
-			count := node.stateSync.RegisterNodeInfo()
+		if !node.IsSynchronized.IsSet() {
+			count := node.SyncInstance().RegisterNodeInfo()
 			utils.Logger().Debug().
 				Int("number", count).
 				Msg("[SYNC] extra node registered")
@@ -752,18 +793,17 @@ func (node *Node) SyncStatus(shardID uint32) (bool, uint64, uint64) {
 func (node *Node) legacySyncStatus(shardID uint32) (bool, uint64, uint64) {
 	switch shardID {
 	case node.NodeConfig.ShardID:
-		if node.stateSync == nil {
+		if node.SyncInstance() == nil {
 			return false, 0, 0
 		}
-		result := node.stateSync.GetSyncStatus()
-		return result.IsInSync, result.OtherHeight, result.HeightDiff
+		return node.SyncInstance().GetParsedSyncStatus()
 
 	case shard.BeaconChainShardID:
 		if node.epochSync == nil {
 			return false, 0, 0
 		}
 		result := node.epochSync.GetSyncStatus()
-		return result.IsInSync, result.OtherHeight, result.HeightDiff
+		return result.IsSynchronized, result.OtherHeight, result.HeightDiff
 
 	default:
 		// Shard node is not working on
@@ -785,18 +825,19 @@ func (node *Node) IsOutOfSync(shardID uint32) bool {
 func (node *Node) legacyIsOutOfSync(shardID uint32) bool {
 	switch shardID {
 	case node.NodeConfig.ShardID:
-		if node.stateSync == nil {
+		if !node.NodeConfig.StagedSync && node.stateSync == nil {
+			return true
+		} else if node.NodeConfig.StagedSync && node.stateStagedSync == nil {
 			return true
 		}
-		result := node.stateSync.GetSyncStatus()
-		return !result.IsInSync
+		return node.SyncInstance().IsSynchronized()
 
 	case shard.BeaconChainShardID:
 		if node.epochSync == nil {
 			return true
 		}
 		result := node.epochSync.GetSyncStatus()
-		return !result.IsInSync
+		return !result.IsSynchronized
 
 	default:
 		return true

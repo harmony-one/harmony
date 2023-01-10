@@ -5,7 +5,7 @@ import (
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
-	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
+	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/pkg/errors"
 )
 

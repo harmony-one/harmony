@@ -41,9 +41,9 @@ if [ "$(uname -s)" == "Darwin" ]; then
    GOOS=darwin
    LIB[libbls384_256.dylib]=${BLS_DIR}/lib/libbls384_256.dylib
    LIB[libmcl.dylib]=${MCL_DIR}/lib/libmcl.dylib
-   LIB[libgmp.10.dylib]=/usr/local/opt/gmp/lib/libgmp.10.dylib
-   LIB[libgmpxx.4.dylib]=/usr/local/opt/gmp/lib/libgmpxx.4.dylib
-   LIB[libcrypto.1.1.dylib]=/usr/local/opt/openssl/lib/libcrypto.1.1.dylib
+   LIB[libgmp.10.dylib]=/opt/homebrew/opt/gmp/lib/libgmp.10.dylib
+   LIB[libgmpxx.4.dylib]=/opt/homebrew/opt/gmp/lib/libgmpxx.4.dylib
+   LIB[libcrypto.1.1.dylib]=/opt/homebrew/opt/openssl@1.1/lib/libcrypto.1.1.dylib
 else
    MD5=md5sum
    LIB[libbls384_256.so]=${BLS_DIR}/lib/libbls384_256.so
