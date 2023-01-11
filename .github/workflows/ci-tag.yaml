@@ -42,7 +42,7 @@ jobs:
     if: needs.check.outputs.tag_annotated == 'true'
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-10.15, [self-hosted, linux, ARM64]]
+        os: [ubuntu-22.04, macos-12, [self-hosted, linux, ARM64]]
 
     steps:
       - name: Import GPG key
