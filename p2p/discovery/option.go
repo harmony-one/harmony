@@ -42,9 +42,7 @@ func (opt DHTConfig) GetLibp2pRawOptions() ([]libp2p_dht.Option, error) {
 		opts = append(opts, libp2p_dht.Concurrency(opt.DiscConcurrency))
 	}
 
-	// TODO: to disable auto refresh to make sure there is no conflicts with protocol discovery functions
-	// it's not applicable for legacy sync
-	// opts = append(opts, libp2p_dht.DisableAutoRefresh())
+	opts = append(opts, libp2p_dht.DisableAutoRefresh())
 
 	return opts, nil
 }

@@ -132,7 +132,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	// TODO: move low and high to configs
 	connmgr, err := connmgr.NewConnManager(
-		int(10),                     // Lowwater
+		int(10),                     // LowWater
 		int(10000)*cfg.MaxConnPerIP, // HighWater,
 		connmgr.WithGracePeriod(time.Minute),
 	)
@@ -141,6 +141,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		return nil, err
 	}
 	var idht *dht.IpfsDHT
+	var opt discovery.DHTConfig
 	p2pHost, err := libp2p.New(
 		listenAddr,
 		libp2p.Identity(key),
@@ -156,22 +157,34 @@ func NewHost(cfg HostConfig) (Host, error) {
 		// Attempt to open ports using uPNP for NATed hosts.
 		libp2p.NATPortMap(),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			idht, err = dht.New(ctx, h)
+			opt = discovery.DHTConfig{
+				BootNodes:       cfg.BootNodes,
+				DataStoreFile:   cfg.DataStoreFile,
+				DiscConcurrency: cfg.DiscConcurrency,
+			}
+			opts, err := opt.GetLibp2pRawOptions()
+			if err != nil {
+				return nil, err
+			}
+			idht, err = dht.New(ctx, h, opts...)
 			return idht, err
 		}),
+
 		// to help other peers to figure out if they are behind
 		// NATs, launch the server-side of AutoNAT too (AutoRelay
 		// already runs the client)
 		// This service is highly rate-limited and should not cause any
 		// performance issues.
 		libp2p.EnableNATService(),
+		// Bandwidth Reporter
 		libp2p.BandwidthReporter(newCounter()),
 		// ForceReachabilityPublic overrides automatic reachability detection in the AutoNAT subsystem,
 		// forcing the local node to believe it is reachable externally.
 		// libp2p.ForceReachabilityPublic(),
-
+		// libp2p.DisableRelay(),
+		libp2p.EnableRelayService(),
 		// prevent dialing of public addresses
-		libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)),
+		// libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)),
 	)
 	if err != nil {
 		cancel()

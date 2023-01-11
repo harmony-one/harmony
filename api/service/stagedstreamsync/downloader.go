@@ -24,6 +24,7 @@ type (
 		syncProtocol       syncProtocol
 		bh                 *beaconHelper
 		stagedSyncInstance *StagedStreamSync
+		isBeaconNode       bool
 
 		downloadC chan struct{}
 		closeC    chan struct{}
@@ -67,7 +68,7 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	//TODO: use mem db should be in config file
-	stagedSyncInstance, err := CreateStagedSync(ctx, bc, false, sp, config, logger, config.LogProgress)
+	stagedSyncInstance, err := CreateStagedSync(ctx, bc, false, isBeaconNode, sp, config, logger, config.LogProgress)
 	if err != nil {
 		cancel()
 		return nil
@@ -78,6 +79,7 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config 
 		syncProtocol:       sp,
 		bh:                 bh,
 		stagedSyncInstance: stagedSyncInstance,
+		isBeaconNode:       isBeaconNode,
 
 		downloadC: make(chan struct{}),
 		closeC:    make(chan struct{}),
@@ -187,7 +189,11 @@ func (d *Downloader) waitForBootFinish() {
 func (d *Downloader) loop() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	initSync := true
+	// for shard chain and beacon chain node, first we start with initSync=true to
+	// make sure it goes through the long range sync first.
+	// for epoch chain we do only need to go through epoch sync process
+	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
+
 	trigger := func() {
 		select {
 		case d.downloadC <- struct{}{}:
@@ -217,7 +223,7 @@ func (d *Downloader) loop() {
 					}
 				}
 
-				// If error happens, sleep 5 seconds and retry
+				// If any error happens, sleep 5 seconds and retry
 				d.logger.Error().
 					Err(err).
 					Bool("initSync", initSync).
@@ -227,7 +233,7 @@ func (d *Downloader) loop() {
 					trigger()
 				}()
 				time.Sleep(1 * time.Second)
-				continue
+				break
 			}
 			if initSync {
 				d.logger.Info().Int("block added", addedBN).
@@ -239,11 +245,11 @@ func (d *Downloader) loop() {
 
 			if addedBN != 0 {
 				// If block number has been changed, trigger another sync
-				// and try to add last mile from pub-sub (blocking)
 				go trigger()
-				if d.bh != nil {
-					d.bh.insertSync()
-				}
+			}
+			// try to add last mile from pub-sub (blocking)
+			if d.bh != nil {
+				d.bh.insertSync()
 			}
 			initSync = false
 

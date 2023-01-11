@@ -49,7 +49,7 @@ func (sr *StageEpoch) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 		return nil
 	}
 
-	if _, ok := sr.configs.bc.(*core.EpochChain); !ok {
+	if sr.configs.bc.ShardID() != shard.BeaconChainShardID || s.state.isBeaconNode {
 		return nil
 	}
 
