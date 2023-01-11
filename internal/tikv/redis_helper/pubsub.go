@@ -109,7 +109,7 @@ func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereu
 		Publish(context.Background(), fmt.Sprintf("%s_new_filter_log_%d", namespace, shardID), msg).Err()
 }
 
-//TxPoolUpdate tx pool update event
+// TxPoolUpdate tx pool update event
 type TxPoolUpdate struct {
 	typ   string
 	Local bool

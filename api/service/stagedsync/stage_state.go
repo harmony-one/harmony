@@ -241,7 +241,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 	return nil
 }
 
-//verifyBlockSignatures verifies block signatures
+// verifyBlockSignatures verifies block signatures
 func (stg *StageStates) verifyBlockSignatures(bc core.BlockChain, block *types.Block, verifyCurrentSig bool, verifySeal bool, verifyAllSig bool) (err error) {
 	if verifyCurrentSig {
 		sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())

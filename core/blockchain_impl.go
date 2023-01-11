@@ -3448,6 +3448,7 @@ var (
 //  3. Corrupted db data. (leveldb.errors.ErrCorrupted)
 //  4. OS error when open file (too many open files, ...)
 //  5. OS error when write file (read-only, not enough disk space, ...)
+//
 // Among all the above leveldb errors, only `too many open files` error is known to be recoverable,
 // thus the unrecoverable errors refers to error that is
 //  1. The error is from the lower storage level (from module leveldb)

@@ -24,8 +24,9 @@ type RateLimiter interface {
 
 // rateLimiter is the implementation of RateLimiter.
 // The rateLimiter limit request rate:
-//   1. For global stream requests
-//   2. For requests from a stream
+//  1. For global stream requests
+//  2. For requests from a stream
+//
 // TODO: make request weighted in rate limiter
 type rateLimiter struct {
 	globalLimiter ratelimit.Limiter

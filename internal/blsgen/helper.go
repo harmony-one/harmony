@@ -10,8 +10,9 @@ import (
 )
 
 // loadHelper defines the helper interface to load bls keys. Implemented by
-//   multiKeyLoader - load key files with a slice of target key files
-//   blsDirLoader   - load key files from a directory
+//
+//	multiKeyLoader - load key files with a slice of target key files
+//	blsDirLoader   - load key files from a directory
 type loadHelper interface {
 	loadKeys() (multibls.PrivateKeys, error)
 }

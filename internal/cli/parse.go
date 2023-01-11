@@ -13,10 +13,11 @@ var (
 
 // SetParseErrorHandle set the error handle function used for cli parsing flags.
 // An error handle example:
-// 		cli.SetParseErrorHandle(func(err error) {
-//			fmt.Println(err)
-// 			os.Exit(3)
-// 		})
+//
+//	cli.SetParseErrorHandle(func(err error) {
+//		fmt.Println(err)
+//		os.Exit(3)
+//	})
 func SetParseErrorHandle(f errorHandle) {
 	parseErrorHandleFunc = f
 }

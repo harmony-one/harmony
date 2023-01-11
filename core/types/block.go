@@ -139,7 +139,8 @@ type Body struct {
 // matches the version of the given field.
 //
 // TODO ek – this is a stopgap, and works only while there is a N:1 mapping
-//  between header and body versions.  Replace usage with factory.
+//
+//	between header and body versions.  Replace usage with factory.
 func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
 	var bi BodyInterface
 	switch h.Header.(type) {
