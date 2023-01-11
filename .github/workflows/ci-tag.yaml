@@ -1,9 +1,9 @@
 name: Manual release harmony (need tag)
 
-on: 
+on:
   workflow_dispatch:
     inputs:
-      tag: 
+      tag:
         decription: 'tag value to create the release'
         required: true
 
@@ -52,10 +52,10 @@ jobs:
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PRIVATE_KEY_PASS }}
 
-      - name: Set up Go 1.14
+      - name: Set up Go 1.19.5
         uses: actions/setup-go@v2
         with:
-          go-version: 1.14.14
+          go-version: 1.19.5
 
       - name: Checkout dependence repo
         uses: actions/checkout@v2
@@ -154,12 +154,12 @@ jobs:
         run: |
           mv $GITHUB_WORKSPACE/harmony-amd64 ./scripts/docker/harmony
         working-directory: harmony
-  
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
       - name: Login to DockerHub
-        uses: docker/login-action@v1 
+        uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
