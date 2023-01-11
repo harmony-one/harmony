@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	versionFormat = "Harmony (C) 2020. %v, version %v-%v (%v %v)"
+	versionFormat = "Harmony (C) 2023. %v, version %v-%v (%v %v)"
 )
 
 // Version string variables
