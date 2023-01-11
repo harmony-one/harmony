@@ -76,17 +76,19 @@ func (bh *beaconHelper) loop() {
 
 		case it := <-bh.insertC:
 			inserted, bn, err := bh.insertLastMileBlocks()
-			numBlocksInsertedBeaconHelperCounter.Add(float64(inserted))
 			if err != nil {
 				bh.logger.Error().Err(err).
 					Msg(WrapStagedSyncMsg("insert last mile blocks error"))
+				close(it.doneC)
 				continue
 			}
-			bh.logger.Info().Int("inserted", inserted).
-				Uint64("end height", bn).
-				Uint32("shard", bh.bc.ShardID()).
-				Msg(WrapStagedSyncMsg("insert last mile blocks"))
-
+			if inserted > 0 {
+				numBlocksInsertedBeaconHelperCounter.Add(float64(inserted))
+				bh.logger.Info().Int("inserted", inserted).
+					Uint64("end height", bn).
+					Uint32("shard", bh.bc.ShardID()).
+					Msg(WrapStagedSyncMsg("insert last mile blocks"))
+			}
 			close(it.doneC)
 
 		case <-bh.closeC:

@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/hashicorp/go-version"
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -246,6 +247,17 @@ func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 		ShardID:     p.config.ShardID,
 		Version:     v,
 		BeaconNode:  p.beaconNode,
+	}
+	return spec.ToProtoID()
+}
+
+func (p *Protocol) protoIDByVersionForShardNodes(v *version.Version) sttypes.ProtoID {
+	spec := sttypes.ProtoSpec{
+		Service:     serviceSpecifier,
+		NetworkType: p.config.Network,
+		ShardID:     p.config.ShardID,
+		Version:     v,
+		BeaconNode:  false,
 	}
 	return spec.ToProtoID()
 }
