@@ -105,10 +105,11 @@ jobs:
         if: matrix.os == 'macos-12'
         run: |
           brew install bash
-          ls /opt/homebrew/opt
-          ls /usr/local/opt/
           sudo rm -f /usr/local/opt/openssl
           sudo ln -sf /usr/local/opt/openssl@1.1 /usr/local/opt/openssl
+          # hack for older chip (macos)
+          mdkir -p /opt/homebrew/opt
+          sudo ln -sf /usr/local/opt/openssl@1.1 /opt/homebrew/opt/openssl@1.1
           make
           cd ./bin && mkdir ./lib && mv ./*.dylib ./lib && rm -f ./bootnode
           gpg --detach-sign harmony
