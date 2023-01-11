@@ -6,6 +6,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 )
@@ -50,7 +51,7 @@ func (sr *StageShortRange) Exec(firstCycle bool, invalidBlockRevert bool, s *Sta
 		return nil
 	}
 
-	if _, ok := sr.configs.bc.(*core.EpochChain); ok {
+	if sr.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
 		return nil
 	}
 

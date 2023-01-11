@@ -878,8 +878,8 @@ func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid
 
 func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyConfig) {
 	blockchains := []core.BlockChain{node.Blockchain()}
-	if !node.IsRunningBeaconChain() {
-		blockchains = append(blockchains, node.Beaconchain())
+	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
+		blockchains = append(blockchains, node.EpochChain())
 	}
 
 	dConfig := downloader.Config{
@@ -913,8 +913,8 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 
 func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyConfig) {
 	blockchains := []core.BlockChain{node.Blockchain()}
-	if !node.IsRunningBeaconChain() {
-		blockchains = append(blockchains, node.Beaconchain())
+	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
+		blockchains = append(blockchains, node.EpochChain())
 	}
 
 	sConfig := stagedstreamsync.Config{

@@ -73,7 +73,6 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		Str("protocol ID", string(pid)).Logger()
 
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
-
 	fmt.Println("my peer id: ", host.ID().String())
 	fmt.Println("my proto id: ", pid)
 
@@ -238,9 +237,6 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 	if mySpec.ShardID != rmSpec.ShardID {
 		return fmt.Errorf("unexpected shard ID: %v/%v", rmSpec.ShardID, mySpec.ShardID)
 	}
-	if mySpec.ShardID == shard.BeaconChainShardID && !rmSpec.BeaconNode {
-		return fmt.Errorf("unexpected beacon node with shard ID: %v/%v", rmSpec.ShardID, mySpec.ShardID)
-	}
 	return nil
 }
 
@@ -311,7 +307,10 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 
 	connecting := 0
 	for peer := range peers {
-		if peer.ID == sm.host.ID() || sm.coolDownCache.Has(peer.ID) {
+		if peer.ID == sm.host.ID() {
+			continue
+		}
+		if sm.coolDownCache.Has(peer.ID) {
 			// If the peer has the same ID and was just connected, skip.
 			continue
 		}
