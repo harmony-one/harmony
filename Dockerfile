@@ -1,7 +1,7 @@
 FROM ubuntu:18.04
 
 ARG TARGETARCH
-ARG GOLANG_VERSION="1.18"
+ARG GOLANG_VERSION="1.19"
 
 SHELL ["/bin/bash", "-c"]
 
@@ -79,7 +79,7 @@ ARG KS3=f4267bb5a2f0e65b8f5792bb6992597fac2b35ebfac9885ce0f4152c451ca31a
 RUN hmy keys import-private-key ${KS1} && \
 	hmy keys import-private-key ${KS2} && \
 	hmy keys import-private-key ${KS3} && \
-	hmy keys generate-bls-key > keys.json 
+	hmy keys generate-bls-key > keys.json
 
 RUN jq  '.["encrypted-private-key-path"]' -r keys.json > /root/keypath && cp keys.json /root && \
 	echo "export BLS_KEY_PATH=$(cat /root/keypath)" >> /root/.bashrc && \

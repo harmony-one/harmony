@@ -16,7 +16,7 @@ http://api.hmny.io/
 
 ## Requirements
 
-### **Go 1.18**
+### **Go 1.19**
 ### **GMP and OpenSSL**
 
 On macOS:
@@ -35,19 +35,19 @@ sudo yum install glibc-static gmp-devel gmp-static openssl-libs openssl-static g
 ```
 ### **Docker** (for testing)
 
-On macOS: 
+On macOS:
 ```bash
 brew install --cask docker
 open /Applications/Docker.app
 ```
 On Linux, reference official documentation [here](https://docs.docker.com/engine/install/).
-### **Bash 4+** 
+### **Bash 4+**
 
 For macOS, you can reference this [guide](http://tldrdevnotes.com/bash-upgrade-3-4-macos). For Linux, you can reference this [guide](https://fossbytes.com/installing-gnu-bash-4-4-linux-distros/).
 
 ## Dev Environment
 
-**Most repos from [harmony-one](https://github.com/harmony-one) assumes the GOPATH convention. More information [here](https://github.com/golang/go/wiki/GOPATH).** 
+**Most repos from [harmony-one](https://github.com/harmony-one) assumes the GOPATH convention. More information [here](https://github.com/golang/go/wiki/GOPATH).**
 
 ### First Install
 Clone and set up all of the repos with the following set of commands:
@@ -57,7 +57,7 @@ Clone and set up all of the repos with the following set of commands:
 mkdir -p $(go env GOPATH)/src/github.com/harmony-one
 cd $(go env GOPATH)/src/github.com/harmony-one
 ```
-> If you get 'unknown command' or something along those lines, make sure to install [golang](https://golang.org/doc/install) first. 
+> If you get 'unknown command' or something along those lines, make sure to install [golang](https://golang.org/doc/install) first.
 
 2. Clone this repo & dependent repos.
 ```bash
@@ -77,9 +77,9 @@ make
 
 ## Dev Docker Image
 
-Included in this repo is a Dockerfile that has a full harmony development environment and 
-comes with emacs, vim, ag, tig and other creature comforts. Most importantly, it already has the go environment 
-with our C/C++ based library dependencies (`libbls` and `mcl`) set up correctly for you. 
+Included in this repo is a Dockerfile that has a full harmony development environment and
+comes with emacs, vim, ag, tig and other creature comforts. Most importantly, it already has the go environment
+with our C/C++ based library dependencies (`libbls` and `mcl`) set up correctly for you.
 
 You can build the docker image for yourself with the following commands:
 ```bash
@@ -110,7 +110,7 @@ Learn more about docker [here](https://docker-curriculum.com/).
 
 ## Build
 
-The `make` command should automatically build the Harmony binary & all dependent libs. 
+The `make` command should automatically build the Harmony binary & all dependent libs.
 
 However, if you wish to bypass the Makefile, first export the build flags:
 ```bash
@@ -150,7 +150,7 @@ make debug-kill
 
 To keep things consistent, we have a docker image to run all tests. **These are the same tests ran on the pull request checks**.
 
-Note that all testing docker container binds a couple of ports to the host machine for your convince. The ports are: 
+Note that all testing docker container binds a couple of ports to the host machine for your convince. The ports are:
 * `9500` - Shard 0 RPC for a validator
 * `9501` - Shard 1 RPC for a validator
 * `9599` - Shard 0 RPC for an explorer
@@ -159,13 +159,13 @@ Note that all testing docker container binds a couple of ports to the host machi
 * `9798` - Shard 1 Rosetta (for an explorer)
 * `9899` - Shard 0 WS for an explorer
 * `9898` - Shard 1 WS for an explorer
-> This allows you to use curl, hmy CLI, postman, rosetta-cli, etc... on your host machine to play with or probe the localnet that was used for the test. 
+> This allows you to use curl, hmy CLI, postman, rosetta-cli, etc... on your host machine to play with or probe the localnet that was used for the test.
 
 ### Go tests
 To run this test, do:
 ```bash
 make test-go
-``` 
+```
 This test runs the go tests along with go lint, go fmt, go imports, go mod, and go generate checks.
 
 ### RPC tests
@@ -174,7 +174,7 @@ To run this test, do:
 make test-rpc
 ```
 This test starts a localnet (within the Docker container), **ensures it reaches a consensus**, and runs a series of tests to ensure correct RPC behavior.
-This test also acts as a preliminary integration test (more through tests are done on the testnets). 
+This test also acts as a preliminary integration test (more through tests are done on the testnets).
 > The tests ran by this command can be found [here](https://github.com/harmony-one/harmony-test/tree/master/localnet).
 
 If you wish to debug further with the localnet after the tests are done, open a new shell and run:
@@ -184,8 +184,8 @@ make test-rpc-attach
 > This will open a shell in the docker container that is running the Node API tests.
 >
 > Note that the docker container has the [Harmony CLI](https://docs.harmony.one/home/wallets/harmony-cli) on path,
-> therefore you can use that to debug if needed. For example, one could do `hmy blockchain latest-headers` to check 
-> the current block height of localnet. Reference the documentation for the CLI [here](https://docs.harmony.one/home/wallets/harmony-cli) 
+> therefore you can use that to debug if needed. For example, one could do `hmy blockchain latest-headers` to check
+> the current block height of localnet. Reference the documentation for the CLI [here](https://docs.harmony.one/home/wallets/harmony-cli)
 > for more details & commands.
 
 ### Rosetta tests

@@ -71,6 +71,8 @@ then
 		echo "go generate FAILED!"
 		echo "go generate changed working tree contents!"
 		"${progdir}/print_file.sh" "${gogenerate_status_diff}" "git status diff"
+		"${progdir}/print_file.sh" "${gogenerate_status_before}" "gogenerate before"
+		"${progdir}/print_file.sh" "${gogenerate_status_after}" "gogenerate after"
 		ok=false
 	fi
 else

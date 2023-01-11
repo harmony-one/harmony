@@ -35,7 +35,7 @@ func MakeGetBlocksByNumRequest(bns []uint64) *Request {
 	}
 }
 
-//MakeGetBlockByHashesRequest makes the GetBlocksByHashes request
+// MakeGetBlockByHashesRequest makes the GetBlocksByHashes request
 func MakeGetBlocksByHashesRequest(hashes []common.Hash) *Request {
 	return &Request{
 		Request: &Request_GetBlocksByHashesRequest{
