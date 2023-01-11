@@ -54,19 +54,20 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 }
 
 type StagedStreamSync struct {
-	ctx        context.Context
-	bc         core.BlockChain
-	isBeacon   bool
-	isExplorer bool
-	db         kv.RwDB
-	protocol   syncProtocol
-	gbm        *blockDownloadManager // initialized when finished get block number
-	inserted   int
-	config     Config
-	logger     zerolog.Logger
-	status     *status //TODO: merge this with currentSyncCycle
-	initSync   bool    // if sets to true, node start long range syncing
-	UseMemDB   bool
+	ctx          context.Context
+	bc           core.BlockChain
+	isBeacon     bool
+	isExplorer   bool
+	db           kv.RwDB
+	protocol     syncProtocol
+	isBeaconNode bool
+	gbm          *blockDownloadManager // initialized when finished get block number
+	inserted     int
+	config       Config
+	logger       zerolog.Logger
+	status       *status //TODO: merge this with currentSyncCycle
+	initSync     bool    // if sets to true, node start long range syncing
+	UseMemDB     bool
 
 	revertPoint     *uint64 // used to run stages
 	prevRevertPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
@@ -254,6 +255,7 @@ func New(ctx context.Context,
 	stagesList []*Stage,
 	isBeacon bool,
 	protocol syncProtocol,
+	isBeaconNode bool,
 	useMemDB bool,
 	config Config,
 	logger zerolog.Logger,
@@ -291,6 +293,7 @@ func New(ctx context.Context,
 		isBeacon:     isBeacon,
 		db:           db,
 		protocol:     protocol,
+		isBeaconNode: isBeaconNode,
 		gbm:          nil,
 		status:       &status,
 		inserted:     0,
