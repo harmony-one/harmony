@@ -241,9 +241,6 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 	if mySpec.ShardID != rmSpec.ShardID {
 		return fmt.Errorf("unexpected shard ID: %v/%v", rmSpec.ShardID, mySpec.ShardID)
 	}
-	if mySpec.ShardID == shard.BeaconChainShardID && !rmSpec.BeaconNode {
-		return fmt.Errorf("unexpected beacon node with shard ID: %v/%v", rmSpec.ShardID, mySpec.ShardID)
-	}
 	return nil
 }
 
