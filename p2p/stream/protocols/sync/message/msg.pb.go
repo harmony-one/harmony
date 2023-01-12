@@ -26,6 +26,7 @@ type Message struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to ReqOrResp:
+	//
 	//	*Message_Req
 	//	*Message_Resp
 	ReqOrResp isMessage_ReqOrResp `protobuf_oneof:"req_or_resp"`
@@ -107,6 +108,7 @@ type Request struct {
 
 	ReqId uint64 `protobuf:"varint,1,opt,name=req_id,json=reqId,proto3" json:"req_id,omitempty"`
 	// Types that are assignable to Request:
+	//
 	//	*Request_GetBlockNumberRequest
 	//	*Request_GetBlockHashesRequest
 	//	*Request_GetBlocksByNumRequest
@@ -402,6 +404,7 @@ type Response struct {
 
 	ReqId uint64 `protobuf:"varint,1,opt,name=req_id,json=reqId,proto3" json:"req_id,omitempty"`
 	// Types that are assignable to Response:
+	//
 	//	*Response_ErrorResponse
 	//	*Response_GetBlockNumberResponse
 	//	*Response_GetBlockHashesResponse

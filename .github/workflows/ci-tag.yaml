@@ -10,14 +10,14 @@ on:
 jobs:
   check:
     name: Per-check for current tag
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     continue-on-error: false
     outputs:
       tag_annotated: ${{ steps.check-tag-annotated.outputs.tag_annotated }}
 
     steps:
       - name: Checkout harmony core code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: harmony
           ref: ${{ github.event.inputs.tag }}
@@ -42,39 +42,39 @@ jobs:
     if: needs.check.outputs.tag_annotated == 'true'
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-10.15, [self-hosted, linux, ARM64]]
+        os: [ubuntu-22.04, macos-12, [self-hosted, linux, ARM64]]
 
     steps:
       - name: Import GPG key
         if: join(matrix.os, '-') != 'self-hosted-linux-ARM64'
-        uses: crazy-max/ghaction-import-gpg@v3
+        uses: crazy-max/ghaction-import-gpg@v5
         with:
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PRIVATE_KEY_PASS }}
 
-      - name: Set up Go 1.14
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.14.14
-
       - name: Checkout dependence repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: harmony-one/mcl
           path: mcl
 
       - name: Checkout dependence repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: harmony-one/bls
           path: bls
 
       - name: Checkout harmony core code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: harmony
           ref: ${{ github.event.inputs.tag }}
           fetch-depth: 0
+
+      - name: Set up Go go.mod
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'harmony/go.mod'
 
       - name: Get latest version and release
         run: |
@@ -85,7 +85,7 @@ jobs:
         working-directory: harmony
 
       - name: Build harmony binary and packages for Linux
-        if: matrix.os == 'ubuntu-18.04'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           make linux_static
           make deb
@@ -104,7 +104,7 @@ jobs:
         working-directory: harmony
 
       - name: Build harmony binary and packages for MacOS
-        if: matrix.os == 'macos-10.15'
+        if: matrix.os == 'macos-12'
         run: |
           brew install bash
           sudo rm -f /usr/local/opt/openssl
@@ -126,12 +126,12 @@ jobs:
   docker-build:
     name: Build and push harmony docker image
     needs: [check, build]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     if: needs.check.outputs.tag_annotated == 'true'
 
     steps:
       - name: Checkout harmony core code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: harmony
           ref: ${{ github.event.inputs.tag }}
@@ -177,18 +177,18 @@ jobs:
   release-page:
     name: Sign binary and create and publish release page
     needs: [check, build]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     if: needs.check.outputs.tag_annotated == 'true'
 
     steps:
       - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v3
+        uses: crazy-max/ghaction-import-gpg@v5
         with:
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PRIVATE_KEY_PASS }}
 
       - name: Checkout harmony core code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: harmony
           ref: ${{ github.event.inputs.tag }}

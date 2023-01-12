@@ -219,6 +219,7 @@ type Message struct {
 	Type        MessageType `protobuf:"varint,2,opt,name=type,proto3,enum=message.MessageType" json:"type,omitempty"`
 	Signature   []byte      `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
 	// Types that are assignable to Request:
+	//
 	//	*Message_Staking
 	//	*Message_Consensus
 	//	*Message_Drand
@@ -372,6 +373,7 @@ type Response struct {
 	ServiceType ServiceType `protobuf:"varint,1,opt,name=service_type,json=serviceType,proto3,enum=message.ServiceType" json:"service_type,omitempty"`
 	Type        MessageType `protobuf:"varint,2,opt,name=type,proto3,enum=message.MessageType" json:"type,omitempty"`
 	// Types that are assignable to Response:
+	//
 	//	*Response_LotteryResponse
 	Response isResponse_Response `protobuf_oneof:"response"`
 }

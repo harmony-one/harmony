@@ -16,10 +16,11 @@ import (
 )
 
 // AwsCfgSrcType is the type of src to load aws config. Four options available:
-//  AwsCfgSrcNil    - Disable kms decryption
-//  AwsCfgSrcFile   - Provide the aws config through a file (json).
-//  AwsCfgSrcPrompt - Provide the aws config though prompt.
-//  AwsCfgSrcShared - Use the shard aws config (env -> default .aws directory)
+//
+//	AwsCfgSrcNil    - Disable kms decryption
+//	AwsCfgSrcFile   - Provide the aws config through a file (json).
+//	AwsCfgSrcPrompt - Provide the aws config though prompt.
+//	AwsCfgSrcShared - Use the shard aws config (env -> default .aws directory)
 type AwsCfgSrcType uint8
 
 const (
@@ -144,11 +145,14 @@ func (cfg AwsConfig) toAws() *aws.Config {
 }
 
 // awsConfigProvider provides the aws config. Implemented by
-//   sharedACProvider - provide the nil to use shared AWS configuration
-//   fileACProvider   - provide the aws config with a json file
-//   promptACProvider - provide the config field from prompt with time out
+//
+//	sharedACProvider - provide the nil to use shared AWS configuration
+//	fileACProvider   - provide the aws config with a json file
+//	promptACProvider - provide the config field from prompt with time out
+//
 // TODO: load aws session set up in a more official way. E.g. session.Opt.SharedConfigFiles,
-//   profile, env, e.t.c.
+//
+//	profile, env, e.t.c.
 type awsConfigProvider interface {
 	getAwsConfig() (*AwsConfig, error)
 }
@@ -187,7 +191,8 @@ func (provider *fileACProvider) getAwsConfig() (*AwsConfig, error) {
 
 // promptACProvider provide a user interactive console for AWS config.
 // Four fields are asked:
-//    1. AccessKey  	2. SecretKey		3. Region
+//  1. AccessKey  	2. SecretKey		3. Region
+//
 // Each field is asked with a timeout mechanism.
 type promptACProvider struct {
 	timeout time.Duration
