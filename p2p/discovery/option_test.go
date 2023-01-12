@@ -40,14 +40,14 @@ func TestDHTOption_getLibp2pRawOptions(t *testing.T) {
 			opt: DHTConfig{
 				BootNodes: testAddrStr,
 			},
-			expLen: 1,
+			expLen: 2,
 		},
 		{
 			opt: DHTConfig{
 				BootNodes:     testAddrStr,
 				DataStoreFile: &validPath,
 			},
-			expLen: 2,
+			expLen: 3,
 		},
 		{
 			opt: DHTConfig{
@@ -58,7 +58,7 @@ func TestDHTOption_getLibp2pRawOptions(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		opts, err := test.opt.getLibp2pRawOptions()
+		opts, err := test.opt.GetLibp2pRawOptions()
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}
