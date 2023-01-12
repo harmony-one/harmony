@@ -40,14 +40,14 @@ func TestDHTOption_getLibp2pRawOptions(t *testing.T) {
 			opt: DHTConfig{
 				BootNodes: testAddrStr,
 			},
-			expLen: 1,
+			expLen: 2,
 		},
 		{
 			opt: DHTConfig{
 				BootNodes:     testAddrStr,
 				DataStoreFile: &validPath,
 			},
-			expLen: 2,
+			expLen: 3,
 		},
 		{
 			opt: DHTConfig{
