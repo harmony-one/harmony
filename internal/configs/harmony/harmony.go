@@ -222,17 +222,18 @@ type PrometheusConfig struct {
 
 type SyncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
-	Enabled        bool             // enable the stream sync protocol
-	Downloader     bool             // start the sync downloader client
-	StagedSync     bool             // use staged sync
-	StagedSyncCfg  StagedSyncConfig // staged sync configurations
-	Concurrency    int              // concurrency used for stream sync protocol
-	MinPeers       int              // minimum streams to start a sync task.
-	InitStreams    int              // minimum streams in bootstrap to start sync loop.
-	DiscSoftLowCap int              // when number of streams is below this value, spin discover during check
-	DiscHardLowCap int              // when removing stream, num is below this value, spin discovery immediately
-	DiscHighCap    int              // upper limit of streams in one sync protocol
-	DiscBatch      int              // size of each discovery
+	Enabled              bool             // enable the stream sync protocol
+	Downloader           bool             // start the sync downloader client
+	StagedSync           bool             // use staged sync
+	StagedSyncCfg        StagedSyncConfig // staged sync configurations
+	Concurrency          int              // concurrency used for stream sync protocol
+	MinPeers             int              // minimum streams to start a sync task.
+	InitStreams          int              // minimum streams in bootstrap to start sync loop.
+	MaxAdvertiseWaitTime int              // maximum time duration between advertisements
+	DiscSoftLowCap       int              // when number of streams is below this value, spin discover during check
+	DiscHardLowCap       int              // when removing stream, num is below this value, spin discovery immediately
+	DiscHighCap          int              // upper limit of streams in one sync protocol
+	DiscBatch            int              // size of each discovery
 }
 
 type StagedSyncConfig struct {

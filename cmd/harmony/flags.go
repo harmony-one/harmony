@@ -1692,6 +1692,11 @@ var (
 		Usage:  "Initial shard-wise number of peers to start syncing",
 		Hidden: true,
 	}
+	syncMaxAdvertiseWaitTimeFlag = cli.IntFlag{
+		Name:   "sync.max-advertise-wait-time",
+		Usage:  "The max time duration between two advertises for each p2p peer to tell other nodes what protocols it supports",
+		Hidden: true,
+	}
 	syncDiscSoftLowFlag = cli.IntFlag{
 		Name:   "sync.disc.soft-low-cap",
 		Usage:  "Soft low cap for sync stream management",
@@ -1738,6 +1743,10 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncInitStreamsFlag) {
 		config.Sync.InitStreams = cli.GetIntFlagValue(cmd, syncInitStreamsFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncMaxAdvertiseWaitTimeFlag) {
+		config.Sync.MaxAdvertiseWaitTime = cli.GetIntFlagValue(cmd, syncMaxAdvertiseWaitTimeFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, syncDiscSoftLowFlag) {
