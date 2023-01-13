@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	goversion "github.com/hashicorp/go-version"
 	"github.com/pelletier/go-toml"
@@ -335,8 +337,38 @@ func getNextVersion(x map[string]configMigrationFunc) string {
 		keys[i] = k
 		i++
 	}
-	sort.Strings(keys)
-	requiredFunc := x[keys[len(keys)-1]]
+	// sorting keys (versions)
+	// each key is in format "x.x.x". Normal sort won't work if the versions
+	// don't have same number of digits, for example 1.02.10 and 1.2.9
+	// so, we need a custom sort
+	sort.Slice(keys, func(i, j int) bool {
+		v1 := keys[i]
+		v2 := keys[j]
+		v1Parts := strings.Split(v1, ".")
+		v2Parts := strings.Split(v2, ".")
+		if len(v1Parts) > len(v2Parts) {
+			return true
+		} else if len(v1Parts) < len(v2Parts) {
+			return false
+		}
+		for i := 0; i < len(v1Parts); i++ {
+			n1, err1 := strconv.ParseInt(v1Parts[i], 10, 32)
+			if err1 != nil {
+				panic("wrong version format")
+			}
+			n2, err2 := strconv.ParseInt(v2Parts[i], 10, 32)
+			if err2 != nil {
+				panic("wrong version format")
+			}
+			if n1 > n2 {
+				return true
+			} else if n1 < n2 {
+				return false
+			}
+		}
+		return false
+	})
+	requiredFunc := x[keys[0]]
 	tree = requiredFunc(tree)
 	return tree.Get("Version").(string)
 }
