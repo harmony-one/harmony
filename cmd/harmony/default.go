@@ -6,7 +6,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.13"
+const tomlConfigVersion = "2.5.11"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -204,14 +204,14 @@ var (
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
 		Downloader:           true,
-		StagedSync:           true,
+		StagedSync:           false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          4,
-		MinPeers:             4,
-		InitStreams:          4,
+		MinPeers:             5,
+		InitStreams:          5,
 		MaxAdvertiseWaitTime: 5, //minutes
-		DiscSoftLowCap:       4,
-		DiscHardLowCap:       4,
+		DiscSoftLowCap:       5,
+		DiscHardLowCap:       5,
 		DiscHighCap:          1024,
 		DiscBatch:            8,
 	}
