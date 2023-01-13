@@ -318,6 +318,14 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.5.10"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("Sync.MaxAdvertiseWaitTime") == nil {
+			confTree.Set("Sync.MaxAdvertiseWaitTime", defaultConfig.Sync.MaxAdvertiseWaitTime)
+		}
+		confTree.Set("Version", "2.5.11")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {
