@@ -41,17 +41,17 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config 
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{
-		Chain:      bc,
-		Host:       host.GetP2PHost(),
-		Discovery:  host.GetDiscovery(),
-		ShardID:    nodeconfig.ShardID(bc.ShardID()),
-		Network:    config.Network,
-		BeaconNode: isBeaconNode,
-
-		SmSoftLowCap: config.SmSoftLowCap,
-		SmHardLowCap: config.SmHardLowCap,
-		SmHiCap:      config.SmHiCap,
-		DiscBatch:    config.SmDiscBatch,
+		Chain:                bc,
+		Host:                 host.GetP2PHost(),
+		Discovery:            host.GetDiscovery(),
+		ShardID:              nodeconfig.ShardID(bc.ShardID()),
+		Network:              config.Network,
+		BeaconNode:           isBeaconNode,
+		MaxAdvertiseWaitTime: config.MaxAdvertiseWaitTime,
+		SmSoftLowCap:         config.SmSoftLowCap,
+		SmHardLowCap:         config.SmHardLowCap,
+		SmHiCap:              config.SmHiCap,
+		DiscBatch:            config.SmDiscBatch,
 	})
 
 	host.AddStreamProtocol(sp)
