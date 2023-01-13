@@ -59,12 +59,13 @@ type (
 
 	// Config is the sync protocol config
 	Config struct {
-		Chain      engine.ChainReader
-		Host       libp2p_host.Host
-		Discovery  discovery.Discovery
-		ShardID    nodeconfig.ShardID
-		Network    nodeconfig.NetworkType
-		BeaconNode bool
+		Chain                engine.ChainReader
+		Host                 libp2p_host.Host
+		Discovery            discovery.Discovery
+		ShardID              nodeconfig.ShardID
+		Network              nodeconfig.NetworkType
+		BeaconNode           bool
+		MaxAdvertiseWaitTime int
 		// stream manager config
 		SmSoftLowCap int
 		SmHardLowCap int

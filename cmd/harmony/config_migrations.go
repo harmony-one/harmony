@@ -319,62 +319,10 @@ func init() {
 	}
 
 	migrations["2.5.10"] = func(confTree *toml.Tree) *toml.Tree {
-		if confTree.Get("P2P.ConnManagerLowWatermark") == nil {
-			confTree.Set("P2P.ConnManagerLowWatermark", defaultConfig.P2P.ConnManagerLowWatermark)
-		}
-		if confTree.Get("P2P.ConnManagerHighWatermark") == nil {
-			confTree.Set("P2P.ConnManagerHighWatermark", defaultConfig.P2P.ConnManagerHighWatermark)
-		}
 		if confTree.Get("Sync.MaxAdvertiseWaitTime") == nil {
 			confTree.Set("Sync.MaxAdvertiseWaitTime", defaultConfig.Sync.MaxAdvertiseWaitTime)
 		}
 		confTree.Set("Version", "2.5.11")
-		return confTree
-	}
-
-	migrations["2.5.11"] = func(confTree *toml.Tree) *toml.Tree {
-		if confTree.Get("General.TriesInMemory") == nil {
-			confTree.Set("General.TriesInMemory", defaultConfig.General.TriesInMemory)
-		}
-		confTree.Set("Version", "2.5.12")
-		return confTree
-	}
-
-	migrations["2.5.12"] = func(confTree *toml.Tree) *toml.Tree {
-		if confTree.Get("HTTP.ReadTimeout") == nil {
-			confTree.Set("HTTP.ReadTimeout", defaultConfig.HTTP.ReadTimeout)
-		}
-		if confTree.Get("HTTP.WriteTimeout") == nil {
-			confTree.Set("HTTP.WriteTimeout", defaultConfig.HTTP.WriteTimeout)
-		}
-		if confTree.Get("HTTP.IdleTimeout") == nil {
-			confTree.Set("HTTP.IdleTimeout", defaultConfig.HTTP.IdleTimeout)
-		}
-		if confTree.Get("RPCOpt.EvmCallTimeout") == nil {
-			confTree.Set("RPCOpt.EvmCallTimeout", defaultConfig.RPCOpt.EvmCallTimeout)
-		}
-		confTree.Set("Version", "2.5.13")
-		return confTree
-	}
-
-	migrations["2.5.13"] = func(confTree *toml.Tree) *toml.Tree {
-		if confTree.Get("TxPool.AccountQueue") == nil {
-			confTree.Set("TxPool.AccountQueue", defaultConfig.TxPool.AccountQueue)
-		}
-		if confTree.Get("TxPool.GlobalQueue") == nil {
-			confTree.Set("TxPool.GlobalQueue", defaultConfig.TxPool.GlobalQueue)
-		}
-		if confTree.Get("TxPool.Lifetime") == nil {
-			confTree.Set("TxPool.Lifetime", defaultConfig.TxPool.Lifetime.String())
-		}
-		if confTree.Get("TxPool.PriceLimit") == nil {
-			confTree.Set("TxPool.PriceLimit", defaultConfig.TxPool.PriceLimit)
-		}
-		if confTree.Get("TxPool.PriceBump") == nil {
-			confTree.Set("TxPool.PriceBump", defaultConfig.TxPool.PriceBump)
-		}
-
-		confTree.Set("Version", "2.5.14")
 		return confTree
 	}
 

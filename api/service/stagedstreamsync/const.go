@@ -36,11 +36,11 @@ type (
 		ServerOnly bool
 
 		// parameters
-		Network     nodeconfig.NetworkType
-		Concurrency int // Number of concurrent sync requests
-		MinStreams  int // Minimum number of streams to do sync
-		InitStreams int // Number of streams requirement for initial bootstrap
-
+		Network              nodeconfig.NetworkType
+		Concurrency          int // Number of concurrent sync requests
+		MinStreams           int // Minimum number of streams to do sync
+		InitStreams          int // Number of streams requirement for initial bootstrap
+		MaxAdvertiseWaitTime int // maximum time duration between protocol advertisements
 		// stream manager config
 		SmSoftLowCap int
 		SmHardLowCap int
