@@ -73,8 +73,12 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		Str("protocol ID", string(pid)).Logger()
 
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
-	fmt.Println("my peer id: ", host.ID().String())
-	fmt.Println("my proto id: ", pid)
+
+	// if it is a beacon node or shard node, print the peer id and proto id
+	if protoSpec.BeaconNode || protoSpec.ShardID != shard.BeaconChainShardID {
+		fmt.Println("My peer id: ", host.ID().String())
+		fmt.Println("My proto id: ", pid)
+	}
 
 	return &streamManager{
 		myProtoID:     pid,
