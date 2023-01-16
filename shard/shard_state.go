@@ -252,9 +252,9 @@ func (ss *State) FindCommitteeByID(shardID uint32) (*Committee, error) {
 	if ss == nil {
 		return nil, ErrShardIDNotInSuperCommittee
 	}
-	for committee := range ss.Shards {
-		if ss.Shards[committee].ShardID == shardID {
-			return &ss.Shards[committee], nil
+	for _, committee := range ss.Shards {
+		if committee.ShardID == shardID {
+			return &committee, nil
 		}
 	}
 	return nil, ErrShardIDNotInSuperCommittee
@@ -332,14 +332,14 @@ func (c *Committee) BLSPublicKeys() ([]bls.PublicKeyWrapper, error) {
 		return nil, ErrSubCommitteeNil
 	}
 
-	slice := make([]bls.PublicKeyWrapper, len(c.Slots))
+	slice := make([]bls.PublicKeyWrapper, 0, len(c.Slots))
 	for j := range c.Slots {
 		pubKey, err := bls.BytesToBLSPublicKey(c.Slots[j].BLSPublicKey[:])
 		if err != nil {
 			return nil, err
 		}
 
-		slice[j] = bls.PublicKeyWrapper{Bytes: c.Slots[j].BLSPublicKey, Object: pubKey}
+		slice = append(slice, bls.PublicKeyWrapper{Bytes: c.Slots[j].BLSPublicKey, Object: pubKey})
 	}
 
 	return slice, nil

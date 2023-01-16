@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -300,10 +301,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
 		consensus.Decider = decider
 	}
-
-	var committeeToSet *shard.Committee
-	epochToSet := curEpoch
-	hasError := false
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
 		curEpoch, consensus.Blockchain(),
 	)
@@ -314,47 +311,14 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			Msg("[UpdateConsensusInformation] Error retrieving current shard state")
 		return Syncing
 	}
-
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
-	// genesis block is a special case that will have shard state and needs to skip processing
-	isNotGenesisBlock := curHeader.Number().Cmp(big.NewInt(0)) > 0
-	if curHeader.IsLastBlockInEpoch() && isNotGenesisBlock {
 
-		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
-			nextEpoch, consensus.Blockchain(),
-		)
-		if err != nil {
-			consensus.getLogger().Error().
-				Err(err).
-				Uint32("shard", consensus.ShardID).
-				Msg("Error retrieving nextEpoch shard state")
-			return Syncing
-		}
-
-		subComm, err := nextShardState.FindCommitteeByID(curHeader.ShardID())
-		if err != nil {
-			consensus.getLogger().Error().
-				Err(err).
-				Uint32("shard", consensus.ShardID).
-				Msg("Error retrieving nextEpoch shard state")
-			return Syncing
-		}
-
-		committeeToSet = subComm
-		epochToSet = nextEpoch
-	} else {
-		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
-		if err != nil {
-			consensus.getLogger().Error().
-				Err(err).
-				Uint32("shard", consensus.ShardID).
-				Msg("Error retrieving current shard state")
-			return Syncing
-		}
-
-		committeeToSet = subComm
+	committeeToSet, epochToSet, err := consensus.committeeToSet(curHeader, curShardState)
+	if err != nil {
+		return Syncing
 	}
 
+	hasError := false
 	if len(committeeToSet.Slots) == 0 {
 		consensus.getLogger().Warn().
 			Msg("[UpdateConsensusInformation] No members in the committee to update")
@@ -405,6 +369,31 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 	}
 
+	if curHeader.IsLastBlockInEpoch() {
+		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
+			nextEpoch, consensus.Blockchain(),
+		)
+		if err != nil {
+			consensus.getLogger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error retrieving nextEpoch shard state")
+			return Syncing
+		}
+		myPubKeys := consensus.GetPublicKeys()
+		for _, committee := range nextShardState.Shards {
+			pubKeys, _ := committee.BLSPublicKeys()
+			for _, key := range pubKeys {
+				if myPubKeys.Contains(key.Object) {
+					if consensus.ShardID != committee.ShardID {
+						// move to another shard
+					}
+				}
+			}
+		}
+
+	}
+
 	for _, key := range pubKeys {
 		// in committee
 		myPubKeys := consensus.GetPublicKeys()
@@ -435,6 +424,44 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// not in committee
 	return Listening
+}
+
+func (consensus *Consensus) committeeToSet(curHeader *block.Header, curShardState *shard.State) (committeeToSet *shard.Committee, epochToSet *big.Int, err error) {
+	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
+	isNotGenesisBlock := curHeader.Number().Cmp(big.NewInt(0)) > 0
+	if curHeader.IsLastBlockInEpoch() && isNotGenesisBlock {
+		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
+			nextEpoch, consensus.Blockchain(),
+		)
+		if err != nil {
+			consensus.getLogger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error retrieving nextEpoch shard state")
+			return nil, nil, err
+		}
+
+		subComm, err := nextShardState.FindCommitteeByID(curHeader.ShardID())
+		if err != nil {
+			consensus.getLogger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error retrieving nextEpoch shard state")
+			return nil, nil, err
+		}
+
+		return subComm, nextEpoch, nil
+	} else {
+		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
+		if err != nil {
+			consensus.getLogger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error retrieving current shard state")
+			return nil, nil, err
+		}
+		return subComm, curHeader.Epoch(), nil
+	}
 }
 
 // IsLeader check if the node is a leader or not by comparing the public key of
