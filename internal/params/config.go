@@ -275,8 +275,6 @@ var (
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     5,
 		FeeCollectEpoch:               big.NewInt(5),
-		LeaderRotationEpoch:           EpochTBD,
-		LeaderRotationBlocksCount:     5,
 	}
 
 	// AllProtocolChanges ...
