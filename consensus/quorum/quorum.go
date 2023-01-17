@@ -230,7 +230,14 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	if numNodes <= 0 || numNodes > len(s.publicKeys) {
 		numNodes = len(s.publicKeys)
 	}
-	idx = (idx + next) % numNodes
+	// numNodes is always positive
+	// next can be negative
+	// idx can be negative only when previous public key is not found
+	// if both idx and next are negative, (idx + next) % numNodes < 0 => error
+	// think -1, -10 and 3 => -11 % 3 => -2
+	// to fix, add back numNodes and do modulo again
+	// (-2 + 3) % 3 => 1
+	idx = ((idx+next)%numNodes + numNodes) % numNodes
 	return found, &s.publicKeys[idx]
 }
 
