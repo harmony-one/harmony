@@ -444,7 +444,8 @@ func (vc *viewChange) InitPayload(
 					vc.nilBitmap[viewID] = nilBitmap
 				}
 				if err := vc.nilBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
-					vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] nilBitmap setkey failed")
+					vc.getLogger().Warn().Err(err).
+						Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] nilBitmap setkey failed")
 					continue
 				}
 				if _, ok := vc.nilSigs[viewID]; !ok {
@@ -475,7 +476,8 @@ func (vc *viewChange) InitPayload(
 				vc.viewIDBitmap[viewID] = viewIDBitmap
 			}
 			if err := vc.viewIDBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
-				vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] viewIDBitmap setkey failed")
+				vc.getLogger().Warn().Err(err).
+					Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] viewIDBitmap setkey failed")
 				continue
 			}
 			if _, ok := vc.viewIDSigs[viewID]; !ok {
