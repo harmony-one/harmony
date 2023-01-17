@@ -1205,22 +1205,20 @@ func (ss *StagedSync) GetMaxPeerHeight() (uint64, error) {
 	return ss.getMaxPeerHeight()
 }
 
-func (ss *StagedSync) addConsensusLastMile(bc core.BlockChain, consensus *consensus.Consensus) error {
+func (ss *StagedSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) error {
 	curNumber := bc.CurrentBlock().NumberU64()
-	blockIter, err := consensus.GetLastMileBlockIter(curNumber + 1)
-	if err != nil {
-		return err
-	}
-	for {
-		block := blockIter.Next()
-		if block == nil {
-			break
+	return cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
+		for {
+			block := blockIter.Next()
+			if block == nil {
+				break
+			}
+			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+				return errors.Wrap(err, "failed to InsertChain")
+			}
 		}
-		if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
-			return errors.Wrap(err, "failed to InsertChain")
-		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // GetSyncingPort returns the syncing port.
