@@ -111,7 +111,6 @@ var (
 		AllowlistEpoch:                big.NewInt(2),
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
-		TesnetNinetyPercentEpoch:      big.NewInt(399),
 		FeeCollectEpoch:               EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -274,7 +273,6 @@ var (
 		AllowlistEpoch:                EpochTBD,
 		LeaderRotationEpoch:           big.NewInt(4),
 		LeaderRotationBlocksCount:     5,
-		TesnetNinetyPercentEpoch:      EpochTBD,
 		FeeCollectEpoch:               big.NewInt(5),
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     5,
@@ -717,10 +715,6 @@ func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
 	return isForked(c.LeaderRotationEpoch, epoch)
-}
-
-func (c *ChainConfig) IsTestnetNinetyPercent(epoch *big.Int) bool {
-	return isForked(c.TesnetNinetyPercentEpoch, epoch) && c == TestnetChainConfig
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.
