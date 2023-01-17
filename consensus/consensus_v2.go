@@ -411,16 +411,6 @@ func (consensus *Consensus) tick() {
 	}
 }
 
-// Close closes the consensus. If current is in normal commit phase, wait until the commit
-// phase end.
-func (consensus *Consensus) Close() error {
-	if consensus.dHelper != nil {
-		consensus.dHelper.close()
-	}
-	consensus.waitForCommit()
-	return nil
-}
-
 func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 	//consensus.ReshardingNextLeader(newBlock)
 				consensus.getLogger().Info().
