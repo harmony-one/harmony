@@ -412,16 +412,6 @@ func (consensus *Consensus) tick() {
 	}
 }
 
-// Close closes the consensus. If current is in normal commit phase, wait until the commit
-// phase end.
-func (consensus *Consensus) Close() error {
-	if consensus.dHelper != nil {
-		consensus.dHelper.close()
-	}
-	consensus.waitForCommit()
-	return nil
-}
-
 func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 	//consensus.ReshardingNextLeader(newBlock)
 				consensus.getLogger().Info().
@@ -489,6 +479,11 @@ func (consensus *Consensus) GetLastMileBlockIter(bnStart uint64, cb func(iter *L
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
+	return consensus.getLastMileBlockIter(bnStart, cb)
+}
+
+// GetLastMileBlockIter get the iterator of the last mile blocks starting from number bnStart
+func (consensus *Consensus) getLastMileBlockIter(bnStart uint64, cb func(iter *LastMileBlockIter) error) error {
 	if consensus.BlockVerifier == nil {
 		return errors.New("consensus haven't initialized yet")
 	}
