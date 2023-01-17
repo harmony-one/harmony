@@ -684,11 +684,12 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	prev := consensus.GetLeaderPubKey()
-	curNumber := consensus.Blockchain.CurrentHeader().Number().Uint64()
-	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v numblocks:%d", epoch.Uint64(), consensus.Blockchain.Config().IsLeaderRotation(epoch), consensus.Blockchain.Config().LeaderRotationBlocksCount)
+	bc := consensus.Blockchain()
+	curNumber := bc.CurrentHeader().Number().Uint64()
+	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v numblocks:%d", epoch.Uint64(), bc.Config().IsLeaderRotation(epoch), bc.Config().LeaderRotationBlocksCount)
 	leader := consensus.GetLeaderPubKey()
-	for i := 0; i < consensus.Blockchain.Config().LeaderRotationBlocksCount; i++ {
-		header := consensus.Blockchain.GetHeaderByNumber(curNumber - uint64(i))
+	for i := 0; i < bc.Config().LeaderRotationBlocksCount; i++ {
+		header := bc.GetHeaderByNumber(curNumber - uint64(i))
 		if header == nil {
 			return
 		}
@@ -697,7 +698,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 			return
 		}
 		// Check if the same leader.
-		pub, err := consensus.Blockchain.GetLeaderPubKeyFromCoinbase(header)
+		pub, err := bc.GetLeaderPubKeyFromCoinbase(header)
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("Failed to get leader public key from coinbase")
 			return
@@ -736,7 +737,7 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 	} else {
 		epoch = blk.Epoch()
 	}
-	if consensus.Blockchain.Config().IsLeaderRotation(epoch) {
+	if consensus.Blockchain().Config().IsLeaderRotation(epoch) {
 		consensus.rotateLeader(epoch)
 	}
 
