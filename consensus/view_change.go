@@ -142,6 +142,10 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 
 	// timestamp messed up in current validator node
 	if curTimestamp <= blockTimestamp {
+		consensus.getLogger().Error().
+			Int64("curTimestamp", curTimestamp).
+			Int64("blockTimestamp", blockTimestamp).
+			Msg("[getNextViewID] timestamp of block too high")
 		return consensus.fallbackNextViewID()
 	}
 	// diff only increases, since view change timeout is shorter than
