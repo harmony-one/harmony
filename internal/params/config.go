@@ -70,8 +70,6 @@ var (
 		CrossShardXferPrecompileEpoch: EpochTBD,
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               EpochTBD,
-		LeaderRotationEpoch:           EpochTBD,
-		LeaderRotationBlocksCount:     64,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -109,8 +107,6 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
-		LeaderRotationEpoch:           big.NewInt(295),
-		LeaderRotationBlocksCount:     64,
 		FeeCollectEpoch:               EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -149,8 +145,6 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		LeaderRotationEpoch:           EpochTBD,
-		LeaderRotationBlocksCount:     64,
 		FeeCollectEpoch:               EpochTBD,
 	}
 
@@ -191,8 +185,6 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               big.NewInt(574),
-		LeaderRotationEpoch:           EpochTBD,
-		LeaderRotationBlocksCount:     64,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -232,8 +224,6 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               EpochTBD,
-		LeaderRotationEpoch:           EpochTBD,
-		LeaderRotationBlocksCount:     64,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -272,8 +262,6 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               big.NewInt(5),
-		LeaderRotationEpoch:           EpochTBD,
-		LeaderRotationBlocksCount:     5,
 	}
 
 	// AllProtocolChanges ...
@@ -313,7 +301,7 @@ var (
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
-		big.NewInt(1),                      // LeaderRotationEpoch
+		big.NewInt(10),                     // LeaderRotationEpoch
 		64,                                 // LeaderRotationBlocksCount
 		big.NewInt(0),                      // FeeCollectEpoch
 	}
@@ -355,7 +343,7 @@ var (
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
-		big.NewInt(1),        // LeaderRotationEpoch
+		big.NewInt(10),       // LeaderRotationEpoch
 		64,                   // LeaderRotationBlocksCount
 		big.NewInt(0),        // FeeCollectEpoch
 	}

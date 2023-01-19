@@ -3262,14 +3262,15 @@ func (bc *BlockChainImpl) SuperCommitteeForNextEpoch(
 
 // GetLeaderPubKeyFromCoinbase retrieve corresponding blsPublicKey from Coinbase Address
 func (bc *BlockChainImpl) GetLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error) {
-	if cached, ok := bc.leaderPubKeyFromCoinbase.Get(h.Number().Uint64()); ok {
+	hash := h.Hash().String()
+	if cached, ok := bc.leaderPubKeyFromCoinbase.Get(hash); ok {
 		return cached.(*bls.PublicKeyWrapper), nil
 	}
 	rs, err := bc.getLeaderPubKeyFromCoinbase(h)
 	if err != nil {
 		return nil, err
 	}
-	bc.leaderPubKeyFromCoinbase.Add(h.Number().Uint64(), rs)
+	bc.leaderPubKeyFromCoinbase.Add(hash, rs)
 	return rs, nil
 }
 

@@ -234,9 +234,8 @@ func New(
 	registry *registry.Registry,
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
-	consensus := Consensus{
-		ShardID: shard,
-	}
+	consensus := Consensus{}
+	consensus.ShardID = shard
 	consensus.Decider = Decider
 	consensus.registry = registry
 	consensus.MinPeers = minPeers
