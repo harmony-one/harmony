@@ -95,7 +95,6 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config 
 func (d *Downloader) Start() {
 	go func() {
 		d.waitForBootFinish()
-		fmt.Printf("boot completed for shard %d, %d streams are connected\n", d.bc.ShardID(), d.syncProtocol.NumStreams())
 		d.loop()
 	}()
 
@@ -178,6 +177,7 @@ func (d *Downloader) waitForBootFinish() {
 
 		case <-checkCh:
 			if d.syncProtocol.NumStreams() >= d.config.InitStreams {
+				fmt.Printf("boot completed for shard %d ( %d streams are connected )\n", d.bc.ShardID(), d.syncProtocol.NumStreams())
 				return
 			}
 		case <-d.closeC:
