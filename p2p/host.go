@@ -116,6 +116,19 @@ func init() {
 	libp2p_pubsub.GossipSubMaxIHaveLength = 1000
 }
 
+func forceReachabilityPublic(f bool) libp2p_config.Option {
+	if f {
+		return func(cfg *libp2p_config.Config) error {
+			public := libp2p_network.Reachability(libp2p_network.ReachabilityPublic)
+			cfg.AutoNATConfig.ForceReachability = &public
+			return nil
+		}
+	}
+	return func(p2pConfig *libp2p_config.Config) error {
+		return nil
+	}
+}
+
 // NewHost ..
 func NewHost(cfg HostConfig) (Host, error) {
 	var (
@@ -132,8 +145,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	// TODO: move low and high to configs
 	connmgr, err := connmgr.NewConnManager(
-		int(10),                     // LowWater
-		int(10000)*cfg.MaxConnPerIP, // HighWater,
+		int(cfg.MaxConnPerIP),      // LowWater
+		int(1024)*cfg.MaxConnPerIP, // HighWater,
 		connmgr.WithGracePeriod(time.Minute),
 	)
 	if err != nil {
@@ -142,16 +155,16 @@ func NewHost(cfg HostConfig) (Host, error) {
 	}
 	var idht *dht.IpfsDHT
 	var opt discovery.DHTConfig
-	p2pHost, err := libp2p.New(
+	p2pHostConfig := []libp2p.Option{
 		listenAddr,
 		libp2p.Identity(key),
-		// support TLS connections
+		// Support TLS connections
 		libp2p.Security(libp2ptls.ID, libp2ptls.New),
-		// support noise connections
+		// Support noise connections
 		libp2p.Security(noise.ID, noise.New),
-		// support any other default transports (TCP)
+		// Support any other default transports (TCP)
 		libp2p.DefaultTransports,
-		// Let's prevent our peer from having too many
+		// Prevent the peer from having too many
 		// connections by attaching a connection manager.
 		libp2p.ConnectionManager(connmgr),
 		// Attempt to open ports using uPNP for NATed hosts.
@@ -169,8 +182,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 			idht, err = dht.New(ctx, h, opts...)
 			return idht, err
 		}),
-
-		// to help other peers to figure out if they are behind
+		// To help other peers to figure out if they are behind
 		// NATs, launch the server-side of AutoNAT too (AutoRelay
 		// already runs the client)
 		// This service is highly rate-limited and should not cause any
@@ -178,14 +190,23 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.EnableNATService(),
 		// Bandwidth Reporter
 		libp2p.BandwidthReporter(newCounter()),
-		// ForceReachabilityPublic overrides automatic reachability detection in the AutoNAT subsystem,
-		// forcing the local node to believe it is reachable externally.
-		// libp2p.ForceReachabilityPublic(),
-		// libp2p.DisableRelay(),
+		// Enable relay service, to disable relay we can use libp2p.DisableRelay()
 		libp2p.EnableRelayService(),
-		// prevent dialing of public addresses
-		// libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)),
-	)
+	}
+
+	if cfg.ForceReachabilityPublic {
+		// ForceReachabilityPublic overrides automatic reachability detection in the AutoNAT subsystem,
+		// forcing the local node to believe it is reachable externally
+		p2pHostConfig = append(p2pHostConfig, libp2p.ForceReachabilityPublic())
+	}
+
+	if cfg.DisablePrivateIPScan {
+		// Prevent dialing of public addresses
+		p2pHostConfig = append(p2pHostConfig, libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)))
+	}
+
+	// create p2p host
+	p2pHost, err := libp2p.New(p2pHostConfig...)
 	if err != nil {
 		cancel()
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
