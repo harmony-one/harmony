@@ -191,14 +191,14 @@ var (
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
 		Downloader:           true,
-		StagedSync:           false,
+		StagedSync:           true,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          4,
-		MinPeers:             5,
-		InitStreams:          5,
+		MinPeers:             4,
+		InitStreams:          4,
 		MaxAdvertiseWaitTime: 5, //minutes
-		DiscSoftLowCap:       5,
-		DiscHardLowCap:       5,
+		DiscSoftLowCap:       4,
+		DiscHardLowCap:       4,
 		DiscHighCap:          1024,
 		DiscBatch:            8,
 	}
