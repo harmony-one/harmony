@@ -116,6 +116,19 @@ func init() {
 	libp2p_pubsub.GossipSubMaxIHaveLength = 1000
 }
 
+func forceReachabilityPublic(f bool) libp2p_config.Option {
+	if f {
+		return func(cfg *libp2p_config.Config) error {
+			public := libp2p_network.Reachability(libp2p_network.ReachabilityPublic)
+			cfg.AutoNATConfig.ForceReachability = &public
+			return nil
+		}
+	}
+	return func(p2pConfig *libp2p_config.Config) error {
+		return nil
+	}
+}
+
 // NewHost ..
 func NewHost(cfg HostConfig) (Host, error) {
 	var (
