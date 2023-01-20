@@ -65,9 +65,9 @@ var (
 		SHA3Epoch:                     big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:                 big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		StakingPrecompileEpoch:        big.NewInt(871), // Around Tue Feb 11 2022
-		ChainIdFixEpoch:               EpochTBD,
+		ChainIdFixEpoch:               big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC 
 		SlotsLimitedEpoch:             big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
-		CrossShardXferPrecompileEpoch: EpochTBD,
+		CrossShardXferPrecompileEpoch: big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC 
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               EpochTBD,
 	}
