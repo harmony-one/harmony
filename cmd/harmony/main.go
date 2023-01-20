@@ -629,6 +629,13 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		Port:            strconv.Itoa(hc.P2P.Port),
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
+
+	// for local-net the node has to be forced to assume it is public reachable
+	forceReachabilityPublic := false
+	if hc.Network.NetworkType == nodeconfig.Localnet {
+		forceReachabilityPublic = true
+	}
+
 	myHost, err = p2p.NewHost(p2p.HostConfig{
 		Self:                     &selfPeer,
 		BLSKey:                   nodeConfig.P2PPriKey,
@@ -639,6 +646,7 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		DisablePrivateIPScan:     hc.P2P.DisablePrivateIPScan,
 		MaxPeers:                 hc.P2P.MaxPeers,
 		WaitForEachPeerToConnect: hc.P2P.WaitForEachPeerToConnect,
+		ForceReachabilityPublic:  forceReachabilityPublic,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
