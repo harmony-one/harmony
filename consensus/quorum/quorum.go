@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -224,6 +225,10 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	idx := s.IndexOf(pubKey.Bytes)
 	if idx != -1 {
 		found = true
+	} else {
+		utils.Logger().Error().
+			Str("key", pubKey.Bytes.Hex()).
+			Msg("[NthNextHmy] pubKey not found")
 	}
 	numNodes := instance.NumHarmonyOperatedNodesPerShard()
 	// sanity check to avoid out of bound access
