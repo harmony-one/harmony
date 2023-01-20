@@ -43,19 +43,24 @@ func (s *PublicHarmonyService) ProtocolVersion(
 }
 
 // Syncing returns false in case the node is in sync with the network
-// With the current network height as well as the difference
+// If it is syncing, it returns:
+// starting block, current block, and network height
 func (s *PublicHarmonyService) Syncing(
 	ctx context.Context,
 ) (interface{}, error) {
+	// difference = target - current
 	inSync, target, difference := s.hmy.NodeAPI.SyncStatus(s.hmy.ShardID)
+	if inSync {
+		return false, nil
+	}
 	return struct {
-		InSync bool   `json:"in-sync"`
-		Target uint64 `json:"network-height"`
-		Delta  uint64 `json:"difference"`
+		Start   uint64 `json:"startingBlock"`
+		Current uint64 `json:"currentBlock"`
+		Target  uint64 `json:"highestBlock"`
 	}{
-		InSync: inSync,
-		Target: target,
-		Delta:  difference,
+		// Start:   0, // TODO
+		Current: target - difference,
+		Target:  target,
 	}, nil
 }
 
