@@ -346,7 +346,6 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	if reset {
 		consensus.resetState()
 	}
-	fmt.Println("[startNewView]", newLeaderPriKey.Pub.Bytes.Hex())
 	consensus.setLeaderPubKey(newLeaderPriKey.Pub)
 
 	return nil

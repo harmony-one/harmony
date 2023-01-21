@@ -536,19 +536,6 @@ func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
 	return consensus.current.SetCurBlockViewID(viewID)
 }
 
-// SetLeaderIndex set the leader index.
-func (consensus *Consensus) SetLeaderIndex(f func(int) int) (current int) {
-	consensus.pubKeyLock.Lock()
-	defer consensus.pubKeyLock.Unlock()
-	consensus.LeaderIndex = f(consensus.LeaderIndex)
-	return consensus.LeaderIndex
-}
-
-func (consensus *Consensus) GetLeaderIndex() int {
-	consensus.pubKeyLock.Lock()
-	defer consensus.pubKeyLock.Unlock()
-	return consensus.LeaderIndex
-}
 // SetCurBlockViewID set the current view ID
 func (consensus *Consensus) setCurBlockViewID(viewID uint64) {
 	consensus.current.SetCurBlockViewID(viewID)
@@ -558,7 +545,6 @@ func (consensus *Consensus) setCurBlockViewID(viewID uint64) {
 func (consensus *Consensus) SetViewChangingID(viewID uint64) {
 	consensus.current.SetViewChangingID(viewID)
 }
-
 
 // SetViewChangingID set the current view change ID
 func (consensus *Consensus) setViewChangingID(viewID uint64) {

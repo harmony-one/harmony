@@ -427,10 +427,10 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 		consensus.getLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
 			Msg("[ConsensusMainLoop] received old block, abort")
 		return
-				}
-				// Sleep to wait for the full block time
-				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
-				time.AfterFunc(time.Until(consensus.NextBlockDue), func() {
+	}
+	// Sleep to wait for the full block time
+	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
+	time.AfterFunc(time.Until(consensus.NextBlockDue), func() {
 		consensus.StartFinalityCount()
 		consensus.mutex.Lock()
 		defer consensus.mutex.Unlock()
@@ -742,12 +742,6 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
 	consensus.setCurBlockViewID(committedMsg.ViewID + 1)
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
-	var epoch *big.Int
-	if blk.IsLastBlockInEpoch() {
-		epoch = new(big.Int).Add(blk.Epoch(), common.Big1)
-	} else {
-		epoch = blk.Epoch()
-	}
 	var epoch *big.Int
 	if blk.IsLastBlockInEpoch() {
 		epoch = new(big.Int).Add(blk.Epoch(), common.Big1)
