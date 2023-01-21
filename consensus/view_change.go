@@ -327,8 +327,8 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 
 	consensus.current.SetMode(Normal)
 	consensus.consensusTimeout[timeoutViewChange].Stop()
-	consensus.SetViewIDs(viewID)
-	consensus.ResetViewChangeState()
+	consensus.setViewIDs(viewID)
+	consensus.resetViewChangeState()
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
 	consensus.getLogger().Info().
@@ -340,7 +340,6 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	if reset {
 		consensus.resetState()
 	}
-	fmt.Println("[startNewView]", newLeaderPriKey.Pub.Bytes.Hex())
 	consensus.setLeaderPubKey(newLeaderPriKey.Pub)
 
 	return nil
@@ -529,7 +528,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	// newView message verified success, override my state
 	consensus.setViewIDs(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
-	consensus.ResetViewChangeState()
+	consensus.resetViewChangeState()
 
 	consensus.msgSender.StopRetry(msg_pb.MessageType_VIEWCHANGE)
 
@@ -550,6 +549,13 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 
 // ResetViewChangeState resets the view change structure
 func (consensus *Consensus) ResetViewChangeState() {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.resetViewChangeState()
+}
+
+// ResetViewChangeState resets the view change structure
+func (consensus *Consensus) resetViewChangeState() {
 	consensus.getLogger().Info().
 		Str("Phase", consensus.phase.String()).
 		Msg("[ResetViewChangeState] Resetting view change state")
