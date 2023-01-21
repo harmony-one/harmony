@@ -32,5 +32,5 @@ func (s *Service) Stop() error {
 	utils.Logger().Info().Msg("Stopping consensus service.")
 	close(s.stopChan)
 	utils.Logger().Info().Msg("Consensus service stopped.")
-	return s.consensus.Close()
+	return nil
 }
