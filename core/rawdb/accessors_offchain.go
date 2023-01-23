@@ -21,7 +21,9 @@ func ReadShardState(
 ) (*shard.State, error) {
 	data, err := db.Get(shardStateKey(epoch))
 	if err != nil {
-		return nil, errors.New(MsgNoShardStateFromDB)
+		return nil, errors.Errorf(
+			MsgNoShardStateFromDB, "epoch: %d", epoch,
+		)
 	}
 	ss, err2 := shard.DecodeWrapper(data)
 	if err2 != nil {

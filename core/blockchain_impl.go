@@ -428,6 +428,7 @@ func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block, beaconChain Block
 		bc, block.Header(),
 	); err != nil {
 		utils.Logger().Error().
+			Uint64("blockNum", block.NumberU64()).
 			Str("blockHash", block.Hash().Hex()).
 			Err(err).
 			Msg("[ValidateNewBlock] Cannot verify vrf for the new block")
