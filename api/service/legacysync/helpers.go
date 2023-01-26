@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 )
 
@@ -51,7 +52,7 @@ func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
 	return maxHeight
 }
 
-func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) (*SyncConfig, error) {
+func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) (*SyncConfig, error) {
 	// sanity check to ensure no duplicate peers
 	if err := checkPeersDuplicity(peers); err != nil {
 		return syncConfig, err
@@ -61,6 +62,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, 
 	targetSize, peers := limitNumPeers(peers, randSeed)
 
 	utils.Logger().Debug().
+		Str("self peer ID", string(selfPeerID)).
 		Int("peers count", len(peers)).
 		Int("target size", targetSize).
 		Uint32("shardID", shardID).
@@ -72,7 +74,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, 
 	if syncConfig != nil {
 		syncConfig.CloseConnections()
 	}
-	syncConfig = NewSyncConfig(shardID, nil)
+	syncConfig = NewSyncConfig(shardID, selfPeerID, nil)
 
 	if !waitForEachPeerToConnect {
 		var wg sync.WaitGroup
