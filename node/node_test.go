@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,7 +70,8 @@ func TestNewNode(t *testing.T) {
 
 func TestDNSSyncingPeerProvider(t *testing.T) {
 	t.Run("Happy", func(t *testing.T) {
-		p := NewDNSSyncingPeerProvider("example.com", "1234")
+		addrs := make([]multiaddr.Multiaddr, 0)
+		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs)
 		lookupCount := 0
 		lookupName := ""
 		p.lookupHost = func(name string) (addrs []string, err error) {
@@ -92,7 +94,8 @@ func TestDNSSyncingPeerProvider(t *testing.T) {
 		}
 	})
 	t.Run("LookupError", func(t *testing.T) {
-		p := NewDNSSyncingPeerProvider("example.com", "1234")
+		addrs := make([]multiaddr.Multiaddr, 0)
+		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs)
 		p.lookupHost = func(_ string) ([]string, error) {
 			return nil, errors.New("omg")
 		}
