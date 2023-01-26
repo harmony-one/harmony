@@ -25,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 )
 
@@ -110,14 +111,16 @@ type SyncConfig struct {
 	// SyncPeerConfig itself is guarded by its own mutex.
 	mtx sync.RWMutex
 
-	peers   []*SyncPeerConfig
-	shardID uint32
+	peers      []*SyncPeerConfig
+	shardID    uint32
+	selfPeerID libp2p_peer.ID
 }
 
-func NewSyncConfig(shardID uint32, peers []*SyncPeerConfig) *SyncConfig {
+func NewSyncConfig(shardID uint32, selfPeerID libp2p_peer.ID, peers []*SyncPeerConfig) *SyncConfig {
 	return &SyncConfig{
-		peers:   peers,
-		shardID: shardID,
+		peers:      peers,
+		shardID:    shardID,
+		selfPeerID: selfPeerID,
 	}
 }
 
@@ -133,6 +136,9 @@ func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
 	// Ensure no duplicate peers
 	for _, p2 := range sc.peers {
 		if peer.IsEqual(p2) {
+			return
+		}
+		if peer.peer.PeerID == sc.selfPeerID {
 			return
 		}
 	}
@@ -192,7 +198,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, isExplorer bool, role nodeconfig.Role) *StateSync {
+func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, peerID libp2p_peer.ID, isExplorer bool, role nodeconfig.Role) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.blockChain = bc
 	stateSync.selfip = ip
@@ -201,7 +207,7 @@ func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, i
 	stateSync.commonBlocks = make(map[int]*types.Block)
 	stateSync.lastMileBlocks = []*types.Block{}
 	stateSync.isExplorer = isExplorer
-	stateSync.syncConfig = NewSyncConfig(bc.ShardID(), nil)
+	stateSync.syncConfig = NewSyncConfig(bc.ShardID(), peerID, nil)
 
 	stateSync.syncStatus = newSyncStatus(role)
 	return stateSync
@@ -366,9 +372,9 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error {
+func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error {
 	var err error
-	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, waitForEachPeerToConnect)
+	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, selfPeerID, waitForEachPeerToConnect)
 	return err
 }
 

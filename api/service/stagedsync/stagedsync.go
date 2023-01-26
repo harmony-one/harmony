@@ -26,6 +26,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/ledgerwatch/erigon-lib/kv"
+
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type StagedSync struct {
@@ -663,7 +665,7 @@ func (ss *StagedSync) AddNewBlock(peerHash []byte, block *types.Block) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error {
+func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error {
 	// sanity check to ensure no duplicate peers
 	if err := checkPeersDuplicity(peers); err != nil {
 		return err
@@ -678,6 +680,7 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitFor
 	}
 
 	utils.Logger().Debug().
+		Str("self peer ID", string(selfPeerID)).
 		Int("peers count", len(peers)).
 		Int("target size", targetSize).
 		Msg("[STAGED_SYNC] CreateSyncConfig: len of peers")
@@ -685,7 +688,9 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitFor
 	if ss.syncConfig != nil {
 		ss.syncConfig.CloseConnections()
 	}
-	ss.syncConfig = &SyncConfig{}
+	ss.syncConfig = &SyncConfig{
+		selfPeerID: selfPeerID,
+	}
 
 	var connectedPeers int
 	for _, peer := range peers {
@@ -694,6 +699,7 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitFor
 			continue
 		}
 		peerConfig := &SyncPeerConfig{
+			peer:   peer,
 			ip:     peer.IP,
 			port:   peer.Port,
 			client: client,

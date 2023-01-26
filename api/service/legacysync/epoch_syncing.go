@@ -14,6 +14,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
+
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type EpochSync struct {
@@ -202,8 +204,8 @@ func processWithPayload(payload [][]byte, bc core.BlockChain) error {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *EpochSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error {
+func (ss *EpochSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error {
 	var err error
-	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, waitForEachPeerToConnect)
+	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, selfPeerID, waitForEachPeerToConnect)
 	return err
 }
