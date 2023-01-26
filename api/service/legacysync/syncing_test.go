@@ -12,6 +12,7 @@ import (
 	"time"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
@@ -128,7 +129,8 @@ func (mockBlockchain) ShardID() uint32 {
 }
 
 func TestCreateStateSync(t *testing.T) {
-	stateSync := CreateStateSync(mockBlockchain{}, "127.0.0.1", "8000", [20]byte{}, false, nodeconfig.Validator)
+	pID, _ := peer.IDFromBytes([]byte{})
+	stateSync := CreateStateSync(mockBlockchain{}, "127.0.0.1", "8000", [20]byte{}, pID, false, nodeconfig.Validator)
 
 	if stateSync == nil {
 		t.Error("Unable to create stateSync")

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/internal/tikv"
+	"github.com/multiformats/go-multiaddr"
 
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -105,7 +106,8 @@ func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
 	mutatedPort := strconv.Itoa(mySyncPort + legacysync.SyncingPortDifference)
 	role := node.NodeConfig.Role()
 	return legacysync.CreateStateSync(bc, node.SelfPeer.IP, mutatedPort,
-		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode, role)
+		node.GetSyncID(), node.host.GetID(),
+		node.NodeConfig.Role() == nodeconfig.ExplorerNode, role)
 }
 
 func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
@@ -151,14 +153,16 @@ type SyncingPeerProvider interface {
 
 // DNSSyncingPeerProvider uses the given DNS zone to resolve syncing peers.
 type DNSSyncingPeerProvider struct {
+	selfAddrs  []multiaddr.Multiaddr
 	zone, port string
 	lookupHost func(name string) (addrs []string, err error)
 }
 
 // NewDNSSyncingPeerProvider returns a provider that uses given DNS name and
 // port number to resolve syncing peers.
-func NewDNSSyncingPeerProvider(zone, port string) *DNSSyncingPeerProvider {
+func NewDNSSyncingPeerProvider(zone, port string, addrs []multiaddr.Multiaddr) *DNSSyncingPeerProvider {
 	return &DNSSyncingPeerProvider{
+		selfAddrs:  addrs,
 		zone:       zone,
 		port:       port,
 		lookupHost: net.LookupHost,
@@ -174,9 +178,25 @@ func (p *DNSSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Peer,
 			"[SYNC] cannot find peers using DNS name %#v", dns)
 	}
 	for _, addr := range addrs {
+		// no need to have peer itself on the list of connected peers
+		if p.getSelfAddrIndex(addr, p.port) >= 0 {
+			continue
+		}
 		peers = append(peers, p2p.Peer{IP: addr, Port: p.port})
 	}
 	return peers, nil
+}
+
+// getSelfAddrIndex returns address index if it is one of self addresses
+func (p *DNSSyncingPeerProvider) getSelfAddrIndex(IP string, Port string) int {
+	peerAddr4 := fmt.Sprintf("/ip4/%s/tcp/%s", IP, Port)
+	peerAddr6 := fmt.Sprintf("/ip6/%s/tcp/%s", IP, Port)
+	for addrIndex, addr := range p.selfAddrs {
+		if addr.String() == peerAddr4 || addr.String() == peerAddr6 {
+			return addrIndex
+		}
+	}
+	return -1
 }
 
 // LocalSyncingPeerProvider uses localnet deployment convention to synthesize
@@ -253,7 +273,8 @@ func (node *Node) doBeaconSyncing() {
 				continue
 			}
 
-			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
+			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID, node.host.GetID(),
+				node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
 				utils.Logger().Warn().Err(err).Msg("[EPOCHSYNC] cannot create beacon sync config")
 				continue
 			}
@@ -296,7 +317,7 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 				Msg("cannot retrieve syncing peers")
 			return
 		}
-		if err := syncInstance.CreateSyncConfig(peers, shardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
+		if err := syncInstance.CreateSyncConfig(peers, shardID, node.host.GetID(), node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Interface("peers", peers).
