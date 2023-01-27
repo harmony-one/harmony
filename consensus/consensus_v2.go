@@ -750,7 +750,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	} else {
 		epoch = blk.Epoch()
 	}
-	if consensus.Blockchain.Config().IsLeaderRotation(epoch) {
+	if consensus.Blockchain().Config().IsLeaderRotation(epoch) {
 		consensus.rotateLeader(epoch)
 	}
 
