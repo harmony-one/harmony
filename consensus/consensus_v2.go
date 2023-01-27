@@ -46,6 +46,8 @@ const (
 
 // IsViewChangingMode return true if curernt mode is viewchanging
 func (consensus *Consensus) IsViewChangingMode() bool {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
 	return consensus.isViewChangingMode()
 }
 
@@ -413,8 +415,7 @@ func (consensus *Consensus) tick() {
 }
 
 func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
-	//consensus.ReshardingNextLeader(newBlock)
-	consensus.getLogger().Info().
+	consensus.GetLogger().Info().
 		Uint64("MsgBlockNum", newBlock.NumberU64()).
 		Msg("[ConsensusMainLoop] Received Proposed New Block!")
 

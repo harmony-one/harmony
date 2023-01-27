@@ -224,6 +224,10 @@ func (consensus *Consensus) BlockNum() uint64 {
 	return atomic.LoadUint64(&consensus.blockNum)
 }
 
+func (consensus *Consensus) getBlockNum() uint64 {
+	return atomic.LoadUint64(&consensus.blockNum)
+}
+
 // New create a new Consensus record
 func New(
 	host p2p.Host, shard uint32, multiBLSPriKey multibls.PrivateKeys,
