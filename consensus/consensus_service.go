@@ -498,6 +498,8 @@ func (consensus *Consensus) isLeader() bool {
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.setViewIDs(height)
 }
 
