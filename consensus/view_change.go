@@ -253,7 +253,7 @@ func (consensus *Consensus) startViewChange() {
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).
-		Uint64("viewChangingID", consensus.GetViewChangingID()).
+		Uint64("viewChangingID", consensus.getViewChangingID()).
 		Dur("timeoutDuration", duration).
 		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("[startViewChange]")
@@ -270,7 +270,7 @@ func (consensus *Consensus) startViewChange() {
 	if err := consensus.vc.InitPayload(
 		consensus.FBFTLog,
 		nextViewID,
-		consensus.BlockNum(),
+		consensus.getBlockNum(),
 		consensus.priKey,
 		members); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[startViewChange] Init Payload Error")
@@ -284,7 +284,7 @@ func (consensus *Consensus) startViewChange() {
 		}
 		msgToSend := consensus.constructViewChangeMessage(&key)
 		if err := consensus.msgSender.SendWithRetry(
-			consensus.BlockNum(),
+			consensus.getBlockNum(),
 			msg_pb.MessageType_VIEWCHANGE,
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
@@ -310,7 +310,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	}
 
 	if err := consensus.msgSender.SendWithRetry(
-		consensus.BlockNum(),
+		consensus.getBlockNum(),
 		msg_pb.MessageType_NEWVIEW,
 		[]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
@@ -450,10 +450,10 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		Msg("[onNewView] Received NewView Message")
 
 	// change view and leaderKey to keep in sync with network
-	if consensus.BlockNum() != recvMsg.BlockNum {
+	if consensus.getBlockNum() != recvMsg.BlockNum {
 		consensus.getLogger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("myBlockNum", consensus.BlockNum()).
+			Uint64("myBlockNum", consensus.getBlockNum()).
 			Msg("[onNewView] Invalid block number")
 		return
 	}
