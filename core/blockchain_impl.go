@@ -327,8 +327,19 @@ func VerifyBlockCrossLinks(blockchain BlockChain, block *types.Block) error {
 		// ReadCrossLink beacon chain usage.
 		cl, err := blockchain.ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
 		if err == nil && cl != nil {
-			// Add slash for exist same blocknum but different crosslink
-			return errAlreadyExist
+			utils.Logger().Err(errAlreadyExist).
+				Uint64("beacon-block-number", block.NumberU64()).
+				Interface("remote", crossLink).
+				Interface("local", cl).
+				Msg("[CrossLinkVerification]")
+			// TODO Add slash for exist same blocknum but different crosslink
+			return errors.Wrapf(
+				errAlreadyExist,
+				"[CrossLinkVerification] shard: %d block: %d on beacon block %d",
+				crossLink.ShardID(),
+				crossLink.BlockNum(),
+				block.NumberU64(),
+			)
 		}
 		if err := VerifyCrossLink(blockchain, crossLink); err != nil {
 			return errors.Wrapf(err, "cannot VerifyBlockCrossLinks")
