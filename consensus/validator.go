@@ -277,7 +277,7 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 			if committedMsg != nil {
 				consensus.onCommitted(committedMsg)
 			}
-			if curBlockNum < consensus.BlockNum() {
+			if curBlockNum < consensus.getBlockNum() {
 				consensus.getLogger().Info().Msg("[OnPrepared] Successfully caught up with committed message")
 				break
 			}

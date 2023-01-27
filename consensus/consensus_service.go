@@ -486,6 +486,8 @@ func (consensus *Consensus) isLeader() bool {
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.setViewIDs(height)
 }
 
@@ -625,11 +627,18 @@ func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uin
 	return count
 }
 
+// GetLogger returns logger for consensus contexts added.
+func (consensus *Consensus) GetLogger() *zerolog.Logger {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return consensus.getLogger()
+}
+
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
-		Uint64("myBlock", consensus.BlockNum()).
-		Uint64("myViewID", consensus.GetCurBlockViewID()).
+		Uint64("myBlock", consensus.blockNum).
+		Uint64("myViewID", consensus.getCurBlockViewID()).
 		Str("phase", consensus.phase.String()).
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
