@@ -711,10 +711,6 @@ func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
 	return isForked(c.LeaderRotationEpoch, epoch)
 }
 
-func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
-	return isForked(c.LeaderRotationEpoch, epoch)
-}
-
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.
 func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
 	return isForked(c.FeeCollectEpoch, epoch)
