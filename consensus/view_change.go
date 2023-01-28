@@ -88,14 +88,14 @@ func (pm *State) SetIsBackup(isBackup bool) {
 // fallbackNextViewID return the next view ID and duration when there is an exception
 // to calculate the time-based viewId
 func (consensus *Consensus) fallbackNextViewID() (uint64, time.Duration) {
-	diff := int64(consensus.GetViewChangingID() + 1 - consensus.GetCurBlockViewID())
+	diff := int64(consensus.getViewChangingID() + 1 - consensus.getCurBlockViewID())
 	if diff <= 0 {
 		diff = int64(1)
 	}
 	consensus.getLogger().Error().
 		Int64("diff", diff).
 		Msg("[fallbackNextViewID] use legacy viewID algorithm")
-	return consensus.GetViewChangingID() + 1, time.Duration(diff * diff * int64(viewChangeDuration))
+	return consensus.getViewChangingID() + 1, time.Duration(diff * diff * int64(viewChangeDuration))
 }
 
 // getNextViewID return the next view ID based on the timestamp
@@ -152,7 +152,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrapper {
 	gap := 1
 
-	cur := consensus.GetCurBlockViewID()
+	cur := consensus.getCurBlockViewID()
 	if viewID > cur {
 		gap = int(viewID - cur)
 	}
@@ -196,7 +196,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 		Str("leaderPubKey", consensus.LeaderPubKey.Bytes.Hex()).
 		Int("gap", gap).
 		Uint64("newViewID", viewID).
-		Uint64("myCurBlockViewID", consensus.GetCurBlockViewID()).
+		Uint64("myCurBlockViewID", consensus.getCurBlockViewID()).
 		Msg("[getNextLeaderKey] got leaderPubKey from coinbase")
 	// wasFound, next := consensus.Decider.NthNext(lastLeaderPubKey, gap)
 	// FIXME: rotate leader on harmony nodes only before fully externalization
@@ -234,7 +234,7 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 
 // startViewChange start the view change process
 func (consensus *Consensus) startViewChange() {
-	if consensus.disableViewChange || consensus.IsBackup() {
+	if consensus.disableViewChange || consensus.isBackup {
 		return
 	}
 
@@ -242,7 +242,7 @@ func (consensus *Consensus) startViewChange() {
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
 	nextViewID, duration := consensus.getNextViewID()
-	consensus.SetViewChangingID(nextViewID)
+	consensus.setViewChangingID(nextViewID)
 	// TODO: set the Leader PubKey to the next leader for view change
 	// this is dangerous as the leader change is not succeeded yet
 	// we use it this way as in many code we validate the messages
