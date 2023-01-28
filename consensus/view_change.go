@@ -152,7 +152,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrapper {
 	gap := 1
 
-	cur := consensus.GetCurBlockViewID()
+	cur := consensus.getCurBlockViewID()
 	if viewID > cur {
 		gap = int(viewID - cur)
 	}
@@ -240,7 +240,7 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 
 // startViewChange start the view change process
 func (consensus *Consensus) startViewChange() {
-	if consensus.disableViewChange || consensus.IsBackup() {
+	if consensus.disableViewChange || consensus.isBackup {
 		return
 	}
 
@@ -248,7 +248,7 @@ func (consensus *Consensus) startViewChange() {
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
 	nextViewID, duration := consensus.getNextViewID()
-	consensus.SetViewChangingID(nextViewID)
+	consensus.setViewChangingID(nextViewID)
 	// TODO: set the Leader PubKey to the next leader for view change
 	// this is dangerous as the leader change is not succeeded yet
 	// we use it this way as in many code we validate the messages

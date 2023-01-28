@@ -366,7 +366,7 @@ func (consensus *Consensus) syncReadyChan() {
 
 func (consensus *Consensus) syncNotReadyChan() {
 	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
-	consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
+	consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
 	consensus.current.SetMode(Syncing)
 	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 	consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
@@ -451,122 +451,16 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 
 // waitForCommit wait extra 2 seconds for commit phase to finish
 func (consensus *Consensus) waitForCommit() {
-	if consensus.Mode() != Normal || consensus.phase.Get() != FBFTCommit {
+	if consensus.mode() != Normal || consensus.phase.Get() != FBFTCommit {
 		return
 	}
 	consensus.mutex.Unlock()
 }
 
-func (consensus *Consensus) syncReadyChan() {
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
-	if consensus.getBlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
-		consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
-		consensus.setViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
-		mode := consensus.updateConsensusInformation()
-		consensus.current.SetMode(mode)
-		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
-		consensus.consensusTimeout[timeoutConsensus].Start()
-		consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
-		consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
-	} else if consensus.mode() == Syncing {
-		// Corner case where sync is triggered before `onCommitted` and there is a race
-		// for block insertion between consensus and downloader.
-		mode := consensus.updateConsensusInformation()
-		consensus.setMode(mode)
-		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
-		consensus.consensusTimeout[timeoutConsensus].Start()
-		consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
-	}
-}
-
-func (consensus *Consensus) syncNotReadyChan() {
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
-	consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
-	consensus.current.SetMode(Syncing)
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
-	consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
-}
-
-func (consensus *Consensus) Tick() {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	consensus.tick()
-}
-
-func (consensus *Consensus) tick() {
-	if !consensus.start && consensus.isInitialLeader {
-		return
-	}
-	for k, v := range consensus.consensusTimeout {
-		// stop timer in listening mode
-		if consensus.current.Mode() == Listening {
-			v.Stop()
-			continue
-		}
-
-		if consensus.current.Mode() == Syncing {
-			// never stop bootstrap timer here in syncing mode as it only starts once
-			// if it is stopped, bootstrap will be stopped and nodes
-			// can't start view change or join consensus
-			// the bootstrap timer will be stopped once consensus is reached or view change
-			// is succeeded
-			if k != timeoutBootstrap {
-				consensus.getLogger().Debug().
-					Str("k", k.String()).
-					Str("Mode", consensus.current.Mode().String()).
-					Msg("[ConsensusMainLoop] consensusTimeout stopped!!!")
-				v.Stop()
-				continue
-			}
-		}
-		if !v.CheckExpire() {
-			continue
-		}
-		if k != timeoutViewChange {
-			consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
-			consensus.startViewChange()
-			break
-		} else {
-			consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
-			consensus.startViewChange()
-			break
-		}
-	}
-}
-
-func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
-	consensus.GetLogger().Info().
-		Uint64("MsgBlockNum", newBlock.NumberU64()).
-		Msg("[ConsensusMainLoop] Received Proposed New Block!")
-
-	if newBlock.NumberU64() < consensus.BlockNum() {
-		consensus.getLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
-			Msg("[ConsensusMainLoop] received old block, abort")
-		return
-	}
-	// Sleep to wait for the full block time
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
-	time.AfterFunc(time.Until(consensus.NextBlockDue), func() {
-		consensus.StartFinalityCount()
-		consensus.mutex.Lock()
-		defer consensus.mutex.Unlock()
-		// Update time due for next block
-		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-
-		startTime = time.Now()
-		consensus.msgSender.Reset(newBlock.NumberU64())
-
-		consensus.getLogger().Info().
-			Int("numTxs", len(newBlock.Transactions())).
-			Int("numStakingTxs", len(newBlock.StakingTransactions())).
-			Time("startTime", startTime).
-			Int64("publicKeys", consensus.Decider.ParticipantsCount()).
-			Msg("[ConsensusMainLoop] STARTING CONSENSUS")
-		consensus.announce(newBlock)
-	})
-
-	if consensus.dHelper != nil {
-		consensus.dHelper.start()
+	maxWait := time.Now().Add(2 * consensus.BlockPeriod)
+	for time.Now().Before(maxWait) && consensus.getConsensusPhase() == "Commit" {
+		utils.Logger().Warn().Msg("[shutdown] wait for consensus finished")
+		time.Sleep(time.Millisecond * 100)
 	}
 }
 
@@ -877,7 +771,7 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 		consensus.switchPhase("TryCatchup", FBFTAnnounce)
 	}
 	// catch up and skip from view change trap
-	if initBN < consensus.BlockNum() && consensus.isViewChangingMode() {
+	if initBN < consensus.getBlockNum() && consensus.isViewChangingMode() {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
