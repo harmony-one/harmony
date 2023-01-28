@@ -152,7 +152,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		Interface("SendPubKeys", recvMsg.SenderPubkeys).
 		Msg("[onViewChangeSanityCheck]")
 
-	if consensus.BlockNum() > recvMsg.BlockNum {
+	if consensus.getBlockNum() > recvMsg.BlockNum {
 		consensus.getLogger().Debug().
 			Msg("[onViewChange] Message BlockNum Is Low")
 		return false
@@ -163,13 +163,13 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		return false
 	}
 	if consensus.isViewChangingMode() &&
-		consensus.GetCurBlockViewID() > recvMsg.ViewID {
-		consensus.getLogger().Debug().Uint64("curBlockViewID", consensus.GetCurBlockViewID()).
+		consensus.getCurBlockViewID() > recvMsg.ViewID {
+		consensus.getLogger().Debug().Uint64("curBlockViewID", consensus.getCurBlockViewID()).
 			Uint64("msgViewID", recvMsg.ViewID).
 			Msg("[onViewChangeSanityCheck] ViewChanging ID Is Low")
 		return false
 	}
-	if recvMsg.ViewID > consensus.GetViewChangingID() && recvMsg.ViewID-consensus.GetViewChangingID() > MaxViewIDDiff {
+	if recvMsg.ViewID > consensus.getViewChangingID() && recvMsg.ViewID-consensus.getViewChangingID() > MaxViewIDDiff {
 		consensus.getLogger().Debug().
 			Msg("[onViewChangeSanityCheck] Received viewID that is MaxViewIDDiff (249) further from the current viewID!")
 		return false
@@ -194,9 +194,9 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 
 // TODO: leo: move the sanity check to p2p message validation
 func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
-	if recvMsg.ViewID < consensus.GetCurBlockViewID() {
+	if recvMsg.ViewID < consensus.getCurBlockViewID() {
 		consensus.getLogger().Warn().
-			Uint64("LastSuccessfulConsensusViewID", consensus.GetCurBlockViewID()).
+			Uint64("LastSuccessfulConsensusViewID", consensus.getCurBlockViewID()).
 			Uint64("MsgViewChangingID", recvMsg.ViewID).
 			Msg("[onNewView] ViewID should be larger than the viewID of the last successful consensus")
 		return false
