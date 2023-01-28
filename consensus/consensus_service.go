@@ -210,6 +210,13 @@ func (consensus *Consensus) SetIsBackup(isBackup bool) {
 
 // Mode returns the mode of consensus
 func (consensus *Consensus) Mode() Mode {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return consensus.mode()
+}
+
+// mode returns the mode of consensus
+func (consensus *Consensus) mode() Mode {
 	return consensus.current.Mode()
 }
 
@@ -251,6 +258,11 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 
 // SetBlockNum sets the blockNum in consensus object, called at node bootstrap
 func (consensus *Consensus) SetBlockNum(blockNum uint64) {
+	atomic.StoreUint64(&consensus.blockNum, blockNum)
+}
+
+// SetBlockNum sets the blockNum in consensus object, called at node bootstrap
+func (consensus *Consensus) setBlockNum(blockNum uint64) {
 	atomic.StoreUint64(&consensus.blockNum, blockNum)
 }
 
