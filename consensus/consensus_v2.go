@@ -144,7 +144,7 @@ func (consensus *Consensus) finalCommit() {
 	consensus.getLogger().Info().
 		Int64("NumCommits", numCommits).
 		Msg("[finalCommit] Finalizing Consensus")
-	beforeCatchupNum := consensus.BlockNum()
+	beforeCatchupNum := consensus.getBlockNum()
 
 	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
@@ -345,16 +345,16 @@ func (consensus *Consensus) StartChannel() {
 
 func (consensus *Consensus) syncReadyChan() {
 	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
-	if consensus.BlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
-		consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
-		consensus.SetViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
+	if consensus.getBlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
+		consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
+		consensus.setViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
 		mode := consensus.updateConsensusInformation()
 		consensus.current.SetMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 		consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
-	} else if consensus.Mode() == Syncing {
+	} else if consensus.mode() == Syncing {
 		// Corner case where sync is triggered before `onCommitted` and there is a race
 		// for block insertion between consensus and downloader.
 		mode := consensus.updateConsensusInformation()
