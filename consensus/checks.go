@@ -147,7 +147,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 
 	consensus.getLogger().Debug().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MyViewChangingID", consensus.GetViewChangingID()).
+		Uint64("MyViewChangingID", consensus.getViewChangingID()).
 		Uint64("MsgViewChangingID", recvMsg.ViewID).
 		Interface("SendPubKeys", recvMsg.SenderPubkeys).
 		Msg("[onViewChangeSanityCheck]")
