@@ -248,9 +248,9 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 			Msg("[checkViewID] Start consensus timer")
 		return nil
-	} else if msg.ViewID > consensus.GetCurBlockViewID() {
+	} else if msg.ViewID > consensus.getCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.GetCurBlockViewID() {
+	} else if msg.ViewID < consensus.getCurBlockViewID() {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil
