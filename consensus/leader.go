@@ -74,7 +74,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 	// Construct broadcast p2p message
 	if err := consensus.msgSender.SendWithRetry(
-		consensus.BlockNum(), msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
+		consensus.getBlockNum(), msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		}, p2p.ConstructMessage(msgToSend)); err != nil {
 		consensus.getLogger().Warn().
@@ -95,7 +95,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
-		consensus.BlockNum(), consensus.GetCurBlockViewID(), recvMsg.BlockHash,
+		consensus.getBlockNum(), consensus.getCurBlockViewID(), recvMsg.BlockHash,
 	) {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
@@ -280,7 +280,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	//// Write - End
 
 	//// Read - Start
-	viewID := consensus.GetCurBlockViewID()
+	viewID := consensus.getCurBlockViewID()
 
 	if consensus.Decider.IsAllSigsCollected() {
 		logger.Info().Msg("[OnCommit] 100% Enough commits received")
@@ -315,7 +315,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 			consensus.mutex.Lock()
 			defer consensus.mutex.Unlock()
-			if viewID == consensus.GetCurBlockViewID() {
+			if viewID == consensus.getCurBlockViewID() {
 				consensus.finalCommit()
 			}
 		}(viewID)
