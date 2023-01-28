@@ -163,8 +163,8 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		return false
 	}
 	if consensus.isViewChangingMode() &&
-		consensus.GetCurBlockViewID() > recvMsg.ViewID {
-		consensus.getLogger().Debug().Uint64("curBlockViewID", consensus.GetCurBlockViewID()).
+		consensus.getCurBlockViewID() > recvMsg.ViewID {
+		consensus.getLogger().Debug().Uint64("curBlockViewID", consensus.getCurBlockViewID()).
 			Uint64("msgViewID", recvMsg.ViewID).
 			Msg("[onViewChangeSanityCheck] ViewChanging ID Is Low")
 		return false
