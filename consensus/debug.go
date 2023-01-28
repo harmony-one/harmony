@@ -2,6 +2,13 @@ package consensus
 
 // GetConsensusPhase returns the current phase of the consensus.
 func (consensus *Consensus) GetConsensusPhase() string {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return consensus.getConsensusPhase()
+}
+
+// GetConsensusPhase returns the current phase of the consensus.
+func (consensus *Consensus) getConsensusPhase() string {
 	return consensus.phase.String()
 }
 

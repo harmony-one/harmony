@@ -367,7 +367,7 @@ func (consensus *Consensus) syncReadyChan() {
 
 func (consensus *Consensus) syncNotReadyChan() {
 	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
-	consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
+	consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
 	consensus.current.SetMode(Syncing)
 	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 	consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
@@ -452,14 +452,14 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 
 // waitForCommit wait extra 2 seconds for commit phase to finish
 func (consensus *Consensus) waitForCommit() {
-	if consensus.Mode() != Normal || consensus.phase.Get() != FBFTCommit {
+	if consensus.mode() != Normal || consensus.phase.Get() != FBFTCommit {
 		return
 	}
 	// We only need to wait consensus is in normal commit phase
 	utils.Logger().Warn().Str("phase", consensus.phase.String()).Msg("[shutdown] commit phase has to wait")
 
 	maxWait := time.Now().Add(2 * consensus.BlockPeriod)
-	for time.Now().Before(maxWait) && consensus.GetConsensusPhase() == "Commit" {
+	for time.Now().Before(maxWait) && consensus.getConsensusPhase() == "Commit" {
 		utils.Logger().Warn().Msg("[shutdown] wait for consensus finished")
 		time.Sleep(time.Millisecond * 100)
 	}
@@ -635,7 +635,7 @@ func (consensus *Consensus) tryCatchup() error {
 	if consensus.BlockVerifier == nil {
 		return errors.New("consensus haven't finished initialization")
 	}
-	initBN := consensus.BlockNum()
+	initBN := consensus.getBlockNum()
 	defer consensus.postCatchup(initBN)
 
 	blks, msgs, err := consensus.getLastMileBlocksAndMsg(initBN)
@@ -764,15 +764,15 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 }
 
 func (consensus *Consensus) postCatchup(initBN uint64) {
-	if initBN < consensus.BlockNum() {
+	if initBN < consensus.getBlockNum() {
 		consensus.getLogger().Info().
 			Uint64("From", initBN).
-			Uint64("To", consensus.BlockNum()).
+			Uint64("To", consensus.getBlockNum()).
 			Msg("[TryCatchup] Caught up!")
 		consensus.switchPhase("TryCatchup", FBFTAnnounce)
 	}
 	// catch up and skip from view change trap
-	if initBN < consensus.BlockNum() && consensus.isViewChangingMode() {
+	if initBN < consensus.getBlockNum() && consensus.isViewChangingMode() {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
@@ -833,7 +833,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 		start := time.Now()
 		vdf.Execute()
 		duration := time.Since(start)
-		consensus.getLogger().Info().
+		consensus.GetLogger().Info().
 			Dur("duration", duration).
 			Msg("[ConsensusMainLoop] VDF computation finished")
 		output := <-outputChannel
