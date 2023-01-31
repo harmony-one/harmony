@@ -72,7 +72,6 @@ require (
 	github.com/ledgerwatch/erigon-lib v0.0.0-20221218022306-0f8fdd40c2db
 	github.com/ledgerwatch/log/v3 v3.6.0
 	github.com/libp2p/go-libp2p-core v0.20.1
-	github.com/olekukonko/tablewriter v0.0.5
 )
 
 require (
@@ -176,7 +175,6 @@ require (
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
-	github.com/libp2p/go-libp2p-core v0.20.1 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-record v0.2.0 // indirect
 	github.com/libp2p/go-msgio v0.2.0 // indirect
