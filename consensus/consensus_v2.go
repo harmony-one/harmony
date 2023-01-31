@@ -310,9 +310,7 @@ func (consensus *Consensus) Start(
 				case <-stopChan:
 					return
 				case <-ticker.C:
-					consensus.mutex.Lock()
-					consensus.tick()
-					consensus.mutex.Unlock()
+					consensus.Tick()
 				}
 			}
 		}()
@@ -371,6 +369,12 @@ func (consensus *Consensus) syncNotReadyChan() {
 	consensus.current.SetMode(Syncing)
 	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 	consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
+}
+
+func (consensus *Consensus) Tick() {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.tick()
 }
 
 func (consensus *Consensus) tick() {
