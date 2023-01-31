@@ -43,7 +43,7 @@ func TestPhaseSwitching(t *testing.T) {
 	_, _, consensus, _, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)
 
-	assert.Equal(t, FBFTAnnounce, consensus.phase.Get()) // It's a new consensus, we should be at the FBFTAnnounce phase.
+	assert.Equal(t, FBFTAnnounce, consensus.phase) // It's a new consensus, we should be at the FBFTAnnounce phase.
 
 	switches := []phaseSwitch{
 		{start: FBFTAnnounce, end: FBFTPrepare},
@@ -73,10 +73,10 @@ func TestPhaseSwitching(t *testing.T) {
 func testPhaseGroupSwitching(t *testing.T, consensus *Consensus, phases []FBFTPhase, startPhase FBFTPhase, desiredPhase FBFTPhase) {
 	for range phases {
 		consensus.switchPhase("test", desiredPhase)
-		assert.Equal(t, desiredPhase, consensus.phase.Get())
+		assert.Equal(t, desiredPhase, consensus.phase)
 	}
 
-	assert.Equal(t, desiredPhase, consensus.phase.Get())
+	assert.Equal(t, desiredPhase, consensus.phase)
 
 	return
 }
