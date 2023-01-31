@@ -39,7 +39,7 @@ func TestConsensusInitialization(t *testing.T) {
 	// FBFTLog
 	assert.Equal(t, fbtLog, consensus.FBFTLog)
 
-	assert.Equal(t, FBFTAnnounce, consensus.phase.Get())
+	assert.Equal(t, FBFTAnnounce, consensus.phase)
 
 	// State / consensus.current
 	assert.Equal(t, state.mode, consensus.current.mode)
