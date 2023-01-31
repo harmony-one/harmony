@@ -450,21 +450,6 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 	}
 }
 
-// waitForCommit wait extra 2 seconds for commit phase to finish
-func (consensus *Consensus) waitForCommit() {
-	if consensus.mode() != Normal || consensus.phase.Get() != FBFTCommit {
-		return
-	}
-	// We only need to wait consensus is in normal commit phase
-	utils.Logger().Warn().Str("phase", consensus.phase.String()).Msg("[shutdown] commit phase has to wait")
-
-	maxWait := time.Now().Add(2 * consensus.BlockPeriod)
-	for time.Now().Before(maxWait) && consensus.getConsensusPhase() == "Commit" {
-		utils.Logger().Warn().Msg("[shutdown] wait for consensus finished")
-		time.Sleep(time.Millisecond * 100)
-	}
-}
-
 // LastMileBlockIter is the iterator to iterate over the last mile blocks in consensus cache.
 // All blocks returned are guaranteed to pass the verification.
 type LastMileBlockIter struct {
