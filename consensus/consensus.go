@@ -154,8 +154,8 @@ func (consensus *Consensus) verifyBlock(block *types.Block) error {
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
 	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.syncReadyChan()
-	consensus.mutex.Unlock()
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
