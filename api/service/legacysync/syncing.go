@@ -1085,7 +1085,16 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		start := time.Now()
 		currentHeight := bc.CurrentBlock().NumberU64()
 		otherHeight, errMaxHeight := getMaxPeerHeight(ss.syncConfig)
-		if errMaxHeight != nil || currentHeight >= otherHeight {
+		if errMaxHeight != nil {
+			utils.Logger().Error().
+				Bool("isBeacon", isBeacon).
+				Uint32("ShardID", bc.ShardID()).
+				Uint64("currentHeight", currentHeight).
+				Int("peers count", ss.syncConfig.PeersCount()).
+				Msgf("[SYNC] get max height failed")
+			break
+		}
+		if currentHeight >= otherHeight {
 			utils.Logger().Info().
 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
