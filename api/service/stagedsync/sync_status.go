@@ -1,6 +1,7 @@
 package stagedsync
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -75,7 +76,9 @@ func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
 	defer status.lock.Unlock()
 	if status.expired() {
 		result := fallback()
-		status.update(result)
+		if result.OtherHeight > 0 && result.OtherHeight < uint64(math.MaxUint64) {
+			status.update(result)
+		}
 	}
 	return status.lastResult
 }
