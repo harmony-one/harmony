@@ -14,7 +14,7 @@ import (
 )
 
 // getMaxPeerHeight gets the maximum blockchain heights from peers
-func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
+func getMaxPeerHeight(syncConfig *SyncConfig) (uint64, error) {
 	maxHeight := uint64(math.MaxUint64)
 	var (
 		wg   sync.WaitGroup
@@ -49,7 +49,12 @@ func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
 		return
 	})
 	wg.Wait()
-	return maxHeight
+
+	if maxHeight == uint64(math.MaxUint64) {
+		return 0, fmt.Errorf("[SYNC] get max peer height failed")
+	}
+
+	return maxHeight, nil
 }
 
 func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) (*SyncConfig, error) {

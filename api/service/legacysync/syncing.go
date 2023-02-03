@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -1060,13 +1061,16 @@ func (ss *StateSync) RegisterNodeInfo() int {
 
 // IsSameBlockchainHeight checks whether the node is out of sync from other peers
 func (ss *StateSync) IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool) {
-	otherHeight := getMaxPeerHeight(ss.syncConfig)
+	otherHeight, err := getMaxPeerHeight(ss.syncConfig)
+	if err != nil {
+		return 0, false
+	}
 	currentHeight := bc.CurrentBlock().NumberU64()
 	return otherHeight, currentHeight == otherHeight
 }
 
 // GetMaxPeerHeight ..
-func (ss *StateSync) GetMaxPeerHeight() uint64 {
+func (ss *StateSync) GetMaxPeerHeight() (uint64, error) {
 	return getMaxPeerHeight(ss.syncConfig)
 }
 
@@ -1079,9 +1083,9 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 
 	for {
 		start := time.Now()
-		otherHeight := getMaxPeerHeight(ss.syncConfig)
 		currentHeight := bc.CurrentBlock().NumberU64()
-		if currentHeight >= otherHeight {
+		otherHeight, errMaxHeight := getMaxPeerHeight(ss.syncConfig)
+		if errMaxHeight != nil || currentHeight >= otherHeight {
 			utils.Logger().Info().
 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
@@ -1218,7 +1222,9 @@ func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
 	defer status.lock.Unlock()
 	if status.expired() {
 		result := fallback()
-		status.update(result)
+		if result.OtherHeight > 0 && result.OtherHeight < uint64(math.MaxUint64) {
+			status.update(result)
+		}
 	}
 	return status.lastResult
 }
@@ -1280,8 +1286,15 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1 := getMaxPeerHeight(ss.syncConfig)
 	lastHeight := ss.blockChain.CurrentBlock().NumberU64()
+	otherHeight1, errMaxHeight1 := getMaxPeerHeight(ss.syncConfig)
+	if errMaxHeight1 != nil {
+		return SyncCheckResult{
+			IsSynchronized: false,
+			OtherHeight:    0,
+			HeightDiff:     0,
+		}
+	}
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
 	if !doubleCheck {
@@ -1302,7 +1315,10 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	// double check the sync status after 1 second to confirm (avoid false alarm)
 	time.Sleep(1 * time.Second)
 
-	otherHeight2 := getMaxPeerHeight(ss.syncConfig)
+	otherHeight2, errMaxHeight2 := getMaxPeerHeight(ss.syncConfig)
+	if errMaxHeight2 != nil {
+		otherHeight2 = otherHeight1
+	}
 	currentHeight := ss.blockChain.CurrentBlock().NumberU64()
 
 	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
