@@ -1201,9 +1201,8 @@ func (ss *StagedSync) IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool) 
 }
 
 // GetMaxPeerHeight returns maximum block height of connected peers
-func (ss *StagedSync) GetMaxPeerHeight() uint64 {
-	mph, _ := ss.getMaxPeerHeight()
-	return mph
+func (ss *StagedSync) GetMaxPeerHeight() (uint64, error) {
+	return ss.getMaxPeerHeight()
 }
 
 func (ss *StagedSync) addConsensusLastMile(bc core.BlockChain, consensus *consensus.Consensus) error {
@@ -1277,8 +1276,15 @@ func (ss *StagedSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1, _ := ss.getMaxPeerHeight()
 	lastHeight := ss.Blockchain().CurrentBlock().NumberU64()
+	otherHeight1, errMaxHeight1 := ss.getMaxPeerHeight()
+	if errMaxHeight1 != nil {
+		return SyncCheckResult{
+			IsSynchronized: false,
+			OtherHeight:    0,
+			HeightDiff:     0,
+		}
+	}
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
 	if !doubleCheck {
@@ -1299,7 +1305,10 @@ func (ss *StagedSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	// double check the sync status after 1 second to confirm (avoid false alarm)
 	time.Sleep(1 * time.Second)
 
-	otherHeight2, _ := ss.getMaxPeerHeight()
+	otherHeight2, errMaxHeight2 := ss.getMaxPeerHeight()
+	if errMaxHeight2 != nil {
+		otherHeight2 = otherHeight1
+	}
 	currentHeight := ss.Blockchain().CurrentBlock().NumberU64()
 
 	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
