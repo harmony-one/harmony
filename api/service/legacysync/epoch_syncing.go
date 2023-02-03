@@ -2,7 +2,6 @@ package legacysync
 
 import (
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -49,11 +48,12 @@ func (ss *EpochSync) isSynchronized(_ bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1 := getMaxPeerHeight(ss.syncConfig)
-	if otherHeight1 == math.MaxUint64 {
+	otherHeight1, errMaxHeight := getMaxPeerHeight(ss.syncConfig)
+	if errMaxHeight != nil {
 		utils.Logger().Error().
 			Uint64("OtherHeight", otherHeight1).
 			Int("Peers count", ss.syncConfig.PeersCount()).
+			Err(errMaxHeight).
 			Msg("[EPOCHSYNC] No peers for get height")
 		return SyncCheckResult{}
 	}
@@ -93,15 +93,15 @@ func (ss *EpochSync) SyncLoop(bc core.BlockChain, consensus *consensus.Consensus
 
 func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 	isBeacon := bc.ShardID() == 0
-	maxHeight := getMaxPeerHeight(syncConfig)
-	for {
-		if maxHeight == 0 || maxHeight == math.MaxUint64 {
-			utils.Logger().Info().
-				Msgf("[EPOCHSYNC] No peers to sync (isBeacon: %t, ShardID: %d, peersCount: %d)",
-					isBeacon, bc.ShardID(), syncConfig.PeersCount())
-			return 10
-		}
+	maxHeight, errMaxHeight := getMaxPeerHeight(syncConfig)
+	if errMaxHeight != nil {
+		utils.Logger().Info().
+			Msgf("[EPOCHSYNC] No peers to sync (isBeacon: %t, ShardID: %d, peersCount: %d)",
+				isBeacon, bc.ShardID(), syncConfig.PeersCount())
+		return 10
+	}
 
+	for {
 		curEpoch := bc.CurrentBlock().Epoch().Uint64()
 		otherEpoch := shard.Schedule.CalcEpochNumber(maxHeight).Uint64()
 		if otherEpoch == curEpoch+1 {
