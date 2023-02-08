@@ -22,6 +22,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IsOffline:        false,
 		DataDir:          "./",
 		TraceEnable:      false,
+		TriesInMemory:    128,
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{

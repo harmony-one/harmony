@@ -26,6 +26,8 @@ import (
 type Options struct {
 	// Subset of blockchain suitable for storing last epoch blocks i.e. blocks with shard state.
 	EpochChain bool
+	// Number of blocks from header stored in disk before exiting
+	TriesInMemory uint64
 }
 
 // BlockChain represents the canonical chain given a database with a genesis

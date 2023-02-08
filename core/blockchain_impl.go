@@ -103,7 +103,6 @@ const (
 	maxFutureBlocks                    = 16
 	maxTimeFutureBlocks                = 30
 	badBlockLimit                      = 10
-	triesInMemory                      = 128
 	triesInRedis                       = 1000
 	shardCacheLimit                    = 10
 	commitsCacheLimit                  = 10
@@ -201,6 +200,12 @@ type BlockChainImpl struct {
 	options Options
 }
 
+// DefaultOptions contains the default configurations for the options.
+var DefaultOptions = Options{
+	EpochChain:    false,
+	TriesInMemory: 128,
+}
+
 // NewBlockChainWithOptions same as NewBlockChain but can accept additional behaviour options.
 func NewBlockChainWithOptions(
 	db ethdb.Database, stateCache state.Database, beaconChain BlockChain, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
@@ -217,6 +222,19 @@ func NewBlockChain(
 	engine consensus_engine.Engine, vmConfig vm.Config,
 ) (*BlockChainImpl, error) {
 	return newBlockChainWithOptions(db, stateCache, beaconChain, cacheConfig, chainConfig, engine, vmConfig, Options{})
+}
+
+func (o *Options) sanitize() Options {
+	options := *o
+	if options.TriesInMemory <= 1 {
+		utils.Logger().Warn().
+			Uint64("provided", options.TriesInMemory).
+			Uint64("updated", DefaultOptions.TriesInMemory).
+			Msg("Sanitizing invalid tries in memory")
+		options.TriesInMemory = DefaultOptions.TriesInMemory
+	}
+
+	return options
 }
 
 func newBlockChainWithOptions(
@@ -276,7 +294,7 @@ func newBlockChainWithOptions(
 		badBlocks:                     badBlocks,
 		pendingSlashes:                slash.Records{},
 		maxGarbCollectedBlkNum:        -1,
-		options:                       options,
+		options:                       (&options).sanitize(),
 	}
 
 	var err error
@@ -1080,7 +1098,7 @@ func (bc *BlockChainImpl) Stop() {
 	if !bc.cacheConfig.Disabled {
 		triedb := bc.stateCache.TrieDB()
 
-		for _, offset := range []uint64{0, 1, triesInMemory - 1} {
+		for _, offset := range []uint64{0, 1, bc.options.TriesInMemory - 1} {
 			if number := bc.CurrentBlock().NumberU64(); number > offset {
 				recent := bc.GetHeaderByNumber(number - offset)
 				if recent != nil {
@@ -1407,7 +1425,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 		triedb.Reference(root, common.Hash{}) // metadata reference to keep trie alive
 		bc.triegc.Push(root, -int64(block.NumberU64()))
 
-		if current := block.NumberU64(); current > triesInMemory {
+		if current := block.NumberU64(); current > bc.options.TriesInMemory {
 			// If we exceeded our memory allowance, flush matured singleton nodes to disk
 			var (
 				nodes, imgs = triedb.Size()
@@ -1417,7 +1435,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 				triedb.Cap(limit - ethdb.IdealBatchSize)
 			}
 			// Find the next state trie we need to commit
-			header := bc.GetHeaderByNumber(current - triesInMemory)
+			header := bc.GetHeaderByNumber(current - bc.options.TriesInMemory)
 			if header != nil {
 				chosen := header.Number().Uint64()
 
@@ -1425,11 +1443,11 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 				if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
 					// If we're exceeding limits but haven't reached a large enough memory gap,
 					// warn the user that the system is becoming unstable.
-					if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
+					if chosen < lastWrite+bc.options.TriesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
 						utils.Logger().Info().
 							Dur("time", bc.gcproc).
 							Dur("allowance", bc.cacheConfig.TrieTimeLimit).
-							Float64("optimum", float64(chosen-lastWrite)/triesInMemory).
+							Float64("optimum", float64(chosen-lastWrite)/float64(bc.options.TriesInMemory)).
 							Msg("State in memory for too long, committing")
 					}
 					// Flush an entire trie and restart the counters

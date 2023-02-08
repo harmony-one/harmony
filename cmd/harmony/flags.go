@@ -31,6 +31,7 @@ var (
 		legacyDataDirFlag,
 
 		taraceFlag,
+		triesInMemoryFlag,
 	}
 
 	dnsSyncFlags = []cli.Flag{
@@ -314,11 +315,15 @@ var (
 		DefValue:   defaultConfig.General.DataDir,
 		Deprecated: "use --datadir",
 	}
-
 	taraceFlag = cli.BoolFlag{
 		Name:     "tracing",
 		Usage:    "indicates if full transaction tracing should be enabled",
 		DefValue: defaultConfig.General.TraceEnable,
+	}
+	triesInMemoryFlag = cli.IntFlag{
+		Name:     "blockchain.tries_in_memory",
+		Usage:    "number of blocks from header stored in disk before exiting",
+		DefValue: defaultConfig.General.TriesInMemory,
 	}
 )
 
@@ -396,6 +401,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, isBackupFlag) {
 		config.General.IsBackup = cli.GetBoolFlagValue(cmd, isBackupFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, triesInMemoryFlag) {
+		config.General.TriesInMemory = cli.GetIntFlagValue(cmd, triesInMemoryFlag)
 	}
 }
 
@@ -1121,6 +1130,7 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rosettaFixFileFlag) {
 		config.TxPool.RosettaFixFile = cli.GetStringFlagValue(cmd, rosettaFixFileFlag)
 	}
+	// TODO: remove panics for AccountSlots & GlobalSlots and implement logic in sanitize()
 	if cli.IsFlagChanged(cmd, tpAccountSlotsFlag) {
 		value := cli.GetIntFlagValue(cmd, tpAccountSlotsFlag) // int, so fits in uint64 when positive
 		if value <= 0 {
