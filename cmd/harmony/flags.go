@@ -1130,7 +1130,6 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rosettaFixFileFlag) {
 		config.TxPool.RosettaFixFile = cli.GetStringFlagValue(cmd, rosettaFixFileFlag)
 	}
-	// TODO: remove panics for AccountSlots & GlobalSlots and implement logic in sanitize()
 	if cli.IsFlagChanged(cmd, tpAccountSlotsFlag) {
 		value := cli.GetIntFlagValue(cmd, tpAccountSlotsFlag) // int, so fits in uint64 when positive
 		if value <= 0 {
