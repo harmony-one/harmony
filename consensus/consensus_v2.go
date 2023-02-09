@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -688,11 +689,16 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
-	prev := consensus.getLeaderPubKey()
-	bc := consensus.Blockchain()
-	curNumber := bc.CurrentHeader().Number().Uint64()
+	var (
+		prev      = consensus.getLeaderPubKey()
+		bc        = consensus.Blockchain()
+		curHeader = bc.CurrentHeader()
+		curNumber = curHeader.Number().Uint64()
+		curEpoch  = curHeader.Epoch().Uint64()
+		leader    = consensus.getLeaderPubKey()
+		offset    = 1
+	)
 	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v numblocks:%d", epoch.Uint64(), bc.Config().IsLeaderRotation(epoch), bc.Config().LeaderRotationBlocksCount)
-	leader := consensus.getLeaderPubKey()
 	for i := 0; i < bc.Config().LeaderRotationBlocksCount; i++ {
 		header := bc.GetHeaderByNumber(curNumber - uint64(i))
 		if header == nil {
@@ -713,13 +719,56 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 			return
 		}
 	}
-	// Passed all checks, we can change leader.
-	wasFound, next := consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
-	if !wasFound {
-		utils.Logger().Error().Msg("Failed to get next leader")
+	// Leader produced enough blocks, we can change leader.
+	// First check if the next leader is still signing blocks.
+	members := consensus.Decider.Participants()
+	mask, err := bls_cosi.NewMask(members, nil)
+	if err != nil {
+		utils.Logger().Err(err).Msg("Failed to create mask")
 		return
-	} else {
+	}
+	for {
+		wasFound, next := consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
+		if !wasFound {
+			utils.Logger().Error().Msg("Failed to get next leader")
+			// Seems like nothing we can do here.
+			return
+		}
+		skipped := 0
+		for i := 0; i < 3; i++ {
+			header := bc.GetHeaderByNumber(curNumber - uint64(i))
+			if header == nil {
+				utils.Logger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(i))
+				return
+			}
+			// if epoch is different, we should not check this block.
+			if header.Epoch().Uint64() != curEpoch {
+				break
+			}
+			// Populate the mask with the bitmap.
+			err = mask.SetMask(header.LastCommitBitmap())
+			if err != nil {
+				utils.Logger().Err(err).Msg("Failed to set mask")
+				return
+			}
+			ok, err := mask.KeyEnabled(next.Bytes)
+			if err != nil {
+				utils.Logger().Err(err).Msg("Failed to get key enabled")
+				return
+			}
+			if !ok {
+				skipped++
+			}
+		}
+
+		if skipped >= 3 {
+			// Next leader is not signing blocks, we should skip it.
+			offset++
+			continue
+		}
+
 		consensus.setLeaderPubKey(next)
+		break
 	}
 	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 		// leader changed
