@@ -22,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -742,17 +743,54 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		wasFound bool
 		next     *bls.PublicKeyWrapper
 	)
-	if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
-		wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, 1)
-	} else {
-		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
-	}
-	if !wasFound {
-		utils.Logger().Error().Msg("Failed to get next leader")
-		return
-	} else {
+
+	for {
+		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
+			wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, 1)
+		} else {
+			wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
+		}
+		if !wasFound {
+			utils.Logger().Error().Msg("Failed to get next leader")
+			// Seems like nothing we can do here.
+			return
+		}
+		skipped := 0
+		for i := 0; i < 3; i++ {
+			header := bc.GetHeaderByNumber(curNumber - uint64(i))
+			if header == nil {
+				utils.Logger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(i))
+				return
+			}
+			// if epoch is different, we should not check this block.
+			if header.Epoch().Uint64() != curEpoch {
+				break
+			}
+			// Populate the mask with the bitmap.
+			err = mask.SetMask(header.LastCommitBitmap())
+			if err != nil {
+				utils.Logger().Err(err).Msg("Failed to set mask")
+				return
+			}
+			ok, err := mask.KeyEnabled(next.Bytes)
+			if err != nil {
+				utils.Logger().Err(err).Msg("Failed to get key enabled")
+				return
+			}
+			if !ok {
+				skipped++
+			}
+		}
+
+		if skipped >= 3 {
+			// Next leader is not signing blocks, we should skip it.
+			offset++
+			continue
+		}
 		consensus.setLeaderPubKey(next)
+		break
 	}
+
 	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 		// leader changed
 		go func() {
