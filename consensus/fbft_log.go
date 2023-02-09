@@ -120,14 +120,45 @@ func NewFBFTLog() *FBFTLog {
 
 // AddBlock add a new block into the log
 func (log *FBFTLog) AddBlock(block *types.Block) {
+	if block == nil {
+		return
+	}
 	log.blockLock.Lock()
 	defer log.blockLock.Unlock()
 
 	log.blocks[block.Hash()] = block
 }
 
+// HasBlock return whether the given hash is in the FBFTLog
+func (log *FBFTLog) HasBlock(hash common.Hash) bool {
+	log.blockLock.RLock()
+	defer log.blockLock.RUnlock()
+
+	return log.blocks[hash] != nil
+}
+
+// AddBlockIfNotExist use double lock mechanism to avoid calculation in getBlock twice in
+// high concurrency.
+func (log *FBFTLog) AddBlockIfNotExist(hash common.Hash, getBlock func() (*types.Block, error)) error {
+	log.blockLock.Lock()
+	defer log.blockLock.Unlock()
+
+	if log.blocks[hash] != nil {
+		return nil
+	}
+	block, err := getBlock()
+	if err != nil {
+		return err
+	}
+	log.blocks[block.Hash()] = block
+	return nil
+}
+
 // MarkBlockVerified marks the block as verified
 func (log *FBFTLog) MarkBlockVerified(block *types.Block) {
+	if block == nil {
+		return
+	}
 	log.blockLock.Lock()
 	defer log.blockLock.Unlock()
 
