@@ -695,6 +695,8 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		prev   = consensus.getLeaderPubKey()
 		leader = consensus.getLeaderPubKey()
 	)
+	const blocksCountAliveness = 3
+
 	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
@@ -756,7 +758,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 			return
 		}
 		skipped := 0
-		for i := 0; i < 3; i++ {
+		for i := 0; i < blocksCountAliveness; i++ {
 			header := bc.GetHeaderByNumber(curNumber - uint64(i))
 			if header == nil {
 				utils.Logger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(i))
@@ -782,7 +784,8 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 			}
 		}
 
-		if skipped >= 3 {
+		// no signature from the next leader at all, we should skip it.
+		if skipped >= blocksCountAliveness {
 			// Next leader is not signing blocks, we should skip it.
 			offset++
 			continue
