@@ -332,6 +332,14 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.5.11"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("General.TriesInMemory") == nil {
+			confTree.Set("General.TriesInMemory", defaultConfig.General.TriesInMemory)
+		}
+		confTree.Set("Version", "2.5.12")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {

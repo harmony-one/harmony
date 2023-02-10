@@ -74,6 +74,7 @@ type GeneralConfig struct {
 	TraceEnable            bool
 	EnablePruneBeaconChain bool
 	RunElasticMode         bool
+	TriesInMemory          int
 }
 
 type TiKVConfig struct {
