@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.11"
+const tomlConfigVersion = "2.5.12"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -22,6 +22,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IsOffline:        false,
 		DataDir:          "./",
 		TraceEnable:      false,
+		TriesInMemory:    128,
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
