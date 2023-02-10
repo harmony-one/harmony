@@ -112,7 +112,7 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 		}
 		if otherEpoch < curEpoch {
 			for _, peerCfg := range syncConfig.GetPeers() {
-				syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: current height is higher that others, remove peers: %s", peerCfg.String()))
+				syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: current height is higher than others, remove peers: %s", peerCfg.String()))
 			}
 			return 2
 		}
