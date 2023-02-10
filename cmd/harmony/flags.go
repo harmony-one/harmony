@@ -1862,7 +1862,7 @@ var (
 	}
 )
 
-func appleGasPriceFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+func applyGasPriceFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, gasPriceBlocksFlag) {
 		cfg.GasPrice.Blocks = cli.GetIntFlagValue(cmd, gasPriceBlocksFlag)
 	}

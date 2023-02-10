@@ -970,6 +970,46 @@ func TestTxPoolFlags(t *testing.T) {
 	}
 }
 
+func TestGasPriceFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig harmonyconfig.GasPriceConfig
+		expErr    error
+	}{
+		{
+			args:      []string{},
+			expConfig: defaultConfig.GasPrice,
+		},
+		{
+			args: []string{"--gasPrice.blocks", "1", "--gasPrice.percentile", "2",
+				"--gasPrice.default", "3", "--gasPrice.maxPrice", "4",
+			},
+			expConfig: harmonyconfig.GasPriceConfig{
+				Blocks:     1,
+				Percentile: 2,
+				Default:    big.NewInt(3),
+				MaxPrice:   big.NewInt(4),
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, gasPriceFlags, applyGasPriceFlags)
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+
+		if !reflect.DeepEqual(hc.GasPrice, test.expConfig) {
+			t.Errorf("Test %v: unexpected config\n\t%+v\n\t%+v", i, hc.TxPool, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
 func TestPprofFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
