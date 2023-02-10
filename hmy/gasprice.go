@@ -35,7 +35,7 @@ import (
 
 const sampleNumber = 3 // Number of transactions sampled in a block
 
-var DefaultMaxPriceGwei = 1000 // 1000 gwei is the max suggested limit
+var DefaultMaxPrice = big.NewInt(1e12) // 1000 gwei is the max suggested limit
 
 // OracleBackend includes all necessary background APIs for oracle.
 type OracleBackend interface {
@@ -77,7 +77,7 @@ func NewOracle(backend *Harmony, params harmony.GasPriceConfig) *Oracle {
 	}
 	maxPrice := params.MaxPrice
 	if maxPrice == nil || maxPrice.Int64() <= 0 {
-		maxPrice = params.Default
+		maxPrice = DefaultMaxPrice
 		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPrice, "updated", maxPrice))
 	}
 	return &Oracle{
