@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -244,8 +245,8 @@ var (
 	gasPriceFlags = []cli.Flag{
 		gasPriceBlocksFlag,
 		gasPricePercentileFlag,
-		gasPriceMaxPriceGweiFlag,
-		gasPriceIgnorePriceFlag,
+		gasPriceDefaultFlag,
+		gasPriceMaxPriceFlag,
 	}
 )
 
@@ -1847,15 +1848,17 @@ var (
 		Usage:    "Suggested gas price is the given percentile of a set of recent transaction gas prices",
 		DefValue: int(defaultConfig.GasPrice.Percentile),
 	}
-	gasPriceMaxPriceGweiFlag = cli.IntFlag{
-		Name:     "gasPrice.maxPriceGwei",
-		Usage:    "Maximum transaction priority fee (or gasprice before London fork) to be recommended by gpo",
-		DefValue: int(defaultConfig.GasPrice.MaxPriceGwei),
+	gasPriceDefaultFlag = cli.IntFlag{
+		Name: "gasPrice.default",
+		// TODO(julia): Add usage for Default gasPrice flag
+		Usage:    "",
+		DefValue: int(defaultConfig.GasPrice.Default.Int64()),
 	}
-	gasPriceIgnorePriceFlag = cli.IntFlag{
-		Name:     "gasPrice.ignorePrice",
-		Usage:    "Gas price below which gpo will ignore transactions",
-		DefValue: int(defaultConfig.GasPrice.IgnorePrice),
+	gasPriceMaxPriceFlag = cli.IntFlag{
+		Name: "gasPrice.maxPrice",
+		// TODO(julia): Add usage for maxPrice gasPrice flag
+		Usage:    "",
+		DefValue: int(defaultConfig.GasPrice.MaxPrice.Int64()),
 	}
 )
 
@@ -1866,10 +1869,10 @@ func appleGasPriceFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, gasPricePercentileFlag) {
 		cfg.GasPrice.Percentile = cli.GetIntFlagValue(cmd, gasPricePercentileFlag)
 	}
-	if cli.IsFlagChanged(cmd, gasPriceMaxPriceGweiFlag) {
-		cfg.GasPrice.MaxPriceGwei = cli.GetIntFlagValue(cmd, gasPriceMaxPriceGweiFlag)
+	if cli.IsFlagChanged(cmd, gasPriceDefaultFlag) {
+		cfg.GasPrice.Default = big.NewInt(int64(cli.GetIntFlagValue(cmd, gasPriceDefaultFlag)))
 	}
-	if cli.IsFlagChanged(cmd, gasPriceIgnorePriceFlag) {
-		cfg.GasPrice.IgnorePrice = cli.GetIntFlagValue(cmd, gasPriceIgnorePriceFlag)
+	if cli.IsFlagChanged(cmd, gasPriceMaxPriceFlag) {
+		cfg.GasPrice.MaxPrice = big.NewInt(int64(cli.GetIntFlagValue(cmd, gasPriceMaxPriceFlag)))
 	}
 }

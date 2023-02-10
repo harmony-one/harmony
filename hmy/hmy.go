@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/hmy/gasprice"
 	"github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	commonRPC "github.com/harmony-one/harmony/rpc/common"
@@ -162,7 +161,7 @@ func New(
 	// Setup gas price oracle
 	gpoParams := nodeAPI.GetHarmonyConfig().GasPrice
 
-	gpo := gasprice.NewOracle(backend, gpoParams)
+	gpo := NewOracle(backend, gpoParams)
 	backend.gpo = gpo
 
 	return backend

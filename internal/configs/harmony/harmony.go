@@ -1,10 +1,9 @@
 package harmony
 
 import (
+	"math/big"
 	"reflect"
 	"strings"
-
-	"github.com/harmony-one/harmony/hmy/gasprice"
 )
 
 // HarmonyConfig contains all the configs user can set for running harmony binary. Served as the bridge
@@ -32,7 +31,7 @@ type HarmonyConfig struct {
 	TiKV       *TiKVConfig       `toml:",omitempty"`
 	DNSSync    DnsSync
 	ShardData  ShardDataConfig
-	GasPrice   gasprice.GasPriceConfig
+	GasPrice   GasPriceConfig
 }
 
 type DnsSync struct {
@@ -250,4 +249,11 @@ type StagedSyncConfig struct {
 	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
 	UseMemDB               bool   // it uses memory by default. set it to false to use disk
 	LogProgress            bool   // log the full sync progress in console
+}
+
+type GasPriceConfig struct {
+	Blocks     int
+	Percentile int
+	Default    *big.Int `toml:",omitempty"`
+	MaxPrice   *big.Int `toml:",omitempty"`
 }

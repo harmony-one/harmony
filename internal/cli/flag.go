@@ -3,7 +3,9 @@
 
 package cli
 
-import "github.com/spf13/pflag"
+import (
+	"github.com/spf13/pflag"
+)
 
 // Flag is the interface for cli flags.
 // To get the value after cli parsing, use fs.GetString(flag.Name)

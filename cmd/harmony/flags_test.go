@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"reflect"
 	"strings"
 	"testing"
@@ -160,10 +161,10 @@ func TestHarmonyFlags(t *testing.T) {
 					CacheSize:       512,
 				},
 				GasPrice: harmonyconfig.GasPriceConfig{
-					Blocks:       20,
-					Percentile:   80,
-					MaxPriceGwei: 100,
-					IgnorePrice:  2,
+					Blocks:     20,
+					Percentile: 80,
+					Default:    big.NewInt(100e9),
+					MaxPrice:   big.NewInt(1e12),
 				},
 			},
 		},
