@@ -51,7 +51,7 @@ func getMaxPeerHeight(syncConfig *SyncConfig) (uint64, error) {
 	wg.Wait()
 
 	if maxHeight == uint64(math.MaxUint64) {
-		return 0, fmt.Errorf("[SYNC] get max peer height failed")
+		return 0, fmt.Errorf("get max peer height failed")
 	}
 
 	return maxHeight, nil
