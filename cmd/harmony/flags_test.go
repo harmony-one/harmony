@@ -159,6 +159,12 @@ func TestHarmonyFlags(t *testing.T) {
 					CacheTime:       10,
 					CacheSize:       512,
 				},
+				GasPrice: harmonyconfig.GasPriceConfig{
+					Blocks:       20,
+					Percentile:   80,
+					MaxPriceGwei: 100,
+					IgnorePrice:  2,
+				},
 			},
 		},
 	}

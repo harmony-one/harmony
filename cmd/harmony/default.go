@@ -1,11 +1,12 @@
 package main
 
 import (
+	"github.com/harmony-one/harmony/hmy/gasprice"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.11"
+const tomlConfigVersion = "2.5.12"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -106,6 +107,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ShardCount:      4,
 		CacheTime:       10,
 		CacheSize:       512,
+	},
+	GasPrice: gasprice.GasPriceConfig{
+		Blocks:       20,
+		Percentile:   80,
+		MaxPriceGwei: 100,
+		IgnorePrice:  2,
 	},
 }
 

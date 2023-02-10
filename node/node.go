@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/internal/configs/harmony"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/utils/crosslinks"
 
@@ -1471,4 +1472,8 @@ func (node *Node) syncFromTiKVWriter() {
 			}
 		})
 	}
+}
+
+func (node *Node) GetHarmonyConfig() *harmony.HarmonyConfig {
+	return node.HarmonyConfig
 }

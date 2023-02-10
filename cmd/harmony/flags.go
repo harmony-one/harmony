@@ -240,6 +240,13 @@ var (
 		metricsETHFlag,
 		metricsExpensiveETHFlag,
 	}
+
+	gasPriceFlags = []cli.Flag{
+		gasPriceBlocksFlag,
+		gasPricePercentileFlag,
+		gasPriceMaxPriceGweiFlag,
+		gasPriceIgnorePriceFlag,
+	}
 )
 
 var (
@@ -1826,5 +1833,43 @@ func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, cacheSizeFlag) {
 		cfg.ShardData.CacheSize = cli.GetIntFlagValue(cmd, cacheSizeFlag)
+	}
+}
+
+var (
+	gasPriceBlocksFlag = cli.IntFlag{
+		Name:     "gasPrice.blocks",
+		Usage:    "Number of recent blocks to check for gas prices",
+		DefValue: int(defaultConfig.GasPrice.Blocks),
+	}
+	gasPricePercentileFlag = cli.IntFlag{
+		Name:     "gasPrice.percentile",
+		Usage:    "Suggested gas price is the given percentile of a set of recent transaction gas prices",
+		DefValue: int(defaultConfig.GasPrice.Percentile),
+	}
+	gasPriceMaxPriceGweiFlag = cli.IntFlag{
+		Name:     "gasPrice.maxPriceGwei",
+		Usage:    "Maximum transaction priority fee (or gasprice before London fork) to be recommended by gpo",
+		DefValue: int(defaultConfig.GasPrice.MaxPriceGwei),
+	}
+	gasPriceIgnorePriceFlag = cli.IntFlag{
+		Name:     "gasPrice.ignorePrice",
+		Usage:    "Gas price below which gpo will ignore transactions",
+		DefValue: int(defaultConfig.GasPrice.IgnorePrice),
+	}
+)
+
+func appleGasPriceFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, gasPriceBlocksFlag) {
+		cfg.GasPrice.Blocks = cli.GetIntFlagValue(cmd, gasPriceBlocksFlag)
+	}
+	if cli.IsFlagChanged(cmd, gasPricePercentileFlag) {
+		cfg.GasPrice.Percentile = cli.GetIntFlagValue(cmd, gasPricePercentileFlag)
+	}
+	if cli.IsFlagChanged(cmd, gasPriceMaxPriceGweiFlag) {
+		cfg.GasPrice.MaxPriceGwei = cli.GetIntFlagValue(cmd, gasPriceMaxPriceGweiFlag)
+	}
+	if cli.IsFlagChanged(cmd, gasPriceIgnorePriceFlag) {
+		cfg.GasPrice.IgnorePrice = cli.GetIntFlagValue(cmd, gasPriceIgnorePriceFlag)
 	}
 }

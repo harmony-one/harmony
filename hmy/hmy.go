@@ -17,6 +17,8 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/hmy/gasprice"
+	"github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/shard"
@@ -120,6 +122,7 @@ type NodeAPI interface {
 	GetConfig() commonRPC.Config
 	ShutDown()
 	GetLastSigningPower() (float64, error)
+	GetHarmonyConfig() *harmony.HarmonyConfig
 }
 
 // New creates a new Harmony object (including the
@@ -157,12 +160,9 @@ func New(
 	}
 
 	// Setup gas price oracle
-	gpoParams := GasPriceConfig{
-		Blocks:     20,                // take all eligible txs past 20 blocks and sort them
-		Percentile: 80,                // get the 80th percentile when sorted in an ascending manner
-		Default:    big.NewInt(100e9), // minimum of 100 gwei
-	}
-	gpo := NewOracle(backend, gpoParams)
+	gpoParams := nodeAPI.GetHarmonyConfig().GasPrice
+
+	gpo := gasprice.NewOracle(backend, gpoParams)
 	backend.gpo = gpo
 
 	return backend

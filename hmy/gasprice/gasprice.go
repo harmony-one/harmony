@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package hmy
+package gasprice
 
 import (
 	"context"
@@ -25,6 +25,7 @@ import (
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/eth/rpc"
+	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -33,14 +34,16 @@ import (
 )
 
 const sampleNumber = 3 // Number of transactions sampled in a block
+// TODO(julia): Add comment after figuring out what default is
+var gasPriceDefault = big.NewInt(100e9)
 
-var DefaultMaxPrice = big.NewInt(1e12) // 1000 gwei is the max suggested limit
+var DefaultMaxPrice = 1000 // 1000 gwei is the max suggested limit
 
 type GasPriceConfig struct {
-	Blocks     int
-	Percentile int
-	Default    *big.Int `toml:",omitempty"`
-	MaxPrice   *big.Int `toml:",omitempty"`
+	Blocks       int
+	Percentile   int
+	MaxPriceGwei int `toml:",omitempty"`
+	IgnorePrice  int `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -53,12 +56,12 @@ type OracleBackend interface {
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
-	backend   *Harmony
-	lastHead  common.Hash
-	lastPrice *big.Int
-	maxPrice  *big.Int
-	cacheLock sync.RWMutex
-	fetchLock sync.Mutex
+	backend      *hmy.Harmony
+	lastHead     common.Hash
+	lastPrice    *big.Int
+	maxPriceGwei int
+	cacheLock    sync.RWMutex
+	fetchLock    sync.Mutex
 
 	checkBlocks int
 	percentile  int
@@ -66,7 +69,7 @@ type Oracle struct {
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
 // gasprice for newly created transaction.
-func NewOracle(backend *Harmony, params GasPriceConfig) *Oracle {
+func NewOracle(backend *hmy.Harmony, params GasPriceConfig) *Oracle {
 	blocks := params.Blocks
 	if blocks < 1 {
 		blocks = 1
@@ -81,17 +84,17 @@ func NewOracle(backend *Harmony, params GasPriceConfig) *Oracle {
 		percent = 100
 		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent))
 	}
-	maxPrice := params.MaxPrice
-	if maxPrice == nil || maxPrice.Int64() <= 0 {
-		maxPrice = DefaultMaxPrice
+	maxPriceGwei := params.MaxPriceGwei
+	if maxPriceGwei <= 0 {
+		maxPriceGwei = DefaultMaxPrice
 		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPrice, "updated", maxPrice))
 	}
 	return &Oracle{
-		backend:     backend,
-		lastPrice:   params.Default,
-		maxPrice:    maxPrice,
-		checkBlocks: blocks,
-		percentile:  percent,
+		backend:      backend,
+		lastPrice:    gasPriceDefault,
+		maxPriceGwei: maxPriceGwei,
+		checkBlocks:  blocks,
+		percentile:   percent,
 	}
 }
 

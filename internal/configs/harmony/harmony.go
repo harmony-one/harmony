@@ -3,6 +3,8 @@ package harmony
 import (
 	"reflect"
 	"strings"
+
+	"github.com/harmony-one/harmony/hmy/gasprice"
 )
 
 // HarmonyConfig contains all the configs user can set for running harmony binary. Served as the bridge
@@ -30,6 +32,7 @@ type HarmonyConfig struct {
 	TiKV       *TiKVConfig       `toml:",omitempty"`
 	DNSSync    DnsSync
 	ShardData  ShardDataConfig
+	GasPrice   gasprice.GasPriceConfig
 }
 
 type DnsSync struct {
