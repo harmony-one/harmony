@@ -408,8 +408,8 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, triesInMemoryFlag) {
 		value := cli.GetIntFlagValue(cmd, triesInMemoryFlag)
-		if value <= 1 {
-			panic("Must number greater than 1 for txpool.accountslots")
+		if value <= 2 {
+			panic("Must provide number greater than 2 for General.TriesInMemory")
 		}
 		config.General.TriesInMemory = value
 	}
