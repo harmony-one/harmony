@@ -1071,7 +1071,7 @@ func (bc *BlockChainImpl) Stop() {
 	// We're writing three different states to catch different restart scenarios:
 	//  - HEAD:     So we don't need to reprocess any blocks in the general case
 	//  - HEAD-1:   So we don't do large reorgs if our HEAD becomes an uncle
-	//  - HEAD-127: So we have a hard limit on the number of blocks reexecuted
+	//  - HEAD-TriesInMemory: So we have a configurable hard limit on the number of blocks reexecuted (default 128)
 	if !bc.cacheConfig.Disabled {
 		triedb := bc.stateCache.TrieDB()
 
