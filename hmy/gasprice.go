@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -33,9 +34,13 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
-const sampleNumber = 3 // Number of transactions sampled in a block
-
-var DefaultMaxPrice = big.NewInt(1e12) // 1000 gwei is the max suggested limit
+var DefaultGasPriceConfig = harmony.GasPriceConfig{
+	Blocks:           20,
+	Percentile:       80,
+	DefaultPriceGwei: 100,
+	MaxPriceGwei:     1000,
+	NumberTxsSampled: 3,
+}
 
 // OracleBackend includes all necessary background APIs for oracle.
 type OracleBackend interface {
@@ -56,6 +61,7 @@ type Oracle struct {
 
 	checkBlocks int
 	percentile  int
+	txsSampled  int
 }
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
@@ -75,17 +81,31 @@ func NewOracle(backend *Harmony, params harmony.GasPriceConfig) *Oracle {
 		percent = 100
 		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent))
 	}
-	maxPrice := params.MaxPrice
+	maxPrice := new(big.Int).Mul(big.NewInt(int64(params.MaxPriceGwei)), big.NewInt(denominations.Nano))
 	if maxPrice == nil || maxPrice.Int64() <= 0 {
-		maxPrice = DefaultMaxPrice
-		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPrice, "updated", maxPrice))
+		maxPrice = new(big.Int).Mul(big.NewInt(int64(DefaultGasPriceConfig.MaxPriceGwei)), big.NewInt(denominations.Nano))
+		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPriceGwei, "updated", DefaultGasPriceConfig.DefaultPriceGwei))
+	}
+	sampled := params.NumberTxsSampled
+	if sampled <= 0 {
+		sampled = DefaultGasPriceConfig.NumberTxsSampled
+		utils.Logger().Warn().
+			Msg(
+				fmt.Sprint("Sanitizing invalid # txs sampled",
+					"provided",
+					params.NumberTxsSampled,
+					"updated",
+					DefaultGasPriceConfig.NumberTxsSampled,
+				),
+			)
 	}
 	return &Oracle{
 		backend:     backend,
-		lastPrice:   params.Default,
+		lastPrice:   new(big.Int).Mul(big.NewInt(int64(params.DefaultPriceGwei)), big.NewInt(denominations.Nano)),
 		maxPrice:    maxPrice,
 		checkBlocks: blocks,
 		percentile:  percent,
+		txsSampled:  sampled,
 	}
 }
 
@@ -120,7 +140,7 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 		txPrices  []*big.Int
 	)
 	for sent < gpo.checkBlocks && number > 0 {
-		go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, sampleNumber, result, quit)
+		go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, gpo.txsSampled, result, quit)
 		sent++
 		exp++
 		number--
@@ -143,7 +163,7 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 		// meaningful returned, try to query more blocks. But the maximum
 		// is 2*checkBlocks.
 		if len(res.prices) == 1 && len(txPrices)+1+exp < gpo.checkBlocks*2 && number > 0 {
-			go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, sampleNumber, result, quit)
+			go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, gpo.txsSampled, result, quit)
 			sent++
 			exp++
 			number--

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 	"reflect"
 	"strings"
 	"testing"
@@ -161,10 +160,11 @@ func TestHarmonyFlags(t *testing.T) {
 					CacheSize:       512,
 				},
 				GasPrice: harmonyconfig.GasPriceConfig{
-					Blocks:     20,
-					Percentile: 80,
-					Default:    big.NewInt(100e9),
-					MaxPrice:   big.NewInt(1e12),
+					Blocks:           20,
+					Percentile:       80,
+					DefaultPriceGwei: 100,
+					MaxPriceGwei:     12,
+					NumberTxsSampled: 3,
 				},
 			},
 		},
@@ -982,13 +982,15 @@ func TestGasPriceFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--gasPrice.blocks", "1", "--gasPrice.percentile", "2",
-				"--gasPrice.default", "3", "--gasPrice.maxPrice", "4",
+				"--gasPrice.defaultPriceGwei", "3", "--gasPrice.maxPriceGwei", "4",
+				"--gasPrice.numberTxsSampled", "5",
 			},
 			expConfig: harmonyconfig.GasPriceConfig{
-				Blocks:     1,
-				Percentile: 2,
-				Default:    big.NewInt(3),
-				MaxPrice:   big.NewInt(4),
+				Blocks:           1,
+				Percentile:       2,
+				DefaultPriceGwei: 3,
+				MaxPriceGwei:     4,
+				NumberTxsSampled: 5,
 			},
 		},
 	}

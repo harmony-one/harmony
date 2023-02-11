@@ -1,7 +1,6 @@
 package harmony
 
 import (
-	"math/big"
 	"reflect"
 	"strings"
 )
@@ -252,8 +251,9 @@ type StagedSyncConfig struct {
 }
 
 type GasPriceConfig struct {
-	Blocks     int
-	Percentile int
-	Default    *big.Int `toml:",omitempty"`
-	MaxPrice   *big.Int `toml:",omitempty"`
+	Blocks           int
+	Percentile       int
+	DefaultPriceGwei int
+	MaxPriceGwei     int
+	NumberTxsSampled int
 }

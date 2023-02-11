@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 	"strconv"
 	"strings"
 
@@ -245,8 +244,9 @@ var (
 	gasPriceFlags = []cli.Flag{
 		gasPriceBlocksFlag,
 		gasPricePercentileFlag,
-		gasPriceDefaultFlag,
-		gasPriceMaxPriceFlag,
+		gasPriceDefaultPriceGweiFlag,
+		gasPriceMaxPriceGweiFlag,
+		gasPriceNumberTxsSampledFlag,
 	}
 )
 
@@ -1841,24 +1841,27 @@ var (
 	gasPriceBlocksFlag = cli.IntFlag{
 		Name:     "gasPrice.blocks",
 		Usage:    "Number of recent blocks to check for gas prices",
-		DefValue: int(defaultConfig.GasPrice.Blocks),
+		DefValue: defaultConfig.GasPrice.Blocks,
 	}
 	gasPricePercentileFlag = cli.IntFlag{
 		Name:     "gasPrice.percentile",
 		Usage:    "Suggested gas price is the given percentile of a set of recent transaction gas prices",
-		DefValue: int(defaultConfig.GasPrice.Percentile),
+		DefValue: defaultConfig.GasPrice.Percentile,
 	}
-	gasPriceDefaultFlag = cli.IntFlag{
-		Name: "gasPrice.default",
-		// TODO(julia): Add usage for Default gasPrice flag
-		Usage:    "",
-		DefValue: int(defaultConfig.GasPrice.Default.Int64()),
+	gasPriceDefaultPriceGweiFlag = cli.IntFlag{
+		Name:     "gasPrice.defaultPriceGwei",
+		Usage:    "Default gas price in gwei used when data is not available",
+		DefValue: defaultConfig.GasPrice.DefaultPriceGwei,
 	}
-	gasPriceMaxPriceFlag = cli.IntFlag{
-		Name: "gasPrice.maxPrice",
-		// TODO(julia): Add usage for maxPrice gasPrice flag
-		Usage:    "",
-		DefValue: int(defaultConfig.GasPrice.MaxPrice.Int64()),
+	gasPriceMaxPriceGweiFlag = cli.IntFlag{
+		Name:     "gasPrice.maxPriceGwei",
+		Usage:    "Maximum possible gas price in gwei returned by eth_gasPrice",
+		DefValue: defaultConfig.GasPrice.MaxPriceGwei,
+	}
+	gasPriceNumberTxsSampledFlag = cli.IntFlag{
+		Name:     "gasPrice.numberTxsSampled",
+		Usage:    "Number of transactions sampled in a block",
+		DefValue: defaultConfig.GasPrice.NumberTxsSampled,
 	}
 )
 
@@ -1869,10 +1872,13 @@ func applyGasPriceFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, gasPricePercentileFlag) {
 		cfg.GasPrice.Percentile = cli.GetIntFlagValue(cmd, gasPricePercentileFlag)
 	}
-	if cli.IsFlagChanged(cmd, gasPriceDefaultFlag) {
-		cfg.GasPrice.Default = big.NewInt(int64(cli.GetIntFlagValue(cmd, gasPriceDefaultFlag)))
+	if cli.IsFlagChanged(cmd, gasPriceDefaultPriceGweiFlag) {
+		cfg.GasPrice.DefaultPriceGwei = cli.GetIntFlagValue(cmd, gasPriceDefaultPriceGweiFlag)
 	}
-	if cli.IsFlagChanged(cmd, gasPriceMaxPriceFlag) {
-		cfg.GasPrice.MaxPrice = big.NewInt(int64(cli.GetIntFlagValue(cmd, gasPriceMaxPriceFlag)))
+	if cli.IsFlagChanged(cmd, gasPriceMaxPriceGweiFlag) {
+		cfg.GasPrice.MaxPriceGwei = cli.GetIntFlagValue(cmd, gasPriceMaxPriceGweiFlag)
+	}
+	if cli.IsFlagChanged(cmd, gasPriceNumberTxsSampledFlag) {
+		cfg.GasPrice.NumberTxsSampled = cli.GetIntFlagValue(cmd, gasPriceNumberTxsSampledFlag)
 	}
 }

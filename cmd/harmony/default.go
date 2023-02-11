@@ -1,8 +1,7 @@
 package main
 
 import (
-	"math/big"
-
+	"github.com/harmony-one/harmony/hmy"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -110,10 +109,11 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		CacheSize:       512,
 	},
 	GasPrice: harmonyconfig.GasPriceConfig{
-		Blocks:     20,
-		Percentile: 80,
-		Default:    big.NewInt(100e9),
-		MaxPrice:   big.NewInt(1e12),
+		Blocks:           hmy.DefaultGasPriceConfig.Blocks,
+		Percentile:       hmy.DefaultGasPriceConfig.Percentile,
+		DefaultPriceGwei: hmy.DefaultGasPriceConfig.DefaultPriceGwei,
+		MaxPriceGwei:     hmy.DefaultGasPriceConfig.MaxPriceGwei,
+		NumberTxsSampled: hmy.DefaultGasPriceConfig.NumberTxsSampled,
 	},
 }
 
