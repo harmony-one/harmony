@@ -9,28 +9,28 @@ import (
 // from user set flags to internal node configs. Also user can persist this structure to a toml file
 // to avoid inputting all arguments.
 type HarmonyConfig struct {
-	Version    string
-	General    GeneralConfig
-	Network    NetworkConfig
-	P2P        P2pConfig
-	HTTP       HttpConfig
-	WS         WsConfig
-	RPCOpt     RpcOptConfig
-	BLSKeys    BlsConfig
-	TxPool     TxPoolConfig
-	Pprof      PprofConfig
-	Log        LogConfig
-	Sync       SyncConfig
-	Sys        *SysConfig        `toml:",omitempty"`
-	Consensus  *ConsensusConfig  `toml:",omitempty"`
-	Devnet     *DevnetConfig     `toml:",omitempty"`
-	Revert     *RevertConfig     `toml:",omitempty"`
-	Legacy     *LegacyConfig     `toml:",omitempty"`
-	Prometheus *PrometheusConfig `toml:",omitempty"`
-	TiKV       *TiKVConfig       `toml:",omitempty"`
-	DNSSync    DnsSync
-	ShardData  ShardDataConfig
-	GasPrice   GasPriceConfig
+	Version        string
+	General        GeneralConfig
+	Network        NetworkConfig
+	P2P            P2pConfig
+	HTTP           HttpConfig
+	WS             WsConfig
+	RPCOpt         RpcOptConfig
+	BLSKeys        BlsConfig
+	TxPool         TxPoolConfig
+	Pprof          PprofConfig
+	Log            LogConfig
+	Sync           SyncConfig
+	Sys            *SysConfig        `toml:",omitempty"`
+	Consensus      *ConsensusConfig  `toml:",omitempty"`
+	Devnet         *DevnetConfig     `toml:",omitempty"`
+	Revert         *RevertConfig     `toml:",omitempty"`
+	Legacy         *LegacyConfig     `toml:",omitempty"`
+	Prometheus     *PrometheusConfig `toml:",omitempty"`
+	TiKV           *TiKVConfig       `toml:",omitempty"`
+	DNSSync        DnsSync
+	ShardData      ShardDataConfig
+	GasPriceOracle GasPriceOracleConfig
 }
 
 type DnsSync struct {
@@ -250,10 +250,10 @@ type StagedSyncConfig struct {
 	LogProgress            bool   // log the full sync progress in console
 }
 
-type GasPriceConfig struct {
-	Blocks           int
-	Percentile       int
-	DefaultPriceGwei int
-	MaxPriceGwei     int
-	NumberTxsSampled int
+type GasPriceOracleConfig struct {
+	Blocks           int // Number of recent blocks to check for gas prices
+	Percentile       int // Suggested gas price is the given percentile of a set of recent transaction gas prices
+	DefaultPriceGwei int // Default gas price in gwei used when data is not available
+	MaxPriceGwei     int // Maximum possible gas price in gwei returned by eth_gasPrice
+	NumberTxsSampled int // Number of transactions sampled in a block
 }

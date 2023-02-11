@@ -34,11 +34,11 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
-var DefaultGasPriceConfig = harmony.GasPriceConfig{
+var DefaultGasPriceOracleConfig = harmony.GasPriceOracleConfig{
 	Blocks:           20,
 	Percentile:       80,
 	DefaultPriceGwei: 100,
-	MaxPriceGwei:     1000,
+	MaxPriceGwei:     12,
 	NumberTxsSampled: 3,
 }
 
@@ -66,36 +66,73 @@ type Oracle struct {
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
 // gasprice for newly created transaction.
-func NewOracle(backend *Harmony, params harmony.GasPriceConfig) *Oracle {
+func NewOracle(backend *Harmony, params harmony.GasPriceOracleConfig) *Oracle {
 	blocks := params.Blocks
 	if blocks < 1 {
 		blocks = 1
-		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle sample blocks", "provided", params.Blocks, "updated", blocks))
+		utils.Logger().Warn().
+			Msg(
+				fmt.Sprint(
+					"Sanitizing invalid gasprice oracle sample blocks",
+					"provided",
+					params.Blocks,
+					"updated",
+					blocks,
+				),
+			)
 	}
 	percent := params.Percentile
 	if percent < 0 {
 		percent = 0
-		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent))
+		utils.Logger().Warn().
+			Msg(
+				fmt.Sprint(
+					"Sanitizing invalid gasprice oracle sample percentile",
+					"provided",
+					params.Percentile,
+					"updated",
+					percent,
+				),
+			)
 	}
 	if percent > 100 {
 		percent = 100
-		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent))
+		utils.Logger().Warn().
+			Msg(
+				fmt.Sprint(
+					"Sanitizing invalid gasprice oracle sample percentile",
+					"provided",
+					params.Percentile,
+					"updated",
+					percent,
+				),
+			)
 	}
 	maxPrice := new(big.Int).Mul(big.NewInt(int64(params.MaxPriceGwei)), big.NewInt(denominations.Nano))
 	if maxPrice == nil || maxPrice.Int64() <= 0 {
-		maxPrice = new(big.Int).Mul(big.NewInt(int64(DefaultGasPriceConfig.MaxPriceGwei)), big.NewInt(denominations.Nano))
-		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPriceGwei, "updated", DefaultGasPriceConfig.DefaultPriceGwei))
+		maxPrice = new(big.Int).Mul(big.NewInt(int64(DefaultGasPriceOracleConfig.MaxPriceGwei)), big.NewInt(denominations.Nano))
+		utils.Logger().Warn().
+			Msg(
+				fmt.Sprint(
+					"Sanitizing invalid gasprice oracle price cap",
+					"provided",
+					params.MaxPriceGwei,
+					"updated",
+					DefaultGasPriceOracleConfig.DefaultPriceGwei,
+				),
+			)
 	}
 	sampled := params.NumberTxsSampled
 	if sampled <= 0 {
-		sampled = DefaultGasPriceConfig.NumberTxsSampled
+		sampled = DefaultGasPriceOracleConfig.NumberTxsSampled
 		utils.Logger().Warn().
 			Msg(
-				fmt.Sprint("Sanitizing invalid # txs sampled",
+				fmt.Sprint(
+					"Sanitizing invalid # txs sampled",
 					"provided",
 					params.NumberTxsSampled,
 					"updated",
-					DefaultGasPriceConfig.NumberTxsSampled,
+					DefaultGasPriceOracleConfig.NumberTxsSampled,
 				),
 			)
 	}

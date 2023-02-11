@@ -159,7 +159,7 @@ func New(
 	}
 
 	// Setup gas price oracle
-	gpoParams := nodeAPI.GetHarmonyConfig().GasPrice
+	gpoParams := nodeAPI.GetHarmonyConfig().GasPriceOracle
 
 	gpo := NewOracle(backend, gpoParams)
 	backend.gpo = gpo
