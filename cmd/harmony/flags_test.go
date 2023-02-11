@@ -32,8 +32,8 @@ func TestHarmonyFlags(t *testing.T) {
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
 				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5 -" +
-				"-gasPriceOracle.blocks 20 --gasPriceOracle.percentile 80 --gasPriceOracle.defaultPriceGwei 100 " +
-				"--gasPriceOracle.maxPriceGwei 12 --gasPriceOracle.numberTxsSampled 3",
+				"-gpo.blocks 20 --gpo.percentile 80 --gpo.defaultprice 100 " +
+				"--gpo.maxprice 12 --gpo.txssampled 3",
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
@@ -983,9 +983,9 @@ func TestGasPriceOracleFlags(t *testing.T) {
 			expConfig: defaultConfig.GasPriceOracle,
 		},
 		{
-			args: []string{"--gasPriceOracle.blocks", "1", "--gasPriceOracle.percentile", "2",
-				"--gasPriceOracle.defaultPriceGwei", "3", "--gasPriceOracle.maxPriceGwei", "4",
-				"--gasPriceOracle.numberTxsSampled", "5",
+			args: []string{"--gpo.blocks", "1", "--gpo.percentile", "2",
+				"--gpo.defaultprice", "3", "--gpo.maxprice", "4",
+				"--gpo.txssampled", "5",
 			},
 			expConfig: harmonyconfig.GasPriceOracleConfig{
 				Blocks:           1,

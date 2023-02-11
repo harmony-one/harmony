@@ -1840,28 +1840,28 @@ func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 
 var (
 	gasPriceOracleBlocksFlag = cli.IntFlag{
-		Name:     "gasPriceOracle.blocks",
-		Usage:    "Number of recent blocks to check for gas prices",
+		Name:     "gpo.blocks",
+		Usage:    "Number of recent blocks to check for gas prices (default: 20)",
 		DefValue: defaultConfig.GasPriceOracle.Blocks,
 	}
 	gasPriceOraclePercentileFlag = cli.IntFlag{
-		Name:     "gasPriceOracle.percentile",
-		Usage:    "Suggested gas price is the given percentile of a set of recent transaction gas prices",
+		Name:     "gpo.percentile",
+		Usage:    "Suggested gas price is the given percentile of a set of recent transaction gas prices (default: 80)",
 		DefValue: defaultConfig.GasPriceOracle.Percentile,
 	}
 	gasPriceOracleDefaultPriceGweiFlag = cli.IntFlag{
-		Name:     "gasPriceOracle.defaultPriceGwei",
-		Usage:    "Default gas price in gwei used when data is not available",
+		Name:     "gpo.defaultprice",
+		Usage:    "Default gas price in gwei used when data is not available (default: 100)",
 		DefValue: defaultConfig.GasPriceOracle.DefaultPriceGwei,
 	}
 	gasPriceOracleMaxPriceGweiFlag = cli.IntFlag{
-		Name:     "gasPriceOracle.maxPriceGwei",
-		Usage:    "Maximum possible gas price in gwei returned by eth_gasPrice",
+		Name:     "gpo.maxprice",
+		Usage:    "Maximum possible gas price in gwei returned by eth_gasPrice (default: 12)",
 		DefValue: defaultConfig.GasPriceOracle.MaxPriceGwei,
 	}
 	gasPriceOracleNumberTxsSampledFlag = cli.IntFlag{
-		Name:     "gasPriceOracle.numberTxsSampled",
-		Usage:    "Number of transactions sampled in a block",
+		Name:     "gpo.txssampled",
+		Usage:    "Number of transactions sampled in a block (default: 3)",
 		DefValue: defaultConfig.GasPriceOracle.NumberTxsSampled,
 	}
 )
