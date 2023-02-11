@@ -355,6 +355,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, syncFlags...)
 	flags = append(flags, shardDataFlags...)
 	flags = append(flags, metricsFlags...)
+	flags = append(flags, gasPriceFlags...)
 
 	return flags
 }
