@@ -108,12 +108,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		CacheTime:       10,
 		CacheSize:       512,
 	},
-	GasPrice: harmonyconfig.GasPriceConfig{
-		Blocks:           hmy.DefaultGasPriceConfig.Blocks,
-		Percentile:       hmy.DefaultGasPriceConfig.Percentile,
-		DefaultPriceGwei: hmy.DefaultGasPriceConfig.DefaultPriceGwei,
-		MaxPriceGwei:     hmy.DefaultGasPriceConfig.MaxPriceGwei,
-		NumberTxsSampled: hmy.DefaultGasPriceConfig.NumberTxsSampled,
+	GasPriceOracle: harmonyconfig.GasPriceOracleConfig{
+		Blocks:           hmy.DefaultGasPriceOracleConfig.Blocks,
+		Percentile:       hmy.DefaultGasPriceOracleConfig.Percentile,
+		DefaultPriceGwei: hmy.DefaultGasPriceOracleConfig.DefaultPriceGwei,
+		MaxPriceGwei:     hmy.DefaultGasPriceOracleConfig.MaxPriceGwei,
+		NumberTxsSampled: hmy.DefaultGasPriceOracleConfig.NumberTxsSampled,
 	},
 }
 

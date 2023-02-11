@@ -32,8 +32,8 @@ func TestHarmonyFlags(t *testing.T) {
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
 				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5 -" +
-				"-gasPrice.blocks 20 --gasPrice.percentile 80 --gasPrice.defaultPriceGwei 100 --gasPrice.maxPric" +
-				"eGwei 12 --gasPrice.numberTxsSampled 3",
+				"-gasPriceOracle.blocks 20 --gasPriceOracle.percentile 80 --gasPriceOracle.defaultPriceGwei 100 " +
+				"--gasPriceOracle.maxPriceGwei 12 --gasPriceOracle.numberTxsSampled 3",
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
@@ -161,7 +161,7 @@ func TestHarmonyFlags(t *testing.T) {
 					CacheTime:       10,
 					CacheSize:       512,
 				},
-				GasPrice: harmonyconfig.GasPriceConfig{
+				GasPriceOracle: harmonyconfig.GasPriceOracleConfig{
 					Blocks:           20,
 					Percentile:       80,
 					DefaultPriceGwei: 100,
@@ -972,22 +972,22 @@ func TestTxPoolFlags(t *testing.T) {
 	}
 }
 
-func TestGasPriceFlags(t *testing.T) {
+func TestGasPriceOracleFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig harmonyconfig.GasPriceConfig
+		expConfig harmonyconfig.GasPriceOracleConfig
 		expErr    error
 	}{
 		{
 			args:      []string{},
-			expConfig: defaultConfig.GasPrice,
+			expConfig: defaultConfig.GasPriceOracle,
 		},
 		{
-			args: []string{"--gasPrice.blocks", "1", "--gasPrice.percentile", "2",
-				"--gasPrice.defaultPriceGwei", "3", "--gasPrice.maxPriceGwei", "4",
-				"--gasPrice.numberTxsSampled", "5",
+			args: []string{"--gasPriceOracle.blocks", "1", "--gasPriceOracle.percentile", "2",
+				"--gasPriceOracle.defaultPriceGwei", "3", "--gasPriceOracle.maxPriceGwei", "4",
+				"--gasPriceOracle.numberTxsSampled", "5",
 			},
-			expConfig: harmonyconfig.GasPriceConfig{
+			expConfig: harmonyconfig.GasPriceOracleConfig{
 				Blocks:           1,
 				Percentile:       2,
 				DefaultPriceGwei: 3,
@@ -997,7 +997,7 @@ func TestGasPriceFlags(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		ts := newFlagTestSuite(t, gasPriceFlags, applyGasPriceFlags)
+		ts := newFlagTestSuite(t, gasPriceOracleFlags, applyGasPriceOracleFlags)
 		hc, err := ts.run(test.args)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
@@ -1007,7 +1007,7 @@ func TestGasPriceFlags(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(hc.GasPrice, test.expConfig) {
+		if !reflect.DeepEqual(hc.GasPriceOracle, test.expConfig) {
 			t.Errorf("Test %v: unexpected config\n\t%+v\n\t%+v", i, hc.TxPool, test.expConfig)
 		}
 		ts.tearDown()

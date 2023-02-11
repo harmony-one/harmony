@@ -327,21 +327,21 @@ func init() {
 	}
 
 	migrations["2.5.11"] = func(confTree *toml.Tree) *toml.Tree {
-		if confTree.Get("GasPrice.Blocks") == nil {
-			confTree.Set("GasPrice.Blocks", defaultConfig.GasPrice.Blocks)
+		if confTree.Get("GasPriceOracle.Blocks") == nil {
+			confTree.Set("GasPriceOracle.Blocks", defaultConfig.GasPriceOracle.Blocks)
 		}
-		if confTree.Get("GasPrice.Percentile") == nil {
-			confTree.Set("GasPrice.Percentile", defaultConfig.GasPrice.Percentile)
+		if confTree.Get("GasPriceOracle.Percentile") == nil {
+			confTree.Set("GasPriceOracle.Percentile", defaultConfig.GasPriceOracle.Percentile)
 		}
 
-		if confTree.Get("GasPrice.DefaultPriceGwei") == nil {
-			confTree.Set("GasPrice.DefaultPriceGwei", defaultConfig.GasPrice.DefaultPriceGwei)
+		if confTree.Get("GasPriceOracle.DefaultPriceGwei") == nil {
+			confTree.Set("GasPriceOracle.DefaultPriceGwei", defaultConfig.GasPriceOracle.DefaultPriceGwei)
 		}
-		if confTree.Get("GasPrice.MaxPriceGwei") == nil {
-			confTree.Set("GasPrice.MaxPriceGwei", defaultConfig.GasPrice.MaxPriceGwei)
+		if confTree.Get("GasPriceOracle.MaxPriceGwei") == nil {
+			confTree.Set("GasPriceOracle.MaxPriceGwei", defaultConfig.GasPriceOracle.MaxPriceGwei)
 		}
-		if confTree.Get("GasPrice.NumberTxsSampled") == nil {
-			confTree.Set("GasPrice.NumberTxsSampled", defaultConfig.GasPrice.NumberTxsSampled)
+		if confTree.Get("GasPriceOracle.NumberTxsSampled") == nil {
+			confTree.Set("GasPrice.NumberTxsSampled", defaultConfig.GasPriceOracle.NumberTxsSampled)
 		}
 		confTree.Set("Version", "2.5.12")
 		return confTree

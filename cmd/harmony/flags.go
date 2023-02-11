@@ -241,12 +241,12 @@ var (
 		metricsExpensiveETHFlag,
 	}
 
-	gasPriceFlags = []cli.Flag{
-		gasPriceBlocksFlag,
-		gasPricePercentileFlag,
-		gasPriceDefaultPriceGweiFlag,
-		gasPriceMaxPriceGweiFlag,
-		gasPriceNumberTxsSampledFlag,
+	gasPriceOracleFlags = []cli.Flag{
+		gasPriceOracleBlocksFlag,
+		gasPriceOraclePercentileFlag,
+		gasPriceOracleDefaultPriceGweiFlag,
+		gasPriceOracleMaxPriceGweiFlag,
+		gasPriceOracleNumberTxsSampledFlag,
 	}
 )
 
@@ -355,7 +355,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, syncFlags...)
 	flags = append(flags, shardDataFlags...)
 	flags = append(flags, metricsFlags...)
-	flags = append(flags, gasPriceFlags...)
+	flags = append(flags, gasPriceOracleFlags...)
 
 	return flags
 }
@@ -1839,47 +1839,47 @@ func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 }
 
 var (
-	gasPriceBlocksFlag = cli.IntFlag{
-		Name:     "gasPrice.blocks",
+	gasPriceOracleBlocksFlag = cli.IntFlag{
+		Name:     "gasPriceOracle.blocks",
 		Usage:    "Number of recent blocks to check for gas prices",
-		DefValue: defaultConfig.GasPrice.Blocks,
+		DefValue: defaultConfig.GasPriceOracle.Blocks,
 	}
-	gasPricePercentileFlag = cli.IntFlag{
-		Name:     "gasPrice.percentile",
+	gasPriceOraclePercentileFlag = cli.IntFlag{
+		Name:     "gasPriceOracle.percentile",
 		Usage:    "Suggested gas price is the given percentile of a set of recent transaction gas prices",
-		DefValue: defaultConfig.GasPrice.Percentile,
+		DefValue: defaultConfig.GasPriceOracle.Percentile,
 	}
-	gasPriceDefaultPriceGweiFlag = cli.IntFlag{
-		Name:     "gasPrice.defaultPriceGwei",
+	gasPriceOracleDefaultPriceGweiFlag = cli.IntFlag{
+		Name:     "gasPriceOracle.defaultPriceGwei",
 		Usage:    "Default gas price in gwei used when data is not available",
-		DefValue: defaultConfig.GasPrice.DefaultPriceGwei,
+		DefValue: defaultConfig.GasPriceOracle.DefaultPriceGwei,
 	}
-	gasPriceMaxPriceGweiFlag = cli.IntFlag{
-		Name:     "gasPrice.maxPriceGwei",
+	gasPriceOracleMaxPriceGweiFlag = cli.IntFlag{
+		Name:     "gasPriceOracle.maxPriceGwei",
 		Usage:    "Maximum possible gas price in gwei returned by eth_gasPrice",
-		DefValue: defaultConfig.GasPrice.MaxPriceGwei,
+		DefValue: defaultConfig.GasPriceOracle.MaxPriceGwei,
 	}
-	gasPriceNumberTxsSampledFlag = cli.IntFlag{
-		Name:     "gasPrice.numberTxsSampled",
+	gasPriceOracleNumberTxsSampledFlag = cli.IntFlag{
+		Name:     "gasPriceOracle.numberTxsSampled",
 		Usage:    "Number of transactions sampled in a block",
-		DefValue: defaultConfig.GasPrice.NumberTxsSampled,
+		DefValue: defaultConfig.GasPriceOracle.NumberTxsSampled,
 	}
 )
 
-func applyGasPriceFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
-	if cli.IsFlagChanged(cmd, gasPriceBlocksFlag) {
-		cfg.GasPrice.Blocks = cli.GetIntFlagValue(cmd, gasPriceBlocksFlag)
+func applyGasPriceOracleFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, gasPriceOracleBlocksFlag) {
+		cfg.GasPriceOracle.Blocks = cli.GetIntFlagValue(cmd, gasPriceOracleBlocksFlag)
 	}
-	if cli.IsFlagChanged(cmd, gasPricePercentileFlag) {
-		cfg.GasPrice.Percentile = cli.GetIntFlagValue(cmd, gasPricePercentileFlag)
+	if cli.IsFlagChanged(cmd, gasPriceOraclePercentileFlag) {
+		cfg.GasPriceOracle.Percentile = cli.GetIntFlagValue(cmd, gasPriceOraclePercentileFlag)
 	}
-	if cli.IsFlagChanged(cmd, gasPriceDefaultPriceGweiFlag) {
-		cfg.GasPrice.DefaultPriceGwei = cli.GetIntFlagValue(cmd, gasPriceDefaultPriceGweiFlag)
+	if cli.IsFlagChanged(cmd, gasPriceOracleDefaultPriceGweiFlag) {
+		cfg.GasPriceOracle.DefaultPriceGwei = cli.GetIntFlagValue(cmd, gasPriceOracleDefaultPriceGweiFlag)
 	}
-	if cli.IsFlagChanged(cmd, gasPriceMaxPriceGweiFlag) {
-		cfg.GasPrice.MaxPriceGwei = cli.GetIntFlagValue(cmd, gasPriceMaxPriceGweiFlag)
+	if cli.IsFlagChanged(cmd, gasPriceOracleMaxPriceGweiFlag) {
+		cfg.GasPriceOracle.MaxPriceGwei = cli.GetIntFlagValue(cmd, gasPriceOracleMaxPriceGweiFlag)
 	}
-	if cli.IsFlagChanged(cmd, gasPriceNumberTxsSampledFlag) {
-		cfg.GasPrice.NumberTxsSampled = cli.GetIntFlagValue(cmd, gasPriceNumberTxsSampledFlag)
+	if cli.IsFlagChanged(cmd, gasPriceOracleNumberTxsSampledFlag) {
+		cfg.GasPriceOracle.NumberTxsSampled = cli.GetIntFlagValue(cmd, gasPriceOracleNumberTxsSampledFlag)
 	}
 }
