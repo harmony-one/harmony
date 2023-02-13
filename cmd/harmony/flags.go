@@ -63,6 +63,8 @@ var (
 		p2pDisablePrivateIPScanFlag,
 		maxConnPerIPFlag,
 		maxPeersFlag,
+		connManagerLowWatermarkFlag,
+		connManagerHighWatermarkFlag,
 	}
 
 	httpFlags = []cli.Flag{
@@ -579,6 +581,16 @@ var (
 		Usage:    "maximum number of peers allowed, 0 means no limit",
 		DefValue: defaultConfig.P2P.MaxConnsPerIP,
 	}
+	connManagerLowWatermarkFlag = cli.IntFlag{
+		Name:     "p2p.connmgr-low",
+		Usage:    "lowest number of connections that'll be maintained in connection manager",
+		DefValue: defaultConfig.P2P.ConnManagerLowWatermark,
+	}
+	connManagerHighWatermarkFlag = cli.IntFlag{
+		Name:     "p2p.connmgr-high",
+		Usage:    "highest number of connections that'll be maintained in connection manager",
+		DefValue: defaultConfig.P2P.ConnManagerHighWatermark,
+	}
 	waitForEachPeerToConnectFlag = cli.BoolFlag{
 		Name:     "p2p.wait-for-connections",
 		Usage:    "node waits for each single peer to connect and it doesn't add them to peers list after timeout",
@@ -622,6 +634,14 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, waitForEachPeerToConnectFlag) {
 		config.P2P.WaitForEachPeerToConnect = cli.GetBoolFlagValue(cmd, waitForEachPeerToConnectFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, connManagerLowWatermarkFlag) {
+		config.P2P.ConnManagerLowWatermark = cli.GetIntFlagValue(cmd, connManagerLowWatermarkFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, connManagerHighWatermarkFlag) {
+		config.P2P.ConnManagerHighWatermark = cli.GetIntFlagValue(cmd, connManagerHighWatermarkFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {

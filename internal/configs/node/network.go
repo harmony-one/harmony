@@ -63,7 +63,13 @@ const (
 	DefaultMaxConnPerIP = 10
 	// DefaultMaxPeers is the maximum number of remote peers, with 0 representing no limit
 	DefaultMaxPeers = 0
-	// DefaultWaitForEachPeerToConnect sets the sync configs to connect to neighbor peers one by one and waits for each peer to connect
+	// DefaultConnManagerLowWatermark is the lowest number of connections that'll be maintained in connection manager
+	DefaultConnManagerLowWatermark = 160
+	// DefaultConnManagerHighWatermark is the highest number of connections that'll be maintained in connection manager
+	// When the peer count exceeds the 'high watermark', as many peers will be pruned (and
+	// their connections terminated) until 'low watermark' peers remain.
+	DefaultConnManagerHighWatermark = 192
+	// DefaultWaitForEachPeerToConnect sets the sync configs to connect to neighbor peers one by one and waits for each peer to connect.
 	DefaultWaitForEachPeerToConnect = false
 )
 

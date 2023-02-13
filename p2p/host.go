@@ -96,6 +96,8 @@ type HostConfig struct {
 	MaxConnPerIP             int
 	DisablePrivateIPScan     bool
 	MaxPeers                 int64
+	ConnManagerLowWatermark  int
+	ConnManagerHighWatermark int
 	WaitForEachPeerToConnect bool
 	ForceReachabilityPublic  bool
 }
@@ -114,19 +116,6 @@ func init() {
 	libp2p_pubsub.GossipSubMaxIHaveLength = 1000
 }
 
-func forceReachabilityPublic(f bool) libp2p_config.Option {
-	if f {
-		return func(cfg *libp2p_config.Config) error {
-			public := libp2p_network.Reachability(libp2p_network.ReachabilityPublic)
-			cfg.AutoNATConfig.ForceReachability = &public
-			return nil
-		}
-	}
-	return func(p2pConfig *libp2p_config.Config) error {
-		return nil
-	}
-}
-
 // NewHost ..
 func NewHost(cfg HostConfig) (Host, error) {
 	var (
@@ -141,16 +130,20 @@ func NewHost(cfg HostConfig) (Host, error) {
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	// TODO: move low and high to configs
-	connmgr, err := connmgr.NewConnManager(
-		int(cfg.MaxConnPerIP),      // LowWater
-		int(1024)*cfg.MaxConnPerIP, // HighWater,
-		connmgr.WithGracePeriod(time.Minute),
-	)
-	if err != nil {
+
+	// create connection manager
+	low := cfg.ConnManagerLowWatermark
+	high := cfg.ConnManagerHighWatermark
+	if high < low {
 		cancel()
-		return nil, err
+		utils.Logger().Error().
+			Int("low", cfg.ConnManagerLowWatermark).
+			Int("high", cfg.ConnManagerHighWatermark).
+			Msg("connection manager watermarks are invalid")
+		return nil, errors.New("invalid connection manager watermarks")
 	}
+
+	// prepare host options
 	var idht *dht.IpfsDHT
 	var opt discovery.DHTConfig
 	p2pHostConfig := []libp2p.Option{
@@ -164,7 +157,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.DefaultTransports,
 		// Prevent the peer from having too many
 		// connections by attaching a connection manager.
-		libp2p.ConnectionManager(connmgr),
+		connectionManager(low, high),
 		// Attempt to open ports using uPNP for NATed hosts.
 		libp2p.NATPortMap(),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
@@ -284,6 +277,33 @@ func NewHost(cfg HostConfig) (Host, error) {
 		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
 		Msg("libp2p host ready")
 	return h, nil
+}
+
+// connectionManager creates a new connection manager and configures libp2p to use the
+// given connection manager.
+// lo and hi are watermarks governing the number of connections that'll be maintained.
+// When the peer count exceeds the 'high watermark', as many peers will be pruned (and
+// their connections terminated) until 'low watermark' peers remain.
+func connectionManager(low int, high int) libp2p_config.Option {
+	if low > 0 && high > low {
+		connmgr, err := connmgr.NewConnManager(
+			low,  // Low Watermark
+			high, // High Watermark
+			connmgr.WithGracePeriod(time.Minute),
+		)
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Int("low", low).
+				Int("high", high).
+				Msg("create connection manager failed")
+			return nil
+		}
+		return libp2p.ConnectionManager(connmgr)
+	}
+	return func(p2pConfig *libp2p_config.Config) error {
+		return nil
+	}
 }
 
 // HostV2 is the version 2 p2p host
