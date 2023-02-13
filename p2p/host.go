@@ -116,19 +116,6 @@ func init() {
 	libp2p_pubsub.GossipSubMaxIHaveLength = 1000
 }
 
-func forceReachabilityPublic(f bool) libp2p_config.Option {
-	if f {
-		return func(cfg *libp2p_config.Config) error {
-			public := libp2p_network.Reachability(libp2p_network.ReachabilityPublic)
-			cfg.AutoNATConfig.ForceReachability = &public
-			return nil
-		}
-	}
-	return func(p2pConfig *libp2p_config.Config) error {
-		return nil
-	}
-}
-
 // NewHost ..
 func NewHost(cfg HostConfig) (Host, error) {
 	var (
@@ -143,16 +130,20 @@ func NewHost(cfg HostConfig) (Host, error) {
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	// TODO: move low and high to configs
-	connmgr, err := connmgr.NewConnManager(
-		int(cfg.MaxConnPerIP),      // LowWater
-		int(1024)*cfg.MaxConnPerIP, // HighWater,
-		connmgr.WithGracePeriod(time.Minute),
-	)
-	if err != nil {
+
+	// create connection manager
+	low := cfg.ConnManagerLowWatermark
+	high := cfg.ConnManagerHighWatermark
+	if high < low {
 		cancel()
-		return nil, err
+		utils.Logger().Error().
+			Int("low", cfg.ConnManagerLowWatermark).
+			Int("high", cfg.ConnManagerHighWatermark).
+			Msg("connection manager watermarks are invalid")
+		return nil, errors.New("invalid connection manager watermarks")
 	}
+
+	// prepare host options
 	var idht *dht.IpfsDHT
 	var opt discovery.DHTConfig
 	p2pHostConfig := []libp2p.Option{
@@ -166,7 +157,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.DefaultTransports,
 		// Prevent the peer from having too many
 		// connections by attaching a connection manager.
-		libp2p.ConnectionManager(connmgr),
+		connectionManager(low, high),
 		// Attempt to open ports using uPNP for NATed hosts.
 		libp2p.NATPortMap(),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
