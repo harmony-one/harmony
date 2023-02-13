@@ -333,7 +333,6 @@ func init() {
 		if confTree.Get("GasPriceOracle.Percentile") == nil {
 			confTree.Set("GasPriceOracle.Percentile", defaultConfig.GasPriceOracle.Percentile)
 		}
-
 		if confTree.Get("GasPriceOracle.DefaultPriceGwei") == nil {
 			confTree.Set("GasPriceOracle.DefaultPriceGwei", defaultConfig.GasPriceOracle.DefaultPriceGwei)
 		}
@@ -341,7 +340,7 @@ func init() {
 			confTree.Set("GasPriceOracle.MaxPriceGwei", defaultConfig.GasPriceOracle.MaxPriceGwei)
 		}
 		if confTree.Get("GasPriceOracle.NumberTxsSampled") == nil {
-			confTree.Set("GasPrice.NumberTxsSampled", defaultConfig.GasPriceOracle.NumberTxsSampled)
+			confTree.Set("GasPriceOracle.NumberTxsSampled", defaultConfig.GasPriceOracle.NumberTxsSampled)
 		}
 		confTree.Set("Version", "2.5.12")
 		return confTree
