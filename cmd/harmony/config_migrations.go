@@ -319,6 +319,12 @@ func init() {
 	}
 
 	migrations["2.5.10"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.ConnManagerLowWatermark") == nil {
+			confTree.Set("P2P.ConnManagerLowWatermark", defaultConfig.P2P.ConnManagerLowWatermark)
+		}
+		if confTree.Get("P2P.ConnManagerHighWatermark") == nil {
+			confTree.Set("P2P.ConnManagerHighWatermark", defaultConfig.P2P.ConnManagerHighWatermark)
+		}
 		if confTree.Get("Sync.MaxAdvertiseWaitTime") == nil {
 			confTree.Set("Sync.MaxAdvertiseWaitTime", defaultConfig.Sync.MaxAdvertiseWaitTime)
 		}

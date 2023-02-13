@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -447,6 +448,7 @@ func (node *Node) BootstrapConsensus() error {
 			if numPeersNow >= min {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				enoughMinPeers <- struct{}{}
+				fmt.Println("Bootstrap consensus done.", numPeersNow, " peers are connected")
 				return
 			}
 			utils.Logger().Info().
