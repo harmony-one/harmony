@@ -645,6 +645,8 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		MaxConnPerIP:             hc.P2P.MaxConnsPerIP,
 		DisablePrivateIPScan:     hc.P2P.DisablePrivateIPScan,
 		MaxPeers:                 hc.P2P.MaxPeers,
+		ConnManagerLowWatermark:  hc.P2P.ConnManagerLowWatermark,
+		ConnManagerHighWatermark: hc.P2P.ConnManagerHighWatermark,
 		WaitForEachPeerToConnect: hc.P2P.WaitForEachPeerToConnect,
 		ForceReachabilityPublic:  forceReachabilityPublic,
 	})

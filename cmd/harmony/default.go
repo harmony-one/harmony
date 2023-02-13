@@ -33,6 +33,8 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
 		DisablePrivateIPScan:     false,
 		MaxPeers:                 nodeconfig.DefaultMaxPeers,
+		ConnManagerLowWatermark:  nodeconfig.DefaultConnManagerLowWatermark,
+		ConnManagerHighWatermark: nodeconfig.DefaultConnManagerHighWatermark,
 		WaitForEachPeerToConnect: nodeconfig.DefaultWaitForEachPeerToConnect,
 	},
 	HTTP: harmonyconfig.HttpConfig{

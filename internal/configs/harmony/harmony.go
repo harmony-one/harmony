@@ -55,6 +55,8 @@ type P2pConfig struct {
 	MaxConnsPerIP            int
 	DisablePrivateIPScan     bool
 	MaxPeers                 int64
+	ConnManagerLowWatermark  int
+	ConnManagerHighWatermark int
 	WaitForEachPeerToConnect bool
 }
 
