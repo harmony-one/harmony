@@ -440,6 +440,36 @@ func TestP2PFlags(t *testing.T) {
 				WaitForEachPeerToConnect: false,
 			},
 		},
+		{
+			args: []string{"--p2p.connmgr-low", "100"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:                     nodeconfig.DefaultP2PPort,
+				IP:                       nodeconfig.DefaultPublicListenIP,
+				KeyFile:                  "./.hmykey",
+				DiscConcurrency:          nodeconfig.DefaultP2PConcurrency,
+				MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
+				DisablePrivateIPScan:     defaultConfig.P2P.DisablePrivateIPScan,
+				MaxPeers:                 defaultConfig.P2P.MaxPeers,
+				ConnManagerLowWatermark:  100,
+				ConnManagerHighWatermark: defaultConfig.P2P.ConnManagerHighWatermark,
+				WaitForEachPeerToConnect: false,
+			},
+		},
+		{
+			args: []string{"--p2p.connmgr-high", "400"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:                     nodeconfig.DefaultP2PPort,
+				IP:                       nodeconfig.DefaultPublicListenIP,
+				KeyFile:                  "./.hmykey",
+				DiscConcurrency:          nodeconfig.DefaultP2PConcurrency,
+				MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
+				DisablePrivateIPScan:     defaultConfig.P2P.DisablePrivateIPScan,
+				MaxPeers:                 defaultConfig.P2P.MaxPeers,
+				ConnManagerLowWatermark:  defaultConfig.P2P.ConnManagerLowWatermark,
+				ConnManagerHighWatermark: 400,
+				WaitForEachPeerToConnect: false,
+			},
+		},
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(p2pFlags, legacyMiscFlags...),
