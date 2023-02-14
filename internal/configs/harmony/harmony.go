@@ -46,14 +46,17 @@ type NetworkConfig struct {
 }
 
 type P2pConfig struct {
-	Port                     int
-	IP                       string
-	KeyFile                  string
-	DHTDataStore             *string `toml:",omitempty"`
-	DiscConcurrency          int     // Discovery Concurrency value
-	MaxConnsPerIP            int
-	DisablePrivateIPScan     bool
-	MaxPeers                 int64
+	Port                 int
+	IP                   string
+	KeyFile              string
+	DHTDataStore         *string `toml:",omitempty"`
+	DiscConcurrency      int     // Discovery Concurrency value
+	MaxConnsPerIP        int
+	DisablePrivateIPScan bool
+	MaxPeers             int64
+	// In order to disable Connection Manager, it only needs to
+	// set both the high and low watermarks to zero. In this way,
+	// using Connection Manager will be an optional feature.
 	ConnManagerLowWatermark  int
 	ConnManagerHighWatermark int
 	WaitForEachPeerToConnect bool
