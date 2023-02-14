@@ -583,12 +583,12 @@ var (
 	}
 	connManagerLowWatermarkFlag = cli.IntFlag{
 		Name:     "p2p.connmgr-low",
-		Usage:    "lowest number of connections that'll be maintained in connection manager",
+		Usage:    "lowest number of connections that'll be maintained in connection manager. Set both high and low watermarks to zero to disable connection manager",
 		DefValue: defaultConfig.P2P.ConnManagerLowWatermark,
 	}
 	connManagerHighWatermarkFlag = cli.IntFlag{
 		Name:     "p2p.connmgr-high",
-		Usage:    "highest number of connections that'll be maintained in connection manager",
+		Usage:    "highest number of connections that'll be maintained in connection manager. Set both high and low watermarks to zero to disable connection manager",
 		DefValue: defaultConfig.P2P.ConnManagerHighWatermark,
 	}
 	waitForEachPeerToConnectFlag = cli.BoolFlag{
