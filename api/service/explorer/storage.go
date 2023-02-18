@@ -2,17 +2,23 @@ package explorer
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/RoaringBitmap/roaring/roaring64"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/tikv"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/core"
 	core2 "github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -20,7 +26,8 @@ import (
 )
 
 const (
-	numWorker = 8
+	numWorker        = 8
+	changedSaveCount = 100
 )
 
 // ErrExplorerNotReady is the error when querying explorer db data when
@@ -30,11 +37,13 @@ var ErrExplorerNotReady = errors.New("explorer db not ready")
 type (
 	storage struct {
 		db database
-		bc *core.BlockChain
+		bc core.BlockChain
+		rb *roaring64.Bitmap
 
 		// TODO: optimize this with priority queue
 		tm      *taskManager
 		resultC chan blockResult
+		resultT chan *traceResult
 
 		available *abool.AtomicBool
 		closeC    chan struct{}
@@ -45,20 +54,48 @@ type (
 		btc batch
 		bn  uint64
 	}
+
+	traceResult struct {
+		btc  batch
+		data *tracers.TraceBlockStorage
+	}
 )
 
-func newStorage(bc *core.BlockChain, dbPath string) (*storage, error) {
-	utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
-	db, err := newLvlDB(dbPath)
+func newExplorerDB(hc *harmonyconfig.HarmonyConfig, dbPath string) (database, error) {
+	if hc.General.RunElasticMode {
+		// init the storage using tikv
+		dbPath = fmt.Sprintf("explorer_tikv_%d", hc.General.ShardID)
+		readOnly := hc.TiKV.Role == tikv.RoleReader
+		utils.Logger().Info().Msg("explorer storage in tikv: " + dbPath)
+		return newExplorerTiKv(hc.TiKV.PDAddr, dbPath, readOnly)
+	} else {
+		// or leveldb
+		utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
+		return newExplorerLvlDB(dbPath)
+	}
+}
+
+func newStorage(hc *harmonyconfig.HarmonyConfig, bc core.BlockChain, dbPath string) (*storage, error) {
+	db, err := newExplorerDB(hc, dbPath)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to create new database")
+		utils.Logger().Error().Err(err).Msg("Failed to create new explorer database")
 		return nil, err
 	}
+
+	// load checkpoint roaring bitmap from storage
+	// roaring bitmap is a very high compression bitmap, in our scene, 1 million blocks use almost 1kb storage
+	bitmap, err := readCheckpointBitmap(db)
+	if err != nil {
+		return nil, err
+	}
+
 	return &storage{
 		db:        db,
 		bc:        bc,
-		tm:        newTaskManager(),
+		rb:        bitmap,
+		tm:        newTaskManager(bitmap),
 		resultC:   make(chan blockResult, numWorker),
+		resultT:   make(chan *traceResult, numWorker),
 		available: abool.New(),
 		closeC:    make(chan struct{}),
 		log:       utils.Logger().With().Str("module", "explorer storage").Logger(),
@@ -70,7 +107,12 @@ func (s *storage) Start() {
 }
 
 func (s *storage) Close() {
+	_ = writeCheckpointBitmap(s.db, s.rb)
 	close(s.closeC)
+}
+
+func (s *storage) DumpTraceResult(data *tracers.TraceBlockStorage) {
+	s.tm.AddNewTraceTask(data)
 }
 
 func (s *storage) DumpNewBlock(b *types.Block) {
@@ -113,6 +155,22 @@ func (s *storage) GetStakingTxsByAddress(addr string) ([]common.Hash, []TxType, 
 	return getStakingTxnHashesByAccount(s.db, oneAddress(addr))
 }
 
+func (s *storage) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error) {
+	if !s.available.IsSet() {
+		return nil, ErrExplorerNotReady
+	}
+	traceStorage := &tracers.TraceBlockStorage{
+		Hash: hash,
+	}
+	err := traceStorage.FromDB(func(key []byte) ([]byte, error) {
+		return getTraceResult(s.db, key)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return traceStorage.ToJson()
+}
+
 func (s *storage) run() {
 	if is, err := isVersionV100(s.db); !is || err != nil {
 		s.available.UnSet()
@@ -136,6 +194,11 @@ func (s *storage) loop() {
 			if err := res.btc.Write(); err != nil {
 				s.log.Error().Err(err).Msg("explorer db failed to write")
 			}
+		case res := <-s.resultT:
+			s.log.Info().Str("block hash", res.data.Hash.Hex()).Msg("writing trace into explorer DB")
+			if err := res.btc.Write(); err != nil {
+				s.log.Error().Err(err).Msg("explorer db failed to write trace data")
+			}
 
 		case <-s.closeC:
 			return
@@ -148,12 +211,18 @@ type taskManager struct {
 	blocksLP []*types.Block // blocks with low priorities
 	lock     sync.Mutex
 
+	rb             *roaring64.Bitmap
+	rbChangedCount int
+
 	C chan struct{}
+	T chan *traceResult
 }
 
-func newTaskManager() *taskManager {
+func newTaskManager(bitmap *roaring64.Bitmap) *taskManager {
 	return &taskManager{
-		C: make(chan struct{}, numWorker),
+		rb: bitmap,
+		C:  make(chan struct{}, numWorker),
+		T:  make(chan *traceResult, numWorker),
 	}
 }
 
@@ -165,6 +234,12 @@ func (tm *taskManager) AddNewTask(b *types.Block) {
 	select {
 	case tm.C <- struct{}{}:
 	default:
+	}
+}
+
+func (tm *taskManager) AddNewTraceTask(data *tracers.TraceBlockStorage) {
+	tm.T <- &traceResult{
+		data: data,
 	}
 }
 
@@ -203,6 +278,30 @@ func (tm *taskManager) PullTask() *types.Block {
 	return nil
 }
 
+// markBlockDone mark block processed done when explorer computed one block
+func (tm *taskManager) markBlockDone(btc batch, blockNum uint64) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+
+	if tm.rb.CheckedAdd(blockNum) {
+		tm.rbChangedCount++
+
+		// every 100 change write once
+		if tm.rbChangedCount == changedSaveCount {
+			tm.rbChangedCount = 0
+			_ = writeCheckpointBitmap(btc, tm.rb)
+		}
+	}
+}
+
+// markBlockDone check block is processed done
+func (tm *taskManager) hasBlockDone(blockNum uint64) bool {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+
+	return tm.rb.Contains(blockNum)
+}
+
 func (s *storage) makeWorkersAndStart() {
 	workers := make([]*blockComputer, 0, numWorker)
 	for i := 0; i != numWorker; i++ {
@@ -211,6 +310,7 @@ func (s *storage) makeWorkersAndStart() {
 			db:      s.db,
 			bc:      s.bc,
 			resultC: s.resultC,
+			resultT: s.resultT,
 			closeC:  s.closeC,
 			log:     s.log.With().Int("worker", i).Logger(),
 		})
@@ -225,6 +325,7 @@ type blockComputer struct {
 	db      database
 	bc      blockChainTxIndexer
 	resultC chan blockResult
+	resultT chan *traceResult
 	closeC  chan struct{}
 	log     zerolog.Logger
 }
@@ -255,7 +356,21 @@ LOOP:
 					return
 				}
 			}
-
+		case traceResult := <-bc.tm.T:
+			if exist, err := isTraceResultInDB(bc.db, traceResult.data.KeyDB()); exist || err != nil {
+				continue
+			}
+			traceResult.btc = bc.db.NewBatch()
+			traceResult.data.ToDB(func(key, value []byte) {
+				if exist, err := isTraceResultInDB(bc.db, key); !exist && err == nil {
+					_ = writeTraceResult(traceResult.btc, key, value)
+				}
+			})
+			select {
+			case bc.resultT <- traceResult:
+			case <-bc.closeC:
+				return
+			}
 		case <-bc.closeC:
 			return
 		}
@@ -263,9 +378,8 @@ LOOP:
 }
 
 func (bc *blockComputer) computeBlock(b *types.Block) (*blockResult, error) {
-	is, err := isBlockComputedInDB(bc.db, b.NumberU64())
-	if is || err != nil {
-		return nil, err
+	if bc.tm.hasBlockDone(b.NumberU64()) {
+		return nil, nil
 	}
 	btc := bc.db.NewBatch()
 
@@ -275,7 +389,7 @@ func (bc *blockComputer) computeBlock(b *types.Block) (*blockResult, error) {
 	for _, stk := range b.StakingTransactions() {
 		bc.computeStakingTx(btc, b, stk)
 	}
-	_ = writeCheckpoint(btc, b.NumberU64())
+	bc.tm.markBlockDone(btc, b.NumberU64())
 	return &blockResult{
 		btc: btc,
 		bn:  b.NumberU64(),

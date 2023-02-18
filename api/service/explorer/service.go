@@ -11,13 +11,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/RoaringBitmap/roaring/roaring64"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -42,20 +45,21 @@ type HTTPError struct {
 
 // Service is the struct for explorer service.
 type Service struct {
-	router      *mux.Router
-	IP          string
-	Port        string
-	storage     *storage
-	server      *http.Server
-	messageChan chan *msg_pb.Message
-	blockchain  *core.BlockChain
-	backend     hmy.NodeAPI
+	router        *mux.Router
+	IP            string
+	Port          string
+	storage       *storage
+	server        *http.Server
+	messageChan   chan *msg_pb.Message
+	blockchain    core.BlockChain
+	backend       hmy.NodeAPI
+	harmonyConfig *harmonyconfig.HarmonyConfig
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service {
+func New(harmonyConfig *harmonyconfig.HarmonyConfig, selfPeer *p2p.Peer, bc core.BlockChain, backend hmy.NodeAPI) *Service {
 	dbPath := defaultDBPath(selfPeer.IP, selfPeer.Port)
-	storage, err := newStorage(bc, dbPath)
+	storage, err := newStorage(harmonyConfig, bc, dbPath)
 	if err != nil {
 		utils.Logger().Fatal().Err(err).Msg("cannot open explorer DB")
 	}
@@ -114,6 +118,7 @@ func (s *Service) Run() *http.Server {
 	// parameter prefix: from which address prefix start
 	s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
 	s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
+	s.router.Path("/height").HandlerFunc(s.GetHeight)
 
 	// Set up router for supply info
 	s.router.Path("/burn-addresses").Queries().HandlerFunc(s.GetInaccessibleAddressInfo).Methods("GET")
@@ -174,6 +179,38 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type HeightResponse struct {
+	S0 uint64 `json:"0,omitempty"`
+	S1 uint64 `json:"1,omitempty"`
+	S2 uint64 `json:"2,omitempty"`
+	S3 uint64 `json:"3,omitempty"`
+}
+
+// GetHeight returns heights of current and beacon chains if needed.
+func (s *Service) GetHeight(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	bc := s.backend.Blockchain()
+	out := HeightResponse{}
+	switch bc.ShardID() {
+	case 0:
+		out.S0 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	case 1:
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S1 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	case 2:
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S2 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	case 3:
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S3 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	}
+
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode addresses")
+	}
+}
+
 // GetNormalTxHashesByAccount get the normal transaction hashes by account
 func (s *Service) GetNormalTxHashesByAccount(address string) ([]ethCommon.Hash, []TxType, error) {
 	return s.storage.GetNormalTxsByAddress(address)
@@ -182,6 +219,15 @@ func (s *Service) GetNormalTxHashesByAccount(address string) ([]ethCommon.Hash, 
 // GetStakingTxHashesByAccount get the staking transaction hashes by account
 func (s *Service) GetStakingTxHashesByAccount(address string) ([]ethCommon.Hash, []TxType, error) {
 	return s.storage.GetStakingTxsByAddress(address)
+}
+
+func (s *Service) GetTraceResultByHash(hash ethCommon.Hash) (json.RawMessage, error) {
+	return s.storage.GetTraceResultByHash(hash)
+}
+
+// DumpTraceResult instruct the explorer storage to trace data in explorer DB
+func (s *Service) DumpTraceResult(data *tracers.TraceBlockStorage) {
+	s.storage.DumpTraceResult(data)
 }
 
 // DumpNewBlock instruct the explorer storage to dump block data in explorer DB
@@ -291,6 +337,11 @@ func (s *Service) NotifyService(params map[string]interface{}) {}
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 	s.messageChan = messageChan
+}
+
+// GetCheckpointBitmap get explorer checkpoint bitmap
+func (s *Service) GetCheckpointBitmap() *roaring64.Bitmap {
+	return s.storage.rb.Clone()
 }
 
 func defaultDBPath(ip, port string) string {

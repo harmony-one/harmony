@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/core/vm"
+
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -58,7 +60,7 @@ func (s *AccountAPI) AccountBalance(
 		})
 	}
 	blockNum := rpc.BlockNumber(block.Header().Header.Number().Int64())
-	balance := new(big.Int)
+	var balance *big.Int
 
 	if request.AccountIdentifier.SubAccount != nil {
 		// indicate it may be a request for delegated balance
@@ -67,7 +69,7 @@ func (s *AccountAPI) AccountBalance(
 			return nil, rosettaError
 		}
 	} else {
-		balance, err = s.hmy.GetBalance(ctx, addr, blockNum)
+		balance, err = s.hmy.GetBalance(ctx, addr, rpc.BlockNumberOrHashWithNumber(blockNum))
 		if err != nil {
 			return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 				"message": "invalid address",
@@ -159,6 +161,47 @@ func newAccountIdentifier(
 		Address:  b32Address,
 		Metadata: metadata,
 	}, nil
+}
+
+// newAccountIdentifier ..
+func newRosettaAccountIdentifier(address *vm.RosettaLogAddressItem) (*types.AccountIdentifier, *types.Error) {
+	if address == nil || address.Account == nil {
+		return nil, nil
+	}
+
+	b32Address, err := internalCommon.AddressToBech32(*address.Account)
+	if err != nil {
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	metadata, err := types.MarshalMap(AccountMetadata{Address: address.Account.String()})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	ai := &types.AccountIdentifier{
+		Address:  b32Address,
+		Metadata: metadata,
+	}
+
+	if address.SubAccount != nil {
+		b32Address, err := internalCommon.AddressToBech32(*address.SubAccount)
+		if err != nil {
+			return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+
+		ai.SubAccount = &types.SubAccountIdentifier{
+			Address:  b32Address,
+			Metadata: address.Metadata,
+		}
+	}
+
+	return ai, nil
 }
 
 func newSubAccountIdentifier(

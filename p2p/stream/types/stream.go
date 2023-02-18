@@ -6,7 +6,7 @@ import (
 	"io"
 	"sync"
 
-	libp2p_network "github.com/libp2p/go-libp2p-core/network"
+	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -21,35 +21,43 @@ type Stream interface {
 	ReadBytes() ([]byte, error)
 	Close() error
 	CloseOnExit() error
+	FailedTimes() int
+	AddFailedTimes()
+	ResetFailedTimes()
 }
 
 // BaseStream is the wrapper around
 type BaseStream struct {
-	raw libp2p_network.Stream
-	rw  *bufio.ReadWriter
+	raw       libp2p_network.Stream
+	reader    *bufio.Reader
+	readLock  sync.Mutex
+	writeLock sync.Mutex
 
 	// parse protocol spec fields
 	spec     ProtoSpec
 	specErr  error
 	specOnce sync.Once
+
+	failedTimes int
 }
 
 // NewBaseStream creates BaseStream as the wrapper of libp2p Stream
 func NewBaseStream(st libp2p_network.Stream) *BaseStream {
-	rw := bufio.NewReadWriter(bufio.NewReader(st), bufio.NewWriter(st))
+	reader := bufio.NewReader(st)
 	return &BaseStream{
-		raw: st,
-		rw:  rw,
+		raw:         st,
+		reader:      reader,
+		failedTimes: 0,
 	}
 }
 
 // StreamID is the unique identifier for the stream. It has the value of
-// libp2p_network.Stream.ID()
+// libp2p_network_peer.ID
 type StreamID string
 
-// Meta return the StreamID of the stream
+// ID return the StreamID of the stream
 func (st *BaseStream) ID() StreamID {
-	return StreamID(st.raw.Conn().ID())
+	return StreamID(st.raw.Conn().RemotePeer().String())
 }
 
 // ProtoID return the remote protocol ID of the stream
@@ -68,6 +76,18 @@ func (st *BaseStream) ProtoSpec() (ProtoSpec, error) {
 // Close reset the stream, and close the connection for both sides.
 func (st *BaseStream) Close() error {
 	return st.raw.Reset()
+}
+
+func (st *BaseStream) FailedTimes() int {
+	return st.failedTimes
+}
+
+func (st *BaseStream) AddFailedTimes() {
+	st.failedTimes++
+}
+
+func (st *BaseStream) ResetFailedTimes() {
+	st.failedTimes = 0
 }
 
 const (
@@ -89,18 +109,21 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 		err = errors.New("message too long")
 		return
 	}
-	if _, err = st.rw.Write(intToBytes(len(b))); err != nil {
-		return
+	size := sizeBytes + len(b)
+	message := make([]byte, size)
+	copy(message, intToBytes(len(b)))
+	copy(message[sizeBytes:], b)
+
+	st.writeLock.Lock()
+	defer st.writeLock.Unlock()
+	if _, err = st.raw.Write(message); err != nil {
+		return err
 	}
-	bytesWriteCounter.Add(sizeBytes)
-	if _, err = st.rw.Write(b); err != nil {
-		return
-	}
-	bytesWriteCounter.Add(float64(len(b)))
-	return st.rw.Flush()
+	bytesWriteCounter.Add(float64(size))
+	return nil
 }
 
-// ReadMsg read the bytes from the stream
+// ReadBytes read the bytes from the stream.
 func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 	defer func() {
 		msgReadCounter.Inc()
@@ -109,8 +132,11 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 		}
 	}()
 
+	st.readLock.Lock()
+	defer st.readLock.Unlock()
+
 	sb := make([]byte, sizeBytes)
-	_, err = st.rw.Read(sb)
+	_, err = st.reader.Read(sb)
 	if err != nil {
 		err = errors.Wrap(err, "read size")
 		return
@@ -123,7 +149,7 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 	}
 
 	cb = make([]byte, size)
-	n, err := io.ReadFull(st.rw, cb)
+	n, err := io.ReadFull(st.reader, cb)
 	if err != nil {
 		err = errors.Wrap(err, "read content")
 		return

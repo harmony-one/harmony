@@ -10,10 +10,10 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	ic "github.com/libp2p/go-libp2p-core/crypto"
-	libp2p_network "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	ic "github.com/libp2p/go-libp2p/core/crypto"
+	libp2p_network "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -195,18 +195,19 @@ func (st *testP2PStream) receiveBytes(b []byte) (n int, err error) {
 	return
 }
 
-func (st *testP2PStream) Close() error                     { return nil }
-func (st *testP2PStream) CloseRead() error                 { return nil }
-func (st *testP2PStream) CloseWrite() error                { return nil }
-func (st *testP2PStream) Reset() error                     { return nil }
-func (st *testP2PStream) SetDeadline(time.Time) error      { return nil }
-func (st *testP2PStream) SetReadDeadline(time.Time) error  { return nil }
-func (st *testP2PStream) SetWriteDeadline(time.Time) error { return nil }
-func (st *testP2PStream) ID() string                       { return "" }
-func (st *testP2PStream) Protocol() protocol.ID            { return "" }
-func (st *testP2PStream) SetProtocol(protocol.ID)          {}
-func (st *testP2PStream) Stat() libp2p_network.Stat        { return libp2p_network.Stat{} }
-func (st *testP2PStream) Conn() libp2p_network.Conn        { return &fakeConn{} }
+func (st *testP2PStream) Close() error                      { return nil }
+func (st *testP2PStream) CloseRead() error                  { return nil }
+func (st *testP2PStream) CloseWrite() error                 { return nil }
+func (st *testP2PStream) Reset() error                      { return nil }
+func (st *testP2PStream) SetDeadline(time.Time) error       { return nil }
+func (st *testP2PStream) SetReadDeadline(time.Time) error   { return nil }
+func (st *testP2PStream) SetWriteDeadline(time.Time) error  { return nil }
+func (st *testP2PStream) ID() string                        { return "" }
+func (st *testP2PStream) Protocol() protocol.ID             { return "" }
+func (st *testP2PStream) SetProtocol(protocol.ID) error     { return nil }
+func (st *testP2PStream) Stat() libp2p_network.Stats        { return libp2p_network.Stats{} }
+func (st *testP2PStream) Conn() libp2p_network.Conn         { return &fakeConn{} }
+func (st *testP2PStream) Scope() libp2p_network.StreamScope { return nil }
 
 type testRemoteBaseStream struct {
 	base *sttypes.BaseStream
@@ -229,14 +230,18 @@ func (st *testRemoteBaseStream) WriteBytes(b []byte) error {
 
 type fakeConn struct{}
 
+func (conn *fakeConn) ID() string                                               { return "" }
+func (conn *fakeConn) NewStream(context.Context) (libp2p_network.Stream, error) { return nil, nil }
+func (conn *fakeConn) GetStreams() []libp2p_network.Stream                      { return nil }
 func (conn *fakeConn) Close() error                                             { return nil }
 func (conn *fakeConn) LocalPeer() peer.ID                                       { return "" }
 func (conn *fakeConn) LocalPrivateKey() ic.PrivKey                              { return nil }
 func (conn *fakeConn) RemotePeer() peer.ID                                      { return "" }
 func (conn *fakeConn) RemotePublicKey() ic.PubKey                               { return nil }
-func (conn *fakeConn) LocalMultiaddr() ma.Multiaddr                             { return nil }
-func (conn *fakeConn) RemoteMultiaddr() ma.Multiaddr                            { return nil }
-func (conn *fakeConn) ID() string                                               { return "" }
-func (conn *fakeConn) NewStream(context.Context) (libp2p_network.Stream, error) { return nil, nil }
-func (conn *fakeConn) GetStreams() []libp2p_network.Stream                      { return nil }
-func (conn *fakeConn) Stat() libp2p_network.Stat                                { return libp2p_network.Stat{} }
+func (conn *fakeConn) ConnState() libp2p_network.ConnectionState {
+	return libp2p_network.ConnectionState{}
+}
+func (conn *fakeConn) LocalMultiaddr() ma.Multiaddr    { return nil }
+func (conn *fakeConn) RemoteMultiaddr() ma.Multiaddr   { return nil }
+func (conn *fakeConn) Stat() libp2p_network.ConnStats  { return libp2p_network.ConnStats{} }
+func (conn *fakeConn) Scope() libp2p_network.ConnScope { return nil }

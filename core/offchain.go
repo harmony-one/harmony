@@ -22,12 +22,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// CommitOffChainData write off chain data of a block onto db writer.
-func (bc *BlockChain) CommitOffChainData(
+func (bc *BlockChainImpl) CommitOffChainData(
 	batch rawdb.DatabaseWriter,
 	block *types.Block,
 	receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
+	stakeMsgs []staking.StakeMsg,
 	payout reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
@@ -118,7 +118,7 @@ func (bc *BlockChain) CommitOffChainData(
 
 	// Do bookkeeping for new staking txns
 	newVals, err := bc.UpdateStakingMetaData(
-		batch, block, state, epoch, nextBlockEpoch,
+		batch, block, stakeMsgs, state, epoch, nextBlockEpoch,
 	)
 	if err != nil {
 		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")
@@ -167,6 +167,8 @@ func (bc *BlockChain) CommitOffChainData(
 
 			cl0, _ := bc.ReadShardLastCrossLink(crossLink.ShardID())
 			if cl0 == nil {
+				// make sure it is written at least once, so that it is overwritten below
+				// under "Roll up latest crosslinks"
 				rawdb.WriteShardLastCrossLink(batch, crossLink.ShardID(), crossLink.Serialize())
 			}
 		}
@@ -276,7 +278,7 @@ func (bc *BlockChain) CommitOffChainData(
 	return CanonStatTy, nil
 }
 
-func (bc *BlockChain) writeValidatorStats(
+func (bc *BlockChainImpl) writeValidatorStats(
 	tempValidatorStats map[common.Address]*staking.ValidatorStats,
 	batch rawdb.DatabaseWriter,
 ) {
@@ -310,7 +312,7 @@ func (bc *BlockChain) writeValidatorStats(
 	}
 }
 
-func (bc *BlockChain) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
+func (bc *BlockChainImpl) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
 	nextBlockEpoch := header.Epoch()
 	if header.IsLastBlockInEpoch() {
 		nextBlockEpoch = new(big.Int).Add(header.Epoch(), common.Big1)

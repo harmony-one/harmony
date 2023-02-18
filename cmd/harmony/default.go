@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.0"
+const tomlConfigVersion = "2.5.12"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -21,14 +21,21 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IsBeaconArchival: false,
 		IsOffline:        false,
 		DataDir:          "./",
+		TraceEnable:      false,
+		TriesInMemory:    128,
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
-		Port:            nodeconfig.DefaultP2PPort,
-		IP:              nodeconfig.DefaultPublicListenIP,
-		KeyFile:         "./.hmykey",
-		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
-		MaxConnsPerIP:   nodeconfig.DefaultMaxConnPerIP,
+		Port:                     nodeconfig.DefaultP2PPort,
+		IP:                       nodeconfig.DefaultPublicListenIP,
+		KeyFile:                  "./.hmykey",
+		DiscConcurrency:          nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
+		DisablePrivateIPScan:     false,
+		MaxPeers:                 nodeconfig.DefaultMaxPeers,
+		ConnManagerLowWatermark:  nodeconfig.DefaultConnManagerLowWatermark,
+		ConnManagerHighWatermark: nodeconfig.DefaultConnManagerHighWatermark,
+		WaitForEachPeerToConnect: nodeconfig.DefaultWaitForEachPeerToConnect,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
@@ -45,9 +52,13 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		AuthPort: nodeconfig.DefaultAuthWSPort,
 	},
 	RPCOpt: harmonyconfig.RpcOptConfig{
-		DebugEnabled:      false,
-		RateLimterEnabled: true,
-		RequestsPerSecond: nodeconfig.DefaultRPCRateLimit,
+		DebugEnabled:       false,
+		EthRPCsEnabled:     true,
+		StakingRPCsEnabled: true,
+		LegacyRPCsEnabled:  true,
+		RpcFilterFile:      "./.hmy/rpc_filter.txt",
+		RateLimterEnabled:  true,
+		RequestsPerSecond:  nodeconfig.DefaultRPCRateLimit,
 	},
 	BLSKeys: harmonyconfig.BlsConfig{
 		KeyDir:   "./.hmy/blskeys",
@@ -63,7 +74,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		KMSConfigFile:    "",
 	},
 	TxPool: harmonyconfig.TxPoolConfig{
-		BlacklistFile: "./.hmy/blacklist.txt",
+		BlacklistFile:     "./.hmy/blacklist.txt",
+		AllowedTxsFile:    "./.hmy/allowedtxs.txt",
+		RosettaFixFile:    "",
+		AccountSlots:      16,
+		LocalAccountsFile: "./.hmy/locals.txt",
+		GlobalSlots:       5120,
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
@@ -75,6 +91,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ProfileDebugValues: []int{0},
 	},
 	Log: harmonyconfig.LogConfig{
+		Console:      false,
 		Folder:       "./latest",
 		FileName:     "harmony.log",
 		RotateSize:   100,
@@ -86,6 +103,13 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		},
 	},
 	DNSSync: getDefaultDNSSyncConfig(defNetworkType),
+	ShardData: harmonyconfig.ShardDataConfig{
+		EnableShardData: false,
+		DiskCount:       8,
+		ShardCount:      4,
+		CacheTime:       10,
+		CacheSize:       512,
+	},
 }
 
 var defaultSysConfig = harmonyconfig.SysConfig{
@@ -96,6 +120,7 @@ var defaultDevnetConfig = harmonyconfig.DevnetConfig{
 	NumShards:   2,
 	ShardSize:   10,
 	HmyNodeSize: 10,
+	SlotsLimit:  0, // 0 means no limit
 }
 
 var defaultRevertConfig = harmonyconfig.RevertConfig{
@@ -122,53 +147,93 @@ var defaultPrometheusConfig = harmonyconfig.PrometheusConfig{
 	Gateway:    "https://gateway.harmony.one",
 }
 
+var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
+	TurboMode:              true,
+	DoubleCheckBlockHashes: false,
+	MaxBlocksPerSyncCycle:  512,   // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
+	MaxBackgroundBlocks:    512,   // max blocks to be downloaded at background process in turbo mode
+	InsertChainBatchSize:   128,   // number of blocks to build a batch and insert to chain in staged sync
+	VerifyAllSig:           false, // whether it should verify signatures for all blocks
+	VerifyHeaderBatchSize:  100,   // batch size to verify block header before insert to chain
+	MaxMemSyncCycleSize:    1024,  // max number of blocks to use a single transaction for staged sync
+	UseMemDB:               true,  // it uses memory by default. set it to false to use disk
+	LogProgress:            false, // log the full sync progress in console
+}
+
 var (
 	defaultMainnetSyncConfig = harmonyconfig.SyncConfig{
-		Enabled:        false,
-		Downloader:     false,
-		Concurrency:    6,
-		MinPeers:       6,
-		InitStreams:    8,
-		DiscSoftLowCap: 8,
-		DiscHardLowCap: 6,
-		DiscHighCap:    128,
-		DiscBatch:      8,
+		Enabled:              false,
+		Downloader:           false,
+		StagedSync:           false,
+		StagedSyncCfg:        defaultStagedSyncConfig,
+		Concurrency:          6,
+		MinPeers:             6,
+		InitStreams:          8,
+		MaxAdvertiseWaitTime: 60, //minutes
+		DiscSoftLowCap:       8,
+		DiscHardLowCap:       6,
+		DiscHighCap:          128,
+		DiscBatch:            8,
 	}
 
 	defaultTestNetSyncConfig = harmonyconfig.SyncConfig{
-		Enabled:        true,
-		Downloader:     false,
-		Concurrency:    4,
-		MinPeers:       4,
-		InitStreams:    4,
-		DiscSoftLowCap: 4,
-		DiscHardLowCap: 4,
-		DiscHighCap:    1024,
-		DiscBatch:      8,
+		Enabled:              true,
+		Downloader:           false,
+		StagedSync:           false,
+		StagedSyncCfg:        defaultStagedSyncConfig,
+		Concurrency:          2,
+		MinPeers:             2,
+		InitStreams:          2,
+		MaxAdvertiseWaitTime: 5, //minutes
+		DiscSoftLowCap:       2,
+		DiscHardLowCap:       2,
+		DiscHighCap:          1024,
+		DiscBatch:            3,
 	}
 
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
-		Enabled:        true,
-		Downloader:     false,
-		Concurrency:    4,
-		MinPeers:       4,
-		InitStreams:    4,
-		DiscSoftLowCap: 4,
-		DiscHardLowCap: 4,
-		DiscHighCap:    1024,
-		DiscBatch:      8,
+		Enabled:              true,
+		Downloader:           true,
+		StagedSync:           true,
+		StagedSyncCfg:        defaultStagedSyncConfig,
+		Concurrency:          4,
+		MinPeers:             4,
+		InitStreams:          4,
+		MaxAdvertiseWaitTime: 5, //minutes
+		DiscSoftLowCap:       4,
+		DiscHardLowCap:       4,
+		DiscHighCap:          1024,
+		DiscBatch:            8,
+	}
+
+	defaultPartnerSyncConfig = harmonyconfig.SyncConfig{
+		Enabled:              true,
+		Downloader:           true,
+		StagedSync:           false,
+		StagedSyncCfg:        defaultStagedSyncConfig,
+		Concurrency:          4,
+		MinPeers:             2,
+		InitStreams:          2,
+		MaxAdvertiseWaitTime: 2, //minutes
+		DiscSoftLowCap:       2,
+		DiscHardLowCap:       2,
+		DiscHighCap:          1024,
+		DiscBatch:            4,
 	}
 
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{
-		Enabled:        true,
-		Downloader:     true,
-		Concurrency:    4,
-		MinPeers:       4,
-		InitStreams:    4,
-		DiscSoftLowCap: 4,
-		DiscHardLowCap: 4,
-		DiscHighCap:    1024,
-		DiscBatch:      8,
+		Enabled:              true,
+		Downloader:           true,
+		StagedSync:           false,
+		StagedSyncCfg:        defaultStagedSyncConfig,
+		Concurrency:          4,
+		MinPeers:             4,
+		InitStreams:          4,
+		MaxAdvertiseWaitTime: 2, //minutes
+		DiscSoftLowCap:       4,
+		DiscHardLowCap:       4,
+		DiscHighCap:          1024,
+		DiscBatch:            8,
 	}
 )
 

@@ -7,6 +7,7 @@ import (
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
@@ -60,11 +61,7 @@ func TestConsensusInitialization(t *testing.T) {
 	assert.Equal(t, uint64(0), consensus.GetViewChangingID())
 	assert.Equal(t, uint32(shard.BeaconChainShardID), consensus.ShardID)
 
-	assert.IsType(t, make(chan struct{}), consensus.syncReadyChan)
-	assert.NotNil(t, consensus.syncReadyChan)
-
-	assert.IsType(t, make(chan struct{}), consensus.syncNotReadyChan)
-	assert.NotNil(t, consensus.syncNotReadyChan)
+	assert.Equal(t, false, consensus.start)
 
 	assert.IsType(t, make(chan slash.Record), consensus.SlashChan)
 	assert.NotNil(t, consensus.SlashChan)
@@ -87,12 +84,10 @@ func GenerateConsensusForTesting() (p2p.Host, multibls.PrivateKeys, *Consensus, 
 		return nil, nil, nil, nil, err
 	}
 
-	peer := host.GetSelfPeer()
-
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
 	multiBLSPrivateKey := multibls.GetPrivateKeys(bls.RandPrivateKey())
 
-	consensus, err := New(host, shard.BeaconChainShardID, peer, multiBLSPrivateKey, decider)
+	consensus, err := New(host, shard.BeaconChainShardID, multiBLSPrivateKey, registry.New(), decider, 3, false)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

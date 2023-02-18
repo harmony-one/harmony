@@ -139,7 +139,8 @@ type Body struct {
 // matches the version of the given field.
 //
 // TODO ek – this is a stopgap, and works only while there is a N:1 mapping
-//  between header and body versions.  Replace usage with factory.
+//
+//	between header and body versions.  Replace usage with factory.
 func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
 	var bi BodyInterface
 	switch h.Header.(type) {
@@ -227,6 +228,7 @@ type Block struct {
 	ReceivedAt   time.Time
 	ReceivedFrom interface{}
 
+	commitLock sync.Mutex
 	// Commit Signatures/Bitmap
 	commitSigAndBitmap []byte
 }
@@ -264,11 +266,15 @@ func (b *Block) SetCurrentCommitSig(sigAndBitmap []byte) {
 			Int("dstLen", len(b.header.LastCommitSignature())).
 			Msg("SetCurrentCommitSig: sig size mismatch")
 	}
+	b.commitLock.Lock()
 	b.commitSigAndBitmap = sigAndBitmap
+	b.commitLock.Unlock()
 }
 
 // GetCurrentCommitSig get the commit group signature that signed on this block.
 func (b *Block) GetCurrentCommitSig() []byte {
+	b.commitLock.Lock()
+	defer b.commitLock.Unlock()
 	return b.commitSigAndBitmap
 }
 

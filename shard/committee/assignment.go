@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -85,10 +86,10 @@ func (p CandidateOrder) MarshalJSON() ([]byte, error) {
 
 // NewEPoSRound runs a fresh computation of EPoS using
 // latest data always
-func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtendedBound bool) (
+func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtendedBound bool, slotsLimit, shardCount int) (
 	*CompletedEPoSRound, error,
 ) {
-	eligibleCandidate, err := prepareOrders(stakedReader)
+	eligibleCandidate, err := prepareOrders(stakedReader, slotsLimit, shardCount)
 	if err != nil {
 		return nil, err
 	}
@@ -131,6 +132,7 @@ func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtend
 
 func prepareOrders(
 	stakedReader StakingCandidatesReader,
+	slotsLimit, shardCount int,
 ) (map[common.Address]*effective.SlotOrder, error) {
 	candidates := stakedReader.ValidatorCandidates()
 	blsKeys := map[bls.SerializedPublicKey]struct{}{}
@@ -174,12 +176,19 @@ func prepareOrders(
 			continue
 		}
 
+		slotPubKeysLimited := make([]bls.SerializedPublicKey, 0, len(validator.SlotPubKeys))
 		found := false
+		shardSlotsCount := make([]int, shardCount)
 		for _, key := range validator.SlotPubKeys {
 			if _, ok := blsKeys[key]; ok {
 				found = true
 			} else {
 				blsKeys[key] = struct{}{}
+				shard := new(big.Int).Mod(key.Big(), big.NewInt(int64(shardCount))).Int64()
+				if slotsLimit == 0 || shardSlotsCount[shard] < slotsLimit {
+					slotPubKeysLimited = append(slotPubKeysLimited, key)
+				}
+				shardSlotsCount[shard]++
 			}
 		}
 
@@ -197,9 +206,9 @@ func prepareOrders(
 		totalStaked.Add(totalStaked, validatorStake)
 
 		essentials[validator.Address] = &effective.SlotOrder{
-			validatorStake,
-			validator.SlotPubKeys,
-			tempZero,
+			Stake:       validatorStake,
+			SpreadAmong: slotPubKeysLimited,
+			Percentage:  tempZero,
 		}
 	}
 	totalStakedDec := numeric.NewDecFromBigInt(totalStaked)
@@ -291,9 +300,8 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) (*shard.State, error)
 				return nil, err
 			}
 			curNodeID := shard.Slot{
-				addr,
-				pubKey,
-				nil,
+				EcdsaAddress: addr,
+				BLSPublicKey: pubKey,
 			}
 			com.Slots = append(com.Slots, curNodeID)
 		}
@@ -310,9 +318,8 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) (*shard.State, error)
 				return nil, err
 			}
 			curNodeID := shard.Slot{
-				addr,
-				pubKey,
-				nil,
+				EcdsaAddress: addr,
+				BLSPublicKey: pubKey,
 			}
 			com.Slots = append(com.Slots, curNodeID)
 		}
@@ -331,7 +338,7 @@ func eposStakedCommittee(
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 
 	for i := 0; i < shardCount; i++ {
-		shardState.Shards[i] = shard.Committee{uint32(i), shard.SlotList{}}
+		shardState.Shards[i] = shard.Committee{ShardID: uint32(i), Slots: shard.SlotList{}}
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardCount
 			pub := &bls_core.PublicKey{}
@@ -348,15 +355,14 @@ func eposStakedCommittee(
 				return nil, err
 			}
 			shardState.Shards[i].Slots = append(shardState.Shards[i].Slots, shard.Slot{
-				addr,
-				pubKey,
-				nil,
+				EcdsaAddress: addr,
+				BLSPublicKey: pubKey,
 			})
 		}
 	}
 
 	// TODO(audit): make sure external validator BLS key are also not duplicate to Harmony's keys
-	completedEPoSRound, err := NewEPoSRound(epoch, stakerReader, stakerReader.Config().IsEPoSBound35(epoch))
+	completedEPoSRound, err := NewEPoSRound(epoch, stakerReader, stakerReader.Config().IsEPoSBound35(epoch), s.SlotsLimit(), shardCount)
 
 	if err != nil {
 		return nil, err
@@ -368,14 +374,23 @@ func eposStakedCommittee(
 		shardID := int(new(big.Int).Mod(purchasedSlot.Key.Big(), shardBig).Int64())
 		shardState.Shards[shardID].Slots = append(
 			shardState.Shards[shardID].Slots, shard.Slot{
-				purchasedSlot.Addr,
-				purchasedSlot.Key,
-				&purchasedSlot.EPoSStake,
+				EcdsaAddress:   purchasedSlot.Addr,
+				BLSPublicKey:   purchasedSlot.Key,
+				EffectiveStake: &purchasedSlot.EPoSStake,
 			},
 		)
 	}
 
 	if len(completedEPoSRound.AuctionWinners) == 0 {
+		instance := shard.Schedule.InstanceForEpoch(epoch)
+		preInstance := shard.Schedule.InstanceForEpoch(new(big.Int).Sub(epoch, big.NewInt(1)))
+		isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
+		isShardReduction := preInstance.NumShards() != instance.NumShards()
+		// If the shard-reduction happens, we cannot use the old committee.
+		if isTestnet && isShardReduction {
+			utils.Logger().Warn().Msg("No elected validators in the new epoch!!! But use the new committee due to Testnet Shard Reduction.")
+			return shardState, nil
+		}
 		utils.Logger().Warn().Msg("No elected validators in the new epoch!!! Reuse old shard state.")
 		return stakerReader.ReadShardState(big.NewInt(0).Sub(epoch, big.NewInt(1)))
 	}

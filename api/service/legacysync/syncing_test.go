@@ -12,6 +12,7 @@ import (
 	"time"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
@@ -29,34 +30,46 @@ func TestSyncPeerConfig_IsEqual(t *testing.T) {
 	}{
 		{
 			p1: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "1",
+				},
 			},
 			p2: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "2",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "2",
+				},
 			},
 			exp: false,
 		},
 		{
 			p1: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "1",
+				},
 			},
 			p2: &SyncPeerConfig{
-				ip:   "0.0.0.2",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.2",
+					Port: "1",
+				},
 			},
 			exp: false,
 		},
 		{
 			p1: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "1",
+				},
 			},
 			p2: &SyncPeerConfig{
-				ip:   "0.0.0.1",
-				port: "1",
+				peer: p2p.Peer{
+					IP:   "0.0.0.1",
+					Port: "1",
+				},
 			},
 			exp: true,
 		},
@@ -104,8 +117,20 @@ func TestCompareSyncPeerConfigByblockHashes(t *testing.T) {
 		0, "syncPeerConfig1 is less than syncPeerConfig2")
 }
 
+type mockBlockchain struct {
+}
+
+func (mockBlockchain) CurrentBlock() *types.Block {
+	panic("implement me")
+}
+
+func (mockBlockchain) ShardID() uint32 {
+	return 0
+}
+
 func TestCreateStateSync(t *testing.T) {
-	stateSync := CreateStateSync(nil, "127.0.0.1", "8000", [20]byte{}, false, nodeconfig.Validator)
+	pID, _ := peer.IDFromBytes([]byte{})
+	stateSync := CreateStateSync(mockBlockchain{}, "127.0.0.1", "8000", [20]byte{}, pID, false, nodeconfig.Validator)
 
 	if stateSync == nil {
 		t.Error("Unable to create stateSync")
@@ -156,7 +181,8 @@ func TestLimitPeersWithBound(t *testing.T) {
 	for _, test := range tests {
 		ps := makePeersForTest(test.size)
 
-		res := limitNumPeers(ps, 1)
+		sz, res := limitNumPeers(ps, 1)
+		res = res[:sz]
 
 		if len(res) != test.expSize {
 			t.Errorf("result size unexpected: %v / %v", len(res), test.expSize)
@@ -172,8 +198,10 @@ func TestLimitPeersWithBound_random(t *testing.T) {
 	ps2 := makePeersForTest(100)
 	s1, s2 := int64(1), int64(2)
 
-	res1 := limitNumPeers(ps1, s1)
-	res2 := limitNumPeers(ps2, s2)
+	sz1, res1 := limitNumPeers(ps1, s1)
+	res1 = res1[:sz1]
+	sz2, res2 := limitNumPeers(ps2, s2)
+	res2 = res2[:sz2]
 	if reflect.DeepEqual(res1, res2) {
 		t.Fatal("not randomized limit peer")
 	}
@@ -269,7 +297,7 @@ func TestSyncStatus_Get_Concurrency(t *testing.T) {
 	fb := func() SyncCheckResult {
 		time.Sleep(1 * time.Second)
 		atomic.AddInt32(&updated, 1)
-		return SyncCheckResult{IsInSync: true}
+		return SyncCheckResult{IsSynchronized: true}
 	}
 	for i := 0; i != 20; i++ {
 		wg.Add(1)

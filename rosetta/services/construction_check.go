@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/vm"
 	ethRpc "github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -228,18 +228,19 @@ func (s *ConstructAPI) ConstructionMetadata(
 		})
 	}
 
+	latest := ethRpc.BlockNumberOrHashWithNumber(ethRpc.LatestBlockNumber)
 	var estGasUsed uint64
 	if !isStakingOperation(options.OperationType) {
 		if options.OperationType == common.ContractCreationOperation {
-			estGasUsed, err = rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{From: senderAddr, Data: &data}, nil)
+			estGasUsed, err = rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{From: senderAddr, Data: &data}, latest, nil)
 			estGasUsed *= 2 // HACK to account for imperfect contract creation estimation
 		} else {
 			estGasUsed, err = rpc.EstimateGas(
-				ctx, s.hmy, rpc.CallArgs{From: senderAddr, To: &contractAddress, Data: &data}, nil,
+				ctx, s.hmy, rpc.CallArgs{From: senderAddr, To: &contractAddress, Data: &data}, latest, nil,
 			)
 		}
 	} else {
-		estGasUsed, err = core.IntrinsicGas(data, false, false,
+		estGasUsed, err = vm.IntrinsicGas(data, false, false,
 			false, options.OperationType == common.CreateValidatorOperation)
 		estGasUsed *= 2
 
@@ -269,7 +270,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 			callArgs.To = &contractAddress
 		}
 		evmExe, err := rpc.DoEVMCall(
-			ctx, s.hmy, callArgs, ethRpc.LatestBlockNumber, rpc.CallTimeout,
+			ctx, s.hmy, callArgs, latest, rpc.CallTimeout,
 		)
 		if err != nil {
 			return nil, common.NewError(common.CatchAllError, map[string]interface{}{

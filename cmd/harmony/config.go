@@ -81,10 +81,9 @@ func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 	zone := nodeconfig.GetDefaultDNSZone(nt)
 	port := nodeconfig.GetDefaultDNSPort(nt)
 	dnsSync := harmonyconfig.DnsSync{
-		Port:          port,
-		Zone:          zone,
-		LegacySyncing: false,
-		ServerPort:    nodeconfig.DefaultDNSPort,
+		Port:       port,
+		Zone:       zone,
+		ServerPort: nodeconfig.DefaultDNSPort,
 	}
 	switch nt {
 	case nodeconfig.Mainnet:
@@ -95,7 +94,7 @@ func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 		dnsSync.Client = true
 	case nodeconfig.Localnet:
 		dnsSync.Server = true
-		dnsSync.Client = true
+		dnsSync.Client = false
 	default:
 		dnsSync.Server = true
 		dnsSync.Client = false
@@ -140,6 +139,8 @@ func getDefaultSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.SyncConfig {
 		return defaultTestNetSyncConfig
 	case nodeconfig.Localnet:
 		return defaultLocalNetSyncConfig
+	case nodeconfig.Partner:
+		return defaultPartnerSyncConfig
 	default:
 		return defaultElseSyncConfig
 	}
@@ -194,7 +195,6 @@ var dumpConfigLegacyCmd = &cobra.Command{
 
 func registerDumpConfigFlags() error {
 	return cli.RegisterFlags(dumpConfigCmd, []cli.Flag{networkTypeFlag})
-	return cli.RegisterFlags(dumpConfigLegacyCmd, []cli.Flag{networkTypeFlag})
 }
 
 func promptConfigUpdate() bool {

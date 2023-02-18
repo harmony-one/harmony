@@ -51,6 +51,9 @@ func NewPublicTransactionAPI(hmy *hmy.Harmony, version Version) rpc.API {
 func (s *PublicTransactionService) GetAccountNonce(
 	ctx context.Context, address string, blockNumber BlockNumber,
 ) (uint64, error) {
+	timer := DoMetricRPCRequest(GetAccountNonce)
+	defer DoRPCRequestDuration(GetAccountNonce, timer)
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -67,10 +70,11 @@ func (s *PublicTransactionService) GetAccountNonce(
 // more granular transaction counts queries
 // Note that the return type is an interface to account for the different versions
 func (s *PublicTransactionService) GetTransactionCount(
-	ctx context.Context, addr string, blockNumber BlockNumber,
+	ctx context.Context, addr string, blockNrOrHash rpc.BlockNumberOrHash,
 ) (response interface{}, err error) {
-	// Process arguments based on version
-	blockNum := blockNumber.EthBlockNumber()
+	timer := DoMetricRPCRequest(GetTransactionCount)
+	defer DoRPCRequestDuration(GetTransactionCount, timer)
+
 	address, err := internal_common.ParseAddr(addr)
 	if err != nil {
 		return nil, err
@@ -78,7 +82,7 @@ func (s *PublicTransactionService) GetTransactionCount(
 
 	// Fetch transaction count
 	var nonce uint64
-	if blockNum == rpc.PendingBlockNumber {
+	if blockNr, ok := blockNrOrHash.Number(); ok && blockNr == rpc.PendingBlockNumber {
 		// Ask transaction pool for the nonce which includes pending transactions
 		nonce, err = s.hmy.GetPoolNonce(ctx, address)
 		if err != nil {
@@ -86,7 +90,7 @@ func (s *PublicTransactionService) GetTransactionCount(
 		}
 	} else {
 		// Resolve block number and use its state to ask for the nonce
-		state, _, err := s.hmy.StateAndHeaderByNumber(ctx, blockNum)
+		state, _, err := s.hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 		if err != nil {
 			return nil, err
 		}
@@ -114,6 +118,9 @@ func (s *PublicTransactionService) GetTransactionCount(
 func (s *PublicTransactionService) GetTransactionsCount(
 	ctx context.Context, address, txType string,
 ) (count uint64, err error) {
+	timer := DoMetricRPCRequest(GetTransactionsCount)
+	defer DoRPCRequestDuration(GetTransactionsCount, timer)
+
 	if !strings.HasPrefix(address, "one1") {
 		// Handle hex address
 		addr, err := internal_common.ParseAddr(address)
@@ -134,6 +141,9 @@ func (s *PublicTransactionService) GetTransactionsCount(
 func (s *PublicTransactionService) GetStakingTransactionsCount(
 	ctx context.Context, address, txType string,
 ) (count uint64, err error) {
+	timer := DoMetricRPCRequest(GetStakingTransactionsCount)
+	defer DoRPCRequestDuration(GetStakingTransactionsCount, timer)
+
 	if !strings.HasPrefix(address, "one1") {
 		// Handle hex address
 		addr, err := internal_common.ParseAddr(address)
@@ -153,9 +163,15 @@ func (s *PublicTransactionService) GetStakingTransactionsCount(
 // EstimateGas returns an estimate of the amount of gas needed to execute the
 // given transaction against the current pending block.
 func (s *PublicTransactionService) EstimateGas(
-	ctx context.Context, args CallArgs,
+	ctx context.Context, args CallArgs, blockNrOrHash *rpc.BlockNumberOrHash,
 ) (hexutil.Uint64, error) {
-	gas, err := EstimateGas(ctx, s.hmy, args, nil)
+	timer := DoMetricRPCRequest(RpcEstimateGas)
+	defer DoRPCRequestDuration(RpcEstimateGas, timer)
+	bNrOrHash := rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber)
+	if blockNrOrHash != nil {
+		bNrOrHash = *blockNrOrHash
+	}
+	gas, err := EstimateGas(ctx, s.hmy, args, bNrOrHash, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -411,6 +427,9 @@ func (s *PublicTransactionService) GetStakingTransactionsHistory(
 func (s *PublicTransactionService) GetBlockTransactionCountByNumber(
 	ctx context.Context, blockNumber BlockNumber,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetBlockTransactionCountByNumber)
+	defer DoRPCRequestDuration(GetBlockTransactionCountByNumber, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -440,6 +459,9 @@ func (s *PublicTransactionService) GetBlockTransactionCountByNumber(
 func (s *PublicTransactionService) GetBlockTransactionCountByHash(
 	ctx context.Context, blockHash common.Hash,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetBlockTransactionCountByHash)
+	defer DoRPCRequestDuration(GetBlockTransactionCountByHash, timer)
+
 	// Fetch block
 	block, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil {
@@ -465,6 +487,9 @@ func (s *PublicTransactionService) GetBlockTransactionCountByHash(
 func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 	ctx context.Context, blockNumber BlockNumber, index TransactionIndex,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetTransactionByBlockNumberAndIndex)
+	defer DoRPCRequestDuration(GetTransactionByBlockNumberAndIndex, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -507,6 +532,9 @@ func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 	ctx context.Context, blockHash common.Hash, index TransactionIndex,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetTransactionByBlockHashAndIndex)
+	defer DoRPCRequestDuration(GetTransactionByBlockHashAndIndex, timer)
+
 	// Fetch Block
 	block, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil {
@@ -547,6 +575,9 @@ func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 func (s *PublicTransactionService) GetBlockStakingTransactionCountByNumber(
 	ctx context.Context, blockNumber BlockNumber,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetBlockStakingTransactionCountByNumber)
+	defer DoRPCRequestDuration(GetBlockStakingTransactionCountByNumber, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -576,6 +607,9 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByNumber(
 func (s *PublicTransactionService) GetBlockStakingTransactionCountByHash(
 	ctx context.Context, blockHash common.Hash,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetBlockStakingTransactionCountByHash)
+	defer DoRPCRequestDuration(GetBlockStakingTransactionCountByHash, timer)
+
 	// Fetch block
 	block, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil {
@@ -601,6 +635,9 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByHash(
 func (s *PublicTransactionService) GetStakingTransactionByBlockNumberAndIndex(
 	ctx context.Context, blockNumber BlockNumber, index TransactionIndex,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetStakingTransactionByBlockNumberAndIndex)
+	defer DoRPCRequestDuration(GetStakingTransactionByBlockNumberAndIndex, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -637,6 +674,9 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockNumberAndIndex(
 func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 	ctx context.Context, blockHash common.Hash, index TransactionIndex,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetStakingTransactionByBlockHashAndIndex)
+	defer DoRPCRequestDuration(GetStakingTransactionByBlockHashAndIndex, timer)
+
 	// Fetch Block
 	block, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil {
@@ -670,6 +710,9 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 func (s *PublicTransactionService) GetTransactionReceipt(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetTransactionReceipt)
+	defer DoRPCRequestDuration(GetTransactionReceipt, timer)
+
 	// Fetch receipt for plain & staking transaction
 	var tx *types.Transaction
 	var stx *staking.StakingTransaction
@@ -735,6 +778,9 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 func (s *PublicTransactionService) GetCXReceiptByHash(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetCXReceiptByHash)
+	defer DoRPCRequestDuration(GetCXReceiptByHash, timer)
+
 	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), hash); cx != nil {
 		// Format response according to version
 		switch s.version {
@@ -766,6 +812,9 @@ func (s *PublicTransactionService) GetCXReceiptByHash(
 // withdrawn already from the source shard but not credited yet in the
 // destination account due to transient failures.
 func (s *PublicTransactionService) ResendCx(ctx context.Context, txID common.Hash) (bool, error) {
+	timer := DoMetricRPCRequest(ResendCx)
+	defer DoRPCRequestDuration(ResendCx, timer)
+
 	_, success := s.hmy.ResendCx(ctx, txID)
 
 	// Response output is the same for all versions
@@ -788,14 +837,13 @@ func returnHashesWithPagination(hashes []common.Hash, pageIndex uint32, pageSize
 }
 
 // EstimateGas - estimate gas cost for a given operation
-func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *big.Int) (uint64, error) {
+func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, gasCap *big.Int) (uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
 		lo  uint64 = params.TxGas - 1
 		hi  uint64
 		cap uint64
 	)
-	blockNum := rpc.LatestBlockNumber
 	// Use zero address if sender unspecified.
 	if args.From == nil {
 		args.From = new(common.Address)
@@ -806,7 +854,7 @@ func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *b
 	} else {
 
 		// Retrieve the block to act as the gas ceiling
-		blk, err := hmy.BlockByNumber(ctx, blockNum)
+		blk, err := hmy.BlockByNumberOrHash(ctx, blockNrOrHash)
 		if err != nil {
 			return 0, err
 		}
@@ -814,7 +862,7 @@ func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *b
 	}
 	// Recap the highest gas limit with account's available balance.
 	if args.GasPrice != nil && args.GasPrice.ToInt().BitLen() != 0 {
-		state, _, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
+		state, _, err := hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 		if err != nil {
 			return 0, err
 		}
@@ -850,7 +898,7 @@ func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *b
 	executable := func(gas uint64) (bool, *core.ExecutionResult, error) {
 		args.Gas = (*hexutil.Uint64)(&gas)
 
-		result, err := DoEVMCall(ctx, hmy, args, blockNum, 0)
+		result, err := DoEVMCall(ctx, hmy, args, blockNrOrHash, 0)
 		if err != nil {
 			if errors.Is(err, core.ErrIntrinsicGas) {
 				return true, nil, nil // Special case, raise gas limit

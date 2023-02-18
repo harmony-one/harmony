@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -46,9 +47,7 @@ func (hmy *Harmony) readAndUpdateRawStakes(
 			if err != nil {
 				continue
 			}
-			wrapper := snapshot.Validator
-			spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
-				QuoInt64(int64(len(wrapper.SlotPubKeys)))
+			spread = snapshot.RawStakePerSlot()
 			validatorSpreads[slotAddr] = spread
 		}
 
@@ -228,6 +227,35 @@ func (hmy *Harmony) GetAllValidatorAddresses() []common.Address {
 	return hmy.BlockChain.ValidatorCandidates()
 }
 
+func (hmy *Harmony) GetValidatorsStakeByBlockNumber(
+	block *types.Block,
+) (map[string]*big.Int, error) {
+	if cachedReward, ok := hmy.stakeByBlockNumberCache.Get(block.Hash()); ok {
+		return cachedReward.(map[string]*big.Int), nil
+	}
+	validatorAddresses := hmy.GetAllValidatorAddresses()
+	stakes := make(map[string]*big.Int, len(validatorAddresses))
+	for _, validatorAddress := range validatorAddresses {
+		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validatorAddress, block.Root())
+		if err != nil {
+			if errors.Cause(err) != state.ErrAddressNotPresent {
+				return nil, errors.Errorf(
+					"cannot fetch information for validator %s at block %d due to %s",
+					validatorAddress.Hex(),
+					block.Number(),
+					err,
+				)
+			} else {
+				// `validatorAddress` was not a validator back then
+				continue
+			}
+		}
+		stakes[validatorAddress.Hex()] = wrapper.TotalDelegation()
+	}
+	hmy.stakeByBlockNumberCache.Add(block.Hash(), stakes)
+	return stakes, nil
+}
+
 var (
 	epochBlocksMap = map[common.Address]map[uint64]staking.EpochSigningEntry{}
 	mapLock        = sync.Mutex{}
@@ -330,6 +358,8 @@ func (hmy *Harmony) GetValidatorInformation(
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.Performance = &staking.CurrentEpochPerformance{
 			CurrentSigningPercentage: *computed,
+			Epoch:                    hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64(),
+			Block:                    hmy.BeaconChain.CurrentBlock().Header().Number().Uint64(),
 		}
 	}
 
@@ -443,7 +473,8 @@ func (hmy *Harmony) GetMedianRawStakeSnapshot() (
 		func() (interface{}, error) {
 			// Compute for next epoch
 			epoch := big.NewInt(0).Add(hmy.CurrentBlock().Epoch(), big.NewInt(1))
-			return committee.NewEPoSRound(epoch, hmy.BlockChain, hmy.BlockChain.Config().IsEPoSBound35(epoch))
+			instance := shard.Schedule.InstanceForEpoch(epoch)
+			return committee.NewEPoSRound(epoch, hmy.BlockChain, hmy.BlockChain.Config().IsEPoSBound35(epoch), instance.SlotsLimit(), int(instance.NumShards()))
 		},
 	)
 	if err != nil {
@@ -453,31 +484,23 @@ func (hmy *Harmony) GetMedianRawStakeSnapshot() (
 }
 
 // GetDelegationsByValidator returns all delegation information of a validator
-func (hmy *Harmony) GetDelegationsByValidator(validator common.Address) []*staking.Delegation {
+func (hmy *Harmony) GetDelegationsByValidator(validator common.Address) []staking.Delegation {
 	wrapper, err := hmy.BlockChain.ReadValidatorInformation(validator)
 	if err != nil || wrapper == nil {
 		return nil
 	}
-	delegations := []*staking.Delegation{}
-	for i := range wrapper.Delegations {
-		delegations = append(delegations, &wrapper.Delegations[i])
-	}
-	return delegations
+	return wrapper.Delegations
 }
 
 // GetDelegationsByValidatorAtBlock returns all delegation information of a validator at the given block
 func (hmy *Harmony) GetDelegationsByValidatorAtBlock(
 	validator common.Address, block *types.Block,
-) []*staking.Delegation {
+) []staking.Delegation {
 	wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validator, block.Root())
 	if err != nil || wrapper == nil {
 		return nil
 	}
-	delegations := []*staking.Delegation{}
-	for i := range wrapper.Delegations {
-		delegations = append(delegations, &wrapper.Delegations[i])
-	}
-	return delegations
+	return wrapper.Delegations
 }
 
 // GetDelegationsByDelegator returns all delegation information of a delegator
@@ -492,13 +515,14 @@ func (hmy *Harmony) GetDelegationsByDelegator(
 func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 	delegator common.Address, block *types.Block,
 ) ([]common.Address, []*staking.Delegation) {
-	addresses := []common.Address{}
-	delegations := []*staking.Delegation{}
 	delegationIndexes, err := hmy.BlockChain.
 		ReadDelegationsByDelegatorAt(delegator, block.Number())
 	if err != nil {
 		return nil, nil
 	}
+
+	addresses := make([]common.Address, 0, len(delegationIndexes))
+	delegations := make([]*staking.Delegation, 0, len(delegationIndexes))
 
 	for i := range delegationIndexes {
 		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(

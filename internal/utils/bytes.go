@@ -1,6 +1,9 @@
 package utils
 
-import "encoding/hex"
+import (
+	"encoding/hex"
+	"math/big"
+)
 
 // use to look up number of 1 bit in 4 bits
 var halfByteLookup = [16]int{0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4}
@@ -43,4 +46,37 @@ func CountOneBits(arr []byte) int64 {
 		count += countOneBitsInByte(arr[i])
 	}
 	return int64(count)
+}
+
+func BytesMiddle(a, b []byte) []byte {
+	if a == nil && b == nil {
+		return []byte{128}
+	}
+
+	if len(a) > len(b) {
+		tmp := make([]byte, len(a))
+		if b == nil {
+			for i, _ := range tmp {
+				tmp[i] = 255
+			}
+		}
+		copy(tmp, b)
+		b = tmp
+	} else if len(a) < len(b) {
+		tmp := make([]byte, len(b))
+		if a == nil {
+			for i, _ := range tmp {
+				tmp[i] = 0
+			}
+		}
+		copy(tmp, a)
+		a = tmp
+	}
+
+	aI := big.NewInt(0).SetBytes(a)
+	bI := big.NewInt(0).SetBytes(b)
+
+	aI.Add(aI, bI)
+	aI.Div(aI, big.NewInt(2))
+	return aI.Bytes()
 }

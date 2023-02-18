@@ -31,9 +31,11 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -49,14 +51,17 @@ const (
 // StateProcessor implements Processor.
 type StateProcessor struct {
 	config      *params.ChainConfig     // Chain configuration options
-	bc          *BlockChain             // Canonical block chain
+	bc          BlockChain              // Canonical blockchain
+	beacon      BlockChain              // Beacon chain
 	engine      consensus_engine.Engine // Consensus engine used for block rewards
 	resultCache *lru.Cache              // Cache for result after a certain block is processed
 }
 
+// this structure is cached, and each individual element is returned
 type ProcessorResult struct {
 	Receipts   types.Receipts
 	CxReceipts types.CXReceipts
+	StakeMsgs  []staking.StakeMsg
 	Logs       []*types.Log
 	UsedGas    uint64
 	Reward     reward.Reader
@@ -65,12 +70,19 @@ type ProcessorResult struct {
 
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(
-	config *params.ChainConfig, bc *BlockChain, engine consensus_engine.Engine,
+	config *params.ChainConfig, bc BlockChain, beacon BlockChain, engine consensus_engine.Engine,
 ) *StateProcessor {
+	if bc == nil {
+		panic("bc is nil")
+	}
+	if beacon == nil {
+		panic("beacon is nil")
+	}
 	resultCache, _ := lru.New(resultCacheLimit)
 	return &StateProcessor{
 		config:      config,
 		bc:          bc,
+		beacon:      beacon,
 		engine:      engine,
 		resultCache: resultCache,
 	}
@@ -86,7 +98,7 @@ func NewStateProcessor(
 func (p *StateProcessor) Process(
 	block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool,
 ) (
-	types.Receipts, types.CXReceipts,
+	types.Receipts, types.CXReceipts, []staking.StakeMsg,
 	[]*types.Log, uint64, reward.Reader, *state.DB, error,
 ) {
 	cacheKey := block.Hash()
@@ -96,38 +108,42 @@ func (p *StateProcessor) Process(
 			// Only the successful results are cached in case for retry.
 			result := cached.(*ProcessorResult)
 			utils.Logger().Info().Str("block num", block.Number().String()).Msg("result cache hit.")
-			return result.Receipts, result.CxReceipts, result.Logs, result.UsedGas, result.Reward, result.State, nil
+			return result.Receipts, result.CxReceipts, result.StakeMsgs, result.Logs, result.UsedGas, result.Reward, result.State, nil
 		}
 	}
 
 	var (
-		receipts types.Receipts
-		outcxs   types.CXReceipts
-		incxs    = block.IncomingReceipts()
-		usedGas  = new(uint64)
-		header   = block.Header()
-		allLogs  []*types.Log
-		gp       = new(GasPool).AddGas(block.GasLimit())
+		receipts       types.Receipts
+		outcxs         types.CXReceipts
+		incxs          = block.IncomingReceipts()
+		usedGas        = new(uint64)
+		header         = block.Header()
+		allLogs        []*types.Log
+		gp                                = new(GasPool).AddGas(block.GasLimit())
+		blockStakeMsgs []staking.StakeMsg = make([]staking.StakeMsg, 0)
 	)
 
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
 	if err != nil {
-		return nil, nil, nil, 0, nil, statedb, err
+		return nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
 	startTime := time.Now()
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, cxReceipt, _, err := ApplyTransaction(
+		receipt, cxReceipt, stakeMsgs, _, err := ApplyTransaction(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
-			return nil, nil, nil, 0, nil, statedb, err
+			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 		receipts = append(receipts, receipt)
 		if cxReceipt != nil {
 			outcxs = append(outcxs, cxReceipt)
+		}
+		if len(stakeMsgs) > 0 {
+			blockStakeMsgs = append(blockStakeMsgs, stakeMsgs...)
 		}
 		allLogs = append(allLogs, receipt.Logs...)
 	}
@@ -142,7 +158,7 @@ func (p *StateProcessor) Process(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
-			return nil, nil, nil, 0, nil, statedb, err
+			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
@@ -156,17 +172,21 @@ func (p *StateProcessor) Process(
 			p.config, statedb, header, cx,
 		); err != nil {
 			return nil, nil,
-				nil, 0, nil, statedb, errors.New("[Process] Cannot apply incoming receipts")
+				nil, nil, 0, nil, statedb, errors.New("[Process] Cannot apply incoming receipts")
 		}
 	}
 
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, 0, nil, statedb, errors.New(
+			return nil, nil, nil, nil, 0, nil, statedb, errors.New(
 				"[Process] Cannot finalize block",
 			)
 		}
+	}
+
+	if err := MayTestnetShardReduction(p.bc, statedb, header); err != nil {
+		return nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
@@ -176,23 +196,26 @@ func (p *StateProcessor) Process(
 		sigsReady <- true
 	}()
 	_, payout, err := p.engine.Finalize(
-		p.bc, header, statedb, block.Transactions(),
+		p.bc,
+		p.beacon,
+		header, statedb, block.Transactions(),
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
 	)
 	if err != nil {
-		return nil, nil, nil, 0, nil, statedb, errors.New("[Process] Cannot finalize block")
+		return nil, nil, nil, nil, 0, nil, statedb, errors.New("[Process] Cannot finalize block")
 	}
 
 	result := &ProcessorResult{
 		Receipts:   receipts,
 		CxReceipts: outcxs,
+		StakeMsgs:  blockStakeMsgs,
 		Logs:       allLogs,
 		UsedGas:    *usedGas,
 		Reward:     payout,
 		State:      statedb,
 	}
 	p.resultCache.Add(cacheKey, result)
-	return receipts, outcxs, allLogs, *usedGas, payout, statedb, nil
+	return receipts, outcxs, blockStakeMsgs, allLogs, *usedGas, payout, statedb, nil
 }
 
 // CacheProcessorResult caches the process result on the cache key.
@@ -223,14 +246,14 @@ func getTransactionType(
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
+func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, []staking.StakeMsg, uint64, error) {
 	txType := getTransactionType(config, header, tx)
 	if txType == types.InvalidTx {
-		return nil, nil, 0, errors.New("Invalid Transaction Type")
+		return nil, nil, nil, 0, errors.New("Invalid Transaction Type")
 	}
 
 	if txType != types.SameShardTx && !config.AcceptsCrossTx(header.Epoch()) {
-		return nil, nil, 0, errors.Errorf(
+		return nil, nil, nil, 0, errors.Errorf(
 			"cannot handle cross-shard transaction until after epoch %v (now %v)",
 			config.CrossTxEpoch, header.Epoch(),
 		)
@@ -239,7 +262,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	var signer types.Signer
 	if tx.IsEthCompatible() {
 		if !config.IsEthCompatible(header.Epoch()) {
-			return nil, nil, 0, errors.New("ethereum compatible transactions not supported at current epoch")
+			return nil, nil, nil, 0, errors.New("ethereum compatible transactions not supported at current epoch")
 		}
 		signer = types.NewEIP155Signer(config.EthCompatibleChainID)
 	} else {
@@ -249,7 +272,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 	// skip signer err for additiononly tx
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 
 	// Create a new context to be used in the EVM environment
@@ -261,7 +284,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 	// Update the state with pending changes
 	var root []byte
@@ -292,12 +315,33 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	var cxReceipt *types.CXReceipt
 	// Do not create cxReceipt if EVM call failed
 	if txType == types.SubtractionOnly && !failedExe {
-		cxReceipt = &types.CXReceipt{tx.Hash(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
+		if vmenv.CXReceipt != nil {
+			return nil, nil, nil, 0, errors.New("cannot have cross shard receipt via precompile and directly")
+		}
+		cxReceipt = &types.CXReceipt{
+			TxHash:    tx.Hash(),
+			From:      msg.From(),
+			To:        msg.To(),
+			ShardID:   tx.ShardID(),
+			ToShardID: tx.ToShardID(),
+			Amount:    msg.Value(),
+		}
 	} else {
-		cxReceipt = nil
+		if !failedExe {
+			if vmenv.CXReceipt != nil {
+				cxReceipt = vmenv.CXReceipt
+				// this tx.Hash needs to be the "original" tx.Hash
+				// since, in effect, we have added
+				// support for cross shard txs
+				// to eth txs
+				cxReceipt.TxHash = tx.HashByType()
+			}
+		} else {
+			cxReceipt = nil
+		}
 	}
 
-	return receipt, cxReceipt, result.UsedGas, err
+	return receipt, cxReceipt, vmenv.StakeMsgs, result.UsedGas, err
 }
 
 // ApplyStakingTransaction attempts to apply a staking transaction to the given state database
@@ -396,4 +440,51 @@ func StakingToMessage(
 	}
 	msg.SetType(types.StakingTypeMap[stkType])
 	return msg, nil
+}
+
+// MayTestnetShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
+// This function does not handle all cases, only for ShardNum from 4 to 2.
+func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.Header) error {
+	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
+	isLastBlock := shard.Schedule.IsLastBlock(header.Number().Uint64())
+	isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
+	if !(isTestnet && isBeaconChain && isLastBlock) {
+		return nil
+	}
+	curInstance := shard.Schedule.InstanceForEpoch(header.Epoch())
+	nextEpoch := big.NewInt(header.Epoch().Int64() + 1)
+	nextInstance := shard.Schedule.InstanceForEpoch(nextEpoch)
+	curNumShards := curInstance.NumShards()
+	nextNumShards := nextInstance.NumShards()
+
+	if curNumShards == nextNumShards {
+		return nil
+	}
+
+	if curNumShards != 4 && nextNumShards != 2 {
+		return errors.New("can only handle the reduction from 4 to 2")
+	}
+	addresses, err := bc.ReadValidatorList()
+	if err != nil {
+		return err
+	}
+	for _, address := range addresses {
+		validator, err := statedb.ValidatorWrapper(address, true, false)
+		if err != nil {
+			return err
+		}
+		if validator.Status == effective.Inactive || validator.Status == effective.Banned {
+			continue
+		}
+		for _, pubKey := range validator.SlotPubKeys {
+			curShard := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(curNumShards))).Uint64()
+			nextShard := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(nextNumShards))).Uint64()
+			if curShard >= uint64(nextNumShards) || curShard != nextShard {
+				validator.Status = effective.Inactive
+				break
+			}
+		}
+	}
+	statedb.IntermediateRoot(bc.Config().IsS3(header.Epoch()))
+	return nil
 }

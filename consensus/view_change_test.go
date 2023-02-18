@@ -43,7 +43,7 @@ func TestPhaseSwitching(t *testing.T) {
 	_, _, consensus, _, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)
 
-	assert.Equal(t, FBFTAnnounce, consensus.phase) // It's a new consensus, we should be at the FBFTAnnounce phase
+	assert.Equal(t, FBFTAnnounce, consensus.phase) // It's a new consensus, we should be at the FBFTAnnounce phase.
 
 	switches := []phaseSwitch{
 		{start: FBFTAnnounce, end: FBFTPrepare},
@@ -111,7 +111,7 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 		wrappedBLSKeys = append(wrappedBLSKeys, wrapped)
 	}
 
-	consensus.Decider.UpdateParticipants(wrappedBLSKeys)
+	consensus.Decider.UpdateParticipants(wrappedBLSKeys, []bls.PublicKeyWrapper{})
 	assert.Equal(t, keyCount, consensus.Decider.ParticipantsCount())
 
 	consensus.LeaderPubKey = &wrappedBLSKeys[0]

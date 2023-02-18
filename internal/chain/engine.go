@@ -40,8 +40,6 @@ const (
 )
 
 type engineImpl struct {
-	beacon engine.ChainReader
-
 	// Caching field
 	epochCtxCache    *lru.Cache // epochCtxKey -> epochCtx
 	verifiedSigCache *lru.Cache // verifiedSigKey -> struct{}{}
@@ -52,19 +50,9 @@ func NewEngine() *engineImpl {
 	sigCache, _ := lru.New(verifiedSigCache)
 	epochCtxCache, _ := lru.New(epochCtxCache)
 	return &engineImpl{
-		beacon:           nil,
 		epochCtxCache:    epochCtxCache,
 		verifiedSigCache: sigCache,
 	}
-}
-
-func (e *engineImpl) Beaconchain() engine.ChainReader {
-	return e.beacon
-}
-
-// SetBeaconchain assigns the beaconchain handle used
-func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
-	e.beacon = beaconchain
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
@@ -198,7 +186,7 @@ func (e *engineImpl) VerifyVRF(
 	return nil
 }
 
-// retrieve corresponding blsPublicKey from Coinbase Address
+// GetLeaderPubKeyFromCoinbase retrieve corresponding blsPublicKey from Coinbase Address
 func GetLeaderPubKeyFromCoinbase(
 	blockchain engine.ChainReader, h *block.Header,
 ) (*bls.PublicKeyWrapper, error) {
@@ -274,7 +262,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 // setting the final state and assembling the block.
 // sigsReady signal indicates whether the commit sigs are populated in the header object.
 func (e *engineImpl) Finalize(
-	chain engine.ChainReader, header *block.Header,
+	chain engine.ChainReader, beacon engine.ChainReader, header *block.Header,
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
@@ -324,7 +312,7 @@ func (e *engineImpl) Finalize(
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewardsAndCountSigs(
-		chain, state, header, e.Beaconchain(), sigsReady,
+		chain, state, header, beacon, sigsReady,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -477,45 +465,30 @@ func applySlashes(
 		return false
 	})
 
+	// The Leader of the block gets all slashing rewards.
+	slashRewardBeneficiary := header.Coinbase()
+
 	// Do the slashing by groups in the sorted order
 	for _, key := range sortedKeys {
 		records := groupedRecords[key]
-		superCommittee, err := chain.ReadShardState(big.NewInt(int64(key.epoch)))
 
-		if err != nil {
-			return errors.New("could not read shard state")
-		}
-
-		subComm, err := superCommittee.FindCommitteeByID(key.shardID)
-
-		if err != nil {
-			return errors.New("could not find shard committee")
-		}
-
-		// Apply the slashes, invariant: assume been verified as legit slash by this point
-		var slashApplied *slash.Application
-		votingPower, err := lookupVotingPower(
-			big.NewInt(int64(key.epoch)), subComm,
-		)
-		if err != nil {
-			return errors.Wrapf(err, "could not lookup cached voting power in slash application")
-		}
-		rate := slash.Rate(votingPower, records)
 		utils.Logger().Info().
-			Str("rate", rate.String()).
 			RawJSON("records", []byte(records.String())).
 			Msg("now applying slash to state during block finalization")
-		if slashApplied, err = slash.Apply(
+
+		// Apply the slashes, invariant: assume been verified as legit slash by this point
+		slashApplied, err := slash.Apply(
 			chain,
 			state,
 			records,
-			rate,
-		); err != nil {
+			slashRewardBeneficiary,
+		)
+
+		if err != nil {
 			return errors.New("[Finalize] could not apply slash")
 		}
 
 		utils.Logger().Info().
-			Str("rate", rate.String()).
 			RawJSON("records", []byte(records.String())).
 			RawJSON("applied", []byte(slashApplied.String())).
 			Msg("slash applied successfully")
@@ -721,7 +694,8 @@ func readShardState(chain engine.ChainReader, epoch *big.Int, targetShardID uint
 		return shardState, nil
 
 	} else {
-		shardState, err := chain.ReadShardState(epoch)
+		//shardState, err := chain.ReadShardState(epoch)
+		shardState, err := committee.WithStakingEnabled.ReadFromDB(epoch, chain)
 		if err != nil {
 			return nil, errors.Wrapf(err, "read shard state for epoch %v", epoch)
 		}

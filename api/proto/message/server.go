@@ -18,6 +18,7 @@ const (
 
 // Server is the Server struct for client service package.
 type Server struct {
+	UnimplementedClientServiceServer
 	server                          *grpc.Server
 	CreateTransactionForEnterMethod func(int64, string) error
 	GetResult                       func(string) ([]string, []*big.Int)

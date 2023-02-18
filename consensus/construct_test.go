@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -30,16 +31,14 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	blsPriKey := bls.RandPrivateKey()
-	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
-	)
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
 	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
 	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
-	priKeyWrapper := bls.PrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
+	priKeyWrapper := bls.PrivateKeyWrapper{Pri: blsPriKey, Pub: &pubKeyWrapper}
 	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, []*bls.PrivateKeyWrapper{&priKeyWrapper}); err != nil {
 		test.Fatalf("could not construct announce: %v", err)
 	}
@@ -64,14 +63,12 @@ func TestConstructPreparedMessage(test *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	blsPriKey := bls.RandPrivateKey()
-	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
-	)
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	consensus.ResetState()
-	consensus.UpdateBitmaps()
+	consensus.resetState()
+	consensus.updateBitmaps()
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
@@ -86,7 +83,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		[]*bls.PublicKeyWrapper{&leaderKeyWrapper},
 		leaderPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
-		consensus.blockNum,
+		consensus.BlockNum(),
 		consensus.GetCurBlockViewID(),
 	)
 	if _, err := consensus.Decider.AddNewVote(
@@ -94,7 +91,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		[]*bls.PublicKeyWrapper{&validatorKeyWrapper},
 		validatorPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
-		consensus.blockNum,
+		consensus.BlockNum(),
 		consensus.GetCurBlockViewID(),
 	); err != nil {
 		test.Log(err)
@@ -110,7 +107,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 
 	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
 	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
-	priKeyWrapper := bls.PrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
+	priKeyWrapper := bls.PrivateKeyWrapper{Pri: blsPriKey, Pub: &pubKeyWrapper}
 	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, []*bls.PrivateKeyWrapper{&priKeyWrapper})
 	if err != nil {
 		test.Errorf("Error when creating prepared message")
@@ -134,29 +131,29 @@ func TestConstructPrepareMessage(test *testing.T) {
 	blsPriKey1 := bls.RandPrivateKey()
 	pubKeyWrapper1 := bls.PublicKeyWrapper{Object: blsPriKey1.GetPublicKey()}
 	pubKeyWrapper1.Bytes.FromLibBLSPublicKey(pubKeyWrapper1.Object)
-	priKeyWrapper1 := bls.PrivateKeyWrapper{blsPriKey1, &pubKeyWrapper1}
+	priKeyWrapper1 := bls.PrivateKeyWrapper{Pri: blsPriKey1, Pub: &pubKeyWrapper1}
 
 	blsPriKey2 := bls.RandPrivateKey()
 	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
 	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
-	priKeyWrapper2 := bls.PrivateKeyWrapper{blsPriKey2, &pubKeyWrapper2}
+	priKeyWrapper2 := bls.PrivateKeyWrapper{Pri: blsPriKey2, Pub: &pubKeyWrapper2}
 
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityStake, shard.BeaconChainShardID,
 	)
 
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey1), decider,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey1), nil, decider, 3, false,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
-	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2}, []bls.PublicKeyWrapper{})
 
 	consensus.SetCurBlockViewID(2)
 	consensus.blockHash = [32]byte{}
 	copy(consensus.blockHash[:], []byte("random"))
-	consensus.blockNum = 1000
+	atomic.StoreUint64(&consensus.blockNum, 1000)
 
 	sig := priKeyWrapper1.Pri.SignHash(consensus.blockHash[:])
 	network, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, []*bls.PrivateKeyWrapper{&priKeyWrapper1})
@@ -226,29 +223,27 @@ func TestConstructCommitMessage(test *testing.T) {
 	blsPriKey1 := bls.RandPrivateKey()
 	pubKeyWrapper1 := bls.PublicKeyWrapper{Object: blsPriKey1.GetPublicKey()}
 	pubKeyWrapper1.Bytes.FromLibBLSPublicKey(pubKeyWrapper1.Object)
-	priKeyWrapper1 := bls.PrivateKeyWrapper{blsPriKey1, &pubKeyWrapper1}
+	priKeyWrapper1 := bls.PrivateKeyWrapper{Pri: blsPriKey1, Pub: &pubKeyWrapper1}
 
 	blsPriKey2 := bls.RandPrivateKey()
 	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
 	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
-	priKeyWrapper2 := bls.PrivateKeyWrapper{blsPriKey2, &pubKeyWrapper2}
+	priKeyWrapper2 := bls.PrivateKeyWrapper{Pri: blsPriKey2, Pub: &pubKeyWrapper2}
 
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityStake, shard.BeaconChainShardID,
 	)
 
-	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey1), decider,
-	)
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey1), nil, decider, 3, false)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
-	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2}, []bls.PublicKeyWrapper{})
 
 	consensus.SetCurBlockViewID(2)
 	consensus.blockHash = [32]byte{}
 	copy(consensus.blockHash[:], []byte("random"))
-	consensus.blockNum = 1000
+	atomic.StoreUint64(&consensus.blockNum, 1000)
 
 	sigPayload := []byte("payload")
 
@@ -321,7 +316,7 @@ func TestPopulateMessageFields(t *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

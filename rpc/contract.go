@@ -35,11 +35,16 @@ type PublicContractService struct {
 }
 
 // NewPublicContractAPI creates a new API for the RPC interface
-func NewPublicContractAPI(hmy *hmy.Harmony, version Version) rpc.API {
+func NewPublicContractAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
+	var limiter *rate.Limiter
+	if limiterEnable {
+		limiter = rate.NewLimiter(rate.Limit(limit), limit)
+	}
+
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicContractService{hmy, version, rate.NewLimiter(200, 1500)},
+		Service:   &PublicContractService{hmy, version, limiter},
 		Public:    true,
 	}
 }
@@ -63,10 +68,10 @@ func (s *PublicContractService) wait(limiter *rate.Limiter, ctx context.Context)
 // Call executes the given transaction on the state for the given block number.
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicContractService) Call(
-	ctx context.Context, args CallArgs, blockNumber BlockNumber,
+	ctx context.Context, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash,
 ) (hexutil.Bytes, error) {
-	// Process number based on version
-	blockNum := blockNumber.EthBlockNumber()
+	timer := DoMetricRPCRequest(Call)
+	defer DoRPCRequestDuration(Call, timer)
 
 	err := s.wait(s.limiterCall, ctx)
 	if err != nil {
@@ -75,24 +80,25 @@ func (s *PublicContractService) Call(
 	}
 
 	// Execute call
-	result, err := DoEVMCall(ctx, s.hmy, args, blockNum, CallTimeout)
+	result, err := DoEVMCall(ctx, s.hmy, args, blockNrOrHash, CallTimeout)
 	if err != nil {
 		return nil, err
 	}
 
+	// If the result contains a revert reason, try to unpack and return it.
+	if len(result.Revert()) > 0 {
+		return nil, newRevertError(&result)
+	}
 	// If VM returns error, still return the ReturnData, which is the contract error message
 	return result.ReturnData, nil
 }
 
 // GetCode returns the code stored at the given address in the state for the given block number.
 func (s *PublicContractService) GetCode(
-	ctx context.Context, addr string, blockNumber BlockNumber,
+	ctx context.Context, addr string, blockNrOrHash rpc.BlockNumberOrHash,
 ) (hexutil.Bytes, error) {
 	timer := DoMetricRPCRequest(GetCode)
 	defer DoRPCRequestDuration(GetCode, timer)
-
-	// Process number based on version
-	blockNum := blockNumber.EthBlockNumber()
 
 	// Fetch state
 	address, err := hmyCommon.ParseAddr(addr)
@@ -100,7 +106,7 @@ func (s *PublicContractService) GetCode(
 		DoMetricRPCQueryInfo(GetCode, FailedNumber)
 		return nil, err
 	}
-	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, blockNum)
+	state, _, err := s.hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
 		DoMetricRPCQueryInfo(GetCode, FailedNumber)
 		return nil, err
@@ -115,15 +121,13 @@ func (s *PublicContractService) GetCode(
 // block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
 // numbers are also allowed.
 func (s *PublicContractService) GetStorageAt(
-	ctx context.Context, addr string, key string, blockNumber BlockNumber,
+	ctx context.Context, addr string, key string, blockNrOrHash rpc.BlockNumberOrHash,
 ) (hexutil.Bytes, error) {
 	timer := DoMetricRPCRequest(GetStorageAt)
 	defer DoRPCRequestDuration(GetStorageAt, timer)
-	// Process number based on version
-	blockNum := blockNumber.EthBlockNumber()
 
 	// Fetch state
-	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, blockNum)
+	state, _, err := s.hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
 		DoMetricRPCQueryInfo(GetStorageAt, FailedNumber)
 		return nil, err
@@ -141,12 +145,9 @@ func (s *PublicContractService) GetStorageAt(
 
 // DoEVMCall executes an EVM call
 func DoEVMCall(
-	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNum rpc.BlockNumber,
+	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash,
 	timeout time.Duration,
 ) (core.ExecutionResult, error) {
-	timer := DoMetricRPCRequest(DoEvmCall)
-	defer DoRPCRequestDuration(DoEvmCall, timer)
-
 	defer func(start time.Time) {
 		utils.Logger().Debug().
 			Dur("runtime", time.Since(start)).
@@ -154,7 +155,7 @@ func DoEVMCall(
 	}(time.Now())
 
 	// Fetch state
-	state, header, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
+	state, header, err := hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
 		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err

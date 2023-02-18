@@ -58,7 +58,7 @@ func TestDHTOption_getLibp2pRawOptions(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		opts, err := test.opt.getLibp2pRawOptions()
+		opts, err := test.opt.GetLibp2pRawOptions()
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}

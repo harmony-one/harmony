@@ -78,8 +78,9 @@ func (cfg *Config) getKmsProviderConfig() kmsDecrypterConfig {
 
 // keyDecrypter is the interface to decrypt the bls key file. Currently, two
 // implementations are supported:
-//   passDecrypter - decrypt with passphrase for file name with extension .key
-//   kmsDecrypter  - decrypt with aws kms service for file name with extension .bls
+//
+//	passDecrypter - decrypt with passphrase for file name with extension .key
+//	kmsDecrypter  - decrypt with aws kms service for file name with extension .bls
 type keyDecrypter interface {
 	extension() string
 	decryptFile(keyFile string) (*bls_core.SecretKey, error)

@@ -13,10 +13,11 @@ import (
 
 // PassSrcType is the type of passphrase provider source.
 // Four options available:
-//  PassSrcNil    - Do not use passphrase decryption
-//  PassSrcFile   - Read the passphrase from files
-//  PassSrcPrompt - Read the passphrase from prompt
-//  PassSrcAuto   - First try to unlock with passphrase from file, then read passphrase from prompt
+//
+//	PassSrcNil    - Do not use passphrase decryption
+//	PassSrcFile   - Read the passphrase from files
+//	PassSrcPrompt - Read the passphrase from prompt
+//	PassSrcAuto   - First try to unlock with passphrase from file, then read passphrase from prompt
 type PassSrcType uint8
 
 const (
@@ -121,10 +122,11 @@ func (pd *passDecrypter) getFilePassProvider() passProvider {
 
 // passProvider is the interface to provide the passphrase of a bls keys.
 // Implemented by
-// 	  promptPassProvider  - provide passphrase through user-interactive prompt
-//    staticPassProvider  - provide passphrase from a static .pass file
-//    dynamicPassProvider - provide the passphrase based on the given key file keyFile
-//    dirPassProvider     - provide passphrase from .pass files in a directory
+//
+//		  promptPassProvider  - provide passphrase through user-interactive prompt
+//	   staticPassProvider  - provide passphrase from a static .pass file
+//	   dynamicPassProvider - provide the passphrase based on the given key file keyFile
+//	   dirPassProvider     - provide passphrase from .pass files in a directory
 type passProvider interface {
 	getPassphrase(keyFile string) (string, error)
 }

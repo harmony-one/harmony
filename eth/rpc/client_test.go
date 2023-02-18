@@ -270,7 +270,7 @@ func TestClientSubscribeClose(t *testing.T) {
 		gotHangSubscriptionReq:  make(chan struct{}),
 		unblockHangSubscription: make(chan struct{}),
 	}
-	if err := server.RegisterName("nftest2", service); err != nil {
+	if err := server.RegisterName("nftest2", service, nil); err != nil {
 		t.Fatal(err)
 	}
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
 )

@@ -15,9 +15,9 @@ type Downloaders struct {
 }
 
 // NewDownloaders creates Downloaders for sync of multiple blockchains
-func NewDownloaders(host p2p.Host, bcs []*core.BlockChain, config Config) *Downloaders {
+func NewDownloaders(host p2p.Host, bcs []core.BlockChain, config Config) *Downloaders {
 	ds := make(map[uint32]*Downloader)
-
+	isBeaconNode := len(bcs) == 1
 	for _, bc := range bcs {
 		if bc == nil {
 			continue
@@ -25,7 +25,7 @@ func NewDownloaders(host p2p.Host, bcs []*core.BlockChain, config Config) *Downl
 		if _, ok := ds[bc.ShardID()]; ok {
 			continue
 		}
-		ds[bc.ShardID()] = NewDownloader(host, bc, config)
+		ds[bc.ShardID()] = NewDownloader(host, bc, isBeaconNode, config)
 	}
 	return &Downloaders{
 		ds:     ds,

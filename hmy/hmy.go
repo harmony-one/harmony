@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,7 +22,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
 )
@@ -34,6 +35,8 @@ const (
 	undelegationPayoutsCacheSize           = 500  // max number of epochs to store in cache
 	preStakingBlockRewardsCacheSize        = 1024 // max number of block rewards to store in cache
 	totalStakeCacheDuration                = 20   // number of blocks where the returned total stake will remain the same
+	// max number of blocks for which the map "validator address -> total delegation to validator" is stored
+	stakeByBlockNumberCacheSize = 250
 )
 
 var (
@@ -46,8 +49,8 @@ type Harmony struct {
 	// Channel for shutting down the service
 	ShutdownChan  chan bool                      // Channel for shutting down the Harmony
 	BloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	BlockChain    *core.BlockChain
-	BeaconChain   *core.BlockChain
+	BlockChain    core.BlockChain
+	BeaconChain   core.BlockChain
 	TxPool        *core.TxPool
 	CxPool        *core.CxPool // CxPool is used to store the blockHashes of blocks containing cx receipts to be sent
 	// DB interfaces
@@ -77,18 +80,21 @@ type Harmony struct {
 	preStakingBlockRewardsCache *lru.Cache
 	// totalStakeCache to save on recomputation for `totalStakeCacheDuration` blocks.
 	totalStakeCache *totalStakeCache
+	// stakeByBlockNumberCache to save on recomputation for `totalStakeCacheDuration` blocks
+	stakeByBlockNumberCache *lru.Cache
 }
 
 // NodeAPI is the list of functions from node used to call rpc apis.
 type NodeAPI interface {
 	AddPendingStakingTransaction(*staking.StakingTransaction) error
 	AddPendingTransaction(newTx *types.Transaction) error
-	Blockchain() *core.BlockChain
-	Beaconchain() *core.BlockChain
+	Blockchain() core.BlockChain
+	Beaconchain() core.BlockChain
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetTransactionsCount(address, txType string) (uint64, error)
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
+	GetTraceResultByHash(hash common.Hash) (json.RawMessage, error)
 	IsCurrentlyLeader() bool
 	IsOutOfSync(shardID uint32) bool
 	SyncStatus(shardID uint32) (bool, uint64, uint64)
@@ -121,12 +127,12 @@ type NodeAPI interface {
 func New(
 	nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool, shardID uint32,
 ) *Harmony {
-	chainDb := nodeAPI.Blockchain().ChainDb()
 	leaderCache, _ := lru.New(leaderCacheSize)
 	undelegationPayoutsCache, _ := lru.New(undelegationPayoutsCacheSize)
+	stakeByBlockNumberCache, _ := lru.New(stakeByBlockNumberCacheSize)
 	preStakingBlockRewardsCache, _ := lru.New(preStakingBlockRewardsCacheSize)
 	totalStakeCache := newTotalStakeCache(totalStakeCacheDuration)
-	bloomIndexer := NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms)
+	bloomIndexer := NewBloomIndexer(nodeAPI.Blockchain(), params.BloomBitsBlocks, params.BloomConfirms)
 	bloomIndexer.Start(nodeAPI.Blockchain())
 
 	backend := &Harmony{
@@ -138,7 +144,7 @@ func New(
 		TxPool:                      txPool,
 		CxPool:                      cxPool,
 		eventMux:                    new(event.TypeMux),
-		chainDb:                     chainDb,
+		chainDb:                     nodeAPI.Blockchain().ChainDb(),
 		NodeAPI:                     nodeAPI,
 		ChainID:                     nodeAPI.Blockchain().Config().ChainID.Uint64(),
 		EthChainID:                  nodeAPI.Blockchain().Config().EthCompatibleChainID.Uint64(),
@@ -147,13 +153,14 @@ func New(
 		totalStakeCache:             totalStakeCache,
 		undelegationPayoutsCache:    undelegationPayoutsCache,
 		preStakingBlockRewardsCache: preStakingBlockRewardsCache,
+		stakeByBlockNumberCache:     stakeByBlockNumberCache,
 	}
 
 	// Setup gas price oracle
 	gpoParams := GasPriceConfig{
-		Blocks:     20,
-		Percentile: 60,
-		Default:    big.NewInt(3e10),
+		Blocks:     20,                // take all eligible txs past 20 blocks and sort them
+		Percentile: 80,                // get the 80th percentile when sorted in an ascending manner
+		Default:    big.NewInt(100e9), // minimum of 100 gwei
 	}
 	gpo := NewOracle(backend, gpoParams)
 	backend.gpo = gpo

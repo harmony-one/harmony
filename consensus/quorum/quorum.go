@@ -3,6 +3,7 @@ package quorum
 import (
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -73,10 +75,10 @@ type ParticipantTracker interface {
 	Participants() multibls.PublicKeys
 	IndexOf(bls.SerializedPublicKey) int
 	ParticipantsCount() int64
-	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
+	NthNextHmyExt(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
-	UpdateParticipants(pubKeys []bls.PublicKeyWrapper)
+	UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper)
 }
 
 // SignatoryTracker ..
@@ -103,21 +105,10 @@ type SignatureReader interface {
 	AggregateVotes(p Phase) *bls_core.Sign
 }
 
-// DependencyInjectionWriter ..
-type DependencyInjectionWriter interface {
-	SetMyPublicKeyProvider(func() (multibls.PublicKeys, error))
-}
-
-// DependencyInjectionReader ..
-type DependencyInjectionReader interface {
-	MyPublicKey() func() (multibls.PublicKeys, error)
-}
-
 // Decider ..
 type Decider interface {
 	fmt.Stringer
 	SignatureReader
-	DependencyInjectionWriter
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
 	AddNewVote(
@@ -128,7 +119,6 @@ type Decider interface {
 	IsQuorumAchieved(Phase) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
 	QuorumThreshold() numeric.Dec
-	AmIMemberOfCommitee() bool
 	IsAllSigsCollected() bool
 	ResetPrepareAndCommitVotes()
 	ResetViewChangeVotes()
@@ -160,15 +150,13 @@ type cIdentities struct {
 	// Public keys of the committee including leader and validators
 	publicKeys  []bls.PublicKeyWrapper
 	keyIndexMap map[bls.SerializedPublicKey]int
-	prepare     *votepower.Round
-	commit      *votepower.Round
+	// every element is a index of publickKeys
+	allowlistIndex []int
+	prepare        *votepower.Round
+	commit         *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewChange *votepower.Round
-}
-
-type depInject struct {
-	publicKeyProvider func() (multibls.PublicKeys, error)
 }
 
 func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
@@ -236,6 +224,10 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	idx := s.IndexOf(pubKey.Bytes)
 	if idx != -1 {
 		found = true
+	} else {
+		utils.Logger().Error().
+			Str("key", pubKey.Bytes.Hex()).
+			Msg("[NthNextHmy] pubKey not found")
 	}
 	numNodes := instance.NumHarmonyOperatedNodesPerShard()
 	// sanity check to avoid out of bound access
@@ -243,6 +235,41 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 		numNodes = len(s.publicKeys)
 	}
 	idx = (idx + next) % numNodes
+	return found, &s.publicKeys[idx]
+}
+
+// NthNextHmyExt return the Nth next pubkey of Harmony + allowlist nodes, next can be negative number
+func (s *cIdentities) NthNextHmyExt(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+	found := false
+
+	idx := s.IndexOf(pubKey.Bytes)
+	if idx != -1 {
+		found = true
+	}
+	numHmyNodes := instance.NumHarmonyOperatedNodesPerShard()
+	// sanity check to avoid out of bound access
+	if numHmyNodes <= 0 || numHmyNodes > len(s.publicKeys) {
+		numHmyNodes = len(s.publicKeys)
+	}
+	nth := idx
+	if idx >= numHmyNodes {
+		nth = sort.SearchInts(s.allowlistIndex, idx) + numHmyNodes
+	}
+
+	numExtNodes := instance.ExternalAllowlistLimit()
+	if numExtNodes > len(s.allowlistIndex) {
+		numExtNodes = len(s.allowlistIndex)
+	}
+
+	totalNodes := numHmyNodes + numExtNodes
+	// (totalNodes + next%totalNodes) can convert negitive 'next' to positive
+	nth = (nth + totalNodes + next%totalNodes) % totalNodes
+	if nth < numHmyNodes {
+		idx = nth
+	} else {
+		// find index of external slot key
+		idx = s.allowlistIndex[nth-numHmyNodes]
+	}
 	return found, &s.publicKeys[idx]
 }
 
@@ -255,11 +282,17 @@ func (s *cIdentities) Participants() multibls.PublicKeys {
 	return s.publicKeys
 }
 
-func (s *cIdentities) UpdateParticipants(pubKeys []bls.PublicKeyWrapper) {
+func (s *cIdentities) UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper) {
 	keyIndexMap := map[bls.SerializedPublicKey]int{}
 	for i := range pubKeys {
 		keyIndexMap[pubKeys[i].Bytes] = i
 	}
+	for _, key := range allowlist {
+		if i, exist := keyIndexMap[key.Bytes]; exist {
+			s.allowlistIndex = append(s.allowlistIndex, i)
+		}
+	}
+	sort.Ints(s.allowlistIndex)
 	s.publicKeys = pubKeys
 	s.keyIndexMap = keyIndexMap
 }
@@ -387,41 +420,20 @@ func newBallotsBackedSignatureReader() *cIdentities {
 	}
 }
 
-type composite struct {
-	DependencyInjectionWriter
-	DependencyInjectionReader
-	SignatureReader
-}
-
-func (d *depInject) SetMyPublicKeyProvider(p func() (multibls.PublicKeys, error)) {
-	d.publicKeyProvider = p
-}
-
-func (d *depInject) MyPublicKey() func() (multibls.PublicKeys, error) {
-	return d.publicKeyProvider
-}
-
 // NewDecider ..
 func NewDecider(p Policy, shardID uint32) Decider {
-	signatureStore := newBallotsBackedSignatureReader()
-	deps := &depInject{}
-	c := &composite{deps, deps, signatureStore}
 	switch p {
 	case SuperMajorityVote:
 		return &uniformVoteWeight{
-			DependencyInjectionWriter:  c.DependencyInjectionWriter,
-			DependencyInjectionReader:  c.DependencyInjectionReader,
-			SignatureReader:            c,
+			SignatureReader:            newBallotsBackedSignatureReader(),
 			lastPowerSignersCountCache: make(map[Phase]int64),
 		}
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
-			SignatureReader:           c.SignatureReader,
-			DependencyInjectionWriter: c.DependencyInjectionWriter,
-			DependencyInjectionReader: c.DependencyInjectionWriter.(DependencyInjectionReader),
-			roster:                    *votepower.NewRoster(shardID),
-			voteTally:                 newVoteTally(),
-			lastPower:                 make(map[Phase]numeric.Dec),
+			SignatureReader: newBallotsBackedSignatureReader(),
+			roster:          *votepower.NewRoster(shardID),
+			voteTally:       newVoteTally(),
+			lastPower:       make(map[Phase]numeric.Dec),
 		}
 	default:
 		// Should not be possible

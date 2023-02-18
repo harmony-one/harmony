@@ -3,6 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
 
 	goversion "github.com/hashicorp/go-version"
 	"github.com/pelletier/go-toml"
@@ -220,4 +223,174 @@ func init() {
 		confTree.Set("Version", "2.5.0")
 		return confTree
 	}
+
+	migrations["2.5.0"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("TxPool.AccountSlots") == nil {
+			confTree.Set("TxPool.AccountSlots", defaultConfig.TxPool.AccountSlots)
+		}
+
+		confTree.Set("Version", "2.5.1")
+		return confTree
+	}
+
+	migrations["2.5.1"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.DisablePrivateIPScan") == nil {
+			confTree.Set("P2P.DisablePrivateIPScan", defaultConfig.P2P.DisablePrivateIPScan)
+		}
+
+		confTree.Set("Version", "2.5.2")
+		return confTree
+	}
+
+	migrations["2.5.2"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("RPCOpt.EthRPCsEnabled") == nil {
+			confTree.Set("RPCOpt.EthRPCsEnabled", defaultConfig.RPCOpt.EthRPCsEnabled)
+		}
+
+		if confTree.Get("RPCOpt.StakingRPCsEnabled") == nil {
+			confTree.Set("RPCOpt.StakingRPCsEnabled", defaultConfig.RPCOpt.StakingRPCsEnabled)
+		}
+
+		if confTree.Get("RPCOpt.LegacyRPCsEnabled") == nil {
+			confTree.Set("RPCOpt.LegacyRPCsEnabled", defaultConfig.RPCOpt.LegacyRPCsEnabled)
+		}
+
+		if confTree.Get("RPCOpt.RpcFilterFile") == nil {
+			confTree.Set("RPCOpt.RpcFilterFile", defaultConfig.RPCOpt.RpcFilterFile)
+		}
+
+		confTree.Set("Version", "2.5.3")
+		return confTree
+	}
+
+	migrations["2.5.3"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("TxPool.AllowedTxsFile") == nil {
+			confTree.Set("TxPool.AllowedTxsFile", defaultConfig.TxPool.AllowedTxsFile)
+		}
+		confTree.Set("Version", "2.5.4")
+		return confTree
+	}
+
+	migrations["2.5.4"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("TxPool.GlobalSlots") == nil {
+			confTree.Set("TxPool.GlobalSlots", defaultConfig.TxPool.GlobalSlots)
+		}
+		confTree.Set("Version", "2.5.5")
+		return confTree
+	}
+
+	migrations["2.5.5"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("Log.Console") == nil {
+			confTree.Set("Log.Console", defaultConfig.Log.Console)
+		}
+		confTree.Set("Version", "2.5.6")
+		return confTree
+	}
+
+	migrations["2.5.6"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.MaxPeers") == nil {
+			confTree.Set("P2P.MaxPeers", defaultConfig.P2P.MaxPeers)
+		}
+		confTree.Set("Version", "2.5.7")
+		return confTree
+	}
+	migrations["2.5.7"] = func(confTree *toml.Tree) *toml.Tree {
+		confTree.Delete("DNSSync.LegacySyncing")
+
+		confTree.Set("Version", "2.5.8")
+		return confTree
+	}
+
+	migrations["2.5.8"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("Sync.StagedSync") == nil {
+			confTree.Set("Sync.StagedSync", defaultConfig.Sync.StagedSync)
+			confTree.Set("Sync.StagedSyncCfg", defaultConfig.Sync.StagedSyncCfg)
+		}
+		confTree.Set("Version", "2.5.9")
+		return confTree
+	}
+
+	migrations["2.5.9"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.WaitForEachPeerToConnect") == nil {
+			confTree.Set("P2P.WaitForEachPeerToConnect", defaultConfig.P2P.WaitForEachPeerToConnect)
+		}
+		confTree.Set("Version", "2.5.10")
+		return confTree
+	}
+
+	migrations["2.5.10"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.ConnManagerLowWatermark") == nil {
+			confTree.Set("P2P.ConnManagerLowWatermark", defaultConfig.P2P.ConnManagerLowWatermark)
+		}
+		if confTree.Get("P2P.ConnManagerHighWatermark") == nil {
+			confTree.Set("P2P.ConnManagerHighWatermark", defaultConfig.P2P.ConnManagerHighWatermark)
+		}
+		if confTree.Get("Sync.MaxAdvertiseWaitTime") == nil {
+			confTree.Set("Sync.MaxAdvertiseWaitTime", defaultConfig.Sync.MaxAdvertiseWaitTime)
+		}
+		confTree.Set("Version", "2.5.11")
+		return confTree
+	}
+
+	migrations["2.5.11"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("General.TriesInMemory") == nil {
+			confTree.Set("General.TriesInMemory", defaultConfig.General.TriesInMemory)
+		}
+		confTree.Set("Version", "2.5.12")
+		return confTree
+	}
+
+	// check that the latest version here is the same as in default.go
+	largestKey := getNextVersion(migrations)
+	if largestKey != tomlConfigVersion {
+		panic(fmt.Sprintf("next migration value: %s, toml version: %s", largestKey, tomlConfigVersion))
+	}
+}
+
+func getNextVersion(x map[string]configMigrationFunc) string {
+	versionMap := make(map[string]interface{}, 1)
+	versionMap["Version"] = "FakeVersion"
+	tree, _ := toml.TreeFromMap(versionMap)
+
+	// needs to be sorted in case the order is incorrect
+	keys := make([]string, len(x))
+	i := 0
+	for k := range x {
+		keys[i] = k
+		i++
+	}
+	// sorting keys (versions)
+	// each key is in format "x.x.x". Normal sort won't work if the versions
+	// don't have same number of digits, for example 1.02.10 and 1.2.9
+	// so, we need a custom sort
+	sort.Slice(keys, func(i, j int) bool {
+		v1 := keys[i]
+		v2 := keys[j]
+		v1Parts := strings.Split(v1, ".")
+		v2Parts := strings.Split(v2, ".")
+		if len(v1Parts) > len(v2Parts) {
+			return true
+		} else if len(v1Parts) < len(v2Parts) {
+			return false
+		}
+		for i := 0; i < len(v1Parts); i++ {
+			n1, err1 := strconv.ParseInt(v1Parts[i], 10, 32)
+			if err1 != nil {
+				panic("wrong version format")
+			}
+			n2, err2 := strconv.ParseInt(v2Parts[i], 10, 32)
+			if err2 != nil {
+				panic("wrong version format")
+			}
+			if n1 > n2 {
+				return true
+			} else if n1 < n2 {
+				return false
+			}
+		}
+		return false
+	})
+	requiredFunc := x[keys[0]]
+	tree = requiredFunc(tree)
+	return tree.Get("Version").(string)
 }

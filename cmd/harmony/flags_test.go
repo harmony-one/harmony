@@ -35,11 +35,12 @@ func TestHarmonyFlags(t *testing.T) {
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
-					NodeType:   "validator",
-					NoStaking:  false,
-					ShardID:    -1,
-					IsArchival: false,
-					DataDir:    "./",
+					NodeType:      "validator",
+					NoStaking:     false,
+					ShardID:       -1,
+					IsArchival:    false,
+					DataDir:       "./",
+					TriesInMemory: 128,
 				},
 				Network: harmonyconfig.NetworkConfig{
 					NetworkType: "mainnet",
@@ -58,11 +59,16 @@ func TestHarmonyFlags(t *testing.T) {
 					ServerPort: nodeconfig.DefaultDNSPort,
 				},
 				P2P: harmonyconfig.P2pConfig{
-					Port:            9000,
-					IP:              defaultConfig.P2P.IP,
-					KeyFile:         defaultConfig.P2P.KeyFile,
-					DiscConcurrency: 5,
-					MaxConnsPerIP:   5,
+					Port:                     9000,
+					IP:                       defaultConfig.P2P.IP,
+					KeyFile:                  defaultConfig.P2P.KeyFile,
+					DiscConcurrency:          5,
+					MaxConnsPerIP:            5,
+					DisablePrivateIPScan:     false,
+					MaxPeers:                 defaultConfig.P2P.MaxPeers,
+					ConnManagerLowWatermark:  defaultConfig.P2P.ConnManagerLowWatermark,
+					ConnManagerHighWatermark: defaultConfig.P2P.ConnManagerHighWatermark,
+					WaitForEachPeerToConnect: false,
 				},
 				HTTP: harmonyconfig.HttpConfig{
 					Enabled:        true,
@@ -73,9 +79,13 @@ func TestHarmonyFlags(t *testing.T) {
 					RosettaPort:    9700,
 				},
 				RPCOpt: harmonyconfig.RpcOptConfig{
-					DebugEnabled:      false,
-					RateLimterEnabled: true,
-					RequestsPerSecond: 1000,
+					DebugEnabled:       false,
+					EthRPCsEnabled:     true,
+					StakingRPCsEnabled: true,
+					LegacyRPCsEnabled:  true,
+					RpcFilterFile:      "./.hmy/rpc_filter.txt",
+					RateLimterEnabled:  true,
+					RequestsPerSecond:  1000,
 				},
 				WS: harmonyconfig.WsConfig{
 					Enabled:  true,
@@ -100,7 +110,12 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
-					BlacklistFile: "./.hmy/blacklist.txt",
+					BlacklistFile:     "./.hmy/blacklist.txt",
+					AllowedTxsFile:    "./.hmy/allowedtxs.txt",
+					RosettaFixFile:    "",
+					AccountSlots:      16,
+					GlobalSlots:       5120,
+					LocalAccountsFile: "./.hmy/locals.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -111,6 +126,7 @@ func TestHarmonyFlags(t *testing.T) {
 					ProfileDebugValues: []int{0},
 				},
 				Log: harmonyconfig.LogConfig{
+					Console:      false,
 					Folder:       "./latest",
 					FileName:     "validator-8.8.8.8-9000.log",
 					RotateSize:   100,
@@ -139,6 +155,13 @@ func TestHarmonyFlags(t *testing.T) {
 					Gateway:    "https://gateway.harmony.one",
 				},
 				Sync: defaultMainnetSyncConfig,
+				ShardData: harmonyconfig.ShardDataConfig{
+					EnableShardData: false,
+					DiskCount:       8,
+					ShardCount:      4,
+					CacheTime:       10,
+					CacheSize:       512,
+				},
 			},
 		},
 	}
@@ -164,63 +187,80 @@ func TestGeneralFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:   "validator",
-				NoStaking:  false,
-				ShardID:    -1,
-				IsArchival: false,
-				DataDir:    "./",
+				NodeType:      "validator",
+				NoStaking:     false,
+				ShardID:       -1,
+				IsArchival:    false,
+				DataDir:       "./",
+				TriesInMemory: 128,
 			},
 		},
 		{
 			args: []string{"--run", "explorer", "--run.legacy", "--run.shard=0",
 				"--run.archive=true", "--datadir=./.hmy"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:   "explorer",
-				NoStaking:  true,
-				ShardID:    0,
-				IsArchival: true,
-				DataDir:    "./.hmy",
+				NodeType:      "explorer",
+				NoStaking:     true,
+				ShardID:       0,
+				IsArchival:    true,
+				DataDir:       "./.hmy",
+				TriesInMemory: 128,
 			},
 		},
 		{
 			args: []string{"--node_type", "explorer", "--staking", "--shard_id", "0",
 				"--is_archival", "--db_dir", "./"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:   "explorer",
-				NoStaking:  false,
-				ShardID:    0,
-				IsArchival: true,
-				DataDir:    "./",
+				NodeType:      "explorer",
+				NoStaking:     false,
+				ShardID:       0,
+				IsArchival:    true,
+				DataDir:       "./",
+				TriesInMemory: 128,
 			},
 		},
 		{
 			args: []string{"--staking=false", "--is_archival=false"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:   "validator",
-				NoStaking:  true,
-				ShardID:    -1,
-				IsArchival: false,
-				DataDir:    "./",
+				NodeType:      "validator",
+				NoStaking:     true,
+				ShardID:       -1,
+				IsArchival:    false,
+				DataDir:       "./",
+				TriesInMemory: 128,
 			},
 		},
 		{
 			args: []string{"--run", "explorer", "--run.shard", "0"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:   "explorer",
-				NoStaking:  false,
-				ShardID:    0,
-				IsArchival: false,
-				DataDir:    "./",
+				NodeType:      "explorer",
+				NoStaking:     false,
+				ShardID:       0,
+				IsArchival:    false,
+				DataDir:       "./",
+				TriesInMemory: 128,
 			},
 		},
 		{
 			args: []string{"--run", "explorer", "--run.shard", "0", "--run.archive=false"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:   "explorer",
-				NoStaking:  false,
-				ShardID:    0,
-				IsArchival: false,
-				DataDir:    "./",
+				NodeType:      "explorer",
+				NoStaking:     false,
+				ShardID:       0,
+				IsArchival:    false,
+				DataDir:       "./",
+				TriesInMemory: 128,
+			},
+		},
+		{
+			args: []string{"--blockchain.tries_in_memory", "64"},
+			expConfig: harmonyconfig.GeneralConfig{
+				NodeType:      "validator",
+				NoStaking:     false,
+				ShardID:       -1,
+				IsArchival:    false,
+				DataDir:       "./",
+				TriesInMemory: 64,
 			},
 		},
 	}
@@ -276,11 +316,10 @@ func TestNetworkFlags(t *testing.T) {
 					BootNodes:   []string{"1", "2", "3", "4"},
 				},
 				DNSSync: harmonyconfig.DnsSync{
-					Port:          9001,
-					Zone:          "8.8.8.8",
-					LegacySyncing: false,
-					Server:        true,
-					ServerPort:    9002,
+					Port:       9001,
+					Zone:       "8.8.8.8",
+					Server:     true,
+					ServerPort: 9002,
 				},
 			},
 		},
@@ -293,28 +332,10 @@ func TestNetworkFlags(t *testing.T) {
 					BootNodes:   []string{"1", "2", "3", "4"},
 				},
 				DNSSync: harmonyconfig.DnsSync{
-					Port:          9001,
-					Zone:          "8.8.8.8",
-					LegacySyncing: false,
-					Server:        true,
-					ServerPort:    nodeconfig.GetDefaultDNSPort(nodeconfig.Pangaea),
-				},
-			},
-		},
-		{
-			args: []string{"--dns=false"},
-			expConfig: harmonyconfig.HarmonyConfig{
-				Network: harmonyconfig.NetworkConfig{
-					NetworkType: defNetworkType,
-					BootNodes:   nodeconfig.GetDefaultBootNodes(defNetworkType),
-				},
-				DNSSync: harmonyconfig.DnsSync{
-					Port:          nodeconfig.GetDefaultDNSPort(defNetworkType),
-					Zone:          nodeconfig.GetDefaultDNSZone(defNetworkType),
-					LegacySyncing: true,
-					Client:        true,
-					Server:        true,
-					ServerPort:    nodeconfig.GetDefaultDNSPort(nodeconfig.Pangaea),
+					Port:       9001,
+					Zone:       "8.8.8.8",
+					Server:     true,
+					ServerPort: nodeconfig.GetDefaultDNSPort(nodeconfig.Pangaea),
 				},
 			},
 		},
@@ -366,30 +387,105 @@ func TestP2PFlags(t *testing.T) {
 			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file", "--p2p.dht.datastore",
 				defDataStore},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:          9001,
-				IP:            nodeconfig.DefaultPublicListenIP,
-				KeyFile:       "./key.file",
-				DHTDataStore:  &defDataStore,
-				MaxConnsPerIP: 10,
+				Port:                     9001,
+				IP:                       nodeconfig.DefaultPublicListenIP,
+				KeyFile:                  "./key.file",
+				DHTDataStore:             &defDataStore,
+				MaxConnsPerIP:            10,
+				DisablePrivateIPScan:     false,
+				MaxPeers:                 defaultConfig.P2P.MaxPeers,
+				ConnManagerLowWatermark:  defaultConfig.P2P.ConnManagerLowWatermark,
+				ConnManagerHighWatermark: defaultConfig.P2P.ConnManagerHighWatermark,
+				WaitForEachPeerToConnect: false,
 			},
 		},
 		{
 			args: []string{"--port", "9001", "--key", "./key.file"},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:          9001,
-				IP:            nodeconfig.DefaultPublicListenIP,
-				KeyFile:       "./key.file",
-				MaxConnsPerIP: 10,
+				Port:                     9001,
+				IP:                       nodeconfig.DefaultPublicListenIP,
+				KeyFile:                  "./key.file",
+				MaxConnsPerIP:            10,
+				DisablePrivateIPScan:     false,
+				MaxPeers:                 defaultConfig.P2P.MaxPeers,
+				ConnManagerLowWatermark:  defaultConfig.P2P.ConnManagerLowWatermark,
+				ConnManagerHighWatermark: defaultConfig.P2P.ConnManagerHighWatermark,
+				WaitForEachPeerToConnect: false,
 			},
 		},
 		{
 			args: []string{"--p2p.port", "9001", "--p2p.disc.concurrency", "5", "--p2p.security.max-conn-per-ip", "5"},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:            9001,
-				IP:              nodeconfig.DefaultPublicListenIP,
-				KeyFile:         "./.hmykey",
-				DiscConcurrency: 5,
-				MaxConnsPerIP:   5,
+				Port:                     9001,
+				IP:                       nodeconfig.DefaultPublicListenIP,
+				KeyFile:                  "./.hmykey",
+				DiscConcurrency:          5,
+				MaxConnsPerIP:            5,
+				DisablePrivateIPScan:     false,
+				MaxPeers:                 defaultConfig.P2P.MaxPeers,
+				ConnManagerLowWatermark:  defaultConfig.P2P.ConnManagerLowWatermark,
+				ConnManagerHighWatermark: defaultConfig.P2P.ConnManagerHighWatermark,
+				WaitForEachPeerToConnect: false,
+			},
+		},
+		{
+			args: []string{"--p2p.no-private-ip-scan"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:                     nodeconfig.DefaultP2PPort,
+				IP:                       nodeconfig.DefaultPublicListenIP,
+				KeyFile:                  "./.hmykey",
+				DiscConcurrency:          nodeconfig.DefaultP2PConcurrency,
+				MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
+				DisablePrivateIPScan:     true,
+				MaxPeers:                 defaultConfig.P2P.MaxPeers,
+				ConnManagerLowWatermark:  defaultConfig.P2P.ConnManagerLowWatermark,
+				ConnManagerHighWatermark: defaultConfig.P2P.ConnManagerHighWatermark,
+				WaitForEachPeerToConnect: false,
+			},
+		},
+		{
+			args: []string{"--p2p.security.max-peers", "100"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:                     nodeconfig.DefaultP2PPort,
+				IP:                       nodeconfig.DefaultPublicListenIP,
+				KeyFile:                  "./.hmykey",
+				DiscConcurrency:          nodeconfig.DefaultP2PConcurrency,
+				MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
+				DisablePrivateIPScan:     defaultConfig.P2P.DisablePrivateIPScan,
+				MaxPeers:                 100,
+				ConnManagerLowWatermark:  defaultConfig.P2P.ConnManagerLowWatermark,
+				ConnManagerHighWatermark: defaultConfig.P2P.ConnManagerHighWatermark,
+				WaitForEachPeerToConnect: false,
+			},
+		},
+		{
+			args: []string{"--p2p.connmgr-low", "100"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:                     nodeconfig.DefaultP2PPort,
+				IP:                       nodeconfig.DefaultPublicListenIP,
+				KeyFile:                  "./.hmykey",
+				DiscConcurrency:          nodeconfig.DefaultP2PConcurrency,
+				MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
+				DisablePrivateIPScan:     defaultConfig.P2P.DisablePrivateIPScan,
+				MaxPeers:                 defaultConfig.P2P.MaxPeers,
+				ConnManagerLowWatermark:  100,
+				ConnManagerHighWatermark: defaultConfig.P2P.ConnManagerHighWatermark,
+				WaitForEachPeerToConnect: false,
+			},
+		},
+		{
+			args: []string{"--p2p.connmgr-high", "400"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:                     nodeconfig.DefaultP2PPort,
+				IP:                       nodeconfig.DefaultPublicListenIP,
+				KeyFile:                  "./.hmykey",
+				DiscConcurrency:          nodeconfig.DefaultP2PConcurrency,
+				MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
+				DisablePrivateIPScan:     defaultConfig.P2P.DisablePrivateIPScan,
+				MaxPeers:                 defaultConfig.P2P.MaxPeers,
+				ConnManagerLowWatermark:  defaultConfig.P2P.ConnManagerLowWatermark,
+				ConnManagerHighWatermark: 400,
+				WaitForEachPeerToConnect: false,
 			},
 		},
 	}
@@ -596,36 +692,104 @@ func TestRPCOptFlags(t *testing.T) {
 		{
 			args: []string{"--rpc.debug"},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      true,
-				RateLimterEnabled: true,
-				RequestsPerSecond: 1000,
+				DebugEnabled:       true,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.eth=false"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     false,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.staking=false"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: false,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.legacy=false"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  false,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.filterspath=./rmf.toml"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./rmf.toml",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
 			},
 		},
 
 		{
 			args: []string{},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      false,
-				RateLimterEnabled: true,
-				RequestsPerSecond: 1000,
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
 			},
 		},
 
 		{
 			args: []string{"--rpc.ratelimiter", "--rpc.ratelimit", "2000"},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      false,
-				RateLimterEnabled: true,
-				RequestsPerSecond: 2000,
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  2000,
 			},
 		},
 
 		{
 			args: []string{"--rpc.ratelimiter=false", "--rpc.ratelimit", "2000"},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      false,
-				RateLimterEnabled: false,
-				RequestsPerSecond: 2000,
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  false,
+				RequestsPerSecond:  2000,
 			},
 		},
 	}
@@ -777,19 +941,67 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile: defaultConfig.TxPool.BlacklistFile,
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
 			},
 		},
 		{
-			args: []string{"--txpool.blacklist", "blacklist.file"},
+			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file", "--txpool.allowedtxs", "allowedtxs.txt"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile: "blacklist.file",
+				BlacklistFile:     "blacklist.file",
+				AllowedTxsFile:    "allowedtxs.txt",
+				RosettaFixFile:    "rosettafix.file",
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
-			args: []string{"--blacklist", "blacklist.file"},
+			args: []string{"--blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile: "blacklist.file",
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+			},
+		},
+		{
+			args: []string{"--txpool.accountslots", "5", "--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				AccountSlots:      5,
+				BlacklistFile:     "blacklist.file",
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
+				RosettaFixFile:    "rosettafix.file",
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+			},
+		},
+		{
+			args: []string{"--txpool.locals", "locals.txt"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: "locals.txt",
+				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+			},
+		},
+		{
+			args: []string{"--txpool.globalslots", "10240"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+				GlobalSlots:       10240,
 			},
 		},
 	}
@@ -935,6 +1147,7 @@ func TestLogFlags(t *testing.T) {
 		{
 			args: []string{"--log.ctx.ip", "8.8.8.8", "--log.ctx.port", "9001"},
 			expConfig: harmonyconfig.LogConfig{
+				Console:       defaultConfig.Log.Console,
 				Folder:        defaultConfig.Log.Folder,
 				FileName:      defaultConfig.Log.FileName,
 				RotateSize:    defaultConfig.Log.RotateSize,
@@ -1198,6 +1411,7 @@ func TestSyncFlags(t *testing.T) {
 				cfgSync := defaultMainnetSyncConfig
 				cfgSync.Enabled = true
 				cfgSync.Downloader = true
+				cfgSync.StagedSync = false
 				cfgSync.Concurrency = 10
 				cfgSync.MinPeers = 10
 				cfgSync.InitStreams = 10
@@ -1223,6 +1437,52 @@ func TestSyncFlags(t *testing.T) {
 		}
 		if !reflect.DeepEqual(hc.Sync, test.expConfig) {
 			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Sync, test.expConfig)
+		}
+
+		ts.tearDown()
+	}
+}
+
+func TestShardDataFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig harmonyconfig.ShardDataConfig
+		expErr    error
+	}{
+		{
+			args:      []string{},
+			expConfig: defaultConfig.ShardData,
+		},
+		{
+			args: []string{"--sharddata.enable",
+				"--sharddata.disk_count", "8",
+				"--sharddata.shard_count", "4",
+				"--sharddata.cache_time", "10",
+				"--sharddata.cache_size", "512",
+			},
+			expConfig: harmonyconfig.ShardDataConfig{
+				EnableShardData: true,
+				DiskCount:       8,
+				ShardCount:      4,
+				CacheTime:       10,
+				CacheSize:       512,
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, shardDataFlags, func(command *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+			applyShardDataFlags(command, config)
+		})
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		if !reflect.DeepEqual(hc.ShardData, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.ShardData, test.expConfig)
 		}
 
 		ts.tearDown()

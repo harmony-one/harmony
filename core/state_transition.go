@@ -17,21 +17,16 @@
 package core
 
 import (
-	"bytes"
 	"fmt"
-	"math"
 	"math/big"
-	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking2 "github.com/harmony-one/harmony/staking"
-	stakingReward "github.com/harmony-one/harmony/staking/reward"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/shard"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
@@ -62,8 +57,10 @@ The state transitioning model does all the necessary work to work out a valid ne
 3) Create a new state object if the recipient is \0*32
 4) Value transfer
 == If contract creation ==
-  4a) Attempt to run transaction data
-  4b) If valid, use result as code for the new state object
+
+	4a) Attempt to run transaction data
+	4b) If valid, use result as code for the new state object
+
 == end ==
 5) Run Script section
 6) Derive new state root
@@ -130,45 +127,6 @@ func (result *ExecutionResult) Revert() []byte {
 		return nil
 	}
 	return common.CopyBytes(result.ReturnData)
-}
-
-// IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, contractCreation, homestead, istanbul, isValidatorCreation bool) (uint64, error) {
-	// Set the starting gas for the raw transaction
-	var gas uint64
-	if contractCreation && homestead {
-		gas = params.TxGasContractCreation
-	} else if isValidatorCreation {
-		gas = params.TxGasValidatorCreation
-	} else {
-		gas = params.TxGas
-	}
-	// Bump the required gas by the amount of transactional data
-	if len(data) > 0 {
-		// Zero and non-zero bytes are priced differently
-		var nz uint64
-		for _, byt := range data {
-			if byt != 0 {
-				nz++
-			}
-		}
-		// Make sure we don't exceed uint64 for all data combinations
-		nonZeroGas := params.TxDataNonZeroGasFrontier
-		if istanbul {
-			nonZeroGas = params.TxDataNonZeroGasEIP2028
-		}
-		if (math.MaxUint64-gas)/nonZeroGas < nz {
-			return 0, vm.ErrOutOfGas
-		}
-		gas += nz * nonZeroGas
-
-		z := uint64(len(data)) - nz
-		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
-			return 0, vm.ErrOutOfGas
-		}
-		gas += z * params.TxDataZeroGas
-	}
-	return gas, nil
 }
 
 // NewStateTransition initialises and returns a new state transition object.
@@ -264,7 +222,7 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, contractCreation, homestead, istanbul, false)
+	gas, err := vm.IntrinsicGas(st.data, contractCreation, homestead, istanbul, false)
 	if err != nil {
 		return ExecutionResult{}, err
 	}
@@ -296,12 +254,7 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 		}
 	}
 	st.refundGas()
-
-	// Burn Txn Fees after staking epoch
-	if !st.evm.ChainConfig().IsStaking(st.evm.EpochNumber) {
-		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
-		st.state.AddBalance(st.evm.Coinbase, txFee)
-	}
+	st.collectGas()
 
 	return ExecutionResult{
 		ReturnData: ret,
@@ -327,6 +280,18 @@ func (st *StateTransition) refundGas() {
 	st.gp.AddGas(st.gas)
 }
 
+func (st *StateTransition) collectGas() {
+	// Burn Txn Fees after staking epoch
+	if config := st.evm.ChainConfig(); !config.IsStaking(st.evm.EpochNumber) {
+		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
+		st.state.AddBalance(st.evm.Coinbase, txFee)
+	} else if config.IsFeeCollectEpoch(st.evm.EpochNumber) { // collect Txn Fees to community-managed account.
+		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
+		txFeeCollector := shard.Schedule.InstanceForEpoch(st.evm.EpochNumber).FeeCollector()
+		st.state.AddBalance(txFeeCollector, txFee)
+	}
+}
+
 // gasUsed returns the amount of gas used up by the state transition.
 func (st *StateTransition) gasUsed() uint64 {
 	return st.initialGas - st.gas
@@ -346,7 +311,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.EpochNumber)
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, false, homestead, istanbul, msg.Type() == types.StakeCreateVal)
+	gas, err := vm.IntrinsicGas(st.data, false, homestead, istanbul, msg.Type() == types.StakeCreateVal)
 
 	if err != nil {
 		return 0, err
@@ -358,9 +323,13 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	// Increment the nonce for the next transaction
 	st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 
+	// from worker.go, we get here with shardID == BeaconChainShardID
+	// from node_handler.go, via blockchain.go => it is checked that block shard == node shard
+	// same via consensus
+	// so only possible to reach here if shardID == BeaconChainShardID (no need to check further)
 	switch msg.Type() {
 	case types.StakeCreateVal:
-		stkMsg := &staking.CreateValidator{}
+		stkMsg := &stakingTypes.CreateValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
@@ -369,9 +338,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.ValidatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.verifyAndApplyCreateValidatorTx(stkMsg, msg.BlockNum())
+		err = st.evm.CreateValidator(st.evm.StateDB, nil, stkMsg)
 	case types.StakeEditVal:
-		stkMsg := &staking.EditValidator{}
+		stkMsg := &stakingTypes.EditValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
@@ -380,9 +349,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.ValidatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.verifyAndApplyEditValidatorTx(stkMsg, msg.BlockNum())
+		err = st.evm.EditValidator(st.evm.StateDB, nil, stkMsg)
 	case types.Delegate:
-		stkMsg := &staking.Delegate{}
+		stkMsg := &stakingTypes.Delegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
@@ -390,9 +359,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.DelegatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.verifyAndApplyDelegateTx(stkMsg)
+		err = st.evm.Delegate(st.evm.StateDB, nil, stkMsg)
 	case types.Undelegate:
-		stkMsg := &staking.Undelegate{}
+		stkMsg := &stakingTypes.Undelegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
@@ -400,9 +369,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.DelegatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.verifyAndApplyUndelegateTx(stkMsg)
+		err = st.evm.Undelegate(st.evm.StateDB, nil, stkMsg)
 	case types.CollectRewards:
-		stkMsg := &staking.CollectRewards{}
+		stkMsg := &stakingTypes.CollectRewards{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
@@ -410,143 +379,12 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.DelegatorAddress {
 			return 0, errInvalidSigner
 		}
-		_, err = st.verifyAndApplyCollectRewards(stkMsg)
+		err = st.evm.CollectRewards(st.evm.StateDB, nil, stkMsg)
 	default:
-		return 0, staking.ErrInvalidStakingKind
+		return 0, stakingTypes.ErrInvalidStakingKind
 	}
 	st.refundGas()
-
-	// Burn Txn Fees
-	//txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
-	//st.state.AddBalance(st.evm.Coinbase, txFee)
+	st.collectGas()
 
 	return st.gasUsed(), err
-}
-
-func (st *StateTransition) verifyAndApplyCreateValidatorTx(
-	createValidator *staking.CreateValidator, blockNum *big.Int,
-) error {
-	wrapper, err := VerifyAndCreateValidatorFromMsg(
-		st.state, st.bc, st.evm.EpochNumber, blockNum, createValidator,
-	)
-	if err != nil {
-		return err
-	}
-	// since createValidator is not accessible to smart contracts
-	// it should not be reversible (to save resources)
-	// but it would be trivial to enable it later
-	if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
-		return err
-	}
-	st.state.SetValidatorFlag(createValidator.ValidatorAddress)
-	st.state.SubBalance(createValidator.ValidatorAddress, createValidator.Amount)
-	return nil
-}
-
-func (st *StateTransition) verifyAndApplyEditValidatorTx(
-	editValidator *staking.EditValidator, blockNum *big.Int,
-) error {
-	wrapper, err := VerifyAndEditValidatorFromMsg(
-		st.state, st.bc, st.evm.EpochNumber, blockNum, editValidator,
-	)
-	if err != nil {
-		return err
-	}
-	// since editValidator is not accessible to smart contracts
-	// it should not be reversible (to save resources)
-	// but it would be trivial to enable it later
-	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
-}
-
-func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) error {
-	delegations, err := st.bc.ReadDelegationsByDelegator(delegate.DelegatorAddress)
-	if err != nil {
-		return err
-	}
-	updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, err := VerifyAndDelegateFromMsg(
-		st.state, st.evm.EpochNumber, delegate, delegations, st.evm.ChainConfig())
-	if err != nil {
-		return err
-	}
-
-	for _, wrapper := range updatedValidatorWrappers {
-		if err := st.state.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
-			return err
-		}
-	}
-
-	st.state.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
-
-	if len(fromLockedTokens) > 0 {
-		sortedKeys := []common.Address{}
-		for key := range fromLockedTokens {
-			sortedKeys = append(sortedKeys, key)
-		}
-		sort.SliceStable(sortedKeys, func(i, j int) bool {
-			return bytes.Compare(sortedKeys[i][:], sortedKeys[j][:]) < 0
-		})
-		// Add log if everything is good
-		for _, key := range sortedKeys {
-			redelegatedToken, ok := fromLockedTokens[key]
-			if !ok {
-				return errors.New("Key missing for delegation receipt")
-			}
-			encodedRedelegationData := []byte{}
-			addrBytes := key.Bytes()
-			encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
-			encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
-			// The data field format is:
-			// [first 20 bytes]: Validator address from which the locked token is used for redelegation.
-			// [rest of the bytes]: the bigInt serialized bytes for the token amount.
-			st.state.AddLog(&types.Log{
-				Address:     delegate.DelegatorAddress,
-				Topics:      []common.Hash{staking2.DelegateTopic},
-				Data:        encodedRedelegationData,
-				BlockNumber: st.evm.BlockNumber.Uint64(),
-			})
-		}
-	}
-	return nil
-}
-
-func (st *StateTransition) verifyAndApplyUndelegateTx(
-	undelegate *staking.Undelegate,
-) error {
-	wrapper, err := VerifyAndUndelegateFromMsg(st.state, st.evm.EpochNumber, undelegate)
-	if err != nil {
-		return err
-	}
-	return st.state.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper)
-}
-
-func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.CollectRewards) (*big.Int, error) {
-	if st.bc == nil {
-		return stakingReward.None, errors.New("[CollectRewards] No chain context provided")
-	}
-	delegations, err := st.bc.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
-	if err != nil {
-		return stakingReward.None, err
-	}
-	updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
-		st.state, delegations,
-	)
-	if err != nil {
-		return stakingReward.None, err
-	}
-	for _, wrapper := range updatedValidatorWrappers {
-		if err := st.state.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
-			return stakingReward.None, err
-		}
-	}
-	st.state.AddBalance(collectRewards.DelegatorAddress, totalRewards)
-
-	// Add log if everything is good
-	st.state.AddLog(&types.Log{
-		Address:     collectRewards.DelegatorAddress,
-		Topics:      []common.Hash{staking2.CollectRewardsTopic},
-		Data:        totalRewards.Bytes(),
-		BlockNumber: st.evm.BlockNumber.Uint64(),
-	})
-
-	return totalRewards, nil
 }

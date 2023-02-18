@@ -36,197 +36,244 @@ var once sync.Once
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:                    MainnetChainID,
-		EthCompatibleChainID:       EthMainnetShard0ChainID,
-		EthCompatibleShard0ChainID: EthMainnetShard0ChainID,
-		EthCompatibleEpoch:         big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
-		CrossTxEpoch:               big.NewInt(28),
-		CrossLinkEpoch:             big.NewInt(186),
-		AggregatedRewardEpoch:      big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
-		StakingEpoch:               big.NewInt(186),
-		PreStakingEpoch:            big.NewInt(185),
-		QuickUnlockEpoch:           big.NewInt(191),
-		FiveSecondsEpoch:           big.NewInt(230),
-		TwoSecondsEpoch:            big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
-		SixtyPercentEpoch:          big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
-		RedelegationEpoch:          big.NewInt(290),
-		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
-		VRFEpoch:                   big.NewInt(631), // Around Wed July 7th 2021
-		PrevVRFEpoch:               big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
-		MinDelegation100Epoch:      big.NewInt(631), // Around Wed July 7th 2021
-		MinCommissionRateEpoch:     big.NewInt(631), // Around Wed July 7th 2021
-		MinCommissionPromoPeriod:   big.NewInt(100),
-		EPoSBound35Epoch:           big.NewInt(631), // Around Wed July 7th 2021
-		EIP155Epoch:                big.NewInt(28),
-		S3Epoch:                    big.NewInt(28),
-		DataCopyFixEpoch:           big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
-		IstanbulEpoch:              big.NewInt(314),
-		ReceiptLogEpoch:            big.NewInt(101),
-		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
-		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
+		ChainID:                       MainnetChainID,
+		EthCompatibleChainID:          EthMainnetShard0ChainID,
+		EthCompatibleShard0ChainID:    EthMainnetShard0ChainID,
+		EthCompatibleEpoch:            big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
+		CrossTxEpoch:                  big.NewInt(28),
+		CrossLinkEpoch:                big.NewInt(186),
+		AggregatedRewardEpoch:         big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
+		StakingEpoch:                  big.NewInt(186),
+		PreStakingEpoch:               big.NewInt(185),
+		QuickUnlockEpoch:              big.NewInt(191),
+		FiveSecondsEpoch:              big.NewInt(230),
+		TwoSecondsEpoch:               big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
+		SixtyPercentEpoch:             big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
+		RedelegationEpoch:             big.NewInt(290),
+		NoEarlyUnlockEpoch:            big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
+		VRFEpoch:                      big.NewInt(631), // Around Wed July 7th 2021
+		PrevVRFEpoch:                  big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
+		MinDelegation100Epoch:         big.NewInt(631), // Around Wed July 7th 2021
+		MinCommissionRateEpoch:        big.NewInt(631), // Around Wed July 7th 2021
+		MinCommissionPromoPeriod:      big.NewInt(100),
+		EPoSBound35Epoch:              big.NewInt(631), // Around Wed July 7th 2021
+		EIP155Epoch:                   big.NewInt(28),
+		S3Epoch:                       big.NewInt(28),
+		DataCopyFixEpoch:              big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
+		IstanbulEpoch:                 big.NewInt(314),
+		ReceiptLogEpoch:               big.NewInt(101),
+		SHA3Epoch:                     big.NewInt(725),  // Around Mon Oct 11 2021, 19:00 UTC
+		HIP6And8Epoch:                 big.NewInt(725),  // Around Mon Oct 11 2021, 19:00 UTC
+		StakingPrecompileEpoch:        big.NewInt(871),  // Around Tue Feb 11 2022
+		ChainIdFixEpoch:               big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
+		SlotsLimitedEpoch:             big.NewInt(999),  // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
+		CrossShardXferPrecompileEpoch: big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
+		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               EpochTBD,
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     64,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:                    TestnetChainID,
-		EthCompatibleChainID:       EthTestnetShard0ChainID,
-		EthCompatibleShard0ChainID: EthTestnetShard0ChainID,
-		EthCompatibleEpoch:         big.NewInt(73290),
-		CrossTxEpoch:               big.NewInt(0),
-		CrossLinkEpoch:             big.NewInt(2),
-		AggregatedRewardEpoch:      big.NewInt(74275),
-		StakingEpoch:               big.NewInt(2),
-		PreStakingEpoch:            big.NewInt(1),
-		QuickUnlockEpoch:           big.NewInt(0),
-		FiveSecondsEpoch:           big.NewInt(16500),
-		TwoSecondsEpoch:            big.NewInt(73000),
-		SixtyPercentEpoch:          big.NewInt(73282),
-		RedelegationEpoch:          big.NewInt(36500),
-		NoEarlyUnlockEpoch:         big.NewInt(73580),
-		VRFEpoch:                   big.NewInt(73880),
-		PrevVRFEpoch:               big.NewInt(74384),
-		MinDelegation100Epoch:      big.NewInt(73880),
-		MinCommissionRateEpoch:     big.NewInt(73880),
-		MinCommissionPromoPeriod:   big.NewInt(10),
-		EPoSBound35Epoch:           big.NewInt(73880),
-		EIP155Epoch:                big.NewInt(0),
-		S3Epoch:                    big.NewInt(0),
-		DataCopyFixEpoch:           big.NewInt(74412),
-		IstanbulEpoch:              big.NewInt(43800),
-		ReceiptLogEpoch:            big.NewInt(0),
-		SHA3Epoch:                  big.NewInt(74570),
-		HIP6And8Epoch:              big.NewInt(74570),
+		ChainID:                       TestnetChainID,
+		EthCompatibleChainID:          EthTestnetShard0ChainID,
+		EthCompatibleShard0ChainID:    EthTestnetShard0ChainID,
+		EthCompatibleEpoch:            big.NewInt(0),
+		CrossTxEpoch:                  big.NewInt(0),
+		CrossLinkEpoch:                big.NewInt(2),
+		AggregatedRewardEpoch:         big.NewInt(2),
+		StakingEpoch:                  big.NewInt(2),
+		PreStakingEpoch:               big.NewInt(1),
+		QuickUnlockEpoch:              big.NewInt(0),
+		FiveSecondsEpoch:              big.NewInt(0),
+		TwoSecondsEpoch:               big.NewInt(2),
+		SixtyPercentEpoch:             big.NewInt(2),
+		RedelegationEpoch:             big.NewInt(2),
+		NoEarlyUnlockEpoch:            big.NewInt(2),
+		VRFEpoch:                      big.NewInt(2),
+		PrevVRFEpoch:                  big.NewInt(2),
+		MinDelegation100Epoch:         big.NewInt(2),
+		MinCommissionRateEpoch:        big.NewInt(2),
+		MinCommissionPromoPeriod:      big.NewInt(2),
+		EPoSBound35Epoch:              big.NewInt(2),
+		EIP155Epoch:                   big.NewInt(0),
+		S3Epoch:                       big.NewInt(0),
+		DataCopyFixEpoch:              big.NewInt(0),
+		IstanbulEpoch:                 big.NewInt(0),
+		ReceiptLogEpoch:               big.NewInt(0),
+		SHA3Epoch:                     big.NewInt(0),
+		HIP6And8Epoch:                 big.NewInt(2),
+		StakingPrecompileEpoch:        big.NewInt(2),
+		SlotsLimitedEpoch:             big.NewInt(2),
+		ChainIdFixEpoch:               big.NewInt(0),
+		CrossShardXferPrecompileEpoch: big.NewInt(2),
+		AllowlistEpoch:                big.NewInt(2),
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     64,
+		FeeCollectEpoch:               EpochTBD,
 	}
-
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
-		ChainID:                    PangaeaChainID,
-		EthCompatibleChainID:       EthPangaeaShard0ChainID,
-		EthCompatibleShard0ChainID: EthPangaeaShard0ChainID,
-		EthCompatibleEpoch:         big.NewInt(0),
-		CrossTxEpoch:               big.NewInt(0),
-		CrossLinkEpoch:             big.NewInt(2),
-		AggregatedRewardEpoch:      big.NewInt(3),
-		StakingEpoch:               big.NewInt(2),
-		PreStakingEpoch:            big.NewInt(1),
-		QuickUnlockEpoch:           big.NewInt(0),
-		FiveSecondsEpoch:           big.NewInt(0),
-		TwoSecondsEpoch:            big.NewInt(0),
-		SixtyPercentEpoch:          big.NewInt(0),
-		RedelegationEpoch:          big.NewInt(0),
-		NoEarlyUnlockEpoch:         big.NewInt(0),
-		VRFEpoch:                   big.NewInt(0),
-		PrevVRFEpoch:               big.NewInt(0),
-		MinDelegation100Epoch:      big.NewInt(0),
-		MinCommissionRateEpoch:     big.NewInt(0),
-		MinCommissionPromoPeriod:   big.NewInt(10),
-		EPoSBound35Epoch:           big.NewInt(0),
-		EIP155Epoch:                big.NewInt(0),
-		S3Epoch:                    big.NewInt(0),
-		DataCopyFixEpoch:           big.NewInt(0),
-		IstanbulEpoch:              big.NewInt(0),
-		ReceiptLogEpoch:            big.NewInt(0),
-		SHA3Epoch:                  big.NewInt(0),
-		HIP6And8Epoch:              big.NewInt(0),
+		ChainID:                       PangaeaChainID,
+		EthCompatibleChainID:          EthPangaeaShard0ChainID,
+		EthCompatibleShard0ChainID:    EthPangaeaShard0ChainID,
+		EthCompatibleEpoch:            big.NewInt(0),
+		CrossTxEpoch:                  big.NewInt(0),
+		CrossLinkEpoch:                big.NewInt(2),
+		AggregatedRewardEpoch:         big.NewInt(3),
+		StakingEpoch:                  big.NewInt(2),
+		PreStakingEpoch:               big.NewInt(1),
+		QuickUnlockEpoch:              big.NewInt(0),
+		FiveSecondsEpoch:              big.NewInt(0),
+		TwoSecondsEpoch:               big.NewInt(0),
+		SixtyPercentEpoch:             big.NewInt(0),
+		RedelegationEpoch:             big.NewInt(0),
+		NoEarlyUnlockEpoch:            big.NewInt(0),
+		VRFEpoch:                      big.NewInt(0),
+		PrevVRFEpoch:                  big.NewInt(0),
+		MinDelegation100Epoch:         big.NewInt(0),
+		MinCommissionRateEpoch:        big.NewInt(0),
+		MinCommissionPromoPeriod:      big.NewInt(10),
+		EPoSBound35Epoch:              big.NewInt(0),
+		EIP155Epoch:                   big.NewInt(0),
+		S3Epoch:                       big.NewInt(0),
+		DataCopyFixEpoch:              big.NewInt(0),
+		IstanbulEpoch:                 big.NewInt(0),
+		ReceiptLogEpoch:               big.NewInt(0),
+		SHA3Epoch:                     big.NewInt(0),
+		HIP6And8Epoch:                 big.NewInt(0),
+		StakingPrecompileEpoch:        big.NewInt(2), // same as staking
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     64,
+		FeeCollectEpoch:               EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
-	// All features except for CrossLink are enabled at launch.
+	// This is the Devnet config
 	PartnerChainConfig = &ChainConfig{
-		ChainID:                    PartnerChainID,
-		EthCompatibleChainID:       EthPartnerShard0ChainID,
-		EthCompatibleShard0ChainID: EthPartnerShard0ChainID,
-		EthCompatibleEpoch:         big.NewInt(0),
-		CrossTxEpoch:               big.NewInt(0),
-		CrossLinkEpoch:             big.NewInt(2),
-		AggregatedRewardEpoch:      big.NewInt(3),
-		StakingEpoch:               big.NewInt(2),
-		PreStakingEpoch:            big.NewInt(1),
-		QuickUnlockEpoch:           big.NewInt(0),
-		FiveSecondsEpoch:           big.NewInt(0),
-		TwoSecondsEpoch:            big.NewInt(0),
-		SixtyPercentEpoch:          big.NewInt(4),
-		RedelegationEpoch:          big.NewInt(0),
-		NoEarlyUnlockEpoch:         big.NewInt(0),
-		VRFEpoch:                   big.NewInt(0),
-		PrevVRFEpoch:               big.NewInt(0),
-		MinDelegation100Epoch:      big.NewInt(0),
-		MinCommissionRateEpoch:     big.NewInt(0),
-		MinCommissionPromoPeriod:   big.NewInt(10),
-		EPoSBound35Epoch:           big.NewInt(0),
-		EIP155Epoch:                big.NewInt(0),
-		S3Epoch:                    big.NewInt(0),
-		DataCopyFixEpoch:           big.NewInt(0),
-		IstanbulEpoch:              big.NewInt(0),
-		ReceiptLogEpoch:            big.NewInt(0),
-		SHA3Epoch:                  big.NewInt(0),
-		HIP6And8Epoch:              big.NewInt(0),
+		ChainID:                       PartnerChainID,
+		EthCompatibleChainID:          EthPartnerShard0ChainID,
+		EthCompatibleShard0ChainID:    EthPartnerShard0ChainID,
+		EthCompatibleEpoch:            big.NewInt(0),
+		CrossTxEpoch:                  big.NewInt(0),
+		CrossLinkEpoch:                big.NewInt(2),
+		AggregatedRewardEpoch:         big.NewInt(3),
+		StakingEpoch:                  big.NewInt(2),
+		PreStakingEpoch:               big.NewInt(1),
+		QuickUnlockEpoch:              big.NewInt(0),
+		FiveSecondsEpoch:              big.NewInt(0),
+		TwoSecondsEpoch:               big.NewInt(0),
+		SixtyPercentEpoch:             big.NewInt(4),
+		RedelegationEpoch:             big.NewInt(0),
+		NoEarlyUnlockEpoch:            big.NewInt(0),
+		VRFEpoch:                      big.NewInt(0),
+		PrevVRFEpoch:                  big.NewInt(0),
+		MinDelegation100Epoch:         big.NewInt(0),
+		MinCommissionRateEpoch:        big.NewInt(0),
+		MinCommissionPromoPeriod:      big.NewInt(10),
+		EPoSBound35Epoch:              big.NewInt(0),
+		EIP155Epoch:                   big.NewInt(0),
+		S3Epoch:                       big.NewInt(0),
+		DataCopyFixEpoch:              big.NewInt(0),
+		IstanbulEpoch:                 big.NewInt(0),
+		ReceiptLogEpoch:               big.NewInt(0),
+		SHA3Epoch:                     big.NewInt(0),
+		HIP6And8Epoch:                 big.NewInt(0),
+		StakingPrecompileEpoch:        big.NewInt(2),
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               big.NewInt(574),
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     64,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
 	// All features except for CrossLink are enabled at launch.
 	StressnetChainConfig = &ChainConfig{
-		ChainID:                    StressnetChainID,
-		EthCompatibleChainID:       EthStressnetShard0ChainID,
-		EthCompatibleShard0ChainID: EthStressnetShard0ChainID,
-		EthCompatibleEpoch:         big.NewInt(0),
-		CrossTxEpoch:               big.NewInt(0),
-		CrossLinkEpoch:             big.NewInt(2),
-		AggregatedRewardEpoch:      big.NewInt(3),
-		StakingEpoch:               big.NewInt(2),
-		PreStakingEpoch:            big.NewInt(1),
-		QuickUnlockEpoch:           big.NewInt(0),
-		FiveSecondsEpoch:           big.NewInt(0),
-		TwoSecondsEpoch:            big.NewInt(0),
-		SixtyPercentEpoch:          big.NewInt(10),
-		RedelegationEpoch:          big.NewInt(0),
-		NoEarlyUnlockEpoch:         big.NewInt(0),
-		VRFEpoch:                   big.NewInt(0),
-		PrevVRFEpoch:               big.NewInt(0),
-		MinDelegation100Epoch:      big.NewInt(0),
-		MinCommissionRateEpoch:     big.NewInt(0),
-		MinCommissionPromoPeriod:   big.NewInt(10),
-		EPoSBound35Epoch:           big.NewInt(0),
-		EIP155Epoch:                big.NewInt(0),
-		S3Epoch:                    big.NewInt(0),
-		DataCopyFixEpoch:           big.NewInt(0),
-		IstanbulEpoch:              big.NewInt(0),
-		ReceiptLogEpoch:            big.NewInt(0),
-		SHA3Epoch:                  big.NewInt(0),
-		HIP6And8Epoch:              big.NewInt(0),
+		ChainID:                       StressnetChainID,
+		EthCompatibleChainID:          EthStressnetShard0ChainID,
+		EthCompatibleShard0ChainID:    EthStressnetShard0ChainID,
+		EthCompatibleEpoch:            big.NewInt(0),
+		CrossTxEpoch:                  big.NewInt(0),
+		CrossLinkEpoch:                big.NewInt(2),
+		AggregatedRewardEpoch:         big.NewInt(3),
+		StakingEpoch:                  big.NewInt(2),
+		PreStakingEpoch:               big.NewInt(1),
+		QuickUnlockEpoch:              big.NewInt(0),
+		FiveSecondsEpoch:              big.NewInt(0),
+		TwoSecondsEpoch:               big.NewInt(0),
+		SixtyPercentEpoch:             big.NewInt(10),
+		RedelegationEpoch:             big.NewInt(0),
+		NoEarlyUnlockEpoch:            big.NewInt(0),
+		VRFEpoch:                      big.NewInt(0),
+		PrevVRFEpoch:                  big.NewInt(0),
+		MinDelegation100Epoch:         big.NewInt(0),
+		MinCommissionRateEpoch:        big.NewInt(0),
+		MinCommissionPromoPeriod:      big.NewInt(10),
+		EPoSBound35Epoch:              big.NewInt(0),
+		EIP155Epoch:                   big.NewInt(0),
+		S3Epoch:                       big.NewInt(0),
+		DataCopyFixEpoch:              big.NewInt(0),
+		IstanbulEpoch:                 big.NewInt(0),
+		ReceiptLogEpoch:               big.NewInt(0),
+		SHA3Epoch:                     big.NewInt(0),
+		HIP6And8Epoch:                 big.NewInt(0),
+		StakingPrecompileEpoch:        big.NewInt(2),
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               EpochTBD,
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     64,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
 	LocalnetChainConfig = &ChainConfig{
-		ChainID:                    TestnetChainID,
-		EthCompatibleChainID:       EthTestnetShard0ChainID,
-		EthCompatibleShard0ChainID: EthTestnetShard0ChainID,
-		EthCompatibleEpoch:         big.NewInt(0),
-		CrossTxEpoch:               big.NewInt(0),
-		CrossLinkEpoch:             big.NewInt(2),
-		AggregatedRewardEpoch:      big.NewInt(3),
-		StakingEpoch:               big.NewInt(2),
-		PreStakingEpoch:            big.NewInt(0),
-		QuickUnlockEpoch:           big.NewInt(0),
-		FiveSecondsEpoch:           big.NewInt(0),
-		TwoSecondsEpoch:            big.NewInt(3),
-		SixtyPercentEpoch:          EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		RedelegationEpoch:          big.NewInt(0),
-		NoEarlyUnlockEpoch:         big.NewInt(0),
-		VRFEpoch:                   big.NewInt(0),
-		PrevVRFEpoch:               big.NewInt(0),
-		MinDelegation100Epoch:      big.NewInt(0),
-		MinCommissionRateEpoch:     big.NewInt(0),
-		MinCommissionPromoPeriod:   big.NewInt(10),
-		EPoSBound35Epoch:           big.NewInt(0),
-		EIP155Epoch:                big.NewInt(0),
-		S3Epoch:                    big.NewInt(0),
-		DataCopyFixEpoch:           big.NewInt(0),
-		IstanbulEpoch:              big.NewInt(0),
-		ReceiptLogEpoch:            big.NewInt(0),
-		SHA3Epoch:                  big.NewInt(0),
-		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		ChainID:                       TestnetChainID,
+		EthCompatibleChainID:          EthTestnetShard0ChainID,
+		EthCompatibleShard0ChainID:    EthTestnetShard0ChainID,
+		EthCompatibleEpoch:            big.NewInt(0),
+		CrossTxEpoch:                  big.NewInt(0),
+		CrossLinkEpoch:                big.NewInt(2),
+		AggregatedRewardEpoch:         big.NewInt(3),
+		StakingEpoch:                  big.NewInt(2),
+		PreStakingEpoch:               big.NewInt(0),
+		QuickUnlockEpoch:              big.NewInt(0),
+		FiveSecondsEpoch:              big.NewInt(0),
+		TwoSecondsEpoch:               big.NewInt(0),
+		SixtyPercentEpoch:             EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		RedelegationEpoch:             big.NewInt(0),
+		NoEarlyUnlockEpoch:            big.NewInt(0),
+		VRFEpoch:                      big.NewInt(0),
+		PrevVRFEpoch:                  big.NewInt(0),
+		MinDelegation100Epoch:         big.NewInt(0),
+		MinCommissionRateEpoch:        big.NewInt(0),
+		MinCommissionPromoPeriod:      big.NewInt(10),
+		EPoSBound35Epoch:              big.NewInt(0),
+		EIP155Epoch:                   big.NewInt(0),
+		S3Epoch:                       big.NewInt(0),
+		DataCopyFixEpoch:              big.NewInt(0),
+		IstanbulEpoch:                 big.NewInt(0),
+		ReceiptLogEpoch:               big.NewInt(0),
+		SHA3Epoch:                     big.NewInt(0),
+		HIP6And8Epoch:                 EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		StakingPrecompileEpoch:        big.NewInt(2),
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     5,
+		FeeCollectEpoch:               big.NewInt(5),
 	}
 
 	// AllProtocolChanges ...
@@ -261,6 +308,14 @@ var (
 		big.NewInt(0),                      // ReceiptLogEpoch
 		big.NewInt(0),                      // SHA3Epoch
 		big.NewInt(0),                      // HIP6And8Epoch
+		big.NewInt(0),                      // StakingPrecompileEpoch
+		big.NewInt(0),                      // ChainIdFixEpoch
+		big.NewInt(0),                      // SlotsLimitedEpoch
+		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
+		big.NewInt(0),                      // AllowlistEpoch
+		big.NewInt(1),                      // LeaderRotationEpoch
+		64,                                 // LeaderRotationBlocksCount
+		big.NewInt(0),                      // FeeCollectEpoch
 	}
 
 	// TestChainConfig ...
@@ -295,11 +350,28 @@ var (
 		big.NewInt(0),        // ReceiptLogEpoch
 		big.NewInt(0),        // SHA3Epoch
 		big.NewInt(0),        // HIP6And8Epoch
+		big.NewInt(0),        // StakingPrecompileEpoch
+		big.NewInt(0),        // ChainIdFixEpoch
+		big.NewInt(0),        // SlotsLimitedEpoch
+		big.NewInt(1),        // CrossShardXferPrecompileEpoch
+		big.NewInt(0),        // AllowlistEpoch
+		big.NewInt(1),        // LeaderRotationEpoch
+		64,                   // LeaderRotationBlocksCount
+		big.NewInt(0),        // FeeCollectEpoch
 	}
 
 	// TestRules ...
 	TestRules = TestChainConfig.Rules(new(big.Int))
 )
+
+func init() {
+	MainnetChainConfig.mustValid()
+	TestnetChainConfig.mustValid()
+	PangaeaChainConfig.mustValid()
+	PartnerChainConfig.mustValid()
+	StressnetChainConfig.mustValid()
+	LocalnetChainConfig.mustValid()
+}
 
 // TrustedCheckpoint represents a set of post-processed trie roots (CHT and
 // BloomTrie) associated with the appropriate section index and head hash. It is
@@ -409,11 +481,37 @@ type ChainConfig struct {
 
 	// IsHIP6And8Epoch is the first epoch to support HIP-6 and HIP-8
 	HIP6And8Epoch *big.Int `json:"hip6_8-epoch,omitempty"`
+
+	// StakingPrecompileEpoch is the first epoch to support the staking precompiles
+	StakingPrecompileEpoch *big.Int `json:"staking-precompile-epoch,omitempty"`
+
+	// ChainIdFixEpoch is the first epoch to return ethereum compatible chain id by ChainID() op code
+	ChainIdFixEpoch *big.Int `json:"chain-id-fix-epoch,omitempty"`
+
+	// SlotsLimitedEpoch is the first epoch to enable HIP-16.
+	SlotsLimitedEpoch *big.Int `json:"slots-limit-epoch,omitempty"`
+
+	// CrossShardXferPrecompileEpoch is the first epoch to feature cross shard transfer precompile
+	CrossShardXferPrecompileEpoch *big.Int `json:"cross-shard-xfer-precompile-epoch,omitempty"`
+
+	// AllowlistEpoch is the first epoch to support allowlist of HIP18
+	AllowlistEpoch *big.Int
+
+	LeaderRotationEpoch *big.Int `json:"leader-rotation-epoch,omitempty"`
+
+	LeaderRotationBlocksCount int `json:"leader-rotation-blocks-count,omitempty"`
+
+	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
+	// It should >= StakingEpoch.
+	// Before StakingEpoch, txn fees are paid to miner/leader.
+	// Then before FeeCollectEpoch, txn fees are burned.
+	// After FeeCollectEpoch, txn fees paid to FeeCollector account.
+	FeeCollectEpoch *big.Int
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch:%v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -422,7 +520,27 @@ func (c *ChainConfig) String() string {
 		c.CrossLinkEpoch,
 		c.ReceiptLogEpoch,
 		c.SHA3Epoch,
+		c.StakingPrecompileEpoch,
+		c.ChainIdFixEpoch,
+		c.CrossShardXferPrecompileEpoch,
 	)
+}
+
+// check if ChainConfig is valid, it will panic if config is invalid. it should only be called in init()
+func (c *ChainConfig) mustValid() {
+	require := func(cond bool, err string) {
+		if !cond {
+			panic(err)
+		}
+	}
+	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0,
+		"must satisfy: FeeCollectEpoch >= StakingEpoch")
+	require(c.PreStakingEpoch.Cmp(c.StakingEpoch) < 0,
+		"must satisfy: PreStakingEpoch < StakingEpoch")
+	require(c.StakingPrecompileEpoch.Cmp(c.PreStakingEpoch) >= 0,
+		"must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
+	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0,
+		"must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -463,6 +581,11 @@ func (c *ChainConfig) IsAggregatedRewardEpoch(epoch *big.Int) bool {
 // IsStaking determines whether it is staking epoch
 func (c *ChainConfig) IsStaking(epoch *big.Int) bool {
 	return isForked(c.StakingEpoch, epoch)
+}
+
+// IsSlotsLimited determines whether HIP-16 is enabled
+func (c *ChainConfig) IsSlotsLimited(epoch *big.Int) bool {
+	return isForked(c.SlotsLimitedEpoch, epoch)
 }
 
 // IsFiveSeconds determines whether it is the epoch to change to 5 seconds block time
@@ -562,6 +685,37 @@ func (c *ChainConfig) IsHIP6And8Epoch(epoch *big.Int) bool {
 	return isForked(c.HIP6And8Epoch, epoch)
 }
 
+// IsStakingPrecompileEpoch determines whether staking
+// precompiles are available in the EVM
+func (c *ChainConfig) IsStakingPrecompile(epoch *big.Int) bool {
+	return isForked(c.StakingPrecompileEpoch, epoch)
+}
+
+// IsCrossShardXferPrecompile determines whether the
+// Cross Shard Transfer Precompile is available in the EVM
+func (c *ChainConfig) IsCrossShardXferPrecompile(epoch *big.Int) bool {
+	return isForked(c.CrossShardXferPrecompileEpoch, epoch)
+}
+
+// IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
+func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
+	return isForked(c.ChainIdFixEpoch, epoch)
+}
+
+// IsAllowlistEpoch determines whether IsAllowlist of HIP18 is enabled
+func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
+	return isForked(c.AllowlistEpoch, epoch)
+}
+
+func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationEpoch, epoch)
+}
+
+// IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.
+func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
+	return isForked(c.FeeCollectEpoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -610,12 +764,19 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                                         *big.Int
-	EthChainID                                                                      *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3 bool
+	ChainID    *big.Int
+	EthChainID *big.Int
+	// gas
+	IsS3,
+	// precompiles
+	IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
+	IsStakingPrecompile, IsCrossShardXferPrecompile,
+	// eip-155 chain id fix
+	IsChainIdFix bool
 }
 
 // Rules ensures c's ChainID is not nil.
+// The Rules object is only used by The EVM
 func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 	chainID := c.ChainID
 	if chainID == nil {
@@ -626,15 +787,15 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		ethChainID = new(big.Int)
 	}
 	return Rules{
-		ChainID:      new(big.Int).Set(chainID),
-		EthChainID:   new(big.Int).Set(ethChainID),
-		IsCrossLink:  c.IsCrossLink(epoch),
-		IsEIP155:     c.IsEIP155(epoch),
-		IsS3:         c.IsS3(epoch),
-		IsReceiptLog: c.IsReceiptLog(epoch),
-		IsIstanbul:   c.IsIstanbul(epoch),
-		IsVRF:        c.IsVRF(epoch),
-		IsPrevVRF:    c.IsPrevVRF(epoch),
-		IsSHA3:       c.IsSHA3(epoch),
+		ChainID:                    new(big.Int).Set(chainID),
+		EthChainID:                 new(big.Int).Set(ethChainID),
+		IsS3:                       c.IsS3(epoch),
+		IsIstanbul:                 c.IsIstanbul(epoch),
+		IsVRF:                      c.IsVRF(epoch),
+		IsPrevVRF:                  c.IsPrevVRF(epoch),
+		IsSHA3:                     c.IsSHA3(epoch),
+		IsStakingPrecompile:        c.IsStakingPrecompile(epoch),
+		IsCrossShardXferPrecompile: c.IsCrossShardXferPrecompile(epoch),
+		IsChainIdFix:               c.IsChainIdFix(epoch),
 	}
 }

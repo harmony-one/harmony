@@ -108,12 +108,6 @@ type Engine interface {
 	// VerifyVRF verifies the vrf of the block
 	VerifyVRF(chain ChainReader, header *block.Header) error
 
-	// Beaconchain provides the handle for Beaconchain
-	Beaconchain() ChainReader
-
-	// SetBeaconchain sets the beaconchain handler on engine
-	SetBeaconchain(ChainReader)
-
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.
 	// Note: The block header and state database might be updated to reflect any
@@ -121,7 +115,9 @@ type Engine interface {
 	// sigsReady signal indicates whether the commit sigs are populated in the header object.
 	// Finalize() will block on sigsReady signal until the first value is send to the channel.
 	Finalize(
-		chain ChainReader, header *block.Header,
+		chain ChainReader,
+		beacon ChainReader,
+		header *block.Header,
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,

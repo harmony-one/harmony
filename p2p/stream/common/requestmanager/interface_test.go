@@ -114,6 +114,18 @@ func (st *testStream) CloseOnExit() error {
 	return nil
 }
 
+func (st *testStream) FailedTimes() int {
+	return 0
+}
+
+func (st *testStream) AddFailedTimes() {
+	return
+}
+
+func (st *testStream) ResetFailedTimes() {
+	return
+}
+
 func makeDummyTestStreams(indexes []int) []sttypes.Stream {
 	sts := make([]sttypes.Stream, 0, len(indexes))
 

@@ -9,15 +9,24 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
-	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
-	libp2p_host "github.com/libp2p/go-libp2p-core/host"
-	libp2p_network "github.com/libp2p/go-libp2p-core/network"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/routing"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	libp2p_config "github.com/libp2p/go-libp2p/config"
+	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
+	libp2p_host "github.com/libp2p/go-libp2p/core/host"
+	libp2p_network "github.com/libp2p/go-libp2p/core/network"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
+	libp2p_peerstore "github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+
+	"github.com/libp2p/go-libp2p/p2p/security/noise"
+	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -50,7 +59,7 @@ type Host interface {
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 	PubSub() *libp2p_pubsub.PubSub
-	C() (int, int, int)
+	PeerConnectivity() (int, int, int)
 	GetOrJoin(topic string) (*libp2p_pubsub.Topic, error)
 	ListPeer(topic string) []libp2p_peer.ID
 	ListTopic() []string
@@ -79,12 +88,32 @@ const (
 
 // HostConfig is the config structure to create a new host
 type HostConfig struct {
-	Self            *Peer
-	BLSKey          libp2p_crypto.PrivKey
-	BootNodes       []string
-	DataStoreFile   *string
-	DiscConcurrency int
-	MaxConnPerIP    int
+	Self                     *Peer
+	BLSKey                   libp2p_crypto.PrivKey
+	BootNodes                []string
+	DataStoreFile            *string
+	DiscConcurrency          int
+	MaxConnPerIP             int
+	DisablePrivateIPScan     bool
+	MaxPeers                 int64
+	ConnManagerLowWatermark  int
+	ConnManagerHighWatermark int
+	WaitForEachPeerToConnect bool
+	ForceReachabilityPublic  bool
+}
+
+func init() {
+	libp2p_pubsub.GossipSubDlazy = 4
+	libp2p_pubsub.GossipSubGossipFactor = 0.15
+	libp2p_pubsub.GossipSubD = 5
+	libp2p_pubsub.GossipSubDlo = 4
+	libp2p_pubsub.GossipSubDhi = 8
+	libp2p_pubsub.GossipSubHistoryLength = 2
+	libp2p_pubsub.GossipSubHistoryGossip = 2
+	libp2p_pubsub.GossipSubGossipRetransmission = 2
+	libp2p_pubsub.GossipSubFanoutTTL = 10 * time.Second
+	libp2p_pubsub.GossipSubMaxPendingConnections = 32
+	libp2p_pubsub.GossipSubMaxIHaveLength = 1000
 }
 
 // NewHost ..
@@ -93,29 +122,91 @@ func NewHost(cfg HostConfig) (Host, error) {
 		self = cfg.Self
 		key  = cfg.BLSKey
 	)
-	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
-	if err != nil {
-		return nil, errors.Wrapf(err,
-			"cannot create listen multiaddr from port %#v", self.Port)
-	}
+
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port)
+	listenAddr := libp2p.ListenAddrStrings(
+		addr,         // regular tcp connections
+		addr+"/quic", // a UDP endpoint for the QUIC transport
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	p2pHost, err := libp2p.New(ctx,
-		libp2p.ListenAddrs(listenAddr),
+
+	// create connection manager
+	low := cfg.ConnManagerLowWatermark
+	high := cfg.ConnManagerHighWatermark
+	if high < low {
+		cancel()
+		utils.Logger().Error().
+			Int("low", cfg.ConnManagerLowWatermark).
+			Int("high", cfg.ConnManagerHighWatermark).
+			Msg("connection manager watermarks are invalid")
+		return nil, errors.New("invalid connection manager watermarks")
+	}
+
+	// prepare host options
+	var idht *dht.IpfsDHT
+	var opt discovery.DHTConfig
+	p2pHostConfig := []libp2p.Option{
+		listenAddr,
 		libp2p.Identity(key),
+		// Support TLS connections
+		libp2p.Security(libp2ptls.ID, libp2ptls.New),
+		// Support noise connections
+		libp2p.Security(noise.ID, noise.New),
+		// Support any other default transports (TCP)
+		libp2p.DefaultTransports,
+		// Prevent the peer from having too many
+		// connections by attaching a connection manager.
+		connectionManager(low, high),
+		// Attempt to open ports using uPNP for NATed hosts.
+		libp2p.NATPortMap(),
+		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+			opt = discovery.DHTConfig{
+				BootNodes:       cfg.BootNodes,
+				DataStoreFile:   cfg.DataStoreFile,
+				DiscConcurrency: cfg.DiscConcurrency,
+			}
+			opts, err := opt.GetLibp2pRawOptions()
+			if err != nil {
+				return nil, err
+			}
+			idht, err = dht.New(ctx, h, opts...)
+			return idht, err
+		}),
+		// To help other peers to figure out if they are behind
+		// NATs, launch the server-side of AutoNAT too (AutoRelay
+		// already runs the client)
+		// This service is highly rate-limited and should not cause any
+		// performance issues.
 		libp2p.EnableNATService(),
-		libp2p.ForceReachabilityPublic(),
-	)
+		// Bandwidth Reporter
+		libp2p.BandwidthReporter(newCounter()),
+		// Enable relay service, to disable relay we can use libp2p.DisableRelay()
+		libp2p.EnableRelayService(),
+	}
+
+	if cfg.ForceReachabilityPublic {
+		// ForceReachabilityPublic overrides automatic reachability detection in the AutoNAT subsystem,
+		// forcing the local node to believe it is reachable externally
+		p2pHostConfig = append(p2pHostConfig, libp2p.ForceReachabilityPublic())
+	}
+
+	if cfg.DisablePrivateIPScan {
+		// Prevent dialing of public addresses
+		p2pHostConfig = append(p2pHostConfig, libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)))
+	}
+
+	// create p2p host
+	p2pHost, err := libp2p.New(p2pHostConfig...)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 
-	disc, err := discovery.NewDHTDiscovery(p2pHost, discovery.DHTConfig{
-		BootNodes:       cfg.BootNodes,
-		DataStoreFile:   cfg.DataStoreFile,
-		DiscConcurrency: cfg.DiscConcurrency,
-	})
+	disc, err := discovery.NewDHTDiscovery(ctx, cancel, p2pHost, idht, opt)
 	if err != nil {
+		cancel()
+		p2pHost.Close()
 		return nil, errors.Wrap(err, "cannot create DHT discovery")
 	}
 
@@ -155,13 +246,15 @@ func NewHost(cfg HostConfig) (Host, error) {
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
+		cancel()
+		p2pHost.Close()
 		return nil, errors.Wrapf(err, "cannot initialize libp2p pub-sub")
 	}
 
 	self.PeerID = p2pHost.ID()
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 
-	security := security.NewManager(cfg.MaxConnPerIP)
+	security := security.NewManager(cfg.MaxConnPerIP, cfg.MaxPeers)
 	// has to save the private key for host
 	h := &HostV2{
 		h:             p2pHost,
@@ -171,8 +264,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 		priKey:        key,
 		discovery:     disc,
 		security:      security,
-		onConnections: []ConnectCallback{},
-		onDisconnects: []DisconnectCallback{},
+		onConnections: ConnectCallbacks{},
+		onDisconnects: DisconnectCallbacks{},
 		logger:        &subLogger,
 		ctx:           ctx,
 		cancel:        cancel,
@@ -184,6 +277,33 @@ func NewHost(cfg HostConfig) (Host, error) {
 		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
 		Msg("libp2p host ready")
 	return h, nil
+}
+
+// connectionManager creates a new connection manager and configures libp2p to use the
+// given connection manager.
+// lo and hi are watermarks governing the number of connections that'll be maintained.
+// When the peer count exceeds the 'high watermark', as many peers will be pruned (and
+// their connections terminated) until 'low watermark' peers remain.
+func connectionManager(low int, high int) libp2p_config.Option {
+	if low > 0 && high > low {
+		connmgr, err := connmgr.NewConnManager(
+			low,  // Low Watermark
+			high, // High Watermark
+			connmgr.WithGracePeriod(time.Minute),
+		)
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Int("low", low).
+				Int("high", high).
+				Msg("create connection manager failed")
+			return nil
+		}
+		return libp2p.ConnectionManager(connmgr)
+	}
+	return func(p2pConfig *libp2p_config.Config) error {
+		return nil
+	}
 }
 
 // HostV2 is the version 2 p2p host
@@ -199,8 +319,8 @@ type HostV2 struct {
 	security      security.Security
 	logger        *zerolog.Logger
 	blocklist     libp2p_pubsub.Blacklist
-	onConnections []ConnectCallback
-	onDisconnects []DisconnectCallback
+	onConnections ConnectCallbacks
+	onDisconnects DisconnectCallbacks
 	ctx           context.Context
 	cancel        func()
 }
@@ -222,7 +342,7 @@ func (host *HostV2) Start() error {
 	return host.discovery.Start()
 }
 
-// Close close the HostV2
+// Close closes the HostV2.
 func (host *HostV2) Close() error {
 	for _, proto := range host.streamProtos {
 		proto.Close()
@@ -232,8 +352,8 @@ func (host *HostV2) Close() error {
 	return host.h.Close()
 }
 
-// C .. -> (total known peers, connected, not connected)
-func (host *HostV2) C() (int, int, int) {
+// PeerConnectivity returns total number of known, connected and not connected peers.
+func (host *HostV2) PeerConnectivity() (int, int, int) {
 	connected, not := 0, 0
 	peers := host.h.Peerstore().Peers()
 	for _, peer := range peers {
@@ -253,6 +373,10 @@ func (host *HostV2) AddStreamProtocol(protocols ...sttypes.Protocol) {
 	for _, proto := range protocols {
 		host.streamProtos = append(host.streamProtos, proto)
 		host.h.SetStreamHandlerMatch(protocol.ID(proto.ProtoID()), proto.Match, proto.HandleStream)
+		// TODO: do we need to add handler match for shard proto id?
+		// if proto.IsBeaconNode() {
+		// 	host.h.SetStreamHandlerMatch(protocol.ID(proto.ShardProtoID()), proto.Match, proto.HandleStream)
+		// }
 	}
 }
 
@@ -414,7 +538,7 @@ func (host *HostV2) ListenClose(net libp2p_network.Network, addr ma.Multiaddr) {
 func (host *HostV2) Connected(net libp2p_network.Network, conn libp2p_network.Conn) {
 	host.logger.Info().Interface("node", conn.RemotePeer()).Msg("peer connected")
 
-	for _, function := range host.onConnections {
+	for _, function := range host.onConnections.GetAll() {
 		if err := function(net, conn); err != nil {
 			host.logger.Error().Err(err).Interface("node", conn.RemotePeer()).Msg("failed on peer connected callback")
 		}
@@ -425,7 +549,7 @@ func (host *HostV2) Connected(net libp2p_network.Network, conn libp2p_network.Co
 func (host *HostV2) Disconnected(net libp2p_network.Network, conn libp2p_network.Conn) {
 	host.logger.Info().Interface("node", conn.RemotePeer()).Msg("peer disconnected")
 
-	for _, function := range host.onDisconnects {
+	for _, function := range host.onDisconnects.GetAll() {
 		if err := function(conn); err != nil {
 			host.logger.Error().Err(err).Interface("node", conn.RemotePeer()).Msg("failed on peer disconnected callback")
 		}
@@ -443,11 +567,11 @@ func (host *HostV2) ClosedStream(net libp2p_network.Network, stream libp2p_netwo
 }
 
 func (host *HostV2) SetConnectCallback(callback ConnectCallback) {
-	host.onConnections = append(host.onConnections, callback)
+	host.onConnections.Add(callback)
 }
 
 func (host *HostV2) SetDisconnectCallback(callback DisconnectCallback) {
-	host.onDisconnects = append(host.onDisconnects, callback)
+	host.onDisconnects.Add(callback)
 }
 
 // NamedTopic represents pubsub topic

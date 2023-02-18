@@ -8,9 +8,12 @@ import (
 	"net/http"
 	"runtime/debug"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/metrics"
+	eth_prometheus "github.com/ethereum/go-ethereum/metrics/prometheus"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -28,11 +31,16 @@ type Config struct {
 	Legacy     bool   // legacy or not, legacy is harmony internal node
 	NodeType   string // node type, validator or exlorer node
 	Shard      uint32 // shard id, used as job suffix
-	Instance   string //identifier of the instance in prometheus metrics
+	Instance   string // identifier of the instance in prometheus metrics
+	TikvRole   string // use for tikv explorer node
 }
 
 func (p Config) String() string {
 	return fmt.Sprintf("%v, %v:%v, %v/%v, %v/%v/%v/%v:%v", p.Enabled, p.IP, p.Port, p.EnablePush, p.Gateway, p.Network, p.Legacy, p.NodeType, p.Shard, p.Instance)
+}
+
+func (p Config) IsUsedTiKV() bool {
+	return p.TikvRole != ""
 }
 
 // Service provides Prometheus metrics via the /metrics route. This route will
@@ -61,8 +69,9 @@ var (
 func (s *Service) getJobName() string {
 	var node string
 
-	// legacy nodes are harmony nodes: s0,s1,s2,s3
-	if s.config.Legacy {
+	if s.config.IsUsedTiKV() { // tikv node must be explorer node, eg: te_reader0, te_writer0
+		node = "te_" + strings.ToLower(s.config.TikvRole)
+	} else if s.config.Legacy { // legacy nodes are harmony nodes: s0,s1,s2,s3
 		node = "s"
 	} else {
 		if s.config.NodeType == "validator" {
@@ -104,6 +113,7 @@ func newService(cfg Config, additionalHandlers ...Handler) *Service {
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", handler)
+	mux.Handle("/metrics/eth", eth_prometheus.Handler(metrics.DefaultRegistry))
 	mux.HandleFunc("/goroutinez", svc.goroutinezHandler)
 
 	// Register additional handlers.

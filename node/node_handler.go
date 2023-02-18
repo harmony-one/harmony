@@ -3,14 +3,19 @@ package node
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/utils/crosslinks"
+
 	"github.com/harmony-one/harmony/api/proto"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -39,18 +44,14 @@ func (node *Node) processSkippedMsgTypeByteValue(
 		node.ProcessReceiptMessage(content)
 	case proto_node.CrossLink:
 		node.ProcessCrossLinkMessage(content)
+	case proto_node.CrosslinkHeartbeat:
+		node.ProcessCrossLinkHeartbeatMessage(content)
 	default:
 		utils.Logger().Error().
 			Int("message-iota-value", int(cat)).
 			Msg("Invariant usage of processSkippedMsgTypeByteValue violated")
 	}
 }
-
-var (
-	errInvalidPayloadSize         = errors.New("invalid payload size")
-	errWrongBlockMsgSize          = errors.New("invalid block message size")
-	latestSentCrosslinkNum uint64 = 0
-)
 
 // HandleNodeMessage parses the message and dispatch the actions.
 func (node *Node) HandleNodeMessage(
@@ -78,9 +79,11 @@ func (node *Node) HandleNodeMessage(
 						if block.ShardID() == 0 {
 							utils.Logger().Info().
 								Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
-							go func(blk *types.Block) {
-								node.BeaconBlockChannel <- blk
-							}(block)
+							if block.IsLastBlockInEpoch() {
+								go func(blk *types.Block) {
+									node.BeaconBlockChannel <- blk
+								}(block)
+							}
 						}
 					}
 				}
@@ -88,7 +91,8 @@ func (node *Node) HandleNodeMessage(
 		case
 			proto_node.SlashCandidate,
 			proto_node.Receipt,
-			proto_node.CrossLink:
+			proto_node.CrossLink,
+			proto_node.CrosslinkHeartbeat:
 			// skip first byte which is blockMsgType
 			node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 		}
@@ -122,7 +126,7 @@ func (node *Node) stakingMessageHandler(msgPayload []byte) {
 	switch txMessageType {
 	case proto_node.Send:
 		txs := staking.StakingTransactions{}
-		err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send messge type
+		err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send message type
 		if err != nil {
 			utils.Logger().Error().
 				Err(err).
@@ -164,24 +168,22 @@ func (node *Node) BroadcastSlash(witness *slash.Record) {
 	utils.Logger().Info().Msg("broadcast the double sign record")
 }
 
-// BroadcastCrossLink is called by consensus leader to
+// BroadcastCrossLinkFromShardsToBeacon is called by consensus leader to
 // send the new header as cross link to beacon chain.
-func (node *Node) BroadcastCrossLink() {
+func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shards
+	if node.IsRunningBeaconChain() {
+		return
+	}
+	if !(node.Consensus.IsLeader() || rand.Intn(100) <= 1) {
+		return
+	}
 	curBlock := node.Blockchain().CurrentBlock()
 	if curBlock == nil {
 		return
 	}
 
-	if node.IsRunningBeaconChain() ||
-		!node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
-		// no need to broadcast crosslink if it's beacon chain or it's not crosslink epoch
-		return
-	}
-
-	// no point to broadcast the crosslink if we aren't even in the right epoch yet
-	if !node.Blockchain().Config().IsCrossLink(
-		node.Blockchain().CurrentHeader().Epoch(),
-	) {
+	if !node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
+		// no need to broadcast crosslink if it's beacon chain, or it's not crosslink epoch
 		return
 	}
 
@@ -189,171 +191,178 @@ func (node *Node) BroadcastCrossLink() {
 		"Construct and Broadcasting new crosslink to beacon chain groupID %s",
 		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 	)
-	headers := []*block.Header{}
-	lastLink, err := node.Beaconchain().ReadShardLastCrossLink(curBlock.ShardID())
+
+	headers, err := getCrosslinkHeadersForShards(node.Blockchain(), curBlock, node.crosslinks)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[BroadcastCrossLink] failed to get crosslinks")
+		return
+	}
+
+	if len(headers) == 0 {
+		utils.Logger().Info().Msg("[BroadcastCrossLink] no crosslinks to broadcast")
+		return
+	}
+
+	for _, h := range headers {
+		utils.Logger().Info().Msgf("[BroadcastCrossLink] header shard %d blockNum %d", h.ShardID(), h.Number().Uint64())
+	}
+
+	err = node.host.SendMessageToGroups(
+		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
+		p2p.ConstructMessage(
+			proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain(), headers)),
+	)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msgf("[BroadcastCrossLink] failed to broadcast message")
+	} else {
+		node.crosslinks.SetLatestSentCrosslinkBlockNumber(headers[len(headers)-1].Number().Uint64())
+	}
+}
+
+// BroadcastCrosslinkHeartbeatSignalFromBeaconToShards is called by consensus leader or 1% validators to
+// send last cross link to shard chains.
+func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // leader of 0 shard
+	if !node.IsRunningBeaconChain() {
+		return
+	}
+	if !(node.IsCurrentlyLeader() || rand.Intn(100) == 0) {
+		return
+	}
+
+	curBlock := node.Beaconchain().CurrentBlock()
+	if curBlock == nil {
+		return
+	}
+
+	if !node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
+		// no need to broadcast crosslink if it's beacon chain, or it's not crosslink epoch
+		return
+	}
+
+	var privToSing *bls.PrivateKeyWrapper
+	for _, priv := range node.Consensus.GetPrivateKeys() {
+		if node.Consensus.IsValidatorInCommittee(priv.Pub.Bytes) {
+			privToSing = &priv
+			break
+		}
+	}
+
+	if privToSing == nil {
+		return
+	}
+	instance := shard.Schedule.InstanceForEpoch(curBlock.Epoch())
+	for shardID := uint32(1); shardID < instance.NumShards(); shardID++ {
+		lastLink, err := node.Blockchain().ReadShardLastCrossLink(shardID)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get crosslinks")
+			continue
+		}
+
+		hb := types.CrosslinkHeartbeat{
+			ShardID:                  lastLink.ShardID(),
+			LatestContinuousBlockNum: lastLink.BlockNum(),
+			Epoch:                    lastLink.Epoch().Uint64(),
+			PublicKey:                privToSing.Pub.Bytes[:],
+			Signature:                nil,
+		}
+
+		rs, err := rlp.EncodeToBytes(hb)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to encode signal")
+			continue
+		}
+		hb.Signature = privToSing.Pri.SignHash(rs).Serialize()
+		bts := proto_node.ConstructCrossLinkHeartBeatMessage(hb)
+		node.host.SendMessageToGroups(
+			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(shardID))},
+			p2p.ConstructMessage(bts),
+		)
+	}
+}
+
+// getCrosslinkHeadersForShards get headers required for crosslink creation.
+func getCrosslinkHeadersForShards(shardChain core.BlockChain, curBlock *types.Block, crosslinks *crosslinks.Crosslinks) ([]*block.Header, error) {
+	var headers []*block.Header
+	signal := crosslinks.LastKnownCrosslinkHeartbeatSignal()
 	var latestBlockNum uint64
 
-	// TODO chao: record the missing crosslink in local database instead of using latest crosslink
-	// if cannot find latest crosslink, broadcast latest 3 block headers
-	if err != nil {
-		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLink] ReadShardLastCrossLink Failed")
-		header := node.Blockchain().GetHeaderByNumber(curBlock.NumberU64() - 2)
-		if header != nil && node.Blockchain().Config().IsCrossLink(header.Epoch()) {
+	if signal == nil {
+		utils.Logger().Debug().Msg("[BroadcastCrossLink] no known crosslink heartbeat signal")
+		header := shardChain.GetHeaderByNumber(curBlock.NumberU64() - 2)
+		if header != nil && shardChain.Config().IsCrossLink(header.Epoch()) {
 			headers = append(headers, header)
 		}
-		header = node.Blockchain().GetHeaderByNumber(curBlock.NumberU64() - 1)
-		if header != nil && node.Blockchain().Config().IsCrossLink(header.Epoch()) {
+		header = shardChain.GetHeaderByNumber(curBlock.NumberU64() - 1)
+		if header != nil && shardChain.Config().IsCrossLink(header.Epoch()) {
 			headers = append(headers, header)
 		}
-		headers = append(headers, curBlock.Header())
-	} else {
-		latestBlockNum = lastLink.BlockNum()
-		if latestSentCrosslinkNum > latestBlockNum && latestSentCrosslinkNum <= latestBlockNum+crossLinkBatchSize*6 {
-			latestBlockNum = latestSentCrosslinkNum
-		}
+		return append(headers, curBlock.Header()), nil
+	}
+	latestBlockNum = signal.LatestContinuousBlockNum
+	latest := crosslinks.LatestSentCrosslinkBlockNumber()
+	if latest > latestBlockNum && latest <= latestBlockNum+crossLinkBatchSize*6 {
+		latestBlockNum = latest
+	}
 
-		batchSize := crossLinkBatchSize
-		diff := curBlock.Number().Uint64() - latestBlockNum
+	batchSize := crossLinkBatchSize
+	diff := curBlock.Number().Uint64() - latestBlockNum
 
-		// Increase batch size by 1 for every 5 blocks behind
-		batchSize += int(diff) / 5
+	// Increase batch size by 1 for every 5 blocks behind
+	batchSize += int(diff) / 5
 
-		// Cap at a sane size to avoid overload network
-		if batchSize > crossLinkBatchSize*2 {
-			batchSize = crossLinkBatchSize * 2
-		}
+	// Cap at a sane size to avoid overload network
+	if batchSize > crossLinkBatchSize*2 {
+		batchSize = crossLinkBatchSize * 2
+	}
 
-		for blockNum := latestBlockNum + 1; blockNum <= curBlock.NumberU64(); blockNum++ {
-			header := node.Blockchain().GetHeaderByNumber(blockNum)
-			if header != nil && node.Blockchain().Config().IsCrossLink(header.Epoch()) {
-				headers = append(headers, header)
-				if len(headers) == batchSize {
-					break
-				}
+	for blockNum := latestBlockNum + 1; blockNum <= curBlock.NumberU64(); blockNum++ {
+		header := shardChain.GetHeaderByNumber(blockNum)
+		if header != nil && shardChain.Config().IsCrossLink(header.Epoch()) {
+			headers = append(headers, header)
+			if len(headers) == batchSize {
+				break
 			}
 		}
 	}
 
-	utils.Logger().Info().Msgf("[BroadcastCrossLink] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, curBlock.NumberU64(), len(headers))
-	for i, header := range headers {
-		utils.Logger().Debug().Msgf(
-			"[BroadcastCrossLink] Broadcasting %d",
-			header.Number().Uint64(),
-		)
-		if i == len(headers)-1 {
-			latestSentCrosslinkNum = header.Number().Uint64()
-		}
-	}
-	node.host.SendMessageToGroups(
-		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-		p2p.ConstructMessage(
-			proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain, headers)),
-	)
+	return headers, nil
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are
-// running consensus on
-func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
-	if newBlock == nil || newBlock.Header() == nil {
-		return errors.New("nil header or block asked to verify")
-	}
-
-	if newBlock.ShardID() != node.Blockchain().ShardID() {
-		utils.Logger().Error().
-			Uint32("my shard ID", node.Blockchain().ShardID()).
-			Uint32("new block's shard ID", newBlock.ShardID()).
-			Msg("[VerifyNewBlock] Wrong shard ID of the new block")
-		return errors.New("[VerifyNewBlock] Wrong shard ID of the new block")
-	}
-
-	if newBlock.NumberU64() <= node.Blockchain().CurrentBlock().NumberU64() {
-		return errors.Errorf("block with the same block number is already committed: %d", newBlock.NumberU64())
-	}
-	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot validate header for the new block")
-		return err
-	}
-
-	if err := node.Blockchain().Engine().VerifyVRF(
-		node.Blockchain(), newBlock.Header(),
-	); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot verify vrf for the new block")
-		return errors.Wrap(err,
-			"[VerifyNewBlock] Cannot verify vrf for the new block",
-		)
-	}
-
-	if err := node.Blockchain().Engine().VerifyShardState(
-		node.Blockchain(), node.Beaconchain(), newBlock.Header(),
-	); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot verify shard state for the new block")
-		return errors.Wrap(err,
-			"[VerifyNewBlock] Cannot verify shard state for the new block",
-		)
-	}
-
-	if err := node.Blockchain().ValidateNewBlock(newBlock); err != nil {
-		if hooks := node.NodeConfig.WebHooks.Hooks; hooks != nil {
-			if p := hooks.ProtocolIssues; p != nil {
-				url := p.OnCannotCommit
-				go func() {
-					webhooks.DoPost(url, map[string]interface{}{
-						"bad-header": newBlock.Header(),
-						"reason":     err.Error(),
-					})
-				}()
+// running consensus on.
+func VerifyNewBlock(nodeConfig *nodeconfig.ConfigType, blockChain core.BlockChain, beaconChain core.BlockChain) func(*types.Block) error {
+	return func(newBlock *types.Block) error {
+		if err := blockChain.ValidateNewBlock(newBlock, beaconChain); err != nil {
+			if hooks := nodeConfig.WebHooks.Hooks; hooks != nil {
+				if p := hooks.ProtocolIssues; p != nil {
+					url := p.OnCannotCommit
+					go func() {
+						webhooks.DoPost(url, map[string]interface{}{
+							"bad-header": newBlock.Header(),
+							"reason":     err.Error(),
+						})
+					}()
+				}
 			}
+			utils.Logger().Error().
+				Str("blockHash", newBlock.Hash().Hex()).
+				Int("numTx", len(newBlock.Transactions())).
+				Int("numStakingTx", len(newBlock.StakingTransactions())).
+				Err(err).
+				Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
+			return errors.Errorf(
+				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
+				newBlock.Hash().Hex(),
+				len(newBlock.Transactions()),
+			)
 		}
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Int("numTx", len(newBlock.Transactions())).
-			Int("numStakingTx", len(newBlock.StakingTransactions())).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
-		return errors.Errorf(
-			"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
-			newBlock.Hash().Hex(),
-			len(newBlock.Transactions()),
-		)
+		return nil
 	}
-
-	// Verify cross links
-	// TODO: move into ValidateNewBlock
-	if node.IsRunningBeaconChain() {
-		err := node.VerifyBlockCrossLinks(newBlock)
-		if err != nil {
-			utils.Logger().Debug().Err(err).Msg("ops2 VerifyBlockCrossLinks Failed")
-			return err
-		}
-	}
-
-	// TODO: move into ValidateNewBlock
-	if err := node.verifyIncomingReceipts(newBlock); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Int("numIncomingReceipts", len(newBlock.IncomingReceipts())).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot ValidateNewBlock")
-		return errors.Wrapf(
-			err, "[VerifyNewBlock] Cannot ValidateNewBlock",
-		)
-	}
-	return nil
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
-// 1. add the new block to blockchain
-// 2. [leader] send new block to the client
-// 3. [leader] send cross shard tx receipts to destination shard
+// 1. [leader] send new block to the client
+// 2. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	if node.Consensus.IsLeader() {
 		if node.IsRunningBeaconChain() {
@@ -424,7 +433,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	return nil
 }
 
-// BootstrapConsensus is the a goroutine to check number of peers and start the consensus
+// BootstrapConsensus is a goroutine to check number of peers and start the consensus
 func (node *Node) BootstrapConsensus() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -438,6 +447,7 @@ func (node *Node) BootstrapConsensus() error {
 			if numPeersNow >= min {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				enoughMinPeers <- struct{}{}
+				fmt.Println("Bootstrap consensus done.", numPeersNow, " peers are connected")
 				return
 			}
 			utils.Logger().Info().
@@ -453,7 +463,7 @@ func (node *Node) BootstrapConsensus() error {
 		return ctx.Err()
 	case <-enoughMinPeers:
 		go func() {
-			node.startConsensus <- struct{}{}
+			node.Consensus.StartChannel()
 		}()
 		return nil
 	}

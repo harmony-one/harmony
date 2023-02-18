@@ -15,7 +15,7 @@ import (
 func (consensus *Consensus) didReachPrepareQuorum() error {
 	logger := utils.Logger()
 	logger.Info().Msg("[OnPrepare] Received Enough Prepare Signatures")
-	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("[OnPrepare] leader not found")
 		return err
@@ -42,11 +42,11 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	if err := rlp.DecodeBytes(consensus.block, &blockObj); err != nil {
 		consensus.getLogger().Warn().
 			Err(err).
-			Uint64("BlockNum", consensus.blockNum).
+			Uint64("BlockNum", consensus.BlockNum()).
 			Msg("[didReachPrepareQuorum] Unparseable block data")
 		return err
 	}
-	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain(),
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 
 	// so by this point, everyone has committed to the blockhash of this block
@@ -69,7 +69,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		}
 	}
 	if err := consensus.msgSender.SendWithRetry(
-		consensus.blockNum,
+		consensus.BlockNum(),
 		msg_pb.MessageType_PREPARED, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
@@ -79,7 +79,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	} else {
 		consensus.getLogger().Info().
 			Hex("blockHash", consensus.blockHash[:]).
-			Uint64("blockNum", consensus.blockNum).
+			Uint64("blockNum", consensus.BlockNum()).
 			Msg("[OnPrepare] Sent Prepared Message!!")
 	}
 	consensus.msgSender.StopRetry(msg_pb.MessageType_ANNOUNCE)

@@ -91,7 +91,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 						if blk, ok := node.proposedBlock[newBlock.NumberU64()]; ok {
 							utils.Logger().Info().Uint64("blockNum", newBlock.NumberU64()).Str("blockHash", blk.Hash().Hex()).
 								Msg("Block with the same number was already proposed, abort.")
-							break
 						}
 						utils.Logger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
@@ -105,7 +104,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 						// Send the new block to Consensus so it can be confirmed.
 						node.proposedBlock[newBlock.NumberU64()] = newBlock
 						delete(node.proposedBlock, newBlock.NumberU64()-10)
-						node.BlockChannel <- newBlock
+						node.Consensus.BlockChannel(newBlock)
 						break
 					} else {
 						retryCount++
@@ -135,7 +134,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	header := node.Worker.GetCurrentHeader()
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
-	leaderKey := node.Consensus.LeaderPubKey
+	leaderKey := node.Consensus.GetLeaderPubKey()
 	var (
 		coinbase    = node.GetAddressForBLSKey(leaderKey.Object, header.Epoch())
 		beneficiary = coinbase
@@ -172,45 +171,47 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
-	// Prepare normal and staking transactions retrieved from transaction pool
-	utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
+	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+		// Prepare normal and staking transactions retrieved from transaction pool
+		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
 
-	pendingPoolTxs, err := node.TxPool.Pending()
-	if err != nil {
-		utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
-		return nil, err
-	}
-	pendingPlainTxs := map[common.Address]types.Transactions{}
-	pendingStakingTxs := staking.StakingTransactions{}
-	for addr, poolTxs := range pendingPoolTxs {
-		plainTxsPerAcc := types.Transactions{}
-		for _, tx := range poolTxs {
-			if plainTx, ok := tx.(*types.Transaction); ok {
-				plainTxsPerAcc = append(plainTxsPerAcc, plainTx)
-			} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
-				// Only process staking transactions after pre-staking epoch happened.
-				if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
-					pendingStakingTxs = append(pendingStakingTxs, stakingTx)
+		pendingPoolTxs, err := node.TxPool.Pending()
+		if err != nil {
+			utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
+			return nil, err
+		}
+		pendingPlainTxs := map[common.Address]types.Transactions{}
+		pendingStakingTxs := staking.StakingTransactions{}
+		for addr, poolTxs := range pendingPoolTxs {
+			plainTxsPerAcc := types.Transactions{}
+			for _, tx := range poolTxs {
+				if plainTx, ok := tx.(*types.Transaction); ok {
+					plainTxsPerAcc = append(plainTxsPerAcc, plainTx)
+				} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
+					// Only process staking transactions after pre-staking epoch happened.
+					if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
+						pendingStakingTxs = append(pendingStakingTxs, stakingTx)
+					}
+				} else {
+					utils.Logger().Err(types.ErrUnknownPoolTxType).
+						Msg("Failed to parse pending transactions")
+					return nil, types.ErrUnknownPoolTxType
 				}
-			} else {
-				utils.Logger().Err(types.ErrUnknownPoolTxType).
-					Msg("Failed to parse pending transactions")
-				return nil, types.ErrUnknownPoolTxType
+			}
+			if plainTxsPerAcc.Len() > 0 {
+				pendingPlainTxs[addr] = plainTxsPerAcc
 			}
 		}
-		if plainTxsPerAcc.Len() > 0 {
-			pendingPlainTxs[addr] = plainTxsPerAcc
-		}
-	}
-	utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 
-	// Try commit normal and staking transactions based on the current state
-	// The successfully committed transactions will be put in the proposed block
-	if err := node.Worker.CommitTransactions(
-		pendingPlainTxs, pendingStakingTxs, beneficiary,
-	); err != nil {
-		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
-		return nil, err
+		// Try commit normal and staking transactions based on the current state
+		// The successfully committed transactions will be put in the proposed block
+		if err := node.Worker.CommitTransactions(
+			pendingPlainTxs, pendingStakingTxs, beneficiary,
+		); err != nil {
+			utils.Logger().Error().Err(err).Msg("cannot commit transactions")
+			return nil, err
+		}
+		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 	}
 
 	// Prepare cross shard transaction receipts
@@ -235,6 +236,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		invalidToDelete := []types.CrossLink{}
 		if err == nil {
 			for _, pending := range allPending {
+				// ReadCrossLink beacon chain usage.
 				exist, err := node.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
 				if err == nil || exist != nil {
 					invalidToDelete = append(invalidToDelete, pending)
@@ -277,6 +279,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
+	node.Worker.ApplyTestnetShardReduction()
 	// Prepare shard state
 	var shardState *shard.State
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(

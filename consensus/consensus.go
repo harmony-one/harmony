@@ -3,14 +3,16 @@ package consensus
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/registry"
 
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -59,14 +61,12 @@ type Consensus struct {
 	commitBitmap         *bls_cosi.Mask
 
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
-	multiSigMutex  sync.RWMutex
 
-	// The blockchain this consensus is working on
-	Blockchain *core.BlockChain
+	// Registry for services.
+	registry *registry.Registry
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
-	MinPeers   int
-	pubKeyLock sync.Mutex
+	MinPeers int
 	// private/public keys of current node
 	priKey multibls.PrivateKeys
 	// the publickey of leader
@@ -83,9 +83,7 @@ type Consensus struct {
 	// IgnoreViewIDCheck determines whether to ignore viewID check
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
-	mutex sync.Mutex
-	// mutex for verify new block
-	verifyBlockMutex sync.Mutex
+	mutex sync.RWMutex
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
@@ -112,10 +110,6 @@ type Consensus struct {
 	host p2p.Host
 	// MessageSender takes are of sending consensus message and the corresponding retry logic.
 	msgSender *MessageSender
-	// Used to convey to the consensus main loop that block syncing has finished.
-	syncReadyChan chan struct{}
-	// Used to convey to the consensus main loop that node is out of sync
-	syncNotReadyChan chan struct{}
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
@@ -131,13 +125,22 @@ type Consensus struct {
 	// finality of previous consensus in the unit of milliseconds
 	finality int64
 	// finalityCounter keep tracks of the finality time
-	finalityCounter int64
+	finalityCounter atomic.Value //int64
 
 	dHelper *downloadHelper
+
+	// Both flags only for initialization state.
+	start           bool
+	isInitialLeader bool
 }
 
-// VerifyBlock is a function used to verify the block and keep trace of verified blocks
-func (consensus *Consensus) VerifyBlock(block *types.Block) error {
+// Blockchain returns the blockchain.
+func (consensus *Consensus) Blockchain() core.BlockChain {
+	return consensus.registry.GetBlockchain()
+}
+
+// VerifyBlock is a function used to verify the block and keep trace of verified blocks.
+func (consensus *Consensus) verifyBlock(block *types.Block) error {
 	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
 			return errors.Wrap(err, "Block verification failed")
@@ -150,12 +153,14 @@ func (consensus *Consensus) VerifyBlock(block *types.Block) error {
 // BlocksSynchronized lets the main loop know that block synchronization finished
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
-	consensus.syncReadyChan <- struct{}{}
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.syncReadyChan()
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
 func (consensus *Consensus) BlocksNotSynchronized() {
-	consensus.syncNotReadyChan <- struct{}{}
+	consensus.syncNotReadyChan()
 }
 
 // VdfSeedSize returns the number of VRFs for VDF computation
@@ -165,11 +170,33 @@ func (consensus *Consensus) VdfSeedSize() int {
 
 // GetPublicKeys returns the public keys
 func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
+	return consensus.getPublicKeys()
+}
+
+func (consensus *Consensus) getPublicKeys() multibls.PublicKeys {
 	return consensus.priKey.GetPublicKeys()
 }
 
+func (consensus *Consensus) GetLeaderPubKey() *bls_cosi.PublicKeyWrapper {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return consensus.getLeaderPubKey()
+}
+
+func (consensus *Consensus) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {
+	return consensus.LeaderPubKey
+}
+
+func (consensus *Consensus) setLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
+	consensus.LeaderPubKey = pub
+}
+
+func (consensus *Consensus) GetPrivateKeys() multibls.PrivateKeys {
+	return consensus.priKey
+}
+
 // GetLeaderPrivateKey returns leader private key if node is the leader
-func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls_core.PublicKey) (*bls.PrivateKeyWrapper, error) {
+func (consensus *Consensus) getLeaderPrivateKey(leaderKey *bls_core.PublicKey) (*bls.PrivateKeyWrapper, error) {
 	for i, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(leaderKey) {
 			return &consensus.priKey[i], nil
@@ -178,28 +205,42 @@ func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls_core.PublicKey) (
 	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
 }
 
-// GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
-func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
-	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey.Object)
+// getConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
+func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
+	return consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
 // SetBlockVerifier sets the block verifier
 func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
 	consensus.BlockVerifier = verifier
-	consensus.vc.SetVerifyBlock(consensus.VerifyBlock)
+	consensus.vc.SetVerifyBlock(consensus.verifyBlock)
 }
 
 func (consensus *Consensus) IsBackup() bool {
 	return consensus.isBackup
 }
 
+func (consensus *Consensus) BlockNum() uint64 {
+	return atomic.LoadUint64(&consensus.blockNum)
+}
+
+func (consensus *Consensus) getBlockNum() uint64 {
+	return atomic.LoadUint64(&consensus.blockNum)
+}
+
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey multibls.PrivateKeys,
-	Decider quorum.Decider,
+	host p2p.Host, shard uint32, multiBLSPriKey multibls.PrivateKeys,
+	registry *registry.Registry,
+	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
-	consensus := Consensus{}
+	consensus := Consensus{
+		ShardID: shard,
+	}
 	consensus.Decider = Decider
+	consensus.registry = registry
+	consensus.MinPeers = minPeers
+	consensus.AggregateSig = aggregateSig
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.BlockNumLowChan = make(chan struct{}, 1)
@@ -224,8 +265,6 @@ func New(
 	// displayed on explorer as Height right now
 	consensus.SetCurBlockViewID(0)
 	consensus.ShardID = shard
-	consensus.syncReadyChan = make(chan struct{})
-	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.ReadySignal = make(chan ProposalType)
 	consensus.CommitSigChannel = make(chan []byte)

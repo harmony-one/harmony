@@ -1,24 +1,34 @@
 package node
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"os"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/internal/registry"
+	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
+	"github.com/harmony-one/harmony/internal/tikv"
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/utils/crosslinks"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	lru "github.com/hashicorp/golang-lru"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rcrowley/go-metrics"
@@ -30,12 +40,12 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/chain"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
@@ -73,29 +83,41 @@ type syncConfig struct {
 	withSig bool
 }
 
+type ISync interface {
+	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error
+	AddLastMileBlock(block *types.Block)
+	GetActivePeerNumber() int
+	CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error
+	SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration)
+	IsSynchronized() bool
+	IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool)
+	AddNewBlock(peerHash []byte, block *types.Block)
+	RegisterNodeInfo() int
+	GetParsedSyncStatus() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
+	GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
+}
+
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel          chan *types.Block                 // The channel to send newly proposed blocks
 	ConfirmedBlockChannel chan *types.Block                 // The channel to send confirmed blocks
 	BeaconBlockChannel    chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
 	pendingCXReceipts     map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex        sync.Mutex
+	crosslinks            *crosslinks.Crosslinks // Memory storage for crosslink processing.
 	// Shard databases
-	shardChains shardchain.Collection
-	SelfPeer    p2p.Peer
-	// TODO: Neighbors should store only neighbor nodes in the same shard
-	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	stateMutex sync.Mutex // mutex for change node state
-	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
-	BeaconNeighbors      sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	TxPool               *core.TxPool
-	CxPool               *core.CxPool // pool for missing cross shard receipts resend
-	Worker, BeaconWorker *worker.Worker
-	downloaderServer     *downloader.Server
+	shardChains      shardchain.Collection
+	SelfPeer         p2p.Peer
+	stateMutex       sync.Mutex // mutex for change node state
+	TxPool           *core.TxPool
+	CxPool           *core.CxPool // pool for missing cross shard receipts resend
+	Worker           *worker.Worker
+	downloaderServer *downloader.Server
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-	stateSync, beaconSync  *legacysync.StateSync
+	stateSync              *legacysync.StateSync
+	epochSync              *legacysync.EpochSync
+	stateStagedSync        *stagedsync.StagedSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
@@ -104,15 +126,11 @@ type Node struct {
 	serviceManager               *service.Manager
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-	// Channel to notify consensus service to really start consensus
-	startConsensus chan struct{}
-	HarmonyConfig  *harmonyconfig.HarmonyConfig
+	HarmonyConfig                *harmonyconfig.HarmonyConfig
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.
-	chainConfig params.ChainConfig
-	// map of service type to its message channel.
-	isFirstTime         bool // the node was started with a fresh database
+	chainConfig         params.ChainConfig
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
 	KeysToAddrs      map[string]common.Address
@@ -123,8 +141,8 @@ type Node struct {
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
 	BroadcastInvalidTx bool
 	// InSync flag indicates the node is in-sync or not
-	IsInSync      *abool.AtomicBool
-	proposedBlock map[uint64]*types.Block
+	IsSynchronized *abool.AtomicBool
+	proposedBlock  map[uint64]*types.Block
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
@@ -134,28 +152,71 @@ type Node struct {
 	// context control for pub-sub handling
 	psCtx    context.Context
 	psCancel func()
+	registry *registry.Registry
 }
 
 // Blockchain returns the blockchain for the node's current shard.
-func (node *Node) Blockchain() *core.BlockChain {
-	shardID := node.NodeConfig.ShardID
-	bc, err := node.shardChains.ShardChain(shardID)
+func (node *Node) Blockchain() core.BlockChain {
+	return node.registry.GetBlockchain()
+}
+
+func (node *Node) SyncInstance() ISync {
+	return node.GetOrCreateSyncInstance(true)
+}
+
+func (node *Node) CurrentSyncInstance() bool {
+	return node.GetOrCreateSyncInstance(false) != nil
+}
+
+// GetOrCreateSyncInstance returns an instance of state sync, either legacy or staged
+// if initiate sets to true, it generates a new instance
+func (node *Node) GetOrCreateSyncInstance(initiate bool) ISync {
+	if node.NodeConfig.StagedSync {
+		if initiate && node.stateStagedSync == nil {
+			utils.Logger().Info().Msg("initializing staged state sync")
+			node.stateStagedSync = node.createStagedSync(node.Blockchain())
+		}
+		return node.stateStagedSync
+	}
+	if initiate && node.stateSync == nil {
+		utils.Logger().Info().Msg("initializing legacy state sync")
+		node.stateSync = node.createStateSync(node.Beaconchain())
+	}
+	return node.stateSync
+}
+
+// Beaconchain returns the beacon chain from node.
+func (node *Node) Beaconchain() core.BlockChain {
+	// tikv mode not have the BeaconChain storage
+	if node.HarmonyConfig != nil && node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.General.ShardID != shard.BeaconChainShardID {
+		return nil
+	}
+
+	return node.chain(shard.BeaconChainShardID, core.Options{})
+}
+
+func (node *Node) chain(shardID uint32, options core.Options) core.BlockChain {
+	bc, err := node.shardChains.ShardChain(shardID, options)
 	if err != nil {
-		utils.Logger().Error().
-			Uint32("shardID", shardID).
-			Err(err).
-			Msg("cannot get shard chain")
+		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
+	}
+	// only available in validator node and shard 1-3
+	isEnablePruneBeaconChain := node.HarmonyConfig != nil && node.HarmonyConfig.General.EnablePruneBeaconChain
+	isNotBeaconChainValidator := node.NodeConfig.Role() == nodeconfig.Validator && node.NodeConfig.ShardID != shard.BeaconChainShardID
+	if isEnablePruneBeaconChain && isNotBeaconChainValidator {
+		bc.EnablePruneBeaconChainFeature()
+	} else if isEnablePruneBeaconChain && !isNotBeaconChainValidator {
+		utils.Logger().Info().Msg("`IsEnablePruneBeaconChain` only available in validator node and shard 1-3")
 	}
 	return bc
 }
 
-// Beaconchain returns the beaconchain from node.
-func (node *Node) Beaconchain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(shard.BeaconChainShardID)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
-	}
-	return bc
+// EpochChain returns the epoch chain from node. Epoch chain is the same as BeaconChain,
+// but with differences in behaviour.
+func (node *Node) EpochChain() core.BlockChain {
+	return node.chain(shard.BeaconChainShardID, core.Options{
+		EpochChain: true,
+	})
 }
 
 // TODO: make this batch more transactions
@@ -195,12 +256,13 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
-	if inSync, _, _ := node.SyncStatus(node.Blockchain().ShardID()); !inSync && node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-		utils.Logger().Debug().
-			Int("length of newTxs", len(newTxs)).
-			Msg("[addPendingTransactions] Node out of sync, ignoring transactions")
-		return nil
-	}
+	// if inSync, _, _ := node.SyncStatus(node.Blockchain().ShardID()); !inSync && node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+	// 	utils.Logger().Debug().
+	// 		Int("length of newTxs", len(newTxs)).
+	// 		Msg("[addPendingTransactions] Node out of sync, ignoring transactions")
+	// 	return nil
+	// }
+
 	poolTxs := types.PoolTransactions{}
 	errs := []error{}
 	acceptCx := node.Blockchain().Config().AcceptsCrossTx(node.Blockchain().CurrentHeader().Epoch())
@@ -218,7 +280,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 	errs = append(errs, node.TxPool.AddRemotes(poolTxs)...)
 
 	pendingCount, queueCount := node.TxPool.Stats()
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		Interface("err", errs).
 		Int("length of newTxs", len(newTxs)).
 		Int("totalPending", pendingCount).
@@ -413,6 +475,11 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 		case proto_node.Sync:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "block_sync"}).Inc()
 
+			// in tikv mode, not need BeaconChain message
+			if node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.General.ShardID != shard.BeaconChainShardID {
+				return nil, 0, errIgnoreBeaconMsg
+			}
+
 			// checks whether the beacon block is larger than current block number
 			blocksPayload := payload[p2pNodeMsgPrefixSize+1:]
 			var blocks []*types.Block
@@ -452,10 +519,14 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "node_receipt"}).Inc()
 		case proto_node.CrossLink:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink"}).Inc()
-			// only beacon chain node process crosslink messages
-			if !node.IsRunningBeaconChain() ||
-				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+			if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
+			}
+		case proto_node.CrosslinkHeartbeat:
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink_heartbeat"}).Inc()
+			// only non beacon chain processes cross link heartbeat
+			if node.IsRunningBeaconChain() {
+				return nil, 0, errInvalidShard
 			}
 		default:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
@@ -641,7 +712,7 @@ func (node *Node) StartPubSub() error {
 			}
 			allTopics = append(
 				allTopics, u{
-					NamedTopic:     p2p.NamedTopic{string(key), topicHandle},
+					NamedTopic:     p2p.NamedTopic{Name: string(key), Topic: topicHandle},
 					consensusBound: isCon,
 				},
 			)
@@ -779,19 +850,6 @@ func (node *Node) StartPubSub() error {
 					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
-				select {
-				case <-ctx.Done():
-					if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
-						errors.Is(ctx.Err(), context.Canceled) {
-						utils.Logger().Warn().
-							Str("topic", topicNamed).Msg("[context] exceeded validation deadline")
-					}
-					errChan <- withError{errors.WithStack(ctx.Err()), nil}
-				default:
-					return libp2p_pubsub.ValidationAccept
-				}
-
-				return libp2p_pubsub.ValidationReject
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
 			// TODO: Currently this timeout is useless. Verify me.
@@ -937,6 +995,7 @@ func (node *Node) StartPubSub() error {
 		}
 	}()
 
+	node.TraceLoopForExplorer()
 	return nil
 }
 
@@ -956,14 +1015,22 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(
 	host p2p.Host,
 	consensusObj *consensus.Consensus,
-	chainDBFactory shardchain.DBFactory,
+	engine engine.Engine,
+	collection *shardchain.CollectionImpl,
 	blacklist map[common.Address]struct{},
+	allowedTxs map[common.Address]core.AllowedTxData,
+	localAccounts []common.Address,
 	isArchival map[uint32]bool,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
+	registry *registry.Registry,
 ) *Node {
-	node := Node{}
-	node.unixTimeAtNodeStart = time.Now().Unix()
-	node.TransactionErrorSink = types.NewTransactionErrorSink()
+	node := Node{
+		registry:             registry,
+		unixTimeAtNodeStart:  time.Now().Unix(),
+		TransactionErrorSink: types.NewTransactionErrorSink(),
+		crosslinks:           crosslinks.New(),
+	}
+
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -981,20 +1048,8 @@ func New(
 	networkType := node.NodeConfig.GetNetworkType()
 	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
-
-	engine := chain.NewEngine()
-
-	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, engine, &chainConfig,
-	)
-
-	for shardID, archival := range isArchival {
-		if archival {
-			collection.DisableCache(shardID)
-		}
-	}
 	node.shardChains = collection
-	node.IsInSync = abool.NewBool(false)
+	node.IsSynchronized = abool.NewBool(false)
 
 	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
@@ -1002,21 +1057,29 @@ func New(
 
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
-		beaconChain := node.Beaconchain()
-		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
-			var err error
-			if b2 {
-				shardID := node.NodeConfig.ShardID
-				// HACK get the real error reason
-				_, err = node.shardChains.ShardChain(shardID)
-			} else {
-				_, err = node.shardChains.ShardChain(shard.BeaconChainShardID)
-			}
-			fmt.Fprintf(os.Stderr, "Cannot initialize node: %v\n", err)
-			os.Exit(-1)
+		var beaconChain core.BlockChain
+		if blockchain.ShardID() == shard.BeaconChainShardID {
+			beaconChain = node.Beaconchain()
+		} else {
+			beaconChain = node.EpochChain()
 		}
 
-		node.BlockChannel = make(chan *types.Block)
+		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
+			// in tikv mode, not need BeaconChain
+			if !(node.HarmonyConfig != nil && node.HarmonyConfig.General.RunElasticMode) || node.HarmonyConfig.General.ShardID == shard.BeaconChainShardID {
+				var err error
+				if b2 {
+					shardID := node.NodeConfig.ShardID
+					// HACK get the real error reason
+					_, err = node.shardChains.ShardChain(shardID)
+				} else {
+					_, err = node.shardChains.ShardChain(shard.BeaconChainShardID)
+				}
+				fmt.Fprintf(os.Stderr, "Cannot initialize node: %v\n", err)
+				os.Exit(-1)
+			}
+		}
+
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
@@ -1026,26 +1089,35 @@ func New(
 			txPoolConfig.PriceLimit = 1e9
 			txPoolConfig.PriceBump = 10
 		}
+		if harmonyconfig != nil {
+			txPoolConfig.AccountSlots = harmonyconfig.TxPool.AccountSlots
+			txPoolConfig.GlobalSlots = harmonyconfig.TxPool.GlobalSlots
+			txPoolConfig.Locals = append(txPoolConfig.Locals, localAccounts...)
+		}
 
 		txPoolConfig.Blacklist = blacklist
+		txPoolConfig.AllowedTxs = allowedTxs
 		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
+		txPoolConfig.AddEvent = func(tx types.PoolTransaction, local bool) {
+			// in tikv mode, writer will publish tx pool update to all reader
+			if node.Blockchain().IsTikvWriterMaster() {
+				err := redis_helper.PublishTxPoolUpdate(uint32(harmonyconfig.General.ShardID), tx, local)
+				if err != nil {
+					utils.Logger().Warn().Err(err).Msg("redis publish txpool update error")
+				}
+			}
+		}
+
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
-		node.Worker = worker.New(node.Blockchain().Config(), blockchain, engine)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, beaconChain, engine)
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
 
-		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-			node.BeaconWorker = worker.New(
-				node.Beaconchain().Config(), beaconChain, engine,
-			)
-		}
-
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
-		engine.SetBeaconchain(beaconChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
@@ -1056,7 +1128,6 @@ func New(
 		Msg("Genesis block hash")
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = map[string]*syncConfig{}
-	node.startConsensus = make(chan struct{})
 	// Broadcast double-signers reported by consensus
 	if node.Consensus != nil {
 		go func() {
@@ -1090,8 +1161,11 @@ func New(
 		}()
 	}
 
-	// update reward values now that node is ready
-	node.updateInitialRewardValues()
+	// in tikv mode, not need BeaconChain
+	if !(node.HarmonyConfig != nil && node.HarmonyConfig.General.RunElasticMode) || node.HarmonyConfig.General.ShardID == shard.BeaconChainShardID {
+		// update reward values now that node is ready
+		node.updateInitialRewardValues()
+	}
 
 	// init metrics
 	initMetrics()
@@ -1124,16 +1198,17 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		)
 	}
 	shardID := node.Consensus.ShardID
-	blockNum := node.Blockchain().CurrentBlock().NumberU64()
+	currentBlock := node.Blockchain().CurrentBlock()
+	blockNum := currentBlock.NumberU64()
 	node.Consensus.SetMode(consensus.Listening)
-	epoch := shard.Schedule.CalcEpochNumber(blockNum)
+	epoch := currentBlock.Epoch()
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
 	shardState, err := committee.WithStakingEnabled.Compute(
-		epoch, node.Consensus.Blockchain,
+		epoch, node.Consensus.Blockchain(),
 	)
 	if err != nil {
 		utils.Logger().Err(err).
@@ -1169,36 +1244,12 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 				Int("numPubKeys", len(pubKeys)).
 				Str("mode", node.Consensus.Mode().String()).
 				Msg("[InitConsensusWithValidators] Successfully updated public keys")
-			node.Consensus.UpdatePublicKeys(pubKeys)
+			node.Consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
 			node.Consensus.SetMode(consensus.Normal)
 			return nil
 		}
 	}
 	return nil
-}
-
-// AddPeers adds neighbors nodes
-func (node *Node) AddPeers(peers []*p2p.Peer) int {
-	for _, p := range peers {
-		key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-		_, ok := node.Neighbors.LoadOrStore(key, *p)
-		if !ok {
-			// !ok means new peer is stored
-			node.host.AddPeer(p)
-			continue
-		}
-	}
-
-	return node.host.GetPeerCount()
-}
-
-// AddBeaconPeer adds beacon chain neighbors nodes
-// Return false means new neighbor peer was added
-// Return true means redundant neighbor peer wasn't added
-func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
-	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
-	return ok
 }
 
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {
@@ -1255,6 +1306,18 @@ func (node *Node) ShutDown() {
 	node.Blockchain().Stop()
 	node.Beaconchain().Stop()
 
+	if node.HarmonyConfig.General.RunElasticMode {
+		_, _ = node.Blockchain().RedisPreempt().Unlock()
+		_, _ = node.Beaconchain().RedisPreempt().Unlock()
+
+		_ = redis_helper.Close()
+		time.Sleep(time.Second)
+
+		if storage := tikv_manage.GetDefaultTiKVFactory(); storage != nil {
+			storage.CloseAllDB()
+		}
+	}
+
 	const msg = "Successfully shut down!\n"
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
@@ -1267,7 +1330,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 	node.keysToAddrsEpoch = epoch
 
 	shardID := node.Consensus.ShardID
-	shardState, err := node.Consensus.Blockchain.ReadShardState(epoch)
+	shardState, err := node.Consensus.Blockchain().ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Int64("epoch", epoch.Int64()).
@@ -1346,4 +1409,61 @@ func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 // IsRunningBeaconChain returns whether the node is running on beacon chain.
 func (node *Node) IsRunningBeaconChain() bool {
 	return node.NodeConfig.ShardID == shard.BeaconChainShardID
+}
+
+// syncFromTiKVWriter used for tikv mode, subscribe data from tikv writer
+func (node *Node) syncFromTiKVWriter() {
+	bc := node.Blockchain()
+
+	// subscribe block update
+	go redis_helper.SubscribeShardUpdate(bc.ShardID(), func(blkNum uint64, logs []*types.Log) {
+		// todo temp code to find and fix problems
+		// redis: 2022/07/09 03:51:23 pubsub.go:605: redis: &{%!s(*redis.PubSub=&{0xc002198d20 0xe0b160 0xe0b380 {0 0} 0xc0454265a0 map[shard_update_0:{}] map[] false 0xc0047c7800 0xc004946240 {1 {0 0}} 0xc0074269c0 <nil>}) %!s(chan *redis.Message=0xc004946180) %!s(chan interface {}=<nil>) %!s(chan struct {}=0xc0047c7b60) %!s(int=100) %!s(time.Duration=60000000000) %!s(time.Duration=3000000000)} channel is full for 1m0s (message is dropped)
+		doneChan := make(chan struct{}, 1)
+		go func() {
+			select {
+			case <-doneChan:
+				return
+			case <-time.After(2 * time.Minute):
+				buf := bytes.NewBuffer(nil)
+				err := pprof.Lookup("goroutine").WriteTo(buf, 1)
+				if err != nil {
+					panic(err)
+				}
+				err = ioutil.WriteFile(fmt.Sprintf("/local/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
+				if err != nil {
+					panic(err)
+				}
+				// todo temp code to fix problems, restart self
+				os.Exit(1)
+			}
+		}()
+		defer close(doneChan)
+
+		if err := bc.SyncFromTiKVWriter(blkNum, logs); err != nil {
+			utils.Logger().Warn().
+				Err(err).
+				Msg("cannot sync block from tikv writer")
+			return
+		}
+	})
+
+	// subscribe txpool update
+	if node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
+		go redis_helper.SubscribeTxPoolUpdate(bc.ShardID(), func(tx types.PoolTransaction, local bool) {
+			var err error
+			if local {
+				err = node.TxPool.AddLocal(tx)
+			} else {
+				err = node.TxPool.AddRemote(tx)
+			}
+			if err != nil {
+				utils.Logger().Debug().
+					Err(err).
+					Interface("tx", tx).
+					Msg("cannot sync txpool from tikv writer")
+				return
+			}
+		})
+	}
 }

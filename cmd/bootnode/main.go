@@ -9,7 +9,7 @@ import (
 	"path"
 
 	"github.com/ethereum/go-ethereum/log"
-	net "github.com/libp2p/go-libp2p-core/network"
+	net "github.com/libp2p/go-libp2p/core/network"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/harmony-one/harmony/internal/utils"
@@ -92,6 +92,7 @@ func printVersion(me string) {
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
+	console := flag.Bool("console_only", false, "Output to console only")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	logMaxSize := flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
 	logRotateCount := flag.Int("log_rotate_count", 0, "the number of rotated logs to keep. If set to 0 rotation is disabled")
@@ -101,6 +102,7 @@ func main() {
 	verbosity := flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
+	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
 
 	flag.Parse()
 
@@ -111,7 +113,9 @@ func main() {
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	utils.AddLogFile(fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port), *logMaxSize, *logRotateCount, *logRotateMaxAge)
+	if *console != true {
+		utils.AddLogFile(fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port), *logMaxSize, *logRotateCount, *logRotateMaxAge)
+	}
 
 	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
@@ -121,12 +125,14 @@ func main() {
 	// For bootstrap nodes, we shall keep .dht file.
 	dataStorePath := fmt.Sprintf(".dht-%s-%s", *ip, *port)
 	selfPeer := p2p.Peer{IP: *ip, Port: *port}
+
 	host, err := p2p.NewHost(p2p.HostConfig{
-		Self:          &selfPeer,
-		BLSKey:        privKey,
-		BootNodes:     nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
-		DataStoreFile: &dataStorePath,
-		MaxConnPerIP:  *maxConnPerIP,
+		Self:                    &selfPeer,
+		BLSKey:                  privKey,
+		BootNodes:               nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
+		DataStoreFile:           &dataStorePath,
+		MaxConnPerIP:            *maxConnPerIP,
+		ForceReachabilityPublic: *forceReachabilityPublic,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")

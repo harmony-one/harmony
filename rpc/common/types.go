@@ -7,7 +7,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // BlockArgs is struct to include optional block formatting params.
@@ -68,7 +68,7 @@ type NodeMetadata struct {
 	PeerID          peer.ID            `json:"peerid"`
 	Consensus       ConsensusInternal  `json:"consensus"`
 	C               C                  `json:"p2p-connectivity"`
-	SyncPeers       map[string]int     `json:"sync-peers",omitempty`
+	SyncPeers       map[string]int     `json:"sync-peers,omitempty"`
 }
 
 // P captures the connected peers per topic

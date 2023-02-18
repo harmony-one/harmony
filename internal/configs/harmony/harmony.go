@@ -27,16 +27,17 @@ type HarmonyConfig struct {
 	Revert     *RevertConfig     `toml:",omitempty"`
 	Legacy     *LegacyConfig     `toml:",omitempty"`
 	Prometheus *PrometheusConfig `toml:",omitempty"`
+	TiKV       *TiKVConfig       `toml:",omitempty"`
 	DNSSync    DnsSync
+	ShardData  ShardDataConfig
 }
 
 type DnsSync struct {
-	Port          int    // replaces: Network.DNSSyncPort
-	Zone          string // replaces: Network.DNSZone
-	LegacySyncing bool   // replaces: Network.LegacySyncing
-	Client        bool   // replaces: Sync.LegacyClient
-	Server        bool   // replaces: Sync.LegacyServer
-	ServerPort    int
+	Port       int    // replaces: Network.DNSSyncPort
+	Zone       string // replaces: Network.DNSZone
+	Client     bool   // replaces: Sync.LegacyClient
+	Server     bool   // replaces: Sync.LegacyServer
+	ServerPort int
 }
 
 type NetworkConfig struct {
@@ -45,23 +46,54 @@ type NetworkConfig struct {
 }
 
 type P2pConfig struct {
-	Port            int
-	IP              string
-	KeyFile         string
-	DHTDataStore    *string `toml:",omitempty"`
-	DiscConcurrency int     // Discovery Concurrency value
-	MaxConnsPerIP   int
+	Port                 int
+	IP                   string
+	KeyFile              string
+	DHTDataStore         *string `toml:",omitempty"`
+	DiscConcurrency      int     // Discovery Concurrency value
+	MaxConnsPerIP        int
+	DisablePrivateIPScan bool
+	MaxPeers             int64
+	// In order to disable Connection Manager, it only needs to
+	// set both the high and low watermarks to zero. In this way,
+	// using Connection Manager will be an optional feature.
+	ConnManagerLowWatermark  int
+	ConnManagerHighWatermark int
+	WaitForEachPeerToConnect bool
 }
 
 type GeneralConfig struct {
-	NodeType         string
-	NoStaking        bool
-	ShardID          int
-	IsArchival       bool
-	IsBackup         bool
-	IsBeaconArchival bool
-	IsOffline        bool
-	DataDir          string
+	NodeType               string
+	NoStaking              bool
+	ShardID                int
+	IsArchival             bool
+	IsBackup               bool
+	IsBeaconArchival       bool
+	IsOffline              bool
+	DataDir                string
+	TraceEnable            bool
+	EnablePruneBeaconChain bool
+	RunElasticMode         bool
+	TriesInMemory          int
+}
+
+type TiKVConfig struct {
+	Debug bool
+
+	PDAddr                      []string
+	Role                        string
+	StateDBCacheSizeInMB        uint32
+	StateDBCachePersistencePath string
+	StateDBRedisServerAddr      []string
+	StateDBRedisLRUTimeInDay    uint32
+}
+
+type ShardDataConfig struct {
+	EnableShardData bool
+	DiskCount       int
+	ShardCount      int
+	CacheTime       int
+	CacheSize       int
 }
 
 type ConsensusConfig struct {
@@ -85,7 +117,12 @@ type BlsConfig struct {
 }
 
 type TxPoolConfig struct {
-	BlacklistFile string
+	BlacklistFile     string
+	AllowedTxsFile    string
+	RosettaFixFile    string
+	AccountSlots      uint64
+	LocalAccountsFile string
+	GlobalSlots       uint64
 }
 
 type PprofConfig struct {
@@ -98,6 +135,7 @@ type PprofConfig struct {
 }
 
 type LogConfig struct {
+	Console       bool
 	Folder        string
 	FileName      string
 	RotateSize    int
@@ -152,15 +190,20 @@ type WsConfig struct {
 }
 
 type RpcOptConfig struct {
-	DebugEnabled      bool // Enables PrivateDebugService APIs, including the EVM tracer
-	RateLimterEnabled bool // Enable Rate limiter for RPC
-	RequestsPerSecond int  // for RPC rate limiter
+	DebugEnabled       bool   // Enables PrivateDebugService APIs, including the EVM tracer
+	EthRPCsEnabled     bool   // Expose Eth RPCs
+	StakingRPCsEnabled bool   // Expose Staking RPCs
+	LegacyRPCsEnabled  bool   // Expose Legacy RPCs
+	RpcFilterFile      string // Define filters to enable/disable RPC exposure
+	RateLimterEnabled  bool   // Enable Rate limiter for RPC
+	RequestsPerSecond  int    // for RPC rate limiter
 }
 
 type DevnetConfig struct {
 	NumShards   int
 	ShardSize   int
 	HmyNodeSize int
+	SlotsLimit  int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 }
 
 // TODO: make `revert` to a separate command
@@ -185,13 +228,29 @@ type PrometheusConfig struct {
 
 type SyncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
-	Enabled        bool // enable the stream sync protocol
-	Downloader     bool // start the sync downloader client
-	Concurrency    int  // concurrency used for stream sync protocol
-	MinPeers       int  // minimum streams to start a sync task.
-	InitStreams    int  // minimum streams in bootstrap to start sync loop.
-	DiscSoftLowCap int  // when number of streams is below this value, spin discover during check
-	DiscHardLowCap int  // when removing stream, num is below this value, spin discovery immediately
-	DiscHighCap    int  // upper limit of streams in one sync protocol
-	DiscBatch      int  // size of each discovery
+	Enabled              bool             // enable the stream sync protocol
+	Downloader           bool             // start the sync downloader client
+	StagedSync           bool             // use staged sync
+	StagedSyncCfg        StagedSyncConfig // staged sync configurations
+	Concurrency          int              // concurrency used for stream sync protocol
+	MinPeers             int              // minimum streams to start a sync task.
+	InitStreams          int              // minimum streams in bootstrap to start sync loop.
+	MaxAdvertiseWaitTime int              // maximum time duration between advertisements
+	DiscSoftLowCap       int              // when number of streams is below this value, spin discover during check
+	DiscHardLowCap       int              // when removing stream, num is below this value, spin discovery immediately
+	DiscHighCap          int              // upper limit of streams in one sync protocol
+	DiscBatch            int              // size of each discovery
+}
+
+type StagedSyncConfig struct {
+	TurboMode              bool   // turn on turbo mode
+	DoubleCheckBlockHashes bool   // double check all block hashes before download blocks
+	MaxBlocksPerSyncCycle  uint64 // max number of blocks per each sync cycle, if set to zero, all blocks will be synced in one full cycle
+	MaxBackgroundBlocks    uint64 // max number of background blocks in turbo mode
+	InsertChainBatchSize   int    // number of blocks to build a batch and insert to chain in staged sync
+	MaxMemSyncCycleSize    uint64 // max number of blocks to use a single transaction for staged sync
+	VerifyAllSig           bool   // verify signatures for all blocks regardless of height and batch size
+	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
+	UseMemDB               bool   // it uses memory by default. set it to false to use disk
+	LogProgress            bool   // log the full sync progress in console
 }

@@ -1,0 +1,29 @@
+version: "2"
+
+services:
+  online-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    privileged: true
+    ports:
+      - "8080:9700"
+    environment:
+      - "MODE=online"
+      - "NETWORK=testnet"
+    volumes:
+      - "./data:/root/data/"
+    labels:
+      service_group: rosetta
+  offline-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    privileged: true
+    ports:
+      - "8081:9700"
+    environment:
+      - "MODE=offline"
+      - "NETWORK=testnet"
+    labels:
+      service_group: rosetta

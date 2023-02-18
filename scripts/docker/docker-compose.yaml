@@ -1,0 +1,45 @@
+version: '3.6'
+services:
+  init:
+    image: alpine
+    command:
+      - /bin/sh
+      - -c
+      - |
+        chown -R 1000:1000 /data
+        echo "done grant data directory permission"
+    volumes:
+      - data:/data
+
+  harmony:
+    build:
+      context: ../../
+      dockerfile: ./scripts/docker/Dockerfile
+    restart: unless-stopped
+    ports:
+      - 9500:9500
+      - 9000:9000
+      - 9700:9700
+    healthcheck:
+      test: netstat -tunlp | grep 9500 > /dev/null; if [ 0 != $$? ]; then exit 1; else exit 0; fi;
+      interval: 5s
+      retries: 5
+      start_period: 10s
+      timeout: 3s
+    volumes:
+      - data:/data
+      - config:/harmony
+
+volumes:
+  config:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/tmp/harmony/config/testnet'
+  data:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/tmp/harmony/data/testnet'

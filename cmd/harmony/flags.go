@@ -29,6 +29,9 @@ var (
 		legacyShardIDFlag,
 		legacyIsArchiveFlag,
 		legacyDataDirFlag,
+
+		taraceFlag,
+		triesInMemoryFlag,
 	}
 
 	dnsSyncFlags = []cli.Flag{
@@ -58,7 +61,11 @@ var (
 		p2pDHTDataStoreFlag,
 		p2pDiscoveryConcurrencyFlag,
 		legacyKeyFileFlag,
+		p2pDisablePrivateIPScanFlag,
 		maxConnPerIPFlag,
+		maxPeersFlag,
+		connManagerLowWatermarkFlag,
+		connManagerHighWatermarkFlag,
 	}
 
 	httpFlags = []cli.Flag{
@@ -79,6 +86,10 @@ var (
 
 	rpcOptFlags = []cli.Flag{
 		rpcDebugEnabledFlag,
+		rpcEthRPCsEnabledFlag,
+		rpcStakingRPCsEnabledFlag,
+		rpcLegacyRPCsEnabledFlag,
+		rpcFilterFileFlag,
 		rpcRateLimiterEnabledFlag,
 		rpcRateLimitFlag,
 	}
@@ -123,8 +134,13 @@ var (
 	}
 
 	txPoolFlags = []cli.Flag{
+		tpAccountSlotsFlag,
+		rosettaFixFileFlag,
 		tpBlacklistFileFlag,
 		legacyTPBlacklistFileFlag,
+		localAccountsFileFlag,
+		allowedTxsFileFlag,
+		tpGlobalSlotsFlag,
 	}
 
 	pprofFlags = []cli.Flag{
@@ -147,6 +163,7 @@ var (
 		logVerbosityFlag,
 		logVerbosePrintsFlag,
 		legacyVerbosityFlag,
+		logConsoleFlag,
 
 		legacyLogFolderFlag,
 		legacyLogRotateSizeFlag,
@@ -204,6 +221,7 @@ var (
 	syncFlags = []cli.Flag{
 		syncStreamEnabledFlag,
 		syncDownloaderFlag,
+		syncStagedSyncFlag,
 		syncConcurrencyFlag,
 		syncMinPeersFlag,
 		syncInitStreamsFlag,
@@ -211,6 +229,19 @@ var (
 		syncDiscHardLowFlag,
 		syncDiscHighFlag,
 		syncDiscBatchFlag,
+	}
+
+	shardDataFlags = []cli.Flag{
+		enableShardDataFlag,
+		diskCountFlag,
+		shardCountFlag,
+		cacheTimeFlag,
+		cacheSizeFlag,
+	}
+
+	metricsFlags = []cli.Flag{
+		metricsETHFlag,
+		metricsExpensiveETHFlag,
 	}
 )
 
@@ -286,6 +317,17 @@ var (
 		DefValue:   defaultConfig.General.DataDir,
 		Deprecated: "use --datadir",
 	}
+
+	taraceFlag = cli.BoolFlag{
+		Name:     "tracing",
+		Usage:    "indicates if full transaction tracing should be enabled",
+		DefValue: defaultConfig.General.TraceEnable,
+	}
+	triesInMemoryFlag = cli.IntFlag{
+		Name:     "blockchain.tries_in_memory",
+		Usage:    "number of blocks from header stored in disk before exiting",
+		DefValue: defaultConfig.General.TriesInMemory,
+	}
 )
 
 func getRootFlags() []cli.Flag {
@@ -311,6 +353,8 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, legacyMiscFlags...)
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
+	flags = append(flags, shardDataFlags...)
+	flags = append(flags, metricsFlags...)
 
 	return flags
 }
@@ -354,8 +398,20 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 		config.General.IsOffline = cli.GetBoolFlagValue(cmd, isOfflineFlag)
 	}
 
+	if cli.IsFlagChanged(cmd, taraceFlag) {
+		config.General.TraceEnable = cli.GetBoolFlagValue(cmd, taraceFlag)
+	}
+
 	if cli.IsFlagChanged(cmd, isBackupFlag) {
 		config.General.IsBackup = cli.GetBoolFlagValue(cmd, isBackupFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, triesInMemoryFlag) {
+		value := cli.GetIntFlagValue(cmd, triesInMemoryFlag)
+		if value <= 2 {
+			panic("Must provide number greater than 2 for General.TriesInMemory")
+		}
+		config.General.TriesInMemory = value
 	}
 }
 
@@ -458,10 +514,6 @@ func applyDNSSyncFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	} else if cli.IsFlagChanged(cmd, legacyDNSZoneFlag) {
 		cfg.DNSSync.Zone = cli.GetStringFlagValue(cmd, legacyDNSZoneFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDNSFlag) {
-		val := cli.GetBoolFlagValue(cmd, legacyDNSFlag)
-		if !val {
-			cfg.DNSSync.LegacySyncing = true
-		}
 	}
 
 	if cli.IsFlagChanged(cmd, dnsPortFlag) {
@@ -528,10 +580,35 @@ var (
 		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
 		DefValue: defaultConfig.P2P.DiscConcurrency,
 	}
+	p2pDisablePrivateIPScanFlag = cli.BoolFlag{
+		Name:     "p2p.no-private-ip-scan",
+		Usage:    "disable scanning of private ip4/6 addresses by DHT",
+		DefValue: defaultConfig.P2P.DisablePrivateIPScan,
+	}
 	maxConnPerIPFlag = cli.IntFlag{
 		Name:     "p2p.security.max-conn-per-ip",
-		Usage:    "maximum number of connections allowed per node",
+		Usage:    "maximum number of connections allowed per remote node, 0 means no limit",
 		DefValue: defaultConfig.P2P.MaxConnsPerIP,
+	}
+	maxPeersFlag = cli.IntFlag{
+		Name:     "p2p.security.max-peers",
+		Usage:    "maximum number of peers allowed, 0 means no limit",
+		DefValue: defaultConfig.P2P.MaxConnsPerIP,
+	}
+	connManagerLowWatermarkFlag = cli.IntFlag{
+		Name:     "p2p.connmgr-low",
+		Usage:    "lowest number of connections that'll be maintained in connection manager. Set both high and low watermarks to zero to disable connection manager",
+		DefValue: defaultConfig.P2P.ConnManagerLowWatermark,
+	}
+	connManagerHighWatermarkFlag = cli.IntFlag{
+		Name:     "p2p.connmgr-high",
+		Usage:    "highest number of connections that'll be maintained in connection manager. Set both high and low watermarks to zero to disable connection manager",
+		DefValue: defaultConfig.P2P.ConnManagerHighWatermark,
+	}
+	waitForEachPeerToConnectFlag = cli.BoolFlag{
+		Name:     "p2p.wait-for-connections",
+		Usage:    "node waits for each single peer to connect and it doesn't add them to peers list after timeout",
+		DefValue: defaultConfig.P2P.WaitForEachPeerToConnect,
 	}
 )
 
@@ -563,6 +640,26 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, maxConnPerIPFlag) {
 		config.P2P.MaxConnsPerIP = cli.GetIntFlagValue(cmd, maxConnPerIPFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, maxPeersFlag) {
+		config.P2P.MaxPeers = int64(cli.GetIntFlagValue(cmd, maxPeersFlag))
+	}
+
+	if cli.IsFlagChanged(cmd, waitForEachPeerToConnectFlag) {
+		config.P2P.WaitForEachPeerToConnect = cli.GetBoolFlagValue(cmd, waitForEachPeerToConnectFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, connManagerLowWatermarkFlag) {
+		config.P2P.ConnManagerLowWatermark = cli.GetIntFlagValue(cmd, connManagerLowWatermarkFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, connManagerHighWatermarkFlag) {
+		config.P2P.ConnManagerHighWatermark = cli.GetIntFlagValue(cmd, connManagerHighWatermarkFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {
+		config.P2P.DisablePrivateIPScan = cli.GetBoolFlagValue(cmd, p2pDisablePrivateIPScanFlag)
 	}
 }
 
@@ -685,6 +782,34 @@ var (
 		Hidden:   true,
 	}
 
+	rpcEthRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.eth",
+		Usage:    "enable eth apis",
+		DefValue: defaultConfig.RPCOpt.EthRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcStakingRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.staking",
+		Usage:    "enable staking apis",
+		DefValue: defaultConfig.RPCOpt.StakingRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcLegacyRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.legacy",
+		Usage:    "enable legacy apis",
+		DefValue: defaultConfig.RPCOpt.LegacyRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcFilterFileFlag = cli.StringFlag{
+		Name:     "rpc.filterspath",
+		Usage:    "toml file path for method exposure filters",
+		DefValue: defaultConfig.RPCOpt.RpcFilterFile,
+		Hidden:   true,
+	}
+
 	rpcRateLimiterEnabledFlag = cli.BoolFlag{
 		Name:     "rpc.ratelimiter",
 		Usage:    "enable rate limiter for RPCs",
@@ -701,6 +826,18 @@ var (
 func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
 		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcEthRPCsEnabledFlag) {
+		config.RPCOpt.EthRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcEthRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcStakingRPCsEnabledFlag) {
+		config.RPCOpt.StakingRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcStakingRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcLegacyRPCsEnabledFlag) {
+		config.RPCOpt.LegacyRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcLegacyRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcFilterFileFlag) {
+		config.RPCOpt.RpcFilterFile = cli.GetStringFlagValue(cmd, rpcFilterFileFlag)
 	}
 	if cli.IsFlagChanged(cmd, rpcRateLimiterEnabledFlag) {
 		config.RPCOpt.RateLimterEnabled = cli.GetBoolFlagValue(cmd, rpcRateLimiterEnabledFlag)
@@ -976,10 +1113,20 @@ func applyConsensusFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig
 
 // transaction pool flags
 var (
+	tpAccountSlotsFlag = cli.IntFlag{
+		Name:     "txpool.accountslots",
+		Usage:    "number of executable transaction slots guaranteed per account",
+		DefValue: int(defaultConfig.TxPool.AccountSlots),
+	}
 	tpBlacklistFileFlag = cli.StringFlag{
 		Name:     "txpool.blacklist",
 		Usage:    "file of blacklisted wallet addresses",
 		DefValue: defaultConfig.TxPool.BlacklistFile,
+	}
+	rosettaFixFileFlag = cli.StringFlag{
+		Name:     "txpool.rosettafixfile",
+		Usage:    "file of rosetta fix file",
+		DefValue: defaultConfig.TxPool.RosettaFixFile,
 	}
 	legacyTPBlacklistFileFlag = cli.StringFlag{
 		Name:       "blacklist",
@@ -987,13 +1134,51 @@ var (
 		DefValue:   defaultConfig.TxPool.BlacklistFile,
 		Deprecated: "use --txpool.blacklist",
 	}
+	localAccountsFileFlag = cli.StringFlag{
+		Name:     "txpool.locals",
+		Usage:    "file of local wallet addresses",
+		DefValue: defaultConfig.TxPool.LocalAccountsFile,
+	}
+	allowedTxsFileFlag = cli.StringFlag{
+		Name:     "txpool.allowedtxs",
+		Usage:    "file of allowed transactions",
+		DefValue: defaultConfig.TxPool.AllowedTxsFile,
+	}
+	tpGlobalSlotsFlag = cli.IntFlag{
+		Name:     "txpool.globalslots",
+		Usage:    "maximum global number of non-executable transactions in the pool",
+		DefValue: int(defaultConfig.TxPool.GlobalSlots),
+	}
 )
 
 func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, rosettaFixFileFlag) {
+		config.TxPool.RosettaFixFile = cli.GetStringFlagValue(cmd, rosettaFixFileFlag)
+	}
+	if cli.IsFlagChanged(cmd, tpAccountSlotsFlag) {
+		value := cli.GetIntFlagValue(cmd, tpAccountSlotsFlag) // int, so fits in uint64 when positive
+		if value <= 0 {
+			panic("Must provide positive for txpool.accountslots")
+		}
+		config.TxPool.AccountSlots = uint64(value)
+	}
+	if cli.IsFlagChanged(cmd, tpGlobalSlotsFlag) {
+		value := cli.GetIntFlagValue(cmd, tpGlobalSlotsFlag)
+		if value <= 0 {
+			panic("Must provide positive value for txpool.globalslots")
+		}
+		config.TxPool.GlobalSlots = uint64(value)
+	}
 	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, legacyTPBlacklistFileFlag)
+	}
+	if cli.IsFlagChanged(cmd, localAccountsFileFlag) {
+		config.TxPool.LocalAccountsFile = cli.GetStringFlagValue(cmd, localAccountsFileFlag)
+	}
+	if cli.IsFlagChanged(cmd, allowedTxsFileFlag) {
+		config.TxPool.AllowedTxsFile = cli.GetStringFlagValue(cmd, allowedTxsFileFlag)
 	}
 }
 
@@ -1101,6 +1286,11 @@ var (
 		Usage:    "debugging feature. to print verbose internal objects as JSON in log file. available internal objects: config",
 		DefValue: []string{"config"},
 	}
+	logConsoleFlag = cli.BoolFlag{
+		Name:     "log.console",
+		Usage:    "output log to console only",
+		DefValue: defaultConfig.Log.Console,
+	}
 	// TODO: remove context (this shall not be in the log)
 	logContextIPFlag = cli.StringFlag{
 		Name:     "log.ctx.ip",
@@ -1168,6 +1358,10 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, logVerbosePrintsFlag) {
 		verbosePrintsFlagSlice := cli.GetStringSliceFlagValue(cmd, logVerbosePrintsFlag)
 		config.Log.VerbosePrints = harmonyconfig.FlagSliceToLogVerbosePrints(verbosePrintsFlagSlice)
+	}
+
+	if cli.IsFlagChanged(cmd, logConsoleFlag) {
+		config.Log.Console = cli.GetBoolFlagValue(cmd, logConsoleFlag)
 	}
 
 	if cli.HasFlagsChanged(cmd, []cli.Flag{logContextIPFlag, logContextPortFlag}) {
@@ -1511,6 +1705,12 @@ var (
 		Hidden:   true,
 		DefValue: false,
 	}
+	syncStagedSyncFlag = cli.BoolFlag{
+		Name:     "sync.stagedsync",
+		Usage:    "Enable the staged sync",
+		Hidden:   false,
+		DefValue: false,
+	}
 	syncConcurrencyFlag = cli.IntFlag{
 		Name:   "sync.concurrency",
 		Usage:  "Concurrency when doing p2p sync requests",
@@ -1524,6 +1724,11 @@ var (
 	syncInitStreamsFlag = cli.IntFlag{
 		Name:   "sync.init-peers",
 		Usage:  "Initial shard-wise number of peers to start syncing",
+		Hidden: true,
+	}
+	syncMaxAdvertiseWaitTimeFlag = cli.IntFlag{
+		Name:   "sync.max-advertise-wait-time",
+		Usage:  "The max time duration between two advertises for each p2p peer to tell other nodes what protocols it supports",
 		Hidden: true,
 	}
 	syncDiscSoftLowFlag = cli.IntFlag{
@@ -1558,6 +1763,10 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
 	}
 
+	if cli.IsFlagChanged(cmd, syncStagedSyncFlag) {
+		config.Sync.StagedSync = cli.GetBoolFlagValue(cmd, syncStagedSyncFlag)
+	}
+
 	if cli.IsFlagChanged(cmd, syncConcurrencyFlag) {
 		config.Sync.Concurrency = cli.GetIntFlagValue(cmd, syncConcurrencyFlag)
 	}
@@ -1568,6 +1777,10 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncInitStreamsFlag) {
 		config.Sync.InitStreams = cli.GetIntFlagValue(cmd, syncInitStreamsFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncMaxAdvertiseWaitTimeFlag) {
+		config.Sync.MaxAdvertiseWaitTime = cli.GetIntFlagValue(cmd, syncMaxAdvertiseWaitTimeFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, syncDiscSoftLowFlag) {
@@ -1584,5 +1797,68 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncDiscBatchFlag) {
 		config.Sync.DiscBatch = cli.GetIntFlagValue(cmd, syncDiscBatchFlag)
+	}
+}
+
+// shard data flags
+var (
+	enableShardDataFlag = cli.BoolFlag{
+		Name:     "sharddata.enable",
+		Usage:    "whether use multi-database mode of levelDB",
+		DefValue: defaultConfig.ShardData.EnableShardData,
+	}
+	diskCountFlag = cli.IntFlag{
+		Name:     "sharddata.disk_count",
+		Usage:    "the count of disks you want to storage block data",
+		DefValue: defaultConfig.ShardData.DiskCount,
+	}
+	shardCountFlag = cli.IntFlag{
+		Name:     "sharddata.shard_count",
+		Usage:    "the count of shards you want to split in each disk",
+		DefValue: defaultConfig.ShardData.ShardCount,
+	}
+	cacheTimeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_time",
+		Usage:    "local cache save time (minute)",
+		DefValue: defaultConfig.ShardData.CacheTime,
+	}
+	cacheSizeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_size",
+		Usage:    "local cache storage size (MB)",
+		DefValue: defaultConfig.ShardData.CacheSize,
+	}
+)
+
+// metrics flags required for the go-eth library
+// https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L35-L55
+var (
+	metricsETHFlag = cli.BoolFlag{
+		Name:     "metrics", // https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L30
+		Usage:    "flag required to enable the eth metrics",
+		DefValue: false,
+	}
+
+	metricsExpensiveETHFlag = cli.BoolFlag{
+		Name:     "metrics.expensive", // https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L33
+		Usage:    "flag required to enable the expensive eth metrics",
+		DefValue: false,
+	}
+)
+
+func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, enableShardDataFlag) {
+		cfg.ShardData.EnableShardData = cli.GetBoolFlagValue(cmd, enableShardDataFlag)
+	}
+	if cli.IsFlagChanged(cmd, diskCountFlag) {
+		cfg.ShardData.DiskCount = cli.GetIntFlagValue(cmd, diskCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, shardCountFlag) {
+		cfg.ShardData.ShardCount = cli.GetIntFlagValue(cmd, shardCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheTimeFlag) {
+		cfg.ShardData.CacheTime = cli.GetIntFlagValue(cmd, cacheTimeFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheSizeFlag) {
+		cfg.ShardData.CacheSize = cli.GetIntFlagValue(cmd, cacheSizeFlag)
 	}
 }

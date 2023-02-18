@@ -5,11 +5,12 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/harmony-one/harmony/rosetta"
 	hmy_rpc "github.com/harmony-one/harmony/rpc"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/rpc/filters"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // IsCurrentlyLeader exposes if node is currently the leader node
@@ -19,7 +20,7 @@ func (node *Node) IsCurrentlyLeader() bool {
 
 // PeerConnectivity ..
 func (node *Node) PeerConnectivity() (int, int, int) {
-	return node.host.C()
+	return node.host.PeerConnectivity()
 }
 
 // ListPeer return list of peers for a certain topic
@@ -70,7 +71,7 @@ func (node *Node) StartRPC() error {
 	// Gather all the possible APIs to surface
 	apis := node.APIs(harmony)
 
-	return hmy_rpc.StartServers(harmony, apis, node.NodeConfig.RPCServer)
+	return hmy_rpc.StartServers(harmony, apis, node.NodeConfig.RPCServer, node.HarmonyConfig.RPCOpt)
 }
 
 // StopRPC stop RPC service
@@ -92,14 +93,22 @@ func (node *Node) StopRosetta() error {
 // APIs return the collection of local RPC services.
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (node *Node) APIs(harmony *hmy.Harmony) []rpc.API {
+	hmyFilter := filters.NewPublicFilterAPI(harmony, false, "hmy", harmony.ShardID)
+	ethFilter := filters.NewPublicFilterAPI(harmony, false, "eth", harmony.ShardID)
+
+	if node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
+		hmyFilter.Service.(*filters.PublicFilterAPI).SyncNewFilterFromOtherReaders()
+		ethFilter.Service.(*filters.PublicFilterAPI).SyncNewFilterFromOtherReaders()
+	}
+
 	// Append all the local APIs and return
 	return []rpc.API{
 		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.V1),
 		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.V2),
 		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.Eth),
 		hmy_rpc.NewPublicWeb3API(),
-		filters.NewPublicFilterAPI(harmony, false, "hmy"),
-		filters.NewPublicFilterAPI(harmony, false, "eth"),
+		hmyFilter,
+		ethFilter,
 	}
 }
 
@@ -125,7 +134,7 @@ func (node *Node) GetConsensusCurViewID() uint64 {
 
 // GetConsensusBlockNum returns the current block number of the consensus
 func (node *Node) GetConsensusBlockNum() uint64 {
-	return node.Consensus.GetBlockNum()
+	return node.Consensus.BlockNum()
 }
 
 // GetConsensusInternal returns consensus internal data

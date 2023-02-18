@@ -71,9 +71,10 @@ type HeaderChain struct {
 }
 
 // NewHeaderChain creates a new HeaderChain structure.
-//  getValidator should return the parent's validator
-//  procInterrupt points to the parent's interrupt semaphore
-//  wg points to the parent's shutdown wait group
+//
+//	getValidator should return the parent's validator
+//	procInterrupt points to the parent's interrupt semaphore
+//	wg points to the parent's shutdown wait group
 func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine consensus_engine.Engine, procInterrupt func() bool) (*HeaderChain, error) {
 	headerCache, _ := lru.New(headerCacheLimit)
 	tdCache, _ := lru.New(tdCacheLimit)
@@ -110,7 +111,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 		}
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
-
+	headHeaderGauge.Update(hc.CurrentHeader().Number().Int64())
 	return hc, nil
 }
 
@@ -348,9 +349,9 @@ func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, ma
 		return common.Hash{}, 0
 	}
 	for ancestor != 0 {
-		if rawdb.ReadCanonicalHash(hc.chainDb, number) == hash {
+		if hc.GetCanonicalHash(number) == hash {
 			number -= ancestor
-			return rawdb.ReadCanonicalHash(hc.chainDb, number), number
+			return hc.GetCanonicalHash(number), number
 		}
 		if *maxNonCanonical == 0 {
 			return common.Hash{}, 0
@@ -448,6 +449,10 @@ func (hc *HeaderChain) GetHeaderByNumber(number uint64) *block.Header {
 }
 
 func (hc *HeaderChain) getHashByNumber(number uint64) common.Hash {
+	return hc.GetCanonicalHash(number)
+}
+
+func (hc *HeaderChain) GetCanonicalHash(number uint64) common.Hash {
 	// Since canonical chain is immutable, it's safe to read header
 	// hash by number from cache.
 	if hash, ok := hc.canonicalCache.Get(number); ok {
@@ -474,6 +479,7 @@ func (hc *HeaderChain) SetCurrentHeader(head *block.Header) error {
 
 	hc.currentHeader.Store(head)
 	hc.currentHeaderHash = head.Hash()
+	headHeaderGauge.Update(head.Number().Int64())
 	return nil
 }
 
@@ -530,7 +536,7 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) error {
 		hc.currentHeader.Store(hc.genesisHeader)
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
-
+	headHeaderGauge.Update(hc.CurrentHeader().Number().Int64())
 	return nil
 }
 

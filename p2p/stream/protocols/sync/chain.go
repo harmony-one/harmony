@@ -6,6 +6,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/utils/keylocker"
 	"github.com/pkg/errors"
 )
 
@@ -18,14 +19,16 @@ type chainHelper interface {
 }
 
 type chainHelperImpl struct {
-	chain    engine.ChainReader
-	schedule shardingconfig.Schedule
+	chain     engine.ChainReader
+	schedule  shardingconfig.Schedule
+	keyLocker *keylocker.KeyLocker
 }
 
 func newChainHelper(chain engine.ChainReader, schedule shardingconfig.Schedule) *chainHelperImpl {
 	return &chainHelperImpl{
-		chain:    chain,
-		schedule: schedule,
+		chain:     chain,
+		schedule:  schedule,
+		keyLocker: keylocker.New(),
 	}
 }
 
@@ -47,23 +50,20 @@ func (ch *chainHelperImpl) getBlockHashes(bns []uint64) []common.Hash {
 }
 
 func (ch *chainHelperImpl) getBlocksByNumber(bns []uint64) ([]*types.Block, error) {
-	var (
-		blocks = make([]*types.Block, 0, len(bns))
-	)
+	curBlock := ch.chain.CurrentHeader().Number().Uint64()
+	blocks := make([]*types.Block, 0, len(bns))
 	for _, bn := range bns {
-		var (
-			block *types.Block
-			err   error
-		)
+		if curBlock < bn {
+			continue
+		}
 		header := ch.chain.GetHeaderByNumber(bn)
 		if header != nil {
-			block, err = ch.getBlockWithSigByHeader(header)
+			block, err := ch.getBlockWithSigByHeader(header)
 			if err != nil {
 				return nil, errors.Wrapf(err, "get block %v at %v", header.Hash().String(), header.Number())
 			}
+			blocks = append(blocks, block)
 		}
-		blocks = append(blocks, block)
-
 	}
 	return blocks, nil
 }
@@ -89,19 +89,25 @@ func (ch *chainHelperImpl) getBlocksByHashes(hs []common.Hash) ([]*types.Block, 
 	return blocks, nil
 }
 
-var errBlockNotFound = errors.New("block not found")
-
 func (ch *chainHelperImpl) getBlockWithSigByHeader(header *block.Header) (*types.Block, error) {
-	b := ch.chain.GetBlock(header.Hash(), header.Number().Uint64())
-	if b == nil {
-		return nil, nil
-	}
-	commitSig, err := ch.getBlockSigAndBitmap(header)
+	rs, err := ch.keyLocker.Lock(header.Number().Uint64(), func() (interface{}, error) {
+		b := ch.chain.GetBlock(header.Hash(), header.Number().Uint64())
+		if b == nil {
+			return nil, errors.Errorf("block %d not found", header.Number().Uint64())
+		}
+		commitSig, err := ch.getBlockSigAndBitmap(header)
+		if err != nil {
+			return nil, errors.New("missing commit signature")
+		}
+		b.SetCurrentCommitSig(commitSig)
+		return b, nil
+	})
+
 	if err != nil {
-		return nil, errors.New("missing commit signature")
+		return nil, err
 	}
-	b.SetCurrentCommitSig(commitSig)
-	return b, nil
+
+	return rs.(*types.Block), nil
 }
 
 func (ch *chainHelperImpl) getBlockSigAndBitmap(header *block.Header) ([]byte, error) {

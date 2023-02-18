@@ -59,7 +59,18 @@ const (
 	DefaultPrometheusPort = 9900
 	// DefaultP2PConcurrency is the default P2P concurrency, 0 means is set the default value of P2P Discovery, the actual value is 10
 	DefaultP2PConcurrency = 0
-	DefaultMaxConnPerIP   = 10
+	// DefaultMaxConnPerIP is the maximum number of connections to/from a remote IP
+	DefaultMaxConnPerIP = 10
+	// DefaultMaxPeers is the maximum number of remote peers, with 0 representing no limit
+	DefaultMaxPeers = 0
+	// DefaultConnManagerLowWatermark is the lowest number of connections that'll be maintained in connection manager
+	DefaultConnManagerLowWatermark = 160
+	// DefaultConnManagerHighWatermark is the highest number of connections that'll be maintained in connection manager
+	// When the peer count exceeds the 'high watermark', as many peers will be pruned (and
+	// their connections terminated) until 'low watermark' peers remain.
+	DefaultConnManagerHighWatermark = 192
+	// DefaultWaitForEachPeerToConnect sets the sync configs to connect to neighbor peers one by one and waits for each peer to connect.
+	DefaultWaitForEachPeerToConnect = false
 )
 
 const (

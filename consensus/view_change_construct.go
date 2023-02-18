@@ -87,7 +87,7 @@ func (vc *viewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.Pub
 	}
 }
 
-// Reset reset the state for viewchange
+// Reset resets the state for viewChange.
 func (vc *viewChange) Reset() {
 	vc.m1Payload = []byte{}
 	vc.bhpSigs = map[uint64]map[string]*bls_core.Sign{}
@@ -108,6 +108,10 @@ func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog) ([]byte, []byte) {
 	blockHash := [32]byte{}
 	// First 32 bytes of m1 payload is the correct block hash
 	copy(blockHash[:], vc.GetM1Payload())
+
+	if !fbftlog.IsBlockVerified(blockHash) {
+		return nil, nil
+	}
 
 	if block := fbftlog.GetBlockByHash(blockHash); block != nil {
 		encodedBlock, err := rlp.EncodeToBytes(block)
@@ -440,7 +444,8 @@ func (vc *viewChange) InitPayload(
 					vc.nilBitmap[viewID] = nilBitmap
 				}
 				if err := vc.nilBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
-					vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] nilBitmap setkey failed")
+					vc.getLogger().Warn().Err(err).
+						Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] nilBitmap setkey failed")
 					continue
 				}
 				if _, ok := vc.nilSigs[viewID]; !ok {
@@ -471,7 +476,8 @@ func (vc *viewChange) InitPayload(
 				vc.viewIDBitmap[viewID] = viewIDBitmap
 			}
 			if err := vc.viewIDBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
-				vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] viewIDBitmap setkey failed")
+				vc.getLogger().Warn().Err(err).
+					Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] viewIDBitmap setkey failed")
 				continue
 			}
 			if _, ok := vc.viewIDSigs[viewID]; !ok {
@@ -500,7 +506,7 @@ func (vc *viewChange) GetViewIDBitmap(viewID uint64) *bls_cosi.Mask {
 	return vc.viewIDBitmap[viewID]
 }
 
-// GetM1Payload returns the m1Payload
+// GetM1Payload returns the m1Payload.
 func (vc *viewChange) GetM1Payload() []byte {
 	return vc.m1Payload
 }

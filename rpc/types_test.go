@@ -3,11 +3,13 @@ package rpc
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -69,4 +71,26 @@ func checkAddressOrListEqual(a, b *AddressOrList) error {
 		}
 	}
 	return nil
+}
+
+func TestDelegation_IntoStructuredResponse(t *testing.T) {
+	d := Delegation{
+		ValidatorAddress: "one1hwe68yprkhp5sqq5u7sm9uqu8jxz87fd7ffex7",
+		DelegatorAddress: "one1c5yja54ksccgmn4njz5w4cqyjwhqatlly7gkm3",
+		Amount:           big.NewInt(1000),
+		Reward:           big.NewInt(1014),
+		Undelegations:    make([]Undelegation, 0),
+	}
+	rs1, err := NewStructuredResponse(d)
+	require.NoError(t, err)
+
+	rs2 := d.IntoStructuredResponse()
+
+	js1, err := json.Marshal(rs1)
+	require.NoError(t, err)
+
+	js2, err := json.Marshal(rs2)
+	require.NoError(t, err)
+
+	require.JSONEq(t, string(js1), string(js2))
 }

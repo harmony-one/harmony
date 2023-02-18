@@ -48,6 +48,7 @@ type environment struct {
 	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
 	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
 	slashes    slash.Records
+	stakeMsgs  []staking.StakeMsg
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -55,7 +56,8 @@ type environment struct {
 type Worker struct {
 	config   *params.ChainConfig
 	factory  blockfactory.Factory
-	chain    *core.BlockChain
+	chain    core.BlockChain
+	beacon   core.BlockChain
 	current  *environment // An environment for current running cycle.
 	engine   consensus_engine.Engine
 	gasFloor uint64
@@ -68,6 +70,12 @@ func (w *Worker) CommitSortedTransactions(
 	coinbase common.Address,
 ) {
 	for {
+		if w.current.gasPool.Gas() < 50000000 {
+			// Temporary solution to reduce the fullness of the block. Break here when the available gas left hit 50M.
+			// Effectively making the gas limit 30M (since 80M is the default gas limit)
+			utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("[Temp Gas Limit] Not enough gas for further transactions")
+			break
+		}
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
 			utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("Not enough gas for further transactions")
@@ -216,6 +224,11 @@ func (w *Worker) commitStakingTransaction(
 	return nil
 }
 
+// ApplyTestnetShardReduction only used to reduce shards of Testnet
+func (w *Worker) ApplyTestnetShardReduction() {
+	core.MayTestnetShardReduction(w.chain, w.current.state, w.current.header)
+}
+
 var (
 	errNilReceipt = errors.New("nil receipt")
 )
@@ -225,7 +238,7 @@ func (w *Worker) commitTransaction(
 ) error {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, cx, _, err := core.ApplyTransaction(
+	receipt, cx, stakeMsgs, _, err := core.ApplyTransaction(
 		w.config,
 		w.chain,
 		&coinbase,
@@ -252,6 +265,7 @@ func (w *Worker) commitTransaction(
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	w.current.logs = append(w.current.logs, receipt.Logs...)
+	w.current.stakeMsgs = append(w.current.stakeMsgs, stakeMsgs...)
 
 	if cx != nil {
 		w.current.outcxs = append(w.current.outcxs, cx)
@@ -332,6 +346,7 @@ func (w *Worker) GetCurrentResult() *core.ProcessorResult {
 		UsedGas:    w.current.header.GasUsed(),
 		Reward:     w.current.reward,
 		State:      w.current.state,
+		StakeMsgs:  w.current.stakeMsgs,
 	}
 }
 
@@ -544,7 +559,9 @@ func (w *Worker) FinalizeNewBlock(
 	}()
 
 	block, payout, err := w.engine.Finalize(
-		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
+		w.chain,
+		w.beacon,
+		copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
 		w.current.slashes, sigsReady, viewID,
 	)
@@ -557,12 +574,13 @@ func (w *Worker) FinalizeNewBlock(
 
 // New create a new worker object.
 func New(
-	config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine,
+	config *params.ChainConfig, chain core.BlockChain, beacon core.BlockChain, engine consensus_engine.Engine,
 ) *Worker {
 	worker := &Worker{
 		config:  config,
 		factory: blockfactory.NewFactory(config),
 		chain:   chain,
+		beacon:  beacon,
 		engine:  engine,
 	}
 	worker.gasFloor = 80000000

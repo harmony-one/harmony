@@ -90,7 +90,8 @@ type DB struct {
 	// The refund counter, also used by state transitioning.
 	refund uint64
 
-	thash, bhash common.Hash
+	thash, bhash common.Hash // thash means hmy tx hash
+	ethTxHash    common.Hash // ethTxHash is eth tx hash, use by tracer
 	txIndex      int
 	logs         map[common.Hash][]*types.Log
 	logSize      uint
@@ -158,6 +159,7 @@ func (db *DB) Reset(root common.Hash) error {
 	db.stateValidators = make(map[common.Address]*stk.ValidatorWrapper)
 	db.thash = common.Hash{}
 	db.bhash = common.Hash{}
+	db.ethTxHash = common.Hash{}
 	db.txIndex = 0
 	db.logs = make(map[common.Hash][]*types.Log)
 	db.logSize = 0
@@ -262,6 +264,10 @@ func (db *DB) TxIndex() int {
 
 func (s *DB) TxHash() common.Hash {
 	return s.thash
+}
+
+func (s *DB) TxHashETH() common.Hash {
+	return s.ethTxHash
 }
 
 // BlockHash returns the current block hash set by Prepare.
@@ -536,7 +542,10 @@ func (db *DB) createObject(addr common.Address) (newobj, prev *Object) {
 		db.journal.append(resetObjectChange{prev: prev})
 	}
 	db.setStateObject(newobj)
-	return newobj, prev
+	if prev != nil && !prev.deleted {
+		return newobj, prev
+	}
+	return newobj, nil
 }
 
 // CreateAccount explicitly creates a state object. If a state object with the address
@@ -545,8 +554,8 @@ func (db *DB) createObject(addr common.Address) (newobj, prev *Object) {
 // CreateAccount is called during the EVM CREATE operation. The situation might arise that
 // a contract does the following:
 //
-//   1. sends funds to sha(account ++ (nonce + 1))
-//   2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
+//  1. sends funds to sha(account ++ (nonce + 1))
+//  2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
 //
 // Carrying over the balance ensures that Ether doesn't disappear.
 func (db *DB) CreateAccount(addr common.Address) {
@@ -747,6 +756,10 @@ func (db *DB) Prepare(thash, bhash common.Hash, ti int) {
 	db.txIndex = ti
 }
 
+func (db *DB) SetTxHashETH(ethTxHash common.Hash) {
+	db.ethTxHash = ethTxHash
+}
+
 func (db *DB) clearJournalAndRefund() {
 	if len(db.journal.entries) > 0 {
 		db.journal = newJournal()
@@ -798,7 +811,7 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 }
 
 var (
-	errAddressNotPresent = errors.New("address not present in state")
+	ErrAddressNotPresent = errors.New("address not present in state")
 )
 
 // ValidatorWrapper retrieves the existing validator in the cache, if sendOriginal
@@ -824,7 +837,7 @@ func (db *DB) ValidatorWrapper(
 
 	by := db.GetCode(addr)
 	if len(by) == 0 {
-		return nil, errAddressNotPresent
+		return nil, ErrAddressNotPresent
 	}
 	val := stk.ValidatorWrapper{}
 	if err := rlp.DecodeBytes(by, &val); err != nil {
@@ -887,7 +900,7 @@ func (db *DB) UpdateValidatorWrapperWithRevert(
 	// a copy of the existing store can be used for revert
 	// since we are replacing the existing with the new anyway
 	prev, err := db.ValidatorWrapper(addr, true, false)
-	if err != nil && err != errAddressNotPresent {
+	if err != nil && err != ErrAddressNotPresent {
 		return err
 	}
 	if err := db.UpdateValidatorWrapper(addr, val); err != nil {

@@ -25,9 +25,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
 	blsPriKey := bls.RandPrivateKey()
-	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
-	)
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -60,7 +58,7 @@ func TestSetViewID(t *testing.T) {
 	)
 	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

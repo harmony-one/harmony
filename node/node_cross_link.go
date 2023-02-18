@@ -1,8 +1,12 @@
 package node
 
 import (
+	"math/big"
+
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -15,41 +19,83 @@ const (
 	crossLinkBatchSize      = 3
 )
 
-var (
-	errAlreadyExist = errors.New("crosslink already exist")
-)
+// ProcessCrossLinkHeartbeatMessage process crosslink heart beat signal.
+// This function is only called on shards 1,2,3 when network message `CrosslinkHeartbeat` receiving.
+func (node *Node) ProcessCrossLinkHeartbeatMessage(msgPayload []byte) {
+	if err := node.processCrossLinkHeartbeatMessage(msgPayload); err != nil {
+		utils.Logger().Err(err).
+			Msg("[ProcessCrossLinkHeartbeatMessage] failed process crosslink heartbeat signal")
+	}
+}
 
-// VerifyBlockCrossLinks verifies the cross links of the block
-func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
-	cxLinksData := block.Header().CrossLinks()
-	if len(cxLinksData) == 0 {
-		utils.Logger().Debug().Msgf("[CrossLinkVerification] Zero CrossLinks in the header")
+func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
+	hb := types.CrosslinkHeartbeat{}
+	err := rlp.DecodeBytes(msgPayload, &hb)
+	if err != nil {
+		return err
+	}
+	shardID := node.Blockchain().CurrentBlock().ShardID()
+	if hb.ShardID != shardID {
+		return errors.Errorf("invalid shard id: expected %d, got %d", shardID, hb.ShardID)
+	}
+
+	// Outdated signal.
+	if s := node.crosslinks.LastKnownCrosslinkHeartbeatSignal(); s != nil && s.LatestContinuousBlockNum > hb.LatestContinuousBlockNum {
 		return nil
 	}
 
-	crossLinks := types.CrossLinks{}
-	err := rlp.DecodeBytes(cxLinksData, &crossLinks)
+	sig := &ffi_bls.Sign{}
+	err = sig.Deserialize(hb.Signature)
 	if err != nil {
-		return errors.Wrapf(
-			err, "[CrossLinkVerification] failed to decode cross links",
-		)
+		return err
 	}
 
-	if !crossLinks.IsSorted() {
-		return errors.New("[CrossLinkVerification] cross links are not sorted")
+	hb.Signature = nil
+	serialized, err := rlp.EncodeToBytes(hb)
+	if err != nil {
+		return err
 	}
 
-	for _, crossLink := range crossLinks {
-		cl, err := node.Blockchain().ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
-		if err == nil && cl != nil {
-			// Add slash for exist same blocknum but different crosslink
-			return errAlreadyExist
+	pub := ffi_bls.PublicKey{}
+	err = pub.Deserialize(hb.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	ok := sig.VerifyHash(&pub, serialized)
+	if !ok {
+		return errors.New("invalid signature")
+	}
+
+	state, err := node.EpochChain().ReadShardState(big.NewInt(int64(hb.Epoch)))
+	if err != nil {
+		return err
+	}
+
+	committee, err := state.FindCommitteeByID(shard.BeaconChainShardID)
+	if err != nil {
+		return err
+	}
+	pubs, err := committee.BLSPublicKeys()
+	if err != nil {
+		return err
+	}
+
+	keyExists := false
+	for _, row := range pubs {
+		if pub.IsEqual(row.Object) {
+			keyExists = true
+			break
 		}
-		if err := node.VerifyCrossLink(crossLink); err != nil {
-			return errors.Wrapf(err, "cannot VerifyBlockCrossLinks")
-
-		}
 	}
+
+	if !keyExists {
+		return errors.New("pub key doesn't exist")
+	}
+
+	utils.Logger().Info().
+		Msgf("[ProcessCrossLinkHeartbeatMessage] storing hb signal with block num %d", hb.LatestContinuousBlockNum)
+	node.crosslinks.SetLastKnownCrosslinkHeartbeatSignal(&hb)
 	return nil
 }
 
@@ -68,7 +114,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			existingCLs[pending.Hash()] = struct{}{}
 		}
 
-		crosslinks := []types.CrossLink{}
+		var crosslinks []types.CrossLink
 		if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
 			utils.Logger().Error().
 				Err(err).
@@ -76,7 +122,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			return
 		}
 
-		candidates := []types.CrossLink{}
+		var candidates []types.CrossLink
 		utils.Logger().Debug().
 			Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks))
 
@@ -93,6 +139,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				continue
 			}
 
+			// ReadCrossLink beacon chain usage.
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
@@ -101,7 +148,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				continue
 			}
 
-			if err = node.VerifyCrossLink(cl); err != nil {
+			if err = core.VerifyCrossLink(node.Blockchain(), cl); err != nil {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "invalid_crosslink"}).Inc()
 				utils.Logger().Info().
 					Str("cross-link-issue", err.Error()).
@@ -127,6 +174,10 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 		return errors.New("[VerifyCrossLink] Shard chains should not verify cross links")
+	}
+	instance := shard.Schedule.InstanceForEpoch(node.Blockchain().CurrentHeader().Epoch())
+	if cl.ShardID() >= instance.NumShards() {
+		return errors.New("[VerifyCrossLink] ShardID should less than NumShards")
 	}
 	engine := node.Blockchain().Engine()
 
