@@ -21,7 +21,7 @@ VERBOSE=
 if [ "$(uname -s)" == "Darwin" ]; then
    GO_GCFLAGS=""
 else
-   GO_GCFLAGS="all=-c 2"
+   GO_GCFLAGS=""
 fi
 DEBUG=false
 STATIC=true
