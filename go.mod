@@ -3,7 +3,7 @@ module github.com/harmony-one/harmony
 go 1.19
 
 require (
-	github.com/RoaringBitmap/roaring v1.2.1
+	github.com/RoaringBitmap/roaring v1.2.3
 	github.com/VictoriaMetrics/fastcache v1.5.7
 	github.com/Workiva/go-datastructures v1.0.50
 	github.com/allegro/bigcache v1.2.1
