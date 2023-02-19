@@ -41,7 +41,7 @@ func readCheckpointBitmap(db databaseReader) (*roaring64.Bitmap, error) {
 }
 
 // writeCheckpointBitmap write explorer checkpoint bitmap to storage
-func writeCheckpointBitmap(db databaseWriter, rb *roaring64.Bitmap) error {
+func writeCheckpointBitmap(db databaseWriter, rb Bitmap) error {
 	bitmapByte, err := rb.MarshalBinary()
 	if err != nil {
 		return err
