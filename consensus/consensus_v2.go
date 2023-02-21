@@ -714,7 +714,15 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		}
 	}
 	// Passed all checks, we can change leader.
-	wasFound, next := consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
+	var (
+		wasFound bool
+		next     *bls.PublicKeyWrapper
+	)
+	if consensus.ShardID == shard.BeaconChainShardID {
+		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
+	} else {
+		wasFound, next = consensus.Decider.NthNext(leader, 1)
+	}
 	if !wasFound {
 		utils.Logger().Error().Msg("Failed to get next leader")
 		return
