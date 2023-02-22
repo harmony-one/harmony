@@ -202,7 +202,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 	// FIXME: rotate leader on harmony nodes only before fully externalization
 	var wasFound bool
 	var next *bls.PublicKeyWrapper
-	if consensus.Blockchain().Config().IsLeaderRotation(epoch) {
+	if blockchain != nil && blockchain.Config().IsLeaderRotation(epoch) {
 		if consensus.ShardID == shard.BeaconChainShardID {
 			wasFound, next = consensus.Decider.NthNextHmy(
 				shard.Schedule.InstanceForEpoch(epoch),
