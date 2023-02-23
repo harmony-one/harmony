@@ -31,11 +31,18 @@ type PublicContractService struct {
 	hmy     *hmy.Harmony
 	version Version
 	// TEMP SOLUTION to rpc node spamming issue
-	limiterCall *rate.Limiter
+	limiterCall    *rate.Limiter
+	evmCallTimeout time.Duration
 }
 
 // NewPublicContractAPI creates a new API for the RPC interface
-func NewPublicContractAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
+func NewPublicContractAPI(
+	hmy *hmy.Harmony,
+	version Version,
+	limiterEnable bool,
+	limit int,
+	evmCallTimeout time.Duration,
+) rpc.API {
 	var limiter *rate.Limiter
 	if limiterEnable {
 		limiter = rate.NewLimiter(rate.Limit(limit), limit)
@@ -44,8 +51,13 @@ func NewPublicContractAPI(hmy *hmy.Harmony, version Version, limiterEnable bool,
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicContractService{hmy, version, limiter},
-		Public:    true,
+		Service: &PublicContractService{
+			hmy:            hmy,
+			version:        version,
+			limiterCall:    limiter,
+			evmCallTimeout: evmCallTimeout,
+		},
+		Public: true,
 	}
 }
 
@@ -80,7 +92,7 @@ func (s *PublicContractService) Call(
 	}
 
 	// Execute call
-	result, err := DoEVMCall(ctx, s.hmy, args, blockNrOrHash, CallTimeout)
+	result, err := DoEVMCall(ctx, s.hmy, args, blockNrOrHash, s.evmCallTimeout)
 	if err != nil {
 		return nil, err
 	}
