@@ -55,8 +55,9 @@ var (
 	wsEndpoint       = ""
 	wsAuthEndpoint   = ""
 	httpVirtualHosts = []string{"*"}
-	httpOrigins      = []string{"*"}
-	wsOrigins        = []string{"*"}
+	// httpTimeouts     = rpc.DefaultHTTPTimeouts
+	httpOrigins = []string{"*"}
+	wsOrigins   = []string{"*"}
 )
 
 // Version of the RPC
