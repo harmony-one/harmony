@@ -340,6 +340,23 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.5.12"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("HTTP.ReadTimeout") == nil {
+			confTree.Set("HTTP.ReadTimeout", defaultConfig.HTTP.ReadTimeout)
+		}
+		if confTree.Get("HTTP.WriteTimeout") == nil {
+			confTree.Set("HTTP.WriteTimeout", defaultConfig.HTTP.WriteTimeout)
+		}
+		if confTree.Get("HTTP.IdleTimeout") == nil {
+			confTree.Set("HTTP.IdleTimeout", defaultConfig.HTTP.IdleTimeout)
+		}
+		if confTree.Get("RPCOpt.EvmCallTimeout") == nil {
+			confTree.Set("RPCOpt.EvmCallTimeout", defaultConfig.RPCOpt.EvmCallTimeout)
+		}
+		confTree.Set("Version", "2.5.13")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {
