@@ -85,7 +85,8 @@ func getRouter(asserter *asserter.Asserter, hmy *hmy.Harmony, limiterEnable bool
 		server.NewNetworkAPIController(services.NewNetworkAPI(hmy), asserter),
 		server.NewConstructionAPIController(services.NewConstructionAPI(hmy), asserter),
 		server.NewCallAPIController(
-			services.NewCallAPIService(hmy, limiterEnable, rateLimit, hmy.NodeAPI.GetConfig().NodeConfig.RPCServer.EvmCallTimeout),
+			services.NewCallAPIService(hmy, limiterEnable, rateLimit,
+				hmy.NodeAPI.GetConfig().NodeConfig.RPCServer.EvmCallTimeout),
 			asserter,
 		),
 		server.NewEventsAPIController(services.NewEventAPI(hmy), asserter),
