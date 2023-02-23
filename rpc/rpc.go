@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
@@ -28,8 +27,6 @@ const (
 const (
 	// APIVersion used for DApp's, bumped after RPC refactor (7/2020)
 	APIVersion = "1.1"
-	// CallTimeout is the timeout given to all contract calls
-	CallTimeout = 5 * time.Second
 	// LogTag is the tag found in the log for all RPC logs
 	LogTag = "[RPC]"
 	// HTTPPortOffset ..
@@ -58,9 +55,8 @@ var (
 	wsEndpoint       = ""
 	wsAuthEndpoint   = ""
 	httpVirtualHosts = []string{"*"}
-	// httpTimeouts     = rpc.DefaultHTTPTimeouts
-	httpOrigins = []string{"*"}
-	wsOrigins   = []string{"*"}
+	httpOrigins      = []string{"*"}
+	wsOrigins        = []string{"*"}
 )
 
 // Version of the RPC
