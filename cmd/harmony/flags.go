@@ -75,6 +75,9 @@ var (
 		httpPortFlag,
 		httpAuthPortFlag,
 		httpRosettaPortFlag,
+		httpReadTimeoutFlag,
+		httpWriteTimeoutFlag,
+		httpIdleTimeoutFlag,
 	}
 
 	wsFlags = []cli.Flag{
@@ -92,6 +95,7 @@ var (
 		rpcFilterFileFlag,
 		rpcRateLimiterEnabledFlag,
 		rpcRateLimitFlag,
+		rpcEvmCallTimeoutFlag,
 	}
 
 	blsFlags = append(newBLSFlags, legacyBLSFlags...)
@@ -695,6 +699,21 @@ var (
 		Usage:    "rosetta port to listen for HTTP requests",
 		DefValue: defaultConfig.HTTP.RosettaPort,
 	}
+	httpReadTimeoutFlag = cli.StringFlag{
+		Name:     "http.timeout.read",
+		Usage:    "maximum duration to read the entire request, including the body",
+		DefValue: defaultConfig.HTTP.ReadTimeout,
+	}
+	httpWriteTimeoutFlag = cli.StringFlag{
+		Name:     "http.timeout.write",
+		Usage:    "maximum duration before timing out writes of the response",
+		DefValue: defaultConfig.HTTP.WriteTimeout,
+	}
+	httpIdleTimeoutFlag = cli.StringFlag{
+		Name:     "http.timeout.idle",
+		Usage:    "maximum amount of time to wait for the next request when keep-alives are enabled",
+		DefValue: defaultConfig.HTTP.IdleTimeout,
+	}
 )
 
 func applyHTTPFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -730,6 +749,16 @@ func applyHTTPFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		config.HTTP.Enabled = cli.GetBoolFlagValue(cmd, httpEnabledFlag)
 	} else if isRPCSpecified {
 		config.HTTP.Enabled = true
+	}
+
+	if cli.IsFlagChanged(cmd, httpReadTimeoutFlag) {
+		config.HTTP.ReadTimeout = cli.GetStringFlagValue(cmd, httpReadTimeoutFlag)
+	}
+	if cli.IsFlagChanged(cmd, httpWriteTimeoutFlag) {
+		config.HTTP.WriteTimeout = cli.GetStringFlagValue(cmd, httpWriteTimeoutFlag)
+	}
+	if cli.IsFlagChanged(cmd, httpIdleTimeoutFlag) {
+		config.HTTP.IdleTimeout = cli.GetStringFlagValue(cmd, httpIdleTimeoutFlag)
 	}
 
 }
@@ -821,6 +850,12 @@ var (
 		Usage:    "the number of requests per second for RPCs",
 		DefValue: defaultConfig.RPCOpt.RequestsPerSecond,
 	}
+
+	rpcEvmCallTimeoutFlag = cli.StringFlag{
+		Name:     "rpc.evm-call-timeout",
+		Usage:    "timeout for evm execution (eth_call); 0 means infinite timeout",
+		DefValue: defaultConfig.RPCOpt.EvmCallTimeout,
+	}
 )
 
 func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -845,7 +880,9 @@ func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcRateLimitFlag) {
 		config.RPCOpt.RequestsPerSecond = cli.GetIntFlagValue(cmd, rpcRateLimitFlag)
 	}
-
+	if cli.IsFlagChanged(cmd, rpcEvmCallTimeoutFlag) {
+		config.RPCOpt.EvmCallTimeout = cli.GetStringFlagValue(cmd, rpcEvmCallTimeoutFlag)
+	}
 }
 
 // bls flags

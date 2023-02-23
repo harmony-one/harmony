@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.12"
+const tomlConfigVersion = "2.5.13"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -44,6 +44,9 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		Port:           nodeconfig.DefaultRPCPort,
 		AuthPort:       nodeconfig.DefaultAuthRPCPort,
 		RosettaPort:    nodeconfig.DefaultRosettaPort,
+		ReadTimeout:    nodeconfig.DefaultHTTPTimeoutRead,
+		WriteTimeout:   nodeconfig.DefaultHTTPTimeoutWrite,
+		IdleTimeout:    nodeconfig.DefaultHTTPTimeoutIdle,
 	},
 	WS: harmonyconfig.WsConfig{
 		Enabled:  true,
@@ -59,6 +62,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		RpcFilterFile:      "./.hmy/rpc_filter.txt",
 		RateLimterEnabled:  true,
 		RequestsPerSecond:  nodeconfig.DefaultRPCRateLimit,
+		EvmCallTimeout:     nodeconfig.DefaultEvmCallTimeout,
 	},
 	BLSKeys: harmonyconfig.BlsConfig{
 		KeyDir:   "./.hmy/blskeys",

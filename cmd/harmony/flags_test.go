@@ -77,6 +77,9 @@ func TestHarmonyFlags(t *testing.T) {
 					AuthPort:       9501,
 					RosettaEnabled: false,
 					RosettaPort:    9700,
+					ReadTimeout:    defaultConfig.HTTP.ReadTimeout,
+					WriteTimeout:   defaultConfig.HTTP.WriteTimeout,
+					IdleTimeout:    defaultConfig.HTTP.IdleTimeout,
 				},
 				RPCOpt: harmonyconfig.RpcOptConfig{
 					DebugEnabled:       false,
@@ -86,6 +89,7 @@ func TestHarmonyFlags(t *testing.T) {
 					RpcFilterFile:      "./.hmy/rpc_filter.txt",
 					RateLimterEnabled:  true,
 					RequestsPerSecond:  1000,
+					EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
 				},
 				WS: harmonyconfig.WsConfig{
 					Enabled:  true,
@@ -531,6 +535,9 @@ func TestRPCFlags(t *testing.T) {
 				Port:           defaultConfig.HTTP.Port,
 				AuthPort:       defaultConfig.HTTP.AuthPort,
 				RosettaPort:    defaultConfig.HTTP.RosettaPort,
+				ReadTimeout:    defaultConfig.HTTP.ReadTimeout,
+				WriteTimeout:   defaultConfig.HTTP.WriteTimeout,
+				IdleTimeout:    defaultConfig.HTTP.IdleTimeout,
 			},
 		},
 		{
@@ -542,6 +549,9 @@ func TestRPCFlags(t *testing.T) {
 				Port:           9001,
 				AuthPort:       defaultConfig.HTTP.AuthPort,
 				RosettaPort:    defaultConfig.HTTP.RosettaPort,
+				ReadTimeout:    defaultConfig.HTTP.ReadTimeout,
+				WriteTimeout:   defaultConfig.HTTP.WriteTimeout,
+				IdleTimeout:    defaultConfig.HTTP.IdleTimeout,
 			},
 		},
 		{
@@ -553,6 +563,9 @@ func TestRPCFlags(t *testing.T) {
 				Port:           defaultConfig.HTTP.Port,
 				AuthPort:       9001,
 				RosettaPort:    defaultConfig.HTTP.RosettaPort,
+				ReadTimeout:    defaultConfig.HTTP.ReadTimeout,
+				WriteTimeout:   defaultConfig.HTTP.WriteTimeout,
+				IdleTimeout:    defaultConfig.HTTP.IdleTimeout,
 			},
 		},
 		{
@@ -564,6 +577,9 @@ func TestRPCFlags(t *testing.T) {
 				Port:           9001,
 				AuthPort:       defaultConfig.HTTP.AuthPort,
 				RosettaPort:    10001,
+				ReadTimeout:    defaultConfig.HTTP.ReadTimeout,
+				WriteTimeout:   defaultConfig.HTTP.WriteTimeout,
+				IdleTimeout:    defaultConfig.HTTP.IdleTimeout,
 			},
 		},
 		{
@@ -575,6 +591,9 @@ func TestRPCFlags(t *testing.T) {
 				Port:           defaultConfig.HTTP.Port,
 				AuthPort:       defaultConfig.HTTP.AuthPort,
 				RosettaPort:    10001,
+				ReadTimeout:    defaultConfig.HTTP.ReadTimeout,
+				WriteTimeout:   defaultConfig.HTTP.WriteTimeout,
+				IdleTimeout:    defaultConfig.HTTP.IdleTimeout,
 			},
 		},
 		{
@@ -586,6 +605,23 @@ func TestRPCFlags(t *testing.T) {
 				Port:           9501,
 				AuthPort:       9502,
 				RosettaPort:    9701,
+				ReadTimeout:    defaultConfig.HTTP.ReadTimeout,
+				WriteTimeout:   defaultConfig.HTTP.WriteTimeout,
+				IdleTimeout:    defaultConfig.HTTP.IdleTimeout,
+			},
+		},
+		{
+			args: []string{"--http.timeout.read", "10s", "--http.timeout.write", "20s", "--http.timeout.idle", "30s"},
+			expConfig: harmonyconfig.HttpConfig{
+				Enabled:        true,
+				RosettaEnabled: false,
+				IP:             defaultConfig.HTTP.IP,
+				Port:           defaultConfig.HTTP.Port,
+				AuthPort:       defaultConfig.HTTP.AuthPort,
+				RosettaPort:    defaultConfig.HTTP.RosettaPort,
+				ReadTimeout:    "10s",
+				WriteTimeout:   "20s",
+				IdleTimeout:    "30s",
 			},
 		},
 	}
@@ -699,6 +735,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
 			},
 		},
 
@@ -712,6 +749,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
 			},
 		},
 
@@ -725,6 +763,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
 			},
 		},
 
@@ -738,6 +777,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
 			},
 		},
 
@@ -751,6 +791,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RpcFilterFile:      "./rmf.toml",
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
 			},
 		},
 
@@ -764,6 +805,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
 			},
 		},
 
@@ -777,6 +819,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  2000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
 			},
 		},
 
@@ -790,6 +833,21 @@ func TestRPCOptFlags(t *testing.T) {
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  false,
 				RequestsPerSecond:  2000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+			},
+		},
+
+		{
+			args: []string{"--rpc.evm-call-timeout", "10s"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+				EvmCallTimeout:     "10s",
 			},
 		},
 	}

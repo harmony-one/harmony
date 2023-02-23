@@ -3,6 +3,10 @@ package harmony
 import (
 	"reflect"
 	"strings"
+	"time"
+
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // HarmonyConfig contains all the configs user can set for running harmony binary. Served as the bridge
@@ -30,6 +34,62 @@ type HarmonyConfig struct {
 	TiKV       *TiKVConfig       `toml:",omitempty"`
 	DNSSync    DnsSync
 	ShardData  ShardDataConfig
+}
+
+func (hc HarmonyConfig) ToRPCServerConfig() nodeconfig.RPCServerConfig {
+	readTimeout, err := time.ParseDuration(hc.HTTP.ReadTimeout)
+	if err != nil {
+		readTimeout, _ = time.ParseDuration(nodeconfig.DefaultHTTPTimeoutRead)
+		utils.Logger().Warn().
+			Str("provided", hc.HTTP.ReadTimeout).
+			Dur("updated", readTimeout).
+			Msg("Sanitizing invalid http read timeout")
+	}
+	writeTimeout, err := time.ParseDuration(hc.HTTP.WriteTimeout)
+	if err != nil {
+		writeTimeout, _ = time.ParseDuration(nodeconfig.DefaultHTTPTimeoutWrite)
+		utils.Logger().Warn().
+			Str("provided", hc.HTTP.WriteTimeout).
+			Dur("updated", writeTimeout).
+			Msg("Sanitizing invalid http write timeout")
+	}
+	idleTimeout, err := time.ParseDuration(hc.HTTP.IdleTimeout)
+	if err != nil {
+		idleTimeout, _ = time.ParseDuration(nodeconfig.DefaultHTTPTimeoutIdle)
+		utils.Logger().Warn().
+			Str("provided", hc.HTTP.IdleTimeout).
+			Dur("updated", idleTimeout).
+			Msg("Sanitizing invalid http idle timeout")
+	}
+	evmCallTimeout, err := time.ParseDuration(hc.RPCOpt.EvmCallTimeout)
+	if err != nil {
+		evmCallTimeout, _ = time.ParseDuration(nodeconfig.DefaultEvmCallTimeout)
+		utils.Logger().Warn().
+			Str("provided", hc.RPCOpt.EvmCallTimeout).
+			Dur("updated", evmCallTimeout).
+			Msg("Sanitizing invalid evm_call timeout")
+	}
+	return nodeconfig.RPCServerConfig{
+		HTTPEnabled:        hc.HTTP.Enabled,
+		HTTPIp:             hc.HTTP.IP,
+		HTTPPort:           hc.HTTP.Port,
+		HTTPAuthPort:       hc.HTTP.AuthPort,
+		HTTPTimeoutRead:    readTimeout,
+		HTTPTimeoutWrite:   writeTimeout,
+		HTTPTimeoutIdle:    idleTimeout,
+		WSEnabled:          hc.WS.Enabled,
+		WSIp:               hc.WS.IP,
+		WSPort:             hc.WS.Port,
+		WSAuthPort:         hc.WS.AuthPort,
+		DebugEnabled:       hc.RPCOpt.DebugEnabled,
+		EthRPCsEnabled:     hc.RPCOpt.EthRPCsEnabled,
+		StakingRPCsEnabled: hc.RPCOpt.StakingRPCsEnabled,
+		LegacyRPCsEnabled:  hc.RPCOpt.LegacyRPCsEnabled,
+		RpcFilterFile:      hc.RPCOpt.RpcFilterFile,
+		RateLimiterEnabled: hc.RPCOpt.RateLimterEnabled,
+		RequestsPerSecond:  hc.RPCOpt.RequestsPerSecond,
+		EvmCallTimeout:     evmCallTimeout,
+	}
 }
 
 type DnsSync struct {
@@ -180,6 +240,9 @@ type HttpConfig struct {
 	AuthPort       int
 	RosettaEnabled bool
 	RosettaPort    int
+	ReadTimeout    string
+	WriteTimeout   string
+	IdleTimeout    string
 }
 
 type WsConfig struct {
@@ -197,6 +260,7 @@ type RpcOptConfig struct {
 	RpcFilterFile      string // Define filters to enable/disable RPC exposure
 	RateLimterEnabled  bool   // Enable Rate limiter for RPC
 	RequestsPerSecond  int    // for RPC rate limiter
+	EvmCallTimeout     string // Timeout for eth_call
 }
 
 type DevnetConfig struct {

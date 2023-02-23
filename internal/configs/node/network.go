@@ -51,6 +51,12 @@ const (
 	DefaultAuthRPCPort = 9501
 	// DefaultRosettaPort is the default rosetta port. The actual port used is 9000+700
 	DefaultRosettaPort = 9700
+	// DefaultHTTP timeouts - read, write, and idle
+	DefaultHTTPTimeoutRead  = "30s"
+	DefaultHTTPTimeoutWrite = "30s"
+	DefaultHTTPTimeoutIdle  = "120s"
+	// DefaultEvmCallTimeout is the default timeout for evm call
+	DefaultEvmCallTimeout = "5s"
 	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
 	DefaultWSPort = 9800
 	// DefaultAuthWSPort is the default port for web socket auth endpoint. The actual port used is
