@@ -6,7 +6,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.12"
+const tomlConfigVersion = "2.5.13"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
