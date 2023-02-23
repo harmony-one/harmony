@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -24,17 +25,19 @@ const (
 
 // ConstructAPI implements the server.ConstructAPIServicer interface.
 type ConstructAPI struct {
-	hmy           *hmy.Harmony
-	signer        hmyTypes.Signer
-	stakingSigner stakingTypes.Signer
+	hmy            *hmy.Harmony
+	signer         hmyTypes.Signer
+	stakingSigner  stakingTypes.Signer
+	evmCallTimeout time.Duration
 }
 
 // NewConstructionAPI creates a new instance of a ConstructAPI.
 func NewConstructionAPI(hmy *hmy.Harmony) server.ConstructionAPIServicer {
 	return &ConstructAPI{
-		hmy:           hmy,
-		signer:        hmyTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
-		stakingSigner: stakingTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
+		hmy:            hmy,
+		signer:         hmyTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
+		stakingSigner:  stakingTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
+		evmCallTimeout: hmy.NodeAPI.GetConfig().NodeConfig.RPCServer.EvmCallTimeout,
 	}
 }
 
