@@ -334,23 +334,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	}
 
 	// Parse RPC config
-	nodeConfig.RPCServer = nodeconfig.RPCServerConfig{
-		HTTPEnabled:        hc.HTTP.Enabled,
-		HTTPIp:             hc.HTTP.IP,
-		HTTPPort:           hc.HTTP.Port,
-		HTTPAuthPort:       hc.HTTP.AuthPort,
-		WSEnabled:          hc.WS.Enabled,
-		WSIp:               hc.WS.IP,
-		WSPort:             hc.WS.Port,
-		WSAuthPort:         hc.WS.AuthPort,
-		DebugEnabled:       hc.RPCOpt.DebugEnabled,
-		EthRPCsEnabled:     hc.RPCOpt.EthRPCsEnabled,
-		StakingRPCsEnabled: hc.RPCOpt.StakingRPCsEnabled,
-		LegacyRPCsEnabled:  hc.RPCOpt.LegacyRPCsEnabled,
-		RpcFilterFile:      hc.RPCOpt.RpcFilterFile,
-		RateLimiterEnabled: hc.RPCOpt.RateLimterEnabled,
-		RequestsPerSecond:  hc.RPCOpt.RequestsPerSecond,
-	}
+	nodeConfig.RPCServer = hc.ToRPCServerConfig()
 
 	// Parse rosetta config
 	nodeConfig.RosettaServer = nodeconfig.RosettaServerConfig{
