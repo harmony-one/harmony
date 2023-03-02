@@ -72,8 +72,9 @@ type Instance interface {
 	// ReshardingEpoch returns a list of Epoch while off-chain resharding happens
 	ReshardingEpoch() []*big.Int
 
-	// Count of blocks per epoch
+	// BlocksPerEpoch returns the number of blocks per epoch.
 	BlocksPerEpoch() uint64
+
 	// HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 	SlotsLimit() int
 

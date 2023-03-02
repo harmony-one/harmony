@@ -114,6 +114,7 @@ const (
 	validatorListByDelegatorCacheLimit = 128
 	pendingCrossLinksCacheLimit        = 2
 	blockAccumulatorCacheLimit         = 64
+	leaderPubKeyFromCoinbaseLimit      = 8
 	maxPendingSlashes                  = 256
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -240,7 +241,7 @@ func newBlockChainWithOptions(
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
-	leaderPubKeyFromCoinbase, _ := lru.New(chainConfig.LeaderRotationBlocksCount + 2)
+	leaderPubKeyFromCoinbase, _ := lru.New(leaderPubKeyFromCoinbaseLimit)
 
 	bc := &BlockChainImpl{
 		chainConfig:                   chainConfig,
@@ -1520,11 +1521,53 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
+	if err == nil {
+		// there should be only 1 block.
+		for _, b := range chain {
+			err := bc.saveLeaderContinuousBlocksCount(b.Header())
+			if err != nil {
+				utils.Logger().Error().Err(err).Msg("save leader continuous blocks count error")
+				return n, err
+			}
+		}
+	}
 	if bc.isInitTiKV() && err != nil {
 		// if has some error, master writer node will release the permission
 		_, _ = bc.redisPreempt.Unlock()
 	}
 	return n, err
+}
+
+func (bc *BlockChainImpl) saveLeaderContinuousBlocksCount(h *block.Header) error {
+	blockPubKey, err := bc.getLeaderPubKeyFromCoinbase(h)
+	if err != nil {
+		return err
+	}
+	type stored struct {
+		pub   []byte
+		epoch uint64
+		count uint64
+	}
+	var s stored
+	// error is possible here only on the first iteration, so we can ignore it
+	s.pub, s.epoch, s.count, _ = rawdb.ReadLeaderContinuousBlocksCount(bc.db)
+
+	cnt := s.count
+	// so, increase counter only if the same leader and epoch
+	if bytes.Equal(s.pub, blockPubKey.Bytes[:]) && s.epoch == h.Epoch().Uint64() {
+		cnt++
+	} else {
+		cnt = 1
+	}
+	err = rawdb.WriteLeaderContinuousBlocksCount(bc.db, blockPubKey.Bytes[:], h.Epoch().Uint64(), cnt)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bc *BlockChainImpl) LeaderContinuousBlocksCount() (publicKeyBytes []byte, epoch uint64, count uint64, err error) {
+	return rawdb.ReadLeaderContinuousBlocksCount(bc.db)
 }
 
 // insertChain will execute the actual chain insertion and event aggregation. The
