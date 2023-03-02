@@ -100,6 +100,7 @@ var (
 	pendingCrosslinkKey          = []byte("pendingCL")        // prefix for shard last pending crosslink
 	pendingSlashingKey           = []byte("pendingSC")        // prefix for shard last pending slashing record
 	preimagePrefix               = []byte("secure-key-")      // preimagePrefix + hash -> preimage
+	continuousBlocksCountKey     = []byte("continuous")       // key for continuous blocks count
 	configPrefix                 = []byte("ethereum-config-") // config prefix for the db
 	crosslinkPrefix              = []byte("cl")               // prefix for crosslink
 	delegatorValidatorListPrefix = []byte("dvl")              // prefix for delegator's validator list
@@ -283,6 +284,10 @@ func bloomBitsKey(bit uint, section uint64, hash common.Hash) []byte {
 // preimageKey = preimagePrefix + hash
 func preimageKey(hash common.Hash) []byte {
 	return append(preimagePrefix, hash.Bytes()...)
+}
+
+func leaderContinuousBlocksCountKey() []byte {
+	return continuousBlocksCountKey
 }
 
 // configKey = configPrefix + hash

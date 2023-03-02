@@ -17,12 +17,14 @@
 package rawdb
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -191,4 +193,32 @@ func WriteTransitionStatus(db ethdb.KeyValueWriter, data []byte) {
 	if err := db.Put(transitionStatusKey, data); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to store the eth2 transition status")
 	}
+}
+
+func WriteLeaderContinuousBlocksCount(db DatabaseWriter, leader []byte, count uint64, epoch uint64) error {
+	if len(leader) != bls.PublicKeySizeInBytes {
+		return errors.New("invalid leader public key size")
+	}
+	value := make([]byte, bls.PublicKeySizeInBytes+16)
+	copy(value, leader)
+	binary.LittleEndian.PutUint64(value[len(leader):], epoch)
+	binary.LittleEndian.PutUint64(value[len(leader)+8:], count)
+	if err := db.Put(leaderContinuousBlocksCountKey(), value); err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to store leader continuous blocks count")
+		return err
+	}
+	return nil
+}
+
+func ReadLeaderContinuousBlocksCount(db DatabaseReader) (pubKeyBytes []byte, epoch uint64, count uint64, err error) {
+	data, _ := db.Get(leaderContinuousBlocksCountKey())
+	if len(data) != bls.PublicKeySizeInBytes+16 {
+		return nil, 0, 0, errors.New("invalid leader continuous blocks count")
+	}
+
+	pubKeyBytes = data[:bls.PublicKeySizeInBytes]
+	epoch = binary.LittleEndian.Uint64(data[bls.PublicKeySizeInBytes:])
+	count = binary.LittleEndian.Uint64(data[bls.PublicKeySizeInBytes+8:])
+
+	return pubKeyBytes, epoch, count, nil
 }

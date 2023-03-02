@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 
 	"github.com/rs/zerolog"
 
@@ -688,41 +689,68 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
-	prev := consensus.getLeaderPubKey()
-	bc := consensus.Blockchain()
-	curNumber := bc.CurrentHeader().Number().Uint64()
-	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v numblocks:%d", epoch.Uint64(), bc.Config().IsLeaderRotation(epoch), bc.Config().LeaderRotationBlocksCount)
-	leader := consensus.getLeaderPubKey()
-	for i := 0; i < bc.Config().LeaderRotationBlocksCount; i++ {
-		header := bc.GetHeaderByNumber(curNumber - uint64(i))
-		if header == nil {
-			return
+	// Feature activated only for non-beacon shards.
+	if consensus.ShardID == shard.BeaconChainShardID {
+		return
+	}
+	var (
+		bc     = consensus.Blockchain()
+		prev   = consensus.getLeaderPubKey()
+		leader = consensus.getLeaderPubKey()
+	)
+	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v ", epoch.Uint64(), bc.Config().IsNonBeaconLeaderRotation(epoch))
+	ss, err := bc.ReadShardState(epoch)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
+		return
+	}
+	committee, err := ss.FindCommitteeByID(consensus.ShardID)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to find committee")
+		return
+	}
+
+	totalStake := numeric.NewDec(0)
+	d := numeric.NewDec(0)
+	curStake := &d
+	for _, s := range committee.Slots {
+		leader := consensus.getLeaderPubKey()
+		if s.BLSPublicKey == leader.Bytes {
+			curStake = s.EffectiveStake
 		}
-		// Previous epoch, we should not change leader.
-		if header.Epoch().Uint64() != epoch.Uint64() {
-			return
-		}
-		// Check if the same leader.
-		pub, err := bc.GetLeaderPubKeyFromCoinbase(header)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to get leader public key from coinbase")
-			return
-		}
-		if !pub.Object.IsEqual(leader.Object) {
-			// Another leader.
-			return
-		}
+		totalStake = totalStake.Add(*s.EffectiveStake)
+	}
+
+	blocksPerEpoch := shard.Schedule.InstanceForEpoch(epoch).BlocksPerEpoch()
+	if blocksPerEpoch == 0 {
+		utils.Logger().Error().Msg("[Rotating leader] blocks per epoch is 0")
+		return
+	}
+
+	numBlocksProducedByLeader := curStake.Div(totalStake).Mul(numeric.NewDec(int64(blocksPerEpoch))).Uint64()
+	if numBlocksProducedByLeader < 3 {
+		// mine no less than 3 blocks in a row
+		numBlocksProducedByLeader = 3
+	}
+	type stored struct {
+		pub   []byte
+		epoch uint64
+		count uint64
+	}
+	var s stored
+	s.pub, s.epoch, s.count, _ = bc.LeaderContinuousBlocksCount()
+	if !bytes.Equal(leader.Bytes[:], s.pub) {
+		// Another leader.
+		return
+	}
+	if s.count < numBlocksProducedByLeader {
+		// Not enough blocks produced by the leader.
+		return
 	}
 	// Passed all checks, we can change leader.
-	var (
-		wasFound bool
-		next     *bls.PublicKeyWrapper
-	)
-	if consensus.ShardID == shard.BeaconChainShardID {
-		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
-	} else {
-		wasFound, next = consensus.Decider.NthNext(leader, 1)
-	}
+	// NthNext will move the leader to the next leader in the committee.
+	// It does not know anything about external or internal validators.
+	wasFound, next := consensus.Decider.NthNext(leader, 1)
 	if !wasFound {
 		utils.Logger().Error().Msg("Failed to get next leader")
 		return
@@ -748,7 +776,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	} else {
 		epoch = blk.Epoch()
 	}
-	if consensus.Blockchain().Config().IsLeaderRotation(epoch) {
+	if consensus.Blockchain().Config().IsNonBeaconLeaderRotation(epoch) {
 		consensus.rotateLeader(epoch)
 	}
 

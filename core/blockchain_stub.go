@@ -423,3 +423,7 @@ func (a Stub) SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log) error {
 func (a Stub) InitTiKV(conf *harmonyconfig.TiKVConfig) {
 	return
 }
+
+func (a Stub) LeaderContinuousBlocksCount() ([]byte, uint64, uint64, error) {
+	return nil, 0, 0, errors.Errorf("method LeaderContinuousBlocksCount not implemented for %s", a.Name)
+}
