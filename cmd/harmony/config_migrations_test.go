@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -385,12 +386,13 @@ func Test_migrateConf(t *testing.T) {
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			got, _, err := migrateConf(tt.args.confBytes)
+			fmt.Println(got.GasPriceOracle.NumberTxsSampled)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("migrateConf() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("migrateConf() = %+v, want %+v", got, tt.want)
+				t.Errorf("migrateConf() = \n%+v\n, \nwant \n%+v\n", got, tt.want)
 			}
 		})
 	}

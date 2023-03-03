@@ -1890,7 +1890,7 @@ var (
 	}
 	gasPriceOracleMaxPriceGweiFlag = cli.IntFlag{
 		Name:     "gpo.maxprice",
-		Usage:    "Maximum possible gas price in gwei returned by eth_gasPrice (default: 12)",
+		Usage:    "Maximum possible gas price in gwei returned by eth_gasPrice (default: 1000)",
 		DefValue: defaultConfig.GasPriceOracle.MaxPriceGwei,
 	}
 	gasPriceOracleNumberTxsSampledFlag = cli.IntFlag{

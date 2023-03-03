@@ -805,9 +805,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
 
-	// Assign GasPriceOracle parameters to the current node
-	currentNode.HarmonyConfig.GasPriceOracle = hc.GasPriceOracle
-
 	// Assign closure functions to the consensus object
 	currentConsensus.SetBlockVerifier(
 		node.VerifyNewBlock(currentNode.NodeConfig, currentNode.Blockchain(), currentNode.Beaconchain()))

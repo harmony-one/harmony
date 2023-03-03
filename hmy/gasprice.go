@@ -38,7 +38,7 @@ var DefaultGasPriceOracleConfig = harmony.GasPriceOracleConfig{
 	Blocks:           20,
 	Percentile:       80,
 	DefaultPriceGwei: 100,
-	MaxPriceGwei:     12,
+	MaxPriceGwei:     1000,
 	NumberTxsSampled: 3,
 }
 

@@ -32,8 +32,7 @@ func TestHarmonyFlags(t *testing.T) {
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
 				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5 -" +
-				"-gpo.blocks 20 --gpo.percentile 80 --gpo.defaultprice 100 " +
-				"--gpo.maxprice 12 --gpo.txssampled 3",
+				"-gpo.blocks 20 --gpo.percentile 80 --gpo.defaultprice 100 --gpo.maxprice 12 --gpo.txssampled 3",
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
@@ -165,11 +164,11 @@ func TestHarmonyFlags(t *testing.T) {
 					CacheSize:       512,
 				},
 				GasPriceOracle: harmonyconfig.GasPriceOracleConfig{
-					Blocks:           20,
-					Percentile:       80,
-					DefaultPriceGwei: 100,
-					MaxPriceGwei:     12,
-					NumberTxsSampled: 3,
+					Blocks:           defaultConfig.GasPriceOracle.Blocks,
+					Percentile:       defaultConfig.GasPriceOracle.Percentile,
+					DefaultPriceGwei: defaultConfig.GasPriceOracle.DefaultPriceGwei,
+					MaxPriceGwei:     defaultConfig.GasPriceOracle.MaxPriceGwei,
+					NumberTxsSampled: defaultConfig.GasPriceOracle.NumberTxsSampled,
 				},
 			},
 		},
@@ -1053,6 +1052,19 @@ func TestGasPriceOracleFlags(t *testing.T) {
 				DefaultPriceGwei: 3,
 				MaxPriceGwei:     4,
 				NumberTxsSampled: 5,
+			},
+		},
+		{
+			args: []string{"--gpo.blocks", "11", "--gpo.percentile", "-1",
+				"--gpo.defaultprice", "-1", "--gpo.maxprice", "-1",
+				"--gpo.txssampled", "-1",
+			},
+			expConfig: harmonyconfig.GasPriceOracleConfig{
+				Blocks:           defaultConfig.GasPriceOracle.Blocks,
+				Percentile:       defaultConfig.GasPriceOracle.Percentile,
+				DefaultPriceGwei: defaultConfig.GasPriceOracle.DefaultPriceGwei,
+				MaxPriceGwei:     defaultConfig.GasPriceOracle.MaxPriceGwei,
+				NumberTxsSampled: defaultConfig.GasPriceOracle.NumberTxsSampled,
 			},
 		},
 	}
