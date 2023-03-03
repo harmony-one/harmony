@@ -3,6 +3,7 @@ package shardchain
 import (
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/harmony-one/harmony/core/state"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
@@ -104,6 +105,15 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		utils.Logger().Info().
 			Uint32("shardID", shardID).
 			Msg("disable cache, running in archival mode")
+	} else {
+		cacheConfig = &core.CacheConfig{
+			TrieNodeLimit: 256 * 1024 * 1024,
+			TrieTimeLimit: 2 * time.Minute,
+			TriesInMemory: 128,
+		}
+		if sc.harmonyconfig != nil {
+			cacheConfig.TriesInMemory = uint64(sc.harmonyconfig.General.TriesInMemory)
+		}
 	}
 
 	chainConfig := *sc.chainConfig

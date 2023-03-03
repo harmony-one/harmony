@@ -348,6 +348,9 @@ func init() {
 		if confTree.Get("GasPriceOracle.NumberTxsSampled") == nil {
 			confTree.Set("GasPriceOracle.NumberTxsSampled", defaultConfig.GasPriceOracle.NumberTxsSampled)
 		}
+		if confTree.Get("General.TriesInMemory") == nil {
+			confTree.Set("General.TriesInMemory", defaultConfig.General.TriesInMemory)
+		}
 		confTree.Set("Version", "2.5.12")
 		return confTree
 	}

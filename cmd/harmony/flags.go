@@ -31,6 +31,7 @@ var (
 		legacyDataDirFlag,
 
 		taraceFlag,
+		triesInMemoryFlag,
 	}
 
 	dnsSyncFlags = []cli.Flag{
@@ -330,6 +331,11 @@ var (
 		Usage:    "indicates if full transaction tracing should be enabled",
 		DefValue: defaultConfig.General.TraceEnable,
 	}
+	triesInMemoryFlag = cli.IntFlag{
+		Name:     "blockchain.tries_in_memory",
+		Usage:    "number of blocks from header stored in disk before exiting",
+		DefValue: defaultConfig.General.TriesInMemory,
+	}
 )
 
 func getRootFlags() []cli.Flag {
@@ -407,6 +413,14 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, isBackupFlag) {
 		config.General.IsBackup = cli.GetBoolFlagValue(cmd, isBackupFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, triesInMemoryFlag) {
+		value := cli.GetIntFlagValue(cmd, triesInMemoryFlag)
+		if value <= 1 {
+			panic("Must number greater than 1 for txpool.accountslots")
+		}
+		config.General.TriesInMemory = value
 	}
 }
 
