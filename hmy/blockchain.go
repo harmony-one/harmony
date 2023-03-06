@@ -362,11 +362,11 @@ func (hmy *Harmony) GetLogs(ctx context.Context, blockHash common.Hash, isEth bo
 			return nil, errors.New("Missing block data")
 		}
 		txns := block.Transactions()
-		for i, _ := range receipts {
+		for i := range receipts {
 			if i < len(txns) {
 				ethHash := txns[i].ConvertToEth().Hash()
 				receipts[i].TxHash = ethHash
-				for j, _ := range receipts[i].Logs {
+				for j := range receipts[i].Logs {
 					// Override log txHash with receipt's
 					receipts[i].Logs[j].TxHash = ethHash
 				}

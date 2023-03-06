@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
@@ -36,7 +37,7 @@ func (s *DB) DiffAndCleanCache(shardId uint32, to *DB) (int, error) {
 			addrBytes := s.trie.GetKey(it.LeafKey())
 			addr := common.BytesToAddress(addrBytes)
 
-			var fromAccount, toAccount Account
+			var fromAccount, toAccount types.StateAccount
 			if err := rlp.DecodeBytes(it.LeafBlob(), &fromAccount); err != nil {
 				continue
 			}
@@ -53,8 +54,14 @@ func (s *DB) DiffAndCleanCache(shardId uint32, to *DB) (int, error) {
 			}
 
 			// create account difference iterator
-			fromAccountTrie := newObject(s, addr, fromAccount).getTrie(s.db)
-			toAccountTrie := newObject(to, addr, toAccount).getTrie(to.db)
+			fromAccountTrie, errFromAcc := newObject(s, addr, fromAccount).getTrie(s.db)
+			if errFromAcc != nil {
+				continue
+			}
+			toAccountTrie, errToAcc := newObject(to, addr, toAccount).getTrie(to.db)
+			if errToAcc != nil {
+				continue
+			}
 			accountIt, _ := trie.NewDifferenceIterator(toAccountTrie.NodeIterator(nil), fromAccountTrie.NodeIterator(nil))
 
 			// parallel to delete data

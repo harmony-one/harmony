@@ -21,6 +21,15 @@ func NewPrefixDatabase(prefix []byte, db common.TiKVStore) *PrefixDatabase {
 	}
 }
 
+func (p *PrefixDatabase) AncientDatadir() (string, error) {
+	return "", nil
+}
+
+// NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
+func (p *PrefixDatabase) NewBatchWithSize(size int) ethdb.Batch {
+	return nil
+}
+
 // makeKey use to create a key with prefix, keysPool can reduce gc pressure
 func (p *PrefixDatabase) makeKey(keys []byte) []byte {
 	prefixLen := len(p.prefix)

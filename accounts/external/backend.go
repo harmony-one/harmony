@@ -26,7 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/signer/core"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/eth/rpc"
@@ -218,12 +218,13 @@ func (api *ExternalSigner) SignTx(account accounts.Account, tx *types.Transactio
 		t := common.NewMixedcaseAddress(*tx.To())
 		to = &t
 	}
-	args := &core.SendTxArgs{
+	gas := hexutil.Big(*tx.GasPrice())
+	args := &apitypes.SendTxArgs{
 		Data:     &data,
 		Nonce:    hexutil.Uint64(tx.Nonce()),
 		Value:    hexutil.Big(*tx.Value()),
 		Gas:      hexutil.Uint64(tx.GasLimit()),
-		GasPrice: hexutil.Big(*tx.GasPrice()),
+		GasPrice: &gas,
 		To:       to,
 		From:     common.NewMixedcaseAddress(account.Address),
 	}

@@ -29,19 +29,9 @@ import (
 	"testing"
 	"testing/quick"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/harmony/numeric"
-	stk "github.com/harmony-one/harmony/staking/types"
-	staketest "github.com/harmony-one/harmony/staking/types/test"
-
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/common/denominations"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -49,7 +39,7 @@ import (
 func TestUpdateLeaks(t *testing.T) {
 	// Create an empty state database
 	db := rawdb.NewMemoryDatabase()
-	state, _ := New(common.Hash{}, NewDatabase(db))
+	state, _ := New(common.Hash{}, NewDatabase(db), nil)
 
 	// Update it with some accounts
 	for i := byte(0); i < 255; i++ {
@@ -70,7 +60,7 @@ func TestUpdateLeaks(t *testing.T) {
 	}
 
 	// Ensure that no data was leaked into the database
-	it := db.NewIterator()
+	it := db.NewIterator(nil, nil)
 	for it.Next() {
 		t.Errorf("State leaked into database: %x -> %x", it.Key(), it.Value())
 	}
@@ -83,8 +73,8 @@ func TestIntermediateLeaks(t *testing.T) {
 	// Create two state databases, one transitioning to the final state, the other final from the beginning
 	transDb := rawdb.NewMemoryDatabase()
 	finalDb := rawdb.NewMemoryDatabase()
-	transState, _ := New(common.Hash{}, NewDatabase(transDb))
-	finalState, _ := New(common.Hash{}, NewDatabase(finalDb))
+	transState, _ := New(common.Hash{}, NewDatabase(transDb), nil)
+	finalState, _ := New(common.Hash{}, NewDatabase(finalDb), nil)
 
 	modify := func(state *DB, addr common.Address, i, tweak byte) {
 		state.SetBalance(addr, big.NewInt(int64(11*i)+int64(tweak)))
@@ -128,7 +118,7 @@ func TestIntermediateLeaks(t *testing.T) {
 		t.Errorf("can not commit trie %v to persistent database", finalRoot.Hex())
 	}
 
-	it := finalDb.NewIterator()
+	it := finalDb.NewIterator(nil, nil)
 	for it.Next() {
 		key, fvalue := it.Key(), it.Value()
 		tvalue, err := transDb.Get(key)
@@ -136,12 +126,12 @@ func TestIntermediateLeaks(t *testing.T) {
 			t.Errorf("entry missing from the transition database: %x -> %x", key, fvalue)
 		}
 		if !bytes.Equal(fvalue, tvalue) {
-			t.Errorf("the value associate key %x is mismatch,: %x in transition database ,%x in final database", key, tvalue, fvalue)
+			t.Errorf("value mismatch at key %x: %x in transition database, %x in final database", key, tvalue, fvalue)
 		}
 	}
 	it.Release()
 
-	it = transDb.NewIterator()
+	it = transDb.NewIterator(nil, nil)
 	for it.Next() {
 		key, tvalue := it.Key(), it.Value()
 		fvalue, err := finalDb.Get(key)
@@ -149,29 +139,22 @@ func TestIntermediateLeaks(t *testing.T) {
 			t.Errorf("extra entry in the transition database: %x -> %x", key, it.Value())
 		}
 		if !bytes.Equal(fvalue, tvalue) {
-			t.Errorf("the value associate key %x is mismatch,: %x in transition database ,%x in final database", key, tvalue, fvalue)
+			t.Errorf("value mismatch at key %x: %x in transition database, %x in final database", key, tvalue, fvalue)
 		}
 	}
 }
 
-// TestCopy tests that copying a statedb object indeed makes the original and
+// TestCopy tests that copying a DB object indeed makes the original and
 // the copy independent of each other. This test is a regression test against
 // https://github.com/ethereum/go-ethereum/pull/15549.
 func TestCopy(t *testing.T) {
 	// Create a random state test to copy and modify "independently"
-	orig, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	orig, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()), nil)
 
 	for i := byte(0); i < 255; i++ {
 		obj := orig.GetOrNewStateObject(common.BytesToAddress([]byte{i}))
 		obj.AddBalance(big.NewInt(int64(i)))
 		orig.updateStateObject(obj)
-
-		validatorWrapper := makeValidValidatorWrapper(common.BytesToAddress([]byte{i}))
-		validatorWrapper.Description.Name = "Original"
-		err := orig.UpdateValidatorWrapper(common.BytesToAddress([]byte{i}), &validatorWrapper)
-		if err != nil {
-			t.Errorf("Couldn't update ValidatorWrapper %d with error %s", i, err)
-		}
 	}
 	orig.Finalise(false)
 
@@ -194,85 +177,6 @@ func TestCopy(t *testing.T) {
 		orig.updateStateObject(origObj)
 		copy.updateStateObject(copyObj)
 		ccopy.updateStateObject(copyObj)
-
-		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}), false, true)
-		if err != nil {
-			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
-		}
-		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}), false, true)
-		if err != nil {
-			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
-		}
-		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}), false, true)
-		if err != nil {
-			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
-		}
-
-		origValWrap.LastEpochInCommittee.SetInt64(1)
-		copyValWrap.LastEpochInCommittee.SetInt64(2)
-		ccopyValWrap.LastEpochInCommittee.SetInt64(3)
-
-		origValWrap.MinSelfDelegation.Mul(big.NewInt(1e18), big.NewInt(10000))
-		copyValWrap.MinSelfDelegation.Mul(big.NewInt(1e18), big.NewInt(20000))
-		ccopyValWrap.MinSelfDelegation.Mul(big.NewInt(1e18), big.NewInt(30000))
-
-		origValWrap.MaxTotalDelegation.Mul(big.NewInt(1e18), big.NewInt(10000))
-		copyValWrap.MaxTotalDelegation.Mul(big.NewInt(1e18), big.NewInt(20000))
-		ccopyValWrap.MaxTotalDelegation.Mul(big.NewInt(1e18), big.NewInt(30000))
-
-		origValWrap.CreationHeight.SetInt64(1)
-		copyValWrap.CreationHeight.SetInt64(2)
-		ccopyValWrap.CreationHeight.SetInt64(3)
-
-		origValWrap.UpdateHeight.SetInt64(1)
-		copyValWrap.UpdateHeight.SetInt64(2)
-		ccopyValWrap.UpdateHeight.SetInt64(3)
-
-		origValWrap.Description.Name = "UpdatedOriginal" + string(i)
-		copyValWrap.Description.Name = "UpdatedCopy" + string(i)
-		ccopyValWrap.Description.Name = "UpdatedCCopy" + string(i)
-
-		origValWrap.Delegations[0].Amount.SetInt64(1)
-		copyValWrap.Delegations[0].Amount.SetInt64(2)
-		ccopyValWrap.Delegations[0].Amount.SetInt64(3)
-
-		origValWrap.Delegations[0].Reward.SetInt64(1)
-		copyValWrap.Delegations[0].Reward.SetInt64(2)
-		ccopyValWrap.Delegations[0].Reward.SetInt64(3)
-
-		origValWrap.Delegations[0].Undelegations[0].Amount.SetInt64(1)
-		copyValWrap.Delegations[0].Undelegations[0].Amount.SetInt64(2)
-		ccopyValWrap.Delegations[0].Undelegations[0].Amount.SetInt64(3)
-
-		origValWrap.Delegations[0].Undelegations[0].Epoch.SetInt64(1)
-		copyValWrap.Delegations[0].Undelegations[0].Epoch.SetInt64(2)
-		ccopyValWrap.Delegations[0].Undelegations[0].Epoch.SetInt64(3)
-
-		origValWrap.Counters.NumBlocksToSign.SetInt64(1)
-		copyValWrap.Counters.NumBlocksToSign.SetInt64(2)
-		ccopyValWrap.Counters.NumBlocksToSign.SetInt64(3)
-
-		origValWrap.Counters.NumBlocksSigned.SetInt64(1)
-		copyValWrap.Counters.NumBlocksSigned.SetInt64(2)
-		ccopyValWrap.Counters.NumBlocksSigned.SetInt64(3)
-
-		origValWrap.BlockReward.SetInt64(1)
-		copyValWrap.BlockReward.SetInt64(2)
-		ccopyValWrap.BlockReward.SetInt64(3)
-
-		err = orig.UpdateValidatorWrapper(common.BytesToAddress([]byte{i}), origValWrap)
-		if err != nil {
-			t.Errorf("Couldn't update ValidatorWrapper %d with error %s", i, err)
-		}
-		err = copy.UpdateValidatorWrapper(common.BytesToAddress([]byte{i}), copyValWrap)
-		if err != nil {
-			t.Errorf("Couldn't update ValidatorWrapper %d with error %s", i, err)
-		}
-		err = ccopy.UpdateValidatorWrapper(common.BytesToAddress([]byte{i}), ccopyValWrap)
-		if err != nil {
-			t.Errorf("Couldn't update ValidatorWrapper %d with error %s", i, err)
-		}
-
 	}
 
 	// Finalise the changes on all concurrently
@@ -303,149 +207,6 @@ func TestCopy(t *testing.T) {
 		if want := big.NewInt(5 * int64(i)); ccopyObj.Balance().Cmp(want) != 0 {
 			t.Errorf("copy obj %d: balance mismatch: have %v, want %v", i, ccopyObj.Balance(), want)
 		}
-
-		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}), true, false)
-		if err != nil {
-			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
-		}
-		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}), true, false)
-		if err != nil {
-			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
-		}
-		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}), true, false)
-		if err != nil {
-			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
-		}
-
-		if origValWrap.LastEpochInCommittee.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("LastEpochInCommittee %d: balance mismatch: have %v, want %v", i, origValWrap.LastEpochInCommittee, big.NewInt(1))
-		}
-		if copyValWrap.LastEpochInCommittee.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("LastEpochInCommittee %d: balance mismatch: have %v, want %v", i, copyValWrap.LastEpochInCommittee, big.NewInt(2))
-		}
-		if ccopyValWrap.LastEpochInCommittee.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("LastEpochInCommittee %d: balance mismatch: have %v, want %v", i, ccopyValWrap.LastEpochInCommittee, big.NewInt(3))
-		}
-
-		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10000)); origValWrap.MinSelfDelegation.Cmp(want) != 0 {
-			t.Errorf("MinSelfDelegation %d: balance mismatch: have %v, want %v", i, origValWrap.MinSelfDelegation, want)
-		}
-		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(20000)); copyValWrap.MinSelfDelegation.Cmp(want) != 0 {
-			t.Errorf("MinSelfDelegation %d: balance mismatch: have %v, want %v", i, copyValWrap.MinSelfDelegation, want)
-		}
-		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(30000)); ccopyValWrap.MinSelfDelegation.Cmp(want) != 0 {
-			t.Errorf("MinSelfDelegation %d: balance mismatch: have %v, want %v", i, ccopyValWrap.MinSelfDelegation, want)
-		}
-
-		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10000)); origValWrap.MaxTotalDelegation.Cmp(want) != 0 {
-			t.Errorf("MaxTotalDelegation %d: balance mismatch: have %v, want %v", i, origValWrap.MaxTotalDelegation, want)
-		}
-		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(20000)); copyValWrap.MaxTotalDelegation.Cmp(want) != 0 {
-			t.Errorf("MaxTotalDelegation %d: balance mismatch: have %v, want %v", i, copyValWrap.MaxTotalDelegation, want)
-		}
-		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(30000)); ccopyValWrap.MaxTotalDelegation.Cmp(want) != 0 {
-			t.Errorf("MaxTotalDelegation %d: balance mismatch: have %v, want %v", i, ccopyValWrap.MaxTotalDelegation, want)
-		}
-
-		if origValWrap.CreationHeight.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, origValWrap.CreationHeight, big.NewInt(1))
-		}
-		if copyValWrap.CreationHeight.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, copyValWrap.CreationHeight, big.NewInt(2))
-		}
-		if ccopyValWrap.CreationHeight.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, ccopyValWrap.CreationHeight, big.NewInt(3))
-		}
-
-		if origValWrap.UpdateHeight.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("UpdateHeight %d: balance mismatch: have %v, want %v", i, origValWrap.UpdateHeight, big.NewInt(1))
-		}
-		if copyValWrap.UpdateHeight.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("UpdateHeight %d: balance mismatch: have %v, want %v", i, copyValWrap.UpdateHeight, big.NewInt(2))
-		}
-		if ccopyValWrap.UpdateHeight.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("UpdateHeight %d: balance mismatch: have %v, want %v", i, ccopyValWrap.UpdateHeight, big.NewInt(3))
-		}
-
-		if want := "UpdatedOriginal" + string(i); origValWrap.Description.Name != want {
-			t.Errorf("originalValWrap %d: Incorrect Name: have %s, want %s", i, origValWrap.Description.Name, want)
-		}
-		if want := "UpdatedCopy" + string(i); copyValWrap.Description.Name != want {
-			t.Errorf("originalValWrap %d: Incorrect Name: have %s, want %s", i, copyValWrap.Description.Name, want)
-		}
-		if want := "UpdatedCCopy" + string(i); ccopyValWrap.Description.Name != want {
-			t.Errorf("originalValWrap %d: Incorrect Name: have %s, want %s", i, ccopyValWrap.Description.Name, want)
-		}
-
-		if origValWrap.Delegations[0].Amount.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("Delegations[0].Amount %d: balance mismatch: have %v, want %v", i, origValWrap.Delegations[0].Amount, big.NewInt(1))
-		}
-		if copyValWrap.Delegations[0].Amount.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("Delegations[0].Amount %d: balance mismatch: have %v, want %v", i, copyValWrap.Delegations[0].Amount, big.NewInt(2))
-		}
-		if ccopyValWrap.Delegations[0].Amount.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("Delegations[0].Amount %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Delegations[0].Amount, big.NewInt(3))
-		}
-
-		if origValWrap.Delegations[0].Reward.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("Delegations[0].Reward %d: balance mismatch: have %v, want %v", i, origValWrap.Delegations[0].Reward, big.NewInt(1))
-		}
-		if copyValWrap.Delegations[0].Reward.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("Delegations[0].Reward %d: balance mismatch: have %v, want %v", i, copyValWrap.Delegations[0].Reward, big.NewInt(2))
-		}
-		if ccopyValWrap.Delegations[0].Reward.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("Delegations[0].Reward %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Delegations[0].Reward, big.NewInt(3))
-		}
-
-		if origValWrap.Delegations[0].Undelegations[0].Amount.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("Delegations[0].Undelegations[0].Amount %d: balance mismatch: have %v, want %v", i, origValWrap.Delegations[0].Undelegations[0].Amount, big.NewInt(1))
-		}
-		if copyValWrap.Delegations[0].Undelegations[0].Amount.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("Delegations[0].Undelegations[0].Amount %d: balance mismatch: have %v, want %v", i, copyValWrap.Delegations[0].Undelegations[0].Amount, big.NewInt(2))
-		}
-		if ccopyValWrap.Delegations[0].Undelegations[0].Amount.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("Delegations[0].Undelegations[0].Amount %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Delegations[0].Undelegations[0].Amount, big.NewInt(3))
-		}
-
-		if origValWrap.Delegations[0].Undelegations[0].Epoch.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, origValWrap.Delegations[0].Undelegations[0].Epoch, big.NewInt(1))
-		}
-		if copyValWrap.Delegations[0].Undelegations[0].Epoch.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, copyValWrap.Delegations[0].Undelegations[0].Epoch, big.NewInt(2))
-		}
-		if ccopyValWrap.Delegations[0].Undelegations[0].Epoch.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Delegations[0].Undelegations[0].Epoch, big.NewInt(3))
-		}
-
-		if origValWrap.Counters.NumBlocksToSign.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("Counters.NumBlocksToSign %d: balance mismatch: have %v, want %v", i, origValWrap.Counters.NumBlocksToSign, big.NewInt(1))
-		}
-		if copyValWrap.Counters.NumBlocksToSign.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("Counters.NumBlocksToSign %d: balance mismatch: have %v, want %v", i, copyValWrap.Counters.NumBlocksToSign, big.NewInt(2))
-		}
-		if ccopyValWrap.Counters.NumBlocksToSign.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("Counters.NumBlocksToSign %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Counters.NumBlocksToSign, big.NewInt(3))
-		}
-
-		if origValWrap.Counters.NumBlocksSigned.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("Counters.NumBlocksSigned %d: balance mismatch: have %v, want %v", i, origValWrap.Counters.NumBlocksSigned, big.NewInt(1))
-		}
-		if copyValWrap.Counters.NumBlocksSigned.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("Counters.NumBlocksSigned %d: balance mismatch: have %v, want %v", i, copyValWrap.Counters.NumBlocksSigned, big.NewInt(2))
-		}
-		if ccopyValWrap.Counters.NumBlocksSigned.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("Counters.NumBlocksSigned %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Counters.NumBlocksSigned, big.NewInt(3))
-		}
-
-		if origValWrap.BlockReward.Cmp(big.NewInt(1)) != 0 {
-			t.Errorf("Block Reward %d: balance mismatch: have %v, want %v", i, origValWrap.BlockReward, big.NewInt(1))
-		}
-		if copyValWrap.BlockReward.Cmp(big.NewInt(2)) != 0 {
-			t.Errorf("Block Reward %d: balance mismatch: have %v, want %v", i, copyValWrap.BlockReward, big.NewInt(2))
-		}
-		if ccopyValWrap.BlockReward.Cmp(big.NewInt(3)) != 0 {
-			t.Errorf("Block Reward %d: balance mismatch: have %v, want %v", i, ccopyValWrap.BlockReward, big.NewInt(3))
-		}
 	}
 }
 
@@ -460,7 +221,7 @@ func TestSnapshotRandom(t *testing.T) {
 	}
 }
 
-// A snapshotTest checks that reverting StateDB snapshots properly undoes all changes
+// A snapshotTest checks that reverting DB snapshots properly undoes all changes
 // captured by the snapshot. Instances of this test with pseudorandom content are created
 // by Generate.
 //
@@ -567,6 +328,30 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 			},
 			args: make([]int64, 1),
 		},
+		{
+			name: "AddAddressToAccessList",
+			fn: func(a testAction, s *DB) {
+				s.AddAddressToAccessList(addr)
+			},
+		},
+		{
+			name: "AddSlotToAccessList",
+			fn: func(a testAction, s *DB) {
+				s.AddSlotToAccessList(addr,
+					common.Hash{byte(a.args[0])})
+			},
+			args: make([]int64, 1),
+		},
+		{
+			name: "SetTransientState",
+			fn: func(a testAction, s *DB) {
+				var key, val common.Hash
+				binary.BigEndian.PutUint16(key[:], uint16(a.args[0]))
+				binary.BigEndian.PutUint16(val[:], uint16(a.args[1]))
+				s.SetTransientState(addr, key, val)
+			},
+			args: make([]int64, 2),
+		},
 	}
 	action := actions[r.Intn(len(actions))]
 	var nameargs []string
@@ -624,7 +409,7 @@ func (test *snapshotTest) String() string {
 func (test *snapshotTest) run() bool {
 	// Run all actions and create snapshots.
 	var (
-		state, _     = New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+		state, _     = New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		snapshotRevs = make([]int, len(test.snapshots))
 		sindex       = 0
 	)
@@ -638,7 +423,7 @@ func (test *snapshotTest) run() bool {
 	// Revert all snapshots in reverse order. Each revert must yield a state
 	// that is equivalent to fresh state with all actions up the snapshot applied.
 	for sindex--; sindex >= 0; sindex-- {
-		checkstate, _ := New(common.Hash{}, state.Database())
+		checkstate, _ := New(common.Hash{}, state.Database(), nil)
 		for _, action := range test.actions[:test.snapshots[sindex]] {
 			action.fn(action, checkstate)
 		}
@@ -688,9 +473,9 @@ func (test *snapshotTest) checkEqual(state, checkstate *DB) error {
 		return fmt.Errorf("got GetRefund() == %d, want GetRefund() == %d",
 			state.GetRefund(), checkstate.GetRefund())
 	}
-	if !reflect.DeepEqual(state.GetLogs(common.Hash{}), checkstate.GetLogs(common.Hash{})) {
+	if !reflect.DeepEqual(state.GetLogs(common.Hash{}, 0, common.Hash{}), checkstate.GetLogs(common.Hash{}, 0, common.Hash{})) {
 		return fmt.Errorf("got GetLogs(common.Hash{}) == %v, want GetLogs(common.Hash{}) == %v",
-			state.GetLogs(common.Hash{}), checkstate.GetLogs(common.Hash{}))
+			state.GetLogs(common.Hash{}, 0, common.Hash{}), checkstate.GetLogs(common.Hash{}, 0, common.Hash{}))
 	}
 	return nil
 }
@@ -699,7 +484,7 @@ func TestTouchDelete(t *testing.T) {
 	s := newStateTest()
 	s.state.GetOrNewStateObject(common.Address{})
 	root, _ := s.state.Commit(false)
-	s.state.Reset(root)
+	s.state, _ = New(root, s.state.db, s.state.snaps)
 
 	snapshot := s.state.Snapshot()
 	s.state.AddBalance(common.Address{}, new(big.Int))
@@ -716,7 +501,7 @@ func TestTouchDelete(t *testing.T) {
 // TestCopyOfCopy tests that modified objects are carried over to the copy, and the copy of the copy.
 // See https://github.com/ethereum/go-ethereum/pull/15225#issuecomment-380191512
 func TestCopyOfCopy(t *testing.T) {
-	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	addr := common.HexToAddress("aaaa")
 	state.SetBalance(addr, big.NewInt(42))
 
@@ -733,7 +518,7 @@ func TestCopyOfCopy(t *testing.T) {
 //
 // See https://github.com/ethereum/go-ethereum/issues/20106.
 func TestCopyCommitCopy(t *testing.T) {
-	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()), nil)
 
 	// Create an account and check if the retrieved balance is correct
 	addr := common.HexToAddress("0xaffeaffeaffeaffeaffeaffeaffeaffeaffeaffe")
@@ -805,7 +590,7 @@ func TestCopyCommitCopy(t *testing.T) {
 //
 // See https://github.com/ethereum/go-ethereum/issues/20106.
 func TestCopyCopyCommitCopy(t *testing.T) {
-	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()), nil)
 
 	// Create an account and check if the retrieved balance is correct
 	addr := common.HexToAddress("0xaffeaffeaffeaffeaffeaffeaffeaffeaffeaffe")
@@ -886,22 +671,22 @@ func TestCopyCopyCommitCopy(t *testing.T) {
 }
 
 // TestDeleteCreateRevert tests a weird state transition corner case that we hit
-// while changing the internals of statedb. The workflow is that a contract is
-// self destructed, then in a followup transaction (but same block) it's created
+// while changing the internals of DB. The workflow is that a contract is
+// self-destructed, then in a follow-up transaction (but same block) it's created
 // again and the transaction reverted.
 //
-// The original statedb implementation flushed dirty objects to the tries after
+// The original DB implementation flushed dirty objects to the tries after
 // each transaction, so this works ok. The rework accumulated writes in memory
 // first, but the journal wiped the entire state object on create-revert.
 func TestDeleteCreateRevert(t *testing.T) {
 	// Create an initial state with a single contract
-	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()), nil)
 
 	addr := common.BytesToAddress([]byte("so"))
 	state.SetBalance(addr, big.NewInt(1))
 
 	root, _ := state.Commit(false)
-	state.Reset(root)
+	state, _ = New(root, state.db, state.snaps)
 
 	// Simulate self-destructing in one transaction, then create-reverting in another
 	state.Suicide(addr)
@@ -913,315 +698,303 @@ func TestDeleteCreateRevert(t *testing.T) {
 
 	// Commit the entire state and make sure we don't crash and have the correct state
 	root, _ = state.Commit(true)
-	state.Reset(root)
+	state, _ = New(root, state.db, state.snaps)
 
 	if state.getStateObject(addr) != nil {
 		t.Fatalf("self-destructed contract came alive")
 	}
 }
 
-func makeValidValidatorWrapper(addr common.Address) stk.ValidatorWrapper {
-	cr := stk.CommissionRates{
-		Rate:          numeric.ZeroDec(),
-		MaxRate:       numeric.ZeroDec(),
-		MaxChangeRate: numeric.ZeroDec(),
+// TestMissingTrieNodes tests that if the DB fails to load parts of the trie,
+// the Commit operation fails with an error
+// If we are missing trie nodes, we should not continue writing to the trie
+func TestMissingTrieNodes(t *testing.T) {
+	// Create an initial state with a few accounts
+	memDb := rawdb.NewMemoryDatabase()
+	db := NewDatabase(memDb)
+	var root common.Hash
+	state, _ := New(common.Hash{}, db, nil)
+	addr := common.BytesToAddress([]byte("so"))
+	{
+		state.SetBalance(addr, big.NewInt(1))
+		state.SetCode(addr, []byte{1, 2, 3})
+		a2 := common.BytesToAddress([]byte("another"))
+		state.SetBalance(a2, big.NewInt(100))
+		state.SetCode(a2, []byte{1, 2, 4})
+		root, _ = state.Commit(false)
+		t.Logf("root: %x", root)
+		// force-flush
+		state.Database().TrieDB().Cap(0)
 	}
-	c := stk.Commission{CommissionRates: cr, UpdateHeight: big.NewInt(300)}
-	d := stk.Description{
-		Name:     "Wayne",
-		Identity: "wen",
-		Website:  "harmony.one.wen",
-		Details:  "best",
-	}
-
-	v := stk.Validator{
-		Address:              addr,
-		SlotPubKeys:          []bls.SerializedPublicKey{makeBLSPubSigPair().pub},
-		LastEpochInCommittee: big.NewInt(20),
-		MinSelfDelegation:    new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18)),
-		MaxTotalDelegation:   new(big.Int).Mul(big.NewInt(12000), big.NewInt(1e18)),
-		Commission:           c,
-		Description:          d,
-		CreationHeight:       big.NewInt(12306),
-	}
-	ds := stk.Delegations{
-		stk.Delegation{
-			DelegatorAddress: v.Address,
-			Amount:           big.NewInt(0),
-			Reward:           big.NewInt(0),
-			Undelegations: stk.Undelegations{
-				stk.Undelegation{
-					Amount: big.NewInt(0),
-					Epoch:  big.NewInt(0),
-				},
-			},
-		},
-	}
-	br := big.NewInt(1)
-
-	w := stk.ValidatorWrapper{
-		Validator:   v,
-		Delegations: ds,
-		BlockReward: br,
-	}
-	w.Counters.NumBlocksSigned = big.NewInt(0)
-	w.Counters.NumBlocksToSign = big.NewInt(0)
-	return w
-}
-
-type blsPubSigPair struct {
-	pub bls.SerializedPublicKey
-	sig bls.SerializedSignature
-}
-
-func makeBLSPubSigPair() blsPubSigPair {
-	blsPriv := bls.RandPrivateKey()
-	blsPub := blsPriv.GetPublicKey()
-	msgHash := hash.Keccak256([]byte(stk.BLSVerificationStr))
-	sig := blsPriv.SignHash(msgHash)
-
-	var shardPub bls.SerializedPublicKey
-	copy(shardPub[:], blsPub.Serialize())
-
-	var shardSig bls.SerializedSignature
-	copy(shardSig[:], sig.Serialize())
-
-	return blsPubSigPair{shardPub, shardSig}
-}
-
-func updateAndCheckValidator(t *testing.T, state *DB, wrapper stk.ValidatorWrapper) {
-	// do not modify / link the original into the state object
-	copied := staketest.CopyValidatorWrapper(wrapper)
-	if err := state.UpdateValidatorWrapperWithRevert(copied.Address, &copied); err != nil {
-		t.Fatalf("Could not update wrapper with revert %v\n", err)
-	}
-
-	// load a copy here to be safe
-	loadedWrapper, err := state.ValidatorWrapper(copied.Address, false, true)
-	if err != nil {
-		t.Fatalf("Could not load wrapper %v\n", err)
-	}
-
-	if err := staketest.CheckValidatorWrapperEqual(wrapper, *loadedWrapper); err != nil {
-		t.Fatalf("Wrappers are unequal %v\n", err)
-	}
-}
-
-func verifyValidatorWrapperRevert(
-	t *testing.T,
-	state *DB,
-	snapshot int,
-	wrapperAddress common.Address, // if expectedWrapper is nil, this is needed
-	allowErrAddressNotPresent bool,
-	expectedWrapper *stk.ValidatorWrapper,
-	stateToCompare *DB,
-	modifiedAddresses []common.Address,
-) {
-	state.RevertToSnapshot(snapshot)
-	loadedWrapper, err := state.ValidatorWrapper(wrapperAddress, true, false)
-	if err != nil && !(err == ErrAddressNotPresent && allowErrAddressNotPresent) {
-		t.Fatalf("Could not load wrapper %v\n", err)
-	}
-	if expectedWrapper != nil {
-		if err := staketest.CheckValidatorWrapperEqual(*expectedWrapper, *loadedWrapper); err != nil {
-			fmt.Printf("ExpectWrapper: %v\n", expectedWrapper)
-			fmt.Printf("LoadedWrapper: %v\n", loadedWrapper)
-			fmt.Printf("ExpectCounters: %v\n", expectedWrapper.Counters)
-			fmt.Printf("LoadedCounters: %v\n", loadedWrapper.Counters)
-			t.Fatalf("Loaded wrapper not equal to expected wrapper after revert %v\n", err)
+	// Create a new state on the old root
+	state, _ = New(root, db, nil)
+	// Now we clear out the memdb
+	it := memDb.NewIterator(nil, nil)
+	for it.Next() {
+		k := it.Key()
+		// Leave the root intact
+		if !bytes.Equal(k, root[:]) {
+			t.Logf("key: %x", k)
+			memDb.Delete(k)
 		}
-	} else if loadedWrapper != nil {
-		t.Fatalf("Expected wrapper is nil but got loaded wrapper %v\n", loadedWrapper)
 	}
-
-	st := &snapshotTest{addrs: modifiedAddresses}
-	if err := st.checkEqual(state, stateToCompare); err != nil {
-		t.Fatalf("State not as expected after revert %v\n", err)
+	balance := state.GetBalance(addr)
+	// The removed elem should lead to it returning zero balance
+	if exp, got := uint64(0), balance.Uint64(); got != exp {
+		t.Errorf("expected %d, got %d", exp, got)
+	}
+	// Modify the state
+	state.SetBalance(addr, big.NewInt(2))
+	root, err := state.Commit(false)
+	if err == nil {
+		t.Fatalf("expected error, got root :%x", root)
 	}
 }
 
-func TestValidatorCreationRevert(t *testing.T) {
-	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
-	emptyState := state.Copy()
-	if err != nil {
-		t.Fatalf("Could not instantiate state %v\n", err)
+func TestStateDBAccessList(t *testing.T) {
+	// Some helpers
+	addr := func(a string) common.Address {
+		return common.HexToAddress(a)
 	}
-	snapshot := state.Snapshot()
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Could not generate key %v\n", err)
+	slot := func(a string) common.Hash {
+		return common.HexToHash(a)
 	}
-	wrapper := makeValidValidatorWrapper(crypto.PubkeyToAddress(key.PublicKey))
-	// step 1 is adding the validator, and checking that is it successfully added
-	updateAndCheckValidator(t, state, wrapper)
-	// step 2 is the revert check, the meat of the test
-	verifyValidatorWrapperRevert(t,
-		state,
-		snapshot,
-		wrapper.Address,
-		true,
-		nil,
-		emptyState,
-		[]common.Address{wrapper.Address},
+
+	memDb := rawdb.NewMemoryDatabase()
+	db := NewDatabase(memDb)
+	state, _ := New(common.Hash{}, db, nil)
+	state.accessList = newAccessList()
+
+	verifyAddrs := func(astrings ...string) {
+		t.Helper()
+		// convert to common.Address form
+		var addresses []common.Address
+		var addressMap = make(map[common.Address]struct{})
+		for _, astring := range astrings {
+			address := addr(astring)
+			addresses = append(addresses, address)
+			addressMap[address] = struct{}{}
+		}
+		// Check that the given addresses are in the access list
+		for _, address := range addresses {
+			if !state.AddressInAccessList(address) {
+				t.Fatalf("expected %x to be in access list", address)
+			}
+		}
+		// Check that only the expected addresses are present in the access list
+		for address := range state.accessList.addresses {
+			if _, exist := addressMap[address]; !exist {
+				t.Fatalf("extra address %x in access list", address)
+			}
+		}
+	}
+	verifySlots := func(addrString string, slotStrings ...string) {
+		if !state.AddressInAccessList(addr(addrString)) {
+			t.Fatalf("scope missing address/slots %v", addrString)
+		}
+		var address = addr(addrString)
+		// convert to common.Hash form
+		var slots []common.Hash
+		var slotMap = make(map[common.Hash]struct{})
+		for _, slotString := range slotStrings {
+			s := slot(slotString)
+			slots = append(slots, s)
+			slotMap[s] = struct{}{}
+		}
+		// Check that the expected items are in the access list
+		for i, s := range slots {
+			if _, slotPresent := state.SlotInAccessList(address, s); !slotPresent {
+				t.Fatalf("input %d: scope missing slot %v (address %v)", i, s, addrString)
+			}
+		}
+		// Check that no extra elements are in the access list
+		index := state.accessList.addresses[address]
+		if index >= 0 {
+			stateSlots := state.accessList.slots[index]
+			for s := range stateSlots {
+				if _, slotPresent := slotMap[s]; !slotPresent {
+					t.Fatalf("scope has extra slot %v (address %v)", s, addrString)
+				}
+			}
+		}
+	}
+
+	state.AddAddressToAccessList(addr("aa"))          // 1
+	state.AddSlotToAccessList(addr("bb"), slot("01")) // 2,3
+	state.AddSlotToAccessList(addr("bb"), slot("02")) // 4
+	verifyAddrs("aa", "bb")
+	verifySlots("bb", "01", "02")
+
+	// Make a copy
+	stateCopy1 := state.Copy()
+	if exp, got := 4, state.journal.length(); exp != got {
+		t.Fatalf("journal length mismatch: have %d, want %d", got, exp)
+	}
+
+	// same again, should cause no journal entries
+	state.AddSlotToAccessList(addr("bb"), slot("01"))
+	state.AddSlotToAccessList(addr("bb"), slot("02"))
+	state.AddAddressToAccessList(addr("aa"))
+	if exp, got := 4, state.journal.length(); exp != got {
+		t.Fatalf("journal length mismatch: have %d, want %d", got, exp)
+	}
+	// some new ones
+	state.AddSlotToAccessList(addr("bb"), slot("03")) // 5
+	state.AddSlotToAccessList(addr("aa"), slot("01")) // 6
+	state.AddSlotToAccessList(addr("cc"), slot("01")) // 7,8
+	state.AddAddressToAccessList(addr("cc"))
+	if exp, got := 8, state.journal.length(); exp != got {
+		t.Fatalf("journal length mismatch: have %d, want %d", got, exp)
+	}
+
+	verifyAddrs("aa", "bb", "cc")
+	verifySlots("aa", "01")
+	verifySlots("bb", "01", "02", "03")
+	verifySlots("cc", "01")
+
+	// now start rolling back changes
+	state.journal.revert(state, 7)
+	if _, ok := state.SlotInAccessList(addr("cc"), slot("01")); ok {
+		t.Fatalf("slot present, expected missing")
+	}
+	verifyAddrs("aa", "bb", "cc")
+	verifySlots("aa", "01")
+	verifySlots("bb", "01", "02", "03")
+
+	state.journal.revert(state, 6)
+	if state.AddressInAccessList(addr("cc")) {
+		t.Fatalf("addr present, expected missing")
+	}
+	verifyAddrs("aa", "bb")
+	verifySlots("aa", "01")
+	verifySlots("bb", "01", "02", "03")
+
+	state.journal.revert(state, 5)
+	if _, ok := state.SlotInAccessList(addr("aa"), slot("01")); ok {
+		t.Fatalf("slot present, expected missing")
+	}
+	verifyAddrs("aa", "bb")
+	verifySlots("bb", "01", "02", "03")
+
+	state.journal.revert(state, 4)
+	if _, ok := state.SlotInAccessList(addr("bb"), slot("03")); ok {
+		t.Fatalf("slot present, expected missing")
+	}
+	verifyAddrs("aa", "bb")
+	verifySlots("bb", "01", "02")
+
+	state.journal.revert(state, 3)
+	if _, ok := state.SlotInAccessList(addr("bb"), slot("02")); ok {
+		t.Fatalf("slot present, expected missing")
+	}
+	verifyAddrs("aa", "bb")
+	verifySlots("bb", "01")
+
+	state.journal.revert(state, 2)
+	if _, ok := state.SlotInAccessList(addr("bb"), slot("01")); ok {
+		t.Fatalf("slot present, expected missing")
+	}
+	verifyAddrs("aa", "bb")
+
+	state.journal.revert(state, 1)
+	if state.AddressInAccessList(addr("bb")) {
+		t.Fatalf("addr present, expected missing")
+	}
+	verifyAddrs("aa")
+
+	state.journal.revert(state, 0)
+	if state.AddressInAccessList(addr("aa")) {
+		t.Fatalf("addr present, expected missing")
+	}
+	if got, exp := len(state.accessList.addresses), 0; got != exp {
+		t.Fatalf("expected empty, got %d", got)
+	}
+	if got, exp := len(state.accessList.slots), 0; got != exp {
+		t.Fatalf("expected empty, got %d", got)
+	}
+	// Check the copy
+	// Make a copy
+	state = stateCopy1
+	verifyAddrs("aa", "bb")
+	verifySlots("bb", "01", "02")
+	if got, exp := len(state.accessList.addresses), 2; got != exp {
+		t.Fatalf("expected empty, got %d", got)
+	}
+	if got, exp := len(state.accessList.slots), 1; got != exp {
+		t.Fatalf("expected empty, got %d", got)
+	}
+}
+
+// Tests that account and storage tries are flushed in the correct order and that
+// no data loss occurs.
+func TestFlushOrderDataLoss(t *testing.T) {
+	// Create a state trie with many accounts and slots
+	var (
+		memdb    = rawdb.NewMemoryDatabase()
+		statedb  = NewDatabase(memdb)
+		state, _ = New(common.Hash{}, statedb, nil)
 	)
-}
-
-func TestValidatorAddDelegationRevert(t *testing.T) {
-	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	for a := byte(0); a < 10; a++ {
+		state.CreateAccount(common.Address{a})
+		for s := byte(0); s < 10; s++ {
+			state.SetState(common.Address{a}, common.Hash{a, s}, common.Hash{a, s})
+		}
+	}
+	root, err := state.Commit(false)
 	if err != nil {
-		t.Fatalf("Could not instantiate state %v\n", err)
+		t.Fatalf("failed to commit state trie: %v", err)
 	}
-	key, err := crypto.GenerateKey()
+	statedb.TrieDB().Reference(root, common.Hash{})
+	if err := statedb.TrieDB().Cap(1024); err != nil {
+		t.Fatalf("failed to cap trie dirty cache: %v", err)
+	}
+	if err := statedb.TrieDB().Commit(root, false); err != nil {
+		t.Fatalf("failed to commit state trie: %v", err)
+	}
+	// Reopen the state trie from flushed disk and verify it
+	state, err = New(root, NewDatabase(memdb), nil)
 	if err != nil {
-		t.Fatalf("Could not generate key %v\n", err)
+		t.Fatalf("failed to reopen state trie: %v", err)
 	}
-	delegatorKey, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Could not generate key %v\n", err)
-	}
-	wrapper := makeValidValidatorWrapper(crypto.PubkeyToAddress(key.PublicKey))
-	// always, step 1 is adding the validator, and checking that is it successfully added
-	updateAndCheckValidator(t, state, wrapper)
-	wrapperWithoutDelegation := staketest.CopyValidatorWrapper(wrapper) // for comparison later
-	stateWithoutDelegation := state.Copy()
-	// we will revert to the state without the delegation
-	snapshot := state.Snapshot()
-	// which is added here
-	wrapper.Delegations = append(wrapper.Delegations, stk.NewDelegation(
-		crypto.PubkeyToAddress(delegatorKey.PublicKey),
-		new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))),
-	)
-	// again, add and make sure added == sent
-	updateAndCheckValidator(t, state, wrapper)
-	// now the meat of the test
-	verifyValidatorWrapperRevert(t,
-		state,
-		snapshot,
-		wrapper.Address,
-		false,
-		&wrapperWithoutDelegation,
-		stateWithoutDelegation,
-		[]common.Address{wrapper.Address, wrapper.Delegations[1].DelegatorAddress},
-	)
-}
-
-type expectedRevertItem struct {
-	snapshot                   int
-	expectedWrapperAfterRevert *stk.ValidatorWrapper
-	expectedStateAfterRevert   *DB
-	modifiedAddresses          []common.Address
-}
-
-func makeExpectedRevertItem(state *DB,
-	wrapper *stk.ValidatorWrapper,
-	modifiedAddresses []common.Address,
-) expectedRevertItem {
-	x := expectedRevertItem{
-		snapshot:                 state.Snapshot(),
-		expectedStateAfterRevert: state.Copy(),
-		modifiedAddresses:        modifiedAddresses,
-	}
-	if wrapper != nil {
-		copied := staketest.CopyValidatorWrapper(*wrapper)
-		x.expectedWrapperAfterRevert = &copied
-	}
-	return x
-}
-
-func TestValidatorMultipleReverts(t *testing.T) {
-	var expectedRevertItems []expectedRevertItem
-
-	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
-	if err != nil {
-		t.Fatalf("Could not instantiate state %v\n", err)
-	}
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Could not generate key %v\n", err)
-	}
-	delegatorKey, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Could not generate key %v\n", err)
-	}
-	validatorAddress := crypto.PubkeyToAddress(key.PublicKey)
-	delegatorAddress := crypto.PubkeyToAddress(delegatorKey.PublicKey)
-	modifiedAddresses := []common.Address{validatorAddress, delegatorAddress}
-	// first we add a validator
-	expectedRevertItems = append(expectedRevertItems,
-		makeExpectedRevertItem(state, nil, modifiedAddresses))
-	wrapper := makeValidValidatorWrapper(crypto.PubkeyToAddress(key.PublicKey))
-	updateAndCheckValidator(t, state, wrapper)
-	// then we add a delegation
-	expectedRevertItems = append(expectedRevertItems,
-		makeExpectedRevertItem(state, &wrapper, modifiedAddresses))
-	wrapper.Delegations = append(wrapper.Delegations, stk.NewDelegation(
-		crypto.PubkeyToAddress(delegatorKey.PublicKey),
-		new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))),
-	)
-	updateAndCheckValidator(t, state, wrapper)
-	// then we have it sign blocks
-	wrapper.Counters.NumBlocksToSign.Add(
-		wrapper.Counters.NumBlocksToSign, common.Big1,
-	)
-	wrapper.Counters.NumBlocksSigned.Add(
-		wrapper.Counters.NumBlocksSigned, common.Big1,
-	)
-	updateAndCheckValidator(t, state, wrapper)
-	// then modify the name and the block reward
-	expectedRevertItems = append(expectedRevertItems,
-		makeExpectedRevertItem(state, &wrapper, modifiedAddresses))
-	wrapper.BlockReward.SetInt64(1)
-	wrapper.Validator.Description.Name = "Name"
-	for i := len(expectedRevertItems) - 1; i >= 0; i-- {
-		item := expectedRevertItems[i]
-		verifyValidatorWrapperRevert(t,
-			state,
-			item.snapshot,
-			wrapper.Address,
-			i == 0,
-			item.expectedWrapperAfterRevert,
-			item.expectedStateAfterRevert,
-			[]common.Address{wrapper.Address},
-		)
+	for a := byte(0); a < 10; a++ {
+		for s := byte(0); s < 10; s++ {
+			if have := state.GetState(common.Address{a}, common.Hash{a, s}); have != (common.Hash{a, s}) {
+				t.Errorf("account %d: slot %d: state mismatch: have %x, want %x", a, s, have, common.Hash{a, s})
+			}
+		}
 	}
 }
 
-func TestValidatorWrapperPanic(t *testing.T) {
-	defer func() { recover() }()
+func TestStateDBTransientStorage(t *testing.T) {
+	memDb := rawdb.NewMemoryDatabase()
+	db := NewDatabase(memDb)
+	state, _ := New(common.Hash{}, db, nil)
 
-	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
-	if err != nil {
-		t.Fatalf("Could not instantiate state %v\n", err)
-	}
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Could not generate key %v\n", err)
-	}
-	validatorAddress := crypto.PubkeyToAddress(key.PublicKey)
-	// will panic because we are asking for Original with copy of delegations
-	_, _ = state.ValidatorWrapper(validatorAddress, true, true)
-	t.Fatalf("Did not panic")
-}
+	key := common.Hash{0x01}
+	value := common.Hash{0x02}
+	addr := common.Address{}
 
-func TestValidatorWrapperGetCode(t *testing.T) {
-	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
-	if err != nil {
-		t.Fatalf("Could not instantiate state %v\n", err)
+	state.SetTransientState(addr, key, value)
+	if exp, got := 1, state.journal.length(); exp != got {
+		t.Fatalf("journal length mismatch: have %d, want %d", got, exp)
 	}
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Could not generate key %v\n", err)
+	// the retrieved value should equal what was set
+	if got := state.GetTransientState(addr, key); got != value {
+		t.Fatalf("transient storage mismatch: have %x, want %x", got, value)
 	}
-	wrapper := makeValidValidatorWrapper(crypto.PubkeyToAddress(key.PublicKey))
-	updateAndCheckValidator(t, state, wrapper)
-	// delete it from the cache so we can force it to use GetCode
-	delete(state.stateValidators, wrapper.Address)
-	loadedWrapper, err := state.ValidatorWrapper(wrapper.Address, false, false)
-	if err := staketest.CheckValidatorWrapperEqual(wrapper, *loadedWrapper); err != nil {
-		fmt.Printf("ExpectWrapper: %v\n", wrapper)
-		fmt.Printf("LoadedWrapper: %v\n", loadedWrapper)
-		fmt.Printf("ExpectCounters: %v\n", wrapper.Counters)
-		fmt.Printf("LoadedCounters: %v\n", loadedWrapper.Counters)
-		t.Fatalf("Loaded wrapper not equal to expected wrapper%v\n", err)
+
+	// revert the transient state being set and then check that the
+	// value is now the empty hash
+	state.journal.revert(state, 0)
+	if got, exp := state.GetTransientState(addr, key), (common.Hash{}); exp != got {
+		t.Fatalf("transient storage mismatch: have %x, want %x", got, exp)
+	}
+
+	// set transient state and then copy the statedb and ensure that
+	// the transient state is copied
+	state.SetTransientState(addr, key, value)
+	cpy := state.Copy()
+	if got := cpy.GetTransientState(addr, key); got != value {
+		t.Fatalf("transient storage mismatch: have %x, want %x", got, value)
 	}
 }

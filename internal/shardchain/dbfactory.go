@@ -9,7 +9,7 @@ import (
 	"github.com/harmony-one/harmony/internal/shardchain/leveldb_shard"
 	"github.com/harmony-one/harmony/internal/shardchain/local_cache"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	"github.com/ethereum/go-ethereum/ethdb"
 )
@@ -34,7 +34,7 @@ type LDBFactory struct {
 // NewChainDB returns a new LDB for the blockchain for given shard.
 func (f *LDBFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
 	dir := path.Join(f.RootDir, fmt.Sprintf("%s_%d", LDBDirPrefix, shardID))
-	return rawdb.NewLevelDBDatabase(dir, 256, 1024, "")
+	return rawdb.NewLevelDBDatabase(dir, 256, 1024, "", false)
 }
 
 // MemDBFactory is a memory-backed blockchain database factory.

@@ -807,7 +807,10 @@ func (s *PublicBlockchainService) GetProof(
 		return nil, err
 	}
 
-	storageTrie := state.StorageTrie(address)
+	storageTrie, errTr := state.StorageTrie(address)
+	if errTr != nil {
+		return
+	}
 	storageHash := types.EmptyRootHash
 	codeHash := state.GetCodeHash(address)
 	storageProof := make([]StorageResult, len(storageKeys))
