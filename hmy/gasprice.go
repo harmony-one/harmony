@@ -109,7 +109,7 @@ func NewOracle(backend *Harmony, params harmony.GasPriceOracleConfig) *Oracle {
 			)
 	}
 	maxPrice := new(big.Int).Mul(big.NewInt(int64(params.MaxPriceGwei)), big.NewInt(denominations.Nano))
-	if maxPrice == nil || maxPrice.Int64() <= 0 {
+	if maxPrice == nil || maxPrice.Int64() <= 0 || maxPrice.Int64() < int64(params.DefaultPriceGwei) {
 		maxPrice = new(big.Int).Mul(big.NewInt(int64(DefaultGasPriceOracleConfig.MaxPriceGwei)), big.NewInt(denominations.Nano))
 		utils.Logger().Warn().
 			Msg(
