@@ -505,9 +505,9 @@ type ChainConfig struct {
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
 
-	LeaderRotationExternalNonBeaconLeaders *big.Int `json:"leader-rotation-external-non-beacon-leaders"`
+	LeaderRotationExternalNonBeaconLeaders *big.Int `json:"non-beacon-leader-rotation-epoch,omitempty"`
 
-	LeaderRotationExternalBeaconLeaders *big.Int `json:"leader-rotation-external-beacon-leaders"`
+	LeaderRotationExternalBeaconLeaders *big.Int `json:"non-beacon-leader-rotation-epoch,omitempty"`
 
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
 	// It should >= StakingEpoch.
