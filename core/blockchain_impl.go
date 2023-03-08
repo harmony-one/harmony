@@ -1524,10 +1524,12 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 	if err == nil {
 		// there should be only 1 block.
 		for _, b := range chain {
-			err := bc.saveLeaderContinuousBlocksCount(b.Header())
-			if err != nil {
-				utils.Logger().Error().Err(err).Msg("save leader continuous blocks count error")
-				return n, err
+			if b.Epoch().Uint64() > 0 {
+				err := bc.saveLeaderContinuousBlocksCount(b.Header())
+				if err != nil {
+					utils.Logger().Error().Err(err).Msg("save leader continuous blocks count error")
+					return n, err
+				}
 			}
 		}
 	}
