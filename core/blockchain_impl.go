@@ -1437,7 +1437,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 				// Garbage collect anything below our required write retention
 				for !bc.triegc.Empty() {
 					root, number := bc.triegc.Pop()
-					if uint64(number) > chosen {
+					if uint64(-number) > chosen {
 						bc.triegc.Push(root, number)
 						break
 					}
