@@ -689,16 +689,12 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
-	// Feature activated only for non-beacon shards.
-	if consensus.ShardID == shard.BeaconChainShardID {
-		return
-	}
 	var (
 		bc     = consensus.Blockchain()
 		prev   = consensus.getLeaderPubKey()
 		leader = consensus.getLeaderPubKey()
 	)
-	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v ", epoch.Uint64(), bc.Config().IsNonBeaconLeaderRotation(epoch))
+	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotation(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch, consensus.ShardID))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
@@ -750,7 +746,15 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	// Passed all checks, we can change leader.
 	// NthNext will move the leader to the next leader in the committee.
 	// It does not know anything about external or internal validators.
-	wasFound, next := consensus.Decider.NthNext(leader, 1)
+	var (
+		wasFound bool
+		next     *bls.PublicKeyWrapper
+	)
+	if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch, consensus.ShardID) {
+		wasFound, next = consensus.Decider.NthNext(leader, 1)
+	} else {
+		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
+	}
 	if !wasFound {
 		utils.Logger().Error().Msg("Failed to get next leader")
 		return
@@ -776,7 +780,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	} else {
 		epoch = blk.Epoch()
 	}
-	if consensus.Blockchain().Config().IsNonBeaconLeaderRotation(epoch) {
+	if consensus.Blockchain().Config().IsLeaderRotation(epoch) {
 		consensus.rotateLeader(epoch)
 	}
 
