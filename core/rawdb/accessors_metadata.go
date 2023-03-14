@@ -99,7 +99,8 @@ func WritePreimages(db DatabaseWriter, number uint64, preimages map[common.Hash]
 	return nil
 }
 
-func WriteLeaderContinuousBlocksCount(db DatabaseWriter, leader []byte, count uint64, epoch uint64) error {
+// WriteLeaderContinuousBlocksCount writes the leader continuous blocks count to the database.
+func WriteLeaderContinuousBlocksCount(db DatabaseWriter, leader []byte, epoch uint64, count uint64) error {
 	if len(leader) != bls.PublicKeySizeInBytes {
 		return errors.New("invalid leader public key size")
 	}
@@ -114,6 +115,7 @@ func WriteLeaderContinuousBlocksCount(db DatabaseWriter, leader []byte, count ui
 	return nil
 }
 
+// ReadLeaderContinuousBlocksCount retrieves the leader continuous blocks count from the database.
 func ReadLeaderContinuousBlocksCount(db DatabaseReader) (pubKeyBytes []byte, epoch uint64, count uint64, err error) {
 	data, _ := db.Get(leaderContinuousBlocksCountKey())
 	if len(data) != bls.PublicKeySizeInBytes+16 {

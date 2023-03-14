@@ -271,8 +271,8 @@ var (
 		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch:          big.NewInt(1),
 		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
+		LeaderRotationExternalNonBeaconLeaders: big.NewInt(5),
+		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
 		FeeCollectEpoch:                        big.NewInt(5),
 	}
 
@@ -497,9 +497,9 @@ type ChainConfig struct {
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
 
-	LeaderRotationExternalNonBeaconLeaders *big.Int `json:"non-beacon-leader-rotation-epoch,omitempty"`
+	LeaderRotationExternalNonBeaconLeaders *big.Int `json:"leader-rotation-external-non-beacon-leaders,omitempty"`
 
-	LeaderRotationExternalBeaconLeaders *big.Int `json:"non-beacon-leader-rotation-epoch,omitempty"`
+	LeaderRotationExternalBeaconLeaders *big.Int `json:"leader-rotation-external-beacon-leaders,omitempty"`
 
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
 	// It should >= StakingEpoch.

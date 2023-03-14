@@ -544,8 +544,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 // validate shardID
 // validate public key size
 // verify message signature
-func (node *Node) validateShardBoundMessage(
-	ctx context.Context, payload []byte,
+func validateShardBoundMessage(nodeConfig *nodeconfig.ConfigType, consensus *consensus.Consensus, payload []byte,
 ) (*msg_pb.Message, *bls.SerializedPublicKey, bool, error) {
 	var (
 		m msg_pb.Message
@@ -556,7 +555,7 @@ func (node *Node) validateShardBoundMessage(
 	}
 
 	// ignore messages not intended for explorer
-	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+	if nodeConfig.Role() == nodeconfig.ExplorerNode {
 		switch m.Type {
 		case
 			msg_pb.MessageType_ANNOUNCE,
@@ -573,7 +572,7 @@ func (node *Node) validateShardBoundMessage(
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
 	// so we just ignore those messages
-	if node.Consensus.IsViewChangingMode() {
+	if consensus.IsViewChangingMode() {
 		switch m.Type {
 		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
@@ -589,7 +588,7 @@ func (node *Node) validateShardBoundMessage(
 	}
 
 	// ignore message not intended for leader, but still forward them to the network
-	if node.Consensus.IsLeader() {
+	if consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_ANNOUNCE, msg_pb.MessageType_PREPARED, msg_pb.MessageType_COMMITTED:
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
@@ -602,7 +601,7 @@ func (node *Node) validateShardBoundMessage(
 	senderBitmap := []byte{}
 
 	if maybeCon != nil {
-		if maybeCon.ShardId != node.Consensus.ShardID {
+		if maybeCon.ShardId != consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
@@ -612,17 +611,17 @@ func (node *Node) validateShardBoundMessage(
 			senderBitmap = maybeCon.SenderPubkeyBitmap
 		}
 		// If the viewID is too old, reject the message.
-		if maybeCon.ViewId+5 < node.Consensus.GetCurBlockViewID() {
+		if maybeCon.ViewId+5 < consensus.GetCurBlockViewID() {
 			return nil, nil, true, errors.WithStack(errViewIDTooOld)
 		}
 	} else if maybeVC != nil {
-		if maybeVC.ShardId != node.Consensus.ShardID {
+		if maybeVC.ShardId != consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderKey = maybeVC.SenderPubkey
 		// If the viewID is too old, reject the message.
-		if maybeVC.ViewId+5 < node.Consensus.GetViewChangingID() {
+		if maybeVC.ViewId+5 < consensus.GetViewChangingID() {
 			return nil, nil, true, errors.WithStack(errViewIDTooOld)
 		}
 	} else {
@@ -632,7 +631,7 @@ func (node *Node) validateShardBoundMessage(
 
 	// ignore mesage not intended for validator
 	// but still forward them to the network
-	if !node.Consensus.IsLeader() {
+	if !consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
@@ -648,12 +647,12 @@ func (node *Node) validateShardBoundMessage(
 		}
 
 		copy(serializedKey[:], senderKey)
-		if !node.Consensus.IsValidatorInCommittee(serializedKey) {
+		if !consensus.IsValidatorInCommittee(serializedKey) {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_committee"}).Inc()
 			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 		}
 	} else {
-		count := node.Consensus.Decider.ParticipantsCount()
+		count := consensus.Decider.ParticipantsCount()
 		if (count+7)>>3 != int64(len(senderBitmap)) {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_participant_count"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongSizeOfBitmap)
@@ -794,9 +793,8 @@ func (node *Node) StartPubSub() error {
 					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "consensus_total"}).Inc()
 
 					// validate consensus message
-					validMsg, senderPubKey, ignore, err := node.validateShardBoundMessage(
-						context.TODO(), openBox[proto.MessageCategoryBytes:],
-					)
+					validMsg, senderPubKey, ignore, err := validateShardBoundMessage(
+						node.NodeConfig, node.Consensus, openBox[proto.MessageCategoryBytes:])
 
 					if err != nil {
 						errChan <- withError{err, msg.GetFrom()}
