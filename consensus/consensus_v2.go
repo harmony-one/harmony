@@ -13,8 +13,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/numeric"
-
 	"github.com/rs/zerolog"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -705,28 +703,17 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		utils.Logger().Error().Err(err).Msg("Failed to find committee")
 		return
 	}
-
-	totalStake := numeric.NewDec(0)
-	d := numeric.NewDec(0)
-	curStake := &d
-	for _, s := range committee.Slots {
-		leader := consensus.getLeaderPubKey()
-		if s.BLSPublicKey == leader.Bytes {
-			curStake = s.EffectiveStake
-		}
-		totalStake = totalStake.Add(*s.EffectiveStake)
-	}
-
+	slotsCount := len(committee.Slots)
 	blocksPerEpoch := shard.Schedule.InstanceForEpoch(epoch).BlocksPerEpoch()
 	if blocksPerEpoch == 0 {
 		utils.Logger().Error().Msg("[Rotating leader] blocks per epoch is 0")
 		return
 	}
-
-	numBlocksProducedByLeader := curStake.Div(totalStake).Mul(numeric.NewDec(int64(blocksPerEpoch))).Uint64()
-	if numBlocksProducedByLeader < 3 {
+	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
+	const minimumBlocksForLeaderInRow = 3
+	if numBlocksProducedByLeader < minimumBlocksForLeaderInRow {
 		// mine no less than 3 blocks in a row
-		numBlocksProducedByLeader = 3
+		numBlocksProducedByLeader = minimumBlocksForLeaderInRow
 	}
 	type stored struct {
 		pub   []byte
