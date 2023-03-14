@@ -116,7 +116,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 				Msg("Failed to deserialize transaction list")
 			return
 		}
-		node.addPendingTransactions(txs)
+		addPendingTransactions(node.registry, txs)
 	}
 }
 

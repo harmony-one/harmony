@@ -10,6 +10,7 @@ import (
 type Registry struct {
 	mu         sync.Mutex
 	blockchain core.BlockChain
+	txPool     *core.TxPool
 }
 
 // New creates a new registry.
@@ -33,3 +34,37 @@ func (r *Registry) GetBlockchain() core.BlockChain {
 
 	return r.blockchain
 }
+
+// SetTxPool sets the txpool to registry.
+func (r *Registry) SetTxPool(txPool *core.TxPool) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.txPool = txPool
+	return r
+}
+
+// GetTxPool gets the txpool from registry.
+func (r *Registry) GetTxPool() *core.TxPool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.txPool
+}
+
+//// SetConsensus sets the consensus to registry.
+//func (r *Registry) SetConsensus(consensus *consensus.Consensus) *Registry {
+//	r.mu.Lock()
+//	defer r.mu.Unlock()
+//
+//	r.consensus = consensus
+//	return r
+//}
+//
+//// GetConsensus gets the consensus from registry.
+//func (r *Registry) GetConsensus() *consensus.Consensus {
+//	r.mu.Lock()
+//	defer r.mu.Unlock()
+//
+//	return r.consensus
+//}
