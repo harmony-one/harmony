@@ -374,7 +374,7 @@ func init() {
 			confTree.Set("TxPool.PriceBump", defaultConfig.TxPool.PriceBump)
 		}
 
-		confTree.Set("Version", "2.5.8")
+		confTree.Set("Version", "2.5.14")
 		return confTree
 	}
 
