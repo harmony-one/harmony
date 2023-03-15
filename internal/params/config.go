@@ -111,7 +111,6 @@ var (
 		AllowlistEpoch:                big.NewInt(2),
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
-		TesnetNinetyPercentEpoch:      big.NewInt(399),
 		FeeCollectEpoch:               EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
