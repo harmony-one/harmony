@@ -197,7 +197,6 @@ func updateZeroLogLevel(level int) {
 	zeroLogger = &childLogger
 }
 
-
 // GetPort is useful for debugging, returns `--port` flag provided to executable.
 func GetPort() int {
 	ok := false
