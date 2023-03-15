@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	goversion "github.com/hashicorp/go-version"
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml" // TODO support go-toml/v2
 
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
