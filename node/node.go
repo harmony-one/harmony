@@ -99,12 +99,11 @@ type ISync interface {
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	ConfirmedBlockChannel chan *types.Block                 // The channel to send confirmed blocks
-	BeaconBlockChannel    chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
-	pendingCXReceipts     map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
-	pendingCXMutex        sync.Mutex
-	crosslinks            *crosslinks.Crosslinks // Memory storage for crosslink processing.
+	Consensus          *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	BeaconBlockChannel chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
+	pendingCXReceipts  map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
+	pendingCXMutex     sync.Mutex
+	crosslinks         *crosslinks.Crosslinks // Memory storage for crosslink processing.
 	// Shard databases
 	shardChains      shardchain.Collection
 	SelfPeer         p2p.Peer
@@ -227,8 +226,8 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
-		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
+		err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID}, p2p.ConstructMessage(msg))
+		if err != nil {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
 		} else {
 			break
@@ -246,7 +245,7 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
 		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
+			p2p.ConstructMessage(msg)); err != nil {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
 		} else {
 			break
@@ -1026,13 +1025,11 @@ func New(
 		crosslinks:           crosslinks.New(),
 		syncID:               GenerateSyncID(),
 	}
-
-	// Get the node config that's created in the harmony.go program.
-	if consensusObj != nil {
-		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
-	} else {
-		node.NodeConfig = nodeconfig.GetDefaultConfig()
+	if consensusObj == nil {
+		panic("consensusObj is nil")
 	}
+	// Get the node config that's created in the harmony.go program.
+	node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
 	node.HarmonyConfig = harmonyconfig
 
 	if host != nil {
@@ -1046,7 +1043,7 @@ func New(
 	node.shardChains = collection
 	node.IsSynchronized = abool.NewBool(false)
 
-	if host != nil && consensusObj != nil {
+	if host != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensusObj
 
@@ -1075,7 +1072,6 @@ func New(
 			}
 		}
 
-		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 
