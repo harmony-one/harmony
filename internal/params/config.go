@@ -72,6 +72,7 @@ var (
 		FeeCollectEpoch:               EpochTBD,
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
+		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -112,6 +113,7 @@ var (
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
 		FeeCollectEpoch:               EpochTBD,
+		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -152,6 +154,7 @@ var (
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
 		FeeCollectEpoch:               EpochTBD,
+		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -193,6 +196,7 @@ var (
 		FeeCollectEpoch:               big.NewInt(574),
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
+		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -234,6 +238,7 @@ var (
 		FeeCollectEpoch:               EpochTBD,
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
+		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -274,6 +279,7 @@ var (
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     5,
 		FeeCollectEpoch:               big.NewInt(5),
+		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -359,6 +365,7 @@ var (
 		big.NewInt(1),        // LeaderRotationEpoch
 		64,                   // LeaderRotationBlocksCount
 		big.NewInt(0),        // FeeCollectEpoch
+		big.NewInt(0),        // ValidatorCodeFixEpoch
 	}
 
 	// TestRules ...
@@ -554,12 +561,8 @@ func (c *ChainConfig) mustValid() {
 	// see AcceptsCrossTx for why > and not >=
 	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0,
 		"must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
-	// the fix is applied only on the Solidity level, so you need eth compat
 	require(c.ValidatorCodeFixEpoch.Cmp(c.EthCompatibleEpoch) >= 0,
 		"must satisfy: ValidatorCodeFixEpoch >= EthCompatibleEpoch")
-	// we accept validator creation transactions starting at PreStakingEpoch
-	require(c.ValidatorCodeFixEpoch.Cmp(c.PreStakingEpoch) >= 0,
-		"must satisfy: ValidatorCodeFixEpoch >= PreStakingEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
