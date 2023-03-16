@@ -72,6 +72,7 @@ var (
 		FeeCollectEpoch:                        EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
+		DisabledHarmonyNodes:                   EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -111,6 +112,7 @@ var (
 		AllowlistEpoch:                         big.NewInt(2),
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
+		DisabledHarmonyNodes:                   EpochTBD,
 		FeeCollectEpoch:                        EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -315,6 +317,7 @@ var (
 		big.NewInt(0),                      // AllowlistEpoch
 		big.NewInt(1),                      // LeaderRotationExternalNonBeaconLeaders
 		big.NewInt(1),                      // LeaderRotationExternalBeaconLeaders
+		big.NewInt(1),                      // DisabledHarmonyNodes
 		big.NewInt(0),                      // FeeCollectEpoch
 	}
 
@@ -357,6 +360,7 @@ var (
 		big.NewInt(0),        // AllowlistEpoch
 		big.NewInt(1),        // LeaderRotationExternalNonBeaconLeaders
 		big.NewInt(1),        // LeaderRotationExternalBeaconLeaders
+		big.NewInt(0),        // DisabledHarmonyNodes
 		big.NewInt(0),        // FeeCollectEpoch
 	}
 
@@ -500,6 +504,14 @@ type ChainConfig struct {
 	LeaderRotationExternalNonBeaconLeaders *big.Int `json:"leader-rotation-external-non-beacon-leaders,omitempty"`
 
 	LeaderRotationExternalBeaconLeaders *big.Int `json:"leader-rotation-external-beacon-leaders,omitempty"`
+
+	// DisabledHarmonyNodes disables harmony nodes.
+	// Harmony nodes are slots that are prepended to the list of validators.
+	// They don't have stake, but participate in consensus.
+	// The number of them can be obtained via the function call
+	// `Schedule.InstanceForEpoch(epoch).NumHarmonyOperatedNodesPerShard()`.
+	// When this feature is activated, the above function call returns 0.
+	DisabledHarmonyNodes *big.Int `json:"disabled-harmony-nodes,omitempty"`
 
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
 	// It should >= StakingEpoch.
@@ -719,6 +731,10 @@ func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int, 
 		return isForked(c.LeaderRotationExternalBeaconLeaders, epoch)
 	}
 	return true
+}
+
+func (c *ChainConfig) IsDisabledHarmonyNodes(epoch *big.Int) bool {
+	return isForked(c.DisabledHarmonyNodes, epoch)
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.

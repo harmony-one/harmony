@@ -31,6 +31,8 @@ const (
 
 func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.LocalnetChainConfig.IsDisabledHarmonyNodes(epoch):
+		return localnetV4
 	case params.LocalnetChainConfig.IsFeeCollectEpoch(epoch):
 		return localnetV3_2
 	case params.LocalnetChainConfig.IsSixtyPercent(epoch):
@@ -158,4 +160,6 @@ var (
 	localnetV3   = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, emptyAddress, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
 	localnetV3_1 = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, emptyAddress, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
 	localnetV3_2 = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, feeCollectorLocalnet, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
+	// disabled harmony validators, which don't have stake, but produce blocks
+	localnetV4 = MustNewInstance(2, 9, 0, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, feeCollectorLocalnet, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
 )
