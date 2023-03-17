@@ -72,7 +72,6 @@ var (
 		FeeCollectEpoch:               EpochTBD,
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
-		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -113,7 +112,6 @@ var (
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
 		FeeCollectEpoch:               EpochTBD,
-		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -154,7 +152,6 @@ var (
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
 		FeeCollectEpoch:               EpochTBD,
-		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -196,7 +193,6 @@ var (
 		FeeCollectEpoch:               big.NewInt(574),
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
-		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -238,7 +234,6 @@ var (
 		FeeCollectEpoch:               EpochTBD,
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     64,
-		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -279,7 +274,6 @@ var (
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     5,
 		FeeCollectEpoch:               big.NewInt(5),
-		ValidatorCodeFixEpoch:         EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -322,7 +316,6 @@ var (
 		big.NewInt(1),                      // LeaderRotationEpoch
 		64,                                 // LeaderRotationBlocksCount
 		big.NewInt(0),                      // FeeCollectEpoch
-		big.NewInt(0),                      // ValidatorCodeFixEpoch
 	}
 
 	// TestChainConfig ...
@@ -365,7 +358,6 @@ var (
 		big.NewInt(1),        // LeaderRotationEpoch
 		64,                   // LeaderRotationBlocksCount
 		big.NewInt(0),        // FeeCollectEpoch
-		big.NewInt(0),        // ValidatorCodeFixEpoch
 	}
 
 	// TestRules ...
@@ -515,13 +507,6 @@ type ChainConfig struct {
 	// Then before FeeCollectEpoch, txn fees are burned.
 	// After FeeCollectEpoch, txn fees paid to FeeCollector account.
 	FeeCollectEpoch *big.Int
-
-	// ValidatorCodeFixEpoch is the first epoch that fixes the issue of validator code
-	// being available in Solidity. This is a temporary fix until we have a better
-	// solution.
-	// Contracts can check the (presence of) validator code by calling the following:
-	// extcodesize, extcodecopy and extcodehash.
-	ValidatorCodeFixEpoch *big.Int `json:"validator-code-fix-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -556,8 +541,6 @@ func (c *ChainConfig) mustValid() {
 		"must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
 	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0,
 		"must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
-	require(c.ValidatorCodeFixEpoch.Cmp(c.EthCompatibleEpoch) >= 0,
-		"must satisfy: ValidatorCodeFixEpoch >= EthCompatibleEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -733,10 +716,6 @@ func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
 	return isForked(c.FeeCollectEpoch, epoch)
 }
 
-func (c *ChainConfig) IsValidatorCodeFix(epoch *big.Int) bool {
-	return isForked(c.ValidatorCodeFixEpoch, epoch)
-}
-
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -794,7 +773,6 @@ type Rules struct {
 	IsStakingPrecompile, IsCrossShardXferPrecompile,
 	// eip-155 chain id fix
 	IsChainIdFix bool
-	IsValidatorCodeFix bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -819,6 +797,5 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsStakingPrecompile:        c.IsStakingPrecompile(epoch),
 		IsCrossShardXferPrecompile: c.IsCrossShardXferPrecompile(epoch),
 		IsChainIdFix:               c.IsChainIdFix(epoch),
-		IsValidatorCodeFix:         c.IsValidatorCodeFix(epoch),
 	}
 }
