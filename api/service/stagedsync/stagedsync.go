@@ -1052,14 +1052,14 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 			}
 
 			startTime := time.Now()
-			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
+			if err := chain.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
 				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
 			}
 			utils.Logger().Debug().
 				Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).
 				Msg("[STAGED_SYNC] VerifyHeaderSignature")
 		}
-		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
+		err := chain.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 		if err == engine.ErrUnknownAncestor {
 			return err
 		} else if err != nil {

@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/chain"
 
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -49,7 +50,6 @@ type BlockGen struct {
 	receipts []*types.Receipt
 	uncles   []*block.Header
 	config   *params.ChainConfig
-	engine   consensus_engine.Engine
 }
 
 // SetCoinbase sets the coinbase of the generated block.
@@ -167,7 +167,7 @@ func (b *BlockGen) PrevBlock(index int) *types.Block {
 // a similar non-validating proof of work implementation.
 func GenerateChain(
 	config *params.ChainConfig, parent *types.Block,
-	engine consensus_engine.Engine, db ethdb.Database,
+	db ethdb.Database,
 	n int,
 	gen func(int, *BlockGen),
 ) ([]*types.Block, []types.Receipts) {
@@ -185,18 +185,17 @@ func GenerateChain(
 			statedb: statedb,
 			config:  config,
 			factory: factory,
-			engine:  engine,
 		}
-		b.header = makeHeader(chainreader, parent, statedb, b.engine, factory)
+		b.header = makeHeader(chainreader, parent, statedb, factory)
 
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)
 		}
 
-		if b.engine != nil {
+		if true {
 			// Finalize and seal the block
-			block, _, err := b.engine.Finalize(
+			block, _, err := chain.Engine().Finalize(
 				chainreader, nil, b.header, statedb, b.txs, b.receipts, nil, nil, nil, nil, nil, func() uint64 { return 0 },
 			)
 			if err != nil {
@@ -228,7 +227,7 @@ func GenerateChain(
 	return blocks, receipts
 }
 
-func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine, factory blockfactory.Factory) *block.Header {
+func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, factory blockfactory.Factory) *block.Header {
 	var time *big.Int
 	if parent.Time() == nil {
 		time = big.NewInt(10)

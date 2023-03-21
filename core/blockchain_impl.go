@@ -49,6 +49,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/chain"
+	chain2 "github.com/harmony-one/harmony/internal/chain"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/tikv"
@@ -190,7 +192,6 @@ type BlockChainImpl struct {
 	// procInterrupt must be atomically called
 	procInterrupt int32 // interrupt signaler for block processing
 
-	engine                 consensus_engine.Engine
 	processor              Processor // block processor interface
 	validator              Validator // block and state validator interface
 	vmConfig               vm.Config
@@ -204,9 +205,9 @@ type BlockChainImpl struct {
 // NewBlockChainWithOptions same as NewBlockChain but can accept additional behaviour options.
 func NewBlockChainWithOptions(
 	db ethdb.Database, stateCache state.Database, beaconChain BlockChain, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
-	engine consensus_engine.Engine, vmConfig vm.Config, options Options,
+	vmConfig vm.Config, options Options,
 ) (*BlockChainImpl, error) {
-	return newBlockChainWithOptions(db, stateCache, beaconChain, cacheConfig, chainConfig, engine, vmConfig, options)
+	return newBlockChainWithOptions(db, stateCache, beaconChain, cacheConfig, chainConfig, vmConfig, options)
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -214,15 +215,15 @@ func NewBlockChainWithOptions(
 // Processor.
 func NewBlockChain(
 	db ethdb.Database, stateCache state.Database, beaconChain BlockChain, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
-	engine consensus_engine.Engine, vmConfig vm.Config,
+	vmConfig vm.Config,
 ) (*BlockChainImpl, error) {
-	return newBlockChainWithOptions(db, stateCache, beaconChain, cacheConfig, chainConfig, engine, vmConfig, Options{})
+	return newBlockChainWithOptions(db, stateCache, beaconChain, cacheConfig, chainConfig, vmConfig, Options{})
 }
 
 func newBlockChainWithOptions(
 	db ethdb.Database, stateCache state.Database, beaconChain BlockChain,
 	cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
-	engine consensus_engine.Engine, vmConfig vm.Config, options Options) (*BlockChainImpl, error) {
+	vmConfig vm.Config, options Options) (*BlockChainImpl, error) {
 
 	bodyCache, _ := lru.New(bodyCacheLimit)
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
@@ -266,7 +267,6 @@ func newBlockChainWithOptions(
 		blockAccumulatorCache:         blockAccumulatorCache,
 		leaderPubKeyFromCoinbase:      leaderPubKeyFromCoinbase,
 		blockchainPruner:              newBlockchainPruner(db),
-		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
 		pendingSlashes:                slash.Records{},
@@ -275,7 +275,7 @@ func newBlockChainWithOptions(
 	}
 
 	var err error
-	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.getProcInterrupt)
+	bc.hc, err = NewHeaderChain(db, chainConfig, bc.getProcInterrupt)
 	if err != nil {
 		return nil, err
 	}
@@ -294,8 +294,8 @@ func newBlockChainWithOptions(
 		beaconChain = bc
 	}
 
-	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
-	bc.SetProcessor(NewStateProcessor(chainConfig, bc, beaconChain, engine))
+	bc.SetValidator(NewBlockValidator(chainConfig, bc))
+	bc.SetProcessor(NewStateProcessor(chainConfig, bc, beaconChain))
 
 	// Take ownership of this particular state
 	go bc.update()
@@ -353,7 +353,7 @@ func VerifyCrossLink(blockchain BlockChain, cl types.CrossLink) error {
 	if blockchain.ShardID() != shard.BeaconChainShardID {
 		return errors.New("[VerifyCrossLink] Shard chains should not verify cross links")
 	}
-	engine := blockchain.Engine()
+	engine := chain.Engine()
 
 	if err := engine.VerifyCrossLink(blockchain, cl); err != nil {
 		return errors.Wrap(err, "[VerifyCrossLink]")
@@ -424,7 +424,7 @@ func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block, beaconChain Block
 			Msg("[ValidateNewBlock] Cannot validate header for the new block")
 		return err
 	}
-	if err := bc.Engine().VerifyVRF(
+	if err := chain.Engine().VerifyVRF(
 		bc, block.Header(),
 	); err != nil {
 		utils.Logger().Error().
@@ -436,7 +436,7 @@ func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block, beaconChain Block
 			"[ValidateNewBlock] Cannot verify vrf for the new block",
 		)
 	}
-	err := bc.Engine().VerifyShardState(bc, beaconChain, block.Header())
+	err := chain.Engine().VerifyShardState(bc, beaconChain, block.Header())
 	if err != nil {
 		utils.Logger().Error().
 			Str("blockHash", block.Hash().Hex()).
@@ -1577,7 +1577,7 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			seals[i] = true
 		}
 		// Note that VerifyHeaders verifies headers in the chain in parallel
-		abort, results := bc.Engine().VerifyHeaders(bc, headers, seals)
+		abort, results := chain2.Engine().VerifyHeaders(bc, headers, seals)
 		verifyHeadersResults = results
 		defer close(abort)
 	}
@@ -2044,8 +2044,6 @@ func (bc *BlockChainImpl) GetHeaderByNumber(number uint64) *block.Header {
 }
 
 func (bc *BlockChainImpl) Config() *params.ChainConfig { return bc.chainConfig }
-
-func (bc *BlockChainImpl) Engine() consensus_engine.Engine { return bc.engine }
 
 func (bc *BlockChainImpl) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {
 	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))

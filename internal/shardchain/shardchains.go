@@ -13,7 +13,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/vm"
@@ -40,7 +39,6 @@ type Collection interface {
 type CollectionImpl struct {
 	dbFactory     DBFactory
 	dbInit        DBInitializer
-	engine        engine.Engine
 	mtx           sync.Mutex
 	pool          map[uint32]core.BlockChain
 	disableCache  map[uint32]bool
@@ -56,14 +54,13 @@ type CollectionImpl struct {
 // the factory is brand new (empty).
 func NewCollection(
 	harmonyconfig *harmonyconfig.HarmonyConfig,
-	dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine,
+	dbFactory DBFactory, dbInit DBInitializer,
 	chainConfig *params.ChainConfig,
 ) *CollectionImpl {
 	return &CollectionImpl{
 		harmonyconfig: harmonyconfig,
 		dbFactory:     dbFactory,
 		dbInit:        dbInit,
-		engine:        engine,
 		pool:          make(map[uint32]core.BlockChain),
 		disableCache:  make(map[uint32]bool),
 		chainConfig:   chainConfig,
@@ -128,7 +125,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 	}
 	var bc core.BlockChain
 	if opts.EpochChain {
-		bc, err = core.NewEpochChain(db, &chainConfig, sc.engine, vm.Config{})
+		bc, err = core.NewEpochChain(db, &chainConfig, vm.Config{})
 	} else {
 		stateCache, err := initStateCache(db, sc, shardID)
 		if err != nil {
@@ -136,7 +133,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		}
 		if shardID == shard.BeaconChainShardID {
 			bc, err = core.NewBlockChainWithOptions(
-				db, stateCache, bc, cacheConfig, &chainConfig, sc.engine, vm.Config{}, opts,
+				db, stateCache, bc, cacheConfig, &chainConfig, vm.Config{}, opts,
 			)
 		} else {
 			beacon, ok := sc.pool[shard.BeaconChainShardID]
@@ -145,7 +142,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 			}
 
 			bc, err = core.NewBlockChainWithOptions(
-				db, stateCache, beacon, cacheConfig, &chainConfig, sc.engine, vm.Config{}, opts,
+				db, stateCache, beacon, cacheConfig, &chainConfig, vm.Config{}, opts,
 			)
 		}
 	}
