@@ -250,7 +250,7 @@ func (stg *StageStates) verifyBlockSignatures(bc core.BlockChain, block *types.B
 		}
 
 		startTime := time.Now()
-		if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
+		if err := chain.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
 			return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
 		}
 		utils.Logger().Debug().

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/internal/params"
 
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
@@ -16,7 +17,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -45,6 +45,8 @@ type engineImpl struct {
 	verifiedSigCache *lru.Cache // verifiedSigKey -> struct{}{}
 }
 
+var internal = NewEngine()
+
 // NewEngine creates Engine with some cache
 func NewEngine() *engineImpl {
 	sigCache, _ := lru.New(verifiedSigCache)
@@ -53,6 +55,10 @@ func NewEngine() *engineImpl {
 		epochCtxCache:    epochCtxCache,
 		verifiedSigCache: sigCache,
 	}
+}
+
+func Engine() *engineImpl {
+	return internal
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
