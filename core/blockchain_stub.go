@@ -141,10 +141,6 @@ func (a Stub) Config() *params.ChainConfig {
 	return nil
 }
 
-func (a Stub) Engine() engine.Engine {
-	return nil
-}
-
 func (a Stub) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {
 	return nil
 }
