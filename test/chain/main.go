@@ -94,7 +94,7 @@ func fundFaucetContract(chain core.BlockChain) {
 	fmt.Println("--------- Funding addresses for Faucet Contract Call ---------")
 	fmt.Println()
 
-	contractworker = pkgworker.New(params.TestChainConfig, chain, nil, chain.Engine())
+	contractworker = pkgworker.New(params.TestChainConfig, chain, nil)
 	nonce = contractworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
 	dataEnc = common.FromHex(FaucetContractBinary)
 	ftx, _ := types.SignTx(
@@ -206,7 +206,7 @@ func playFaucetContract(chain core.BlockChain) {
 
 func main() {
 	genesis := gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, harmonyState.NewDatabase(database), nil, nil, gspec.Config, chain.Engine(), vm.Config{})
+	chain, _ := core.NewBlockChain(database, harmonyState.NewDatabase(database), nil, nil, gspec.Config, vm.Config{})
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain, types.NewTransactionErrorSink())
 
 	backend := &testWorkerBackend{
@@ -223,7 +223,7 @@ func main() {
 	//// Generate a small n-block chain and an uncle block for it
 	n := 3
 	if n > 0 {
-		blocks, _ := chain2.GenerateChain(chainConfig, genesis, chain.Engine(), database, n, func(i int, gen *chain2.BlockGen) {
+		blocks, _ := chain2.GenerateChain(chainConfig, genesis, database, n, func(i int, gen *chain2.BlockGen) {
 			gen.SetCoinbase(FaucetAddress)
 			gen.SetShardID(0)
 			gen.AddTx(pendingTxs[i].(*types.Transaction))

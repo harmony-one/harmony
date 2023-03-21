@@ -21,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
-	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -41,12 +40,11 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChainImpl, *state.D
 			Alloc:   GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 0,
 		}
-		engine = chain2.NewEngine()
 	)
 	genesis := gspec.MustCommit(database)
 
 	// fake blockchain
-	chain, _ := NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, engine, vm.Config{})
+	chain, _ := NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, vm.Config{})
 	db, _ := chain.StateAt(genesis.Root())
 
 	// make a fake block header (use epoch 1 so that locked tokens can be tested)

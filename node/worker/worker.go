@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/internal/chain"
 
 	"github.com/harmony-one/harmony/consensus"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -59,7 +59,6 @@ type Worker struct {
 	chain    core.BlockChain
 	beacon   core.BlockChain
 	current  *environment // An environment for current running cycle.
-	engine   consensus_engine.Engine
 	gasFloor uint64
 	gasCeil  uint64
 }
@@ -558,7 +557,7 @@ func (w *Worker) FinalizeNewBlock(
 		}
 	}()
 
-	block, payout, err := w.engine.Finalize(
+	block, payout, err := chain.Engine().Finalize(
 		w.chain,
 		w.beacon,
 		copyHeader, state, w.current.txs, w.current.receipts,
@@ -574,14 +573,13 @@ func (w *Worker) FinalizeNewBlock(
 
 // New create a new worker object.
 func New(
-	config *params.ChainConfig, chain core.BlockChain, beacon core.BlockChain, engine consensus_engine.Engine,
+	config *params.ChainConfig, chain core.BlockChain, beacon core.BlockChain,
 ) *Worker {
 	worker := &Worker{
 		config:  config,
 		factory: blockfactory.NewFactory(config),
 		chain:   chain,
 		beacon:  beacon,
-		engine:  engine,
 	}
 	worker.gasFloor = 80000000
 	worker.gasCeil = 120000000

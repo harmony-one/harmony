@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv"
@@ -1009,7 +1008,6 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(
 	host p2p.Host,
 	consensusObj *consensus.Consensus,
-	engine engine.Engine,
 	collection *shardchain.CollectionImpl,
 	blacklist map[common.Address]struct{},
 	allowedTxs map[common.Address]core.AllowedTxData,
@@ -1105,7 +1103,7 @@ func New(
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.registry.SetTxPool(node.TxPool)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
-		node.Worker = worker.New(node.Blockchain().Config(), blockchain, beaconChain, engine)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, beaconChain)
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)

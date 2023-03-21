@@ -26,6 +26,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/internal/chain"
+	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/pkg/errors"
 
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -40,16 +42,14 @@ import (
 //
 // BlockValidator implements validator.
 type BlockValidator struct {
-	config *params.ChainConfig     // Chain configuration options
-	bc     BlockChain              // Canonical blockchain
-	engine consensus_engine.Engine // Consensus engine used for validating
+	config *params.ChainConfig // Chain configuration options
+	bc     BlockChain          // Canonical blockchain
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
-func NewBlockValidator(config *params.ChainConfig, blockchain BlockChain, engine consensus_engine.Engine) *BlockValidator {
+func NewBlockValidator(config *params.ChainConfig, blockchain BlockChain) *BlockValidator {
 	validator := &BlockValidator{
 		config: config,
-		engine: engine,
 		bc:     blockchain,
 	}
 	return validator
@@ -131,7 +131,7 @@ func (v *BlockValidator) ValidateHeader(block *types.Block, seal bool) error {
 		return errors.New("block is nil")
 	}
 	if h := block.Header(); h != nil {
-		return v.engine.VerifyHeader(v.bc, h, true)
+		return chain.Engine().VerifyHeader(v.bc, h, true)
 	}
 	return errors.New("header field was nil")
 }
@@ -147,7 +147,7 @@ func (v *BlockValidator) ValidateHeaders(chain []*types.Block) (chan<- struct{},
 		headers[i] = block.Header()
 		seals[i] = true
 	}
-	return v.engine.VerifyHeaders(v.bc, headers, seals)
+	return chain2.Engine().VerifyHeaders(v.bc, headers, seals)
 }
 
 // CalcGasLimit computes the gas limit of the next block after parent. It aims
@@ -249,5 +249,5 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	// (4) verify blockHeader with seal
 	var commitSig bls.SerializedSignature
 	copy(commitSig[:], cxp.CommitSig)
-	return v.engine.VerifyHeaderSignature(v.bc, cxp.Header, commitSig, cxp.CommitBitmap)
+	return chain.Engine().VerifyHeaderSignature(v.bc, cxp.Header, commitSig, cxp.CommitBitmap)
 }

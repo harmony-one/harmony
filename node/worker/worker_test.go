@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
 )
 
@@ -40,18 +39,17 @@ func TestNewWorker(t *testing.T) {
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 10,
 		}
-		engine = chain2.NewEngine()
 	)
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, err := core.NewBlockChain(database, state.NewDatabase(database), &core.BlockChainImpl{}, nil, gspec.Config, engine, vm.Config{})
+	chain, err := core.NewBlockChain(database, state.NewDatabase(database), &core.BlockChainImpl{}, nil, gspec.Config, vm.Config{})
 
 	if err != nil {
 		t.Error(err)
 	}
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, nil, engine)
+	worker := New(params.TestChainConfig, chain, nil)
 
 	if worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(testBankKey.PublicKey)).Cmp(testBankFunds) != 0 {
 		t.Error("Worker state is not setup correctly")
@@ -68,14 +66,13 @@ func TestCommitTransactions(t *testing.T) {
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 0,
 		}
-		engine = chain2.NewEngine()
 	)
 
 	gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, engine, vm.Config{})
+	chain, _ := core.NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, vm.Config{})
 
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, nil, engine)
+	worker := New(params.TestChainConfig, chain, nil)
 
 	// Generate a test tx
 	baseNonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
