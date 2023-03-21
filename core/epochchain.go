@@ -128,7 +128,7 @@ func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
 		}
 
 		// Signature validation.
-		err = bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap)
+		err = chain.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap)
 		if err != nil {
 			return i, errors.Wrap(err, "failed signature validation")
 		}
