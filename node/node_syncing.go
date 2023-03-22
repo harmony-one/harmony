@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/harmony-one/harmony/internal/tikv"
@@ -65,28 +64,11 @@ func GenerateRandomString(n int) string {
 	return string(b)
 }
 
-// getNeighborPeers is a helper function to return list of peers
-// based on different neightbor map
-func getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
-	tmp := []p2p.Peer{}
-	neighbor.Range(func(k, v interface{}) bool {
-		p := v.(p2p.Peer)
-		t := p.Port
-		p.Port = legacysync.GetSyncingPort(t)
-		tmp = append(tmp, p)
-		return true
-	})
-	return tmp
-}
-
-// DoSyncWithoutConsensus gets sync-ed to blockchain without joining consensus
-func (node *Node) DoSyncWithoutConsensus() {
-	go node.DoSyncing(node.Blockchain(), node.Worker, false) //Don't join consensus
-}
-
-// IsSameHeight tells whether node is at same bc height as a peer
-func (node *Node) IsSameHeight() (uint64, bool) {
-	return node.SyncInstance().IsSameBlockchainHeight(node.Blockchain())
+// GenerateSyncID generates a random string with given length
+func GenerateSyncID() [SyncIDLength]byte {
+	var syncID [SyncIDLength]byte
+	copy(syncID[:], GenerateRandomString(SyncIDLength))
+	return syncID
 }
 
 func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
