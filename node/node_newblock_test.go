@@ -34,9 +34,8 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	var testDBFactory = &shardchain.MemDBFactory{}
-	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, &chainconfig,
+		nil, testDBFactory, &core.GenesisInitializer{}, nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType(),
 	)
 	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
 	require.NoError(t, err)
