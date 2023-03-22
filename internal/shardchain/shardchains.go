@@ -7,6 +7,7 @@ import (
 
 	"github.com/harmony-one/harmony/core/state"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 
 	"github.com/harmony-one/harmony/shard"
@@ -16,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -42,7 +42,7 @@ type CollectionImpl struct {
 	mtx           sync.Mutex
 	pool          map[uint32]core.BlockChain
 	disableCache  map[uint32]bool
-	chainConfig   *params.ChainConfig
+	networkType   nodeconfig.NetworkType
 	harmonyconfig *harmonyconfig.HarmonyConfig
 }
 
@@ -55,7 +55,7 @@ type CollectionImpl struct {
 func NewCollection(
 	harmonyconfig *harmonyconfig.HarmonyConfig,
 	dbFactory DBFactory, dbInit DBInitializer,
-	chainConfig *params.ChainConfig,
+	network nodeconfig.NetworkType,
 ) *CollectionImpl {
 	return &CollectionImpl{
 		harmonyconfig: harmonyconfig,
@@ -63,7 +63,7 @@ func NewCollection(
 		dbInit:        dbInit,
 		pool:          make(map[uint32]core.BlockChain),
 		disableCache:  make(map[uint32]bool),
-		chainConfig:   chainConfig,
+		networkType:   network,
 	}
 }
 
@@ -92,7 +92,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		utils.Logger().Info().
 			Uint32("shardID", shardID).
 			Msg("initializing a new chain database")
-		if err := sc.dbInit.InitChainDB(db, shardID); err != nil {
+		if err := sc.dbInit.InitChainDB(db, sc.networkType, shardID); err != nil {
 			return nil, errors.Wrapf(err, "cannot initialize a new chain database")
 		}
 	}
@@ -113,7 +113,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		}
 	}
 
-	chainConfig := *sc.chainConfig
+	chainConfig := sc.networkType.ChainConfig()
 
 	if shardID == shard.BeaconChainShardID {
 		// For beacon chain inside a shard chain, need to reset the eth chainID to shard 0's eth chainID in the config
