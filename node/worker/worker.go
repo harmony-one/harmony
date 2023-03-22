@@ -311,7 +311,7 @@ func (w *Worker) UpdateCurrent() error {
 		Time(big.NewInt(timestamp)).
 		ShardID(w.chain.ShardID()).
 		Header()
-	return w.makeCurrent(parent, header)
+	return w.makeCurrent(parent.Header(), header)
 }
 
 // GetCurrentHeader returns the current header to propose
@@ -320,7 +320,7 @@ func (w *Worker) GetCurrentHeader() *block.Header {
 }
 
 // makeCurrent creates a new environment for the current cycle.
-func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
+func (w *Worker) makeCurrent(parent *block.Header, header *block.Header) error {
 	state, err := w.chain.StateAt(parent.Root())
 	if err != nil {
 		return err
@@ -378,16 +378,6 @@ func (w *Worker) GetNewEpoch() *big.Int {
 // GetCurrentReceipts get the receipts generated starting from the last state.
 func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 	return w.current.receipts
-}
-
-// OutgoingReceipts get the receipts generated starting from the last state.
-func (w *Worker) OutgoingReceipts() []*types.CXReceipt {
-	return w.current.outcxs
-}
-
-// IncomingReceipts get incoming receipts in destination shard that is received from source shard
-func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
-	return w.current.incxs
 }
 
 // CollectVerifiedSlashes sets w.current.slashes only to those that
@@ -596,7 +586,7 @@ func New(
 		Time(big.NewInt(timestamp)).
 		ShardID(worker.chain.ShardID()).
 		Header()
-	worker.makeCurrent(parent, header)
+	worker.makeCurrent(parent.Header(), header)
 
 	return worker
 }
