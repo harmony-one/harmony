@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/internal/chain"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
@@ -133,7 +134,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		}
 		if shardID == shard.BeaconChainShardID {
 			bc, err = core.NewBlockChainWithOptions(
-				db, stateCache, bc, cacheConfig, &chainConfig, vm.Config{}, opts,
+				db, stateCache, bc, cacheConfig, &chainConfig, chain.Engine(), vm.Config{}, opts,
 			)
 		} else {
 			beacon, ok := sc.pool[shard.BeaconChainShardID]
@@ -142,7 +143,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 			}
 
 			bc, err = core.NewBlockChainWithOptions(
-				db, stateCache, beacon, cacheConfig, &chainConfig, vm.Config{}, opts,
+				db, stateCache, beacon, cacheConfig, &chainConfig, chain.Engine(), vm.Config{}, opts,
 			)
 		}
 	}

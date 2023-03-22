@@ -45,10 +45,10 @@ type engineImpl struct {
 	verifiedSigCache *lru.Cache // verifiedSigKey -> struct{}{}
 }
 
-var internal = NewEngine()
+var internal engine.Engine = NewEngine()
 
 // NewEngine creates Engine with some cache
-func NewEngine() *engineImpl {
+func NewEngine() engine.Engine {
 	sigCache, _ := lru.New(verifiedSigCache)
 	epochCtxCache, _ := lru.New(epochCtxCache)
 	return &engineImpl{
@@ -57,7 +57,7 @@ func NewEngine() *engineImpl {
 	}
 }
 
-func Engine() *engineImpl {
+func Engine() engine.Engine {
 	return internal
 }
 

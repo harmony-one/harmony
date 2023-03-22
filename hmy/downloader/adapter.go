@@ -25,6 +25,7 @@ type syncProtocol interface {
 
 type blockChain interface {
 	engine.ChainReader
+	Engine() engine.Engine
 
 	InsertChain(chain types.Blocks, verifyHeaders bool) (int, error)
 	WriteCommitSig(blockNum uint64, lastCommits []byte) error
