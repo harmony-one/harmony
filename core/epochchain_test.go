@@ -12,7 +12,7 @@ import (
 
 func TestGenesisBlock(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	err := (&core.GenesisInitializer{NetworkType: nodeconfig.Mainnet}).InitChainDB(db, 0)
+	err := (&core.GenesisInitializer{}).InitChainDB(db, nodeconfig.Mainnet, 0)
 	require.NoError(t, err)
 
 	chain, err := core.NewEpochChain(db, nil, vm.Config{})

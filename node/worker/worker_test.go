@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/internal/chain"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
@@ -43,7 +44,7 @@ func TestNewWorker(t *testing.T) {
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, err := core.NewBlockChain(database, state.NewDatabase(database), &core.BlockChainImpl{}, nil, gspec.Config, vm.Config{})
+	chain, err := core.NewBlockChain(database, state.NewDatabase(database), &core.BlockChainImpl{}, nil, gspec.Config, chain.Engine(), vm.Config{})
 
 	if err != nil {
 		t.Error(err)
@@ -69,7 +70,7 @@ func TestCommitTransactions(t *testing.T) {
 	)
 
 	gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, vm.Config{})
+	chain, _ := core.NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, chain.Engine(), vm.Config{})
 
 	// Create a new worker
 	worker := New(params.TestChainConfig, chain, nil)

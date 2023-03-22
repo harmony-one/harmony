@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -128,7 +129,7 @@ func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
 		}
 
 		// Signature validation.
-		err = chain.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap)
+		err = bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap)
 		if err != nil {
 			return i, errors.Wrap(err, "failed signature validation")
 		}
@@ -236,6 +237,10 @@ func (bc *EpochChain) getHashByNumber(number uint64) common.Hash {
 
 func (bc *EpochChain) Config() *params.ChainConfig {
 	return bc.chainConfig
+}
+
+func (bc *EpochChain) Engine() engine.Engine {
+	return chain.Engine()
 }
 
 func (bc *EpochChain) ReadShardState(epoch *big.Int) (*shard.State, error) {
