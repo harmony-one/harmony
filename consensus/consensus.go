@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/registry"
+	"github.com/harmony-one/harmony/webhooks"
 
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -316,4 +317,36 @@ func New(
 	consensus.AddPubkeyMetrics()
 
 	return &consensus, nil
+}
+
+// VerifyNewBlock is called by consensus participants to verify the block (account model) they are
+// running consensus on.
+func VerifyNewBlock(hooks *webhooks.Hooks, blockChain core.BlockChain, beaconChain core.BlockChain) func(*types.Block) error {
+	return func(newBlock *types.Block) error {
+		if err := blockChain.ValidateNewBlock(newBlock, beaconChain); err != nil {
+			if hooks != nil {
+				if p := hooks.ProtocolIssues; p != nil {
+					url := p.OnCannotCommit
+					go func() {
+						webhooks.DoPost(url, map[string]interface{}{
+							"bad-header": newBlock.Header(),
+							"reason":     err.Error(),
+						})
+					}()
+				}
+			}
+			utils.Logger().Error().
+				Str("blockHash", newBlock.Hash().Hex()).
+				Int("numTx", len(newBlock.Transactions())).
+				Int("numStakingTx", len(newBlock.StakingTransactions())).
+				Err(err).
+				Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
+			return errors.Errorf(
+				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
+				newBlock.Hash().Hex(),
+				len(newBlock.Transactions()),
+			)
+		}
+		return nil
+	}
 }
