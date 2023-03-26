@@ -31,7 +31,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 	epoch := newBlock.Header().Epoch()
 	shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
-	myShardID := node.Consensus.ShardID
+	myShardID := node.Consensus.ShardID()
 	utils.Logger().Info().Int("shardNum", shardNum).Uint32("myShardID", myShardID).Uint64("blockNum", newBlock.NumberU64()).Msg("[BroadcastCXReceipts]")
 
 	for i := 0; i < shardNum; i++ {
@@ -44,7 +44,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 
 // BroadcastCXReceiptsWithShardID broadcasts cross shard receipts to given ToShardID
 func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig []byte, commitBitmap []byte, toShardID uint32) {
-	myShardID := node.Consensus.ShardID
+	myShardID := node.Consensus.ShardID()
 	utils.Logger().Debug().
 		Uint32("toShardID", toShardID).
 		Uint32("myShardID", myShardID).

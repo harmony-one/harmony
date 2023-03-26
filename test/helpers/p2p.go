@@ -18,8 +18,6 @@ type Host struct {
 var (
 	// Hosts - host combinations
 	Hosts []Host
-	// Topics - p2p topics
-	Topics []string
 	// Bootnodes - p2p bootnodes
 	Bootnodes []string
 )
@@ -28,14 +26,6 @@ func init() {
 	Hosts = []Host{
 		{IP: nodeconfig.DefaultLocalListenIP, Port: "9000"},
 		{IP: nodeconfig.DefaultLocalListenIP, Port: "9001"},
-	}
-
-	Topics = []string{
-		"hmy/testnet/0.0.1/client/beacon",
-		"hmy/testnet/0.0.1/node/beacon",
-		"hmy/testnet/0.0.1/node/shard/1",
-		"hmy/testnet/0.0.1/node/shard/2",
-		"hmy/testnet/0.0.1/node/shard/3",
 	}
 
 	Bootnodes = []string{

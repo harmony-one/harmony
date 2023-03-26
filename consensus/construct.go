@@ -31,7 +31,7 @@ func (consensus *Consensus) populateMessageFields(
 ) *msg_pb.ConsensusRequest {
 	request.ViewId = consensus.getCurBlockViewID()
 	request.BlockNum = consensus.getBlockNum()
-	request.ShardId = consensus.ShardID
+	request.ShardId = consensus.shardID
 	// 32 byte block hash
 	request.BlockHash = blockHash
 	return request

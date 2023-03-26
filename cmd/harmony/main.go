@@ -722,12 +722,12 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 
 	// We are not beacon chain, make sure beacon already initialized.
 	if nodeConfig.ShardID != shard.BeaconChainShardID {
-		beacon, err := collection.ShardChain(shard.BeaconChainShardID, core.Options{EpochChain: true})
+		beaconChain, err := collection.ShardChain(shard.BeaconChainShardID, core.Options{EpochChain: true})
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 			os.Exit(1)
 		}
-		registry.SetBeaconchain(beacon)
+		registry.SetBeaconchain(beaconChain)
 	}
 
 	blockchain, err = collection.ShardChain(nodeConfig.ShardID)

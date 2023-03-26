@@ -29,7 +29,7 @@ func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockN
 	timer := DoMetricRPCRequest(Block)
 	defer DoRPCRequestDuration(Block, timer)
 
-	block := s.hmy.BlockChain.GetBlockByNumber(uint64(number))
+	block := s.hmy.BlockChain().GetBlockByNumber(uint64(number))
 	if block == nil {
 		return nil, nil
 	}

@@ -100,7 +100,7 @@ func (s *PublicHarmonyService) GetPeerInfo(
 
 // GetNumPendingCrossLinks returns length of hmy.BlockChain.ReadPendingCrossLinks()
 func (s *PublicHarmonyService) GetNumPendingCrossLinks() (int, error) {
-	links, err := s.hmy.BlockChain.ReadPendingCrossLinks()
+	links, err := s.hmy.BlockChain().ReadPendingCrossLinks()
 	if err != nil {
 		return 0, err
 	}

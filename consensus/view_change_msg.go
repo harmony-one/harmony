@@ -25,7 +25,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 			Viewchange: &msg_pb.ViewChangeRequest{
 				ViewId:       consensus.getViewChangingID(),
 				BlockNum:     consensus.getBlockNum(),
-				ShardId:      consensus.ShardID,
+				ShardId:      consensus.shardID,
 				SenderPubkey: priKey.Pub.Bytes[:],
 				LeaderPubkey: consensus.LeaderPubKey.Bytes[:],
 			},
@@ -108,7 +108,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 			Viewchange: &msg_pb.ViewChangeRequest{
 				ViewId:       viewID,
 				BlockNum:     consensus.getBlockNum(),
-				ShardId:      consensus.ShardID,
+				ShardId:      consensus.shardID,
 				SenderPubkey: priKey.Pub.Bytes[:],
 			},
 		},

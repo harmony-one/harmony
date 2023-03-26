@@ -43,7 +43,7 @@ func (hmy *Harmony) readAndUpdateRawStakes(
 		slotKey := slot.BLSPublicKey
 		spread, ok := validatorSpreads[slotAddr]
 		if !ok {
-			snapshot, err := hmy.BlockChain.ReadValidatorSnapshotAtEpoch(epoch, slotAddr)
+			snapshot, err := hmy.BlockChain().ReadValidatorSnapshotAtEpoch(epoch, slotAddr)
 			if err != nil {
 				continue
 			}
@@ -64,9 +64,9 @@ func (hmy *Harmony) readAndUpdateRawStakes(
 }
 
 func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
-	nowE := hmy.BlockChain.CurrentHeader().Epoch()
+	nowE := hmy.BlockChain().CurrentHeader().Epoch()
 
-	if hmy.BlockChain.CurrentHeader().IsLastBlockInEpoch() {
+	if hmy.BlockChain().CurrentHeader().IsLastBlockInEpoch() {
 		// current epoch is current header epoch + 1 if the header was last block of prev epoch
 		nowE = new(big.Int).Add(nowE, common.Big1)
 	}
@@ -76,11 +76,11 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 		nowCommittee, prevCommittee *shard.State
 		err                         error
 	)
-	nowCommittee, err = hmy.BlockChain.ReadShardState(nowE)
+	nowCommittee, err = hmy.BlockChain().ReadShardState(nowE)
 	if err != nil {
 		return nil, err
 	}
-	prevCommittee, err = hmy.BlockChain.ReadShardState(thenE)
+	prevCommittee, err = hmy.BlockChain().ReadShardState(thenE)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		// before staking skip computing
-		if hmy.BlockChain.Config().IsStaking(prevCommittee.Epoch) {
+		if hmy.BlockChain().Config().IsStaking(prevCommittee.Epoch) {
 			if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
 				return nil, err
 			}
@@ -116,8 +116,8 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 			return nil, errors.Wrapf(
 				err,
 				"committee is only available from staking epoch: %v, current epoch: %v",
-				hmy.BlockChain.Config().StakingEpoch,
-				hmy.BlockChain.CurrentHeader().Epoch(),
+				hmy.BlockChain().Config().StakingEpoch,
+				hmy.BlockChain().CurrentHeader().Epoch(),
 			)
 		}
 		rawStakes = hmy.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
@@ -130,27 +130,27 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 
 // IsStakingEpoch ...
 func (hmy *Harmony) IsStakingEpoch(epoch *big.Int) bool {
-	return hmy.BlockChain.Config().IsStaking(epoch)
+	return hmy.BlockChain().Config().IsStaking(epoch)
 }
 
 // IsPreStakingEpoch ...
 func (hmy *Harmony) IsPreStakingEpoch(epoch *big.Int) bool {
-	return hmy.BlockChain.Config().IsPreStaking(epoch)
+	return hmy.BlockChain().Config().IsPreStaking(epoch)
 }
 
 // IsNoEarlyUnlockEpoch ...
 func (hmy *Harmony) IsNoEarlyUnlockEpoch(epoch *big.Int) bool {
-	return hmy.BlockChain.Config().IsNoEarlyUnlock(epoch)
+	return hmy.BlockChain().Config().IsNoEarlyUnlock(epoch)
 }
 
 // IsCommitteeSelectionBlock checks if the given block is the committee selection block
 func (hmy *Harmony) IsCommitteeSelectionBlock(header *block.Header) bool {
-	return chain.IsCommitteeSelectionBlock(hmy.BlockChain, header)
+	return chain.IsCommitteeSelectionBlock(hmy.BlockChain(), header)
 }
 
 // GetDelegationLockingPeriodInEpoch ...
 func (hmy *Harmony) GetDelegationLockingPeriodInEpoch(epoch *big.Int) int {
-	return chain.GetLockPeriodInEpoch(hmy.BlockChain, epoch)
+	return chain.GetLockPeriodInEpoch(hmy.BlockChain(), epoch)
 }
 
 // SendStakingTx adds a staking transaction
@@ -174,7 +174,7 @@ func (hmy *Harmony) GetStakingTransactionsCount(address, txType string) (uint64,
 
 // GetSuperCommittees ..
 func (hmy *Harmony) GetSuperCommittees() (*quorum.Transition, error) {
-	nowE := hmy.BlockChain.CurrentHeader().Epoch()
+	nowE := hmy.BlockChain().CurrentHeader().Epoch()
 	key := fmt.Sprintf("sc-%s", nowE.String())
 
 	res, err := hmy.SingleFlightRequest(
@@ -192,7 +192,7 @@ func (hmy *Harmony) GetSuperCommittees() (*quorum.Transition, error) {
 
 // GetValidators returns validators for a particular epoch.
 func (hmy *Harmony) GetValidators(epoch *big.Int) (*shard.Committee, error) {
-	state, err := hmy.BlockChain.ReadShardState(epoch)
+	state, err := hmy.BlockChain().ReadShardState(epoch)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (hmy *Harmony) GetValidators(epoch *big.Int) (*shard.Committee, error) {
 
 // GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
 func (hmy *Harmony) GetValidatorSelfDelegation(addr common.Address) *big.Int {
-	wrapper, err := hmy.BlockChain.ReadValidatorInformation(addr)
+	wrapper, err := hmy.BlockChain().ReadValidatorInformation(addr)
 	if err != nil || wrapper == nil {
 		return nil
 	}
@@ -218,13 +218,13 @@ func (hmy *Harmony) GetValidatorSelfDelegation(addr common.Address) *big.Int {
 
 // GetElectedValidatorAddresses returns the address of elected validators for current epoch
 func (hmy *Harmony) GetElectedValidatorAddresses() []common.Address {
-	list, _ := hmy.BlockChain.ReadShardState(hmy.BlockChain.CurrentBlock().Epoch())
+	list, _ := hmy.BlockChain().ReadShardState(hmy.BlockChain().CurrentBlock().Epoch())
 	return list.StakedValidators().Addrs
 }
 
 // GetAllValidatorAddresses returns the up to date validator candidates for next epoch
 func (hmy *Harmony) GetAllValidatorAddresses() []common.Address {
-	return hmy.BlockChain.ValidatorCandidates()
+	return hmy.BlockChain().ValidatorCandidates()
 }
 
 func (hmy *Harmony) GetValidatorsStakeByBlockNumber(
@@ -236,7 +236,7 @@ func (hmy *Harmony) GetValidatorsStakeByBlockNumber(
 	validatorAddresses := hmy.GetAllValidatorAddresses()
 	stakes := make(map[string]*big.Int, len(validatorAddresses))
 	for _, validatorAddress := range validatorAddresses {
-		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validatorAddress, block.Root())
+		wrapper, err := hmy.BlockChain().ReadValidatorInformationAtRoot(validatorAddress, block.Root())
 		if err != nil {
 			if errors.Cause(err) != state.ErrAddressNotPresent {
 				return nil, errors.Errorf(
@@ -271,7 +271,7 @@ func (hmy *Harmony) getEpochSigning(epoch *big.Int, addr common.Address) (stakin
 		}
 	}
 
-	snapshot, err := hmy.BlockChain.ReadValidatorSnapshotAtEpoch(epoch, addr)
+	snapshot, err := hmy.BlockChain().ReadValidatorSnapshotAtEpoch(epoch, addr)
 	if err != nil {
 		return entry, err
 	}
@@ -282,7 +282,7 @@ func (hmy *Harmony) getEpochSigning(epoch *big.Int, addr common.Address) (stakin
 	entry.Blocks = snapshot.Validator.Counters
 
 	// subtract previous epoch counters if exists
-	prevEpochSnap, err := hmy.BlockChain.ReadValidatorSnapshotAtEpoch(prevEpoch, addr)
+	prevEpochSnap, err := hmy.BlockChain().ReadValidatorSnapshotAtEpoch(prevEpoch, addr)
 	if err == nil {
 		entry.Blocks.NumBlocksSigned.Sub(
 			entry.Blocks.NumBlocksSigned,
@@ -309,7 +309,7 @@ func (hmy *Harmony) getEpochSigning(epoch *big.Int, addr common.Address) (stakin
 func (hmy *Harmony) GetValidatorInformation(
 	addr common.Address, block *types.Block,
 ) (*staking.ValidatorRPCEnhanced, error) {
-	bc := hmy.BlockChain
+	bc := hmy.BlockChain()
 	wrapper, err := bc.ReadValidatorInformationAtRoot(addr, block.Root())
 	if err != nil {
 		s, _ := internalCommon.AddressToBech32(addr)
@@ -351,15 +351,15 @@ func (hmy *Harmony) GetValidatorInformation(
 		snapshot.Validator, wrapper,
 	)
 
-	lastBlockOfEpoch := shard.Schedule.EpochLastBlock(hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64())
+	lastBlockOfEpoch := shard.Schedule.EpochLastBlock(hmy.BeaconChain().CurrentBlock().Header().Epoch().Uint64())
 
-	computed.BlocksLeftInEpoch = lastBlockOfEpoch - hmy.BeaconChain.CurrentBlock().Header().Number().Uint64()
+	computed.BlocksLeftInEpoch = lastBlockOfEpoch - hmy.BeaconChain().CurrentBlock().Header().Number().Uint64()
 
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.Performance = &staking.CurrentEpochPerformance{
 			CurrentSigningPercentage: *computed,
-			Epoch:                    hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64(),
-			Block:                    hmy.BeaconChain.CurrentBlock().Header().Number().Uint64(),
+			Epoch:                    hmy.BeaconChain().CurrentBlock().Header().Epoch().Uint64(),
+			Block:                    hmy.BeaconChain().CurrentBlock().Header().Number().Uint64(),
 		}
 	}
 
@@ -474,7 +474,7 @@ func (hmy *Harmony) GetMedianRawStakeSnapshot() (
 			// Compute for next epoch
 			epoch := big.NewInt(0).Add(hmy.CurrentBlock().Epoch(), big.NewInt(1))
 			instance := shard.Schedule.InstanceForEpoch(epoch)
-			return committee.NewEPoSRound(epoch, hmy.BlockChain, hmy.BlockChain.Config().IsEPoSBound35(epoch), instance.SlotsLimit(), int(instance.NumShards()))
+			return committee.NewEPoSRound(epoch, hmy.BlockChain(), hmy.BlockChain().Config().IsEPoSBound35(epoch), instance.SlotsLimit(), int(instance.NumShards()))
 		},
 	)
 	if err != nil {
@@ -485,7 +485,7 @@ func (hmy *Harmony) GetMedianRawStakeSnapshot() (
 
 // GetDelegationsByValidator returns all delegation information of a validator
 func (hmy *Harmony) GetDelegationsByValidator(validator common.Address) []staking.Delegation {
-	wrapper, err := hmy.BlockChain.ReadValidatorInformation(validator)
+	wrapper, err := hmy.BlockChain().ReadValidatorInformation(validator)
 	if err != nil || wrapper == nil {
 		return nil
 	}
@@ -496,7 +496,7 @@ func (hmy *Harmony) GetDelegationsByValidator(validator common.Address) []stakin
 func (hmy *Harmony) GetDelegationsByValidatorAtBlock(
 	validator common.Address, block *types.Block,
 ) []staking.Delegation {
-	wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validator, block.Root())
+	wrapper, err := hmy.BlockChain().ReadValidatorInformationAtRoot(validator, block.Root())
 	if err != nil || wrapper == nil {
 		return nil
 	}
@@ -507,7 +507,7 @@ func (hmy *Harmony) GetDelegationsByValidatorAtBlock(
 func (hmy *Harmony) GetDelegationsByDelegator(
 	delegator common.Address,
 ) ([]common.Address, []*staking.Delegation) {
-	block := hmy.BlockChain.CurrentBlock()
+	block := hmy.BlockChain().CurrentBlock()
 	return hmy.GetDelegationsByDelegatorByBlock(delegator, block)
 }
 
@@ -515,7 +515,7 @@ func (hmy *Harmony) GetDelegationsByDelegator(
 func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 	delegator common.Address, block *types.Block,
 ) ([]common.Address, []*staking.Delegation) {
-	delegationIndexes, err := hmy.BlockChain.
+	delegationIndexes, err := hmy.BlockChain().
 		ReadDelegationsByDelegatorAt(delegator, block.Number())
 	if err != nil {
 		return nil, nil
@@ -525,7 +525,7 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 	delegations := make([]*staking.Delegation, 0, len(delegationIndexes))
 
 	for i := range delegationIndexes {
-		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(
+		wrapper, err := hmy.BlockChain().ReadValidatorInformationAtRoot(
 			delegationIndexes[i].ValidatorAddress, block.Root(),
 		)
 		if err != nil || wrapper == nil {
@@ -594,7 +594,7 @@ func (hmy *Harmony) GetUndelegationPayouts(
 
 	lockingPeriod := hmy.GetDelegationLockingPeriodInEpoch(undelegationPayoutBlock.Epoch())
 	for _, validator := range hmy.GetAllValidatorAddresses() {
-		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validator, undelegationPayoutBlock.Root())
+		wrapper, err := hmy.BlockChain().ReadValidatorInformationAtRoot(validator, undelegationPayoutBlock.Root())
 		if err != nil || wrapper == nil {
 			continue // Not a validator at this epoch or unable to fetch validator info because of pruned state.
 		}
@@ -617,7 +617,7 @@ func (hmy *Harmony) GetTotalStakingSnapshot() *big.Int {
 		return stake
 	}
 	currHeight := hmy.CurrentBlock().NumberU64()
-	candidates := hmy.BlockChain.ValidatorCandidates()
+	candidates := hmy.BlockChain().ValidatorCandidates()
 	if len(candidates) == 0 {
 		stake := big.NewInt(0)
 		hmy.totalStakeCache.push(currHeight, stake)
@@ -625,8 +625,8 @@ func (hmy *Harmony) GetTotalStakingSnapshot() *big.Int {
 	}
 	stakes := big.NewInt(0)
 	for i := range candidates {
-		snapshot, _ := hmy.BlockChain.ReadValidatorSnapshot(candidates[i])
-		validator, _ := hmy.BlockChain.ReadValidatorInformation(candidates[i])
+		snapshot, _ := hmy.BlockChain().ReadValidatorSnapshot(candidates[i])
+		validator, _ := hmy.BlockChain().ReadValidatorInformation(candidates[i])
 		if !committee.IsEligibleForEPoSAuction(
 			snapshot, validator,
 		) {

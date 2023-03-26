@@ -116,7 +116,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 	database := state.NewDatabaseWithCache(hmy.ChainDb(), 16)
 
 	if origin > 0 {
-		start = hmy.BlockChain.GetBlock(start.ParentHash(), origin-1)
+		start = hmy.BlockChain().GetBlock(start.ParentHash(), origin-1)
 		if start == nil {
 			return nil, fmt.Errorf("parent block #%d not found", origin-1)
 		}
@@ -131,7 +131,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 		}
 		// Find the most recent block that has state available
 		for i := uint64(0); i < reexec; i++ {
-			start = hmy.BlockChain.GetBlock(start.ParentHash(), start.NumberU64()-1)
+			start = hmy.BlockChain().GetBlock(start.ParentHash(), start.NumberU64()-1)
 			if start == nil {
 				break
 			}
@@ -164,8 +164,8 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 
 			// Fetch and execute the next block trace tasks
 			for task := range tasks {
-				hmySigner := types.MakeSigner(hmy.BlockChain.Config(), task.block.Number())
-				ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+				hmySigner := types.MakeSigner(hmy.BlockChain().Config(), task.block.Number())
+				ethSigner := types.NewEIP155Signer(hmy.BlockChain().Config().EthCompatibleChainID)
 
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
@@ -174,7 +174,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 						signer = ethSigner
 					}
 					msg, _ := tx.AsMessage(signer)
-					vmCtx := core.NewEVMContext(msg, task.block.Header(), hmy.BlockChain, nil)
+					vmCtx := core.NewEVMContext(msg, task.block.Header(), hmy.BlockChain(), nil)
 
 					res, err := hmy.TraceTx(ctx, msg, vmCtx, task.statedb, config)
 					if err != nil {
@@ -265,7 +265,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 				logged = time.Now()
 			}
 			// Retrieve the next block to trace
-			block := hmy.BlockChain.GetBlockByNumber(number)
+			block := hmy.BlockChain().GetBlockByNumber(number)
 			if block == nil {
 				failed = fmt.Errorf("block #%d not found", number)
 				break
@@ -282,7 +282,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 				traced += uint64(len(txs))
 			}
 			// Generate the next state snapshot fast without tracing
-			_, _, _, _, _, _, _, err := hmy.BlockChain.Processor().Process(block, statedb, vm.Config{}, false)
+			_, _, _, _, _, _, _, err := hmy.BlockChain().Processor().Process(block, statedb, vm.Config{}, false)
 			if err != nil {
 				failed = err
 				break
@@ -347,10 +347,10 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 // same as TraceBlock, but only use 1 thread
 func (hmy *Harmony) traceBlockNoThread(ctx context.Context, block *types.Block, config *TraceConfig) ([]*TxTraceResult, error) {
 	// Create the parent state database
-	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
+	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain(), block.Header(), true); err != nil {
 		return nil, err
 	}
-	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	parent := hmy.BlockChain().GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return nil, fmt.Errorf("parent %#x not found", block.ParentHash())
 	}
@@ -364,8 +364,8 @@ func (hmy *Harmony) traceBlockNoThread(ctx context.Context, block *types.Block, 
 	}
 	// Execute all the transaction contained within the block concurrently
 	var (
-		hmySigner = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+		hmySigner = types.MakeSigner(hmy.BlockChain().Config(), block.Number())
+		ethSigner = types.NewEIP155Signer(hmy.BlockChain().Config().EthCompatibleChainID)
 		txs       = block.Transactions()
 		results   = make([]*TxTraceResult, len(txs))
 	)
@@ -383,7 +383,7 @@ traceLoop:
 		msg, _ := tx.AsMessage(signer)
 		statedb.Prepare(tx.Hash(), blockHash, i)
 		statedb.SetTxHashETH(tx.ConvertToEth().Hash())
-		vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
+		vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain(), nil)
 		res, err := hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 		if err != nil {
 			results[i] = &TxTraceResult{Error: err.Error()}
@@ -422,10 +422,10 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 		return hmy.traceBlockNoThread(ctx, block, config)
 	}
 	// Create the parent state database
-	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
+	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain(), block.Header(), true); err != nil {
 		return nil, err
 	}
-	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	parent := hmy.BlockChain().GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return nil, fmt.Errorf("parent %#x not found", block.ParentHash())
 	}
@@ -439,8 +439,8 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 	}
 	// Execute all the transaction contained within the block concurrently
 	var (
-		hmySigner = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+		hmySigner = types.MakeSigner(hmy.BlockChain().Config(), block.Number())
+		ethSigner = types.NewEIP155Signer(hmy.BlockChain().Config().EthCompatibleChainID)
 		txs       = block.Transactions()
 		results   = make([]*TxTraceResult, len(txs))
 
@@ -465,7 +465,7 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 				}
 
 				msg, _ := txs[task.index].AsMessage(signer)
-				vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
+				vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain(), nil)
 				tx := txs[task.index]
 				task.statedb.Prepare(tx.Hash(), blockHash, task.index)
 				task.statedb.SetTxHashETH(tx.ConvertToEth().Hash())
@@ -492,9 +492,9 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 		msg, _ := tx.AsMessage(signer)
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
 		statedb.SetTxHashETH(tx.ConvertToEth().Hash())
-		vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
+		vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain(), nil)
 
-		vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vm.Config{})
+		vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain().Config(), vm.Config{})
 		if _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas())); err != nil {
 			failed = err
 			break
@@ -523,10 +523,10 @@ func (hmy *Harmony) standardTraceBlockToFile(ctx context.Context, block *types.B
 		}
 	}
 	// Create the parent state database
-	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
+	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain(), block.Header(), true); err != nil {
 		return nil, err
 	}
-	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	parent := hmy.BlockChain().GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return nil, fmt.Errorf("parent %#x not found", block.ParentHash())
 	}
@@ -553,8 +553,8 @@ func (hmy *Harmony) standardTraceBlockToFile(ctx context.Context, block *types.B
 
 	// Execute transaction, either tracing all or just the requested one
 	var (
-		hmySigner = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+		hmySigner = types.MakeSigner(hmy.BlockChain().Config(), block.Number())
+		ethSigner = types.NewEIP155Signer(hmy.BlockChain().Config().EthCompatibleChainID)
 		dumps     []string
 	)
 	for i, tx := range block.Transactions() {
@@ -565,7 +565,7 @@ func (hmy *Harmony) standardTraceBlockToFile(ctx context.Context, block *types.B
 		// Prepare the transaction for un-traced execution
 		var (
 			msg, _ = tx.AsMessage(signer)
-			vmctx  = core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
+			vmctx  = core.NewEVMContext(msg, block.Header(), hmy.BlockChain(), nil)
 
 			vmConf vm.Config
 			dump   *os.File
@@ -592,7 +592,7 @@ func (hmy *Harmony) standardTraceBlockToFile(ctx context.Context, block *types.B
 			}
 		}
 		// Execute the transaction and flush any traces to disk
-		vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vmConf)
+		vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain().Config(), vmConf)
 		_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
 		if writer != nil {
 			writer.Flush()
@@ -631,16 +631,16 @@ func containsTx(block *types.Block, hash common.Hash) bool {
 // attempted to be reexecuted to generate the desired state.
 func (hmy *Harmony) ComputeStateDB(block *types.Block, reexec uint64) (*state.DB, error) {
 	// If we have the state fully available, use that
-	statedb, err := hmy.BlockChain.StateAt(block.Root())
+	statedb, err := hmy.BlockChain().StateAt(block.Root())
 	if err == nil {
 		return statedb, nil
 	}
 	// Otherwise try to reexec blocks until we find a state or reach our limit
 	origin := block.NumberU64()
-	database := state.NewDatabaseWithCache(hmy.BlockChain.ChainDb(), 16)
+	database := state.NewDatabaseWithCache(hmy.BlockChain().ChainDb(), 16)
 
 	for i := uint64(0); i < reexec; i++ {
-		block = hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
+		block = hmy.BlockChain().GetBlock(block.ParentHash(), block.NumberU64()-1)
 		if block == nil {
 			break
 		}
@@ -674,10 +674,10 @@ func (hmy *Harmony) ComputeStateDB(block *types.Block, reexec uint64) (*state.DB
 			logged = time.Now()
 		}
 		// Retrieve the next block to regenerate and process it
-		if block = hmy.BlockChain.GetBlockByNumber(block.NumberU64() + 1); block == nil {
+		if block = hmy.BlockChain().GetBlockByNumber(block.NumberU64() + 1); block == nil {
 			return nil, fmt.Errorf("block #%d not found", block.NumberU64()+1)
 		}
-		_, _, _, _, _, _, _, err := hmy.BlockChain.Processor().Process(block, statedb, vm.Config{}, false)
+		_, _, _, _, _, _, _, err := hmy.BlockChain().Processor().Process(block, statedb, vm.Config{}, false)
 		if err != nil {
 			return nil, fmt.Errorf("processing block %d failed: %v", block.NumberU64(), err)
 		}
@@ -750,7 +750,7 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 		tracer = vm.NewStructLogger(config.LogConfig)
 	}
 	// Run the transaction with tracing enabled.
-	vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer})
+	vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain().Config(), vm.Config{Debug: true, Tracer: tracer})
 
 	result, err := core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()))
 	if err != nil {
@@ -781,7 +781,7 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 // ComputeTxEnv returns the execution environment of a certain transaction.
 func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64) (core.Message, vm.Context, *state.DB, error) {
 	// Create the parent state database
-	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	parent := hmy.BlockChain().GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return nil, vm.Context{}, nil, fmt.Errorf("parent %#x not found", block.ParentHash())
 	}
@@ -795,8 +795,8 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 	}
 
 	// Recompute transactions up to the target index.
-	hmySigner := types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-	ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+	hmySigner := types.MakeSigner(hmy.BlockChain().Config(), block.Number())
+	ethSigner := types.NewEIP155Signer(hmy.BlockChain().Config().EthCompatibleChainID)
 
 	for idx, tx := range block.Transactions() {
 		signer := hmySigner
@@ -806,12 +806,12 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 
 		// Assemble the transaction call message and return if the requested offset
 		msg, _ := tx.AsMessage(signer)
-		context := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
+		context := core.NewEVMContext(msg, block.Header(), hmy.BlockChain(), nil)
 		if idx == txIndex {
 			return msg, context, statedb, nil
 		}
 		// Not yet the searched for transaction, execute on top of the current state
-		vmenv := vm.NewEVM(context, statedb, hmy.BlockChain.Config(), vm.Config{})
+		vmenv := vm.NewEVM(context, statedb, hmy.BlockChain().Config(), vm.Config{})
 		if _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.GasLimit())); err != nil {
 			return nil, vm.Context{}, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
 		}
@@ -824,7 +824,7 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 // ComputeTxEnvEachBlockWithoutApply returns the execution environment of a certain transaction.
 func (hmy *Harmony) ComputeTxEnvEachBlockWithoutApply(block *types.Block, reexec uint64, cb func(int, *types.Transaction, core.Message, vm.Context, *state.DB) bool) error {
 	// Create the parent state database
-	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	parent := hmy.BlockChain().GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return fmt.Errorf("parent %#x not found", block.ParentHash())
 	}
@@ -834,8 +834,8 @@ func (hmy *Harmony) ComputeTxEnvEachBlockWithoutApply(block *types.Block, reexec
 	}
 
 	// Recompute transactions up to the target index.
-	hmySigner := types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-	ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+	hmySigner := types.MakeSigner(hmy.BlockChain().Config(), block.Number())
+	ethSigner := types.NewEIP155Signer(hmy.BlockChain().Config().EthCompatibleChainID)
 
 	for idx, tx := range block.Transactions() {
 		signer := hmySigner
@@ -845,7 +845,7 @@ func (hmy *Harmony) ComputeTxEnvEachBlockWithoutApply(block *types.Block, reexec
 
 		// Assemble the transaction call message and return if the requested offset
 		msg, _ := tx.AsMessage(signer)
-		context := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
+		context := core.NewEVMContext(msg, block.Header(), hmy.BlockChain(), nil)
 		if !cb(idx, tx, msg, context, statedb) {
 			return nil
 		}
