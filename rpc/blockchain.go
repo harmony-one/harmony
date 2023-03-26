@@ -194,12 +194,12 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	}
 	var blockNum uint64
 	if blockNumber.EthBlockNumber() == rpc.LatestBlockNumber {
-		blockNum = s.hmy.BlockChain().CurrentHeader().Number().Uint64()
+		blockNum = s.hmy.BlockChain.CurrentHeader().Number().Uint64()
 	} else {
 		blockNum = uint64(blockNumber.EthBlockNumber().Int64())
 	}
 
-	blk := s.hmy.BlockChain().GetBlockByNumber(blockNum)
+	blk := s.hmy.BlockChain.GetBlockByNumber(blockNum)
 	// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
 	// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
 	// Throwing an error like "requested block number greater than current block number" breaks this retry functionality.
@@ -297,7 +297,7 @@ func (s *PublicBlockchainService) GetBlocks(
 	blockStart := blockNumberStart.Int64()
 	blockEnd := blockNumberEnd.Int64()
 	if blockNumberEnd.EthBlockNumber() == rpc.LatestBlockNumber {
-		blockEnd = s.hmy.BlockChain().CurrentHeader().Number().Int64()
+		blockEnd = s.hmy.BlockChain.CurrentHeader().Number().Int64()
 	}
 	if blockEnd >= blockStart && blockEnd-blockStart > rpcGetBlocksLimit {
 		return nil, fmt.Errorf("GetBlocks query must be smaller than size %v", rpcGetBlocksLimit)
@@ -377,7 +377,7 @@ func (s *PublicBlockchainService) GetBlockSigners(
 	} else {
 		bn = uint64(blockNum.Int64())
 	}
-	blk := s.hmy.BlockChain().GetBlockByNumber(bn)
+	blk := s.hmy.BlockChain.GetBlockByNumber(bn)
 	if blk == nil {
 		return nil, errors.New("unknown block")
 	}
@@ -504,7 +504,7 @@ func (s *PublicBlockchainService) IsBlockSigner(
 	if blockNum == rpc.PendingBlockNumber {
 		return false, errors.New("no signing data for pending block number")
 	} else if blockNum == rpc.LatestBlockNumber {
-		bn = s.hmy.BlockChain().CurrentBlock().NumberU64()
+		bn = s.hmy.BlockChain.CurrentBlock().NumberU64()
 	} else {
 		bn = uint64(blockNum.Int64())
 	}
@@ -544,11 +544,11 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 		if err != nil {
 			return nil, err
 		}
-		curVal, err := s.hmy.BlockChain().ReadValidatorInformation(ethAddr)
+		curVal, err := s.hmy.BlockChain.ReadValidatorInformation(ethAddr)
 		if err != nil {
 			return nil, err
 		}
-		prevVal, err := s.hmy.BlockChain().ReadValidatorSnapshot(ethAddr)
+		prevVal, err := s.hmy.BlockChain.ReadValidatorSnapshot(ethAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -599,7 +599,7 @@ func (s *PublicBlockchainService) GetLeader(ctx context.Context) (string, error)
 	defer DoRPCRequestDuration(GetLeader, timer)
 
 	// Fetch Header
-	blk := s.hmy.BlockChain().CurrentBlock()
+	blk := s.hmy.BlockChain.CurrentBlock()
 	// Response output is the same for all versions
 	leader := s.helper.GetLeader(blk)
 	return leader, nil
@@ -988,7 +988,7 @@ func (s *PublicBlockchainService) GetTotalSupply(
 ) (numeric.Dec, error) {
 	timer := DoMetricRPCRequest(GetTotalSupply)
 	defer DoRPCRequestDuration(GetTotalSupply, timer)
-	return stakingReward.GetTotalTokens(s.hmy.BlockChain())
+	return stakingReward.GetTotalTokens(s.hmy.BlockChain)
 }
 
 // GetCirculatingSupply ...
@@ -997,7 +997,7 @@ func (s *PublicBlockchainService) GetCirculatingSupply(
 ) (numeric.Dec, error) {
 	timer := DoMetricRPCRequest(GetCirculatingSupply)
 	defer DoRPCRequestDuration(GetCirculatingSupply, timer)
-	return chain.GetCirculatingSupply(s.hmy.BlockChain())
+	return chain.GetCirculatingSupply(s.hmy.BlockChain)
 }
 
 // GetStakingNetworkInfo ..
@@ -1063,7 +1063,7 @@ const (
 func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
 	timer := DoMetricRPCRequest(InSync)
 	defer DoRPCRequestDuration(InSync, timer)
-	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain().ShardID())
+	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
 	if !inSync && diff <= inSyncTolerance {
 		inSync = true
 	}
@@ -1074,7 +1074,7 @@ func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
 func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error) {
 	timer := DoMetricRPCRequest(BeaconInSync)
 	defer DoRPCRequestDuration(BeaconInSync, timer)
-	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain().ShardID())
+	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
 	if !inSync && diff <= inSyncTolerance {
 		inSync = true
 	}

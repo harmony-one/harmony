@@ -23,12 +23,12 @@ func (hmy *Harmony) SendTx(ctx context.Context, signedTx *types.Transaction) err
 // Note that cross shard txn is only for regular txns, not for staking txns, so the input txn hash
 // is expected to be regular txn hash
 func (hmy *Harmony) ResendCx(ctx context.Context, txID common.Hash) (uint64, bool) {
-	blockHash, blockNum, index := hmy.BlockChain().ReadTxLookupEntry(txID)
+	blockHash, blockNum, index := hmy.BlockChain.ReadTxLookupEntry(txID)
 	if blockHash == (common.Hash{}) {
 		return 0, false
 	}
 
-	blk := hmy.BlockChain().GetBlockByHash(blockHash)
+	blk := hmy.BlockChain.GetBlockByHash(blockHash)
 	if blk == nil {
 		return 0, false
 	}
@@ -51,7 +51,7 @@ func (hmy *Harmony) ResendCx(ctx context.Context, txID common.Hash) (uint64, boo
 
 // GetReceipts ...
 func (hmy *Harmony) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	return hmy.BlockChain().GetReceiptsByHash(hash), nil
+	return hmy.BlockChain.GetReceiptsByHash(hash), nil
 }
 
 // GetTransactionsHistory returns list of transactions hashes of address.

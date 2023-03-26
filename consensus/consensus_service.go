@@ -315,7 +315,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		if err != nil {
 			consensus.getLogger().Error().
 				Err(err).
-				Uint32("shard", consensus.shardID).
+				Uint32("shard", consensus.ShardID).
 				Msg("[UpdateConsensusInformation] Error retrieving current shard state in the first block")
 			return Syncing
 		}
@@ -338,7 +338,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.shardID)
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
 		consensus.Decider = decider
 	}
 
@@ -351,7 +351,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	if err != nil {
 		consensus.getLogger().Error().
 			Err(err).
-			Uint32("shard", consensus.shardID).
+			Uint32("shard", consensus.ShardID).
 			Msg("[UpdateConsensusInformation] Error retrieving current shard state")
 		return Syncing
 	}
@@ -367,7 +367,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		if err != nil {
 			consensus.getLogger().Error().
 				Err(err).
-				Uint32("shard", consensus.shardID).
+				Uint32("shard", consensus.ShardID).
 				Msg("Error retrieving nextEpoch shard state")
 			return Syncing
 		}
@@ -376,7 +376,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		if err != nil {
 			consensus.getLogger().Error().
 				Err(err).
-				Uint32("shard", consensus.shardID).
+				Uint32("shard", consensus.ShardID).
 				Msg("Error retrieving nextEpoch shard state")
 			return Syncing
 		}
@@ -388,7 +388,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		if err != nil {
 			consensus.getLogger().Error().
 				Err(err).
-				Uint32("shard", consensus.shardID).
+				Uint32("shard", consensus.ShardID).
 				Msg("Error retrieving current shard state")
 			return Syncing
 		}
@@ -417,7 +417,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	); err != nil {
 		consensus.getLogger().Error().
 			Err(err).
-			Uint32("shard", consensus.shardID).
+			Uint32("shard", consensus.ShardID).
 			Msg("Error when updating voters")
 		return Syncing
 	}

@@ -196,7 +196,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 	}
 
 	if options.OperationType == common.NativeCrossShardTransferOperation &&
-		!s.hmy.BlockChain().Config().AcceptsCrossTx(currBlock.Epoch()) {
+		!s.hmy.BlockChain.Config().AcceptsCrossTx(currBlock.Epoch()) {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "cross-shard transaction is not accepted yet",
 		})

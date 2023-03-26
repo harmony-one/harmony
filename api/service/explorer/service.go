@@ -190,21 +190,20 @@ type HeightResponse struct {
 func (s *Service) GetHeight(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	blockchain := s.backend.Blockchain()
-	beaconchain := s.backend.Beaconchain()
+	bc := s.backend.Blockchain()
 	out := HeightResponse{}
-	switch blockchain.ShardID() {
+	switch bc.ShardID() {
 	case 0:
-		out.S0 = blockchain.CurrentHeader().NumberU64()
+		out.S0 = s.backend.Blockchain().CurrentBlock().NumberU64()
 	case 1:
-		out.S0 = beaconchain.CurrentHeader().NumberU64()
-		out.S1 = blockchain.CurrentHeader().NumberU64()
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S1 = s.backend.Blockchain().CurrentBlock().NumberU64()
 	case 2:
-		out.S0 = beaconchain.CurrentHeader().NumberU64()
-		out.S2 = blockchain.CurrentHeader().NumberU64()
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S2 = s.backend.Blockchain().CurrentBlock().NumberU64()
 	case 3:
-		out.S0 = beaconchain.CurrentHeader().NumberU64()
-		out.S3 = blockchain.CurrentHeader().NumberU64()
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S3 = s.backend.Blockchain().CurrentBlock().NumberU64()
 	}
 
 	if err := json.NewEncoder(w).Encode(out); err != nil {

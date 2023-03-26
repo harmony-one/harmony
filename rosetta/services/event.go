@@ -50,11 +50,11 @@ func (e *EventAPI) EventsBlocks(ctx context.Context, request *types.EventsBlocks
 	}
 
 	resp = &types.EventsBlocksResponse{
-		MaxSequence: e.hmy.BlockChain().CurrentHeader().Number().Int64(),
+		MaxSequence: e.hmy.BlockChain.CurrentHeader().Number().Int64(),
 	}
 
 	for i := offset; i < offset+limit; i++ {
-		block := e.hmy.BlockChain().GetBlockByNumber(uint64(i))
+		block := e.hmy.BlockChain.GetBlockByNumber(uint64(i))
 		if block == nil {
 			break
 		}

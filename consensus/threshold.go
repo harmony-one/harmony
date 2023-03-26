@@ -71,7 +71,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.BlockNum(),
 		msg_pb.MessageType_PREPARED, []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.shardID)),
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
 		p2p.ConstructMessage(msgToSend),
 	); err != nil {

@@ -75,11 +75,11 @@ func (consensus *Consensus) announce(block *types.Block) {
 	// Construct broadcast p2p message
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.getBlockNum(), msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.shardID)),
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		}, p2p.ConstructMessage(msgToSend)); err != nil {
 		consensus.getLogger().Warn().
 			Str("groupID", string(nodeconfig.NewGroupIDByShardID(
-				nodeconfig.ShardID(consensus.shardID),
+				nodeconfig.ShardID(consensus.ShardID),
 			))).
 			Msg("[Announce] Cannot send announce message")
 	} else {

@@ -189,7 +189,7 @@ func (consensus *Consensus) finalCommit() {
 		if err := consensus.msgSender.SendWithRetry(
 			block.NumberU64(),
 			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.shardID)),
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 			},
 			p2p.ConstructMessage(msgToSend)); err != nil {
 			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send committed message")
@@ -206,7 +206,7 @@ func (consensus *Consensus) finalCommit() {
 		consensus.msgSender.DelayedSendWithRetry(
 			block.NumberU64(),
 			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.shardID)),
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 			},
 			p2p.ConstructMessage(msgToSend))
 		consensus.getLogger().Info().
@@ -564,7 +564,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		if err := consensus.msgSender.SendWithRetry(
 			blk.NumberU64(),
 			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID())),
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 			},
 			p2p.ConstructMessage(msgToSend)); err != nil {
 			consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")

@@ -155,11 +155,7 @@ type Node struct {
 
 // Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() core.BlockChain {
-	return node.Consensus.Blockchain()
-}
-
-func (node *Node) GetConsensus() *consensus.Consensus {
-	return node.Consensus
+	return node.registry.GetBlockchain()
 }
 
 func (node *Node) SyncInstance() ISync {
@@ -196,10 +192,6 @@ func (node *Node) Beaconchain() core.BlockChain {
 
 	return node.chain(shard.BeaconChainShardID, core.Options{})
 }
-
-//func (node *Node) GetConsensus() *consensus.Consensus {
-//	return node.Consensus
-//}
 
 func (node *Node) chain(shardID uint32, options core.Options) core.BlockChain {
 	bc, err := node.shardChains.ShardChain(shardID, options)
@@ -391,7 +383,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	}
 
 	// cross-shard receipt should not be coming from our shard
-	if s := node.Consensus.ShardID(); s == shardID {
+	if s := node.Consensus.ShardID; s == shardID {
 		utils.Logger().Info().
 			Uint32("my-shard", s).
 			Uint32("receipt-shard", shardID).
@@ -604,7 +596,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, nodeConfig *nodec
 	senderBitmap := []byte{}
 
 	if maybeCon != nil {
-		if maybeCon.ShardId != consensus.ShardID() {
+		if maybeCon.ShardId != consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
@@ -618,7 +610,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, nodeConfig *nodec
 			return nil, nil, true, errors.WithStack(errViewIDTooOld)
 		}
 	} else if maybeVC != nil {
-		if maybeVC.ShardId != consensus.ShardID() {
+		if maybeVC.ShardId != consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
@@ -669,6 +661,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, nodeConfig *nodec
 }
 
 var (
+	errMsgHadNoHMYPayLoadAssumption      = errors.New("did not have sufficient size for hmy msg")
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
 )
 
@@ -702,7 +695,7 @@ func (node *Node) StartPubSub() error {
 
 	utils.Logger().Debug().
 		Interface("topics-ended-up-with", groups).
-		Uint32("shard-id", node.Consensus.ShardID()).
+		Uint32("shard-id", node.Consensus.ShardID).
 		Msg("starting with these topics")
 
 	if !node.NodeConfig.IsOffline {
@@ -1037,7 +1030,7 @@ func New(
 		panic("consensusObj is nil")
 	}
 	// Get the node config that's created in the harmony.go program.
-	node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID())
+	node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
 	node.HarmonyConfig = harmonyconfig
 
 	if host != nil {
@@ -1201,7 +1194,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			"[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID",
 		)
 	}
-	shardID := node.Consensus.ShardID()
+	shardID := node.Consensus.ShardID
 	currentBlock := node.Blockchain().CurrentBlock()
 	blockNum := currentBlock.NumberU64()
 	node.Consensus.SetMode(consensus.Listening)
@@ -1329,7 +1322,7 @@ func (node *Node) ShutDown() {
 }
 
 func (node *Node) populateSelfAddresses(epoch *big.Int) {
-	shardID := node.Consensus.ShardID()
+	shardID := node.Consensus.ShardID
 	shardState, err := node.Consensus.Blockchain().ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).
