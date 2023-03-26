@@ -44,14 +44,14 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 								committee, err := consensus.Blockchain().ReadShardState(curHeader.Epoch())
 								if err != nil {
 									consensus.getLogger().Err(err).
-										Uint32("shard", consensus.ShardID).
+										Uint32("shard", consensus.shardID).
 										Uint64("epoch", curHeader.Epoch().Uint64()).
 										Msg("could not read shard state")
 									return true
 								}
 
 								subComm, err := committee.FindCommitteeByID(
-									consensus.ShardID,
+									consensus.shardID,
 								)
 								if err != nil {
 									consensus.getLogger().Err(err).
@@ -97,7 +97,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 											}},
 										Moment: slash.Moment{
 											Epoch:   curHeader.Epoch(),
-											ShardID: consensus.ShardID,
+											ShardID: consensus.shardID,
 											Height:  recvMsg.BlockNum,
 											ViewID:  recvMsg.ViewID,
 										},

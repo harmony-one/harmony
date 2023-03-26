@@ -8,8 +8,9 @@ import (
 
 // Registry consolidates services at one place.
 type Registry struct {
-	mu         sync.Mutex
-	blockchain core.BlockChain
+	mu          sync.Mutex
+	blockchain  core.BlockChain
+	beaconchain core.BlockChain
 	txPool     *core.TxPool
 }
 
@@ -33,6 +34,23 @@ func (r *Registry) GetBlockchain() core.BlockChain {
 	defer r.mu.Unlock()
 
 	return r.blockchain
+}
+
+// SetBeaconchain sets the beaconchain to registry.
+func (r *Registry) SetBeaconchain(bc core.BlockChain) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.beaconchain = bc
+	return r
+}
+
+// GetBeaconchain gets the beaconchain from registry.
+func (r *Registry) GetBeaconchain() core.BlockChain {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.beaconchain
 }
 
 // SetTxPool sets the txpool to registry.

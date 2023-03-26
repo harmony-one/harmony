@@ -9,7 +9,7 @@ import (
 
 // GetCurrentUtilityMetrics ..
 func (hmy *Harmony) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
-	return network.NewUtilityMetricSnapshot(hmy.BlockChain)
+	return network.NewUtilityMetricSnapshot(hmy.BlockChain())
 }
 
 // GetPeerInfo returns the peer info to the node, including blocked peer, connected peer, number of peers

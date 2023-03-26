@@ -108,7 +108,7 @@ func (s *PublicTracerService) TraceBlockByNumber(ctx context.Context, number rpc
 	defer DoRPCRequestDuration(TraceBlockByNumber, timer)
 
 	// Fetch the block that we want to trace
-	block := s.hmy.BlockChain.GetBlockByNumber(uint64(number))
+	block := s.hmy.BlockChain().GetBlockByNumber(uint64(number))
 
 	return s.hmy.TraceBlock(ctx, block, config)
 }
@@ -119,7 +119,7 @@ func (s *PublicTracerService) TraceBlockByHash(ctx context.Context, hash common.
 	timer := DoMetricRPCRequest(TraceBlockByHash)
 	defer DoRPCRequestDuration(TraceBlockByHash, timer)
 
-	block := s.hmy.BlockChain.GetBlockByHash(hash)
+	block := s.hmy.BlockChain().GetBlockByHash(hash)
 	if block == nil {
 		DoMetricRPCQueryInfo(TraceBlockByHash, FailedNumber)
 		return nil, fmt.Errorf("block %#x not found", hash)
@@ -158,7 +158,7 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 		reexec = *config.Reexec
 	}
 	// Retrieve the block
-	block := s.hmy.BlockChain.GetBlockByHash(blockHash)
+	block := s.hmy.BlockChain().GetBlockByHash(blockHash)
 	if block == nil {
 		DoMetricRPCQueryInfo(TraceTransaction, FailedNumber)
 		return nil, fmt.Errorf("block %#x not found", blockHash)
@@ -185,7 +185,7 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 	statedb, header, err := s.hmy.StateAndHeaderByNumber(ctx, blockNr)
 	if err != nil {
 		// Try to retrieve the specified block
-		block := s.hmy.BlockChain.GetBlockByNumber(uint64(blockNr))
+		block := s.hmy.BlockChain().GetBlockByNumber(uint64(blockNr))
 		if block == nil {
 			DoMetricRPCQueryInfo(TraceCall, FailedNumber)
 			return nil, fmt.Errorf("block %v not found: %v", blockNr, err)
@@ -204,7 +204,7 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 
 	// Execute the trace
 	msg := args.ToMessage(s.hmy.RPCGasCap)
-	vmctx := core.NewEVMContext(msg, header, s.hmy.BlockChain, nil)
+	vmctx := core.NewEVMContext(msg, header, s.hmy.BlockChain(), nil)
 	// Trace the transaction and return
 	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 }

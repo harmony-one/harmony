@@ -66,7 +66,7 @@ func (node *Node) ReportPlainErrorSink() types.TransactionErrorReports {
 
 // StartRPC start RPC service
 func (node *Node) StartRPC() error {
-	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
+	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID())
 
 	// Gather all the possible APIs to surface
 	apis := node.APIs(harmony)
@@ -81,7 +81,7 @@ func (node *Node) StopRPC() error {
 
 // StartRosetta start rosetta service
 func (node *Node) StartRosetta() error {
-	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
+	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID())
 	return rosetta.StartServers(harmony, node.NodeConfig.RosettaServer, node.NodeConfig.RPCServer.RateLimiterEnabled, node.NodeConfig.RPCServer.RequestsPerSecond)
 }
 

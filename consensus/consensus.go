@@ -79,7 +79,7 @@ type Consensus struct {
 	// Block to run consensus on
 	block []byte
 	// Shard Id which this node belongs to
-	ShardID uint32
+	shardID uint32
 	// IgnoreViewIDCheck determines whether to ignore viewID check
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
@@ -139,10 +139,6 @@ func (consensus *Consensus) Blockchain() core.BlockChain {
 	return consensus.registry.GetBlockchain()
 }
 
-func (consensus *Consensus) ReadySignal(p ProposalType) {
-	consensus.readySignal <- p
-}
-
 func (consensus *Consensus) GetReadySignal() chan ProposalType {
 	return consensus.readySignal
 }
@@ -153,6 +149,17 @@ func (consensus *Consensus) CommitSigChannel() chan []byte {
 
 func (consensus *Consensus) GetCommitSigChannel() chan []byte {
 	return consensus.commitSigChannel
+}
+
+// Beaconchain returns the beaconchain.
+func (consensus *Consensus) Beaconchain() core.BlockChain {
+	return consensus.registry.GetBeaconchain()
+}
+
+func (consensus *Consensus) ShardID() uint32 {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return consensus.shardID
 }
 
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks.
@@ -259,7 +266,7 @@ func New(
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
 	consensus := Consensus{
-		ShardID: shard,
+		shardID: shard,
 	}
 	consensus.Decider = Decider
 	consensus.registry = registry
@@ -288,7 +295,6 @@ func New(
 	// the blockchain during initialization as it was
 	// displayed on explorer as Height right now
 	consensus.SetCurBlockViewID(0)
-	consensus.ShardID = shard
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.readySignal = make(chan ProposalType)
 	consensus.commitSigChannel = make(chan []byte)

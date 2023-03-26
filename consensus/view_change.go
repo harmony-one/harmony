@@ -293,7 +293,7 @@ func (consensus *Consensus) startViewChange() {
 			consensus.getBlockNum(),
 			msg_pb.MessageType_VIEWCHANGE,
 			[]nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.shardID))},
 			p2p.ConstructMessage(msgToSend),
 		); err != nil {
 			consensus.getLogger().Err(err).
@@ -319,7 +319,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 		consensus.getBlockNum(),
 		msg_pb.MessageType_NEWVIEW,
 		[]nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.shardID))},
 		p2p.ConstructMessage(msgToSend),
 	); err != nil {
 		return errors.New("failed to send out the NewView message")

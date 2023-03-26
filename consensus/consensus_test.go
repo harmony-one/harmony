@@ -59,7 +59,7 @@ func TestConsensusInitialization(t *testing.T) {
 
 	// Misc
 	assert.Equal(t, uint64(0), consensus.GetViewChangingID())
-	assert.Equal(t, uint32(shard.BeaconChainShardID), consensus.ShardID)
+	assert.Equal(t, uint32(shard.BeaconChainShardID), consensus.ShardID())
 
 	assert.Equal(t, false, consensus.start)
 
