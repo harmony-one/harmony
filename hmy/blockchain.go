@@ -29,12 +29,12 @@ import (
 
 // ChainConfig ...
 func (hmy *Harmony) ChainConfig() *params.ChainConfig {
-	return hmy.BlockChain().Config()
+	return hmy.BlockChain.Config()
 }
 
 // GetShardState ...
 func (hmy *Harmony) GetShardState() (*shard.State, error) {
-	return hmy.BlockChain().ReadShardState(hmy.BlockChain().CurrentHeader().Epoch())
+	return hmy.BlockChain.ReadShardState(hmy.BlockChain.CurrentHeader().Epoch())
 }
 
 // GetBlockSigners ..
@@ -95,7 +95,7 @@ func (hmy *Harmony) GetDetailedBlockSignerInfo(
 	if err != nil {
 		return nil, err
 	}
-	parentShardState, err := hmy.BlockChain().ReadShardState(parentBlk.Epoch())
+	parentShardState, err := hmy.BlockChain.ReadShardState(parentBlk.Epoch())
 	if err != nil {
 		return nil, err
 	}
@@ -181,12 +181,12 @@ func (hmy *Harmony) GetLatestChainHeaders() *block.HeaderPair {
 		ShardHeader:  &block.Header{Header: v3.NewHeader()},
 	}
 
-	if hmy.BeaconChain() != nil {
-		pair.BeaconHeader = hmy.BeaconChain().CurrentHeader()
+	if hmy.BeaconChain != nil {
+		pair.BeaconHeader = hmy.BeaconChain.CurrentHeader()
 	}
 
-	if hmy.BlockChain() != nil {
-		pair.ShardHeader = hmy.BlockChain().CurrentHeader()
+	if hmy.BlockChain != nil {
+		pair.ShardHeader = hmy.BlockChain.CurrentHeader()
 	}
 
 	return pair
@@ -196,7 +196,7 @@ func (hmy *Harmony) GetLatestChainHeaders() *block.HeaderPair {
 func (hmy *Harmony) GetLastCrossLinks() ([]*types.CrossLink, error) {
 	crossLinks := []*types.CrossLink{}
 	for i := uint32(1); i < shard.Schedule.InstanceForEpoch(hmy.CurrentBlock().Epoch()).NumShards(); i++ {
-		link, err := hmy.BlockChain().ReadShardLastCrossLink(i)
+		link, err := hmy.BlockChain.ReadShardLastCrossLink(i)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +208,7 @@ func (hmy *Harmony) GetLastCrossLinks() ([]*types.CrossLink, error) {
 
 // CurrentBlock ...
 func (hmy *Harmony) CurrentBlock() *types.Block {
-	return types.NewBlockWithHeader(hmy.BlockChain().CurrentHeader())
+	return types.NewBlockWithHeader(hmy.BlockChain.CurrentHeader())
 }
 
 // CurrentHeader returns the current header from the local chain.
@@ -218,7 +218,7 @@ func (hmy *Harmony) CurrentHeader() *block.Header {
 
 // GetBlock returns block by hash.
 func (hmy *Harmony) GetBlock(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	return hmy.BlockChain().GetBlockByHash(hash), nil
+	return hmy.BlockChain.GetBlockByHash(hash), nil
 }
 
 // GetHeader returns header by hash.
@@ -228,7 +228,7 @@ func (hmy *Harmony) GetHeader(ctx context.Context, hash common.Hash) (*block.Hea
 
 // GetCurrentBadBlocks ..
 func (hmy *Harmony) GetCurrentBadBlocks() []core.BadBlock {
-	return hmy.BlockChain().BadBlocks()
+	return hmy.BlockChain.BadBlocks()
 }
 
 func (hmy *Harmony) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
@@ -236,14 +236,14 @@ func (hmy *Harmony) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.B
 		return hmy.BlockByNumber(ctx, blockNr)
 	}
 	if hash, ok := blockNrOrHash.Hash(); ok {
-		header := hmy.BlockChain().GetHeaderByHash(hash)
+		header := hmy.BlockChain.GetHeaderByHash(hash)
 		if header == nil {
 			return nil, errors.New("header for hash not found")
 		}
-		if blockNrOrHash.RequireCanonical && hmy.BlockChain().GetCanonicalHash(header.Number().Uint64()) != hash {
+		if blockNrOrHash.RequireCanonical && hmy.BlockChain.GetCanonicalHash(header.Number().Uint64()) != hash {
 			return nil, errors.New("hash is not currently canonical")
 		}
-		block := hmy.BlockChain().GetBlock(hash, header.Number().Uint64())
+		block := hmy.BlockChain.GetBlock(hash, header.Number().Uint64())
 		if block == nil {
 			return nil, errors.New("header found, but block body is missing")
 		}
@@ -269,9 +269,9 @@ func (hmy *Harmony) BlockByNumber(ctx context.Context, blockNum rpc.BlockNumber)
 	}
 	// Otherwise resolve and return the block
 	if blockNum == rpc.LatestBlockNumber {
-		return hmy.BlockChain().CurrentBlock(), nil
+		return hmy.BlockChain.CurrentBlock(), nil
 	}
-	return hmy.BlockChain().GetBlockByNumber(uint64(blockNum)), nil
+	return hmy.BlockChain.GetBlockByNumber(uint64(blockNum)), nil
 }
 
 // HeaderByNumber ...
@@ -282,14 +282,14 @@ func (hmy *Harmony) HeaderByNumber(ctx context.Context, blockNum rpc.BlockNumber
 	}
 	// Otherwise resolve and return the block
 	if blockNum == rpc.LatestBlockNumber {
-		return hmy.BlockChain().CurrentBlock().Header(), nil
+		return hmy.BlockChain.CurrentBlock().Header(), nil
 	}
-	return hmy.BlockChain().GetHeaderByNumber(uint64(blockNum)), nil
+	return hmy.BlockChain.GetHeaderByNumber(uint64(blockNum)), nil
 }
 
 // HeaderByHash ...
 func (hmy *Harmony) HeaderByHash(ctx context.Context, blockHash common.Hash) (*block.Header, error) {
-	header := hmy.BlockChain().GetHeaderByHash(blockHash)
+	header := hmy.BlockChain.GetHeaderByHash(blockHash)
 	if header == nil {
 		return nil, errors.New("Header is not found")
 	}
@@ -307,7 +307,7 @@ func (hmy *Harmony) StateAndHeaderByNumber(ctx context.Context, blockNum rpc.Blo
 	if header == nil || err != nil {
 		return nil, nil, err
 	}
-	stateDb, err := hmy.BlockChain().StateAt(header.Root())
+	stateDb, err := hmy.BlockChain.StateAt(header.Root())
 	return stateDb, header, err
 }
 
@@ -323,10 +323,10 @@ func (hmy *Harmony) StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrH
 		if header == nil {
 			return nil, nil, errors.New("header for hash not found")
 		}
-		if blockNrOrHash.RequireCanonical && hmy.BlockChain().GetCanonicalHash(header.Number().Uint64()) != hash {
+		if blockNrOrHash.RequireCanonical && hmy.BlockChain.GetCanonicalHash(header.Number().Uint64()) != hash {
 			return nil, nil, errors.New("hash is not currently canonical")
 		}
-		stateDb, err := hmy.BlockChain().StateAt(header.Root())
+		stateDb, err := hmy.BlockChain.StateAt(header.Root())
 		return stateDb, header, err
 	}
 	return nil, nil, errors.New("invalid arguments; neither block nor hash specified")
@@ -362,12 +362,12 @@ func (hmy *Harmony) GetLeaderAddress(coinbaseAddr common.Address, epoch *big.Int
 
 // GetLogs ...
 func (hmy *Harmony) GetLogs(ctx context.Context, blockHash common.Hash, isEth bool) ([][]*types.Log, error) {
-	receipts := hmy.BlockChain().GetReceiptsByHash(blockHash)
+	receipts := hmy.BlockChain.GetReceiptsByHash(blockHash)
 	if receipts == nil {
 		return nil, errors.New("Missing receipts")
 	}
 	if isEth {
-		block := hmy.BlockChain().GetBlockByHash(blockHash)
+		block := hmy.BlockChain.GetBlockByHash(blockHash)
 		if block == nil {
 			return nil, errors.New("Missing block data")
 		}
@@ -405,29 +405,29 @@ func (hmy *Harmony) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subsc
 // SubscribeChainEvent subscribes chain event.
 // TODO: this is not implemented or verified yet for harmony.
 func (hmy *Harmony) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
-	return hmy.BlockChain().SubscribeChainEvent(ch)
+	return hmy.BlockChain.SubscribeChainEvent(ch)
 }
 
 // SubscribeChainHeadEvent subcribes chain head event.
 // TODO: this is not implemented or verified yet for harmony.
 func (hmy *Harmony) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return hmy.BlockChain().SubscribeChainHeadEvent(ch)
+	return hmy.BlockChain.SubscribeChainHeadEvent(ch)
 }
 
 // SubscribeChainSideEvent subcribes chain side event.
 // TODO: this is not implemented or verified yet for harmony.
 func (hmy *Harmony) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
-	return hmy.BlockChain().SubscribeChainSideEvent(ch)
+	return hmy.BlockChain.SubscribeChainSideEvent(ch)
 }
 
 // SubscribeRemovedLogsEvent subcribes removed logs event.
 // TODO: this is not implemented or verified yet for harmony.
 func (hmy *Harmony) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
-	return hmy.BlockChain().SubscribeRemovedLogsEvent(ch)
+	return hmy.BlockChain.SubscribeRemovedLogsEvent(ch)
 }
 
 // SubscribeLogsEvent subcribes log event.
 // TODO: this is not implemented or verified yet for harmony.
 func (hmy *Harmony) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
-	return hmy.BlockChain().SubscribeLogsEvent(ch)
+	return hmy.BlockChain.SubscribeLogsEvent(ch)
 }

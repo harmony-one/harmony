@@ -859,7 +859,7 @@ func (s *PublicStakingService) GetAvailableRedelegationBalance(
 		return nil, ErrNotBeaconShard
 	}
 
-	currEpoch := s.hmy.BlockChain().CurrentHeader().Epoch()
+	currEpoch := s.hmy.BlockChain.CurrentHeader().Epoch()
 
 	delegatorAddr, err := internal_common.ParseAddr(address)
 	if err != nil {

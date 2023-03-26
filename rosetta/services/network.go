@@ -84,7 +84,7 @@ func (s *NetworkAPI) NetworkStatus(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	isSyncing, targetHeight, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain().ShardID())
+	isSyncing, targetHeight, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
 	syncStatus := common.SyncingFinish
 	if targetHeight == 0 {
 		syncStatus = common.SyncingUnknown
@@ -101,7 +101,7 @@ func (s *NetworkAPI) NetworkStatus(
 	// Only applicable to non-archival nodes
 	var oldestBlockIdentifier *types.BlockIdentifier
 	if !nodeconfig.GetShardConfig(s.hmy.ShardID).GetArchival() {
-		maxGarbCollectedBlockNum := s.hmy.BlockChain().GetMaxGarbageCollectedBlockNumber()
+		maxGarbCollectedBlockNum := s.hmy.BlockChain.GetMaxGarbageCollectedBlockNumber()
 		if maxGarbCollectedBlockNum == -1 || maxGarbCollectedBlockNum >= currentHeader.Number().Int64() {
 			oldestBlockIdentifier = currentBlockIdentifier
 		} else {

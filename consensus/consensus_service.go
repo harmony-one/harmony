@@ -5,9 +5,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/multibls"
+	"github.com/harmony-one/harmony/webhooks"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -313,7 +315,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		if err != nil {
 			consensus.getLogger().Error().
 				Err(err).
-				Uint32("shard", consensus.shardID).
+				Uint32("shard", consensus.ShardID).
 				Msg("[UpdateConsensusInformation] Error retrieving current shard state in the first block")
 			return Syncing
 		}
@@ -336,7 +338,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.shardID)
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
 		consensus.Decider = decider
 	}
 
@@ -349,7 +351,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	if err != nil {
 		consensus.getLogger().Error().
 			Err(err).
-			Uint32("shard", consensus.shardID).
+			Uint32("shard", consensus.ShardID).
 			Msg("[UpdateConsensusInformation] Error retrieving current shard state")
 		return Syncing
 	}
@@ -365,7 +367,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		if err != nil {
 			consensus.getLogger().Error().
 				Err(err).
-				Uint32("shard", consensus.shardID).
+				Uint32("shard", consensus.ShardID).
 				Msg("Error retrieving nextEpoch shard state")
 			return Syncing
 		}
@@ -374,7 +376,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		if err != nil {
 			consensus.getLogger().Error().
 				Err(err).
-				Uint32("shard", consensus.shardID).
+				Uint32("shard", consensus.ShardID).
 				Msg("Error retrieving nextEpoch shard state")
 			return Syncing
 		}
@@ -386,7 +388,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		if err != nil {
 			consensus.getLogger().Error().
 				Err(err).
-				Uint32("shard", consensus.shardID).
+				Uint32("shard", consensus.ShardID).
 				Msg("Error retrieving current shard state")
 			return Syncing
 		}
@@ -415,7 +417,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	); err != nil {
 		consensus.getLogger().Error().
 			Err(err).
-			Uint32("shard", consensus.shardID).
+			Uint32("shard", consensus.ShardID).
 			Msg("Error when updating voters")
 		return Syncing
 	}
@@ -657,4 +659,36 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
 	return &logger
+}
+
+// VerifyNewBlock is called by consensus participants to verify the block (account model) they are
+// running consensus on.
+func VerifyNewBlock(hooks *webhooks.Hooks, blockChain core.BlockChain, beaconChain core.BlockChain) func(*types.Block) error {
+	return func(newBlock *types.Block) error {
+		if err := blockChain.ValidateNewBlock(newBlock, beaconChain); err != nil {
+			if hooks := hooks; hooks != nil {
+				if p := hooks.ProtocolIssues; p != nil {
+					url := p.OnCannotCommit
+					go func() {
+						webhooks.DoPost(url, map[string]interface{}{
+							"bad-header": newBlock.Header(),
+							"reason":     err.Error(),
+						})
+					}()
+				}
+			}
+			utils.Logger().Error().
+				Str("blockHash", newBlock.Hash().Hex()).
+				Int("numTx", len(newBlock.Transactions())).
+				Int("numStakingTx", len(newBlock.StakingTransactions())).
+				Err(err).
+				Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
+			return errors.Errorf(
+				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
+				newBlock.Hash().Hex(),
+				len(newBlock.Transactions()),
+			)
+		}
+		return nil
+	}
 }

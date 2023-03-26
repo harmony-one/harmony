@@ -44,19 +44,15 @@ var (
 	ErrFinalizedTransaction = errors.New("transaction already finalized")
 )
 
-//type consensus interface {
-//	Blockchain() core.BlockChain
-//	Beaconchain() core.BlockChain
-//}
-
 // Harmony implements the Harmony full node service.
 type Harmony struct {
 	// Channel for shutting down the service
 	ShutdownChan  chan bool                      // Channel for shutting down the Harmony
 	BloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	//Consensus     Consensus
-	TxPool *core.TxPool
-	CxPool *core.CxPool // CxPool is used to store the blockHashes of blocks containing cx receipts to be sent
+	BlockChain    core.BlockChain
+	BeaconChain   core.BlockChain
+	TxPool        *core.TxPool
+	CxPool        *core.CxPool // CxPool is used to store the blockHashes of blocks containing cx receipts to be sent
 	// DB interfaces
 	BloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
 	NodeAPI      NodeAPI
@@ -86,11 +82,6 @@ type Harmony struct {
 	totalStakeCache *totalStakeCache
 	// stakeByBlockNumberCache to save on recomputation for `totalStakeCacheDuration` blocks
 	stakeByBlockNumberCache *lru.Cache
-}
-
-type Consensus interface {
-	Blockchain() core.BlockChain
-	Beaconchain() core.BlockChain
 }
 
 // NodeAPI is the list of functions from node used to call rpc apis.
@@ -148,6 +139,8 @@ func New(
 		ShutdownChan:                make(chan bool),
 		BloomRequests:               make(chan chan *bloombits.Retrieval),
 		BloomIndexer:                bloomIndexer,
+		BlockChain:                  nodeAPI.Blockchain(),
+		BeaconChain:                 nodeAPI.Beaconchain(),
 		TxPool:                      txPool,
 		CxPool:                      cxPool,
 		eventMux:                    new(event.TypeMux),
@@ -251,8 +244,8 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 // GetEVM returns a new EVM entity
 func (hmy *Harmony) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *block.Header) (*vm.EVM, error) {
 	state.SetBalance(msg.From(), math.MaxBig256)
-	vmCtx := core.NewEVMContext(msg, header, hmy.BlockChain(), nil)
-	return vm.NewEVM(vmCtx, state, hmy.BlockChain().Config(), *hmy.BlockChain().GetVMConfig()), nil
+	vmCtx := core.NewEVMContext(msg, header, hmy.BlockChain, nil)
+	return vm.NewEVM(vmCtx, state, hmy.BlockChain.Config(), *hmy.BlockChain.GetVMConfig()), nil
 }
 
 // ChainDb ..
@@ -270,12 +263,4 @@ func (hmy *Harmony) EventMux() *event.TypeMux {
 func (hmy *Harmony) BloomStatus() (uint64, uint64) {
 	sections, _, _ := hmy.BloomIndexer.Sections()
 	return BloomBitsBlocks, sections
-}
-
-func (hmy *Harmony) BlockChain() core.BlockChain {
-	return hmy.NodeAPI.Blockchain()
-}
-
-func (hmy *Harmony) BeaconChain() core.BlockChain {
-	return hmy.NodeAPI.Beaconchain()
 }
