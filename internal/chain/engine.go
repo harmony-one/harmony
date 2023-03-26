@@ -632,7 +632,7 @@ func payloadArgsFromCrossLink(cl types.CrossLink) payloadArgs {
 }
 
 func (args payloadArgs) constructPayload(chain engine.ChainReader) []byte {
-	return signature.ConstructCommitPayload(chain, args.epoch, args.blockHash, args.number, args.viewID)
+	return signature.ConstructCommitPayload(chain.Config(), args.epoch, args.blockHash, args.number, args.viewID)
 }
 
 type sigArgs struct {

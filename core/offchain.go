@@ -205,8 +205,8 @@ func (bc *BlockChainImpl) CommitOffChainData(
 		if shardState, err := shard.DecodeWrapper(
 			header.ShardState(),
 		); err == nil {
-			if stats, err := bc.UpdateValidatorVotingPower(
-				batch, block, shardState, currentSuperCommittee, state,
+			if stats, err := UpdateValidatorVotingPower(
+				bc, block, shardState, currentSuperCommittee, state,
 			); err != nil {
 				utils.Logger().
 					Err(err).

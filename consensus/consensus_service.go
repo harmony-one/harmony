@@ -590,7 +590,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 	consensus.switchPhase("selfCommit", FBFTCommit)
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
-	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain(),
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader().Config(),
 		block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
 	for i, key := range consensus.priKey {
 		if err := consensus.commitBitmap.SetKey(key.Pub.Bytes, true); err != nil {

@@ -608,7 +608,7 @@ func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types
 	}
 	aggPubKey := consensus.commitBitmap.AggregatePublic
 
-	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain(),
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain().Config(),
 		blk.Epoch(), blk.Hash(), blk.NumberU64(), blk.Header().ViewID().Uint64())
 
 	if !aggSig.VerifyHash(aggPubKey, commitPayload) {

@@ -47,14 +47,14 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	reg := registry.New().SetBlockchain(blockchain).SetBeaconchain(blockchain)
-	consensus, err := consensus.New(
+	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 
-	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
+	node := New(host, consensusObj, engine, collection, nil, nil, nil, nil, nil, reg)
 
 	node.Worker.UpdateCurrent()
 
@@ -72,7 +72,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
 	)
 
-	if err := VerifyNewBlock(nil, blockchain, nil)(block); err != nil {
+	if err := consensus.VerifyNewBlock(nil, blockchain, nil)(block); err != nil {
 		t.Error("New block is not verified successfully:", err)
 	}
 

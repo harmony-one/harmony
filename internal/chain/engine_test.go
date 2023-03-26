@@ -275,7 +275,7 @@ func (kp blsKeyPair) Pub() bls.SerializedPublicKey {
 
 func (kp blsKeyPair) Sign(block *types.Block) []byte {
 	chain := &fakeBlockChain{config: *params.LocalnetChainConfig}
-	msg := consensus_sig.ConstructCommitPayload(chain, block.Epoch(), block.Hash(),
+	msg := consensus_sig.ConstructCommitPayload(chain.Config(), block.Epoch(), block.Hash(),
 		block.Number().Uint64(), block.Header().ViewID().Uint64())
 
 	sig := kp.pri.SignHash(msg)

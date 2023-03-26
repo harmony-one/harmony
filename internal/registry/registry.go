@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/webhooks"
 )
 
 // Registry consolidates services at one place.
@@ -11,6 +12,7 @@ type Registry struct {
 	mu          sync.Mutex
 	blockchain  core.BlockChain
 	beaconchain core.BlockChain
+	webHooks    *webhooks.Hooks
 	txPool     *core.TxPool
 }
 
@@ -51,6 +53,23 @@ func (r *Registry) GetBeaconchain() core.BlockChain {
 	defer r.mu.Unlock()
 
 	return r.beaconchain
+}
+
+// SetWebHooks sets the webhooks to registry.
+func (r *Registry) SetWebHooks(hooks *webhooks.Hooks) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.webHooks = hooks
+	return r
+}
+
+// GetWebHooks gets the webhooks from registry.
+func (r *Registry) GetWebHooks() *webhooks.Hooks {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.webHooks
 }
 
 // SetTxPool sets the txpool to registry.
