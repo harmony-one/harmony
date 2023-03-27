@@ -1475,7 +1475,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 	if err := rawdb.WriteCxLookupEntries(batch, block); err != nil {
 		return NonStatTy, err
 	}
-	if err := rawdb.WritePreimages(bc.db, state.Preimages()); err != nil {
+	if err := rawdb.WritePreimages(batch, state.Preimages()); err != nil {
 		return NonStatTy, err
 	}
 
