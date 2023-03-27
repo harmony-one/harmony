@@ -72,7 +72,7 @@ var (
 		FeeCollectEpoch:                        EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		ValidatorCodeFixEpoch:         EpochTBD,
+		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -113,7 +113,7 @@ var (
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        EpochTBD,
-		ValidatorCodeFixEpoch:         EpochTBD,
+		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -154,7 +154,7 @@ var (
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        EpochTBD,
-		ValidatorCodeFixEpoch:         EpochTBD,
+		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -196,7 +196,7 @@ var (
 		FeeCollectEpoch:                        big.NewInt(574),
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		ValidatorCodeFixEpoch:         EpochTBD,
+		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -238,7 +238,7 @@ var (
 		FeeCollectEpoch:                        EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		ValidatorCodeFixEpoch:         EpochTBD,
+		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -279,7 +279,7 @@ var (
 		LeaderRotationExternalNonBeaconLeaders: big.NewInt(5),
 		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
 		FeeCollectEpoch:                        big.NewInt(5),
-		ValidatorCodeFixEpoch:         EpochTBD,
+		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 
 	// AllProtocolChanges ...
