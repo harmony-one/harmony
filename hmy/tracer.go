@@ -39,7 +39,6 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy/tracers"
-	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -348,7 +347,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 // same as TraceBlock, but only use 1 thread
 func (hmy *Harmony) traceBlockNoThread(ctx context.Context, block *types.Block, config *TraceConfig) ([]*TxTraceResult, error) {
 	// Create the parent state database
-	if err := chain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
+	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
 		return nil, err
 	}
 	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
@@ -423,7 +422,7 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 		return hmy.traceBlockNoThread(ctx, block, config)
 	}
 	// Create the parent state database
-	if err := chain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
+	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
 		return nil, err
 	}
 	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
@@ -524,7 +523,7 @@ func (hmy *Harmony) standardTraceBlockToFile(ctx context.Context, block *types.B
 		}
 	}
 	// Create the parent state database
-	if err := chain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
+	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
 		return nil, err
 	}
 	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)

@@ -20,13 +20,13 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/chain"
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -50,13 +50,14 @@ const (
 //
 // StateProcessor implements Processor.
 type StateProcessor struct {
-	config      *params.ChainConfig // Chain configuration options
-	bc          BlockChain          // Canonical blockchain
-	beacon      BlockChain          // Beacon chain
-	resultCache *lru.Cache          // Cache for result after a certain block is processed
+	config      *params.ChainConfig     // Chain configuration options
+	bc          BlockChain              // Canonical blockchain
+	beacon      BlockChain              // Beacon chain
+	engine      consensus_engine.Engine // Consensus engine used for block rewards
+	resultCache *lru.Cache              // Cache for result after a certain block is processed
 }
 
-// ProcessorResult structure is cached, and each individual element is returned
+// this structure is cached, and each individual element is returned
 type ProcessorResult struct {
 	Receipts   types.Receipts
 	CxReceipts types.CXReceipts
@@ -69,7 +70,7 @@ type ProcessorResult struct {
 
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(
-	config *params.ChainConfig, bc BlockChain, beacon BlockChain,
+	config *params.ChainConfig, bc BlockChain, beacon BlockChain, engine consensus_engine.Engine,
 ) *StateProcessor {
 	if bc == nil {
 		panic("bc is nil")
@@ -82,6 +83,7 @@ func NewStateProcessor(
 		config:      config,
 		bc:          bc,
 		beacon:      beacon,
+		engine:      engine,
 		resultCache: resultCache,
 	}
 }
@@ -193,7 +195,7 @@ func (p *StateProcessor) Process(
 		// Block processing don't need to block on reward computation as in block proposal
 		sigsReady <- true
 	}()
-	_, payout, err := chain.Engine().Finalize(
+	_, payout, err := p.engine.Finalize(
 		p.bc,
 		p.beacon,
 		header, statedb, block.Transactions(),

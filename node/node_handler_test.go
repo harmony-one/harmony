@@ -33,8 +33,10 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
+	engine := chain.NewEngine()
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{}, nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType(),
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
 	)
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
@@ -51,7 +53,7 @@ func TestAddNewBlock(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
-	node := New(host, consensus, collection, nil, nil, nil, nil, nil, reg)
+	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -88,8 +90,10 @@ func TestVerifyNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
+	engine := chain.NewEngine()
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{}, nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType(),
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
 	)
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
@@ -108,7 +112,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, collection, nil, nil, nil, archiveMode, nil, reg)
+	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -142,8 +146,10 @@ func TestVerifyVRF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
+	engine := chain.NewEngine()
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{}, nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType(),
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
 	)
 	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
@@ -162,7 +168,7 @@ func TestVerifyVRF(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, collection, nil, nil, nil, archiveMode, nil, reg)
+	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -199,7 +205,7 @@ func TestVerifyVRF(t *testing.T) {
 	node.Blockchain().WriteShardStateBytes(node.Blockchain().ChainDb(), big.NewInt(1), node.Worker.GetCurrentHeader().ShardState())
 
 	node.Blockchain().Config().VRFEpoch = big.NewInt(0)
-	if err := chain.Engine().VerifyVRF(
+	if err := node.Blockchain().Engine().VerifyVRF(
 		node.Blockchain(), block.Header(),
 	); err != nil {
 		t.Error("New vrf is not verified successfully:", err)

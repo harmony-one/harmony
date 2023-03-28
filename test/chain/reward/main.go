@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/harmony-one/harmony/internal/chain"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -23,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"
 
 	protobuf "github.com/golang/protobuf/proto"

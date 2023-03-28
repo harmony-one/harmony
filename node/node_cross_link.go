@@ -8,7 +8,6 @@ import (
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -180,7 +179,7 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	if cl.ShardID() >= instance.NumShards() {
 		return errors.New("[VerifyCrossLink] ShardID should less than NumShards")
 	}
-	engine := chain.Engine()
+	engine := node.Blockchain().Engine()
 
 	if err := engine.VerifyCrossLink(node.Blockchain(), cl); err != nil {
 		return errors.Wrap(err, "[VerifyCrossLink]")

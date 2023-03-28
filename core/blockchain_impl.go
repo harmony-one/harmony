@@ -276,7 +276,7 @@ func newBlockChainWithOptions(
 	}
 
 	var err error
-	bc.hc, err = NewHeaderChain(db, chainConfig, bc.getProcInterrupt)
+	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.getProcInterrupt)
 	if err != nil {
 		return nil, err
 	}
@@ -295,8 +295,8 @@ func newBlockChainWithOptions(
 		beaconChain = bc
 	}
 
-	bc.SetValidator(NewBlockValidator(chainConfig, bc))
-	bc.SetProcessor(NewStateProcessor(chainConfig, bc, beaconChain))
+	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
+	bc.SetProcessor(NewStateProcessor(chainConfig, bc, beaconChain, engine))
 
 	// Take ownership of this particular state
 	go bc.update()

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/reward"
-	"github.com/harmony-one/harmony/internal/chain"
 
 	"github.com/harmony-one/harmony/consensus"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -59,6 +59,7 @@ type Worker struct {
 	chain    core.BlockChain
 	beacon   core.BlockChain
 	current  *environment // An environment for current running cycle.
+	engine   consensus_engine.Engine
 	gasFloor uint64
 	gasCeil  uint64
 }
@@ -311,7 +312,7 @@ func (w *Worker) UpdateCurrent() error {
 		Time(big.NewInt(timestamp)).
 		ShardID(w.chain.ShardID()).
 		Header()
-	return w.makeCurrent(parent.Header(), header)
+	return w.makeCurrent(parent, header)
 }
 
 // GetCurrentHeader returns the current header to propose
@@ -320,7 +321,7 @@ func (w *Worker) GetCurrentHeader() *block.Header {
 }
 
 // makeCurrent creates a new environment for the current cycle.
-func (w *Worker) makeCurrent(parent *block.Header, header *block.Header) error {
+func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 	state, err := w.chain.StateAt(parent.Root())
 	if err != nil {
 		return err
@@ -378,6 +379,16 @@ func (w *Worker) GetNewEpoch() *big.Int {
 // GetCurrentReceipts get the receipts generated starting from the last state.
 func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 	return w.current.receipts
+}
+
+// OutgoingReceipts get the receipts generated starting from the last state.
+func (w *Worker) OutgoingReceipts() []*types.CXReceipt {
+	return w.current.outcxs
+}
+
+// IncomingReceipts get incoming receipts in destination shard that is received from source shard
+func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
+	return w.current.incxs
 }
 
 // CollectVerifiedSlashes sets w.current.slashes only to those that
@@ -547,7 +558,7 @@ func (w *Worker) FinalizeNewBlock(
 		}
 	}()
 
-	block, payout, err := chain.Engine().Finalize(
+	block, payout, err := w.engine.Finalize(
 		w.chain,
 		w.beacon,
 		copyHeader, state, w.current.txs, w.current.receipts,
@@ -563,13 +574,14 @@ func (w *Worker) FinalizeNewBlock(
 
 // New create a new worker object.
 func New(
-	config *params.ChainConfig, chain core.BlockChain, beacon core.BlockChain,
+	config *params.ChainConfig, chain core.BlockChain, beacon core.BlockChain, engine consensus_engine.Engine,
 ) *Worker {
 	worker := &Worker{
 		config:  config,
 		factory: blockfactory.NewFactory(config),
 		chain:   chain,
 		beacon:  beacon,
+		engine:  engine,
 	}
 	worker.gasFloor = 80000000
 	worker.gasCeil = 120000000
@@ -586,7 +598,7 @@ func New(
 		Time(big.NewInt(timestamp)).
 		ShardID(worker.chain.ShardID()).
 		Header()
-	worker.makeCurrent(parent.Header(), header)
+	worker.makeCurrent(parent, header)
 
 	return worker
 }
