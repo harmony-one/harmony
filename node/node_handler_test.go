@@ -33,8 +33,9 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{}, nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType(),
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, &chainconfig,
 	)
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
@@ -88,8 +89,9 @@ func TestVerifyNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{}, nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType(),
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, &chainconfig,
 	)
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
@@ -142,8 +144,9 @@ func TestVerifyVRF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{}, nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType(),
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, &chainconfig,
 	)
 	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
 	if err != nil {

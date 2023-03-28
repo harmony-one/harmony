@@ -126,8 +126,6 @@ type BlockChain interface {
 	GetHeaderByNumber(number uint64) *block.Header
 	// Config retrieves the blockchain's chain configuration.
 	Config() *params.ChainConfig
-	// Engine retrieves the blockchain's consensus engine.
-	Engine() engine.Engine
 	// SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 	SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription
 	// SubscribeTraceEvent registers a subscription of ChainEvent.
