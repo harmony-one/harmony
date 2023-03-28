@@ -51,20 +51,3 @@ func (r *Registry) GetTxPool() *core.TxPool {
 
 	return r.txPool
 }
-
-//// SetConsensus sets the consensus to registry.
-//func (r *Registry) SetConsensus(consensus *consensus.Consensus) *Registry {
-//	r.mu.Lock()
-//	defer r.mu.Unlock()
-//
-//	r.consensus = consensus
-//	return r
-//}
-//
-//// GetConsensus gets the consensus from registry.
-//func (r *Registry) GetConsensus() *consensus.Consensus {
-//	r.mu.Lock()
-//	defer r.mu.Unlock()
-//
-//	return r.consensus
-//}
