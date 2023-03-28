@@ -153,11 +153,6 @@ func (h *Header) IsLastBlockInEpoch() bool {
 	return len(h.ShardState()) > 0
 }
 
-// NumberU64 returns the block number in uint64.
-func (h Header) NumberU64() uint64 {
-	return h.Number().Uint64()
-}
-
 // HeaderRegistry is the taggedrlp type registry for versioned headers.
 var HeaderRegistry = taggedrlp.NewRegistry()
 

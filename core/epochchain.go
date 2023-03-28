@@ -8,6 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/engine"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -27,6 +29,7 @@ type EpochChain struct {
 	db            ethdb.Database // Low level persistent database to store final content in.
 	mu            chan struct{}
 	currentHeader atomic.Value // Current head of the blockchain.
+	engine        consensus_engine.Engine
 	vmConfig      *vm.Config
 
 	headerCache     *lru.Cache // Cache for the most recent block headers
@@ -43,7 +46,7 @@ func cache(size int) *lru.Cache {
 }
 
 func NewEpochChain(db ethdb.Database, chainConfig *params.ChainConfig,
-	vmConfig vm.Config) (*EpochChain, error) {
+	engine consensus_engine.Engine, vmConfig vm.Config) (*EpochChain, error) {
 
 	hash := rawdb.ReadCanonicalHash(db, 0)
 	genesisBlock := rawdb.ReadBlock(db, hash, 0)
@@ -57,6 +60,7 @@ func NewEpochChain(db ethdb.Database, chainConfig *params.ChainConfig,
 		db:            db,
 		mu:            make(chan struct{}, 1),
 		currentHeader: atomic.Value{},
+		engine:        engine,
 		vmConfig:      &vmConfig,
 
 		headerCache:     cache(headerCacheLimit),
@@ -236,6 +240,10 @@ func (bc *EpochChain) getHashByNumber(number uint64) common.Hash {
 
 func (bc *EpochChain) Config() *params.ChainConfig {
 	return bc.chainConfig
+}
+
+func (bc *EpochChain) Engine() engine.Engine {
+	return bc.engine
 }
 
 func (bc *EpochChain) ReadShardState(epoch *big.Int) (*shard.State, error) {

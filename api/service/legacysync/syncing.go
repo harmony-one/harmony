@@ -880,12 +880,12 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 			}
 
 			startTime := time.Now()
-			if err := chain.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
+			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
 				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
 			}
 			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("[Sync] VerifyHeaderSignature")
 		}
-		err := chain.Engine().VerifyHeader(bc, block.Header(), verifySeal)
+		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 		if err == engine.ErrUnknownAncestor {
 			return err
 		} else if err != nil {

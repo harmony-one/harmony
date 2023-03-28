@@ -32,6 +32,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/harmony-one/harmony/block"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -65,7 +66,8 @@ type HeaderChain struct {
 
 	procInterrupt func() bool
 
-	rand *mrand.Rand
+	rand   *mrand.Rand
+	engine consensus_engine.Engine
 }
 
 // NewHeaderChain creates a new HeaderChain structure.
@@ -73,7 +75,7 @@ type HeaderChain struct {
 //	getValidator should return the parent's validator
 //	procInterrupt points to the parent's interrupt semaphore
 //	wg points to the parent's shutdown wait group
-func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, procInterrupt func() bool) (*HeaderChain, error) {
+func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine consensus_engine.Engine, procInterrupt func() bool) (*HeaderChain, error) {
 	headerCache, _ := lru.New(headerCacheLimit)
 	tdCache, _ := lru.New(tdCacheLimit)
 	numberCache, _ := lru.New(numberCacheLimit)
@@ -94,6 +96,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, procInte
 		canonicalCache: canonicalHash,
 		procInterrupt:  procInterrupt,
 		rand:           mrand.New(mrand.NewSource(seed.Int64())),
+		engine:         engine,
 	}
 
 	hc.genesisHeader = hc.GetHeaderByNumber(0)
@@ -544,6 +547,9 @@ func (hc *HeaderChain) SetGenesis(head *block.Header) {
 
 // Config retrieves the header chain's chain configuration.
 func (hc *HeaderChain) Config() *params.ChainConfig { return hc.config }
+
+// Engine retrieves the header chain's consensus engine.
+func (hc *HeaderChain) Engine() consensus_engine.Engine { return hc.engine }
 
 // GetBlock implements consensus.ChainReader, and returns nil for every input as
 // a header chain does not have blocks available for retrieval.

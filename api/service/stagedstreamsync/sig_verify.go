@@ -47,10 +47,10 @@ func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*type
 		}
 	}
 
-	if err := chain.Engine().VerifyHeaderSignature(bc, block.Header(), sigBytes, bitmap); err != nil {
+	if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sigBytes, bitmap); err != nil {
 		return &sigVerifyErr{err}
 	}
-	if err := chain.Engine().VerifyHeader(bc, block.Header(), true); err != nil {
+	if err := bc.Engine().VerifyHeader(bc, block.Header(), true); err != nil {
 		return errors.Wrap(err, "[VerifyHeader]")
 	}
 	if _, err := bc.InsertChain(types.Blocks{block}, false); err != nil {

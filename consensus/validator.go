@@ -331,7 +331,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 			Msg("[OnCommitted] Failed to parse commit sigBytes and bitmap")
 		return
 	}
-	if err := chain.Engine().VerifyHeaderSignature(consensus.Blockchain(), blockObj.Header(),
+	if err := consensus.Blockchain().Engine().VerifyHeaderSignature(consensus.Blockchain(), blockObj.Header(),
 		sigBytes, bitmap); err != nil {
 		consensus.getLogger().Error().
 			Uint64("blockNum", recvMsg.BlockNum).
