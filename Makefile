@@ -12,7 +12,7 @@ RPMBUILD=$(HOME)/rpmbuild
 DEBBUILD=$(HOME)/debbuild
 SHELL := bash
 
-.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker
+.PHONY: all help libs exe race trace-pointer debug debug-ext debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
@@ -23,8 +23,9 @@ help:
 	@echo "exe - build the harmony binary & bootnode"
 	@echo "race - build the harmony binary & bootnode with race condition checks"
 	@echo "trace-pointer - build the harmony binary & bootnode with pointer analysis"
-	@echo "debug - start a localnet with 2 shards (s0 rpc endpoint = localhost:9599; s1 rpc endpoint = localhost:9598)"
+	@echo "debug - start a localnet with 2 shards (s0 rpc endpoint = localhost:9700; s1 rpc endpoint = localhost:9800)"
 	@echo "debug-kill - force kill the localnet"
+	@echo "debug-ext - start a localnet with 2 shards and external (s0 rpc endpoint = localhost:9598; s1 rpc endpoint = localhost:9596)"
 	@echo "clean - remove node files & logs created by localnet"
 	@echo "distclean - remove node files & logs created by localnet, and all libs"
 	@echo "test - run the entire test suite (go test & Node API test)"
@@ -59,6 +60,9 @@ debug:
 
 debug-kill:
 	bash ./test/kill_node.sh
+
+debug-ext:
+	bash ./test/debug-external.sh
 
 clean:
 	rm -rf ./tmp_log*
