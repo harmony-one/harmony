@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -33,11 +34,13 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
+	engine := chain.NewEngine()
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{}, nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType(),
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
 	)
 	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
@@ -51,7 +54,7 @@ func TestNewNode(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 
-	node := New(host, consensus, collection, nil, nil, nil, nil, nil, reg)
+	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}

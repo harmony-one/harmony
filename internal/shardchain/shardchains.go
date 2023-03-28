@@ -6,18 +6,18 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/internal/chain"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 
 	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -40,10 +40,11 @@ type Collection interface {
 type CollectionImpl struct {
 	dbFactory     DBFactory
 	dbInit        DBInitializer
+	engine        engine.Engine
 	mtx           sync.Mutex
 	pool          map[uint32]core.BlockChain
 	disableCache  map[uint32]bool
-	networkType   nodeconfig.NetworkType
+	chainConfig   *params.ChainConfig
 	harmonyconfig *harmonyconfig.HarmonyConfig
 }
 
@@ -55,16 +56,17 @@ type CollectionImpl struct {
 // the factory is brand new (empty).
 func NewCollection(
 	harmonyconfig *harmonyconfig.HarmonyConfig,
-	dbFactory DBFactory, dbInit DBInitializer,
-	network nodeconfig.NetworkType,
+	dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine,
+	chainConfig *params.ChainConfig,
 ) *CollectionImpl {
 	return &CollectionImpl{
 		harmonyconfig: harmonyconfig,
 		dbFactory:     dbFactory,
 		dbInit:        dbInit,
+		engine:        engine,
 		pool:          make(map[uint32]core.BlockChain),
 		disableCache:  make(map[uint32]bool),
-		networkType:   network,
+		chainConfig:   chainConfig,
 	}
 }
 
@@ -93,7 +95,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		utils.Logger().Info().
 			Uint32("shardID", shardID).
 			Msg("initializing a new chain database")
-		if err := sc.dbInit.InitChainDB(db, sc.networkType, shardID); err != nil {
+		if err := sc.dbInit.InitChainDB(db, shardID); err != nil {
 			return nil, errors.Wrapf(err, "cannot initialize a new chain database")
 		}
 	}
@@ -114,7 +116,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		}
 	}
 
-	chainConfig := sc.networkType.ChainConfig()
+	chainConfig := *sc.chainConfig
 
 	if shardID == shard.BeaconChainShardID {
 		// For beacon chain inside a shard chain, need to reset the eth chainID to shard 0's eth chainID in the config
@@ -126,7 +128,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 	}
 	var bc core.BlockChain
 	if opts.EpochChain {
-		bc, err = core.NewEpochChain(db, &chainConfig, vm.Config{})
+		bc, err = core.NewEpochChain(db, &chainConfig, sc.engine, vm.Config{})
 	} else {
 		stateCache, err := initStateCache(db, sc, shardID)
 		if err != nil {
@@ -134,7 +136,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		}
 		if shardID == shard.BeaconChainShardID {
 			bc, err = core.NewBlockChainWithOptions(
-				db, stateCache, bc, cacheConfig, &chainConfig, chain.Engine(), vm.Config{}, opts,
+				db, stateCache, bc, cacheConfig, &chainConfig, sc.engine, vm.Config{}, opts,
 			)
 		} else {
 			beacon, ok := sc.pool[shard.BeaconChainShardID]
@@ -143,7 +145,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 			}
 
 			bc, err = core.NewBlockChainWithOptions(
-				db, stateCache, beacon, cacheConfig, &chainConfig, chain.Engine(), vm.Config{}, opts,
+				db, stateCache, beacon, cacheConfig, &chainConfig, sc.engine, vm.Config{}, opts,
 			)
 		}
 	}

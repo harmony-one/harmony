@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
@@ -700,8 +701,11 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	}
 
+	engine := chain.NewEngine()
+
+	chainConfig := nodeConfig.GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		&hc, chainDBFactory, &core.GenesisInitializer{}, nodeConfig.GetNetworkType(),
+		&hc, chainDBFactory, &core.GenesisInitializer{NetworkType: nodeConfig.GetNetworkType()}, engine, &chainConfig,
 	)
 	for shardID, archival := range nodeConfig.ArchiveModes() {
 		if archival {
@@ -736,7 +740,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		os.Exit(1)
 	}
 
-	currentNode := node.New(myHost, currentConsensus, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc, registry)
+	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc, registry)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn

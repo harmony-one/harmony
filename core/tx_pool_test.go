@@ -28,8 +28,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
+
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/chain"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -41,6 +41,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/hash"
+	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -159,7 +160,8 @@ func createBlockChain() *BlockChainImpl {
 	database := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	blockchain, _ := NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, chain.Engine(), vm.Config{})
+	engine := chain2.NewEngine()
+	blockchain, _ := NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, engine, vm.Config{})
 	return blockchain
 }
 

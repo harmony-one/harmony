@@ -79,7 +79,7 @@ type Engine interface {
 	// via the VerifySeal method.
 	VerifyHeader(chain ChainReader, header *block.Header, seal bool) error
 
-	// VerifyHeaderSignature similar to VerifyHeader, which is only for verifying the block headers of one's own chain, this verification
+	// Similiar to VerifyHeader, which is only for verifying the block headers of one's own chain, this verification
 	// is used for verifying "incoming" block header against commit signature and bitmap sent from the other chain cross-shard via libp2p.
 	// i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
 	// for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.

@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -34,8 +35,10 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	var testDBFactory = &shardchain.MemDBFactory{}
+	engine := chain.NewEngine()
+	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		nil, testDBFactory, &core.GenesisInitializer{}, nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType(),
+		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
 	)
 	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
 	require.NoError(t, err)
@@ -50,7 +53,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 
-	node := New(host, consensus, collection, nil, nil, nil, nil, nil, registry.New().SetBlockchain(blockchain))
+	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, registry.New().SetBlockchain(blockchain))
 
 	node.Worker.UpdateCurrent()
 

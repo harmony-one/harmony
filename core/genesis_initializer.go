@@ -13,10 +13,11 @@ import (
 
 // GenesisInitializer is a shardchain.DBInitializer adapter.
 type GenesisInitializer struct {
+	NetworkType nodeconfig.NetworkType
 }
 
 // InitChainDB sets up a new genesis block in the database for the given shard.
-func (gi *GenesisInitializer) InitChainDB(db ethdb.Database, networkType nodeconfig.NetworkType, shardID uint32) error {
+func (gi *GenesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) error {
 	shardState, _ := committee.WithStakingEnabled.Compute(
 		big.NewInt(GenesisEpoch), nil,
 	)
@@ -33,14 +34,14 @@ func (gi *GenesisInitializer) InitChainDB(db ethdb.Database, networkType nodecon
 		}
 		shardState = &shard.State{Shards: []shard.Committee{*subComm}}
 	}
-	gi.setupGenesisBlock(db, shardID, shardState, networkType)
+	gi.setupGenesisBlock(db, shardID, shardState)
 	return nil
 }
 
 // SetupGenesisBlock sets up a genesis blockchain.
-func (gi *GenesisInitializer) setupGenesisBlock(db ethdb.Database, shardID uint32, myShardState *shard.State, networkType nodeconfig.NetworkType) {
+func (gi *GenesisInitializer) setupGenesisBlock(db ethdb.Database, shardID uint32, myShardState *shard.State) {
 	utils.Logger().Info().Interface("shardID", shardID).Msg("setting up a brand new chain database")
-	gspec := NewGenesisSpec(networkType, shardID)
+	gspec := NewGenesisSpec(gi.NetworkType, shardID)
 	gspec.ShardStateHash = myShardState.Hash()
 	gspec.ShardState = *myShardState.DeepCopy()
 	// Store genesis block into db.
