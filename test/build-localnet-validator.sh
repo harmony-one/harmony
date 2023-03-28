@@ -62,7 +62,7 @@ hmy --node="http://localhost:9500" staking create-validator \
 
 echo "validator created"
 echo '''check their information
-hmy blockchain validator information one103q7qe5t2505lypvltkqtddaef5tzfxwsse4z7 --node="http://localhost:9500"
+hmy blockchain validator information one17ughrllgnzx9sfa46p568k8rdmtz7qj85slc6t --node="http://localhost:9500"
 hmy blockchain validator information one1auqndgthqu5lznsn7tuma8s5333cq0y07cwc6x --node="http://localhost:9500"
 hmy blockchain validator information one19aw2wcr5y4lxeuwt0ajgt5aw3a3qkjdgg67ygj --node="http://localhost:9500"
 hmy blockchain validator information one1eenp9ujcrmyaq22ef6jrpry2k97tjz4xs6ppcf --node="http://localhost:9500"
