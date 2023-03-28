@@ -700,8 +700,9 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	}
 
+	chainConfig := nodeConfig.GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
-		&hc, chainDBFactory, &core.GenesisInitializer{}, nodeConfig.GetNetworkType(),
+		&hc, chainDBFactory, &core.GenesisInitializer{NetworkType: nodeConfig.GetNetworkType()}, &chainConfig,
 	)
 	for shardID, archival := range nodeConfig.ArchiveModes() {
 		if archival {
