@@ -799,6 +799,7 @@ func ReadLogs(db ethdb.Reader, hash common.Hash, number uint64, config *params.C
 	return logs
 }
 
+// This function is NOT used, just ported over from the Ethereum
 func writeAncientBlock(op ethdb.AncientWriteOp, block *types.Block, header *block.Header, receipts []*types.ReceiptForStorage, td *big.Int) error {
 	num := block.NumberU64()
 	if err := op.AppendRaw(ChainFreezerHashTable, num, block.Hash().Bytes()); err != nil {
@@ -847,6 +848,7 @@ func (s badBlockList) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 // WriteBadBlock serializes the bad block into the database. If the cumulated
 // bad blocks exceeds the limitation, the oldest will be dropped.
+// This function is NOT used, just ported over from the Ethereum
 func WriteBadBlock(db ethdb.KeyValueStore, block *types.Block) {
 	blob, err := db.Get(badBlockKey)
 	if err != nil {
@@ -882,6 +884,7 @@ func WriteBadBlock(db ethdb.KeyValueStore, block *types.Block) {
 }
 
 // DeleteBadBlocks deletes all the bad blocks from the database
+// This function is NOT used, just ported over from the Ethereum
 func DeleteBadBlocks(db ethdb.KeyValueWriter) {
 	if err := db.Delete(badBlockKey); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to delete bad blocks")

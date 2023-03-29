@@ -108,6 +108,7 @@ const crashesToKeep = 10
 // the previous data
 // - a list of timestamps
 // - a count of how many old unclean-shutdowns have been discarded
+// This function is NOT used, just ported over from the Ethereum
 func PushUncleanShutdownMarker(db ethdb.KeyValueStore) ([]uint64, uint64, error) {
 	var uncleanShutdowns crashList
 	// Read old data
@@ -136,6 +137,7 @@ func PushUncleanShutdownMarker(db ethdb.KeyValueStore) ([]uint64, uint64, error)
 }
 
 // PopUncleanShutdownMarker removes the last unclean shutdown marker
+// This function is NOT used, just ported over from the Ethereum
 func PopUncleanShutdownMarker(db ethdb.KeyValueStore) {
 	var uncleanShutdowns crashList
 	// Read old data
@@ -154,6 +156,7 @@ func PopUncleanShutdownMarker(db ethdb.KeyValueStore) {
 }
 
 // UpdateUncleanShutdownMarker updates the last marker's timestamp to now.
+// This function is NOT used, just ported over from the Ethereum
 func UpdateUncleanShutdownMarker(db ethdb.KeyValueStore) {
 	var uncleanShutdowns crashList
 	// Read old data
@@ -176,12 +179,14 @@ func UpdateUncleanShutdownMarker(db ethdb.KeyValueStore) {
 }
 
 // ReadTransitionStatus retrieves the eth2 transition status from the database
+// This function is NOT used, just ported over from the Ethereum
 func ReadTransitionStatus(db ethdb.KeyValueReader) []byte {
 	data, _ := db.Get(transitionStatusKey)
 	return data
 }
 
 // WriteTransitionStatus stores the eth2 transition status to the database
+// This function is NOT used, just ported over from the Ethereum
 func WriteTransitionStatus(db ethdb.KeyValueWriter, data []byte) {
 	if err := db.Put(transitionStatusKey, data); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to store the eth2 transition status")

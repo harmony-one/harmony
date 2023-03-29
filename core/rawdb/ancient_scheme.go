@@ -17,6 +17,7 @@
 package rawdb
 
 // The list of table names of chain freezer.
+// This variables is NOT used, just ported over from the Ethereum
 const (
 	// ChainFreezerHeaderTable indicates the name of the freezer header table.
 	ChainFreezerHeaderTable = "headers"
@@ -36,6 +37,7 @@ const (
 
 // chainFreezerNoSnappy configures whether compression is disabled for the ancient-tables.
 // Hashes and difficulties don't compress well.
+// This function is NOT used, just ported over from the Ethereum
 var chainFreezerNoSnappy = map[string]bool{
 	ChainFreezerHeaderTable:     false,
 	ChainFreezerHashTable:       true,

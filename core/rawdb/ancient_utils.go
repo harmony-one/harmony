@@ -51,6 +51,7 @@ func (info *freezerInfo) size() common.StorageSize {
 }
 
 // inspectFreezers inspects all freezers registered in the system.
+// This function is NOT used, just ported over from the Ethereum
 func inspectFreezers(db ethdb.Database) ([]freezerInfo, error) {
 	var infos []freezerInfo
 	for _, freezer := range freezers {
