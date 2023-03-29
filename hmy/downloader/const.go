@@ -35,7 +35,8 @@ type (
 		// Only run stream sync protocol as a server.
 		// TODO: remove this when stream sync is fully up.
 		ServerOnly bool
-
+		// use staged sync
+		Staged bool
 		// parameters
 		Network     nodeconfig.NetworkType
 		Concurrency int // Number of concurrent sync requests

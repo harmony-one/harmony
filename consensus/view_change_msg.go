@@ -23,8 +23,8 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 		Type:        msg_pb.MessageType_VIEWCHANGE,
 		Request: &msg_pb.Message_Viewchange{
 			Viewchange: &msg_pb.ViewChangeRequest{
-				ViewId:       consensus.GetViewChangingID(),
-				BlockNum:     consensus.BlockNum(),
+				ViewId:       consensus.getViewChangingID(),
+				BlockNum:     consensus.getBlockNum(),
 				ShardId:      consensus.ShardID,
 				SenderPubkey: priKey.Pub.Bytes[:],
 				LeaderPubkey: consensus.LeaderPubKey.Bytes[:],
@@ -33,7 +33,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 	}
 
 	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
-		msg_pb.MessageType_PREPARED, consensus.BlockNum(),
+		msg_pb.MessageType_PREPARED, consensus.getBlockNum(),
 	)
 	preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
@@ -45,7 +45,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 			Interface("preparedMsg", preparedMsg).
 			Msg("[constructViewChangeMessage] found prepared msg")
 		if block != nil {
-			if err := consensus.VerifyBlock(block); err == nil {
+			if err := consensus.verifyBlock(block); err == nil {
 				tmpEncoded, err := rlp.EncodeToBytes(block)
 				if err != nil {
 					consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed encoding block")
@@ -83,7 +83,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 	}
 
 	viewIDBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(viewIDBytes, consensus.GetViewChangingID())
+	binary.LittleEndian.PutUint64(viewIDBytes, consensus.getViewChangingID())
 	sign1 := priKey.Pri.SignHash(viewIDBytes)
 	if sign1 != nil {
 		vcMsg.ViewidSig = sign1.Serialize()
@@ -107,7 +107,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 		Request: &msg_pb.Message_Viewchange{
 			Viewchange: &msg_pb.ViewChangeRequest{
 				ViewId:       viewID,
-				BlockNum:     consensus.BlockNum(),
+				BlockNum:     consensus.getBlockNum(),
 				ShardId:      consensus.ShardID,
 				SenderPubkey: priKey.Pub.Bytes[:],
 			},

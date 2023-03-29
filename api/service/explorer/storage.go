@@ -34,11 +34,54 @@ const (
 // explorer db is doing migration and unavailable
 var ErrExplorerNotReady = errors.New("explorer db not ready")
 
+type Bitmap interface {
+	Clone() *roaring64.Bitmap
+	MarshalBinary() ([]byte, error)
+	CheckedAdd(x uint64) bool
+	Contains(x uint64) bool
+}
+
+type ThreadSafeBitmap struct {
+	b  Bitmap
+	mu sync.Mutex
+}
+
+func (a *ThreadSafeBitmap) Clone() *roaring64.Bitmap {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.b.Clone()
+}
+
+func (a *ThreadSafeBitmap) CheckedAdd(x uint64) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.b.CheckedAdd(x)
+}
+
+func (a *ThreadSafeBitmap) Contains(x uint64) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.b.Contains(x)
+}
+
+func (a *ThreadSafeBitmap) MarshalBinary() ([]byte, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.b.MarshalBinary()
+}
+
+func NewThreadSafeBitmap(bitmap Bitmap) Bitmap {
+	return &ThreadSafeBitmap{
+		b:  bitmap,
+		mu: sync.Mutex{},
+	}
+}
+
 type (
 	storage struct {
 		db database
 		bc core.BlockChain
-		rb *roaring64.Bitmap
+		rb Bitmap //*roaring64.Bitmap
 
 		// TODO: optimize this with priority queue
 		tm      *taskManager
@@ -89,11 +132,12 @@ func newStorage(hc *harmonyconfig.HarmonyConfig, bc core.BlockChain, dbPath stri
 		return nil, err
 	}
 
+	safeBitmap := NewThreadSafeBitmap(bitmap)
 	return &storage{
 		db:        db,
 		bc:        bc,
-		rb:        bitmap,
-		tm:        newTaskManager(bitmap),
+		rb:        safeBitmap,
+		tm:        newTaskManager(safeBitmap),
 		resultC:   make(chan blockResult, numWorker),
 		resultT:   make(chan *traceResult, numWorker),
 		available: abool.New(),
@@ -211,14 +255,14 @@ type taskManager struct {
 	blocksLP []*types.Block // blocks with low priorities
 	lock     sync.Mutex
 
-	rb             *roaring64.Bitmap
+	rb             Bitmap
 	rbChangedCount int
 
 	C chan struct{}
 	T chan *traceResult
 }
 
-func newTaskManager(bitmap *roaring64.Bitmap) *taskManager {
+func newTaskManager(bitmap Bitmap) *taskManager {
 	return &taskManager{
 		rb: bitmap,
 		C:  make(chan struct{}, numWorker),

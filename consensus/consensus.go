@@ -47,7 +47,7 @@ type Consensus struct {
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
-	phase *LockedFBFTPhase
+	phase FBFTPhase
 	// current indicates what state a node is in
 	current State
 	// isBackup declarative the node is in backup mode
@@ -61,14 +61,12 @@ type Consensus struct {
 	commitBitmap         *bls_cosi.Mask
 
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
-	multiSigMutex  sync.RWMutex
 
 	// Registry for services.
 	registry *registry.Registry
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
-	MinPeers   int
-	pubKeyLock sync.Mutex
+	MinPeers int
 	// private/public keys of current node
 	priKey multibls.PrivateKeys
 	// the publickey of leader
@@ -85,9 +83,7 @@ type Consensus struct {
 	// IgnoreViewIDCheck determines whether to ignore viewID check
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
-	mutex sync.Mutex
-	// mutex for verify new block
-	verifyBlockMutex sync.Mutex
+	mutex sync.RWMutex
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
@@ -114,10 +110,6 @@ type Consensus struct {
 	host p2p.Host
 	// MessageSender takes are of sending consensus message and the corresponding retry logic.
 	msgSender *MessageSender
-	// Used to convey to the consensus main loop that block syncing has finished.
-	syncReadyChan chan struct{}
-	// Used to convey to the consensus main loop that node is out of sync
-	syncNotReadyChan chan struct{}
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
@@ -136,6 +128,10 @@ type Consensus struct {
 	finalityCounter atomic.Value //int64
 
 	dHelper *downloadHelper
+
+	// Both flags only for initialization state.
+	start           bool
+	isInitialLeader bool
 }
 
 // Blockchain returns the blockchain.
@@ -144,7 +140,7 @@ func (consensus *Consensus) Blockchain() core.BlockChain {
 }
 
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks.
-func (consensus *Consensus) VerifyBlock(block *types.Block) error {
+func (consensus *Consensus) verifyBlock(block *types.Block) error {
 	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
 			return errors.Errorf("Block verification failed: %s", err)
@@ -157,12 +153,14 @@ func (consensus *Consensus) VerifyBlock(block *types.Block) error {
 // BlocksSynchronized lets the main loop know that block synchronization finished
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
-	consensus.syncReadyChan <- struct{}{}
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.syncReadyChan()
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
 func (consensus *Consensus) BlocksNotSynchronized() {
-	consensus.syncNotReadyChan <- struct{}{}
+	consensus.syncNotReadyChan()
 }
 
 // VdfSeedSize returns the number of VRFs for VDF computation
@@ -172,13 +170,31 @@ func (consensus *Consensus) VdfSeedSize() int {
 
 // GetPublicKeys returns the public keys
 func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
+	return consensus.getPublicKeys()
+}
+
+func (consensus *Consensus) getPublicKeys() multibls.PublicKeys {
 	return consensus.priKey.GetPublicKeys()
 }
 
 func (consensus *Consensus) GetLeaderPubKey() *bls_cosi.PublicKeyWrapper {
-	consensus.pubKeyLock.Lock()
-	defer consensus.pubKeyLock.Unlock()
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return consensus.getLeaderPubKey()
+}
+
+func (consensus *Consensus) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {
 	return consensus.LeaderPubKey
+}
+
+func (consensus *Consensus) SetLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.setLeaderPubKey(pub)
+}
+
+func (consensus *Consensus) setLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
+	consensus.LeaderPubKey = pub
 }
 
 func (consensus *Consensus) GetPrivateKeys() multibls.PrivateKeys {
@@ -186,7 +202,7 @@ func (consensus *Consensus) GetPrivateKeys() multibls.PrivateKeys {
 }
 
 // GetLeaderPrivateKey returns leader private key if node is the leader
-func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls_core.PublicKey) (*bls.PrivateKeyWrapper, error) {
+func (consensus *Consensus) getLeaderPrivateKey(leaderKey *bls_core.PublicKey) (*bls.PrivateKeyWrapper, error) {
 	for i, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(leaderKey) {
 			return &consensus.priKey[i], nil
@@ -195,15 +211,15 @@ func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls_core.PublicKey) (
 	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
 }
 
-// GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
-func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
-	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey.Object)
+// getConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
+func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
+	return consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
 // SetBlockVerifier sets the block verifier
 func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
 	consensus.BlockVerifier = verifier
-	consensus.vc.SetVerifyBlock(consensus.VerifyBlock)
+	consensus.vc.SetVerifyBlock(consensus.verifyBlock)
 }
 
 func (consensus *Consensus) IsBackup() bool {
@@ -214,13 +230,19 @@ func (consensus *Consensus) BlockNum() uint64 {
 	return atomic.LoadUint64(&consensus.blockNum)
 }
 
+func (consensus *Consensus) getBlockNum() uint64 {
+	return atomic.LoadUint64(&consensus.blockNum)
+}
+
 // New create a new Consensus record
 func New(
 	host p2p.Host, shard uint32, multiBLSPriKey multibls.PrivateKeys,
 	registry *registry.Registry,
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
-	consensus := Consensus{}
+	consensus := Consensus{
+		ShardID: shard,
+	}
 	consensus.Decider = Decider
 	consensus.registry = registry
 	consensus.MinPeers = minPeers
@@ -230,7 +252,7 @@ func New(
 	consensus.BlockNumLowChan = make(chan struct{}, 1)
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
-	consensus.phase = NewLockedFBFTPhase(FBFTAnnounce)
+	consensus.phase = FBFTAnnounce
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
@@ -249,8 +271,6 @@ func New(
 	// displayed on explorer as Height right now
 	consensus.SetCurBlockViewID(0)
 	consensus.ShardID = shard
-	consensus.syncReadyChan = make(chan struct{})
-	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.ReadySignal = make(chan ProposalType)
 	consensus.CommitSigChannel = make(chan []byte)

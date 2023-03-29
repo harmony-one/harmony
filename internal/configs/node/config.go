@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"time"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -115,6 +116,10 @@ type RPCServerConfig struct {
 	HTTPPort     int
 	HTTPAuthPort int
 
+	HTTPTimeoutRead  time.Duration
+	HTTPTimeoutWrite time.Duration
+	HTTPTimeoutIdle  time.Duration
+
 	WSEnabled  bool
 	WSIp       string
 	WSPort     int
@@ -130,6 +135,8 @@ type RPCServerConfig struct {
 
 	RateLimiterEnabled bool
 	RequestsPerSecond  int
+
+	EvmCallTimeout time.Duration
 }
 
 // RosettaServerConfig is the config for the rosetta server

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"sync"
 	"time"
 
@@ -194,4 +195,20 @@ func updateZeroLogLevel(level int) {
 	}
 	childLogger := Logger().Level(zeroLoggerLevel)
 	zeroLogger = &childLogger
+}
+
+// GetPort is useful for debugging, returns `--port` flag provided to executable.
+func GetPort() int {
+	ok := false
+	for _, x := range os.Args {
+		if x == "--port" {
+			ok = true
+			continue
+		}
+		if ok {
+			rs, _ := strconv.ParseInt(x, 10, 64)
+			return int(rs)
+		}
+	}
+	return 0
 }

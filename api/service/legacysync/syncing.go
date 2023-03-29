@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -17,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/consensus"
+	consensus2 "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -25,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 )
 
@@ -110,14 +113,16 @@ type SyncConfig struct {
 	// SyncPeerConfig itself is guarded by its own mutex.
 	mtx sync.RWMutex
 
-	peers   []*SyncPeerConfig
-	shardID uint32
+	peers      []*SyncPeerConfig
+	shardID    uint32
+	selfPeerID libp2p_peer.ID
 }
 
-func NewSyncConfig(shardID uint32, peers []*SyncPeerConfig) *SyncConfig {
+func NewSyncConfig(shardID uint32, selfPeerID libp2p_peer.ID, peers []*SyncPeerConfig) *SyncConfig {
 	return &SyncConfig{
-		peers:   peers,
-		shardID: shardID,
+		peers:      peers,
+		shardID:    shardID,
+		selfPeerID: selfPeerID,
 	}
 }
 
@@ -133,6 +138,9 @@ func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
 	// Ensure no duplicate peers
 	for _, p2 := range sc.peers {
 		if peer.IsEqual(p2) {
+			return
+		}
+		if peer.peer.PeerID == sc.selfPeerID {
 			return
 		}
 	}
@@ -192,7 +200,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, isExplorer bool, role nodeconfig.Role) *StateSync {
+func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, peerID libp2p_peer.ID, isExplorer bool, role nodeconfig.Role) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.blockChain = bc
 	stateSync.selfip = ip
@@ -201,7 +209,7 @@ func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, i
 	stateSync.commonBlocks = make(map[int]*types.Block)
 	stateSync.lastMileBlocks = []*types.Block{}
 	stateSync.isExplorer = isExplorer
-	stateSync.syncConfig = NewSyncConfig(bc.ShardID(), nil)
+	stateSync.syncConfig = NewSyncConfig(bc.ShardID(), peerID, nil)
 
 	stateSync.syncStatus = newSyncStatus(role)
 	return stateSync
@@ -366,9 +374,9 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error {
+func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error {
 	var err error
-	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, waitForEachPeerToConnect)
+	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, selfPeerID, waitForEachPeerToConnect)
 	return err
 }
 
@@ -1054,13 +1062,16 @@ func (ss *StateSync) RegisterNodeInfo() int {
 
 // IsSameBlockchainHeight checks whether the node is out of sync from other peers
 func (ss *StateSync) IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool) {
-	otherHeight := getMaxPeerHeight(ss.syncConfig)
+	otherHeight, err := getMaxPeerHeight(ss.syncConfig)
+	if err != nil {
+		return 0, false
+	}
 	currentHeight := bc.CurrentBlock().NumberU64()
 	return otherHeight, currentHeight == otherHeight
 }
 
 // GetMaxPeerHeight ..
-func (ss *StateSync) GetMaxPeerHeight() uint64 {
+func (ss *StateSync) GetMaxPeerHeight() (uint64, error) {
 	return getMaxPeerHeight(ss.syncConfig)
 }
 
@@ -1073,8 +1084,17 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 
 	for {
 		start := time.Now()
-		otherHeight := getMaxPeerHeight(ss.syncConfig)
 		currentHeight := bc.CurrentBlock().NumberU64()
+		otherHeight, errMaxHeight := getMaxPeerHeight(ss.syncConfig)
+		if errMaxHeight != nil {
+			utils.Logger().Error().
+				Bool("isBeacon", isBeacon).
+				Uint32("ShardID", bc.ShardID()).
+				Uint64("currentHeight", currentHeight).
+				Int("peers count", ss.syncConfig.PeersCount()).
+				Msgf("[SYNC] get max height failed")
+			break
+		}
 		if currentHeight >= otherHeight {
 			utils.Logger().Info().
 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
@@ -1123,20 +1143,19 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 
 func (ss *StateSync) addConsensusLastMile(bc core.BlockChain, consensus *consensus.Consensus) error {
 	curNumber := bc.CurrentBlock().NumberU64()
-	blockIter, err := consensus.GetLastMileBlockIter(curNumber + 1)
-	if err != nil {
-		return err
-	}
-	for {
-		block := blockIter.Next()
-		if block == nil {
-			break
+	err := consensus.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus2.LastMileBlockIter) error {
+		for {
+			block := blockIter.Next()
+			if block == nil {
+				break
+			}
+			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+				return errors.Wrap(err, "failed to InsertChain")
+			}
 		}
-		if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
-			return errors.Wrap(err, "failed to InsertChain")
-		}
-	}
-	return nil
+		return nil
+	})
+	return err
 }
 
 // GetSyncingPort returns the syncing port.
@@ -1212,7 +1231,9 @@ func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
 	defer status.lock.Unlock()
 	if status.expired() {
 		result := fallback()
-		status.update(result)
+		if result.OtherHeight > 0 && result.OtherHeight < uint64(math.MaxUint64) {
+			status.update(result)
+		}
 	}
 	return status.lastResult
 }
@@ -1274,8 +1295,15 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1 := getMaxPeerHeight(ss.syncConfig)
 	lastHeight := ss.blockChain.CurrentBlock().NumberU64()
+	otherHeight1, errMaxHeight1 := getMaxPeerHeight(ss.syncConfig)
+	if errMaxHeight1 != nil {
+		return SyncCheckResult{
+			IsSynchronized: false,
+			OtherHeight:    0,
+			HeightDiff:     0,
+		}
+	}
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
 	if !doubleCheck {
@@ -1296,7 +1324,10 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	// double check the sync status after 1 second to confirm (avoid false alarm)
 	time.Sleep(1 * time.Second)
 
-	otherHeight2 := getMaxPeerHeight(ss.syncConfig)
+	otherHeight2, errMaxHeight2 := getMaxPeerHeight(ss.syncConfig)
+	if errMaxHeight2 != nil {
+		otherHeight2 = otherHeight1
+	}
 	currentHeight := ss.blockChain.CurrentBlock().NumberU64()
 
 	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2

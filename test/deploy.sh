@@ -54,7 +54,7 @@ function setup() {
 
 function launch_bootnode() {
   echo "launching boot node ..."
-  ${DRYRUN} ${ROOT}/bin/bootnode -port 19876 -max_conn_per_ip 100 >"${log_folder}"/bootnode.log 2>&1 | tee -a "${LOG_FILE}" &
+  ${DRYRUN} ${ROOT}/bin/bootnode -port 19876 -max_conn_per_ip 100 -force_public true >"${log_folder}"/bootnode.log 2>&1 | tee -a "${LOG_FILE}" &
   sleep 1
   BN_MA=$(grep "BN_MA" "${log_folder}"/bootnode.log | awk -F\= ' { print $2 } ')
   echo "bootnode launched." + " $BN_MA"
@@ -83,8 +83,8 @@ function launch_localnet() {
     # Read config for i-th node form config file
     IFS=' ' read -r ip port mode bls_key shard node_config <<<"${line}"
     args=("${base_args[@]}" --ip "${ip}" --port "${port}" --key "/tmp/${ip}-${port}.key" --db_dir "${ROOT}/db-${ip}-${port}" "--broadcast_invalid_tx=false")
-    if [[ -z "$ip" || -z "$port" ]]; then
-      echo "skip empty node"
+    if [[ -z "$ip" || -z "$port" || "$ip" == "#" ]]; then
+      echo "skip empty line or node or comment"
       continue
     fi
     if [[ $EXPOSEAPIS == "true" ]]; then

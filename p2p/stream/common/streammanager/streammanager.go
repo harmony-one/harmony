@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -72,6 +73,12 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		Str("protocol ID", string(pid)).Logger()
 
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
+
+	// if it is a beacon node or shard node, print the peer id and proto id
+	if protoSpec.BeaconNode || protoSpec.ShardID != shard.BeaconChainShardID {
+		fmt.Println("My peer id: ", host.ID().String())
+		fmt.Println("My proto id: ", pid)
+	}
 
 	return &streamManager{
 		myProtoID:     pid,
@@ -304,8 +311,14 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 
 	connecting := 0
 	for peer := range peers {
-		if peer.ID == sm.host.ID() || sm.coolDownCache.Has(peer.ID) {
+		if peer.ID == sm.host.ID() {
+			continue
+		}
+		if sm.coolDownCache.Has(peer.ID) {
 			// If the peer has the same ID and was just connected, skip.
+			continue
+		}
+		if _, ok := sm.streams.get(sttypes.StreamID(peer.ID)); ok {
 			continue
 		}
 		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
@@ -314,6 +327,7 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			// The ctx here is using the module context instead of discover context
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
 			if err != nil {
+				sm.coolDownCache.Add(pid)
 				sm.logger.Warn().Err(err).Str("peerID", string(pid)).Msg("failed to setup stream with peer")
 				return
 			}
@@ -323,7 +337,7 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 }
 
 func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrInfo, error) {
-	protoID := string(sm.myProtoID)
+	protoID := sm.targetProtoID()
 	discBatch := sm.config.DiscBatch
 	if sm.config.HiCap-sm.streams.size() < sm.config.DiscBatch {
 		discBatch = sm.config.HiCap - sm.streams.size()
@@ -340,6 +354,14 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 	return sm.pf.FindPeers(ctx2, protoID, discBatch)
 }
 
+func (sm *streamManager) targetProtoID() string {
+	targetSpec := sm.myProtoSpec
+	if targetSpec.ShardID == shard.BeaconChainShardID { // for beacon chain, only connect to beacon nodes
+		targetSpec.BeaconNode = true
+	}
+	return string(targetSpec.ToProtoID())
+}
+
 func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_peer.ID) error {
 	timer := prometheus.NewTimer(setupStreamDuration.With(prometheus.Labels{"topic": string(sm.myProtoID)}))
 	defer timer.ObserveDuration()
@@ -347,7 +369,7 @@ func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_pee
 	nCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 
-	st, err := sm.host.NewStream(nCtx, pid, protocol.ID(sm.myProtoID))
+	st, err := sm.host.NewStream(nCtx, pid, protocol.ID(sm.targetProtoID()))
 	if err != nil {
 		return err
 	}
@@ -392,6 +414,10 @@ func (ss *streamSet) get(id sttypes.StreamID) (sttypes.Stream, bool) {
 	ss.lock.RLock()
 	defer ss.lock.RUnlock()
 
+	if id == "" {
+		return nil, false
+	}
+
 	st, ok := ss.streams[id]
 	return st, ok
 }
@@ -400,9 +426,13 @@ func (ss *streamSet) addStream(st sttypes.Stream) {
 	ss.lock.Lock()
 	defer ss.lock.Unlock()
 
-	ss.streams[st.ID()] = st
-	spec, _ := st.ProtoSpec()
-	ss.numByProto[spec]++
+	if spec, err := st.ProtoSpec(); err != nil {
+		return
+	} else {
+		ss.streams[st.ID()] = st
+		ss.numByProto[spec]++
+	}
+
 }
 
 func (ss *streamSet) deleteStream(st sttypes.Stream) {

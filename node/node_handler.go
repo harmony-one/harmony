@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -360,9 +361,8 @@ func VerifyNewBlock(nodeConfig *nodeconfig.ConfigType, blockChain core.BlockChai
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
-// 1. add the new block to blockchain
-// 2. [leader] send new block to the client
-// 3. [leader] send cross shard tx receipts to destination shard
+// 1. [leader] send new block to the client
+// 2. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	if node.Consensus.IsLeader() {
 		if node.IsRunningBeaconChain() {
@@ -433,7 +433,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	return nil
 }
 
-// BootstrapConsensus is the a goroutine to check number of peers and start the consensus
+// BootstrapConsensus is a goroutine to check number of peers and start the consensus
 func (node *Node) BootstrapConsensus() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -447,6 +447,7 @@ func (node *Node) BootstrapConsensus() error {
 			if numPeersNow >= min {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				enoughMinPeers <- struct{}{}
+				fmt.Println("Bootstrap consensus done.", numPeersNow, " peers are connected")
 				return
 			}
 			utils.Logger().Info().
@@ -462,7 +463,7 @@ func (node *Node) BootstrapConsensus() error {
 		return ctx.Err()
 	case <-enoughMinPeers:
 		go func() {
-			node.startConsensus <- struct{}{}
+			node.Consensus.StartChannel()
 		}()
 		return nil
 	}

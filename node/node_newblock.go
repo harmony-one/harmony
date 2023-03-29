@@ -104,7 +104,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 						// Send the new block to Consensus so it can be confirmed.
 						node.proposedBlock[newBlock.NumberU64()] = newBlock
 						delete(node.proposedBlock, newBlock.NumberU64()-10)
-						node.BlockChannel <- newBlock
+						node.Consensus.BlockChannel(newBlock)
 						break
 					} else {
 						retryCount++

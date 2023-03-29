@@ -99,7 +99,6 @@ type SignatoryTracker interface {
 // SignatureReader ..
 type SignatureReader interface {
 	SignatoryTracker
-	ReadAllBallots(Phase) []*votepower.Ballot
 	ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot
 	TwoThirdsSignersCount() int64
 	// 96 bytes aggregated signature

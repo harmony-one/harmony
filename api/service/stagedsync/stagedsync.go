@@ -26,6 +26,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/ledgerwatch/erigon-lib/kv"
+
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type StagedSync struct {
@@ -663,7 +665,7 @@ func (ss *StagedSync) AddNewBlock(peerHash []byte, block *types.Block) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error {
+func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error {
 	// sanity check to ensure no duplicate peers
 	if err := checkPeersDuplicity(peers); err != nil {
 		return err
@@ -678,6 +680,7 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitFor
 	}
 
 	utils.Logger().Debug().
+		Str("self peer ID", string(selfPeerID)).
 		Int("peers count", len(peers)).
 		Int("target size", targetSize).
 		Msg("[STAGED_SYNC] CreateSyncConfig: len of peers")
@@ -685,7 +688,9 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitFor
 	if ss.syncConfig != nil {
 		ss.syncConfig.CloseConnections()
 	}
-	ss.syncConfig = &SyncConfig{}
+	ss.syncConfig = &SyncConfig{
+		selfPeerID: selfPeerID,
+	}
 
 	var connectedPeers int
 	for _, peer := range peers {
@@ -694,6 +699,7 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitFor
 			continue
 		}
 		peerConfig := &SyncPeerConfig{
+			peer:   peer,
 			ip:     peer.IP,
 			port:   peer.Port,
 			client: client,
@@ -1195,27 +1201,24 @@ func (ss *StagedSync) IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool) 
 }
 
 // GetMaxPeerHeight returns maximum block height of connected peers
-func (ss *StagedSync) GetMaxPeerHeight() uint64 {
-	mph, _ := ss.getMaxPeerHeight()
-	return mph
+func (ss *StagedSync) GetMaxPeerHeight() (uint64, error) {
+	return ss.getMaxPeerHeight()
 }
 
-func (ss *StagedSync) addConsensusLastMile(bc core.BlockChain, consensus *consensus.Consensus) error {
+func (ss *StagedSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) error {
 	curNumber := bc.CurrentBlock().NumberU64()
-	blockIter, err := consensus.GetLastMileBlockIter(curNumber + 1)
-	if err != nil {
-		return err
-	}
-	for {
-		block := blockIter.Next()
-		if block == nil {
-			break
+	return cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
+		for {
+			block := blockIter.Next()
+			if block == nil {
+				break
+			}
+			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+				return errors.Wrap(err, "failed to InsertChain")
+			}
 		}
-		if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
-			return errors.Wrap(err, "failed to InsertChain")
-		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // GetSyncingPort returns the syncing port.
@@ -1271,8 +1274,15 @@ func (ss *StagedSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1, _ := ss.getMaxPeerHeight()
 	lastHeight := ss.Blockchain().CurrentBlock().NumberU64()
+	otherHeight1, errMaxHeight1 := ss.getMaxPeerHeight()
+	if errMaxHeight1 != nil {
+		return SyncCheckResult{
+			IsSynchronized: false,
+			OtherHeight:    0,
+			HeightDiff:     0,
+		}
+	}
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
 	if !doubleCheck {
@@ -1293,7 +1303,10 @@ func (ss *StagedSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	// double check the sync status after 1 second to confirm (avoid false alarm)
 	time.Sleep(1 * time.Second)
 
-	otherHeight2, _ := ss.getMaxPeerHeight()
+	otherHeight2, errMaxHeight2 := ss.getMaxPeerHeight()
+	if errMaxHeight2 != nil {
+		otherHeight2 = otherHeight1
+	}
 	currentHeight := ss.Blockchain().CurrentBlock().NumberU64()
 
 	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2

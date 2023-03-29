@@ -18,7 +18,7 @@ import (
 )
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
-	recvMsg, err := consensus.ParseFBFTMessage(msg)
+	recvMsg, err := consensus.parseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Error().
 			Err(err).
@@ -38,12 +38,10 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Msg("[OnAnnounce] Announce message Added")
 	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 	consensus.blockHash = recvMsg.BlockHash
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
-	if consensus.IsViewChangingMode() {
+	if consensus.isViewChangingMode() {
 		consensus.getLogger().Debug().
 			Msg("[OnAnnounce] Still in ViewChanging Mode, Exiting !!")
 		return
@@ -64,7 +62,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if len(recvMsg.Block) > 0 {
 		go func() {
 			// Best effort check, no need to error out.
-			_, err := consensus.validateNewBlock(recvMsg)
+			_, err := consensus.ValidateNewBlock(recvMsg)
 
 			if err == nil {
 				consensus.getLogger().Info().
@@ -74,11 +72,12 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 }
 
+func (consensus *Consensus) ValidateNewBlock(recvMsg *FBFTMessage) (*types.Block, error) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	return consensus.validateNewBlock(recvMsg)
+}
 func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block, error) {
-	// Lock to prevent race condition between announce and prepare
-	consensus.verifyBlockMutex.Lock()
-	defer consensus.verifyBlockMutex.Unlock()
-
 	if consensus.FBFTLog.IsBlockVerified(recvMsg.BlockHash) {
 		var blockObj *types.Block
 
@@ -132,7 +131,7 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 		return nil, errors.New("nil block verifier")
 	}
 
-	if err := consensus.VerifyBlock(&blockObj); err != nil {
+	if err := consensus.verifyBlock(&blockObj); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[validateNewBlock] Block verification failed")
 		return nil, errors.New("Block verification failed")
 	}
@@ -184,9 +183,6 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 // if onPrepared accepts the prepared message from the leader, then
 // it will send a COMMIT message for the leader to receive on the network.
 func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -209,7 +205,7 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 
 	// check validity of prepared signature
 	blockHash := recvMsg.BlockHash
-	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
+	aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 0, consensus.Decider.Participants())
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!")
 		return
@@ -275,11 +271,13 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 			return
 		}
 		curBlockNum := consensus.BlockNum()
+		consensus.mutex.Lock()
+		defer consensus.mutex.Unlock()
 		for _, committedMsg := range consensus.FBFTLog.GetNotVerifiedCommittedMessages(blockObj.NumberU64(), blockObj.Header().ViewID().Uint64(), blockObj.Hash()) {
 			if committedMsg != nil {
 				consensus.onCommitted(committedMsg)
 			}
-			if curBlockNum < consensus.BlockNum() {
+			if curBlockNum < consensus.getBlockNum() {
 				consensus.getLogger().Info().Msg("[OnPrepared] Successfully caught up with committed message")
 				break
 			}
@@ -288,9 +286,6 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 }
 
 func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -385,7 +380,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 		return
 	}
 
-	if consensus.IsViewChangingMode() {
+	if consensus.isViewChangingMode() {
 		consensus.getLogger().Info().Msg("[OnCommitted] Still in ViewChanging mode, Exiting!!")
 		return
 	}
@@ -406,7 +401,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 func (consensus *Consensus) getPriKeysInCommittee() []*bls.PrivateKeyWrapper {
 	priKeys := []*bls.PrivateKeyWrapper{}
 	for i, key := range consensus.priKey {
-		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
+		if !consensus.isValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
 		priKeys = append(priKeys, &consensus.priKey[i])

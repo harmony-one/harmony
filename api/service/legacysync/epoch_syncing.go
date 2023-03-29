@@ -2,7 +2,6 @@ package legacysync
 
 import (
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -14,6 +13,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
+
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type EpochSync struct {
@@ -47,11 +48,12 @@ func (ss *EpochSync) isSynchronized(_ bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1 := getMaxPeerHeight(ss.syncConfig)
-	if otherHeight1 == math.MaxUint64 {
+	otherHeight1, errMaxHeight := getMaxPeerHeight(ss.syncConfig)
+	if errMaxHeight != nil {
 		utils.Logger().Error().
 			Uint64("OtherHeight", otherHeight1).
 			Int("Peers count", ss.syncConfig.PeersCount()).
+			Err(errMaxHeight).
 			Msg("[EPOCHSYNC] No peers for get height")
 		return SyncCheckResult{}
 	}
@@ -91,15 +93,15 @@ func (ss *EpochSync) SyncLoop(bc core.BlockChain, consensus *consensus.Consensus
 
 func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 	isBeacon := bc.ShardID() == 0
-	maxHeight := getMaxPeerHeight(syncConfig)
-	for {
-		if maxHeight == 0 || maxHeight == math.MaxUint64 {
-			utils.Logger().Info().
-				Msgf("[EPOCHSYNC] No peers to sync (isBeacon: %t, ShardID: %d, peersCount: %d)",
-					isBeacon, bc.ShardID(), syncConfig.PeersCount())
-			return 10
-		}
+	maxHeight, errMaxHeight := getMaxPeerHeight(syncConfig)
+	if errMaxHeight != nil {
+		utils.Logger().Info().
+			Msgf("[EPOCHSYNC] No peers to sync (isBeacon: %t, ShardID: %d, peersCount: %d)",
+				isBeacon, bc.ShardID(), syncConfig.PeersCount())
+		return 10
+	}
 
+	for {
 		curEpoch := bc.CurrentBlock().Epoch().Uint64()
 		otherEpoch := shard.Schedule.CalcEpochNumber(maxHeight).Uint64()
 		if otherEpoch == curEpoch+1 {
@@ -110,7 +112,7 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 		}
 		if otherEpoch < curEpoch {
 			for _, peerCfg := range syncConfig.GetPeers() {
-				syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: current height is higher that others, remove peers: %s", peerCfg.String()))
+				syncConfig.RemovePeer(peerCfg, fmt.Sprintf("[EPOCHSYNC]: current height is higher than others, remove peers: %s", peerCfg.String()))
 			}
 			return 2
 		}
@@ -202,8 +204,8 @@ func processWithPayload(payload [][]byte, bc core.BlockChain) error {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *EpochSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error {
+func (ss *EpochSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error {
 	var err error
-	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, waitForEachPeerToConnect)
+	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, selfPeerID, waitForEachPeerToConnect)
 	return err
 }

@@ -3,7 +3,7 @@ module github.com/harmony-one/harmony
 go 1.19
 
 require (
-	github.com/RoaringBitmap/roaring v1.2.1
+	github.com/RoaringBitmap/roaring v1.2.3
 	github.com/VictoriaMetrics/fastcache v1.5.7
 	github.com/Workiva/go-datastructures v1.0.50
 	github.com/allegro/bigcache v1.2.1
@@ -71,6 +71,7 @@ require (
 	github.com/c2h5oh/datasize v0.0.0-20220606134207-859f65c6625b
 	github.com/ledgerwatch/erigon-lib v0.0.0-20221218022306-0f8fdd40c2db
 	github.com/ledgerwatch/log/v3 v3.6.0
+	github.com/libp2p/go-libp2p-core v0.20.1
 )
 
 require (

@@ -5,10 +5,10 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/harmony-one/harmony/internal/tikv"
+	"github.com/multiformats/go-multiaddr"
 
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,11 +22,11 @@ import (
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	legdownloader "github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
+	"github.com/harmony-one/harmony/api/service/stagedstreamsync"
 	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy/downloader"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -64,28 +64,11 @@ func GenerateRandomString(n int) string {
 	return string(b)
 }
 
-// getNeighborPeers is a helper function to return list of peers
-// based on different neightbor map
-func getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
-	tmp := []p2p.Peer{}
-	neighbor.Range(func(k, v interface{}) bool {
-		p := v.(p2p.Peer)
-		t := p.Port
-		p.Port = legacysync.GetSyncingPort(t)
-		tmp = append(tmp, p)
-		return true
-	})
-	return tmp
-}
-
-// DoSyncWithoutConsensus gets sync-ed to blockchain without joining consensus
-func (node *Node) DoSyncWithoutConsensus() {
-	go node.DoSyncing(node.Blockchain(), node.Worker, false) //Don't join consensus
-}
-
-// IsSameHeight tells whether node is at same bc height as a peer
-func (node *Node) IsSameHeight() (uint64, bool) {
-	return node.SyncInstance().IsSameBlockchainHeight(node.Blockchain())
+// GenerateSyncID generates a random string with given length
+func GenerateSyncID() [SyncIDLength]byte {
+	var syncID [SyncIDLength]byte
+	copy(syncID[:], GenerateRandomString(SyncIDLength))
+	return syncID
 }
 
 func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
@@ -105,7 +88,8 @@ func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
 	mutatedPort := strconv.Itoa(mySyncPort + legacysync.SyncingPortDifference)
 	role := node.NodeConfig.Role()
 	return legacysync.CreateStateSync(bc, node.SelfPeer.IP, mutatedPort,
-		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode, role)
+		node.GetSyncID(), node.host.GetID(),
+		node.NodeConfig.Role() == nodeconfig.ExplorerNode, role)
 }
 
 func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
@@ -151,14 +135,16 @@ type SyncingPeerProvider interface {
 
 // DNSSyncingPeerProvider uses the given DNS zone to resolve syncing peers.
 type DNSSyncingPeerProvider struct {
+	selfAddrs  []multiaddr.Multiaddr
 	zone, port string
 	lookupHost func(name string) (addrs []string, err error)
 }
 
 // NewDNSSyncingPeerProvider returns a provider that uses given DNS name and
 // port number to resolve syncing peers.
-func NewDNSSyncingPeerProvider(zone, port string) *DNSSyncingPeerProvider {
+func NewDNSSyncingPeerProvider(zone, port string, addrs []multiaddr.Multiaddr) *DNSSyncingPeerProvider {
 	return &DNSSyncingPeerProvider{
+		selfAddrs:  addrs,
 		zone:       zone,
 		port:       port,
 		lookupHost: net.LookupHost,
@@ -174,9 +160,25 @@ func (p *DNSSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Peer,
 			"[SYNC] cannot find peers using DNS name %#v", dns)
 	}
 	for _, addr := range addrs {
+		// no need to have peer itself on the list of connected peers
+		if p.getSelfAddrIndex(addr, p.port) >= 0 {
+			continue
+		}
 		peers = append(peers, p2p.Peer{IP: addr, Port: p.port})
 	}
 	return peers, nil
+}
+
+// getSelfAddrIndex returns address index if it is one of self addresses
+func (p *DNSSyncingPeerProvider) getSelfAddrIndex(IP string, Port string) int {
+	peerAddr4 := fmt.Sprintf("/ip4/%s/tcp/%s", IP, Port)
+	peerAddr6 := fmt.Sprintf("/ip6/%s/tcp/%s", IP, Port)
+	for addrIndex, addr := range p.selfAddrs {
+		if addr.String() == peerAddr4 || addr.String() == peerAddr6 {
+			return addrIndex
+		}
+	}
+	return -1
 }
 
 // LocalSyncingPeerProvider uses localnet deployment convention to synthesize
@@ -253,7 +255,8 @@ func (node *Node) doBeaconSyncing() {
 				continue
 			}
 
-			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
+			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID, node.host.GetID(),
+				node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
 				utils.Logger().Warn().Err(err).Msg("[EPOCHSYNC] cannot create beacon sync config")
 				continue
 			}
@@ -296,7 +299,7 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 				Msg("cannot retrieve syncing peers")
 			return
 		}
-		if err := syncInstance.CreateSyncConfig(peers, shardID, node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
+		if err := syncInstance.CreateSyncConfig(peers, shardID, node.host.GetID(), node.HarmonyConfig.P2P.WaitForEachPeerToConnect); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Interface("peers", peers).
@@ -811,7 +814,7 @@ func (node *Node) legacySyncStatus(shardID uint32) (bool, uint64, uint64) {
 	}
 }
 
-// IsOutOfSync return whether the node is out of sync of the given hsardID
+// IsOutOfSync return whether the node is out of sync of the given shardID
 func (node *Node) IsOutOfSync(shardID uint32) bool {
 	ds := node.getDownloaders()
 	if ds == nil || !ds.IsActive() {
@@ -859,14 +862,36 @@ func (node *Node) SyncPeers() map[string]int {
 	return res
 }
 
-func (node *Node) getDownloaders() *downloader.Downloaders {
-	syncService := node.serviceManager.GetService(service.Synchronize)
-	if syncService == nil {
-		return nil
+type Downloaders interface {
+	Start()
+	Close()
+	DownloadAsync(shardID uint32)
+	// GetShardDownloader(shardID uint32) *Downloader
+	NumPeers() map[uint32]int
+	SyncStatus(shardID uint32) (bool, uint64, uint64)
+	IsActive() bool
+}
+
+func (node *Node) getDownloaders() Downloaders {
+	if node.NodeConfig.StagedSync {
+		syncService := node.serviceManager.GetService(service.StagedStreamSync)
+		if syncService == nil {
+			return nil
+		}
+		dsService, ok := syncService.(*stagedstreamsync.StagedStreamSyncService)
+		if !ok {
+			return nil
+		}
+		return dsService.Downloaders
+	} else {
+		syncService := node.serviceManager.GetService(service.Synchronize)
+		if syncService == nil {
+			return nil
+		}
+		dsService, ok := syncService.(*synchronize.Service)
+		if !ok {
+			return nil
+		}
+		return dsService.Downloaders
 	}
-	dsService, ok := syncService.(*synchronize.Service)
-	if !ok {
-		return nil
-	}
-	return dsService.Downloaders
 }

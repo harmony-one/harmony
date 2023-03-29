@@ -76,7 +76,7 @@ func (dh *downloadHelper) downloadFinishedLoop() {
 	for {
 		select {
 		case <-dh.finishedCh:
-			err := dh.c.addConsensusLastMile()
+			err := dh.c.AddConsensusLastMile()
 			if err != nil {
 				dh.c.getLogger().Error().Err(err).Msg("add last mile failed")
 			}
@@ -89,22 +89,21 @@ func (dh *downloadHelper) downloadFinishedLoop() {
 	}
 }
 
-func (consensus *Consensus) addConsensusLastMile() error {
+func (consensus *Consensus) AddConsensusLastMile() error {
 	curBN := consensus.Blockchain().CurrentBlock().NumberU64()
-	blockIter, err := consensus.GetLastMileBlockIter(curBN + 1)
-	if err != nil {
-		return err
-	}
-	for {
-		block := blockIter.Next()
-		if block == nil {
-			break
+	err := consensus.GetLastMileBlockIter(curBN+1, func(blockIter *LastMileBlockIter) error {
+		for {
+			block := blockIter.Next()
+			if block == nil {
+				break
+			}
+			if _, err := consensus.Blockchain().InsertChain(types.Blocks{block}, true); err != nil {
+				return errors.Wrap(err, "failed to InsertChain")
+			}
 		}
-		if _, err := consensus.Blockchain().InsertChain(types.Blocks{block}, true); err != nil {
-			return errors.Wrap(err, "failed to InsertChain")
-		}
-	}
-	return nil
+		return nil
+	})
+	return err
 }
 
 func (consensus *Consensus) spinUpStateSync() {

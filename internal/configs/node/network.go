@@ -51,6 +51,12 @@ const (
 	DefaultAuthRPCPort = 9501
 	// DefaultRosettaPort is the default rosetta port. The actual port used is 9000+700
 	DefaultRosettaPort = 9700
+	// DefaultHTTP timeouts - read, write, and idle
+	DefaultHTTPTimeoutRead  = "30s"
+	DefaultHTTPTimeoutWrite = "30s"
+	DefaultHTTPTimeoutIdle  = "120s"
+	// DefaultEvmCallTimeout is the default timeout for evm call
+	DefaultEvmCallTimeout = "5s"
 	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
 	DefaultWSPort = 9800
 	// DefaultAuthWSPort is the default port for web socket auth endpoint. The actual port used is
@@ -63,7 +69,13 @@ const (
 	DefaultMaxConnPerIP = 10
 	// DefaultMaxPeers is the maximum number of remote peers, with 0 representing no limit
 	DefaultMaxPeers = 0
-	// DefaultWaitForEachPeerToConnect sets the sync configs to connect to neighbor peers one by one and waits for each peer to connect
+	// DefaultConnManagerLowWatermark is the lowest number of connections that'll be maintained in connection manager
+	DefaultConnManagerLowWatermark = 160
+	// DefaultConnManagerHighWatermark is the highest number of connections that'll be maintained in connection manager
+	// When the peer count exceeds the 'high watermark', as many peers will be pruned (and
+	// their connections terminated) until 'low watermark' peers remain.
+	DefaultConnManagerHighWatermark = 192
+	// DefaultWaitForEachPeerToConnect sets the sync configs to connect to neighbor peers one by one and waits for each peer to connect.
 	DefaultWaitForEachPeerToConnect = false
 )
 

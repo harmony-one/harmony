@@ -87,7 +87,7 @@ func (vc *viewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.Pub
 	}
 }
 
-// Reset reset the state for viewchange
+// Reset resets the state for viewChange.
 func (vc *viewChange) Reset() {
 	vc.m1Payload = []byte{}
 	vc.bhpSigs = map[uint64]map[string]*bls_core.Sign{}

@@ -3,11 +3,10 @@ package consensus
 import (
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
-	"github.com/harmony-one/harmony/consensus/signature"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -27,14 +26,10 @@ func (consensus *Consensus) announce(block *types.Block) {
 		return
 	}
 
-	//// Lock Write - Start
-	consensus.mutex.Lock()
 	copy(consensus.blockHash[:], blockHash[:])
 	consensus.block = encodedBlock // Must set block bytes before consensus.construct()
-	consensus.mutex.Unlock()
-	//// Lock Write - End
 
-	key, err := consensus.GetConsensusLeaderPrivateKey()
+	key, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[Announce] Node not a leader")
 		return
@@ -79,7 +74,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 	// Construct broadcast p2p message
 	if err := consensus.msgSender.SendWithRetry(
-		consensus.BlockNum(), msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
+		consensus.getBlockNum(), msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		}, p2p.ConstructMessage(msgToSend)); err != nil {
 		consensus.getLogger().Warn().
@@ -100,18 +95,13 @@ func (consensus *Consensus) announce(block *types.Block) {
 func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
-		consensus.BlockNum(), consensus.GetCurBlockViewID(), recvMsg.BlockHash,
+		consensus.getBlockNum(), consensus.getCurBlockViewID(), recvMsg.BlockHash,
 	) {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnPrepare] No Matching Announce message")
 	}
-
-	//// Read - Start
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
@@ -200,8 +190,6 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 }
 
 func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 	//// Read - Start
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
@@ -292,7 +280,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	//// Write - End
 
 	//// Read - Start
-	viewID := consensus.GetCurBlockViewID()
+	viewID := consensus.getCurBlockViewID()
 
 	if consensus.Decider.IsAllSigsCollected() {
 		logger.Info().Msg("[OnCommit] 100% Enough commits received")
@@ -327,7 +315,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 			consensus.mutex.Lock()
 			defer consensus.mutex.Unlock()
-			if viewID == consensus.GetCurBlockViewID() {
+			if viewID == consensus.getCurBlockViewID() {
 				consensus.finalCommit()
 			}
 		}(viewID)

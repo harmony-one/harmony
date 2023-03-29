@@ -18,19 +18,22 @@ type Service struct {
 
 // New returns a block proposal service.
 func New(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, waitForConsensusReady func(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
-	return &Service{readySignal: readySignal, commitSigsChan: commitSigsChan, waitForConsensusReady: waitForConsensusReady}
+	return &Service{
+		readySignal:           readySignal,
+		commitSigsChan:        commitSigsChan,
+		waitForConsensusReady: waitForConsensusReady,
+		stopChan:              make(chan struct{}),
+		stoppedChan:           make(chan struct{}),
+	}
 }
 
 // Start starts block proposal service.
 func (s *Service) Start() error {
-	s.stopChan = make(chan struct{})
-	s.stoppedChan = make(chan struct{})
-
-	s.run(s.stopChan, s.stoppedChan)
+	s.run()
 	return nil
 }
 
-func (s *Service) run(stopChan chan struct{}, stoppedChan chan struct{}) {
+func (s *Service) run() {
 	s.waitForConsensusReady(s.readySignal, s.commitSigsChan, s.stopChan, s.stoppedChan)
 }
 

@@ -39,6 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -47,6 +48,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/bls"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/tikv"
@@ -101,7 +103,6 @@ const (
 	maxFutureBlocks                    = 16
 	maxTimeFutureBlocks                = 30
 	badBlockLimit                      = 10
-	triesInMemory                      = 128
 	triesInRedis                       = 1000
 	shardCacheLimit                    = 10
 	commitsCacheLimit                  = 10
@@ -125,6 +126,7 @@ type CacheConfig struct {
 	Disabled      bool          // Whether to disable trie write caching (archive node)
 	TrieNodeLimit int           // Memory limit (MB) at which to flush the current in-memory trie to disk
 	TrieTimeLimit time.Duration // Time limit after which to flush the current in-memory trie to disk
+	TriesInMemory uint64        // Block number from the head stored in disk before exiting
 }
 
 type BlockChainImpl struct {
@@ -181,6 +183,7 @@ type BlockChainImpl struct {
 	validatorListByDelegatorCache *lru.Cache        // Cache of validator list by delegator
 	pendingCrossLinksCache        *lru.Cache        // Cache of last pending crosslinks
 	blockAccumulatorCache         *lru.Cache        // Cache of block accumulators
+	leaderPubKeyFromCoinbase      *lru.Cache        // Cache of leader public key from coinbase
 	quit                          chan struct{}     // blockchain quit channel
 	running                       int32             // running must be called atomically
 	blockchainPruner              *blockchainPruner // use to prune beacon chain
@@ -220,12 +223,7 @@ func newBlockChainWithOptions(
 	db ethdb.Database, stateCache state.Database, beaconChain BlockChain,
 	cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config, options Options) (*BlockChainImpl, error) {
-	if cacheConfig == nil {
-		cacheConfig = &CacheConfig{
-			TrieNodeLimit: 256 * 1024 * 1024,
-			TrieTimeLimit: 2 * time.Minute,
-		}
-	}
+
 	bodyCache, _ := lru.New(bodyCacheLimit)
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	receiptsCache, _ := lru.New(receiptsCacheLimit)
@@ -242,6 +240,7 @@ func newBlockChainWithOptions(
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
+	leaderPubKeyFromCoinbase, _ := lru.New(chainConfig.LeaderRotationBlocksCount + 2)
 
 	bc := &BlockChainImpl{
 		chainConfig:                   chainConfig,
@@ -265,6 +264,7 @@ func newBlockChainWithOptions(
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
 		blockAccumulatorCache:         blockAccumulatorCache,
+		leaderPubKeyFromCoinbase:      leaderPubKeyFromCoinbase,
 		blockchainPruner:              newBlockchainPruner(db),
 		engine:                        engine,
 		vmConfig:                      vmConfig,
@@ -1071,11 +1071,11 @@ func (bc *BlockChainImpl) Stop() {
 	// We're writing three different states to catch different restart scenarios:
 	//  - HEAD:     So we don't need to reprocess any blocks in the general case
 	//  - HEAD-1:   So we don't do large reorgs if our HEAD becomes an uncle
-	//  - HEAD-127: So we have a hard limit on the number of blocks reexecuted
+	//  - HEAD-TriesInMemory: So we have a configurable hard limit on the number of blocks reexecuted (default 128)
 	if !bc.cacheConfig.Disabled {
 		triedb := bc.stateCache.TrieDB()
 
-		for _, offset := range []uint64{0, 1, triesInMemory - 1} {
+		for _, offset := range []uint64{0, 1, bc.cacheConfig.TriesInMemory - 1} {
 			if number := bc.CurrentBlock().NumberU64(); number > offset {
 				recent := bc.GetHeaderByNumber(number - offset)
 				if recent != nil {
@@ -1402,7 +1402,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 		triedb.Reference(root, common.Hash{}) // metadata reference to keep trie alive
 		bc.triegc.Push(root, -int64(block.NumberU64()))
 
-		if current := block.NumberU64(); current > triesInMemory {
+		if current := block.NumberU64(); current > bc.cacheConfig.TriesInMemory {
 			// If we exceeded our memory allowance, flush matured singleton nodes to disk
 			var (
 				nodes, imgs = triedb.Size()
@@ -1412,7 +1412,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 				triedb.Cap(limit - ethdb.IdealBatchSize)
 			}
 			// Find the next state trie we need to commit
-			header := bc.GetHeaderByNumber(current - triesInMemory)
+			header := bc.GetHeaderByNumber(current - bc.cacheConfig.TriesInMemory)
 			if header != nil {
 				chosen := header.Number().Uint64()
 
@@ -1420,11 +1420,11 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 				if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
 					// If we're exceeding limits but haven't reached a large enough memory gap,
 					// warn the user that the system is becoming unstable.
-					if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
+					if chosen < lastWrite+bc.cacheConfig.TriesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
 						utils.Logger().Info().
 							Dur("time", bc.gcproc).
 							Dur("allowance", bc.cacheConfig.TrieTimeLimit).
-							Float64("optimum", float64(chosen-lastWrite)/triesInMemory).
+							Float64("optimum", float64(chosen-lastWrite)/float64(bc.cacheConfig.TriesInMemory)).
 							Msg("State in memory for too long, committing")
 					}
 					// Flush an entire trie and restart the counters
@@ -3254,6 +3254,60 @@ func (bc *BlockChainImpl) SuperCommitteeForNextEpoch(
 
 	}
 	return nextCommittee, err
+}
+
+// GetLeaderPubKeyFromCoinbase retrieve corresponding blsPublicKey from Coinbase Address
+func (bc *BlockChainImpl) GetLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error) {
+	if cached, ok := bc.leaderPubKeyFromCoinbase.Get(h.Number().Uint64()); ok {
+		return cached.(*bls.PublicKeyWrapper), nil
+	}
+	rs, err := bc.getLeaderPubKeyFromCoinbase(h)
+	if err != nil {
+		return nil, err
+	}
+	bc.leaderPubKeyFromCoinbase.Add(h.Number().Uint64(), rs)
+	return rs, nil
+}
+
+// getLeaderPubKeyFromCoinbase retrieve corresponding blsPublicKey from Coinbase Address
+func (bc *BlockChainImpl) getLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error) {
+	shardState, err := bc.ReadShardState(h.Epoch())
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
+			h.Epoch(),
+			h.Coinbase().Hash().Hex(),
+		)
+	}
+
+	committee, err := shardState.FindCommitteeByID(h.ShardID())
+	if err != nil {
+		return nil, err
+	}
+
+	committerKey := new(bls2.PublicKey)
+	isStaking := bc.Config().IsStaking(h.Epoch())
+	for _, member := range committee.Slots {
+		if isStaking {
+			// After staking the coinbase address will be the address of bls public key
+			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == h.Coinbase() {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
+					return nil, err
+				}
+				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+			}
+		} else {
+			if member.EcdsaAddress == h.Coinbase() {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
+					return nil, err
+				}
+				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+			}
+		}
+	}
+	return nil, errors.Errorf(
+		"cannot find corresponding BLS Public Key coinbase %s",
+		h.Coinbase().Hex(),
+	)
 }
 
 func (bc *BlockChainImpl) EnablePruneBeaconChainFeature() {

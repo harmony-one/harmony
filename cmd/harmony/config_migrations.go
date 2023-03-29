@@ -318,6 +318,45 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.5.10"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.ConnManagerLowWatermark") == nil {
+			confTree.Set("P2P.ConnManagerLowWatermark", defaultConfig.P2P.ConnManagerLowWatermark)
+		}
+		if confTree.Get("P2P.ConnManagerHighWatermark") == nil {
+			confTree.Set("P2P.ConnManagerHighWatermark", defaultConfig.P2P.ConnManagerHighWatermark)
+		}
+		if confTree.Get("Sync.MaxAdvertiseWaitTime") == nil {
+			confTree.Set("Sync.MaxAdvertiseWaitTime", defaultConfig.Sync.MaxAdvertiseWaitTime)
+		}
+		confTree.Set("Version", "2.5.11")
+		return confTree
+	}
+
+	migrations["2.5.11"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("General.TriesInMemory") == nil {
+			confTree.Set("General.TriesInMemory", defaultConfig.General.TriesInMemory)
+		}
+		confTree.Set("Version", "2.5.12")
+		return confTree
+	}
+
+	migrations["2.5.12"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("HTTP.ReadTimeout") == nil {
+			confTree.Set("HTTP.ReadTimeout", defaultConfig.HTTP.ReadTimeout)
+		}
+		if confTree.Get("HTTP.WriteTimeout") == nil {
+			confTree.Set("HTTP.WriteTimeout", defaultConfig.HTTP.WriteTimeout)
+		}
+		if confTree.Get("HTTP.IdleTimeout") == nil {
+			confTree.Set("HTTP.IdleTimeout", defaultConfig.HTTP.IdleTimeout)
+		}
+		if confTree.Get("RPCOpt.EvmCallTimeout") == nil {
+			confTree.Set("RPCOpt.EvmCallTimeout", defaultConfig.RPCOpt.EvmCallTimeout)
+		}
+		confTree.Set("Version", "2.5.13")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {

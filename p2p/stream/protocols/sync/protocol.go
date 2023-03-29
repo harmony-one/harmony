@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/hashicorp/go-version"
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -39,12 +41,13 @@ var (
 type (
 	// Protocol is the protocol for sync streaming
 	Protocol struct {
-		chain    engine.ChainReader            // provide SYNC data
-		schedule shardingconfig.Schedule       // provide schedule information
-		rl       ratelimiter.RateLimiter       // limit the incoming request rate
-		sm       streammanager.StreamManager   // stream management
-		rm       requestmanager.RequestManager // deliver the response from stream
-		disc     discovery.Discovery
+		chain      engine.ChainReader            // provide SYNC data
+		beaconNode bool                          // is beacon node or shard chain node
+		schedule   shardingconfig.Schedule       // provide schedule information
+		rl         ratelimiter.RateLimiter       // limit the incoming request rate
+		sm         streammanager.StreamManager   // stream management
+		rm         requestmanager.RequestManager // deliver the response from stream
+		disc       discovery.Discovery
 
 		config Config
 		logger zerolog.Logger
@@ -56,12 +59,13 @@ type (
 
 	// Config is the sync protocol config
 	Config struct {
-		Chain     engine.ChainReader
-		Host      libp2p_host.Host
-		Discovery discovery.Discovery
-		ShardID   nodeconfig.ShardID
-		Network   nodeconfig.NetworkType
-
+		Chain                engine.ChainReader
+		Host                 libp2p_host.Host
+		Discovery            discovery.Discovery
+		ShardID              nodeconfig.ShardID
+		Network              nodeconfig.NetworkType
+		BeaconNode           bool
+		MaxAdvertiseWaitTime int
 		// stream manager config
 		SmSoftLowCap int
 		SmHardLowCap int
@@ -75,12 +79,13 @@ func NewProtocol(config Config) *Protocol {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sp := &Protocol{
-		chain:  config.Chain,
-		disc:   config.Discovery,
-		config: config,
-		ctx:    ctx,
-		cancel: cancel,
-		closeC: make(chan struct{}),
+		chain:      config.Chain,
+		beaconNode: config.BeaconNode,
+		disc:       config.Discovery,
+		config:     config,
+		ctx:        ctx,
+		cancel:     cancel,
+		closeC:     make(chan struct{}),
 	}
 	smConfig := streammanager.Config{
 		SoftLoCap: config.SmSoftLowCap,
@@ -104,7 +109,10 @@ func (p *Protocol) Start() {
 	p.sm.Start()
 	p.rm.Start()
 	p.rl.Start()
-	go p.advertiseLoop()
+	// If it's not EpochChain, advertise
+	if p.beaconNode || p.chain.ShardID() != shard.BeaconChainShardID {
+		go p.advertiseLoop()
+	}
 }
 
 // Close close the protocol
@@ -126,9 +134,19 @@ func (p *Protocol) ProtoID() sttypes.ProtoID {
 	return p.protoIDByVersion(MyVersion)
 }
 
+// ShardProtoID returns the ProtoID of the sync protocol for shard nodes
+func (p *Protocol) ShardProtoID() sttypes.ProtoID {
+	return p.protoIDByVersionForShardNodes(MyVersion)
+}
+
 // Version returns the sync protocol version
 func (p *Protocol) Version() *version.Version {
 	return MyVersion
+}
+
+// IsBeaconNode returns true if it is a beacon chain node
+func (p *Protocol) IsBeaconNode() bool {
+	return p.beaconNode
 }
 
 // Match checks the compatibility to the target protocol ID.
@@ -162,16 +180,21 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 			Msg("failed to add new stream")
 		return
 	}
+	fmt.Println("Connected to", raw.Conn().RemotePeer().String(), "(", st.ProtoID(), ")")
 	st.run()
 }
 
 func (p *Protocol) advertiseLoop() {
 	for {
 		sleep := p.advertise()
+		maxSleepTime := time.Duration(p.config.MaxAdvertiseWaitTime) * time.Minute
+		if sleep > maxSleepTime {
+			sleep = maxSleepTime
+		}
 		select {
-		case <-time.After(sleep):
 		case <-p.closeC:
 			return
+		case <-time.After(sleep):
 		}
 	}
 }
@@ -205,6 +228,11 @@ func (p *Protocol) supportedProtoIDs() []sttypes.ProtoID {
 	pids := make([]sttypes.ProtoID, 0, len(vs))
 	for _, v := range vs {
 		pids = append(pids, p.protoIDByVersion(v))
+		// beacon node needs to inform shard nodes about it supports them as well for EpochChain
+		// basically beacon node can accept connection from shard nodes to share last epoch blocks
+		if p.beaconNode {
+			pids = append(pids, p.protoIDByVersionForShardNodes(v))
+		}
 	}
 	return pids
 }
@@ -219,18 +247,51 @@ func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 		NetworkType: p.config.Network,
 		ShardID:     p.config.ShardID,
 		Version:     v,
+		BeaconNode:  p.beaconNode,
+	}
+	return spec.ToProtoID()
+}
+
+func (p *Protocol) protoIDByVersionForShardNodes(v *version.Version) sttypes.ProtoID {
+	spec := sttypes.ProtoSpec{
+		Service:     serviceSpecifier,
+		NetworkType: p.config.Network,
+		ShardID:     p.config.ShardID,
+		Version:     v,
+		BeaconNode:  false,
 	}
 	return spec.ToProtoID()
 }
 
 // RemoveStream removes the stream of the given stream ID
+// TODO: add reason to parameters
 func (p *Protocol) RemoveStream(stID sttypes.StreamID) {
-	if stID == "" {
-		return
-	}
 	st, exist := p.sm.GetStreamByID(stID)
 	if exist && st != nil {
+		//TODO: log this incident with reason
 		st.Close()
+		// stream manager removes this stream from the list and triggers discovery if number of streams are not enough
+		p.sm.RemoveStream(stID) //TODO: double check to see if this part is needed
+	}
+}
+
+func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
+	st, exist := p.sm.GetStreamByID(stID)
+	if exist && st != nil {
+		st.AddFailedTimes()
+		p.logger.Info().
+			Str("stream ID", string(st.ID())).
+			Int("num failures", st.FailedTimes()).
+			Str("reason", reason).
+			Msg("stream failed")
+		if st.FailedTimes() >= MaxStreamFailures {
+			st.Close()
+			// stream manager removes this stream from the list and triggers discovery if number of streams are not enough
+			p.sm.RemoveStream(stID) //TODO: double check to see if this part is needed
+			p.logger.Warn().
+				Str("stream ID", string(st.ID())).
+				Msg("stream removed")
+		}
 	}
 }
 

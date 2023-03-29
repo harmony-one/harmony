@@ -87,7 +87,7 @@ type ISync interface {
 	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error
 	AddLastMileBlock(block *types.Block)
 	GetActivePeerNumber() int
-	CreateSyncConfig(peers []p2p.Peer, shardID uint32, waitForEachPeerToConnect bool) error
+	CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error
 	SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration)
 	IsSynchronized() bool
 	IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool)
@@ -100,7 +100,6 @@ type ISync interface {
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel          chan *types.Block                 // The channel to send newly proposed blocks
 	ConfirmedBlockChannel chan *types.Block                 // The channel to send confirmed blocks
 	BeaconBlockChannel    chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
 	pendingCXReceipts     map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
@@ -127,9 +126,7 @@ type Node struct {
 	serviceManager               *service.Manager
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-	// Channel to notify consensus service to really start consensus
-	startConsensus chan struct{}
-	HarmonyConfig  *harmonyconfig.HarmonyConfig
+	HarmonyConfig                *harmonyconfig.HarmonyConfig
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.
@@ -1032,6 +1029,7 @@ func New(
 		unixTimeAtNodeStart:  time.Now().Unix(),
 		TransactionErrorSink: types.NewTransactionErrorSink(),
 		crosslinks:           crosslinks.New(),
+		syncID:               GenerateSyncID(),
 	}
 
 	// Get the node config that's created in the harmony.go program.
@@ -1042,7 +1040,6 @@ func New(
 	}
 	node.HarmonyConfig = harmonyconfig
 
-	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
 	if host != nil {
 		node.host = host
 		node.SelfPeer = host.GetSelfPeer()
@@ -1083,7 +1080,6 @@ func New(
 			}
 		}
 
-		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
@@ -1132,7 +1128,6 @@ func New(
 		Msg("Genesis block hash")
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = map[string]*syncConfig{}
-	node.startConsensus = make(chan struct{})
 	// Broadcast double-signers reported by consensus
 	if node.Consensus != nil {
 		go func() {

@@ -270,7 +270,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 			callArgs.To = &contractAddress
 		}
 		evmExe, err := rpc.DoEVMCall(
-			ctx, s.hmy, callArgs, latest, rpc.CallTimeout,
+			ctx, s.hmy, callArgs, latest, s.evmCallTimeout,
 		)
 		if err != nil {
 			return nil, common.NewError(common.CatchAllError, map[string]interface{}{

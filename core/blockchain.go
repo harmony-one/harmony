@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/bls"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
@@ -333,6 +334,8 @@ type BlockChain interface {
 		payout reward.Reader,
 		state *state.DB,
 	) (status WriteStatus, err error)
+
+	GetLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error)
 
 	// ========== Only For Tikv Start ==========
 

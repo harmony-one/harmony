@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
@@ -28,8 +27,6 @@ const (
 const (
 	// APIVersion used for DApp's, bumped after RPC refactor (7/2020)
 	APIVersion = "1.1"
-	// CallTimeout is the timeout given to all contract calls
-	CallTimeout = 5 * time.Second
 	// LogTag is the tag found in the log for all RPC logs
 	LogTag = "[RPC]"
 	// HTTPPortOffset ..
@@ -58,7 +55,6 @@ var (
 	wsEndpoint       = ""
 	wsAuthEndpoint   = ""
 	httpVirtualHosts = []string{"*"}
-	httpTimeouts     = rpc.DefaultHTTPTimeouts
 	httpOrigins      = []string{"*"}
 	wsOrigins        = []string{"*"}
 )
@@ -86,13 +82,18 @@ func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerC
 		rmf.ExposeAll()
 	}
 	if config.HTTPEnabled {
+		timeouts := rpc.HTTPTimeouts{
+			ReadTimeout:  config.HTTPTimeoutRead,
+			WriteTimeout: config.HTTPTimeoutWrite,
+			IdleTimeout:  config.HTTPTimeoutIdle,
+		}
 		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
-		if err := startHTTP(apis, &rmf); err != nil {
+		if err := startHTTP(apis, &rmf, timeouts); err != nil {
 			return err
 		}
 
 		httpAuthEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPAuthPort)
-		if err := startAuthHTTP(authApis, &rmf); err != nil {
+		if err := startAuthHTTP(authApis, &rmf, timeouts); err != nil {
 			return err
 		}
 	}
@@ -158,8 +159,8 @@ func getAPIs(hmy *hmy.Harmony, config nodeconfig.RPCServerConfig) []rpc.API {
 		NewPublicHarmonyAPI(hmy, V2),
 		NewPublicBlockchainAPI(hmy, V1, config.RateLimiterEnabled, config.RequestsPerSecond),
 		NewPublicBlockchainAPI(hmy, V2, config.RateLimiterEnabled, config.RequestsPerSecond),
-		NewPublicContractAPI(hmy, V1, config.RateLimiterEnabled, config.RequestsPerSecond),
-		NewPublicContractAPI(hmy, V2, config.RateLimiterEnabled, config.RequestsPerSecond),
+		NewPublicContractAPI(hmy, V1, config.RateLimiterEnabled, config.RequestsPerSecond, config.EvmCallTimeout),
+		NewPublicContractAPI(hmy, V2, config.RateLimiterEnabled, config.RequestsPerSecond, config.EvmCallTimeout),
 		NewPublicTransactionAPI(hmy, V1),
 		NewPublicTransactionAPI(hmy, V2),
 		NewPublicPoolAPI(hmy, V1, config.RateLimiterEnabled, config.RequestsPerSecond),
@@ -185,7 +186,7 @@ func getAPIs(hmy *hmy.Harmony, config nodeconfig.RPCServerConfig) []rpc.API {
 		publicAPIs = append(publicAPIs,
 			NewPublicHarmonyAPI(hmy, Eth),
 			NewPublicBlockchainAPI(hmy, Eth, config.RateLimiterEnabled, config.RequestsPerSecond),
-			NewPublicContractAPI(hmy, Eth, config.RateLimiterEnabled, config.RequestsPerSecond),
+			NewPublicContractAPI(hmy, Eth, config.RateLimiterEnabled, config.RequestsPerSecond, config.EvmCallTimeout),
 			NewPublicTransactionAPI(hmy, Eth),
 			NewPublicPoolAPI(hmy, Eth, config.RateLimiterEnabled, config.RequestsPerSecond),
 			eth.NewPublicEthService(hmy, "eth"),
@@ -210,7 +211,7 @@ func getAPIs(hmy *hmy.Harmony, config nodeconfig.RPCServerConfig) []rpc.API {
 	return publicAPIs
 }
 
-func startHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
+func startHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter, httpTimeouts rpc.HTTPTimeouts) (err error) {
 	httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
 		httpEndpoint, apis, HTTPModules, rmf, httpOrigins, httpVirtualHosts, httpTimeouts,
 	)
@@ -227,7 +228,7 @@ func startHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
 	return nil
 }
 
-func startAuthHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
+func startAuthHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter, httpTimeouts rpc.HTTPTimeouts) (err error) {
 	httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
 		httpAuthEndpoint, apis, HTTPModules, rmf, httpOrigins, httpVirtualHosts, httpTimeouts,
 	)

@@ -5,6 +5,7 @@ import (
 
 	p2ptypes "github.com/harmony-one/harmony/p2p/types"
 	badger "github.com/ipfs/go-ds-badger"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_dht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
@@ -14,10 +15,11 @@ type DHTConfig struct {
 	BootNodes       []string
 	DataStoreFile   *string // File path to store DHT data. Shall be only used for bootstrap nodes.
 	DiscConcurrency int
+	DHT             *dht.IpfsDHT
 }
 
-// getLibp2pRawOptions get the raw libp2p options as a slice.
-func (opt DHTConfig) getLibp2pRawOptions() ([]libp2p_dht.Option, error) {
+// GetLibp2pRawOptions get the raw libp2p options as a slice.
+func (opt DHTConfig) GetLibp2pRawOptions() ([]libp2p_dht.Option, error) {
 	var opts []libp2p_dht.Option
 
 	bootOption, err := getBootstrapOption(opt.BootNodes)
@@ -39,6 +41,10 @@ func (opt DHTConfig) getLibp2pRawOptions() ([]libp2p_dht.Option, error) {
 	if opt.DiscConcurrency > 0 {
 		opts = append(opts, libp2p_dht.Concurrency(opt.DiscConcurrency))
 	}
+
+	// TODO: to disable auto refresh to make sure there is no conflicts with protocol discovery functions
+	// it's not applicable for legacy sync
+	// opts = append(opts, libp2p_dht.DisableAutoRefresh())
 
 	return opts, nil
 }

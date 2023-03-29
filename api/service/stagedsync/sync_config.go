@@ -14,6 +14,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 // Constants for syncing.
@@ -40,6 +42,7 @@ const (
 
 // SyncPeerConfig is peer config to sync.
 type SyncPeerConfig struct {
+	peer        p2p.Peer
 	ip          string
 	port        string
 	peerHash    []byte
@@ -156,6 +159,7 @@ type SyncConfig struct {
 	mtx           sync.RWMutex
 	reservedPeers []*SyncPeerConfig
 	peers         []*SyncPeerConfig
+	selfPeerID    libp2p_peer.ID
 }
 
 // AddPeer adds the given sync peer.
@@ -166,6 +170,9 @@ func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
 	// Ensure no duplicate peers
 	for _, p2 := range sc.peers {
 		if peer.IsEqual(p2) {
+			return
+		}
+		if peer.peer.PeerID == sc.selfPeerID {
 			return
 		}
 	}
