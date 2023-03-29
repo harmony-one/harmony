@@ -1,10 +1,10 @@
 package main
 
 import (
-	"reflect"
 	"testing"
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/stretchr/testify/require"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -72,6 +72,11 @@ Version = "1.0.2"
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
+  AccountQueue = 64
+  GlobalQueue = 5120
+  Lifetime = "30m"
+  PriceBump = 1
+  PriceLimit = 100e9
 
 [WS]
   Enabled = true
@@ -142,6 +147,11 @@ Version = "1.0.3"
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
+  AccountQueue = 64
+  GlobalQueue = 5120
+  Lifetime = "30m"
+  PriceBump = 1
+  PriceLimit = 100e9
 
 [WS]
   Enabled = true
@@ -224,6 +234,11 @@ Version = "1.0.4"
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
+  AccountQueue = 64
+  GlobalQueue = 5120
+  Lifetime = "30m"
+  PriceBump = 1
+  PriceLimit = 100e9
 
 [WS]
   Enabled = true
@@ -314,6 +329,11 @@ Version = "1.0.4"
   BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
   AllowedTxsFile = "./.hmy/allowedtxs.txt"
+  AccountQueue = 64
+  GlobalQueue = 5120
+  Lifetime = "30m"
+  PriceBump = 1
+  PriceLimit = 100e9
 
 [WS]
   Enabled = true
@@ -389,9 +409,7 @@ func Test_migrateConf(t *testing.T) {
 				t.Errorf("migrateConf() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("migrateConf() = %+v, want %+v", got, tt.want)
-			}
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
