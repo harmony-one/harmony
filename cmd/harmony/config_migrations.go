@@ -357,6 +357,27 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.5.13"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("TxPool.AccountQueue") == nil {
+			confTree.Set("TxPool.AccountQueue", defaultConfig.TxPool.AccountQueue)
+		}
+		if confTree.Get("TxPool.GlobalQueue") == nil {
+			confTree.Set("TxPool.GlobalQueue", defaultConfig.TxPool.GlobalQueue)
+		}
+		if confTree.Get("TxPool.Lifetime") == nil {
+			confTree.Set("TxPool.Lifetime", defaultConfig.TxPool.Lifetime.String())
+		}
+		if confTree.Get("TxPool.PriceLimit") == nil {
+			confTree.Set("TxPool.PriceLimit", defaultConfig.TxPool.PriceLimit)
+		}
+		if confTree.Get("TxPool.PriceBump") == nil {
+			confTree.Set("TxPool.PriceBump", defaultConfig.TxPool.PriceBump)
+		}
+
+		confTree.Set("Version", "2.5.14")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {
