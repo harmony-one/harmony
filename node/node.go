@@ -1029,6 +1029,7 @@ func New(
 		unixTimeAtNodeStart:  time.Now().Unix(),
 		TransactionErrorSink: types.NewTransactionErrorSink(),
 		crosslinks:           crosslinks.New(),
+		syncID:               GenerateSyncID(),
 	}
 
 	// Get the node config that's created in the harmony.go program.
@@ -1039,7 +1040,6 @@ func New(
 	}
 	node.HarmonyConfig = harmonyconfig
 
-	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
 	if host != nil {
 		node.host = host
 		node.SelfPeer = host.GetSelfPeer()

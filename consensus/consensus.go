@@ -187,6 +187,12 @@ func (consensus *Consensus) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {
 	return consensus.LeaderPubKey
 }
 
+func (consensus *Consensus) SetLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.setLeaderPubKey(pub)
+}
+
 func (consensus *Consensus) setLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
 	consensus.LeaderPubKey = pub
 }

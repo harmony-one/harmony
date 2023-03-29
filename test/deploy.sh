@@ -83,8 +83,8 @@ function launch_localnet() {
     # Read config for i-th node form config file
     IFS=' ' read -r ip port mode bls_key shard node_config <<<"${line}"
     args=("${base_args[@]}" --ip "${ip}" --port "${port}" --key "/tmp/${ip}-${port}.key" --db_dir "${ROOT}/db-${ip}-${port}" "--broadcast_invalid_tx=false")
-    if [[ -z "$ip" || -z "$port" ]]; then
-      echo "skip empty node"
+    if [[ -z "$ip" || -z "$port" || "$ip" == "#" ]]; then
+      echo "skip empty line or node or comment"
       continue
     fi
     if [[ $EXPOSEAPIS == "true" ]]; then
