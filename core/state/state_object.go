@@ -125,10 +125,10 @@ func newObject(db *DB, address common.Address, data types.StateAccount) *Object 
 		data.Balance = new(big.Int)
 	}
 	if data.CodeHash == nil {
-		data.CodeHash = EmptyCodeHash.Bytes()
+		data.CodeHash = types.EmptyCodeHash.Bytes()
 	}
 	if data.Root == (common.Hash{}) {
-		data.Root = EmptyRootHash
+		data.Root = types.EmptyRootHash
 	}
 	return &Object{
 		db:             db,
@@ -175,7 +175,7 @@ func (s *Object) getTrie(db Database) (Trie, error) {
 	if s.trie == nil {
 		// Try fetching from prefetcher first
 		// We don't prefetch empty tries
-		if s.data.Root != EmptyRootHash && s.db.prefetcher != nil {
+		if s.data.Root != types.EmptyRootHash && s.db.prefetcher != nil {
 			// When the miner is creating the pending state, there is no
 			// prefetcher
 			s.trie = s.db.prefetcher.trie(s.addrHash, s.data.Root)
@@ -322,7 +322,7 @@ func (s *Object) finalise(prefetch bool) {
 			slotsToPrefetch = append(slotsToPrefetch, common.CopyBytes(key[:])) // Copy needed for closure
 		}
 	}
-	if s.db.prefetcher != nil && prefetch && len(slotsToPrefetch) > 0 && s.data.Root != EmptyRootHash {
+	if s.db.prefetcher != nil && prefetch && len(slotsToPrefetch) > 0 && s.data.Root != types.EmptyRootHash {
 		s.db.prefetcher.prefetch(s.addrHash, s.data.Root, slotsToPrefetch)
 	}
 	if len(s.dirtyStorage) > 0 {
@@ -481,18 +481,18 @@ func (s *Object) setBalance(amount *big.Int) {
 func (s *Object) ReturnGas(gas *big.Int) {}
 
 func (s *Object) deepCopy(db *DB) *Object {
-	stateObject := newObject(db, s.address, s.data)
+	Object := newObject(db, s.address, s.data)
 	if s.trie != nil {
-		stateObject.trie = db.db.CopyTrie(s.trie)
+		Object.trie = db.db.CopyTrie(s.trie)
 	}
-	stateObject.code = s.code
-	stateObject.dirtyStorage = s.dirtyStorage.Copy()
-	stateObject.originStorage = s.originStorage.Copy()
-	stateObject.pendingStorage = s.pendingStorage.Copy()
-	stateObject.suicided = s.suicided
-	stateObject.dirtyCode = s.dirtyCode
-	stateObject.deleted = s.deleted
-	return stateObject
+	Object.code = s.code
+	Object.dirtyStorage = s.dirtyStorage.Copy()
+	Object.originStorage = s.originStorage.Copy()
+	Object.pendingStorage = s.pendingStorage.Copy()
+	Object.suicided = s.suicided
+	Object.dirtyCode = s.dirtyCode
+	Object.deleted = s.deleted
+	return Object
 }
 
 //
@@ -509,7 +509,7 @@ func (s *Object) Code(db Database) []byte {
 	if s.code != nil {
 		return s.code
 	}
-	if bytes.Equal(s.CodeHash(), EmptyCodeHash.Bytes()) {
+	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
 		return nil
 	}
 	var err error
@@ -538,43 +538,24 @@ func (s *Object) Code(db Database) []byte {
 	return code
 }
 
-// CodeSize returns the size of the contract/validator code associated with this object,
+// CodeSize returns the size of the contract code associated with this object,
 // or zero if none. This method is an almost mirror of Code, but uses a cache
 // inside the database to avoid loading codes seen recently.
 func (s *Object) CodeSize(db Database) int {
 	if s.code != nil {
 		return len(s.code)
 	}
-	if bytes.Equal(s.CodeHash(), EmptyCodeHash.Bytes()) {
+	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
 		return 0
 	}
-	var err error
-	size := int(0)
-
-	// if it's not set for validator wrapper, then it may be either contract code or validator wrapper (old version of db
-	// don't have any prefix to differentiate between them)
-	// so, if it's not set for validator wrapper, we need to check contract code as well
-	if !s.validatorWrapper {
-		size, err = db.ContractCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
-	}
-	// if it couldn't get contract code or it is set to validator wrapper, then it tries to retrieve validator wrapper code
-	if s.validatorWrapper || err != nil {
-		vcSize, errVCSize := db.ValidatorCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
-		if errVCSize == nil && vcSize > 0 {
-			return size
-		}
-		if s.validatorWrapper {
-			s.setError(fmt.Errorf("can't load validator code size %x for account address hash %x : %v", s.CodeHash(), s.addrHash, err))
-		} else {
-			s.setError(fmt.Errorf("can't load contract/validator code size %x for account address hash %x : contract code size error: %v, validator code size error: %v",
-				s.CodeHash(), s.addrHash, err, errVCSize))
-		}
-		s.setError(fmt.Errorf("can't load code size %x (validator wrapper: %t): %v", s.CodeHash(), s.validatorWrapper, err))
+	size, err := db.ContractCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
+	if err != nil {
+		s.setError(fmt.Errorf("can't load code size %x: %v", s.CodeHash(), err))
 	}
 	return size
 }
 
-func (s *Object) SetCode(codeHash common.Hash, code []byte, isValidatorCode bool) {
+func (s *Object) SetCode(codeHash common.Hash, code []byte) {
 	prevcode := s.Code(s.db.db)
 	s.db.journal.append(codeChange{
 		account:  &s.address,

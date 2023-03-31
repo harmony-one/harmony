@@ -366,12 +366,12 @@ func (db *KakashiDB) stateDataDump(block *types.Block) {
 
 func dumpMain(srcDBDir, destDBDir string, batchLimit int) {
 	fmt.Println("===dumpMain===")
-	srcDB, err := rawdb.NewLevelDBDatabase(srcDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "", false)
+	srcDB, err := ethRawDB.NewLevelDBDatabase(srcDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "", false)
 	if err != nil {
 		fmt.Println("open src db error:", err)
 		os.Exit(-1)
 	}
-	destDB, err := rawdb.NewLevelDBDatabase(destDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "", false)
+	destDB, err := ethRawDB.NewLevelDBDatabase(destDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "", false)
 	if err != nil {
 		fmt.Println("open dest db error:", err)
 		os.Exit(-1)

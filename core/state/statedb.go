@@ -475,10 +475,10 @@ func (db *DB) SetNonce(addr common.Address, nonce uint64) {
 	}
 }
 
-func (db *DB) SetCode(addr common.Address, code []byte, isValidatorCode bool) {
+func (db *DB) SetCode(addr common.Address, code []byte) {
 	Object := db.GetOrNewStateObject(addr)
 	if Object != nil {
-		Object.SetCode(crypto.Keccak256Hash(code), code, isValidatorCode)
+		Object.SetCode(crypto.Keccak256Hash(code), code)
 	}
 }
 
@@ -1053,11 +1053,7 @@ func (db *DB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		if obj := db.stateObjects[addr]; !obj.deleted {
 			// Write any contract code associated with the state object
 			if obj.code != nil && obj.dirtyCode {
-				if obj.validatorWrapper {
-					rawdb.WriteValidatorCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
-				} else {
-					rawdb.WriteCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
-				}
+				rawdb.WriteCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
 				obj.dirtyCode = false
 			}
 			// Write any storage changes in the state object to its storage trie

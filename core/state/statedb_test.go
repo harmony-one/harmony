@@ -717,10 +717,10 @@ func TestMissingTrieNodes(t *testing.T) {
 	addr := common.BytesToAddress([]byte("so"))
 	{
 		state.SetBalance(addr, big.NewInt(1))
-		state.SetCode(addr, []byte{1, 2, 3}, false)
+		state.SetCode(addr, []byte{1, 2, 3})
 		a2 := common.BytesToAddress([]byte("another"))
 		state.SetBalance(a2, big.NewInt(100))
-		state.SetCode(a2, []byte{1, 2, 4}, false)
+		state.SetCode(a2, []byte{1, 2, 4})
 		root, _ = state.Commit(false)
 		t.Logf("root: %x", root)
 		// force-flush
