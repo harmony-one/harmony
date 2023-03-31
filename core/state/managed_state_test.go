@@ -19,7 +19,7 @@ package state
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	"github.com/ethereum/go-ethereum/common"
 )
