@@ -122,7 +122,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 		}
 	}
 
-	statedb, err := state.New(start.Root(), database)
+	statedb, err := state.New(start.Root(), database, nil)
 	if err != nil {
 		// If the starting state is missing, allow some number of blocks to be executed
 		reexec := defaultTraceReexec
@@ -135,7 +135,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 			if start == nil {
 				break
 			}
-			if statedb, err = state.New(start.Root(), database); err == nil {
+			if statedb, err = state.New(start.Root(), database, nil); err == nil {
 				break
 			}
 		}
@@ -644,7 +644,7 @@ func (hmy *Harmony) ComputeStateDB(block *types.Block, reexec uint64) (*state.DB
 		if block == nil {
 			break
 		}
-		if statedb, err = state.New(block.Root(), database); err == nil {
+		if statedb, err = state.New(block.Root(), database, nil); err == nil {
 			break
 		}
 	}

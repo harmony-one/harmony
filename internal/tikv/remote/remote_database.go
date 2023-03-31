@@ -39,6 +39,14 @@ func (d *RemoteDatabase) ReadOnly() {
 	d.readOnly = true
 }
 
+func (d *RemoteDatabase) AncientDatadir() (string, error) {
+	return "", nil
+}
+
+func (d *RemoteDatabase) NewBatchWithSize(size int) ethdb.Batch {
+	return nil
+}
+
 // Has retrieves if a key is present in the key-value data store.
 func (d *RemoteDatabase) Has(key []byte) (bool, error) {
 	data, err := d.Get(key)

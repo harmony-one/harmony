@@ -1651,7 +1651,7 @@ func makeVWrapperByIndex(index int) staking.ValidatorWrapper {
 }
 
 func newTestStateDB() (*state.DB, error) {
-	return state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
+	return state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 }
 
 // makeVWrappersForStake makes the default staking.ValidatorWrappers for

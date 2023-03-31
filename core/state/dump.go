@@ -17,29 +17,27 @@
 package state
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// DumpConfig is a set of options to control what portions of the statewill be
+// DumpConfig is a set of options to control what portions of the state will be
 // iterated and collected.
 type DumpConfig struct {
 	SkipCode          bool
 	SkipStorage       bool
 	OnlyWithAddresses bool
-	HoldStorage       bool
 	Start             []byte
 	End               []byte
-	StateStart        []byte
-	StateEnd          []byte
 	Max               uint64
 }
 
@@ -48,10 +46,7 @@ type DumpCollector interface {
 	// OnRoot is called with the state root
 	OnRoot(common.Hash)
 	// OnAccount is called once for each account in the trie
-	OnAccountStart(common.Address, DumpAccount)
-	// OnAccount is called once for each account in the trie
-	OnAccountState(_ common.Address, StateSecureKey hexutil.Bytes, key, value []byte)
-	OnAccountEnd(common.Address, DumpAccount)
+	OnAccount(common.Address, DumpAccount)
 }
 
 // DumpAccount represents an account in the state.
@@ -78,15 +73,7 @@ func (d *Dump) OnRoot(root common.Hash) {
 }
 
 // OnAccount implements DumpCollector interface
-func (d *Dump) OnAccountStart(addr common.Address, account DumpAccount) {
-}
-
-// OnAccount implements DumpCollector interface
-func (d *Dump) OnAccountState(_ common.Address, StateSecureKey hexutil.Bytes, key, value []byte) {
-}
-
-// OnAccount implements DumpCollector interface
-func (d *Dump) OnAccountEnd(addr common.Address, account DumpAccount) {
+func (d *Dump) OnAccount(addr common.Address, account DumpAccount) {
 	d.Accounts[addr] = account
 }
 
@@ -103,15 +90,7 @@ func (d *IteratorDump) OnRoot(root common.Hash) {
 }
 
 // OnAccount implements DumpCollector interface
-func (d *IteratorDump) OnAccountStart(addr common.Address, account DumpAccount) {
-}
-
-// OnAccount implements DumpCollector interface
-func (d *IteratorDump) OnAccountState(_ common.Address, StateSecureKey hexutil.Bytes, key, value []byte) {
-}
-
-// OnAccount implements DumpCollector interface
-func (d *IteratorDump) OnAccountEnd(addr common.Address, account DumpAccount) {
+func (d *IteratorDump) OnAccount(addr common.Address, account DumpAccount) {
 	d.Accounts[addr] = account
 }
 
@@ -121,15 +100,7 @@ type iterativeDump struct {
 }
 
 // OnAccount implements DumpCollector interface
-func (d iterativeDump) OnAccountStart(addr common.Address, account DumpAccount) {
-}
-
-// OnAccount implements DumpCollector interface
-func (d iterativeDump) OnAccountState(_ common.Address, StateSecureKey hexutil.Bytes, key, value []byte) {
-}
-
-// OnAccount implements DumpCollector interface
-func (d iterativeDump) OnAccountEnd(addr common.Address, account DumpAccount) {
+func (d iterativeDump) OnAccount(addr common.Address, account DumpAccount) {
 	dumpAccount := &DumpAccount{
 		Balance:   account.Balance,
 		Nonce:     account.Nonce,
@@ -169,15 +140,9 @@ func (s *DB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []byte)
 	log.Info("Trie dumping started", "root", s.trie.Hash())
 	c.OnRoot(s.trie.Hash())
 
-	hasEnd := len(conf.End) > 0
-	stateStart := conf.StateStart
-	hasStateEnd := len(conf.StateEnd) > 0
 	it := trie.NewIterator(s.trie.NodeIterator(conf.Start))
 	for it.Next() {
-		if hasEnd && bytes.Compare(it.Key, conf.End) >= 0 {
-			break
-		}
-		var data Account
+		var data types.StateAccount
 		if err := rlp.DecodeBytes(it.Value, &data); err != nil {
 			panic(err)
 		}
@@ -202,29 +167,24 @@ func (s *DB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []byte)
 		if !conf.SkipCode {
 			account.Code = obj.Code(s.db)
 		}
-		c.OnAccountStart(addr, account)
 		if !conf.SkipStorage {
 			account.Storage = make(map[common.Hash]string)
-			storageIt := trie.NewIterator(obj.getTrie(s.db).NodeIterator(stateStart))
-			for storageIt.Next() {
-				if hasStateEnd && bytes.Compare(storageIt.Key, conf.StateEnd) >= 0 {
-					break
-				}
-				key := s.trie.GetKey(storageIt.Key)
-				c.OnAccountState(addr, storageIt.Key, key, storageIt.Value)
-				if conf.HoldStorage {
-					_, content, _, err := rlp.Split(storageIt.Value)
-					if err != nil {
-						log.Error("Failed to decode the value returned by iterator", "error", err)
-						continue
-					}
-					account.Storage[common.BytesToHash(s.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(content)
-				}
+			tr, err := obj.getTrie(s.db)
+			if err != nil {
+				utils.Logger().Error().Err(err).Msg("Failed to load storage trie")
+				continue
 			}
-			stateStart = nil
-			hasStateEnd = false
+			storageIt := trie.NewIterator(tr.NodeIterator(nil))
+			for storageIt.Next() {
+				_, content, _, err := rlp.Split(storageIt.Value)
+				if err != nil {
+					utils.Logger().Error().Err(err).Msg("Failed to decode the value returned by iterator")
+					continue
+				}
+				account.Storage[common.BytesToHash(s.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(content)
+			}
 		}
-		c.OnAccountEnd(addr, account)
+		c.OnAccount(addr, account)
 		accounts++
 		if time.Since(logged) > 8*time.Second {
 			log.Info("Trie dumping in progress", "at", it.Key, "accounts", accounts,
@@ -239,7 +199,7 @@ func (s *DB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []byte)
 		}
 	}
 	if missingPreimages > 0 {
-		log.Warn("Dump incomplete due to missing preimages", "missing", missingPreimages)
+		utils.Logger().Warn().Int("missing", missingPreimages).Msg("Dump incomplete due to missing preimages")
 	}
 	log.Info("Trie dumping complete", "accounts", accounts,
 		"elapsed", common.PrettyDuration(time.Since(start)))

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -15,7 +16,7 @@ import (
 
 type prefetchJob struct {
 	accountAddr []byte
-	account     *Account
+	account     *types.StateAccount
 	start, end  []byte
 }
 
@@ -91,7 +92,7 @@ func (s *DB) prefetchWorker(job *prefetchJob, jobs chan *prefetchJob) {
 			}
 
 			// build account data from main trie tree
-			var data Account
+			var data types.StateAccount
 			if err := rlp.DecodeBytes(it.Value, &data); err != nil {
 				panic(err)
 			}
@@ -103,7 +104,8 @@ func (s *DB) prefetchWorker(job *prefetchJob, jobs chan *prefetchJob) {
 			}
 
 			// build account trie tree
-			storageIt := trie.NewIterator(obj.getTrie(s.db).NodeIterator(nil))
+			tr, _ := obj.getTrie(s.db)
+			storageIt := trie.NewIterator(tr.NodeIterator(nil))
 			storageJob := &prefetchJob{
 				accountAddr: addrBytes,
 				account:     &data,
@@ -115,7 +117,8 @@ func (s *DB) prefetchWorker(job *prefetchJob, jobs chan *prefetchJob) {
 	} else {
 		// scan main trie tree
 		obj := newObject(s, common.BytesToAddress(job.accountAddr), *job.account)
-		storageIt := trie.NewIterator(obj.getTrie(s.db).NodeIterator(job.start))
+		tr, _ := obj.getTrie(s.db)
+		storageIt := trie.NewIterator(tr.NodeIterator(job.start))
 
 		// fetch data
 		s.prefetchAccountStorage(jobs, job, storageIt)
