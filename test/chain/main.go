@@ -6,7 +6,7 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 	chain2 "github.com/harmony-one/harmony/test/chain/chain"
 
 	"github.com/ethereum/go-ethereum/common"

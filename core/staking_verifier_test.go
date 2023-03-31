@@ -9,7 +9,7 @@ import (
 
 	"github.com/harmony-one/harmony/internal/params"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
