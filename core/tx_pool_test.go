@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
