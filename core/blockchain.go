@@ -107,8 +107,8 @@ type BlockChain interface {
 	//
 	// After insertion is done, all accumulated events will be fired.
 	InsertChain(chain types.Blocks, verifyHeaders bool) (int, error)
-	// LeaderContinuousBlocksCount returns the number of continuous blocks by the leader.
-	LeaderContinuousBlocksCount() (publicKeyBytes []byte, epoch uint64, count uint64, err error)
+	// LeaderRotationMeta returns the number of continuous blocks by the leader.
+	LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts uint64, err error)
 	// BadBlocks returns a list of the last 'bad blocks' that
 	// the client has seen on the network.
 	BadBlocks() []BadBlock

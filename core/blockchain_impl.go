@@ -1527,7 +1527,7 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 		// there should be only 1 block.
 		for _, b := range chain {
 			if b.Epoch().Uint64() > 0 {
-				err := bc.saveLeaderContinuousBlocksCount(b.Header())
+				err := bc.saveLeaderRotationMeta(b.Header())
 				if err != nil {
 					utils.Logger().Error().Err(err).Msg("save leader continuous blocks count error")
 					return n, err
@@ -1542,36 +1542,45 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 	return n, err
 }
 
-func (bc *BlockChainImpl) saveLeaderContinuousBlocksCount(h *block.Header) error {
+func (bc *BlockChainImpl) saveLeaderRotationMeta(h *block.Header) error {
 	blockPubKey, err := bc.getLeaderPubKeyFromCoinbase(h)
 	if err != nil {
 		return err
 	}
 	type stored struct {
-		pub   []byte
-		epoch uint64
-		count uint64
+		pub    []byte
+		epoch  uint64
+		count  uint64
+		shifts uint64
 	}
 	var s stored
 	// error is possible here only on the first iteration, so we can ignore it
-	s.pub, s.epoch, s.count, _ = rawdb.ReadLeaderContinuousBlocksCount(bc.db)
+	s.pub, s.epoch, s.count, s.shifts, _ = rawdb.ReadLeaderRotationMeta(bc.db)
 
-	cnt := s.count
-	// so, increase counter only if the same leader and epoch
+	// increase counter only if the same leader and epoch
 	if bytes.Equal(s.pub, blockPubKey.Bytes[:]) && s.epoch == h.Epoch().Uint64() {
-		cnt++
+		s.count++
 	} else {
-		cnt = 1
+		s.count = 1
 	}
-	err = rawdb.WriteLeaderContinuousBlocksCount(bc.db, blockPubKey.Bytes[:], h.Epoch().Uint64(), cnt)
+	// we should increase shifts if the leader is changed.
+	if !bytes.Equal(s.pub, blockPubKey.Bytes[:]) {
+		s.shifts++
+	}
+	// but set to zero if new
+	if s.epoch != h.Epoch().Uint64() {
+		s.shifts = 0
+	}
+
+	err = rawdb.WriteLeaderRotationMeta(bc.db, blockPubKey.Bytes[:], h.Epoch().Uint64(), s.count, s.shifts)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (bc *BlockChainImpl) LeaderContinuousBlocksCount() (publicKeyBytes []byte, epoch uint64, count uint64, err error) {
-	return rawdb.ReadLeaderContinuousBlocksCount(bc.db)
+func (bc *BlockChainImpl) LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts uint64, err error) {
+	return rawdb.ReadLeaderRotationMeta(bc.db)
 }
 
 // insertChain will execute the actual chain insertion and event aggregation. The

@@ -709,22 +709,32 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		utils.Logger().Error().Msg("[Rotating leader] blocks per epoch is 0")
 		return
 	}
+	if slotsCount == 0 {
+		utils.Logger().Error().Msg("[Rotating leader] slots count is 0")
+		return
+	}
 	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
+	rest := blocksPerEpoch % uint64(slotsCount)
 	const minimumBlocksForLeaderInRow = 3
 	if numBlocksProducedByLeader < minimumBlocksForLeaderInRow {
 		// mine no less than 3 blocks in a row
 		numBlocksProducedByLeader = minimumBlocksForLeaderInRow
 	}
 	type stored struct {
-		pub   []byte
-		epoch uint64
-		count uint64
+		pub    []byte
+		epoch  uint64
+		count  uint64
+		shifts uint64 // count how much changes validator per epoch
 	}
 	var s stored
-	s.pub, s.epoch, s.count, _ = bc.LeaderContinuousBlocksCount()
+	s.pub, s.epoch, s.count, s.shifts, _ = bc.LeaderRotationMeta()
 	if !bytes.Equal(leader.Bytes[:], s.pub) {
 		// Another leader.
 		return
+	}
+	// if it is the first validator which produce blocks, then it should produce `rest` blocks too.
+	if s.shifts == 0 {
+		numBlocksProducedByLeader += rest
 	}
 	if s.count < numBlocksProducedByLeader {
 		// Not enough blocks produced by the leader.

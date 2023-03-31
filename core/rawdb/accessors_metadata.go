@@ -195,15 +195,16 @@ func WriteTransitionStatus(db ethdb.KeyValueWriter, data []byte) {
 	}
 }
 
-// WriteLeaderContinuousBlocksCount writes the leader continuous blocks count to the database.
-func WriteLeaderContinuousBlocksCount(db DatabaseWriter, leader []byte, epoch uint64, count uint64) error {
+// WriteLeaderRotationMeta writes the leader continuous blocks count to the database.
+func WriteLeaderRotationMeta(db DatabaseWriter, leader []byte, epoch uint64, count, shifts uint64) error {
 	if len(leader) != bls.PublicKeySizeInBytes {
 		return errors.New("invalid leader public key size")
 	}
-	value := make([]byte, bls.PublicKeySizeInBytes+16)
+	value := make([]byte, bls.PublicKeySizeInBytes+8*3)
 	copy(value, leader)
-	binary.LittleEndian.PutUint64(value[len(leader):], epoch)
-	binary.LittleEndian.PutUint64(value[len(leader)+8:], count)
+	binary.LittleEndian.PutUint64(value[len(leader)+8*0:], epoch)
+	binary.LittleEndian.PutUint64(value[len(leader)+8*1:], count)
+	binary.LittleEndian.PutUint64(value[len(leader)+8*2:], shifts)
 	if err := db.Put(leaderContinuousBlocksCountKey(), value); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to store leader continuous blocks count")
 		return err
@@ -211,16 +212,16 @@ func WriteLeaderContinuousBlocksCount(db DatabaseWriter, leader []byte, epoch ui
 	return nil
 }
 
-// ReadLeaderContinuousBlocksCount retrieves the leader continuous blocks count from the database.
-func ReadLeaderContinuousBlocksCount(db DatabaseReader) (pubKeyBytes []byte, epoch uint64, count uint64, err error) {
+// ReadLeaderRotationMeta retrieves the leader continuous blocks count from the database.
+func ReadLeaderRotationMeta(db DatabaseReader) (pubKeyBytes []byte, epoch, count, shifts uint64, err error) {
 	data, _ := db.Get(leaderContinuousBlocksCountKey())
-	if len(data) != bls.PublicKeySizeInBytes+16 {
-		return nil, 0, 0, errors.New("invalid leader continuous blocks count")
+	if len(data) != bls.PublicKeySizeInBytes+24 {
+		return nil, 0, 0, 0, errors.New("invalid leader continuous blocks count")
 	}
 
 	pubKeyBytes = data[:bls.PublicKeySizeInBytes]
 	epoch = binary.LittleEndian.Uint64(data[bls.PublicKeySizeInBytes:])
 	count = binary.LittleEndian.Uint64(data[bls.PublicKeySizeInBytes+8:])
-
-	return pubKeyBytes, epoch, count, nil
+	shifts = binary.LittleEndian.Uint64(data[bls.PublicKeySizeInBytes+16:])
+	return pubKeyBytes, epoch, count, shifts, nil
 }

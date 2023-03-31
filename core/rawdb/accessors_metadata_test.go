@@ -7,13 +7,13 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 )
 
-func TestLeaderContinuousBlocksCount(t *testing.T) {
+func TestLeaderRotationMeta(t *testing.T) {
 	db := ethRawDB.NewMemoryDatabase()
-	err := WriteLeaderContinuousBlocksCount(db, make([]byte, bls.PublicKeySizeInBytes), 1, 2)
+	err := WriteLeaderRotationMeta(db, make([]byte, bls.PublicKeySizeInBytes), 1, 2, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pub, epoch, count, err := ReadLeaderContinuousBlocksCount(db)
+	pub, epoch, count, shifts, err := ReadLeaderRotationMeta(db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,5 +25,8 @@ func TestLeaderContinuousBlocksCount(t *testing.T) {
 	}
 	if count != 2 {
 		t.Fatal("invalid count")
+	}
+	if shifts != 3 {
+		t.Fatal("invalid shifts")
 	}
 }
