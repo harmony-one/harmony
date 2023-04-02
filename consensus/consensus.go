@@ -163,12 +163,6 @@ func (consensus *Consensus) Beaconchain() core.BlockChain {
 	return consensus.registry.GetBeaconchain()
 }
 
-//func (consensus *Consensus) ShardID() uint32 {
-//	consensus.mutex.RLock()
-//	defer consensus.mutex.RUnlock()
-//	return consensus.shardID
-//}
-
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks.
 func (consensus *Consensus) verifyBlock(block *types.Block) error {
 	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
@@ -310,6 +304,7 @@ func New(
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	// Make Sure Verifier is not null
 	consensus.vc = newViewChange()
+	// TODO: reference to blockchain/beaconchain should be removed.
 	consensus.setBlockVerifier(VerifyNewBlock(registry.GetWebHooks(), consensus.Blockchain(), consensus.Beaconchain()))
 
 	// init prometheus metrics
