@@ -159,12 +159,6 @@ func (consensus *Consensus) Beaconchain() core.BlockChain {
 	return consensus.registry.GetBeaconchain()
 }
 
-//func (consensus *Consensus) ShardID() uint32 {
-//	consensus.mutex.RLock()
-//	defer consensus.mutex.RUnlock()
-//	return consensus.shardID
-//}
-
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks.
 func (consensus *Consensus) verifyBlock(block *types.Block) error {
 	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
