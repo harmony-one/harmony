@@ -183,8 +183,7 @@ func skeletonHeaderKey(number uint64) []byte {
 
 // codeKey = CodePrefix + hash
 func codeKey(hash common.Hash) []byte {
-	// We don't use any prefix for code key, otherwise we should return append(CodePrefix, hash.Bytes()...)
-	return hash.Bytes()
+	return append(CodePrefix, hash.Bytes()...)
 }
 
 // IsCodeKey reports whether the given byte slice is the key of contract code,
