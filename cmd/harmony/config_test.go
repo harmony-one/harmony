@@ -79,7 +79,7 @@ Version = "1.0.4"
   Port = 9000
 
 [Pprof]
-  Enabled = true
+  Enabled = false
   ListenAddr = "127.0.0.1:6060"
 
 [TxPool]
