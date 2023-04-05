@@ -100,12 +100,11 @@ type ISync interface {
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	ConfirmedBlockChannel chan *types.Block                 // The channel to send confirmed blocks
-	BeaconBlockChannel    chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
-	pendingCXReceipts     map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
-	pendingCXMutex        sync.Mutex
-	crosslinks            *crosslinks.Crosslinks // Memory storage for crosslink processing.
+	Consensus          *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	BeaconBlockChannel chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
+	pendingCXReceipts  map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
+	pendingCXMutex     sync.Mutex
+	crosslinks         *crosslinks.Crosslinks // Memory storage for crosslink processing.
 	// Shard databases
 	shardChains      shardchain.Collection
 	SelfPeer         p2p.Peer
@@ -1025,6 +1024,9 @@ func New(
 		crosslinks:           crosslinks.New(),
 		syncID:               GenerateSyncID(),
 	}
+	if consensusObj == nil {
+		panic("consensusObj is nil")
+	}
 	// Get the node config that's created in the harmony.go program.
 	node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
 	node.HarmonyConfig = harmonyconfig
@@ -1069,7 +1071,6 @@ func New(
 			}
 		}
 
-		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 
