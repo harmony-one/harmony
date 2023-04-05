@@ -434,8 +434,8 @@ func (ctx *incStateTestCtx) checkAddrIncStateByType(addr common.Address, typeInc
 // checkHmyNodeStateChangeByAddr checks the state change for hmy nodes. Since hmy nodes does not
 // have wrapper, it is supposed to be unchanged in code field
 func (ctx *incStateTestCtx) checkHmyNodeStateChangeByAddr(addr common.Address) error {
-	snapCode := ctx.snapState.GetCode(addr)
-	curCode := ctx.state.GetCode(addr)
+	snapCode := ctx.snapState.GetCode(addr, false)
+	curCode := ctx.state.GetCode(addr, false)
 	if !reflect.DeepEqual(snapCode, curCode) {
 		return errors.New("code not expected")
 	}
@@ -618,7 +618,7 @@ func (state testStateDB) UpdateValidatorWrapper(addr common.Address, wrapper *st
 	return nil
 }
 
-func (state testStateDB) GetCode(addr common.Address) []byte {
+func (state testStateDB) GetCode(addr common.Address, isValidatorCode bool) []byte {
 	wrapper, ok := state[addr]
 	if !ok {
 		return nil

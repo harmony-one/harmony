@@ -353,7 +353,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			ret := stackPeek(0)
 			if ret.Sign() != 0 {
 				call.to = common.BigToAddress(ret)
-				call.output = env.StateDB.GetCode(call.to)
+				call.output = env.StateDB.GetCode(call.to, false)
 			} else if call.err == nil {
 				call.err = errors.New("internal failure")
 			}

@@ -34,7 +34,7 @@ func filledStateDB() *DB {
 	sval := common.HexToHash("bbb")
 
 	state.SetBalance(addr, big.NewInt(42)) // Change the account trie
-	state.SetCode(addr, []byte("hello"))   // Change an external metadata
+	state.SetCode(addr, []byte("hello"), false)   // Change an external metadata
 	state.SetState(addr, skey, sval)       // Change the storage trie
 	for i := 0; i < 100; i++ {
 		sk := common.BigToHash(big.NewInt(int64(i)))
