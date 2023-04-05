@@ -122,11 +122,11 @@ func TestHarmonyFlags(t *testing.T) {
 					LocalAccountsFile: "./.hmy/locals.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
-					Enabled:            true,
+					Enabled:            false,
 					ListenAddr:         "127.0.0.1:6060",
 					Folder:             "./profiles",
-					ProfileNames:       []string{"cpu", "heap", "goroutine"},
-					ProfileIntervals:   []int{3600},
+					ProfileNames:       []string{},
+					ProfileIntervals:   []int{600},
 					ProfileDebugValues: []int{0},
 				},
 				Log: harmonyconfig.LogConfig{
@@ -1092,9 +1092,9 @@ func TestPprofFlags(t *testing.T) {
 			expConfig: defaultConfig.Pprof,
 		},
 		{
-			args: []string{"--pprof=false"},
+			args: []string{"--pprof"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:            false,
+				Enabled:            true,
 				ListenAddr:         defaultConfig.Pprof.ListenAddr,
 				Folder:             defaultConfig.Pprof.Folder,
 				ProfileNames:       defaultConfig.Pprof.ProfileNames,
