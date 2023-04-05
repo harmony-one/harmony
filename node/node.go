@@ -99,12 +99,11 @@ type ISync interface {
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	ConfirmedBlockChannel chan *types.Block                 // The channel to send confirmed blocks
-	BeaconBlockChannel    chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
-	pendingCXReceipts     map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
-	pendingCXMutex        sync.Mutex
-	crosslinks            *crosslinks.Crosslinks // Memory storage for crosslink processing.
+	Consensus          *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	BeaconBlockChannel chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
+	pendingCXReceipts  map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
+	pendingCXMutex     sync.Mutex
+	crosslinks         *crosslinks.Crosslinks // Memory storage for crosslink processing.
 	// Shard databases
 	shardChains      shardchain.Collection
 	SelfPeer         p2p.Peer
@@ -227,8 +226,8 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
-		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
+		err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID}, p2p.ConstructMessage(msg))
+		if err != nil {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
 		} else {
 			break
@@ -246,7 +245,7 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
 		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
+			p2p.ConstructMessage(msg)); err != nil {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
 		} else {
 			break
@@ -255,31 +254,27 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 }
 
 // Add new transactions to the pending transaction list.
-func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
-	// if inSync, _, _ := node.SyncStatus(node.Blockchain().ShardID()); !inSync && node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-	// 	utils.Logger().Debug().
-	// 		Int("length of newTxs", len(newTxs)).
-	// 		Msg("[addPendingTransactions] Node out of sync, ignoring transactions")
-	// 	return nil
-	// }
-
-	poolTxs := types.PoolTransactions{}
-	errs := []error{}
-	acceptCx := node.Blockchain().Config().AcceptsCrossTx(node.Blockchain().CurrentHeader().Epoch())
+func addPendingTransactions(registry *registry.Registry, newTxs types.Transactions) []error {
+	var (
+		errs     []error
+		bc       = registry.GetBlockchain()
+		txPool   = registry.GetTxPool()
+		poolTxs  = types.PoolTransactions{}
+		acceptCx = bc.Config().AcceptsCrossTx(bc.CurrentHeader().Epoch())
+	)
 	for _, tx := range newTxs {
 		if tx.ShardID() != tx.ToShardID() && !acceptCx {
 			errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
 			continue
 		}
-		if tx.IsEthCompatible() && !node.Blockchain().Config().IsEthCompatible(node.Blockchain().CurrentBlock().Epoch()) {
+		if tx.IsEthCompatible() && !bc.Config().IsEthCompatible(bc.CurrentBlock().Epoch()) {
 			errs = append(errs, errors.WithMessage(errInvalidEpoch, "ethereum tx not accepted yet"))
 			continue
 		}
 		poolTxs = append(poolTxs, tx)
 	}
-	errs = append(errs, node.TxPool.AddRemotes(poolTxs)...)
-
-	pendingCount, queueCount := node.TxPool.Stats()
+	errs = append(errs, registry.GetTxPool().AddRemotes(poolTxs)...)
+	pendingCount, queueCount := txPool.Stats()
 	utils.Logger().Debug().
 		Interface("err", errs).
 		Int("length of newTxs", len(newTxs)).
@@ -346,7 +341,7 @@ func (node *Node) AddPendingStakingTransaction(
 // This is only called from SDK.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 	if newTx.ShardID() == node.NodeConfig.ShardID {
-		errs := node.addPendingTransactions(types.Transactions{newTx})
+		errs := addPendingTransactions(node.registry, types.Transactions{newTx})
 		var err error
 		for i := range errs {
 			if errs[i] != nil {
@@ -544,11 +539,11 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 // validate shardID
 // validate public key size
 // verify message signature
-func (node *Node) validateShardBoundMessage(
-	ctx context.Context, payload []byte,
+func validateShardBoundMessage(consensus *consensus.Consensus, nodeConfig *nodeconfig.ConfigType, payload []byte,
 ) (*msg_pb.Message, *bls.SerializedPublicKey, bool, error) {
 	var (
 		m msg_pb.Message
+		//consensus = registry.GetConsensus()
 	)
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
 		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_unmarshal"}).Inc()
@@ -556,7 +551,7 @@ func (node *Node) validateShardBoundMessage(
 	}
 
 	// ignore messages not intended for explorer
-	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+	if nodeConfig.Role() == nodeconfig.ExplorerNode {
 		switch m.Type {
 		case
 			msg_pb.MessageType_ANNOUNCE,
@@ -573,7 +568,7 @@ func (node *Node) validateShardBoundMessage(
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
 	// so we just ignore those messages
-	if node.Consensus.IsViewChangingMode() {
+	if consensus.IsViewChangingMode() {
 		switch m.Type {
 		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
@@ -589,7 +584,7 @@ func (node *Node) validateShardBoundMessage(
 	}
 
 	// ignore message not intended for leader, but still forward them to the network
-	if node.Consensus.IsLeader() {
+	if consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_ANNOUNCE, msg_pb.MessageType_PREPARED, msg_pb.MessageType_COMMITTED:
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
@@ -602,7 +597,7 @@ func (node *Node) validateShardBoundMessage(
 	senderBitmap := []byte{}
 
 	if maybeCon != nil {
-		if maybeCon.ShardId != node.Consensus.ShardID {
+		if maybeCon.ShardId != consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
@@ -612,17 +607,17 @@ func (node *Node) validateShardBoundMessage(
 			senderBitmap = maybeCon.SenderPubkeyBitmap
 		}
 		// If the viewID is too old, reject the message.
-		if maybeCon.ViewId+5 < node.Consensus.GetCurBlockViewID() {
+		if maybeCon.ViewId+5 < consensus.GetCurBlockViewID() {
 			return nil, nil, true, errors.WithStack(errViewIDTooOld)
 		}
 	} else if maybeVC != nil {
-		if maybeVC.ShardId != node.Consensus.ShardID {
+		if maybeVC.ShardId != consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderKey = maybeVC.SenderPubkey
 		// If the viewID is too old, reject the message.
-		if maybeVC.ViewId+5 < node.Consensus.GetViewChangingID() {
+		if maybeVC.ViewId+5 < consensus.GetViewChangingID() {
 			return nil, nil, true, errors.WithStack(errViewIDTooOld)
 		}
 	} else {
@@ -632,7 +627,7 @@ func (node *Node) validateShardBoundMessage(
 
 	// ignore mesage not intended for validator
 	// but still forward them to the network
-	if !node.Consensus.IsLeader() {
+	if !consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
@@ -648,12 +643,12 @@ func (node *Node) validateShardBoundMessage(
 		}
 
 		copy(serializedKey[:], senderKey)
-		if !node.Consensus.IsValidatorInCommittee(serializedKey) {
+		if !consensus.IsValidatorInCommittee(serializedKey) {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_committee"}).Inc()
 			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 		}
 	} else {
-		count := node.Consensus.Decider.ParticipantsCount()
+		count := consensus.Decider.ParticipantsCount()
 		if (count+7)>>3 != int64(len(senderBitmap)) {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_participant_count"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongSizeOfBitmap)
@@ -667,7 +662,6 @@ func (node *Node) validateShardBoundMessage(
 }
 
 var (
-	errMsgHadNoHMYPayLoadAssumption      = errors.New("did not have sufficient size for hmy msg")
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
 )
 
@@ -794,8 +788,8 @@ func (node *Node) StartPubSub() error {
 					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "consensus_total"}).Inc()
 
 					// validate consensus message
-					validMsg, senderPubKey, ignore, err := node.validateShardBoundMessage(
-						context.TODO(), openBox[proto.MessageCategoryBytes:],
+					validMsg, senderPubKey, ignore, err := validateShardBoundMessage(
+						node.Consensus, node.NodeConfig, openBox[proto.MessageCategoryBytes:],
 					)
 
 					if err != nil {
@@ -1031,13 +1025,11 @@ func New(
 		crosslinks:           crosslinks.New(),
 		syncID:               GenerateSyncID(),
 	}
-
-	// Get the node config that's created in the harmony.go program.
-	if consensusObj != nil {
-		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
-	} else {
-		node.NodeConfig = nodeconfig.GetDefaultConfig()
+	if consensusObj == nil {
+		panic("consensusObj is nil")
 	}
+	// Get the node config that's created in the harmony.go program.
+	node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
 	node.HarmonyConfig = harmonyconfig
 
 	if host != nil {
@@ -1051,7 +1043,7 @@ func New(
 	node.shardChains = collection
 	node.IsSynchronized = abool.NewBool(false)
 
-	if host != nil && consensusObj != nil {
+	if host != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensusObj
 
@@ -1080,7 +1072,6 @@ func New(
 			}
 		}
 
-		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 
@@ -1114,6 +1105,7 @@ func New(
 		}
 
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
+		node.registry.SetTxPool(node.TxPool)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, beaconChain, engine)
 

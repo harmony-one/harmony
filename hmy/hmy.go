@@ -187,16 +187,20 @@ func (hmy *Harmony) ProtocolVersion() int {
 	return proto.ProtocolVersion
 }
 
-// IsLeader exposes if node is currently leader
+// IsLeader exposes if node is currently leader.
 func (hmy *Harmony) IsLeader() bool {
 	return hmy.NodeAPI.IsCurrentlyLeader()
 }
 
-// GetNodeMetadata ..
+// GetNodeMetadata returns the node metadata.
 func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
-	header := hmy.CurrentBlock().Header()
-	cfg := nodeconfig.GetShardConfig(header.ShardID())
-	var blockEpoch *uint64
+	var (
+		header     = hmy.CurrentHeader()
+		cfg        = nodeconfig.GetShardConfig(header.ShardID())
+		blockEpoch *uint64
+		blsKeys    []string
+		c          = commonRPC.C{}
+	)
 
 	if header.ShardID() == shard.BeaconChainShardID {
 		sched := shard.Schedule.InstanceForEpoch(header.Epoch())
@@ -204,13 +208,12 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 		blockEpoch = &b
 	}
 
-	blsKeys := []string{}
 	if cfg.ConsensusPriKey != nil {
 		for _, key := range cfg.ConsensusPriKey {
 			blsKeys = append(blsKeys, key.Pub.Bytes.Hex())
 		}
 	}
-	c := commonRPC.C{}
+
 	c.TotalKnownPeers, c.Connected, c.NotConnected = hmy.NodeAPI.PeerConnectivity()
 
 	syncPeers := hmy.NodeAPI.SyncPeers()
