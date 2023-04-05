@@ -547,7 +547,7 @@ func (consensus *Consensus) GetFinality() int64 {
 	return consensus.finality
 }
 
-// switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
+// switchPhase will switch FBFTPhase to desired phase.
 func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase) {
 	consensus.getLogger().Info().
 		Str("from:", consensus.phase.String()).

@@ -218,6 +218,8 @@ func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 
 // SetBlockVerifier sets the block verifier
 func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.BlockVerifier = verifier
 	consensus.vc.SetVerifyBlock(consensus.verifyBlock)
 }

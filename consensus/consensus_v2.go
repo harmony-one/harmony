@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/rs/zerolog"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -688,40 +687,70 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
-	prev := consensus.getLeaderPubKey()
-	bc := consensus.Blockchain()
-	curNumber := bc.CurrentHeader().Number().Uint64()
-	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v numblocks:%d", epoch.Uint64(), bc.Config().IsLeaderRotation(epoch), bc.Config().LeaderRotationBlocksCount)
-	leader := consensus.getLeaderPubKey()
-	for i := 0; i < bc.Config().LeaderRotationBlocksCount; i++ {
-		header := bc.GetHeaderByNumber(curNumber - uint64(i))
-		if header == nil {
-			return
-		}
-		// Previous epoch, we should not change leader.
-		if header.Epoch().Uint64() != epoch.Uint64() {
-			return
-		}
-		// Check if the same leader.
-		pub, err := bc.GetLeaderPubKeyFromCoinbase(header)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to get leader public key from coinbase")
-			return
-		}
-		if !pub.Object.IsEqual(leader.Object) {
-			// Another leader.
-			return
-		}
+	var (
+		bc     = consensus.Blockchain()
+		prev   = consensus.getLeaderPubKey()
+		leader = consensus.getLeaderPubKey()
+	)
+	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotation(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch, consensus.ShardID))
+	ss, err := bc.ReadShardState(epoch)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
+		return
+	}
+	committee, err := ss.FindCommitteeByID(consensus.ShardID)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to find committee")
+		return
+	}
+	slotsCount := len(committee.Slots)
+	blocksPerEpoch := shard.Schedule.InstanceForEpoch(epoch).BlocksPerEpoch()
+	if blocksPerEpoch == 0 {
+		utils.Logger().Error().Msg("[Rotating leader] blocks per epoch is 0")
+		return
+	}
+	if slotsCount == 0 {
+		utils.Logger().Error().Msg("[Rotating leader] slots count is 0")
+		return
+	}
+	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
+	rest := blocksPerEpoch % uint64(slotsCount)
+	const minimumBlocksForLeaderInRow = 3
+	if numBlocksProducedByLeader < minimumBlocksForLeaderInRow {
+		// mine no less than 3 blocks in a row
+		numBlocksProducedByLeader = minimumBlocksForLeaderInRow
+	}
+	type stored struct {
+		pub    []byte
+		epoch  uint64
+		count  uint64
+		shifts uint64 // count how much changes validator per epoch
+	}
+	var s stored
+	s.pub, s.epoch, s.count, s.shifts, _ = bc.LeaderRotationMeta()
+	if !bytes.Equal(leader.Bytes[:], s.pub) {
+		// Another leader.
+		return
+	}
+	// if it is the first validator which produce blocks, then it should produce `rest` blocks too.
+	if s.shifts == 0 {
+		numBlocksProducedByLeader += rest
+	}
+	if s.count < numBlocksProducedByLeader {
+		// Not enough blocks produced by the leader.
+		return
 	}
 	// Passed all checks, we can change leader.
+	// NthNext will move the leader to the next leader in the committee.
+	// It does not know anything about external or internal validators.
 	var (
 		wasFound bool
 		next     *bls.PublicKeyWrapper
 	)
-	if consensus.ShardID == shard.BeaconChainShardID {
-		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
-	} else {
+	if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch, consensus.ShardID) {
 		wasFound, next = consensus.Decider.NthNext(leader, 1)
+	} else {
+		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
 	}
 	if !wasFound {
 		utils.Logger().Error().Msg("Failed to get next leader")

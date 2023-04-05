@@ -368,3 +368,27 @@ func TestDecCeil(t *testing.T) {
 		require.Equal(t, tc.expected, res, "unexpected result for test case %d, input: %v", i, tc.input)
 	}
 }
+
+func TestDiv(t *testing.T) {
+	tests := []struct {
+		d1, d2, exp Dec
+	}{
+		{mustNewDecFromStr(t, "0"), mustNewDecFromStr(t, "1"), ZeroDec()},
+		{mustNewDecFromStr(t, "1"), mustNewDecFromStr(t, "1"), NewDec(1)},
+		{mustNewDecFromStr(t, "1"), mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "0.5")},
+		{mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "1"), NewDec(2)},
+		{mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "3"), mustNewDecFromStr(t, "0.666666666666666667")},
+		{mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "4"), mustNewDecFromStr(t, "0.5")},
+		{mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "5"), mustNewDecFromStr(t, "0.4")},
+		{mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "6"), mustNewDecFromStr(t, "0.333333333333333333")},
+		{mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "7"), mustNewDecFromStr(t, "0.285714285714285714")},
+		{mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "8"), mustNewDecFromStr(t, "0.25")},
+		{mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "9"), mustNewDecFromStr(t, "0.222222222222222222")},
+		{mustNewDecFromStr(t, "2"), mustNewDecFromStr(t, "10"), mustNewDecFromStr(t, "0.2")},
+	}
+	for i, tc := range tests {
+		res := tc.d1.Quo(tc.d2)
+		require.True(t, res.Equal(tc.exp), "unexpected result for test case %d, input: %s %s %s", i, tc.d1, tc.d2, tc.exp)
+	}
+
+}
