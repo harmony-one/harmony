@@ -1053,7 +1053,11 @@ func (db *DB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		if obj := db.stateObjects[addr]; !obj.deleted {
 			// Write any contract code associated with the state object
 			if obj.code != nil && obj.dirtyCode {
-				rawdb.WriteCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
+				if obj.validatorWrapper {
+					rawdb.WriteValidatorCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
+				} else {
+					rawdb.WriteCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
+				}
 				obj.dirtyCode = false
 			}
 			// Write any storage changes in the state object to its storage trie

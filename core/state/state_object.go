@@ -125,13 +125,13 @@ func newObject(db *DB, address common.Address, data types.StateAccount) *Object 
 		data.Root = types.EmptyRootHash
 	}
 	return &Object{
-		db:               db,
-		address:          address,
-		addrHash:         crypto.Keccak256Hash(address[:]),
-		data:             data,
-		originStorage:    make(Storage),
-		pendingStorage:   make(Storage),
-		dirtyStorage:     make(Storage),
+		db:             db,
+		address:        address,
+		addrHash:       crypto.Keccak256Hash(address[:]),
+		data:           data,
+		originStorage:  make(Storage),
+		pendingStorage: make(Storage),
+		dirtyStorage:   make(Storage),
 	}
 }
 
@@ -506,13 +506,15 @@ func (s *Object) Code(db Database, isValidatorCode bool) []byte {
 	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
 		return nil
 	}
-	if isValidatorCode {
+	if s.validatorWrapper || isValidatorCode {
 		code, err := db.ValidatorCode(s.addrHash, common.BytesToHash(s.CodeHash()))
 		if err != nil {
 			s.setError(fmt.Errorf("can't load validator code hash %x: %v", s.CodeHash(), err))
 		}
-		s.code = code
-		return code
+		if code != nil {
+			s.code = code
+			return code
+		}
 	}
 	code, err := db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
 	if err != nil {
@@ -532,12 +534,14 @@ func (s *Object) CodeSize(db Database, isValidatorCode bool) int {
 	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
 		return 0
 	}
-	if isValidatorCode {
+	if  s.validatorWrapper || isValidatorCode {
 		size, err := db.ValidatorCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
 		if err != nil {
 			s.setError(fmt.Errorf("can't load validator code size %x: %v", s.CodeHash(), err))
 		}
-		return size
+		if size > 0 {
+			return size
+		}
 	}
 	size, err := db.ContractCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
 	if err != nil {
