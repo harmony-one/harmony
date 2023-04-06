@@ -534,7 +534,7 @@ func (s *Object) CodeSize(db Database, isValidatorCode bool) int {
 	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
 		return 0
 	}
-	if  s.validatorWrapper || isValidatorCode {
+	if s.validatorWrapper || isValidatorCode {
 		size, err := db.ValidatorCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
 		if err != nil {
 			s.setError(fmt.Errorf("can't load validator code size %x: %v", s.CodeHash(), err))
