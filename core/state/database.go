@@ -240,7 +240,7 @@ func (db *cachingDB) ContractCodeSize(addrHash, codeHash common.Hash) (int, erro
 	return len(code), err
 }
 
-// ValidatorCodeSize retrieves a particular contracts code's size.
+// ValidatorCodeSize retrieves a particular validators code's size.
 func (db *cachingDB) ValidatorCodeSize(addrHash, codeHash common.Hash) (int, error) {
 	if cached, ok := db.codeSizeCache.Get(codeHash); ok {
 		return cached, nil
@@ -249,7 +249,7 @@ func (db *cachingDB) ValidatorCodeSize(addrHash, codeHash common.Hash) (int, err
 	return len(code), err
 }
 
-// ValidatorCode retrieves a particular contract's code.
+// ValidatorCode retrieves a particular validator's code.
 func (db *cachingDB) ValidatorCode(addrHash, codeHash common.Hash) ([]byte, error) {
 	code, _ := db.codeCache.Get(codeHash)
 	if len(code) > 0 {

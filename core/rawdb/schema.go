@@ -196,12 +196,12 @@ func IsCodeKey(key []byte) (bool, []byte) {
 	return false, nil
 }
 
-// codeKey = CodePrefix + hash
+// validatorCodeKey = ValidatorCodePrefix + hash
 func validatorCodeKey(hash common.Hash) []byte {
 	return append(ValidatorCodePrefix, hash.Bytes()...)
 }
 
-// IsCodeKey reports whether the given byte slice is the key of contract code,
+// IsValidatorCodeKey reports whether the given byte slice is the key of validator code,
 // if so return the raw code hash as well.
 func IsValidatorCodeKey(key []byte) (bool, []byte) {
 	if bytes.HasPrefix(key, ValidatorCodePrefix) && len(key) == common.HashLength+len(ValidatorCodePrefix) {

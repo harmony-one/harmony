@@ -498,7 +498,7 @@ func (s *Object) Address() common.Address {
 	return s.address
 }
 
-// Code returns the contract code associated with this object, if any.
+// Code returns the contract/validator code associated with this object, if any.
 func (s *Object) Code(db Database, isValidatorCode bool) []byte {
 	if s.code != nil {
 		return s.code
@@ -522,7 +522,7 @@ func (s *Object) Code(db Database, isValidatorCode bool) []byte {
 	return code
 }
 
-// CodeSize returns the size of the contract code associated with this object,
+// CodeSize returns the size of the contract/validator code associated with this object,
 // or zero if none. This method is an almost mirror of Code, but uses a cache
 // inside the database to avoid loading codes seen recently.
 func (s *Object) CodeSize(db Database, isValidatorCode bool) int {
