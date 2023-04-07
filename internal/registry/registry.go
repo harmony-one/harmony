@@ -13,7 +13,7 @@ type Registry struct {
 	blockchain  core.BlockChain
 	beaconchain core.BlockChain
 	webHooks    *webhooks.Hooks
-	txPool     *core.TxPool
+	txPool      *core.TxPool
 }
 
 // New creates a new registry.
