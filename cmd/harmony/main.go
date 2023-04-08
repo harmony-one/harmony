@@ -752,6 +752,8 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		os.Exit(1)
 	}
 
+	cxPool := core.NewCxPool(core.CxPoolSize)
+	registry.SetCxPool(cxPool)
 	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc, registry)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
