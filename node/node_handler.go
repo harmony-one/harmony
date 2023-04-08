@@ -337,7 +337,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			// But need to make sure there is at least 1 node that will do the job.
 			node.BroadcastNewBlock(newBlock)
 		}
-		node.BroadcastCXReceipts(newBlock)
+		BroadcastCXReceipts(newBlock, node.Consensus)
 	} else {
 		if node.Consensus.Mode() != consensus.Listening {
 			numSignatures := node.Consensus.NumSignaturesIncludedInBlock(newBlock)
@@ -360,7 +360,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 				if node.IsRunningBeaconChain() {
 					node.BroadcastNewBlock(newBlock)
 				}
-				node.BroadcastCXReceipts(newBlock)
+				BroadcastCXReceipts(newBlock, node.Consensus)
 			}
 		}
 	}

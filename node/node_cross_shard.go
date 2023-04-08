@@ -14,7 +14,7 @@ import (
 
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
 // destination shards
-func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
+func BroadcastCXReceipts(newBlock *types.Block, consensus *consensus.Consensus) {
 	commitSigAndBitmap := newBlock.GetCurrentCommitSig()
 	//#### Read payload data from committed msg
 	if len(commitSigAndBitmap) <= 96 {
@@ -32,14 +32,14 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 	epoch := newBlock.Header().Epoch()
 	shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
-	myShardID := node.Consensus.ShardID
+	myShardID := consensus.ShardID
 	utils.Logger().Info().Int("shardNum", shardNum).Uint32("myShardID", myShardID).Uint64("blockNum", newBlock.NumberU64()).Msg("[BroadcastCXReceipts]")
 
 	for i := 0; i < shardNum; i++ {
 		if i == int(myShardID) {
 			continue
 		}
-		BroadcastCXReceiptsWithShardID(newBlock, commitSig, commitBitmap, uint32(i), node.Consensus)
+		BroadcastCXReceiptsWithShardID(newBlock, commitSig, commitBitmap, uint32(i), consensus)
 	}
 }
 
