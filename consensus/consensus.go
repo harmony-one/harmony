@@ -303,7 +303,9 @@ func New(
 	// Make Sure Verifier is not null
 	consensus.vc = newViewChange()
 	// TODO: reference to blockchain/beaconchain should be removed.
-	consensus.setBlockVerifier(VerifyNewBlock(registry.GetWebHooks(), consensus.Blockchain(), consensus.Beaconchain()))
+	verifier := VerifyNewBlock(registry.GetWebHooks(), consensus.Blockchain(), consensus.Beaconchain())
+	consensus.BlockVerifier = verifier
+	consensus.vc.verifyBlock = consensus.verifyBlock
 
 	// init prometheus metrics
 	initMetrics()
