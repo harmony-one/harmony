@@ -14,6 +14,7 @@ type Registry struct {
 	beaconchain core.BlockChain
 	webHooks    *webhooks.Hooks
 	txPool      *core.TxPool
+	isBackup    bool
 }
 
 // New creates a new registry.
@@ -87,4 +88,19 @@ func (r *Registry) GetTxPool() *core.TxPool {
 	defer r.mu.Unlock()
 
 	return r.txPool
+}
+
+func (r *Registry) SetIsBackup(isBackup bool) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.isBackup = isBackup
+	return r
+}
+
+func (r *Registry) IsBackup() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.isBackup
 }

@@ -313,3 +313,7 @@ func New(
 
 	return &consensus, nil
 }
+
+func (consensus *Consensus) GetHost() p2p.Host {
+	return consensus.host
+}

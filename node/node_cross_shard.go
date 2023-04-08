@@ -3,6 +3,7 @@ package node
 import (
 	"github.com/ethereum/go-ethereum/rlp"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -38,20 +39,20 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 		if i == int(myShardID) {
 			continue
 		}
-		node.BroadcastCXReceiptsWithShardID(newBlock, commitSig, commitBitmap, uint32(i))
+		BroadcastCXReceiptsWithShardID(newBlock, commitSig, commitBitmap, uint32(i), node.Consensus)
 	}
 }
 
 // BroadcastCXReceiptsWithShardID broadcasts cross shard receipts to given ToShardID
-func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig []byte, commitBitmap []byte, toShardID uint32) {
-	myShardID := node.Consensus.ShardID
+func BroadcastCXReceiptsWithShardID(block *types.Block, commitSig []byte, commitBitmap []byte, toShardID uint32, consensus *consensus.Consensus) {
+	myShardID := consensus.ShardID
 	utils.Logger().Debug().
 		Uint32("toShardID", toShardID).
 		Uint32("myShardID", myShardID).
 		Uint64("blockNum", block.NumberU64()).
 		Msg("[BroadcastCXReceiptsWithShardID]")
 
-	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash())
+	cxReceipts, err := consensus.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash())
 	if err != nil || len(cxReceipts) == 0 {
 		utils.Logger().Debug().Uint32("ToShardID", toShardID).
 			Int("numCXReceipts", len(cxReceipts)).
@@ -59,7 +60,7 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 		return
 	}
 
-	merkleProof, err := node.Blockchain().CXMerkleProof(toShardID, block)
+	merkleProof, err := consensus.Blockchain().CXMerkleProof(toShardID, block)
 	if err != nil {
 		utils.Logger().Warn().
 			Uint32("ToShardID", toShardID).
@@ -81,7 +82,7 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 		Interface("cxp", cxReceiptsProof).
 		Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof ready. Sending CX receipts...")
 	// TODO ek – limit concurrency
-	go node.host.SendMessageToGroups([]nodeconfig.GroupID{groupID},
+	go consensus.GetHost().SendMessageToGroups([]nodeconfig.GroupID{groupID},
 		p2p.ConstructMessage(proto_node.ConstructCXReceiptsProof(cxReceiptsProof)),
 	)
 }
@@ -105,7 +106,7 @@ func (node *Node) BroadcastMissingCXReceipts() {
 		}
 		sig := nextHeader.LastCommitSignature()
 		bitmap := nextHeader.LastCommitBitmap()
-		node.BroadcastCXReceiptsWithShardID(blk, sig[:], bitmap, toShardID)
+		BroadcastCXReceiptsWithShardID(blk, sig[:], bitmap, toShardID, node.Consensus)
 	}
 	node.CxPool.Clear()
 	// this should not happen or maybe happen for impatient user
