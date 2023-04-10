@@ -741,6 +741,9 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		registry.SetBeaconchain(registry.GetBlockchain())
 	}
 
+	cxPool := core.NewCxPool(core.CxPoolSize)
+	registry.SetCxPool(cxPool)
+
 	// Consensus object.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, nodeConfig.ShardID)
 	registry.SetIsBackup(isBackup(hc))
@@ -752,8 +755,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		os.Exit(1)
 	}
 
-	cxPool := core.NewCxPool(core.CxPoolSize)
-	registry.SetCxPool(cxPool)
 	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc, registry)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {

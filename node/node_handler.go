@@ -366,7 +366,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	}
 
 	// Broadcast client requested missing cross shard receipts if there is any
-	node.BroadcastMissingCXReceipts()
+	BroadcastMissingCXReceipts(node.Consensus)
 
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
 		if h.Availability != nil {

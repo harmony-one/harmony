@@ -3,6 +3,7 @@ package node
 import (
 	"github.com/ethereum/go-ethereum/rlp"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -39,12 +40,12 @@ func BroadcastCXReceipts(newBlock *types.Block, consensus *consensus.Consensus) 
 		if i == int(myShardID) {
 			continue
 		}
-		BroadcastCXReceiptsWithShardID(newBlock, commitSig, commitBitmap, uint32(i), consensus)
+		BroadcastCXReceiptsWithShardID(newBlock.Header(), commitSig, commitBitmap, uint32(i), consensus)
 	}
 }
 
 // BroadcastCXReceiptsWithShardID broadcasts cross shard receipts to given ToShardID
-func BroadcastCXReceiptsWithShardID(block *types.Block, commitSig []byte, commitBitmap []byte, toShardID uint32, consensus *consensus.Consensus) {
+func BroadcastCXReceiptsWithShardID(block *block.Header, commitSig []byte, commitBitmap []byte, toShardID uint32, consensus *consensus.Consensus) {
 	myShardID := consensus.ShardID
 	utils.Logger().Debug().
 		Uint32("toShardID", toShardID).
@@ -71,7 +72,7 @@ func BroadcastCXReceiptsWithShardID(block *types.Block, commitSig []byte, commit
 	cxReceiptsProof := &types.CXReceiptsProof{
 		Receipts:     cxReceipts,
 		MerkleProof:  merkleProof,
-		Header:       block.Header(),
+		Header:       block,
 		CommitSig:    commitSig,
 		CommitBitmap: commitBitmap,
 	}
@@ -88,30 +89,34 @@ func BroadcastCXReceiptsWithShardID(block *types.Block, commitSig []byte, commit
 }
 
 // BroadcastMissingCXReceipts broadcasts missing cross shard receipts per request
-func (node *Node) BroadcastMissingCXReceipts() {
-	sendNextTime := []core.CxEntry{}
-	it := node.CxPool.Pool().Iterator()
+func BroadcastMissingCXReceipts(c *consensus.Consensus) {
+	var (
+		sendNextTime = make([]core.CxEntry, 0)
+		cxPool       = c.Registry().GetCxPool()
+		blockchain   = c.Blockchain()
+	)
+	it := cxPool.Pool().Iterator()
 	for entry := range it.C {
 		cxEntry := entry.(core.CxEntry)
 		toShardID := cxEntry.ToShardID
-		blk := node.Blockchain().GetBlockByHash(cxEntry.BlockHash)
+		blk := blockchain.GetBlockByHash(cxEntry.BlockHash)
 		if blk == nil {
 			continue
 		}
 		blockNum := blk.NumberU64()
-		nextHeader := node.Blockchain().GetHeaderByNumber(blockNum + 1)
+		nextHeader := blockchain.GetHeaderByNumber(blockNum + 1)
 		if nextHeader == nil {
 			sendNextTime = append(sendNextTime, cxEntry)
 			continue
 		}
 		sig := nextHeader.LastCommitSignature()
 		bitmap := nextHeader.LastCommitBitmap()
-		BroadcastCXReceiptsWithShardID(blk, sig[:], bitmap, toShardID, node.Consensus)
+		BroadcastCXReceiptsWithShardID(blk.Header(), sig[:], bitmap, toShardID, c)
 	}
-	node.CxPool.Clear()
+	cxPool.Clear()
 	// this should not happen or maybe happen for impatient user
 	for _, entry := range sendNextTime {
-		node.CxPool.Add(entry)
+		cxPool.Add(entry)
 	}
 }
 

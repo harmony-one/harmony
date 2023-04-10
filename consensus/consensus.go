@@ -317,3 +317,7 @@ func New(
 func (consensus *Consensus) GetHost() p2p.Host {
 	return consensus.host
 }
+
+func (consensus *Consensus) Registry() *registry.Registry {
+	return consensus.registry
+}

@@ -122,6 +122,11 @@ func (h *Header) Hash() common.Hash {
 	return hash.FromRLP(h)
 }
 
+// NumberU64 returns the block number of the header as a uint64.
+func (h *Header) NumberU64() uint64 {
+	return h.Number().Uint64()
+}
+
 // Logger returns a sub-logger with block contexts added.
 func (h *Header) Logger(logger *zerolog.Logger) *zerolog.Logger {
 	nlogger := logger.With().
