@@ -282,7 +282,7 @@ func TestGetSideEffectOperationsFromUndelegationPayouts(t *testing.T) {
 	}, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
-			&types.OperationIdentifier{
+			{
 				Index: 0,
 			},
 		},

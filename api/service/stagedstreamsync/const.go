@@ -25,7 +25,7 @@ const (
 
 	// ShortRangeTimeout is the timeout for each short range sync, which allow short range sync
 	// to restart automatically when stuck in `getBlockHashes`
-	ShortRangeTimeout time.Duration = 1 * time.Minute
+	ShortRangeTimeout = 1 * time.Minute
 )
 
 type (

@@ -18,7 +18,7 @@
 // the internal calls made by a transaction, along with any useful information.
 {
 	// callstack is the current recursive call stack of the EVM execution.
-	callstack: [{}],
+	[{}],
 
 	// descended tracks whether we've just descended from an outer transaction into
 	// an inner call.

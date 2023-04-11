@@ -77,7 +77,7 @@ func (c *stakingPrecompile) RequiredGas(
 ) (uint64, error) {
 	// if invalid data or invalid shard
 	// set payload to blank and charge minimum gas
-	var payload []byte = make([]byte, 0)
+	var payload = make([]byte, 0)
 	// availability of staking and precompile has already been checked
 	if evm.Context.ShardID == shard.BeaconChainShardID {
 		// check that input is well formed

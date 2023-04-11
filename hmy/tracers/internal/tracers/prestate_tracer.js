@@ -18,7 +18,7 @@
 // the transaction from a custom assembled genesis block.
 {
 	// prestate is the genesis that we're building.
-	prestate: null,
+	null,
 
 	// lookupAccount injects the specified account into the prestate object.
 	lookupAccount: function(addr, db){

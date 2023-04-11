@@ -27,7 +27,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
-	eth "github.com/harmony-one/harmony/rpc/eth"
+	"github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"

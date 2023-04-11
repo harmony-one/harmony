@@ -121,14 +121,14 @@ func TestCompatibilityOldShardStateIntoNew(t *testing.T) {
 	}
 
 	postStakingState := State{nil, []Committee{
-		Committee{ShardID: 0, Slots: SlotList{
+		{ShardID: 0, Slots: SlotList{
 			Slot{junkA, blsPubKey1, nil},
 			Slot{junkA, blsPubKey2, nil},
 			Slot{junkA, blsPubKey3, &stake1},
 			Slot{junkA, blsPubKey5, nil},
 			Slot{junkA, blsPubKey1, &stake2},
 		}},
-		Committee{ShardID: 1, Slots: SlotList{
+		{ShardID: 1, Slots: SlotList{
 			Slot{junkA, blsPubKey2, &stake1},
 			Slot{junkA, blsPubKey3, nil},
 			Slot{junkA, blsPubKey4, nil},

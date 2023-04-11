@@ -232,7 +232,7 @@ func (node *Node) doBeaconSyncing() {
 		// If Downloader is not working, we need also deal with blocks from beaconBlockChannel
 		go func(node *Node) {
 			// TODO ek – infinite loop; add shutdown/cleanup logic
-			for _ = range node.BeaconBlockChannel {
+			for range node.BeaconBlockChannel {
 			}
 		}(node)
 	}

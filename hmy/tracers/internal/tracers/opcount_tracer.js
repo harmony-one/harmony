@@ -18,7 +18,7 @@
 // executed by the EVM before the transaction terminated.
 {
 	// count tracks the number of EVM instructions executed.
-	count: 0,
+	0,
 
 	// step is invoked for every opcode that the VM executes.
 	step: function(log, db) { this.count++ },

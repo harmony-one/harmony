@@ -20,7 +20,7 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
-	eth "github.com/harmony-one/harmony/rpc/eth"
+	"github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -840,7 +840,7 @@ func returnHashesWithPagination(hashes []common.Hash, pageIndex uint32, pageSize
 func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, gasCap *big.Int) (uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
-		lo  uint64 = params.TxGas - 1
+		lo  = params.TxGas - 1
 		hi  uint64
 		cap uint64
 	)

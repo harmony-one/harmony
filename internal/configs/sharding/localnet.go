@@ -91,10 +91,10 @@ func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 			if firstBlock2s == 0 {
 				blockNum -= localnetEpochBlock1
 			}
-			return ((blockNum-firstBlock2s)%ls.BlocksPerEpoch() == ls.BlocksPerEpoch()-1)
+			return (blockNum-firstBlock2s)%ls.BlocksPerEpoch() == ls.BlocksPerEpoch()-1
 		default: // genesis
 			blocks := ls.BlocksPerEpochOld()
-			return ((blockNum-localnetEpochBlock1)%blocks == blocks-1)
+			return (blockNum-localnetEpochBlock1)%blocks == blocks-1
 		}
 	}
 }

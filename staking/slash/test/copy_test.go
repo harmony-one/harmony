@@ -15,7 +15,7 @@ func TestCopyRecord(t *testing.T) {
 	tests := []slash.Record{
 		makeNonZeroRecord(),
 		makeZeroRecord(),
-		slash.Record{},
+		{},
 	}
 	for i, test := range tests {
 		cp := CopyRecord(test)

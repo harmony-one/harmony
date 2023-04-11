@@ -17,19 +17,19 @@ func TestAllowedTxsParse(t *testing.T) {
 		one1s4dvv454dtmkzsulffz3epewsyhrjq9y0g3fqz->one10fhdp2g9q5azrs2ukk608x6krd4rleg0ueskug:0x
 	`)
 	expected := map[ethCommon.Address]core.AllowedTxData{
-		common.HexToAddress("0x7A6Ed0a905053A21C15cB5b4F39b561B6A3FE50f"): core.AllowedTxData{
+		common.HexToAddress("0x7A6Ed0a905053A21C15cB5b4F39b561B6A3FE50f"): {
 			To:   common.HexToAddress("0x855Ac656956AF761439f4a451c872E812E3900a4"),
 			Data: common.FromHex("0x"),
 		},
-		common.HexToAddress("0x7A6Ed0a905053A21C15cB5b4F39b561B6A3FE50f"): core.AllowedTxData{
+		common.HexToAddress("0x7A6Ed0a905053A21C15cB5b4F39b561B6A3FE50f"): {
 			To:   common.HexToAddress("0x985458E523dB3d53125813eD68c274899e9DfAb4"),
 			Data: common.FromHex("0xa9059cbb"),
 		},
-		common.HexToAddress("0x855Ac656956AF761439f4a451c872E812E3900a4"): core.AllowedTxData{
+		common.HexToAddress("0x855Ac656956AF761439f4a451c872E812E3900a4"): {
 			To:   common.HexToAddress("0x985458E523dB3d53125813eD68c274899e9DfAb4"),
 			Data: common.FromHex("0xa9059cbb"),
 		},
-		common.HexToAddress("0x855Ac656956AF761439f4a451c872E812E3900a4"): core.AllowedTxData{
+		common.HexToAddress("0x855Ac656956AF761439f4a451c872E812E3900a4"): {
 			To:   common.HexToAddress("0x7A6Ed0a905053A21C15cB5b4F39b561B6A3FE50f"),
 			Data: common.FromHex("0x"),
 		},

@@ -32,7 +32,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking"
+	"github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 

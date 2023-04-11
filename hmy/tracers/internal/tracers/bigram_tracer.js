@@ -16,9 +16,9 @@
 
 {
     // hist is the counters of opcode bigrams
-    hist: {},
+    {},
     // lastOp is last operation
-    lastOp: '',
+    '',
     // execution depth of last op
     lastDepth: 0,
     // step is invoked for every opcode that the VM executes.
