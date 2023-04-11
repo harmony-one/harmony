@@ -93,9 +93,10 @@ type Object struct {
 	// Cache flags.
 	// When an object is marked suicided it will be delete from the trie
 	// during the "update" phase of the state transition.
-	dirtyCode bool // true if the code was updated
-	suicided  bool
-	deleted   bool
+	validatorWrapper bool // true if the code belongs to validator wrapper
+	dirtyCode        bool // true if the code was updated
+	suicided         bool
+	deleted          bool
 }
 
 // empty returns whether the account is considered empty.
@@ -497,13 +498,23 @@ func (s *Object) Address() common.Address {
 	return s.address
 }
 
-// Code returns the contract code associated with this object, if any.
-func (s *Object) Code(db Database) []byte {
+// Code returns the contract/validator code associated with this object, if any.
+func (s *Object) Code(db Database, isValidatorCode bool) []byte {
 	if s.code != nil {
 		return s.code
 	}
 	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
 		return nil
+	}
+	if s.validatorWrapper || isValidatorCode {
+		code, err := db.ValidatorCode(s.addrHash, common.BytesToHash(s.CodeHash()))
+		if err != nil {
+			s.setError(fmt.Errorf("can't load validator code hash %x: %v", s.CodeHash(), err))
+		}
+		if code != nil {
+			s.code = code
+			return code
+		}
 	}
 	code, err := db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
 	if err != nil {
@@ -513,15 +524,24 @@ func (s *Object) Code(db Database) []byte {
 	return code
 }
 
-// CodeSize returns the size of the contract code associated with this object,
+// CodeSize returns the size of the contract/validator code associated with this object,
 // or zero if none. This method is an almost mirror of Code, but uses a cache
 // inside the database to avoid loading codes seen recently.
-func (s *Object) CodeSize(db Database) int {
+func (s *Object) CodeSize(db Database, isValidatorCode bool) int {
 	if s.code != nil {
 		return len(s.code)
 	}
 	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
 		return 0
+	}
+	if s.validatorWrapper || isValidatorCode {
+		size, err := db.ValidatorCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
+		if err != nil {
+			s.setError(fmt.Errorf("can't load validator code size %x: %v", s.CodeHash(), err))
+		}
+		if size > 0 {
+			return size
+		}
 	}
 	size, err := db.ContractCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
 	if err != nil {
@@ -530,20 +550,21 @@ func (s *Object) CodeSize(db Database) int {
 	return size
 }
 
-func (s *Object) SetCode(codeHash common.Hash, code []byte) {
-	prevcode := s.Code(s.db.db)
+func (s *Object) SetCode(codeHash common.Hash, code []byte, isValidatorCode bool) {
+	prevcode := s.Code(s.db.db, isValidatorCode)
 	s.db.journal.append(codeChange{
 		account:  &s.address,
 		prevhash: s.CodeHash(),
 		prevcode: prevcode,
 	})
-	s.setCode(codeHash, code)
+	s.setCode(codeHash, code, isValidatorCode)
 }
 
-func (s *Object) setCode(codeHash common.Hash, code []byte) {
+func (s *Object) setCode(codeHash common.Hash, code []byte, isValidatorCode bool) {
 	s.code = code
 	s.data.CodeHash = codeHash[:]
 	s.dirtyCode = true
+	s.validatorWrapper = isValidatorCode
 }
 
 func (s *Object) SetNonce(nonce uint64) {

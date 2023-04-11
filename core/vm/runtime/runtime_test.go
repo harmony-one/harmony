@@ -105,7 +105,7 @@ func TestCall(t *testing.T) {
 		byte(vm.PUSH1), 32,
 		byte(vm.PUSH1), 0,
 		byte(vm.RETURN),
-	})
+	}, false)
 
 	ret, _, err := Call(address, nil, &Config{State: state})
 	if err != nil {
@@ -158,7 +158,7 @@ func benchmarkEVMCreate(bench *testing.B, code string) {
 	)
 
 	statedb.CreateAccount(sender)
-	statedb.SetCode(receiver, common.FromHex(code))
+	statedb.SetCode(receiver, common.FromHex(code), false)
 	runtimeConfig := Config{
 		Origin:      sender,
 		State:       statedb,

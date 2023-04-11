@@ -28,10 +28,10 @@ type dummyContractRef struct {
 	calledForEach bool
 }
 
-func (dummyContractRef) ReturnGas(*big.Int)          {}
-func (dummyContractRef) Address() common.Address     { return common.Address{} }
-func (dummyContractRef) Value() *big.Int             { return new(big.Int) }
-func (dummyContractRef) SetCode(common.Hash, []byte) {}
+func (dummyContractRef) ReturnGas(*big.Int)                {}
+func (dummyContractRef) Address() common.Address           { return common.Address{} }
+func (dummyContractRef) Value() *big.Int                   { return new(big.Int) }
+func (dummyContractRef) SetCode(common.Hash, []byte, bool) {}
 func (d *dummyContractRef) ForEachStorage(callback func(key, value common.Hash) bool) {
 	d.calledForEach = true
 }

@@ -100,7 +100,7 @@ func (s *DB) prefetchWorker(job *prefetchJob, jobs chan *prefetchJob) {
 			addr := common.BytesToAddress(addrBytes)
 			obj := newObject(s, addr, data)
 			if data.CodeHash != nil {
-				obj.Code(s.db)
+				obj.Code(s.db, false)
 			}
 
 			// build account trie tree

@@ -93,3 +93,57 @@ func DeleteCode(db ethdb.KeyValueWriter, hash common.Hash) {
 		utils.Logger().Error().Err(err).Msg("Failed to delete contract code")
 	}
 }
+
+// ReadValidatorCode retrieves the validator code of the provided code hash.
+func ReadValidatorCode(db ethdb.KeyValueReader, hash common.Hash) []byte {
+	// Try with the prefixed code scheme first, if not then try with legacy
+	// scheme.
+	data := ReadValidatorCodeWithPrefix(db, hash)
+	if len(data) != 0 {
+		return data
+	}
+	data, _ = db.Get(hash.Bytes())
+	return data
+}
+
+// ReadValidatorCodeWithPrefix retrieves the validator code of the provided code hash.
+// The main difference between this function and ReadValidatorCode is this function
+// will only check the existence with latest scheme(with prefix).
+func ReadValidatorCodeWithPrefix(db ethdb.KeyValueReader, hash common.Hash) []byte {
+	data, _ := db.Get(validatorCodeKey(hash))
+	return data
+}
+
+// HasValidatorCode checks if the validator code corresponding to the
+// provided code hash is present in the db.
+func HasValidatorCode(db ethdb.KeyValueReader, hash common.Hash) bool {
+	// Try with the prefixed code scheme first, if not then try with legacy
+	// scheme.
+	if ok := HasValidatorCodeWithPrefix(db, hash); ok {
+		return true
+	}
+	ok, _ := db.Has(hash.Bytes())
+	return ok
+}
+
+// HasValidatorCodeWithPrefix checks if the validator code corresponding to the
+// provided code hash is present in the db. This function will only check
+// presence using the prefix-scheme.
+func HasValidatorCodeWithPrefix(db ethdb.KeyValueReader, hash common.Hash) bool {
+	ok, _ := db.Has(validatorCodeKey(hash))
+	return ok
+}
+
+// WriteValidatorCode writes the provided validator code to database.
+func WriteValidatorCode(db ethdb.KeyValueWriter, hash common.Hash, code []byte) {
+	if err := db.Put(validatorCodeKey(hash), code); err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to store validator code")
+	}
+}
+
+// DeleteValidatorCode deletes the specified validator code from the database.
+func DeleteValidatorCode(db ethdb.KeyValueWriter, hash common.Hash) {
+	if err := db.Delete(validatorCodeKey(hash)); err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to delete validator code")
+	}
+}

@@ -342,18 +342,18 @@ func (db *DB) BlockHash() common.Hash {
 	return db.bhash
 }
 
-func (db *DB) GetCode(addr common.Address) []byte {
+func (db *DB) GetCode(addr common.Address, isValidatorCode bool) []byte {
 	Object := db.getStateObject(addr)
 	if Object != nil {
-		return Object.Code(db.db)
+		return Object.Code(db.db, isValidatorCode)
 	}
 	return nil
 }
 
-func (db *DB) GetCodeSize(addr common.Address) int {
+func (db *DB) GetCodeSize(addr common.Address, isValidatorCode bool) int {
 	Object := db.getStateObject(addr)
 	if Object != nil {
-		return Object.CodeSize(db.db)
+		return Object.CodeSize(db.db, isValidatorCode)
 	}
 	return 0
 }
@@ -475,10 +475,10 @@ func (db *DB) SetNonce(addr common.Address, nonce uint64) {
 	}
 }
 
-func (db *DB) SetCode(addr common.Address, code []byte) {
+func (db *DB) SetCode(addr common.Address, code []byte, isValidatorCode bool) {
 	Object := db.GetOrNewStateObject(addr)
 	if Object != nil {
-		Object.SetCode(crypto.Keccak256Hash(code), code)
+		Object.SetCode(crypto.Keccak256Hash(code), code, isValidatorCode)
 	}
 }
 
@@ -1053,7 +1053,11 @@ func (db *DB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		if obj := db.stateObjects[addr]; !obj.deleted {
 			// Write any contract code associated with the state object
 			if obj.code != nil && obj.dirtyCode {
-				rawdb.WriteCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
+				if obj.validatorWrapper {
+					rawdb.WriteValidatorCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
+				} else {
+					rawdb.WriteCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
+				}
 				obj.dirtyCode = false
 			}
 			// Write any storage changes in the state object to its storage trie
@@ -1237,9 +1241,12 @@ func (db *DB) ValidatorWrapper(
 		return copyValidatorWrapperIfNeeded(cached, sendOriginal, copyDelegations), nil
 	}
 
-	by := db.GetCode(addr)
+	by := db.GetCode(addr, true)
 	if len(by) == 0 {
-		return nil, ErrAddressNotPresent
+		by = db.GetCode(addr, false)
+		if len(by) == 0 {
+			return nil, ErrAddressNotPresent
+		}
 	}
 	val := stk.ValidatorWrapper{}
 	if err := rlp.DecodeBytes(by, &val); err != nil {
@@ -1285,7 +1292,7 @@ func (db *DB) UpdateValidatorWrapper(
 		return err
 	}
 	// has revert in-built for the code field
-	db.SetCode(addr, by)
+	db.SetCode(addr, by, true)
 	// update cache
 	db.stateValidators[addr] = val
 	return nil
