@@ -165,7 +165,7 @@ func (s *DB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []byte)
 		addr := common.BytesToAddress(addrBytes)
 		obj := newObject(s, addr, data)
 		if !conf.SkipCode {
-			account.Code = obj.Code(s.db)
+			account.Code = obj.Code(s.db, false)
 		}
 		if !conf.SkipStorage {
 			account.Storage = make(map[common.Hash]string)

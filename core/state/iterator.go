@@ -124,6 +124,12 @@ func (it *NodeIterator) step() error {
 		if err != nil {
 			return fmt.Errorf("code %x: %v", account.CodeHash, err)
 		}
+		if it.code == nil || len(it.code) == 0 {
+			it.code, err = it.state.db.ValidatorCode(addrHash, common.BytesToHash(account.CodeHash))
+			if err != nil {
+				return fmt.Errorf("code %x: %v", account.CodeHash, err)
+			}
+		}
 	}
 	it.accountHash = it.stateIt.Parent()
 	return nil

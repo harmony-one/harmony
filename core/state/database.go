@@ -53,6 +53,12 @@ type Database interface {
 	// ContractCodeSize retrieves a particular contracts code's size.
 	ContractCodeSize(addrHash, codeHash common.Hash) (int, error)
 
+	// ValidatorCode retrieves a particular validator's code.
+	ValidatorCode(addrHash, codeHash common.Hash) ([]byte, error)
+
+	// ValidatorCodeSize retrieves a particular validator code's size.
+	ValidatorCodeSize(addrHash, codeHash common.Hash) (int, error)
+
 	// DiskDB returns the underlying key-value disk database.
 	DiskDB() ethdb.KeyValueStore
 
@@ -232,6 +238,47 @@ func (db *cachingDB) ContractCodeSize(addrHash, codeHash common.Hash) (int, erro
 	}
 	code, err := db.ContractCode(addrHash, codeHash)
 	return len(code), err
+}
+
+// ValidatorCodeSize retrieves a particular validators code's size.
+func (db *cachingDB) ValidatorCodeSize(addrHash, codeHash common.Hash) (int, error) {
+	if cached, ok := db.codeSizeCache.Get(codeHash); ok {
+		return cached, nil
+	}
+	code, err := db.ValidatorCode(addrHash, codeHash)
+	return len(code), err
+}
+
+// ValidatorCode retrieves a particular validator's code.
+func (db *cachingDB) ValidatorCode(addrHash, codeHash common.Hash) ([]byte, error) {
+	code, _ := db.codeCache.Get(codeHash)
+	if len(code) > 0 {
+		return code, nil
+	}
+	code = rawdb.ReadValidatorCode(db.disk, codeHash)
+	if len(code) > 0 {
+		db.codeCache.Add(codeHash, code)
+		db.codeSizeCache.Add(codeHash, len(code))
+		return code, nil
+	}
+	return nil, errors.New("not found")
+}
+
+// ValidatorCodeWithPrefix retrieves a particular validator's code. If the
+// code can't be found in the cache, then check the existence with **new**
+// db scheme.
+func (db *cachingDB) ValidatorCodeWithPrefix(addrHash, codeHash common.Hash) ([]byte, error) {
+	code, _ := db.codeCache.Get(codeHash)
+	if len(code) > 0 {
+		return code, nil
+	}
+	code = rawdb.ReadValidatorCodeWithPrefix(db.disk, codeHash)
+	if len(code) > 0 {
+		db.codeCache.Add(codeHash, code)
+		db.codeSizeCache.Add(codeHash, len(code))
+		return code, nil
+	}
+	return nil, errors.New("not found")
 }
 
 // DiskDB returns the underlying key-value disk database.

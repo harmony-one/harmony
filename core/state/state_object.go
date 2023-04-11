@@ -505,48 +505,49 @@ func (s *Object) Address() common.Address {
 }
 
 // Code returns the contract/validator code associated with this object, if any.
-func (s *Object) Code(db Database) []byte {
+func (s *Object) Code(db Database, isValidatorCode bool) []byte {
 	if s.code != nil {
 		return s.code
 	}
 	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
 		return nil
 	}
-	var err error
-	code := []byte{}
-	// if it's not set for validator wrapper, then it may be either contract code or validator wrapper (old version of db
-	// don't have any prefix to differentiate between them)
-	// so, if it's not set for validator wrapper, we need to check contract code as well
-	if !s.validatorWrapper {
-		code, err = db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
+	if s.validatorWrapper || isValidatorCode {
+		code, err := db.ValidatorCode(s.addrHash, common.BytesToHash(s.CodeHash()))
+		if err != nil {
+			s.setError(fmt.Errorf("can't load validator code hash %x: %v", s.CodeHash(), err))
+		}
+		if code != nil {
+			s.code = code
+			return code
+		}
 	}
-	// if it couldn't load contract code or it is set to validator wrapper, then it tries to fetch validator wrapper code
-	if s.validatorWrapper || err != nil {
-		vCode, errVCode := db.ValidatorCode(s.addrHash, common.BytesToHash(s.CodeHash()))
-		if errVCode == nil && vCode != nil {
-			s.code = vCode
-			return vCode
-		}
-		if s.validatorWrapper {
-			s.setError(fmt.Errorf("can't load validator code hash %x for account address hash %x : %v", s.CodeHash(), s.addrHash, err))
-		} else {
-			s.setError(fmt.Errorf("can't load contract/validator code hash %x for account address hash %x : contract code error: %v, validator code error: %v",
-				s.CodeHash(), s.addrHash, err, errVCode))
-		}
+	code, err := db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
+	if err != nil {
+		s.setError(fmt.Errorf("can't load code hash %x: %v", s.CodeHash(), err))
 	}
 	s.code = code
 	return code
 }
 
-// CodeSize returns the size of the contract code associated with this object,
+// CodeSize returns the size of the contract/validator code associated with this object,
 // or zero if none. This method is an almost mirror of Code, but uses a cache
 // inside the database to avoid loading codes seen recently.
-func (s *Object) CodeSize(db Database) int {
+func (s *Object) CodeSize(db Database, isValidatorCode bool) int {
 	if s.code != nil {
 		return len(s.code)
 	}
 	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
 		return 0
+	}
+	if s.validatorWrapper || isValidatorCode {
+		size, err := db.ValidatorCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
+		if err != nil {
+			s.setError(fmt.Errorf("can't load validator code size %x: %v", s.CodeHash(), err))
+		}
+		if size > 0 {
+			return size
+		}
 	}
 	size, err := db.ContractCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
 	if err != nil {
@@ -555,8 +556,8 @@ func (s *Object) CodeSize(db Database) int {
 	return size
 }
 
-func (s *Object) SetCode(codeHash common.Hash, code []byte) {
-	prevcode := s.Code(s.db.db)
+func (s *Object) SetCode(codeHash common.Hash, code []byte, isValidatorCode bool) {
+	prevcode := s.Code(s.db.db, isValidatorCode)
 	s.db.journal.append(codeChange{
 		account:  &s.address,
 		prevhash: s.CodeHash(),

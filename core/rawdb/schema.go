@@ -126,10 +126,11 @@ var (
 	snapdbInfoKey = []byte("SnapdbInfo")
 
 	// Data item prefixes (use single byte to avoid mixing data types, avoid `i`, used for indexes).
-	SnapshotAccountPrefix = []byte("a") // SnapshotAccountPrefix + account hash -> account trie value
-	SnapshotStoragePrefix = []byte("o") // SnapshotStoragePrefix + account hash + storage hash -> storage trie value
-	CodePrefix            = []byte("c") // CodePrefix + code hash -> account code -> We not using this at the moment
-	skeletonHeaderPrefix  = []byte("S") // skeletonHeaderPrefix + num (uint64 big endian) -> header
+	SnapshotAccountPrefix = []byte("a")  // SnapshotAccountPrefix + account hash -> account trie value
+	SnapshotStoragePrefix = []byte("o")  // SnapshotStoragePrefix + account hash + storage hash -> storage trie value
+	CodePrefix            = []byte("c")  // CodePrefix + code hash -> account code
+	ValidatorCodePrefix   = []byte("vc") // ValidatorCodePrefix + code hash -> validator code
+	skeletonHeaderPrefix  = []byte("S")  // skeletonHeaderPrefix + num (uint64 big endian) -> header
 
 	// Path-based trie node scheme.
 	trieNodeAccountPrefix = []byte("A") // trieNodeAccountPrefix + hexPath -> trie node
@@ -192,6 +193,20 @@ func codeKey(hash common.Hash) []byte {
 func IsCodeKey(key []byte) (bool, []byte) {
 	if bytes.HasPrefix(key, CodePrefix) && len(key) == common.HashLength+len(CodePrefix) {
 		return true, key[len(CodePrefix):]
+	}
+	return false, nil
+}
+
+// validatorCodeKey = ValidatorCodePrefix + hash
+func validatorCodeKey(hash common.Hash) []byte {
+	return append(ValidatorCodePrefix, hash.Bytes()...)
+}
+
+// IsValidatorCodeKey reports whether the given byte slice is the key of validator code,
+// if so return the raw code hash as well.
+func IsValidatorCodeKey(key []byte) (bool, []byte) {
+	if bytes.HasPrefix(key, ValidatorCodePrefix) && len(key) == common.HashLength+len(ValidatorCodePrefix) {
+		return true, key[len(ValidatorCodePrefix):]
 	}
 	return false, nil
 }
