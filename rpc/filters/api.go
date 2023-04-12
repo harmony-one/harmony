@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
