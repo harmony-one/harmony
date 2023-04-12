@@ -1,9 +1,9 @@
 name: Manual release harmony (need tag)
 
-on: 
+on:
   workflow_dispatch:
     inputs:
-      tag: 
+      tag:
         decription: 'tag value to create the release'
         required: true
 
@@ -42,7 +42,7 @@ jobs:
     if: needs.check.outputs.tag_annotated == 'true'
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-12, [self-hosted, linux, ARM64]]
+        os: [ ubuntu-22.04, macos-12, [ self-hosted, linux, ARM64 ] ]
 
     steps:
       - name: Import GPG key
@@ -125,7 +125,7 @@ jobs:
 
   docker-build:
     name: Build and push harmony docker image
-    needs: [check, build]
+    needs: [ check, build ]
     runs-on: ubuntu-22.04
     if: needs.check.outputs.tag_annotated == 'true'
 
@@ -154,7 +154,7 @@ jobs:
         run: |
           mv $GITHUB_WORKSPACE/harmony-amd64 ./scripts/docker/harmony
         working-directory: harmony
-  
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -176,7 +176,7 @@ jobs:
 
   release-page:
     name: Sign binary and create and publish release page
-    needs: [check, build]
+    needs: [ check, build ]
     runs-on: ubuntu-22.04
     if: needs.check.outputs.tag_annotated == 'true'
 

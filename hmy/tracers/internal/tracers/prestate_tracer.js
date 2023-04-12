@@ -17,92 +17,107 @@
 // prestateTracer outputs sufficient information to create a local execution of
 // the transaction from a custom assembled genesis block.
 {
-	// prestate is the genesis that we're building.
-	null,
+    // prestate is the genesis that we're building.
+    null,
 
-	// lookupAccount injects the specified account into the prestate object.
-	lookupAccount: function(addr, db){
-		var acc = toHex(addr);
-		if (this.prestate[acc] === undefined) {
-			this.prestate[acc] = {
-				balance: '0x' + db.getBalance(addr).toString(16),
-				nonce:   db.getNonce(addr),
-				code:    toHex(db.getCode(addr)),
-				storage: {}
-			};
-		}
-	},
+        // lookupAccount injects the specified account into the prestate object.
+        lookupAccount
+:
 
-	// lookupStorage injects the specified storage entry of the given account into
-	// the prestate object.
-	lookupStorage: function(addr, key, db){
-		var acc = toHex(addr);
-		var idx = toHex(key);
+    function (addr, db) {
+        var acc = toHex(addr);
+        if (this.prestate[acc] === undefined) {
+            this.prestate[acc] = {
+                balance: '0x' + db.getBalance(addr).toString(16),
+                nonce: db.getNonce(addr),
+                code: toHex(db.getCode(addr)),
+                storage: {}
+            };
+        }
+    }
 
-		if (this.prestate[acc].storage[idx] === undefined) {
-			this.prestate[acc].storage[idx] = toHex(db.getState(addr, key));
-		}
-	},
+,
 
-	// result is invoked when all the opcodes have been iterated over and returns
-	// the final result of the tracing.
-	result: function(ctx, db) {
-		// At this point, we need to deduct the 'value' from the
-		// outer transaction, and move it back to the origin
-		this.lookupAccount(ctx.from, db);
+    // lookupStorage injects the specified storage entry of the given account into
+    // the prestate object.
+    lookupStorage: function (addr, key, db) {
+        var acc = toHex(addr);
+        var idx = toHex(key);
 
-		var fromBal = bigInt(this.prestate[toHex(ctx.from)].balance.slice(2), 16);
-		var toBal   = bigInt(this.prestate[toHex(ctx.to)].balance.slice(2), 16);
+        if (this.prestate[acc].storage[idx] === undefined) {
+            this.prestate[acc].storage[idx] = toHex(db.getState(addr, key));
+        }
+    }
+,
 
-		this.prestate[toHex(ctx.to)].balance   = '0x'+toBal.subtract(ctx.value).toString(16);
-		this.prestate[toHex(ctx.from)].balance = '0x'+fromBal.add(ctx.value).toString(16);
+    // result is invoked when all the opcodes have been iterated over and returns
+    // the final result of the tracing.
+    result: function (ctx, db) {
+        // At this point, we need to deduct the 'value' from the
+        // outer transaction, and move it back to the origin
+        this.lookupAccount(ctx.from, db);
 
-		// Decrement the caller's nonce, and remove empty create targets
-		this.prestate[toHex(ctx.from)].nonce--;
-		if (ctx.type == 'CREATE') {
-			// We can blibdly delete the contract prestate, as any existing state would
-			// have caused the transaction to be rejected as invalid in the first place.
-			delete this.prestate[toHex(ctx.to)];
-		}
-		// Return the assembled allocations (prestate)
-		return this.prestate;
-	},
+        var fromBal = bigInt(this.prestate[toHex(ctx.from)].balance.slice(2), 16);
+        var toBal = bigInt(this.prestate[toHex(ctx.to)].balance.slice(2), 16);
 
-	// step is invoked for every opcode that the VM executes.
-	step: function(log, db) {
-		// Add the current account if we just started tracing
-		if (this.prestate === null){
-			this.prestate = {};
-			// Balance will potentially be wrong here, since this will include the value
-			// sent along with the message. We fix that in 'result()'.
-			this.lookupAccount(log.contract.getAddress(), db);
-		}
-		// Whenever new state is accessed, add it to the prestate
-		switch (log.op.toString()) {
-			case "EXTCODECOPY": case "EXTCODESIZE": case "BALANCE":
-				this.lookupAccount(toAddress(log.stack.peek(0).toString(16)), db);
-				break;
-			case "CREATE":
-				var from = log.contract.getAddress();
-				this.lookupAccount(toContract(from, db.getNonce(from)), db);
-				break;
-			case "CREATE2":
-				var from = log.contract.getAddress();
-				// stack: salt, size, offset, endowment
-				var offset = log.stack.peek(1).valueOf()
-				var size = log.stack.peek(2).valueOf()
-				var end = offset + size
-				this.lookupAccount(toContract2(from, log.stack.peek(3).toString(16), log.memory.slice(offset, end)), db);
-				break;
-			case "CALL": case "CALLCODE": case "DELEGATECALL": case "STATICCALL":
-				this.lookupAccount(toAddress(log.stack.peek(1).toString(16)), db);
-				break;
-			case 'SSTORE':case 'SLOAD':
-				this.lookupStorage(log.contract.getAddress(), toWord(log.stack.peek(0).toString(16)), db);
-				break;
-		}
-	},
+        this.prestate[toHex(ctx.to)].balance = '0x' + toBal.subtract(ctx.value).toString(16);
+        this.prestate[toHex(ctx.from)].balance = '0x' + fromBal.add(ctx.value).toString(16);
 
-	// fault is invoked when the actual execution of an opcode fails.
-	fault: function(log, db) {}
+        // Decrement the caller's nonce, and remove empty create targets
+        this.prestate[toHex(ctx.from)].nonce--;
+        if (ctx.type == 'CREATE') {
+            // We can blibdly delete the contract prestate, as any existing state would
+            // have caused the transaction to be rejected as invalid in the first place.
+            delete this.prestate[toHex(ctx.to)];
+        }
+        // Return the assembled allocations (prestate)
+        return this.prestate;
+    }
+,
+
+    // step is invoked for every opcode that the VM executes.
+    step: function (log, db) {
+        // Add the current account if we just started tracing
+        if (this.prestate === null) {
+            this.prestate = {};
+            // Balance will potentially be wrong here, since this will include the value
+            // sent along with the message. We fix that in 'result()'.
+            this.lookupAccount(log.contract.getAddress(), db);
+        }
+        // Whenever new state is accessed, add it to the prestate
+        switch (log.op.toString()) {
+            case "EXTCODECOPY":
+            case "EXTCODESIZE":
+            case "BALANCE":
+                this.lookupAccount(toAddress(log.stack.peek(0).toString(16)), db);
+                break;
+            case "CREATE":
+                var from = log.contract.getAddress();
+                this.lookupAccount(toContract(from, db.getNonce(from)), db);
+                break;
+            case "CREATE2":
+                var from = log.contract.getAddress();
+                // stack: salt, size, offset, endowment
+                var offset = log.stack.peek(1).valueOf()
+                var size = log.stack.peek(2).valueOf()
+                var end = offset + size
+                this.lookupAccount(toContract2(from, log.stack.peek(3).toString(16), log.memory.slice(offset, end)), db);
+                break;
+            case "CALL":
+            case "CALLCODE":
+            case "DELEGATECALL":
+            case "STATICCALL":
+                this.lookupAccount(toAddress(log.stack.peek(1).toString(16)), db);
+                break;
+            case 'SSTORE':
+            case 'SLOAD':
+                this.lookupStorage(log.contract.getAddress(), toWord(log.stack.peek(0).toString(16)), db);
+                break;
+        }
+    }
+,
+
+    // fault is invoked when the actual execution of an opcode fails.
+    fault: function (log, db) {
+    }
 }

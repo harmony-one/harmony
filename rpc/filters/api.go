@@ -10,7 +10,6 @@ import (
 
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"

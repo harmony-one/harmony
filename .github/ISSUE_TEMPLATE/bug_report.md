@@ -12,6 +12,7 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior:
+
 1. Check out code with "sha1" commit
 2. Build
 3. run local test using "...." commands
@@ -23,7 +24,8 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **Environment (please complete the following information):**
- - OS: [Linux, MacOS]
+
+- OS: [Linux, MacOS]
 - Go environment [ ```go env``` ]
 
 **Additional context**

@@ -4,8 +4,8 @@
 
 Create a github issue if vulnerability can be exposed publicly otherwise send an email to security@harmony.one
 
-Fingerprint : 4F8E 9A61 C807 B5E8 98E6  9BF2 F0C5 926C BA34 9CC5
- 
+Fingerprint : 4F8E 9A61 C807 B5E8 98E6 9BF2 F0C5 926C BA34 9CC5
+
 <details>
   <summary>PGP public key</summary>
 
@@ -63,4 +63,5 @@ fP6A0g//74BUCXdvIQr1Q7dpGYwGtoM0uckEvzwRSx4cIjTlZ14uM6RhLIAu69+l
 =5E62
 -----END PGP PUBLIC KEY BLOCK-----
 ```
+
 </details>

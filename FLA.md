@@ -4,37 +4,37 @@ Thank you for your interest in contributing to Simple Rules Company's Harmony
 ("We" or "Us").
 
 The purpose of this contributor agreement ("Agreement") is to clarify and
-document the rights granted by contributors to Us.  By Your Submission of your
+document the rights granted by contributors to Us. By Your Submission of your
 Contribution to Us, You and We mutually agree to the terms and conditions of
 this Agreement.
 
 ## 0. Preamble
 
 Software is deeply embedded in all aspects of our lives and it is important
-that it empower, rather than restrict us.  Free Software gives everybody the
-rights to use, understand, adapt and share software.  These rights help support
+that it empower, rather than restrict us. Free Software gives everybody the
+rights to use, understand, adapt and share software. These rights help support
 other fundamental freedoms like freedom of speech, press and privacy.
 
-Development of Free Software can follow many patterns.  In some cases whole
-development is handled by a sole programmer or a small group of people.  But
+Development of Free Software can follow many patterns. In some cases whole
+development is handled by a sole programmer or a small group of people. But
 usually, the creation and maintenance of software is a complex process that
-requires the contribution of many individuals.  This also affects who owns the
-rights to the software.  In the latter case, rights in software are owned
+requires the contribution of many individuals. This also affects who owns the
+rights to the software. In the latter case, rights in software are owned
 jointly by a great number of individuals.
 
 To tackle this issue some projects require a full copyright assignment to be
-signed by all contributors.  The problem with such assignments is that they
+signed by all contributors. The problem with such assignments is that they
 often lack checks and balances that would protect the contributors from
 potential abuse of power from the new copyright holder.
 
 FSFE’s Fiduciary License Agreement (FLA) was created by the Free Software
 Foundation Europe e.V. with just that in mind – to concentrate all deciding
 power within one entity and prevent fragmentation of rights on one hand, while
-on the other preventing that single entity from abusing its power.  The main
+on the other preventing that single entity from abusing its power. The main
 aim is to ensure that the software covered under the FLA will forever remain
 Free Software.
 
-This process only serves for the transfer of economic rights.  So-called moral
+This process only serves for the transfer of economic rights. So-called moral
 rights (e.g. authors right to be identified as author) remain with the original
 author(s) and are inalienable.
 
@@ -42,7 +42,7 @@ author(s) and are inalienable.
 
 If You are an employee and have created the Contribution as part of your
 employment, You need to have Your employer approve this Agreement or sign the
-Entity version of this document.  If You do not own the Copyright in the entire
+Entity version of this document. If You do not own the Copyright in the entire
 work of authorship, any other author of the Contribution should also sign this
 – in any event, please contact Us at licensing@harmony.one
 
@@ -59,9 +59,9 @@ copyright, moral and neighboring rights, as appropriate, for the full term of
 their existence.
 
 **"Material"** means the software or documentation made available by Us to
-third parties.  When this Agreement covers more than one software project, the
+third parties. When this Agreement covers more than one software project, the
 Material means the software or documentation to which the Contribution was
-Submitted.  After You Submit the Contribution, it may be included in the
+Submitted. After You Submit the Contribution, it may be included in the
 Material.
 
 **"Submit"** means any act by which a Contribution is transferred to Us by You
@@ -95,7 +95,7 @@ including, but not limited to:
 ### 2.2 Moral rights
 
 Moral Rights remain unaffected to the extent they are recognized and not
-waivable by applicable law.  Notwithstanding, You may add your name to the
+waivable by applicable law. Notwithstanding, You may add your name to the
 attribution mechanism customary used in the Materials you Contribute to, such
 as the header of the source code files of Your Contribution, and We will
 respect this attribution when using Your Contribution.
@@ -130,7 +130,7 @@ patent license, with the right to transfer an unlimited number of non-exclusive
 licenses or to grant sublicenses to third parties, to make, have made, use,
 sell, offer for sale, import and otherwise transfer the Contribution and the
 Contribution in combination with any Material (and portions of such
-combination).  This license applies to all patents owned or controlled by You,
+combination). This license applies to all patents owned or controlled by You,
 whether already acquired or hereafter acquired, that would be infringed by
 making, having made, using, selling, offering for sale, importing or otherwise
 transferring of Your Contribution(s) alone or by combination of Your
@@ -140,7 +140,7 @@ Contribution(s) with any Material.
 
 You reserve the right to revoke the patent license stated in section 3.1 if We
 make any infringement claim that is targeted at your Contribution and not
-asserted for a Defensive Purpose.  An assertion of claims of the Patents shall
+asserted for a Defensive Purpose. An assertion of claims of the Patents shall
 be considered for a "Defensive Purpose" if the claims are asserted against an
 entity that has filed, maintained, threatened, or voluntarily participated in a
 patent infringement lawsuit against Us or any of Our licensees.
@@ -160,10 +160,10 @@ by the Open Source Initiative as Open Source licenses..
 
 ## 5. Disclaimer
 
-THE CONTRIBUTION IS PROVIDED "AS IS".  MORE PARTICULARLY, ALL EXPRESS OR
+THE CONTRIBUTION IS PROVIDED "AS IS". MORE PARTICULARLY, ALL EXPRESS OR
 IMPLIED WARRANTIES INCLUDING, WITHOUT LIMITATION, ANY IMPLIED WARRANTY OF
 SATISFACTORY QUALITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT ARE
-EXPRESSLY DISCLAIMED BY YOU TO US AND BY US TO YOU.  TO THE EXTENT THAT ANY
+EXPRESSLY DISCLAIMED BY YOU TO US AND BY US TO YOU. TO THE EXTENT THAT ANY
 SUCH WARRANTIES CANNOT BE DISCLAIMED, SUCH WARRANTY IS LIMITED IN DURATION AND
 EXTENT TO THE MINIMUM PERIOD AND EXTENT PERMITTED BY LAW.
 
@@ -188,13 +188,13 @@ OR CONTRACTUAL LIABILITY IN CONNECTION WITH THE CONTRIBUTION.
 conditions.
 
 8.2 This Agreement shall apply for the term of the copyright and patents
-licensed here.  However, You shall have the right to terminate the Agreement if
-We do not fulfill the obligations as set forth in Section 4.  Such termination
+licensed here. However, You shall have the right to terminate the Agreement if
+We do not fulfill the obligations as set forth in Section 4. Such termination
 must be made in writing.
 
 8.3 In the event of a termination of this Agreement Sections 5., 6., 7., 8.,
 and 9. shall survive such termination and shall remain in full force
-thereafter.  For the avoidance of doubt, Free and Open Source Software
+thereafter. For the avoidance of doubt, Free and Open Source Software
 (sub)licenses that have already been granted for Contributions at the date of
 the termination shall remain in full force after the termination of this
 Agreement.
@@ -209,13 +209,13 @@ America excluding its private international law provisions.
 9.2 This Agreement sets out the entire agreement between You and Us for Your
 Contributions to Us and overrides all other agreements or understandings.
 
-9.3 In case of Your death, this agreement shall continue with Your heirs.  In
+9.3 In case of Your death, this agreement shall continue with Your heirs. In
 case of more than one heir, all heirs must exercise their rights through a
 commonly authorized person.
 
 9.4 If any provision of this Agreement is found void and unenforceable, such
 provision will be replaced to the extent possible with a provision that comes
-closest to the meaning of the original provision and that is enforceable.  The
+closest to the meaning of the original provision and that is enforceable. The
 terms and conditions set forth in this Agreement shall apply notwithstanding
 any failure of essential purpose of this Agreement or any limited remedy to the
 maximum extent possible under law.
