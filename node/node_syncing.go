@@ -24,7 +24,6 @@ import (
 	downloader_pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/api/service/stagedstreamsync"
 	"github.com/harmony-one/harmony/api/service/stagedsync"
-	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -875,25 +874,13 @@ type Downloaders interface {
 }
 
 func (node *Node) getDownloaders() Downloaders {
-	if node.NodeConfig.StagedSync {
-		syncService := node.serviceManager.GetService(service.StagedStreamSync)
-		if syncService == nil {
-			return nil
-		}
-		dsService, ok := syncService.(*stagedstreamsync.StagedStreamSyncService)
-		if !ok {
-			return nil
-		}
-		return dsService.Downloaders
-	} else {
-		syncService := node.serviceManager.GetService(service.Synchronize)
-		if syncService == nil {
-			return nil
-		}
-		dsService, ok := syncService.(*synchronize.Service)
-		if !ok {
-			return nil
-		}
-		return dsService.Downloaders
+	syncService := node.serviceManager.GetService(service.Synchronize)
+	if syncService == nil {
+		return nil
 	}
+	dsService, ok := syncService.(*stagedstreamsync.StagedStreamSyncService)
+	if !ok {
+		return nil
+	}
+	return dsService.Downloaders
 }
