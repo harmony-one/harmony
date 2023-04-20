@@ -48,8 +48,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 					Msg("Consensus new block proposal: STOPPED!")
 				return
 			case proposalType := <-cs.GetReadySignal():
-				retryCount := 0
-				for cs.IsLeader() {
+				for retryCount := 0; retryCount < 3 && cs.IsLeader(); retryCount++ {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
 						Uint64("blockNum", cs.Blockchain().CurrentBlock().NumberU64()+1).
@@ -86,12 +85,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 						}
 					}()
 					newBlock, err := node.ProposeNewBlock(newCommitSigsChan)
-
 					if err == nil {
-						if blk, ok := node.proposedBlock[newBlock.NumberU64()]; ok {
-							utils.Logger().Info().Uint64("blockNum", newBlock.NumberU64()).Str("blockHash", blk.Hash().Hex()).
-								Msg("Block with the same number was already proposed, abort.")
-						}
 						utils.Logger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
 							Uint64("epoch", newBlock.Epoch().Uint64()).
@@ -102,18 +96,11 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 							Msg("=========Successfully Proposed New Block==========")
 
 						// Send the new block to Consensus so it can be confirmed.
-						node.proposedBlock[newBlock.NumberU64()] = newBlock
-						delete(node.proposedBlock, newBlock.NumberU64()-10)
-						node.Consensus.BlockChannel(newBlock)
+						cs.BlockChannel(newBlock)
 						break
 					} else {
-						retryCount++
 						utils.Logger().Err(err).Int("retryCount", retryCount).
 							Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
-						if retryCount > 3 {
-							// break to avoid repeated failures
-							break
-						}
 						continue
 					}
 				}

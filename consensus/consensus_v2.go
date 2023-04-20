@@ -428,7 +428,7 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 		return
 	}
 	// Sleep to wait for the full block time
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
+	consensus.GetLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
 	time.AfterFunc(time.Until(consensus.NextBlockDue), func() {
 		consensus.StartFinalityCount()
 		consensus.mutex.Lock()

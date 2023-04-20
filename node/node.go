@@ -141,7 +141,6 @@ type Node struct {
 	BroadcastInvalidTx bool
 	// InSync flag indicates the node is in-sync or not
 	IsSynchronized *abool.AtomicBool
-	proposedBlock  map[uint64]*types.Block
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
@@ -1113,7 +1112,6 @@ func New(
 		node.committeeCache, _ = lru.New(16)
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
-		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
