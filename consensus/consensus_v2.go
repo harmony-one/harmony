@@ -247,6 +247,7 @@ func (consensus *Consensus) finalCommit() {
 
 	consensus.UpdateLeaderMetrics(float64(numCommits), float64(block.NumberU64()))
 
+	consensus.getLogger().Info().Msgf("[finalCommit] isLeader %v block.IsLastBlockInEpoch() %v", consensus.isLeader(), block.IsLastBlockInEpoch())
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
 	if consensus.isLeader() {

@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -140,6 +141,9 @@ func (consensus *Consensus) Blockchain() core.BlockChain {
 }
 
 func (consensus *Consensus) ReadySignal(p ProposalType) {
+	_, f, l, _ := runtime.Caller(1)
+	fmt.Println(utils.GetPort(), f, l)
+	utils.Logger().Info().Msgf("ReadySignal: %d %s %d", utils.GetPort(), f, l)
 	consensus.readySignal <- p
 }
 
