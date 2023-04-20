@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus"
-
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	staking "github.com/harmony-one/harmony/staking/types"
