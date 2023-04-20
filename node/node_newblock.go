@@ -27,7 +27,7 @@ const (
 
 // WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
 // only leader will receive the ready signal
-func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{}) {
+func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
@@ -47,12 +47,12 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 				utils.Logger().Warn().
 					Msg("Consensus new block proposal: STOPPED!")
 				return
-			case proposalType := <-readySignal:
+			case proposalType := <-cs.GetReadySignal():
 				retryCount := 0
-				for node.Consensus != nil && node.Consensus.IsLeader() {
+				for cs.IsLeader() {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
-						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
+						Uint64("blockNum", cs.Blockchain().CurrentBlock().NumberU64()+1).
 						Bool("asyncProposal", proposalType == consensus.AsyncProposal).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
@@ -71,14 +71,14 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 							} else {
 								utils.Logger().Info().Msg("[ProposeNewBlock] Timeout waiting for commit sigs, reading directly from DB")
 							}
-							sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
+							sigs, err := cs.BlockCommitSigs(cs.Blockchain().CurrentBlock().NumberU64())
 
 							if err != nil {
 								utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
 							} else {
 								newCommitSigsChan <- sigs
 							}
-						case commitSigs := <-commitSigsChan:
+						case commitSigs := <-cs.CommitSigChannel():
 							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
 							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
 								newCommitSigsChan <- commitSigs

@@ -87,9 +87,9 @@ type Consensus struct {
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
-	ReadySignal chan ProposalType
+	readySignal chan ProposalType
 	// Channel to send full commit signatures to finish new block proposal
-	CommitSigChannel chan []byte
+	commitSigChannel chan []byte
 	// The post-consensus job func passed from Node object
 	// Called when consensus on a new block is done
 	PostConsensusJob func(*types.Block) error
@@ -137,6 +137,22 @@ type Consensus struct {
 // Blockchain returns the blockchain.
 func (consensus *Consensus) Blockchain() core.BlockChain {
 	return consensus.registry.GetBlockchain()
+}
+
+func (consensus *Consensus) ReadySignal(p ProposalType) {
+	consensus.readySignal <- p
+}
+
+func (consensus *Consensus) GetReadySignal() chan ProposalType {
+	return consensus.readySignal
+}
+
+func (consensus *Consensus) CommitSigChannel() chan []byte {
+	return consensus.commitSigChannel
+}
+
+func (consensus *Consensus) GetCommitSigChannel() chan []byte {
+	return consensus.commitSigChannel
 }
 
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks.
@@ -274,8 +290,8 @@ func New(
 	consensus.SetCurBlockViewID(0)
 	consensus.ShardID = shard
 	consensus.SlashChan = make(chan slash.Record)
-	consensus.ReadySignal = make(chan ProposalType)
-	consensus.CommitSigChannel = make(chan []byte)
+	consensus.readySignal = make(chan ProposalType)
+	consensus.commitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
