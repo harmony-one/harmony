@@ -34,20 +34,21 @@ const (
 )
 
 func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
-	switch {
-	case params.LocalnetChainConfig.IsFeeCollectEpoch(epoch):
-		return localnetV3_2
-	case params.LocalnetChainConfig.IsSixtyPercent(epoch):
-		return localnetV3_1
-	case params.LocalnetChainConfig.IsTwoSeconds(epoch):
-		return localnetV3
-	case params.LocalnetChainConfig.IsStaking(epoch):
-		return localnetV2
-	case epoch.Cmp(big.NewInt(localnetV1Epoch)) >= 0:
-		return localnetV1
-	default: // genesis
-		return localnetV0
-	}
+	return localnetV3_2
+	//switch {
+	//case params.LocalnetChainConfig.IsFeeCollectEpoch(epoch):
+	//	return localnetV3_2
+	//case params.LocalnetChainConfig.IsSixtyPercent(epoch):
+	//	return localnetV3_1
+	//case params.LocalnetChainConfig.IsTwoSeconds(epoch):
+	//	return localnetV3
+	//case params.LocalnetChainConfig.IsStaking(epoch):
+	//	return localnetV2
+	//case epoch.Cmp(big.NewInt(localnetV1Epoch)) >= 0:
+	//	return localnetV1
+	//default: // genesis
+	//	return localnetV0
+	//}
 }
 
 func (ls localnetSchedule) BlocksPerEpochOld() uint64 {
@@ -156,10 +157,10 @@ var (
 		big.NewInt(0), big.NewInt(localnetV1Epoch), params.LocalnetChainConfig.StakingEpoch, params.LocalnetChainConfig.TwoSecondsEpoch,
 	}
 	// Number of shards, how many slots on each , how many slots owned by Harmony
-	localnetV0   = MustNewInstance(2, 7, 5, 0, numeric.OneDec(), genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpochOld())
-	localnetV1   = MustNewInstance(2, 8, 5, 0, numeric.OneDec(), genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpochOld())
-	localnetV2   = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpochOld())
-	localnetV3   = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
-	localnetV3_1 = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
-	localnetV3_2 = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, feeCollectorsLocalnet, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
+	//localnetV0   = MustNewInstance(2, 7, 5, 0, numeric.OneDec(), genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpochOld())
+	//localnetV1   = MustNewInstance(2, 8, 5, 0, numeric.OneDec(), genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpochOld())
+	//localnetV2   = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpochOld())
+	//localnetV3   = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
+	//localnetV3_1 = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
+	localnetV3_2 = MustNewInstance(1, 3, 3, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, feeCollectorsLocalnet, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
 )

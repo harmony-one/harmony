@@ -664,11 +664,10 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	var minPeers int
 	var aggregateSig bool
 	if hc.Consensus != nil {
-		minPeers = hc.Consensus.MinPeers
+		minPeers = 1 //hc.Consensus.MinPeers
 		aggregateSig = hc.Consensus.AggregateSig
 	} else {
-		minPeers = defaultConsensusConfig.MinPeers
-		aggregateSig = defaultConsensusConfig.AggregateSig
+		panic("consensus config is nil")
 	}
 
 	blacklist, err := setupBlacklist(hc)

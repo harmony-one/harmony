@@ -39,7 +39,7 @@ import (
 // See GenerateChain for a detailed explanation.
 type BlockGen struct {
 	i        int
-	parent   *types.Block
+	parent   *block.Header
 	chain    []*types.Block
 	factory  blockfactory.Factory
 	header   *block.Header
@@ -140,19 +140,6 @@ func (b *BlockGen) AddUncle(h *block.Header) {
 	b.uncles = append(b.uncles, h)
 }
 
-// PrevBlock returns a previously generated block by number. It panics if
-// num is greater or equal to the number of the block being generated.
-// For index -1, PrevBlock returns the parent block given to GenerateChain.
-func (b *BlockGen) PrevBlock(index int) *types.Block {
-	if index >= b.i {
-		panic(fmt.Errorf("block index %d out of range (%d,%d)", index, -1, b.i))
-	}
-	if index == -1 {
-		return b.parent
-	}
-	return b.chain[index]
-}
-
 // GenerateChain creates a chain of n blocks. The first block's
 // parent will be the provided parent. db is used to store
 // intermediate states and should contain the parent's state trie.
@@ -187,7 +174,7 @@ func GenerateChain(
 			factory: factory,
 			engine:  engine,
 		}
-		b.header = makeHeader(chainreader, parent, statedb, b.engine, factory)
+		b.header = makeHeader(chainreader, parent.Header(), statedb, b.engine, factory)
 
 		// Execute any user modifications to the block
 		if gen != nil {
@@ -228,7 +215,7 @@ func GenerateChain(
 	return blocks, receipts
 }
 
-func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine, factory blockfactory.Factory) *block.Header {
+func makeHeader(chain consensus_engine.ChainReader, parent *block.Header, state *state.DB, engine consensus_engine.Engine, factory blockfactory.Factory) *block.Header {
 	var time *big.Int
 	if parent.Time() == nil {
 		time = big.NewInt(10)

@@ -442,9 +442,13 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		}
 	}
 
+	utils.Logger().Info().Msgf("[UpdateConsensusInformation] LeaderPubKey: %s", consensus.LeaderPubKey.Bytes.Hex())
+
 	for _, key := range pubKeys {
+
 		// in committee
 		myPubKeys := consensus.getPublicKeys()
+		utils.Logger().Info().Msgf("[UpdateConsensusInformation] committiie key: %s, my key", key.Bytes.Hex(), myPubKeys.SerializeToHexStr())
 		if myPubKeys.Contains(key.Object) {
 			if hasError {
 				consensus.getLogger().Error().
@@ -453,8 +457,10 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 
 				return Syncing
 			}
-
+			consensus.getLogger().Info().
+				Msgf("[UpdateConsensusInformation] I am in committee, myKey: %s", myPubKeys.SerializeToHexStr())
 			// If the leader changed and I myself become the leader
+			consensus.getLogger().Info().Msgf("[UpdateConsensusInformation] oldLeader: %s, newLeader: %s", oldLeader.Bytes.Hex(), consensus.LeaderPubKey.Bytes.Hex(), consensus.isLeader())
 			if (oldLeader != nil && consensus.LeaderPubKey != nil &&
 				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
 				go func() {

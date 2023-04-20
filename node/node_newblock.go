@@ -2,6 +2,7 @@ package node
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -39,6 +40,9 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 			return
 		}
 
+		utils.Logger().Debug().
+			Msg("Consensus wait successful")
+
 		for {
 			// keep waiting for Consensus ready
 			select {
@@ -47,6 +51,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 					Msg("Consensus new block proposal: STOPPED!")
 				return
 			case proposalType := <-cs.GetReadySignal():
+				utils.Logger().Info().Msgf("Consensus new block proposal: READY! %v", proposalType)
 				for retryCount := 0; retryCount < 3 && cs.IsLeader(); retryCount++ {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
@@ -55,9 +60,11 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					// Prepare last commit signatures
-					newCommitSigsChan := make(chan []byte)
+					newCommitSigsChan := make(chan []byte, 1)
 
 					go func() {
+						s := time.Now()
+						defer fmt.Println("Time to read commit sigs from DB:", time.Since(s))
 						waitTime := 0 * time.Second
 						if proposalType == consensus.AsyncProposal {
 							waitTime = consensus.CommitSigReceiverTimeout
@@ -114,7 +121,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
 	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)
 	defer utils.AnalysisEnd("ProposeNewBlock", nowEpoch, blockNow)
-
+	utils.Logger().Info().Msgf("ProposeNewBlock: port %d, now block %d epoch %d", utils.GetPort(), blockNow, nowEpoch)
 	node.Worker.UpdateCurrent()
 
 	header := node.Worker.GetCurrentHeader()

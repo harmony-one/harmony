@@ -340,7 +340,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	consensus.getLogger().Info().
 		Uint64("viewID", viewID).
 		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
-		Msg("[startNewView] viewChange stopped. I am the New Leader")
+		Msgf("[startNewView] viewChange stopped. I am the New Leader %s", newLeaderPriKey.Pub.Bytes.Hex())
 
 	// TODO: consider make ResetState unified and only called in one place like finalizeCommit()
 	if reset {
@@ -548,7 +548,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	}
 	consensus.getLogger().Info().
 		Str("newLeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
-		Msg("new leader changed")
+		Msgf("new leader changed to %s", consensus.LeaderPubKey.Bytes.Hex())
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "finished"}).Inc()
 }

@@ -371,6 +371,14 @@ func (s *cIdentities) reset(ps []Phase) {
 }
 
 func (s *cIdentities) TwoThirdsSignersCount() int64 {
+	switch s.ParticipantsCount() {
+	case 1:
+		return 1 // ?
+	case 2:
+		return 1
+	case 3:
+		return 2
+	}
 	return s.ParticipantsCount()*2/3 + 1
 }
 

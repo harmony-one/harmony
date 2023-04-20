@@ -157,10 +157,11 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	if currentTotalPower == nil {
 		return false
 	}
-	const msg = "[IsQuorumAchievedByMask] Voting power: need %+v, have %+v"
+	const msg = "[IsQuorumAchievedByMask] Voting power: need %+v > have %+v, quorum achieved? %v"
+	output := (*currentTotalPower).GT(threshold)
 	utils.Logger().Debug().
-		Msgf(msg, threshold, currentTotalPower)
-	return (*currentTotalPower).GT(threshold)
+		Msgf(msg, threshold, currentTotalPower, output)
+	return output
 }
 
 func (v *stakedVoteWeight) currentTotalPower(p Phase) (*numeric.Dec, error) {

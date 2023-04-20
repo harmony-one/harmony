@@ -444,6 +444,7 @@ func (node *Node) BootstrapConsensus() error {
 		for {
 			<-time.After(checkEvery)
 			numPeersNow := node.host.GetPeerCount()
+			fmt.Println("Bootstrap consensus: ", numPeersNow, " peers are connected", "min", min, numPeersNow >= min)
 			if numPeersNow >= min {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				enoughMinPeers <- struct{}{}
@@ -463,6 +464,7 @@ func (node *Node) BootstrapConsensus() error {
 		return ctx.Err()
 	case <-enoughMinPeers:
 		go func() {
+
 			node.Consensus.StartChannel()
 		}()
 		return nil

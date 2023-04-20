@@ -331,6 +331,7 @@ func (consensus *Consensus) Start(
 func (consensus *Consensus) StartChannel() {
 	consensus.mutex.Lock()
 	consensus.isInitialLeader = consensus.isLeader()
+	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] StartChannel isInitialLeader %v", consensus.isInitialLeader)
 	if consensus.isInitialLeader {
 		consensus.start = true
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
