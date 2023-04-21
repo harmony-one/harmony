@@ -13,7 +13,17 @@ import (
 // configuration schedule.
 var PartnerSchedule partnerSchedule
 
-var feeCollectorDevnet = mustAddress("0xb728AEaBF60fD01816ee9e756c18bc01dC91ba5D")
+var feeCollectEpochV1 = big.NewInt(574)
+
+var feeCollectorsDevnet = []FeeCollectors{
+	FeeCollectors{
+		mustAddress("0xb728AEaBF60fD01816ee9e756c18bc01dC91ba5D"): numeric.OneDec(),
+	},
+	FeeCollectors{
+		mustAddress("0xb728AEaBF60fD01816ee9e756c18bc01dC91ba5D"): numeric.MustNewDecFromStr("0.5"),
+		mustAddress("0xb41B6B8d9e68fD44caC8342BC2EEf4D59531d7d7"): numeric.MustNewDecFromStr("0.5"),
+	},
+}
 
 type partnerSchedule struct{}
 
@@ -32,6 +42,8 @@ const (
 func (ps partnerSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case params.PartnerChainConfig.IsFeeCollectEpoch(epoch):
+		return partnerV3
+	case epoch.Cmp(feeCollectEpochV1) >= 0:
 		return partnerV2
 	case epoch.Cmp(params.PartnerChainConfig.StakingEpoch) >= 0:
 		return partnerV1
@@ -80,6 +92,7 @@ var partnerReshardingEpoch = []*big.Int{
 	params.PartnerChainConfig.StakingEpoch,
 }
 
-var partnerV0 = MustNewInstance(2, 5, 5, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, emptyAddress, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
-var partnerV1 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, emptyAddress, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
-var partnerV2 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, feeCollectorDevnet, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV0 = MustNewInstance(2, 5, 5, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV1 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV2 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, feeCollectorsDevnet[0], partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV3 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, feeCollectorsDevnet[1], partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())

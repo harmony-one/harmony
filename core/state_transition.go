@@ -25,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -281,14 +282,28 @@ func (st *StateTransition) refundGas() {
 }
 
 func (st *StateTransition) collectGas() {
-	// Burn Txn Fees after staking epoch
 	if config := st.evm.ChainConfig(); !config.IsStaking(st.evm.EpochNumber) {
-		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
+		// Before staking epoch, add the fees to the block producer
+		txFee := new(big.Int).Mul(
+			new(big.Int).SetUint64(st.gasUsed()),
+			st.gasPrice,
+		)
 		st.state.AddBalance(st.evm.Coinbase, txFee)
-	} else if config.IsFeeCollectEpoch(st.evm.EpochNumber) { // collect Txn Fees to community-managed account.
-		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
-		txFeeCollector := shard.Schedule.InstanceForEpoch(st.evm.EpochNumber).FeeCollector()
-		st.state.AddBalance(txFeeCollector, txFee)
+	} else if feeCollectors := shard.Schedule.InstanceForEpoch(
+		st.evm.EpochNumber,
+	).FeeCollectors(); len(feeCollectors) > 0 {
+		// The caller must ensure that the feeCollectors are accurately set
+		// at the appropriate epochs
+		txFee := numeric.NewDecFromBigInt(
+			new(big.Int).Mul(
+				new(big.Int).SetUint64(st.gasUsed()),
+				st.gasPrice,
+			),
+		)
+		for address, percent := range feeCollectors {
+			collectedFee := percent.Mul(txFee)
+			st.state.AddBalance(address, collectedFee.TruncateInt())
+		}
 	}
 }
 
