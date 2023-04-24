@@ -4,11 +4,17 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math"
+	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -80,4 +86,69 @@ func testApplyStakingMessage(test applyStakingMessageTest, t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestCollectGas(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	chain, db, header, _ := getTestEnvironment(*key)
+	header.SetEpoch(new(big.Int).Set(params.LocalnetChainConfig.FeeCollectEpoch))
+
+	// set the shard schedule so that fee collectors are available
+	shard.Schedule = shardingconfig.LocalnetSchedule
+	feeCollectors := shard.Schedule.InstanceForEpoch(header.Epoch()).FeeCollectors()
+	if len(feeCollectors) == 0 {
+		t.Fatal("No fee collectors set")
+	}
+
+	tx := types.NewTransaction(
+		0, // nonce
+		common.BytesToAddress([]byte("to")),
+		0,                 // shardid
+		big.NewInt(1e18),  // amount, 1 ONE
+		50000,             // gasLimit, intentionally higher than the 21000 required
+		big.NewInt(100e9), // gasPrice
+		[]byte{},          // payload, intentionally empty
+	)
+	from, _ := tx.SenderAddress()
+	initialBalance := big.NewInt(2e18)
+	db.AddBalance(from, initialBalance)
+	msg, _ := tx.AsMessage(types.NewEIP155Signer(common.Big2))
+	ctx := NewEVMContext(msg, header, chain, nil /* coinbase is nil, no block reward */)
+	ctx.TxType = types.SameShardTx
+
+	vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+	gasPool := new(GasPool).AddGas(math.MaxUint64)
+	_, err := ApplyMessage(vmenv, msg, gasPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check that sender got the exact expected balance
+	balance := db.GetBalance(from)
+	fee := new(big.Int).Mul(tx.GasPrice(), new(big.Int).
+		SetUint64(
+			21000, // base fee for normal transfers
+		))
+	feePlusAmount := new(big.Int).Add(fee, tx.Value())
+	expectedBalance := new(big.Int).Sub(initialBalance, feePlusAmount)
+	if balance.Cmp(expectedBalance) != 0 {
+		t.Errorf("Balance mismatch for sender: got %v, expected %v", balance, expectedBalance)
+	}
+
+	// check that the fee collectors got the fees in the provided ratio
+	feeDec := numeric.NewDecFromBigInt(fee)
+	for collector, percentage := range feeCollectors {
+		feeForThisCollector := feeDec.Mul(percentage).TruncateInt()
+		balance := db.GetBalance(collector)
+		if balance.Cmp(feeForThisCollector) != 0 {
+			t.Errorf("Balance mismatch for collector %v: got %v, expected %v",
+				collector, balance, feeForThisCollector)
+		}
+	}
+
+	// lastly, check the receiver's balance
+	balance = db.GetBalance(*tx.To())
+	if balance.Cmp(tx.Value()) != 0 {
+		t.Errorf("Balance mismatch for receiver: got %v, expected %v", balance, tx.Value())
+	}
 }
