@@ -85,10 +85,6 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 					}()
 					newBlock, err := node.ProposeNewBlock(newCommitSigsChan)
 					if err == nil {
-						if blk, ok := node.proposedBlock[newBlock.NumberU64()]; ok {
-							utils.Logger().Info().Uint64("blockNum", newBlock.NumberU64()).Str("blockHash", blk.Hash().Hex()).
-								Msg("Block with the same number was already proposed, abort.")
-						}
 						utils.Logger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
 							Uint64("epoch", newBlock.Epoch().Uint64()).
@@ -99,9 +95,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 							Msg("=========Successfully Proposed New Block==========")
 
 						// Send the new block to Consensus so it can be confirmed.
-						node.proposedBlock[newBlock.NumberU64()] = newBlock
-						delete(node.proposedBlock, newBlock.NumberU64()-10)
-						node.Consensus.BlockChannel(newBlock)
+						cs.BlockChannel(newBlock)
 						break
 					} else {
 						utils.Logger().Err(err).Int("retryCount", retryCount).

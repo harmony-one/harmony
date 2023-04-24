@@ -1023,6 +1023,7 @@ func New(
 		TransactionErrorSink: types.NewTransactionErrorSink(),
 		crosslinks:           crosslinks.New(),
 		syncID:               GenerateSyncID(),
+		keysToAddrs:          lrucache.NewCache[uint64, map[string]common.Address](10),
 	}
 	if consensusObj == nil {
 		panic("consensusObj is nil")
