@@ -177,11 +177,11 @@ func TestCollectGasRounding(t *testing.T) {
 	tx := types.NewTransaction(
 		0, // nonce
 		common.BytesToAddress([]byte("to")),
-		0,                 // shardid
-		big.NewInt(1e18),  // amount, 1 ONE
-		5,             // gasLimit
-		big.NewInt(1), // gasPrice
-		[]byte{},          // payload, intentionally empty
+		0,                // shardid
+		big.NewInt(1e18), // amount, 1 ONE
+		5,                // gasLimit
+		big.NewInt(1),    // gasPrice
+		[]byte{},         // payload, intentionally empty
 	)
 	from, _ := tx.SenderAddress()
 	initialBalance := big.NewInt(2e18)
@@ -203,7 +203,7 @@ func TestCollectGasRounding(t *testing.T) {
 
 	// check that the fee collectors got the fees in the provided ratio
 	for collector := range feeCollectors {
-		expectedFee := big.NewInt(2)	// GIF(5 / 2) = 2
+		expectedFee := big.NewInt(2) // GIF(5 / 2) = 2
 		balance := db.GetBalance(collector)
 		if balance.Cmp(expectedFee) != 0 {
 			t.Errorf("Balance mismatch for collector %v: got %v, expected %v",
