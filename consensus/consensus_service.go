@@ -458,10 +458,10 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 			if (oldLeader != nil && consensus.LeaderPubKey != nil &&
 				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
 				go func() {
-					consensus.getLogger().Info().
+					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal <- SyncProposal
+					consensus.ReadySignal(SyncProposal)
 				}()
 			}
 			return Normal

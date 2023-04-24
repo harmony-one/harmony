@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
+	"github.com/harmony-one/harmony/internal/utils/lrucache"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
@@ -132,8 +133,7 @@ type Node struct {
 	chainConfig         params.ChainConfig
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
-	KeysToAddrs      map[string]common.Address
-	keysToAddrsEpoch *big.Int
+	keysToAddrs      *lrucache.Cache[uint64, map[string]common.Address]
 	keysToAddrsMutex sync.Mutex
 	// TransactionErrorSink contains error messages for any failed transaction, in memory only
 	TransactionErrorSink *types.TransactionErrorSink
@@ -141,7 +141,6 @@ type Node struct {
 	BroadcastInvalidTx bool
 	// InSync flag indicates the node is in-sync or not
 	IsSynchronized *abool.AtomicBool
-	proposedBlock  map[uint64]*types.Block
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
@@ -1024,6 +1023,7 @@ func New(
 		TransactionErrorSink: types.NewTransactionErrorSink(),
 		crosslinks:           crosslinks.New(),
 		syncID:               GenerateSyncID(),
+		keysToAddrs:          lrucache.NewCache[uint64, map[string]common.Address](10),
 	}
 	if consensusObj == nil {
 		panic("consensusObj is nil")
@@ -1113,7 +1113,6 @@ func New(
 		node.committeeCache, _ = lru.New(16)
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
-		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
@@ -1322,10 +1321,6 @@ func (node *Node) ShutDown() {
 }
 
 func (node *Node) populateSelfAddresses(epoch *big.Int) {
-	// reset the self addresses
-	node.KeysToAddrs = map[string]common.Address{}
-	node.keysToAddrsEpoch = epoch
-
 	shardID := node.Consensus.ShardID
 	shardState, err := node.Consensus.Blockchain().ReadShardState(epoch)
 	if err != nil {
@@ -1344,7 +1339,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 			Msg("[PopulateSelfAddresses] failed to find shard committee")
 		return
 	}
-
+	keysToAddrs := map[string]common.Address{}
 	for _, blskey := range node.Consensus.GetPublicKeys() {
 		blsStr := blskey.Bytes.Hex()
 		shardkey := bls.FromLibBLSPublicKeyUnsafe(blskey.Object)
@@ -1365,7 +1360,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 				Msg("[PopulateSelfAddresses] could not find address")
 			return
 		}
-		node.KeysToAddrs[blsStr] = *addr
+		keysToAddrs[blsStr] = *addr
 		utils.Logger().Debug().
 			Int64("epoch", epoch.Int64()).
 			Uint32("shard-id", shardID).
@@ -1373,34 +1368,27 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 			Str("address", common2.MustAddressToBech32(*addr)).
 			Msg("[PopulateSelfAddresses]")
 	}
+	node.keysToAddrs.Set(epoch.Uint64(), keysToAddrs)
 }
 
 // GetAddressForBLSKey retrieves the ECDSA address associated with bls key for epoch
 func (node *Node) GetAddressForBLSKey(blskey *bls_core.PublicKey, epoch *big.Int) common.Address {
-	// populate if first time setting or new epoch
-	node.keysToAddrsMutex.Lock()
-	defer node.keysToAddrsMutex.Unlock()
-	if node.keysToAddrsEpoch == nil || epoch.Cmp(node.keysToAddrsEpoch) != 0 {
-		node.populateSelfAddresses(epoch)
-	}
-	blsStr := blskey.SerializeToHexStr()
-	addr, ok := node.KeysToAddrs[blsStr]
-	if !ok {
-		return common.Address{}
-	}
-	return addr
+	return node.GetAddresses(epoch)[blskey.SerializeToHexStr()]
 }
 
 // GetAddresses retrieves all ECDSA addresses of the bls keys for epoch
 func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
-	// populate if first time setting or new epoch
-	node.keysToAddrsMutex.Lock()
-	defer node.keysToAddrsMutex.Unlock()
-	if node.keysToAddrsEpoch == nil || epoch.Cmp(node.keysToAddrsEpoch) != 0 {
-		node.populateSelfAddresses(epoch)
+	// populate if new epoch
+	if rs, ok := node.keysToAddrs.Get(epoch.Uint64()); ok {
+		return rs
 	}
-	// self addresses map can never be nil
-	return node.KeysToAddrs
+	node.keysToAddrsMutex.Lock()
+	node.populateSelfAddresses(epoch)
+	node.keysToAddrsMutex.Unlock()
+	if rs, ok := node.keysToAddrs.Get(epoch.Uint64()); ok {
+		return rs
+	}
+	return make(map[string]common.Address)
 }
 
 // IsRunningBeaconChain returns whether the node is running on beacon chain.

@@ -19,7 +19,7 @@ func (node *Node) RegisterValidatorServices() {
 	// Register new block service.
 	node.serviceManager.Register(
 		service.BlockProposal,
-		blockproposal.New(node.Consensus.ReadySignal, node.Consensus.CommitSigChannel, node.WaitForConsensusReadyV2),
+		blockproposal.New(node.Consensus, node.WaitForConsensusReadyV2),
 	)
 }
 

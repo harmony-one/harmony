@@ -254,13 +254,13 @@ func (consensus *Consensus) finalCommit() {
 			// No pipelining
 			go func() {
 				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-				consensus.ReadySignal <- SyncProposal
+				consensus.ReadySignal(SyncProposal)
 			}()
 		} else {
 			// pipelining
 			go func() {
 				select {
-				case consensus.CommitSigChannel <- commitSigAndBitmap:
+				case consensus.GetCommitSigChannel() <- commitSigAndBitmap:
 				case <-time.After(CommitSigSenderTimeout):
 					utils.Logger().Error().Err(err).Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
 				}
@@ -334,7 +334,7 @@ func (consensus *Consensus) StartChannel() {
 		consensus.start = true
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal <- SyncProposal
+		consensus.ReadySignal(SyncProposal)
 		return
 	}
 	consensus.mutex.Unlock()
@@ -428,7 +428,7 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 		return
 	}
 	// Sleep to wait for the full block time
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
+	consensus.GetLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
 	time.AfterFunc(time.Until(consensus.NextBlockDue), func() {
 		consensus.StartFinalityCount()
 		consensus.mutex.Lock()
@@ -587,7 +587,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		// Send signal to Node to propose the new block for consensus
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
 
-		consensus.ReadySignal <- AsyncProposal
+		consensus.ReadySignal(AsyncProposal)
 	}()
 
 	return nil
@@ -761,7 +761,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 		// leader changed
 		go func() {
-			consensus.ReadySignal <- SyncProposal
+			consensus.ReadySignal(SyncProposal)
 		}()
 	}
 }

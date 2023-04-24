@@ -10,17 +10,15 @@ import (
 type Service struct {
 	stopChan              chan struct{}
 	stoppedChan           chan struct{}
-	readySignal           chan consensus.ProposalType
-	commitSigsChan        chan []byte
+	c                     *consensus.Consensus
 	messageChan           chan *msg_pb.Message
-	waitForConsensusReady func(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{})
+	waitForConsensusReady func(c *consensus.Consensus, stopChan chan struct{}, stoppedChan chan struct{})
 }
 
 // New returns a block proposal service.
-func New(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, waitForConsensusReady func(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
+func New(c *consensus.Consensus, waitForConsensusReady func(c *consensus.Consensus, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
 	return &Service{
-		readySignal:           readySignal,
-		commitSigsChan:        commitSigsChan,
+		c:                     c,
 		waitForConsensusReady: waitForConsensusReady,
 		stopChan:              make(chan struct{}),
 		stoppedChan:           make(chan struct{}),
@@ -34,7 +32,7 @@ func (s *Service) Start() error {
 }
 
 func (s *Service) run() {
-	s.waitForConsensusReady(s.readySignal, s.commitSigsChan, s.stopChan, s.stoppedChan)
+	s.waitForConsensusReady(s.c, s.stopChan, s.stoppedChan)
 }
 
 // Stop stops block proposal service.
