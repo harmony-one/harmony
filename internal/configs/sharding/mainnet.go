@@ -47,10 +47,11 @@ var (
 		3: []*big.Int{big.NewInt(183), big.NewInt(184), big.NewInt(185)},
 	}
 
-	// TODO: set valid addresses
 	feeCollectorsMainnet = FeeCollectors{
-		// mustAddress("0xInfrastructure"): numeric.MustNewDecFromStr("0.5"),
-		// mustAddress("0xCommunity"): numeric.MustNewDecFromStr("0.5"),
+		// Infrastructure
+		mustAddress("0xa0c395A83503ad89613E43397e9fE1f8E93B6384"): numeric.MustNewDecFromStr("0.5"),
+		// Community
+		mustAddress("0xbdFeE8587d347Cd8df002E6154763325265Fa84c"): numeric.MustNewDecFromStr("0.5"),
 	}
 )
 
