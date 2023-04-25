@@ -39,8 +39,8 @@ func (timeout *Timeout) Stop() {
 	timeout.start = time.Now()
 }
 
-// CheckExpire checks whether the timeout is reached/expired
-func (timeout *Timeout) CheckExpire(now time.Time) bool {
+// Expired checks whether the timeout is reached/expired
+func (timeout *Timeout) Expired(now time.Time) bool {
 	if timeout.state == Active && now.Sub(timeout.start) > timeout.d {
 		timeout.state = Expired
 	}
