@@ -661,7 +661,6 @@ func validateShardBoundMessage(consensus *consensus.Consensus, nodeConfig *nodec
 }
 
 var (
-	errMsgHadNoHMYPayLoadAssumption      = errors.New("did not have sufficient size for hmy msg")
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
 )
 
