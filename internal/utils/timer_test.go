@@ -33,9 +33,9 @@ func TestCheckExpire(t *testing.T) {
 	// stop
 	timer.Stop()
 	if timer.Expired(now) {
-		t.Fatalf("Expired shouldn't be expired because it is stopped")
+		t.Fatalf("Timer shouldn't be expired because it is stopped")
 	}
 	if timer.Expired(now.Add(2 * time.Second)) {
-		t.Fatalf("Expired shouldn't be expired because it is stopped")
+		t.Fatalf("Timer shouldn't be expired because it is stopped")
 	}
 }
