@@ -40,8 +40,8 @@ func (timeout *Timeout) Stop() {
 }
 
 // CheckExpire checks whether the timeout is reached/expired
-func (timeout *Timeout) CheckExpire() bool {
-	if timeout.state == Active && time.Since(timeout.start) > timeout.d {
+func (timeout *Timeout) CheckExpire(now time.Time) bool {
+	if timeout.state == Active && now.Sub(timeout.start) > timeout.d {
 		timeout.state = Expired
 	}
 	if timeout.state == Expired {

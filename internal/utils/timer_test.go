@@ -15,17 +15,16 @@ func TestNewTimeout(t *testing.T) {
 func TestCheckExpire(t *testing.T) {
 	timer := NewTimeout(time.Second)
 	timer.Start()
-	time.Sleep(2 * time.Second)
-	if timer.CheckExpire() == false {
+	now := time.Now().Add(2 * time.Second)
+	if timer.CheckExpire(now) == false {
 		t.Fatalf("CheckExpire should be true")
 	}
 	timer.Start()
-	if timer.CheckExpire() == true {
+	if timer.CheckExpire(now) == true {
 		t.Fatalf("CheckExpire should be false")
 	}
 	timer.Stop()
-	if timer.CheckExpire() == true {
+	if timer.CheckExpire(now) == true {
 		t.Fatalf("CheckExpire should be false")
 	}
-
 }
