@@ -1,7 +1,6 @@
 package quorum
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/harmony-one/harmony/consensus/votepower"
@@ -49,7 +48,6 @@ func (sv *stakeVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 		return false
 	}
 	vp := sv.r.VotePowerByMask(mask)
-	fmt.Println("vote power", vp, "threshold", sv.threshold())
 	return vp.GT(sv.threshold())
 }
 
@@ -77,7 +75,6 @@ func newUniformVerifier(committee *shard.Committee) (*uniformVerifier, error) {
 func (uv *uniformVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	got := int64(len(mask.Publics))
 	exp := uv.thresholdKeyCount()
-	//fmt.Println("uniformVerifier ", uv.pubKeyCnt, exp)
 	// Theoretically speaking, greater or equal will do the work. But current logic is more strict
 	// without equal, thus conform to current logic implemented.
 	// (engineImpl.VerifySeal, uniformVoteWeight.IsQuorumAchievedByMask)
@@ -85,10 +82,7 @@ func (uv *uniformVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 }
 
 func (uv *uniformVerifier) thresholdKeyCount() int64 {
-
 	switch uv.pubKeyCnt {
-	case 1:
-		return 1
 	case 2:
 		return 1
 	case 3:

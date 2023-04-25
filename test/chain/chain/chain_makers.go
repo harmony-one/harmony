@@ -153,7 +153,7 @@ func (b *BlockGen) AddUncle(h *block.Header) {
 // values. Inserting them into BlockChain requires use of FakePow or
 // a similar non-validating proof of work implementation.
 func GenerateChain(
-	config *params.ChainConfig, parent *types.Block,
+	config *params.ChainConfig, parent *block.Header,
 	engine consensus_engine.Engine, db ethdb.Database,
 	n int,
 	gen func(int, *BlockGen),
@@ -164,7 +164,7 @@ func GenerateChain(
 	factory := blockfactory.NewFactory(config)
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
 	chainreader := &fakeChainReader{config: config}
-	genblock := func(i int, parent *types.Block, statedb *state.DB) (*types.Block, types.Receipts) {
+	genblock := func(i int, parent *block.Header, statedb *state.DB) (*types.Block, types.Receipts) {
 		b := &BlockGen{
 			i:       i,
 			chain:   blocks,
@@ -174,7 +174,7 @@ func GenerateChain(
 			factory: factory,
 			engine:  engine,
 		}
-		b.header = makeHeader(chainreader, parent.Header(), statedb, b.engine, factory)
+		b.header = makeHeader(chainreader, parent, statedb, b.engine, factory)
 
 		// Execute any user modifications to the block
 		if gen != nil {
@@ -210,7 +210,7 @@ func GenerateChain(
 		block, receipt := genblock(i, parent, statedb)
 		blocks[i] = block
 		receipts[i] = receipt
-		parent = block
+		parent = block.Header()
 	}
 	return blocks, receipts
 }
