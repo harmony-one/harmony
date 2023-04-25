@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -135,14 +134,14 @@ func TestCollectGas(t *testing.T) {
 		t.Errorf("Balance mismatch for sender: got %v, expected %v", balance, expectedBalance)
 	}
 
-	// check that the fee collectors got the fees in the provided ratio
-	feeDec := numeric.NewDecFromBigInt(fee)
-	for collector, percentage := range feeCollectors {
-		feeForThisCollector := feeDec.Mul(percentage).TruncateInt()
+	// check that the fee collectors got half of the fees each
+	expectedFeePerCollector := new(big.Int).Mul(tx.GasPrice(),
+		new(big.Int).SetUint64(21000 / 2))
+	for collector := range feeCollectors {
 		balance := db.GetBalance(collector)
-		if balance.Cmp(feeForThisCollector) != 0 {
+		if balance.Cmp(expectedFeePerCollector) != 0 {
 			t.Errorf("Balance mismatch for collector %v: got %v, expected %v",
-				collector, balance, feeForThisCollector)
+				collector, balance, expectedFeePerCollector)
 		}
 	}
 
@@ -161,8 +160,10 @@ func TestCollectGasRounding(t *testing.T) {
 	// If the gas is 1e9 + 1, then the fee collectors should get 0.5e9 each,
 	// with the extra 1 being dropped. This test checks for that.
 	// Such a situation can potentially occur, but is not an immediate concern
-	// since we require transactions to have a minimum gas price of 100 gwei.
-	// For example, a gas price of 1 wei * gas used of (21,000 + odd number)
+	// since we require transactions to have a minimum gas price of 100 gwei
+	// which is always even (in wei) and can be divided across two collectors.
+	// Hypothetically, a gas price of 1 wei * gas used of (21,000 + odd number)
+	// could result in such a case which is well handled.
 	key, _ := crypto.GenerateKey()
 	chain, db, header, _ := getTestEnvironment(*key)
 	header.SetEpoch(new(big.Int).Set(params.LocalnetChainConfig.FeeCollectEpoch))
@@ -202,12 +203,12 @@ func TestCollectGasRounding(t *testing.T) {
 	st.collectGas()
 
 	// check that the fee collectors got the fees in the provided ratio
+	expectedFeePerCollector := big.NewInt(2) // GIF(5 / 2) = 2
 	for collector := range feeCollectors {
-		expectedFee := big.NewInt(2) // GIF(5 / 2) = 2
 		balance := db.GetBalance(collector)
-		if balance.Cmp(expectedFee) != 0 {
+		if balance.Cmp(expectedFeePerCollector) != 0 {
 			t.Errorf("Balance mismatch for collector %v: got %v, expected %v",
-				collector, balance, expectedFee)
+				collector, balance, expectedFeePerCollector)
 		}
 	}
 }
