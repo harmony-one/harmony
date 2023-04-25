@@ -150,6 +150,10 @@ func (consensus *Consensus) GetReadySignal() chan ProposalType {
 	return consensus.readySignal
 }
 
+func (consensus *Consensus) ReadySignal(p ProposalType) {
+	consensus.readySignal <- p
+}
+
 func (consensus *Consensus) CommitSigChannel() chan []byte {
 	return consensus.commitSigChannel
 }
