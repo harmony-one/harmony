@@ -136,7 +136,7 @@ func TestCollectGas(t *testing.T) {
 
 	// check that the fee collectors got half of the fees each
 	expectedFeePerCollector := new(big.Int).Mul(tx.GasPrice(),
-		new(big.Int).SetUint64(21000 / 2))
+		new(big.Int).SetUint64(21000/2))
 	for collector := range feeCollectors {
 		balance := db.GetBalance(collector)
 		if balance.Cmp(expectedFeePerCollector) != 0 {
