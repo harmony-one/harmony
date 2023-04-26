@@ -113,7 +113,7 @@ var (
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(1296), // 2023-04-28 07:14:20+00:00
-		ValidatorCodeFixEpoch:                  EpochTBD,
+		ValidatorCodeFixEpoch:                  big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -193,9 +193,9 @@ var (
 		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch:          big.NewInt(1),
 		AllowlistEpoch:                         EpochTBD,
-		FeeCollectEpoch:                        big.NewInt(848), // 2023-04-28 04:33:33+00:00
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
+		FeeCollectEpoch:                        big.NewInt(848), // 2023-04-28 04:33:33+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(848),
 	}
 
@@ -279,7 +279,7 @@ var (
 		LeaderRotationExternalNonBeaconLeaders: big.NewInt(5),
 		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
 		FeeCollectEpoch:                        big.NewInt(2),
-		ValidatorCodeFixEpoch:                  EpochTBD,
+		ValidatorCodeFixEpoch:                  big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
@@ -548,16 +548,25 @@ func (c *ChainConfig) mustValid() {
 			panic(err)
 		}
 	}
+	// before staking epoch, fees were sent to coinbase
 	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0,
 		"must satisfy: FeeCollectEpoch >= StakingEpoch")
+	// obvious
 	require(c.PreStakingEpoch.Cmp(c.StakingEpoch) < 0,
 		"must satisfy: PreStakingEpoch < StakingEpoch")
+	// delegations can be made starting at PreStakingEpoch
 	require(c.StakingPrecompileEpoch.Cmp(c.PreStakingEpoch) >= 0,
 		"must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
+	// main functionality must come before the precompile
+	// see AcceptsCrossTx for why > and not >=
 	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0,
 		"must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
+	// the fix is applied only on the Solidity level, so you need eth compat
 	require(c.ValidatorCodeFixEpoch.Cmp(c.EthCompatibleEpoch) >= 0,
 		"must satisfy: ValidatorCodeFixEpoch >= EthCompatibleEpoch")
+	// we accept validator creation transactions starting at PreStakingEpoch
+	require(c.ValidatorCodeFixEpoch.Cmp(c.PreStakingEpoch) >= 0,
+		"must satisfy: ValidatorCodeFixEpoch >= PreStakingEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
