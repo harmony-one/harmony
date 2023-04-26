@@ -112,7 +112,7 @@ var (
 		AllowlistEpoch:                         big.NewInt(2),
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		FeeCollectEpoch:                        EpochTBD,
+		FeeCollectEpoch:                        big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -193,10 +193,10 @@ var (
 		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch:          big.NewInt(1),
 		AllowlistEpoch:                         EpochTBD,
-		FeeCollectEpoch:                        big.NewInt(574),
+		FeeCollectEpoch:                        big.NewInt(848), // 2023-04-28 04:33:33+00:00
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		ValidatorCodeFixEpoch:                  EpochTBD,
+		ValidatorCodeFixEpoch:                  big.NewInt(848),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -278,7 +278,7 @@ var (
 		AllowlistEpoch:                         EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: big.NewInt(5),
 		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
-		FeeCollectEpoch:                        big.NewInt(5),
+		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 
