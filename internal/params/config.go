@@ -112,7 +112,7 @@ var (
 		AllowlistEpoch:                         big.NewInt(2),
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		FeeCollectEpoch:                        EpochTBD,
+		FeeCollectEpoch:                        big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -278,7 +278,7 @@ var (
 		AllowlistEpoch:                         EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: big.NewInt(5),
 		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
-		FeeCollectEpoch:                        big.NewInt(5),
+		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  EpochTBD,
 	}
 
