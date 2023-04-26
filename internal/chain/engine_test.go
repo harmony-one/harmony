@@ -19,7 +19,7 @@ import (
 	types2 "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
@@ -228,7 +228,7 @@ func (maker *shardSlotMaker) makeSlot() shard.Slot {
 
 func makeTestStateDB() *state.DB {
 	db := state.NewDatabase(rawdb.NewMemoryDatabase())
-	sdb, err := state.New(common.Hash{}, db)
+	sdb, err := state.New(common.Hash{}, db, nil)
 	if err != nil {
 		panic(err)
 	}

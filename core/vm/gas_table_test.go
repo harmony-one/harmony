@@ -26,7 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 )
 
@@ -83,9 +83,9 @@ func TestEIP2200(t *testing.T) {
 	for i, tt := range eip2200Tests {
 		address := common.BytesToAddress([]byte("contract"))
 
-		statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
+		statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		statedb.CreateAccount(address)
-		statedb.SetCode(address, hexutil.MustDecode(tt.input))
+		statedb.SetCode(address, hexutil.MustDecode(tt.input), false)
 		statedb.SetState(address, common.Hash{}, common.BytesToHash([]byte{tt.original}))
 		statedb.Finalise(true) // Push the state into the "original" slot
 

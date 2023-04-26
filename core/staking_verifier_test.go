@@ -9,7 +9,7 @@ import (
 
 	"github.com/harmony-one/harmony/internal/params"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -1651,7 +1651,7 @@ func makeVWrapperByIndex(index int) staking.ValidatorWrapper {
 }
 
 func newTestStateDB() (*state.DB, error) {
-	return state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
+	return state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 }
 
 // makeVWrappersForStake makes the default staking.ValidatorWrappers for

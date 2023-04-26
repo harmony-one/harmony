@@ -66,8 +66,8 @@ func TestConsensusInitialization(t *testing.T) {
 	assert.IsType(t, make(chan slash.Record), consensus.SlashChan)
 	assert.NotNil(t, consensus.SlashChan)
 
-	assert.IsType(t, make(chan ProposalType), consensus.ReadySignal)
-	assert.NotNil(t, consensus.ReadySignal)
+	assert.IsType(t, make(chan ProposalType), consensus.GetReadySignal())
+	assert.NotNil(t, consensus.GetReadySignal())
 
 	assert.IsType(t, make(chan [vdfAndSeedSize]byte), consensus.RndChannel)
 	assert.NotNil(t, consensus.RndChannel)

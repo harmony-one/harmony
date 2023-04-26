@@ -185,12 +185,12 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	PriceLimit: 100e9, // 100 Gwei/Nano
 	PriceBump:  1,     // PriceBump is percent, 1% is enough
 
-	AccountSlots: 16,
-	GlobalSlots:  4096,
-	AccountQueue: 64,
-	GlobalQueue:  1024,
+	AccountSlots: 16,   // --txpool.accountslots
+	GlobalSlots:  4096, // --txpool.globalslots
+	AccountQueue: 64,   // --txpool.accountqueue
+	GlobalQueue:  5120, // --txpool.globalqueue
 
-	Lifetime: 30 * time.Minute,
+	Lifetime: 30 * time.Minute, // --txpool.lifetime
 
 	Blacklist:  map[common.Address]struct{}{},
 	AllowedTxs: map[common.Address]AllowedTxData{},
@@ -242,6 +242,27 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 			Uint64("updated", DefaultTxPoolConfig.GlobalSlots).
 			Msg("Sanitizing invalid txpool global slots")
 		conf.GlobalSlots = DefaultTxPoolConfig.GlobalSlots
+	}
+	if conf.AccountQueue == 0 {
+		utils.Logger().Warn().
+			Uint64("provided", conf.AccountQueue).
+			Uint64("updated", DefaultTxPoolConfig.AccountQueue).
+			Msg("Sanitizing invalid txpool account queue")
+		conf.AccountQueue = DefaultTxPoolConfig.AccountQueue
+	}
+	if conf.GlobalQueue == 0 {
+		utils.Logger().Warn().
+			Uint64("provided", conf.GlobalQueue).
+			Uint64("updated", DefaultTxPoolConfig.GlobalQueue).
+			Msg("Sanitizing invalid txpool account queue")
+		conf.GlobalQueue = DefaultTxPoolConfig.GlobalQueue
+	}
+	if conf.Lifetime == 0 {
+		utils.Logger().Warn().
+			Dur("provided", conf.Lifetime).
+			Dur("updated", DefaultTxPoolConfig.Lifetime).
+			Msg("Sanitizing invalid txpool lifetime")
+		conf.Lifetime = DefaultTxPoolConfig.Lifetime
 	}
 
 	return conf
@@ -1415,7 +1436,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 	if pending > pool.config.GlobalSlots {
 		pendingBeforeCap := pending
 		// Assemble a spam order to penalize large transactors first
-		spammers := prque.New(nil)
+		spammers := prque.New[int64, common.Address](nil)
 		for addr, list := range pool.pending {
 			// Only evict transactions from high rollers
 			if !pool.locals.contains(addr) && uint64(list.Len()) > pool.config.AccountSlots {
@@ -1427,12 +1448,12 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		for pending > pool.config.GlobalSlots && !spammers.Empty() {
 			// Retrieve the next offender if not local address
 			offender, _ := spammers.Pop()
-			offenders = append(offenders, offender.(common.Address))
+			offenders = append(offenders, offender)
 
 			// Equalize balances until all the same or below threshold
 			if len(offenders) > 1 {
 				// Calculate the equalization threshold for all current offenders
-				threshold := pool.pending[offender.(common.Address)].Len()
+				threshold := pool.pending[offender].Len()
 
 				// Iteratively reduce all offenders until below limit or threshold reached
 				for pending > pool.config.GlobalSlots && pool.pending[offenders[len(offenders)-2]].Len() > threshold {

@@ -34,14 +34,14 @@ type journalEntry interface {
 }
 
 // journal contains the list of state modifications applied since the last state
-// commit. These are tracked to be able to be reverted in case of an execution
-// exception or revertal request.
+// commit. These are tracked to be able to be reverted in the case of an execution
+// exception or request for reversal.
 type journal struct {
 	entries []journalEntry         // Current changes tracked by the journal
 	dirties map[common.Address]int // Dirty accounts and the number of changes
 }
 
-// newJournal create a new initialized journal.
+// newJournal creates a new initialized journal.
 func newJournal() *journal {
 	return &journal{
 		dirties: make(map[common.Address]int),
@@ -91,7 +91,8 @@ type (
 		account *common.Address
 	}
 	resetObjectChange struct {
-		prev *Object
+		prev         *Object
+		prevdestruct bool
 	}
 	suicideChange struct {
 		account     *common.Address
@@ -134,7 +135,29 @@ type (
 	touchChange struct {
 		account *common.Address
 	}
+	// Changes to the access list
+	accessListAddAccountChange struct {
+		address *common.Address
+	}
+	accessListAddSlotChange struct {
+		address *common.Address
+		slot    *common.Hash
+	}
+
+	transientStorageChange struct {
+		account       *common.Address
+		key, prevalue common.Hash
+	}
 )
+
+// dirtied returns the Ethereum address modified by this journal entry.
+func (v validatorWrapperChange) dirtied() *common.Address {
+	return v.address
+}
+
+// revert undoes the changes introduced by this journal entry.
+func (v validatorWrapperChange) revert(*DB) {
+}
 
 func (ch createObjectChange) revert(s *DB) {
 	delete(s.stateObjects, *ch.account)
@@ -147,6 +170,9 @@ func (ch createObjectChange) dirtied() *common.Address {
 
 func (ch resetObjectChange) revert(s *DB) {
 	s.setStateObject(ch.prev)
+	if !ch.prevdestruct {
+		delete(s.stateObjectsDestruct, ch.prev.address)
+	}
 }
 
 func (ch resetObjectChange) dirtied() *common.Address {
@@ -191,19 +217,11 @@ func (ch nonceChange) dirtied() *common.Address {
 }
 
 func (ch codeChange) revert(s *DB) {
-	s.getStateObject(*ch.account).setCode(common.BytesToHash(ch.prevhash), ch.prevcode)
+	s.getStateObject(*ch.account).setCode(common.BytesToHash(ch.prevhash), ch.prevcode, false)
 }
 
 func (ch codeChange) dirtied() *common.Address {
 	return ch.account
-}
-
-func (ch validatorWrapperChange) revert(s *DB) {
-	s.stateValidators[*(ch.address)] = ch.prev
-}
-
-func (ch validatorWrapperChange) dirtied() *common.Address {
-	return ch.address
 }
 
 func (ch storageChange) revert(s *DB) {
@@ -212,6 +230,14 @@ func (ch storageChange) revert(s *DB) {
 
 func (ch storageChange) dirtied() *common.Address {
 	return ch.account
+}
+
+func (ch transientStorageChange) revert(s *DB) {
+	s.setTransientState(*ch.account, ch.key, ch.prevalue)
+}
+
+func (ch transientStorageChange) dirtied() *common.Address {
+	return nil
 }
 
 func (ch refundChange) revert(s *DB) {
@@ -241,5 +267,30 @@ func (ch addPreimageChange) revert(s *DB) {
 }
 
 func (ch addPreimageChange) dirtied() *common.Address {
+	return nil
+}
+
+func (ch accessListAddAccountChange) revert(s *DB) {
+	/*
+		One important invariant here, is that whenever a (addr, slot) is added, if the
+		addr is not already present, the add causes two journal entries:
+		- one for the address,
+		- one for the (address,slot)
+		Therefore, when unrolling the change, we can always blindly delete the
+		(addr) at this point, since no storage adds can remain when come upon
+		a single (addr) change.
+	*/
+	s.accessList.DeleteAddress(*ch.address)
+}
+
+func (ch accessListAddAccountChange) dirtied() *common.Address {
+	return nil
+}
+
+func (ch accessListAddSlotChange) revert(s *DB) {
+	s.accessList.DeleteSlot(*ch.address, *ch.slot)
+}
+
+func (ch accessListAddSlotChange) dirtied() *common.Address {
 	return nil
 }

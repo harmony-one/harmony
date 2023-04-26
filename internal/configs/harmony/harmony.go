@@ -1,6 +1,7 @@
 package harmony
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -181,8 +182,13 @@ type TxPoolConfig struct {
 	AllowedTxsFile    string
 	RosettaFixFile    string
 	AccountSlots      uint64
+	AccountQueue      uint64
+	GlobalQueue       uint64
 	LocalAccountsFile string
 	GlobalSlots       uint64
+	Lifetime          time.Duration
+	PriceLimit        PriceLimit
+	PriceBump         uint64
 }
 
 type PprofConfig struct {
@@ -317,4 +323,27 @@ type StagedSyncConfig struct {
 	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
 	UseMemDB               bool   // it uses memory by default. set it to false to use disk
 	LogProgress            bool   // log the full sync progress in console
+}
+
+type PriceLimit int64
+
+func (s *PriceLimit) UnmarshalTOML(data interface{}) error {
+	switch v := data.(type) {
+	case float64:
+		*s = PriceLimit(v)
+	case int64:
+		*s = PriceLimit(v)
+	case PriceLimit:
+		*s = v
+	default:
+		return fmt.Errorf("PriceLimit.UnmarshalTOML: %T", data)
+	}
+	return nil
+}
+
+func (s PriceLimit) MarshalTOML() ([]byte, error) {
+	if s > 1_000_000_000 {
+		return []byte(fmt.Sprintf("%de9", s/1_000_000_000)), nil
+	}
+	return []byte(fmt.Sprintf("%d", s)), nil
 }

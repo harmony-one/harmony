@@ -43,6 +43,11 @@ func newBlockchainPruner(db ethdb.Database) *blockchainPruner {
 	}
 }
 
+// Put inserts the given value into the key-value data store.
+func (bp *blockchainPruner) Put(key []byte, value []byte) error {
+	return nil
+}
+
 func (bp *blockchainPruner) Delete(key []byte) error {
 	err := bp.batchWriter.Delete(key)
 	if err != nil {

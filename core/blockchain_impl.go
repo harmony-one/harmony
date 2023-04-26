@@ -114,6 +114,7 @@ const (
 	validatorListByDelegatorCacheLimit = 128
 	pendingCrossLinksCacheLimit        = 2
 	blockAccumulatorCacheLimit         = 64
+	leaderPubKeyFromCoinbaseLimit      = 8
 	maxPendingSlashes                  = 256
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -135,9 +136,9 @@ type BlockChainImpl struct {
 	pruneBeaconChainEnable bool                // pruneBeaconChainEnable is enable prune BeaconChain feature
 	shardID                uint32              // Shard number
 
-	db     ethdb.Database // Low level persistent database to store final content in
-	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
-	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
+	db     ethdb.Database                   // Low level persistent database to store final content in
+	triegc *prque.Prque[int64, common.Hash] // Priority queue mapping block numbers to tries to gc
+	gcproc time.Duration                    // Accumulates canonical block processing for trie dumping
 
 	// The following two variables are used to clean up the cache of redis in tikv mode.
 	// This can improve the cache hit rate of redis
@@ -240,13 +241,13 @@ func newBlockChainWithOptions(
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
-	leaderPubKeyFromCoinbase, _ := lru.New(chainConfig.LeaderRotationBlocksCount + 2)
+	leaderPubKeyFromCoinbase, _ := lru.New(leaderPubKeyFromCoinbaseLimit)
 
 	bc := &BlockChainImpl{
 		chainConfig:                   chainConfig,
 		cacheConfig:                   cacheConfig,
 		db:                            db,
-		triegc:                        prque.New(nil),
+		triegc:                        prque.New[int64, common.Hash](nil),
 		stateCache:                    stateCache,
 		quit:                          make(chan struct{}),
 		bodyCache:                     bodyCache,
@@ -462,7 +463,7 @@ func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block, beaconChain Block
 }
 
 func (bc *BlockChainImpl) validateNewBlock(block *types.Block) error {
-	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
+	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache, nil)
 	if err != nil {
 		return err
 	}
@@ -520,7 +521,7 @@ func (bc *BlockChainImpl) loadLastState() error {
 		return bc.Reset()
 	}
 	// Make sure the state associated with the block is available
-	if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
+	if _, err := state.New(currentBlock.Root(), bc.stateCache, nil); err != nil {
 		// Dangling block without a state associated, init from scratch
 		utils.Logger().Warn().
 			Str("number", currentBlock.Number().String()).
@@ -617,7 +618,7 @@ func (bc *BlockChainImpl) SetHead(head uint64) error {
 		headBlockGauge.Update(int64(newHeadBlock.NumberU64()))
 	}
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil {
-		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
+		if _, err := state.New(currentBlock.Root(), bc.stateCache, nil); err != nil {
 			// Rewound state missing, rolled back to before pivot, reset to genesis
 			bc.currentBlock.Store(bc.genesisBlock)
 			headBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
@@ -694,7 +695,7 @@ func (bc *BlockChainImpl) State() (*state.DB, error) {
 }
 
 func (bc *BlockChainImpl) StateAt(root common.Hash) (*state.DB, error) {
-	return state.New(root, bc.stateCache)
+	return state.New(root, bc.stateCache, nil)
 }
 
 func (bc *BlockChainImpl) Reset() error {
@@ -739,7 +740,7 @@ func (bc *BlockChainImpl) repair(head **types.Block) error {
 	valsToRemove := map[common.Address]struct{}{}
 	for {
 		// Abort if we've rewound to a head block that does have associated state
-		if _, err := state.New((*head).Root(), bc.stateCache); err == nil {
+		if _, err := state.New((*head).Root(), bc.stateCache, nil); err == nil {
 			utils.Logger().Info().
 				Str("number", (*head).Number().String()).
 				Str("hash", (*head).Hash().Hex()).
@@ -1007,7 +1008,7 @@ func (bc *BlockChainImpl) GetReceiptsByHash(hash common.Hash) types.Receipts {
 		return nil
 	}
 
-	receipts := rawdb.ReadReceipts(bc.db, hash, *number)
+	receipts := rawdb.ReadReceipts(bc.db, hash, *number, nil)
 	bc.receiptsCache.Add(hash, receipts)
 	return receipts
 }
@@ -1091,7 +1092,8 @@ func (bc *BlockChainImpl) Stop() {
 			}
 		}
 		for !bc.triegc.Empty() {
-			triedb.Dereference(bc.triegc.PopItem().(common.Hash))
+			v := common.Hash(bc.triegc.PopItem())
+			triedb.Dereference(v)
 		}
 		if size, _ := triedb.Size(); size != 0 {
 			utils.Logger().Error().Msg("Dangling trie nodes after full cleanup")
@@ -1400,6 +1402,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 	} else {
 		// Full but not archive node, do proper garbage collection
 		triedb.Reference(root, common.Hash{}) // metadata reference to keep trie alive
+		// r := common.Hash(root)
 		bc.triegc.Push(root, -int64(block.NumberU64()))
 
 		if current := block.NumberU64(); current > bc.cacheConfig.TriesInMemory {
@@ -1442,7 +1445,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 					if -number > bc.maxGarbCollectedBlkNum {
 						bc.maxGarbCollectedBlkNum = -number
 					}
-					triedb.Dereference(root.(common.Hash))
+					triedb.Dereference(root)
 				}
 			}
 		}
@@ -1473,7 +1476,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 	if err := rawdb.WriteCxLookupEntries(batch, block); err != nil {
 		return NonStatTy, err
 	}
-	if err := rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages()); err != nil {
+	if err := rawdb.WritePreimages(batch, state.Preimages()); err != nil {
 		return NonStatTy, err
 	}
 
@@ -1520,11 +1523,64 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
+	if err == nil {
+		// there should be only 1 block.
+		for _, b := range chain {
+			if b.Epoch().Uint64() > 0 {
+				err := bc.saveLeaderRotationMeta(b.Header())
+				if err != nil {
+					utils.Logger().Error().Err(err).Msg("save leader continuous blocks count error")
+					return n, err
+				}
+			}
+		}
+	}
 	if bc.isInitTiKV() && err != nil {
 		// if has some error, master writer node will release the permission
 		_, _ = bc.redisPreempt.Unlock()
 	}
 	return n, err
+}
+
+func (bc *BlockChainImpl) saveLeaderRotationMeta(h *block.Header) error {
+	blockPubKey, err := bc.getLeaderPubKeyFromCoinbase(h)
+	if err != nil {
+		return err
+	}
+	type stored struct {
+		pub    []byte
+		epoch  uint64
+		count  uint64
+		shifts uint64
+	}
+	var s stored
+	// error is possible here only on the first iteration, so we can ignore it
+	s.pub, s.epoch, s.count, s.shifts, _ = rawdb.ReadLeaderRotationMeta(bc.db)
+
+	// increase counter only if the same leader and epoch
+	if bytes.Equal(s.pub, blockPubKey.Bytes[:]) && s.epoch == h.Epoch().Uint64() {
+		s.count++
+	} else {
+		s.count = 1
+	}
+	// we should increase shifts if the leader is changed.
+	if !bytes.Equal(s.pub, blockPubKey.Bytes[:]) {
+		s.shifts++
+	}
+	// but set to zero if new
+	if s.epoch != h.Epoch().Uint64() {
+		s.shifts = 0
+	}
+
+	err = rawdb.WriteLeaderRotationMeta(bc.db, blockPubKey.Bytes[:], h.Epoch().Uint64(), s.count, s.shifts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bc *BlockChainImpl) LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts uint64, err error) {
+	return rawdb.ReadLeaderRotationMeta(bc.db)
 }
 
 // insertChain will execute the actual chain insertion and event aggregation. The
@@ -1677,7 +1733,7 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 		} else {
 			parent = chain[i-1]
 		}
-		state, err := state.New(parent.Root(), bc.stateCache)
+		state, err := state.New(parent.Root(), bc.stateCache, nil)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
@@ -3362,14 +3418,14 @@ func (bc *BlockChainImpl) tikvCleanCache() {
 		for i := bc.latestCleanCacheNum + 1; i <= to; i++ {
 			// build previous block statedb
 			fromBlock := bc.GetBlockByNumber(i)
-			fromTrie, err := state.New(fromBlock.Root(), bc.stateCache)
+			fromTrie, err := state.New(fromBlock.Root(), bc.stateCache, nil)
 			if err != nil {
 				continue
 			}
 
 			// build current block statedb
 			toBlock := bc.GetBlockByNumber(i + 1)
-			toTrie, err := state.New(toBlock.Root(), bc.stateCache)
+			toTrie, err := state.New(toBlock.Root(), bc.stateCache, nil)
 			if err != nil {
 				continue
 			}
@@ -3469,7 +3525,7 @@ func (bc *BlockChainImpl) InitTiKV(conf *harmonyconfig.TiKVConfig) {
 		// If redis is empty, the hit rate will be too low and the synchronization block speed will be slow
 		// set LOAD_PRE_FETCH is yes can significantly improve this.
 		if os.Getenv("LOAD_PRE_FETCH") == "yes" {
-			if trie, err := state.New(bc.CurrentBlock().Root(), bc.stateCache); err == nil {
+			if trie, err := state.New(bc.CurrentBlock().Root(), bc.stateCache, nil); err == nil {
 				trie.Prefetch(512)
 			} else {
 				log.Println("LOAD_PRE_FETCH ERR: ", err)

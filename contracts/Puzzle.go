@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -154,7 +153,7 @@ func bindPuzzle(address common.Address, caller bind.ContractCaller, transactor b
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Puzzle *PuzzleRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Puzzle *PuzzleRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Puzzle.Contract.PuzzleCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -173,7 +172,7 @@ func (_Puzzle *PuzzleRaw) Transact(opts *bind.TransactOpts, method string, param
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Puzzle *PuzzleCallerRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Puzzle *PuzzleCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Puzzle.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -192,12 +191,13 @@ func (_Puzzle *PuzzleTransactorRaw) Transact(opts *bind.TransactOpts, method str
 //
 // Solidity: function getPlayers() constant returns(address[])
 func (_Puzzle *PuzzleCaller) GetPlayers(opts *bind.CallOpts) ([]common.Address, error) {
-	var (
-		ret0 = new([]common.Address)
-	)
-	out := ret0
-	err := _Puzzle.contract.Call(opts, out, "getPlayers")
-	return *ret0, err
+	var results []interface{}
+	err := _Puzzle.contract.Call(opts, &results, "getPlayers")
+	if err != nil {
+		return *new([]common.Address), err
+	}
+	out := *abi.ConvertType(results, new([]common.Address)).(*[]common.Address)
+	return out, err
 }
 
 // GetPlayers is a free data retrieval call binding the contract method 0x8b5b9ccc.
@@ -218,12 +218,13 @@ func (_Puzzle *PuzzleCallerSession) GetPlayers() ([]common.Address, error) {
 //
 // Solidity: function manager() constant returns(address)
 func (_Puzzle *PuzzleCaller) Manager(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Puzzle.contract.Call(opts, out, "manager")
-	return *ret0, err
+	var results []interface{}
+	err := _Puzzle.contract.Call(opts, &results, "manager")
+	if err != nil {
+		return *new(common.Address), err
+	}
+	out := *abi.ConvertType(results[0], new([]common.Address)).(*[]common.Address)
+	return out[0], err
 }
 
 // Manager is a free data retrieval call binding the contract method 0x481c6a75.
@@ -244,12 +245,13 @@ func (_Puzzle *PuzzleCallerSession) Manager() (common.Address, error) {
 //
 // Solidity: function players(uint256 ) constant returns(address)
 func (_Puzzle *PuzzleCaller) Players(opts *bind.CallOpts, arg0 *big.Int) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Puzzle.contract.Call(opts, out, "players", arg0)
-	return *ret0, err
+	var results []interface{}
+	err := _Puzzle.contract.Call(opts, &results, "players", arg0)
+	if err != nil {
+		return *new(common.Address), err
+	}
+	out := *abi.ConvertType(results[0], new([]common.Address)).(*[]common.Address)
+	return out[0], err
 }
 
 // Players is a free data retrieval call binding the contract method 0xf71d96cb.

@@ -488,7 +488,7 @@ func opExtCodeSize(pc *uint64, interpreter *EVMInterpreter, contract *Contract, 
 		slot.SetUint64(0)
 		return nil, nil
 	}
-	slot.SetUint64(uint64(interpreter.evm.StateDB.GetCodeSize(common.BigToAddress(slot))))
+	slot.SetUint64(uint64(interpreter.evm.StateDB.GetCodeSize(common.BigToAddress(slot), false)))
 
 	return nil, nil
 }
@@ -528,7 +528,7 @@ func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, contract *Contract, 
 		// for EOAs that are not validators, statedb returns nil
 		code = nil
 	} else {
-		code = interpreter.evm.StateDB.GetCode(addr)
+		code = interpreter.evm.StateDB.GetCode(addr, false)
 	}
 	codeCopy := getDataBig(code, codeOffset, length)
 	memory.Set(memOffset.Uint64(), length.Uint64(), codeCopy)

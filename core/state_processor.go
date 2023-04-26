@@ -308,7 +308,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 	// Set the receipt logs and create a bloom for filtering
 	if config.IsReceiptLog(header.Epoch()) {
-		receipt.Logs = statedb.GetLogs(tx.Hash())
+		receipt.Logs = statedb.GetLogs(tx.Hash(), header.Number().Uint64(), header.Hash())
 	}
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
@@ -384,7 +384,7 @@ func ApplyStakingTransaction(
 	receipt.GasUsed = gas
 
 	if config.IsReceiptLog(header.Epoch()) {
-		receipt.Logs = statedb.GetLogs(tx.Hash())
+		receipt.Logs = statedb.GetLogs(tx.Hash(), header.Number().Uint64(), header.Hash())
 		utils.Logger().Info().Interface("CollectReward", receipt.Logs)
 	}
 

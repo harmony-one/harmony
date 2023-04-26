@@ -12,7 +12,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -176,7 +175,8 @@ func (db *KakashiDB) Close() error {
 	return db.Database.Close()
 }
 
-func (db *KakashiDB) OnRoot(common.Hash) {}
+func (db *KakashiDB) OnRoot(common.Hash)                          {}
+func (db *KakashiDB) OnAccount(common.Address, state.DumpAccount) {}
 
 // OnAccount implements DumpCollector interface
 func (db *KakashiDB) OnAccountStart(addr common.Address, acc state.DumpAccount) {
@@ -345,7 +345,7 @@ func (db *KakashiDB) stateDataDump(block *types.Block) {
 	fmt.Println("stateDataDump:", snapdbInfo.LastAccountKey.String(), snapdbInfo.LastAccountStateKey.String())
 	stateDB0 := state.NewDatabaseWithCache(db, STATEDB_CACHE_SIZE)
 	rootHash := block.Root()
-	stateDB, err := state.New(rootHash, stateDB0)
+	stateDB, err := state.New(rootHash, stateDB0, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -354,8 +354,8 @@ func (db *KakashiDB) stateDataDump(block *types.Block) {
 	if len(snapdbInfo.LastAccountStateKey) > 0 {
 		stateKey := new(big.Int).SetBytes(snapdbInfo.LastAccountStateKey)
 		stateKey.Add(stateKey, big.NewInt(1))
-		config.StateStart = stateKey.Bytes()
-		if len(config.StateStart) != len(snapdbInfo.LastAccountStateKey) {
+		config.Start = stateKey.Bytes()
+		if len(config.Start) != len(snapdbInfo.LastAccountStateKey) {
 			panic("statekey overflow")
 		}
 	}
@@ -366,12 +366,12 @@ func (db *KakashiDB) stateDataDump(block *types.Block) {
 
 func dumpMain(srcDBDir, destDBDir string, batchLimit int) {
 	fmt.Println("===dumpMain===")
-	srcDB, err := ethRawDB.NewLevelDBDatabase(srcDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "")
+	srcDB, err := rawdb.NewLevelDBDatabase(srcDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "", false)
 	if err != nil {
 		fmt.Println("open src db error:", err)
 		os.Exit(-1)
 	}
-	destDB, err := ethRawDB.NewLevelDBDatabase(destDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "")
+	destDB, err := rawdb.NewLevelDBDatabase(destDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "", false)
 	if err != nil {
 		fmt.Println("open dest db error:", err)
 		os.Exit(-1)

@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
@@ -103,7 +103,7 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 	setDefaults(cfg)
 
 	if cfg.State == nil {
-		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
+		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	}
 	var (
 		address = common.BytesToAddress([]byte("contract"))
@@ -112,7 +112,7 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 	)
 	cfg.State.CreateAccount(address)
 	// set the receiver's (the executing contract) code for execution.
-	cfg.State.SetCode(address, code)
+	cfg.State.SetCode(address, code, false)
 	// Call the code with the given configuration.
 	ret, _, err := vmenv.Call(
 		sender,
@@ -133,7 +133,7 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 	setDefaults(cfg)
 
 	if cfg.State == nil {
-		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
+		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	}
 	var (
 		vmenv  = NewEnv(cfg)

@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 
-	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -72,8 +71,9 @@ type Instance interface {
 	// ReshardingEpoch returns a list of Epoch while off-chain resharding happens
 	ReshardingEpoch() []*big.Int
 
-	// Count of blocks per epoch
+	// BlocksPerEpoch returns the number of blocks per epoch.
 	BlocksPerEpoch() uint64
+
 	// HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 	SlotsLimit() int
 
@@ -83,8 +83,8 @@ type Instance interface {
 	// ExternalAllowlistLimit returns the maximum number of external leader keys on each shard(HIP18)
 	ExternalAllowlistLimit() int
 
-	// FeeCollector returns a address to receive txn fees
-	FeeCollector() ethCommon.Address
+	// FeeCollector returns a mapping of address to decimal % of fee
+	FeeCollectors() FeeCollectors
 }
 
 // genShardingStructure return sharding structure, given shard number and its patterns.

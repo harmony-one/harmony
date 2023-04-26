@@ -123,7 +123,7 @@ func (s *PublicContractService) GetCode(
 		DoMetricRPCQueryInfo(GetCode, FailedNumber)
 		return nil, err
 	}
-	code := state.GetCode(address)
+	code := state.GetCode(address, false)
 
 	// Response output is the same for all versions
 	return code, state.Error()

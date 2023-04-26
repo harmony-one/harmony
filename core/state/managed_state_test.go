@@ -19,7 +19,7 @@ package state
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -27,7 +27,7 @@ import (
 var addr = common.BytesToAddress([]byte("test"))
 
 func create() (*ManagedState, *account) {
-	statedb, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	statedb, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	ms := ManageState(statedb)
 	ms.DB.SetNonce(addr, 100)
 	ms.accounts[addr] = newAccount(ms.DB.getStateObject(addr))

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -22,7 +21,7 @@ func TestSnapdbInfo(t *testing.T) {
 		LastAccountKey:      hexutil.MustDecode("0x1339383fd90ed804e28464763a13fafad66dd0f88434b8e5d8b410eb75a10331"),
 		LastAccountStateKey: hexutil.MustDecode("0xa940a0bb9eca4f9d5eee3f4059f458bd4a05bb1d680c5f7c781b06bc43c20df6"),
 	}
-	db := ethRawDB.NewMemoryDatabase()
+	db := NewMemoryDatabase()
 	if err := WriteSnapdbInfo(db, src); err != nil {
 		t.Fatal(err)
 	}

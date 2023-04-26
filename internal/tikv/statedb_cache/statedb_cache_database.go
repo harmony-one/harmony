@@ -139,6 +139,14 @@ func NewStateDBCacheDatabase(remoteDB common.TiKVStore, config StateDBCacheConfi
 	return db, nil
 }
 
+func (c *StateDBCacheDatabase) AncientDatadir() (string, error) {
+	return "", nil
+}
+
+func (c *StateDBCacheDatabase) NewBatchWithSize(size int) ethdb.Batch {
+	return nil
+}
+
 // Has retrieves if a key is present in the key-value data store.
 func (c *StateDBCacheDatabase) Has(key []byte) (bool, error) {
 	return c.remoteDB.Has(key)

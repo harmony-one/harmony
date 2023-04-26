@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -1171,7 +1171,7 @@ func defaultTestStateDB() *state.DB {
 
 func makeTestStateDB() *state.DB {
 	db := state.NewDatabase(rawdb.NewMemoryDatabase())
-	sdb, err := state.New(common.Hash{}, db)
+	sdb, err := state.New(common.Hash{}, db, nil)
 	if err != nil {
 		panic(err)
 	}

@@ -211,9 +211,19 @@ func (hmy *Harmony) CurrentBlock() *types.Block {
 	return types.NewBlockWithHeader(hmy.BlockChain.CurrentHeader())
 }
 
-// GetBlock ...
+// CurrentHeader returns the current header from the local chain.
+func (hmy *Harmony) CurrentHeader() *block.Header {
+	return hmy.BlockChain.CurrentHeader()
+}
+
+// GetBlock returns block by hash.
 func (hmy *Harmony) GetBlock(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	return hmy.BlockChain.GetBlockByHash(hash), nil
+}
+
+// GetHeader returns header by hash.
+func (hmy *Harmony) GetHeader(ctx context.Context, hash common.Hash) (*block.Header, error) {
+	return hmy.BlockChain.GetHeaderByHash(hash), nil
 }
 
 // GetCurrentBadBlocks ..
@@ -362,11 +372,11 @@ func (hmy *Harmony) GetLogs(ctx context.Context, blockHash common.Hash, isEth bo
 			return nil, errors.New("Missing block data")
 		}
 		txns := block.Transactions()
-		for i, _ := range receipts {
+		for i := range receipts {
 			if i < len(txns) {
 				ethHash := txns[i].ConvertToEth().Hash()
 				receipts[i].TxHash = ethHash
-				for j, _ := range receipts[i].Logs {
+				for j := range receipts[i].Logs {
 					// Override log txHash with receipt's
 					receipts[i].Logs[j].TxHash = ethHash
 				}

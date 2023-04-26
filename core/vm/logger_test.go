@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/internal/params"
 )
 
@@ -29,10 +28,10 @@ type dummyContractRef struct {
 	calledForEach bool
 }
 
-func (dummyContractRef) ReturnGas(*big.Int)          {}
-func (dummyContractRef) Address() common.Address     { return common.Address{} }
-func (dummyContractRef) Value() *big.Int             { return new(big.Int) }
-func (dummyContractRef) SetCode(common.Hash, []byte) {}
+func (dummyContractRef) ReturnGas(*big.Int)                {}
+func (dummyContractRef) Address() common.Address           { return common.Address{} }
+func (dummyContractRef) Value() *big.Int                   { return new(big.Int) }
+func (dummyContractRef) SetCode(common.Hash, []byte, bool) {}
 func (d *dummyContractRef) ForEachStorage(callback func(key, value common.Hash) bool) {
 	d.calledForEach = true
 }
@@ -43,7 +42,7 @@ func (d *dummyContractRef) SetNonce(uint64)            {}
 func (d *dummyContractRef) Balance() *big.Int          { return new(big.Int) }
 
 type dummyStatedb struct {
-	state.DB
+	StateDB
 }
 
 func (*dummyStatedb) GetRefund() uint64 { return 1337 }

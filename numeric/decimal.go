@@ -202,6 +202,12 @@ func (d Dec) Copy() Dec {
 	}
 }
 
+func (d Dec) Div(d2 Dec) Dec {
+	return Dec{
+		new(big.Int).Div(d.Int, d2.Int),
+	}
+}
+
 // IsNil ...
 func (d Dec) IsNil() bool { return d.Int == nil } // is decimal nil
 // IsZero ...
