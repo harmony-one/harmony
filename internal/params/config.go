@@ -278,7 +278,7 @@ var (
 		AllowlistEpoch:                         EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: big.NewInt(5),
 		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
-		FeeCollectEpoch:                        big.NewInt(5),
+		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  big.NewInt(2),
 	}
 
