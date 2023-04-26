@@ -565,7 +565,7 @@ func TestNthNextHmyExt(test *testing.T) {
 	allLeaders := append(blsKeys[:numHmyNodes], allowlistLeaders...)
 
 	decider := NewDecider(SuperMajorityVote, shard.BeaconChainShardID)
-	fakeInstance := shardingconfig.MustNewInstance(2, 20, numHmyNodes, 0, numeric.OneDec(), nil, nil, allowlist, common.Address{}, nil, 0)
+	fakeInstance := shardingconfig.MustNewInstance(2, 20, numHmyNodes, 0, numeric.OneDec(), nil, nil, allowlist, nil, nil, 0)
 
 	decider.UpdateParticipants(blsKeys, allowlistLeaders)
 	for i := 0; i < len(allLeaders); i++ {
