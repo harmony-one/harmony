@@ -402,7 +402,7 @@ func (consensus *Consensus) tick() {
 				continue
 			}
 		}
-		if !v.CheckExpire() {
+		if !v.Expired(time.Now()) {
 			continue
 		}
 		if k != timeoutViewChange {
