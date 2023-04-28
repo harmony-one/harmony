@@ -69,10 +69,10 @@ var (
 		SlotsLimitedEpoch:                      big.NewInt(999),  // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch:          big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
 		AllowlistEpoch:                         EpochTBD,
-		FeeCollectEpoch:                        EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		ValidatorCodeFixEpoch:                  EpochTBD,
+		FeeCollectEpoch:                        big.NewInt(1451), // 2023-05-17 04:02:00+00:00
+		ValidatorCodeFixEpoch:                  big.NewInt(1451),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
