@@ -68,6 +68,7 @@ require (
 
 require (
 	github.com/c2h5oh/datasize v0.0.0-20220606134207-859f65c6625b
+	github.com/holiman/bloomfilter/v2 v2.0.3
 	github.com/ledgerwatch/erigon-lib v0.0.0-20221218022306-0f8fdd40c2db
 	github.com/ledgerwatch/log/v3 v3.6.0
 	github.com/libp2p/go-libp2p-core v0.20.1
@@ -151,7 +152,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/big v0.0.0-20221017200358-a027dc42d04e // indirect
-	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/holiman/uint256 v1.2.1 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
