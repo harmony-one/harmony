@@ -90,7 +90,7 @@ func NewPruner(db ethdb.Database, config Config) (*Pruner, error) {
 	snapconfig := snapshot.Config{
 		CacheSize:  256,
 		Recovery:   false,
-		NoBuild:    true,
+		NoBuild:    false,
 		AsyncBuild: false,
 	}
 	snaptree, err := snapshot.New(snapconfig, db, trie.NewDatabase(db), headBlock.Root())
