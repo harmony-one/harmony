@@ -23,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/bitutil"
 	"github.com/ethereum/go-ethereum/core/bloombits"
-	ethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
@@ -72,7 +71,7 @@ func NewBloomIndexer(db core.Chain, size, confirms uint64) *core.ChainIndexer {
 		db:   db.ChainDb(),
 		size: size,
 	}
-	table := ethRawDB.NewTable(db.ChainDb(), string(rawdb.BloomBitsIndexPrefix))
+	table := rawdb.NewTable(db.ChainDb(), string(rawdb.BloomBitsIndexPrefix))
 
 	return core.NewChainIndexer(db, table, backend, size, confirms, bloomThrottling, "bloombits")
 }

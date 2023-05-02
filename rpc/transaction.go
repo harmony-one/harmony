@@ -203,7 +203,7 @@ func (s *PublicTransactionService) GetTransactionByHash(
 		DoMetricRPCQueryInfo(GetTransactionByHash, FailedNumber)
 		return nil, nil
 	}
-	block, err := s.hmy.GetBlock(ctx, blockHash)
+	block, err := s.hmy.GetHeader(ctx, blockHash)
 	if err != nil {
 		utils.Logger().Debug().
 			Err(err).

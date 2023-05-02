@@ -21,8 +21,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
@@ -34,7 +32,7 @@ import (
 
 // Tests block header storage and retrieval operations.
 func TestHeaderStorage(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
+	db := NewMemoryDatabase()
 
 	// Create a test header to move around the database and make sure it's really new
 	header := blockfactory.NewTestHeader().With().Number(big.NewInt(42)).Extra([]byte("test header")).Header()
@@ -67,7 +65,7 @@ func TestHeaderStorage(t *testing.T) {
 
 // Tests block body storage and retrieval operations.
 func TestBodyStorage(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
+	db := NewMemoryDatabase()
 
 	// Create a test body to move around the database and make sure it's really new
 	body := types.NewTestBody().With().Uncles([]*block.Header{blockfactory.NewTestHeader().With().Extra([]byte("test header")).Header()}).Body()
@@ -105,7 +103,7 @@ func TestBodyStorage(t *testing.T) {
 
 // Tests block storage and retrieval operations.
 func TestBlockStorage(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
+	db := NewMemoryDatabase()
 
 	// Create a test block to move around the database and make sure it's really new
 	block := types.NewBlockWithHeader(blockfactory.NewTestHeader().With().
@@ -167,7 +165,7 @@ func TestBlockStorage(t *testing.T) {
 
 // Tests that partial block contents don't get reassembled into full blocks.
 func TestPartialBlockStorage(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
+	db := NewMemoryDatabase()
 	block := types.NewBlockWithHeader(blockfactory.NewTestHeader().With().
 		Extra([]byte("test block")).
 		TxHash(types.EmptyRootHash).
@@ -200,7 +198,7 @@ func TestPartialBlockStorage(t *testing.T) {
 
 // Tests block total difficulty storage and retrieval operations.
 func TestTdStorage(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
+	db := NewMemoryDatabase()
 
 	// Create a test TD to move around the database and make sure it's really new
 	hash, td := common.Hash{}, big.NewInt(314)
@@ -223,7 +221,7 @@ func TestTdStorage(t *testing.T) {
 
 // Tests that canonical numbers can be mapped to hashes and retrieved.
 func TestCanonicalMappingStorage(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
+	db := NewMemoryDatabase()
 
 	// Create a test canonical number and assinged hash to move around
 	hash, number := common.Hash{0: 0xff}, uint64(314)
@@ -246,7 +244,7 @@ func TestCanonicalMappingStorage(t *testing.T) {
 
 // Tests that head headers and head blocks can be assigned, individually.
 func TestHeadStorage(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
+	db := NewMemoryDatabase()
 
 	blockHead := types.NewBlockWithHeader(blockfactory.NewTestHeader().With().Extra([]byte("test block header")).Header())
 	blockFull := types.NewBlockWithHeader(blockfactory.NewTestHeader().With().Extra([]byte("test block full")).Header())
@@ -281,7 +279,7 @@ func TestHeadStorage(t *testing.T) {
 
 // Tests that receipts associated with a single block can be stored and retrieved.
 func TestBlockReceiptStorage(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
+	db := NewMemoryDatabase()
 
 	receipt1 := &types.Receipt{
 		Status:            types.ReceiptStatusFailed,
@@ -309,14 +307,14 @@ func TestBlockReceiptStorage(t *testing.T) {
 
 	// Check that no receipt entries are in a pristine database
 	hash := common.BytesToHash([]byte{0x03, 0x14})
-	if rs := ReadReceipts(db, hash, 0); len(rs) != 0 {
+	if rs := ReadReceipts(db, hash, 0, nil); len(rs) != 0 {
 		t.Fatalf("non existent receipts returned: %v", rs)
 	}
 	// Insert the receipt slice into the database and check presence
 	if err := WriteReceipts(db, hash, 0, receipts); err != nil {
 		t.Fatalf("write receipts")
 	}
-	if rs := ReadReceipts(db, hash, 0); len(rs) == 0 {
+	if rs := ReadReceipts(db, hash, 0, nil); len(rs) == 0 {
 		t.Fatalf("no receipts returned")
 	} else {
 		for i := 0; i < len(receipts); i++ {
@@ -330,7 +328,7 @@ func TestBlockReceiptStorage(t *testing.T) {
 	}
 	// Delete the receipt slice and check purge
 	DeleteReceipts(db, hash, 0)
-	if rs := ReadReceipts(db, hash, 0); len(rs) != 0 {
+	if rs := ReadReceipts(db, hash, 0, nil); len(rs) != 0 {
 		t.Fatalf("deleted receipts returned: %v", rs)
 	}
 }

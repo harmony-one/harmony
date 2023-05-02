@@ -42,7 +42,7 @@ type explorerDB struct {
 
 // newExplorerLvlDB new explorer storage using leveldb
 func newExplorerLvlDB(dbPath string) (database, error) {
-	db, err := leveldb.New(dbPath, 16, 500, "explorer_db")
+	db, err := leveldb.New(dbPath, 16, 500, "explorer_db", false)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (db *explorerDB) NewBatch() batch {
 }
 
 func (db *explorerDB) NewPrefixIterator(prefix []byte) iterator {
-	it := db.db.NewIteratorWithPrefix(prefix)
+	it := db.db.NewIterator(prefix, nil)
 	return it
 }
 
@@ -95,7 +95,7 @@ type sizedIterator struct {
 }
 
 func (db *explorerDB) newSizedIterator(start []byte, size int) *sizedIterator {
-	it := db.db.NewIteratorWithStart(start)
+	it := db.db.NewIterator(nil, start)
 	return &sizedIterator{
 		it:        it,
 		curIndex:  0,

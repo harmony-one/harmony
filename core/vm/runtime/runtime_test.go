@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -96,7 +96,7 @@ func TestExecute(t *testing.T) {
 }
 
 func TestCall(t *testing.T) {
-	state, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
+	state, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	address := common.HexToAddress("0x0a")
 	state.SetCode(address, []byte{
 		byte(vm.PUSH1), 10,
@@ -105,7 +105,7 @@ func TestCall(t *testing.T) {
 		byte(vm.PUSH1), 32,
 		byte(vm.PUSH1), 0,
 		byte(vm.RETURN),
-	})
+	}, false)
 
 	ret, _, err := Call(address, nil, &Config{State: state})
 	if err != nil {
@@ -152,13 +152,13 @@ func BenchmarkCall(b *testing.B) {
 }
 func benchmarkEVMCreate(bench *testing.B, code string) {
 	var (
-		statedb, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
+		statedb, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		sender     = common.BytesToAddress([]byte("sender"))
 		receiver   = common.BytesToAddress([]byte("receiver"))
 	)
 
 	statedb.CreateAccount(sender)
-	statedb.SetCode(receiver, common.FromHex(code))
+	statedb.SetCode(receiver, common.FromHex(code), false)
 	runtimeConfig := Config{
 		Origin:      sender,
 		State:       statedb,

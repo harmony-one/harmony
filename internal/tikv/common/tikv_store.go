@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"io"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -23,7 +24,7 @@ type TiKVStoreWrapper struct {
 	TiKVStore
 }
 
-func (t *TiKVStoreWrapper) NewIterator() ethdb.Iterator {
+func (t *TiKVStoreWrapper) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	return t.TiKVStore.NewIterator(nil, nil)
 }
 
@@ -34,6 +35,10 @@ func (t *TiKVStoreWrapper) NewIteratorWithStart(start []byte) ethdb.Iterator {
 func (t *TiKVStoreWrapper) NewIteratorWithPrefix(prefix []byte) ethdb.Iterator {
 	bytesPrefix := util.BytesPrefix(prefix)
 	return t.TiKVStore.NewIterator(bytesPrefix.Start, bytesPrefix.Limit)
+}
+
+func (t *TiKVStoreWrapper) NewSnapshot() (ethdb.Snapshot, error) {
+	return nil, errors.New("not supported")
 }
 
 func ToEthKeyValueStore(store TiKVStore) ethdb.KeyValueStore {

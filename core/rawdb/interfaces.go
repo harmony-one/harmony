@@ -27,13 +27,15 @@ type DatabaseReader interface {
 // DatabaseWriter wraps the Put method of a backing data store.
 type DatabaseWriter interface {
 	Put(key []byte, value []byte) error
+	Delete(key []byte) error
 }
 
 // DatabaseDeleter wraps the Delete method of a backing data store.
 type DatabaseDeleter interface {
+	Put(key []byte, value []byte) error
 	Delete(key []byte) error
 }
 
 type DatabaseIterator interface {
-	NewIteratorWithPrefix(prefix []byte) ethdb.Iterator
+	NewIterator(prefix []byte, start []byte) ethdb.Iterator
 }

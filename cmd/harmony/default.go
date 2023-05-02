@@ -1,11 +1,12 @@
 package main
 
 import (
+	"github.com/harmony-one/harmony/core"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.13"
+const tomlConfigVersion = "2.5.14"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -81,9 +82,14 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		BlacklistFile:     "./.hmy/blacklist.txt",
 		AllowedTxsFile:    "./.hmy/allowedtxs.txt",
 		RosettaFixFile:    "",
-		AccountSlots:      16,
+		AccountSlots:      core.DefaultTxPoolConfig.AccountSlots,
 		LocalAccountsFile: "./.hmy/locals.txt",
-		GlobalSlots:       5120,
+		GlobalSlots:       core.DefaultTxPoolConfig.GlobalSlots,
+		AccountQueue:      core.DefaultTxPoolConfig.AccountQueue,
+		GlobalQueue:       core.DefaultTxPoolConfig.GlobalQueue,
+		Lifetime:          core.DefaultTxPoolConfig.Lifetime,
+		PriceLimit:        harmonyconfig.PriceLimit(core.DefaultTxPoolConfig.PriceLimit),
+		PriceBump:         core.DefaultTxPoolConfig.PriceBump,
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{

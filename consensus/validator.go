@@ -63,9 +63,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		go func() {
 			// Best effort check, no need to error out.
 			_, err := consensus.ValidateNewBlock(recvMsg)
-
 			if err == nil {
-				consensus.getLogger().Info().
+				consensus.GetLogger().Info().
 					Msg("[Announce] Block verified")
 			}
 		}()

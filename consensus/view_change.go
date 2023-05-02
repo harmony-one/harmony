@@ -203,13 +203,13 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 	var wasFound bool
 	var next *bls.PublicKeyWrapper
 	if blockchain != nil && blockchain.Config().IsLeaderRotation(epoch) {
-		if consensus.ShardID == shard.BeaconChainShardID {
-			wasFound, next = consensus.Decider.NthNextHmy(
-				shard.Schedule.InstanceForEpoch(epoch),
+		if blockchain.Config().IsLeaderRotationExternalValidatorsAllowed(epoch, consensus.ShardID) {
+			wasFound, next = consensus.Decider.NthNext(
 				lastLeaderPubKey,
 				gap)
 		} else {
-			wasFound, next = consensus.Decider.NthNext(
+			wasFound, next = consensus.Decider.NthNextHmy(
+				shard.Schedule.InstanceForEpoch(epoch),
 				lastLeaderPubKey,
 				gap)
 		}
@@ -422,10 +422,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 				consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 				return
 			}
-
-			go func() {
-				consensus.ReadySignal <- SyncProposal
-			}()
+			go consensus.ReadySignal(SyncProposal)
 			return
 		}
 

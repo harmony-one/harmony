@@ -96,6 +96,14 @@ func NewLeveldbShard(savePath string, diskCount int, diskShards int) (shard *Lev
 	return shard, err
 }
 
+func (l *LeveldbShard) NewBatchWithSize(size int) ethdb.Batch {
+	return nil
+}
+
+func (l *LeveldbShard) NewSnapshot() (ethdb.Snapshot, error) {
+	return nil, nil
+}
+
 func (l *LeveldbShard) mapDB(key []byte) *leveldb.DB {
 	return l.dbs[mapDBIndex(key, l.dbCount)]
 }
@@ -128,7 +136,7 @@ func (l *LeveldbShard) NewBatch() ethdb.Batch {
 
 // NewIterator creates a binary-alphabetical iterator over the entire keyspace
 // contained within the key-value database.
-func (l *LeveldbShard) NewIterator() ethdb.Iterator {
+func (l *LeveldbShard) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	return l.iterator(nil)
 }
 

@@ -423,3 +423,7 @@ func (a Stub) SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log) error {
 func (a Stub) InitTiKV(conf *harmonyconfig.TiKVConfig) {
 	return
 }
+
+func (a Stub) LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts uint64, err error) {
+	return nil, 0, 0, 0, errors.Errorf("method LeaderRotationMeta not implemented for %s", a.Name)
+}

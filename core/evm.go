@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
@@ -39,9 +38,6 @@ import (
 // ChainContext supports retrieving headers and consensus parameters from the
 // current blockchain to be used during transaction processing.
 type ChainContext interface {
-	// Engine retrieves the chain's consensus engine.
-	Engine() consensus_engine.Engine
-
 	// GetHeader returns the hash corresponding to their hash.
 	GetHeader(common.Hash, uint64) *block.Header
 

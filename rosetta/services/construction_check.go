@@ -289,7 +289,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 		GasPrice:        sugNativePrice,
 		GasLimit:        estGasUsed,
 		Transaction:     options.TransactionMetadata,
-		ContractCode:    state.GetCode(contractAddress),
+		ContractCode:    state.GetCode(contractAddress, false),
 		EvmErrorMessage: evmErrorMsg,
 		EvmReturn:       evmReturn,
 	})

@@ -38,9 +38,9 @@ type StateDB interface {
 	SetNonce(common.Address, uint64)
 
 	GetCodeHash(common.Address) common.Hash
-	GetCode(common.Address) []byte
-	SetCode(common.Address, []byte)
-	GetCodeSize(common.Address) int
+	GetCode(common.Address, bool) []byte
+	SetCode(common.Address, []byte, bool)
+	GetCodeSize(common.Address, bool) int
 
 	ValidatorWrapper(common.Address, bool, bool) (*staking.ValidatorWrapper, error)
 	UpdateValidatorWrapper(common.Address, *staking.ValidatorWrapper) error

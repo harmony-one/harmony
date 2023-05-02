@@ -458,10 +458,10 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 			if (oldLeader != nil && consensus.LeaderPubKey != nil &&
 				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
 				go func() {
-					consensus.getLogger().Info().
+					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal <- SyncProposal
+					consensus.ReadySignal(SyncProposal)
 				}()
 			}
 			return Normal
@@ -549,7 +549,7 @@ func (consensus *Consensus) GetFinality() int64 {
 	return consensus.finality
 }
 
-// switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
+// switchPhase will switch FBFTPhase to desired phase.
 func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase) {
 	consensus.getLogger().Info().
 		Str("from:", consensus.phase.String()).

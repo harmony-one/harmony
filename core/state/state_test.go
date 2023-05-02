@@ -22,9 +22,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/harmony/core/rawdb"
 )
 
 type stateTest struct {
@@ -34,18 +35,20 @@ type stateTest struct {
 
 func newStateTest() *stateTest {
 	db := rawdb.NewMemoryDatabase()
-	sdb, _ := New(common.Hash{}, NewDatabase(db))
+	sdb, _ := New(common.Hash{}, NewDatabase(db), nil)
 	return &stateTest{db: db, state: sdb}
 }
 
 func TestDump(t *testing.T) {
-	s := newStateTest()
+	db := rawdb.NewMemoryDatabase()
+	sdb, _ := New(common.Hash{}, NewDatabaseWithConfig(db, &trie.Config{Preimages: true}), nil)
+	s := &stateTest{db: db, state: sdb}
 
 	// generate a few entries
 	obj1 := s.state.GetOrNewStateObject(common.BytesToAddress([]byte{0x01}))
 	obj1.AddBalance(big.NewInt(22))
 	obj2 := s.state.GetOrNewStateObject(common.BytesToAddress([]byte{0x01, 0x02}))
-	obj2.SetCode(crypto.Keccak256Hash([]byte{3, 3, 3, 3, 3, 3, 3}), []byte{3, 3, 3, 3, 3, 3, 3})
+	obj2.SetCode(crypto.Keccak256Hash([]byte{3, 3, 3, 3, 3, 3, 3}), []byte{3, 3, 3, 3, 3, 3, 3}, false)
 	obj3 := s.state.GetOrNewStateObject(common.BytesToAddress([]byte{0x02}))
 	obj3.SetBalance(big.NewInt(44))
 
@@ -147,7 +150,7 @@ func TestSnapshotEmpty(t *testing.T) {
 }
 
 func TestSnapshot2(t *testing.T) {
-	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()), nil)
 
 	stateobjaddr0 := common.BytesToAddress([]byte("so0"))
 	stateobjaddr1 := common.BytesToAddress([]byte("so1"))
@@ -163,19 +166,19 @@ func TestSnapshot2(t *testing.T) {
 	so0 := state.getStateObject(stateobjaddr0)
 	so0.SetBalance(big.NewInt(42))
 	so0.SetNonce(43)
-	so0.SetCode(crypto.Keccak256Hash([]byte{'c', 'a', 'f', 'e'}), []byte{'c', 'a', 'f', 'e'})
+	so0.SetCode(crypto.Keccak256Hash([]byte{'c', 'a', 'f', 'e'}), []byte{'c', 'a', 'f', 'e'}, false)
 	so0.suicided = false
 	so0.deleted = false
 	state.setStateObject(so0)
 
 	root, _ := state.Commit(false)
-	state.Reset(root)
+	state, _ = New(root, state.db, state.snaps)
 
 	// and one with deleted == true
 	so1 := state.getStateObject(stateobjaddr1)
 	so1.SetBalance(big.NewInt(52))
 	so1.SetNonce(53)
-	so1.SetCode(crypto.Keccak256Hash([]byte{'c', 'a', 'f', 'e', '2'}), []byte{'c', 'a', 'f', 'e', '2'})
+	so1.SetCode(crypto.Keccak256Hash([]byte{'c', 'a', 'f', 'e', '2'}), []byte{'c', 'a', 'f', 'e', '2'}, false)
 	so1.suicided = true
 	so1.deleted = true
 	state.setStateObject(so1)
@@ -191,7 +194,7 @@ func TestSnapshot2(t *testing.T) {
 	so0Restored := state.getStateObject(stateobjaddr0)
 	// Update lazily-loaded values before comparing.
 	so0Restored.GetState(state.db, storageaddr)
-	so0Restored.Code(state.db)
+	so0Restored.Code(state.db, false)
 	// non-deleted is equal (restored)
 	compareStateObjects(so0Restored, so0, t)
 
