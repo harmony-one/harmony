@@ -264,7 +264,7 @@ func newBlockChainWithOptions(
 	if stateCache == nil {
 		stateCache = state.NewDatabaseWithNodeDB(db, triedb)
 	}
-	
+
 	bodyCache, _ := lru.New(bodyCacheLimit)
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	receiptsCache, _ := lru.New(receiptsCacheLimit)

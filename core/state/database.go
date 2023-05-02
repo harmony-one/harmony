@@ -139,7 +139,10 @@ func NewDatabase(db ethdb.Database) Database {
 }
 
 func NewDatabaseWithCache(db ethdb.Database, cache int) Database {
-	return NewDatabaseWithConfig(db, nil)
+	config := trie.Config{
+		Cache: cache,
+	}
+	return NewDatabaseWithConfig(db, &config)
 }
 
 // NewDatabaseWithConfig creates a backing store for state. The returned database
