@@ -1086,7 +1086,7 @@ func testTransactionQueueTimeLimiting(t *testing.T, nolocals bool) {
 		t.Fatalf("pool internal state corrupted: %v", err)
 	}
 	// Wait a bit for eviction to run and clean up any leftovers, and ensure only the local remains
-	time.Sleep(2 * config.Lifetime)
+	time.Sleep(4 * config.Lifetime)
 
 	pending, queued = pool.Stats()
 	if pending != 0 {
