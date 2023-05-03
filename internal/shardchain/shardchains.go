@@ -172,9 +172,8 @@ func initStateCache(db ethdb.Database, sc *CollectionImpl, shardID uint32) (stat
 			return nil, err
 		}
 		return state.NewDatabaseWithCache(stateDB, 64), nil
-	} else {
-		return state.NewDatabase(db), nil
 	}
+	return nil, nil
 }
 
 // DisableCache disables caching mode for newly opened chains.
