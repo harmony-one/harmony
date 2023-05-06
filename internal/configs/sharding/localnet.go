@@ -160,6 +160,6 @@ var (
 	localnetV1   = MustNewInstance(2, 4, 4, 0, numeric.OneDec(), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpochOld())
 	localnetV2   = MustNewInstance(2, 4, 4, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpochOld())
 	localnetV3   = MustNewInstance(2, 4, 4, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
-	localnetV3_1 = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
+	localnetV3_1 = MustNewInstance(2, 6, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, nil, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
 	localnetV3_2 = MustNewInstance(2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, emptyAllowlist, feeCollectorsLocalnet, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
 )
