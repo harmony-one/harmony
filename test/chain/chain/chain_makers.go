@@ -177,7 +177,7 @@ func GenerateChain(
 	factory := blockfactory.NewFactory(config)
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
 	chainreader := &fakeChainReader{config: config}
-	genblock := func(i int, parent *types.Block, statedb *state.DB) (*types.Block, types.Receipts) {
+	genblock := func(i int, parent *block.Header, statedb *state.DB) (*types.Block, types.Receipts) {
 		b := &BlockGen{
 			i:       i,
 			chain:   blocks,
@@ -228,7 +228,7 @@ func GenerateChain(
 	return blocks, receipts
 }
 
-func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine, factory blockfactory.Factory) *block.Header {
+func makeHeader(chain consensus_engine.ChainReader, parent *block.Header, state *state.DB, engine consensus_engine.Engine, factory blockfactory.Factory) *block.Header {
 	var time *big.Int
 	if parent.Time() == nil {
 		time = big.NewInt(10)
