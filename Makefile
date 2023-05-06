@@ -164,3 +164,7 @@ go-test:
 
 docker:
 	docker build --pull -t harmonyone/$(PKGNAME):latest -f scripts/docker/Dockerfile .
+
+
+travis_rpc_checker:
+	bash ./scripts/travis_rpc_checker.sh
