@@ -664,6 +664,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	var minPeers int
 	var aggregateSig bool
 	if hc.Consensus != nil {
+		fmt.Println("MinPeers is set in harmony config", hc.Consensus.MinPeers)
 		minPeers = hc.Consensus.MinPeers
 		aggregateSig = hc.Consensus.AggregateSig
 	} else {
