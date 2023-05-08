@@ -174,7 +174,7 @@ func GenerateChain(
 			factory: factory,
 			engine:  engine,
 		}
-		b.header = makeHeader(chainreader, parent, statedb, b.engine, factory)
+		b.header = makeHeader(chainreader, parent, statedb, factory)
 
 		// Execute any user modifications to the block
 		if gen != nil {
@@ -215,7 +215,7 @@ func GenerateChain(
 	return blocks, receipts
 }
 
-func makeHeader(chain consensus_engine.ChainReader, parent *block.Header, state *state.DB, engine consensus_engine.Engine, factory blockfactory.Factory) *block.Header {
+func makeHeader(chain consensus_engine.ChainReader, parent *block.Header, state *state.DB, factory blockfactory.Factory) *block.Header {
 	var time *big.Int
 	if parent.Time() == nil {
 		time = big.NewInt(10)

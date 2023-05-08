@@ -300,7 +300,7 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 
 // UpdateCurrent updates the current environment with the current state and header.
 func (w *Worker) UpdateCurrent() error {
-	parent := w.chain.CurrentBlock().Header()
+	parent := w.chain.CurrentHeader()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
 

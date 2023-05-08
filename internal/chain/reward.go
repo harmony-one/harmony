@@ -138,7 +138,7 @@ func lookupDelegatorShares(
 // Handle block rewards during pre-staking era
 func accumulateRewardsAndCountSigsBeforeStaking(
 	bc engine.ChainReader, state *state.DB,
-	header *block.Header, beaconChain engine.ChainReader, sigsReady chan bool,
+	header *block.Header, sigsReady chan bool,
 ) (reward.Reader, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 
@@ -252,7 +252,7 @@ func AccumulateRewardsAndCountSigs(
 
 	// Pre-staking era
 	if !bc.Config().IsStaking(epoch) {
-		return accumulateRewardsAndCountSigsBeforeStaking(bc, state, header, beaconChain, sigsReady)
+		return accumulateRewardsAndCountSigsBeforeStaking(bc, state, header, sigsReady)
 	}
 
 	// Rewards are accumulated only in the beaconchain, so just wait for commit sigs and return.
