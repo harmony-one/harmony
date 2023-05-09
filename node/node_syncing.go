@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/knownpeers"
 	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/multiformats/go-multiaddr"
 
@@ -139,16 +140,18 @@ type DNSSyncingPeerProvider struct {
 	selfAddrs  []multiaddr.Multiaddr
 	zone, port string
 	lookupHost func(name string) (addrs []string, err error)
+	knownpeers knownpeers.KnownPeers
 }
 
 // NewDNSSyncingPeerProvider returns a provider that uses given DNS name and
 // port number to resolve syncing peers.
-func NewDNSSyncingPeerProvider(zone, port string, addrs []multiaddr.Multiaddr) *DNSSyncingPeerProvider {
+func NewDNSSyncingPeerProvider(zone, port string, selfAddrs []multiaddr.Multiaddr, knownhosts knownpeers.KnownPeers) *DNSSyncingPeerProvider {
 	return &DNSSyncingPeerProvider{
-		selfAddrs:  addrs,
+		selfAddrs:  selfAddrs,
 		zone:       zone,
 		port:       port,
 		lookupHost: net.LookupHost,
+		knownpeers: knownhosts,
 	}
 }
 
@@ -167,6 +170,8 @@ func (p *DNSSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Peer,
 		}
 		peers = append(peers, p2p.Peer{IP: addr, Port: p.port})
 	}
+	// add additional peers
+	peers = append(peers, p.knownpeers.GetChecked(2)...)
 	return peers, nil
 }
 

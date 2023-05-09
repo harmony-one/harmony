@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/knownpeers"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -71,7 +72,7 @@ func TestNewNode(t *testing.T) {
 func TestDNSSyncingPeerProvider(t *testing.T) {
 	t.Run("Happy", func(t *testing.T) {
 		addrs := make([]multiaddr.Multiaddr, 0)
-		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs)
+		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs, knownpeers.NewKnownHosts())
 		lookupCount := 0
 		lookupName := ""
 		p.lookupHost = func(name string) (addrs []string, err error) {
@@ -95,7 +96,7 @@ func TestDNSSyncingPeerProvider(t *testing.T) {
 	})
 	t.Run("LookupError", func(t *testing.T) {
 		addrs := make([]multiaddr.Multiaddr, 0)
-		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs)
+		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs, knownpeers.NewKnownHosts())
 		p.lookupHost = func(_ string) ([]string, error) {
 			return nil, errors.New("omg")
 		}
