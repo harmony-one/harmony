@@ -509,7 +509,12 @@ func (s *Object) Code(db Database, isValidatorCode bool) []byte {
 	if s.validatorWrapper || isValidatorCode {
 		code, err := db.ValidatorCode(s.addrHash, common.BytesToHash(s.CodeHash()))
 		if err != nil {
-			s.setError(fmt.Errorf("can't load validator code hash %x: %v", s.CodeHash(), err))
+			s.setError(
+				fmt.Errorf(
+					"can't load validator code for address %s hash %x: %v",
+					s.address.Hex(), s.CodeHash(), err,
+				),
+			)
 		}
 		if code != nil {
 			s.code = code
@@ -518,10 +523,18 @@ func (s *Object) Code(db Database, isValidatorCode bool) []byte {
 	}
 	code, err := db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
 	if err != nil {
-		s.setError(fmt.Errorf("can't load code hash %x: %v", s.CodeHash(), err))
+		s.setError(
+			fmt.Errorf(
+				"can't load code for address %s hash %x: %v",
+				s.address.Hex(), s.CodeHash(), err,
+			),
+		)
 	}
-	s.code = code
-	return code
+	if code != nil {
+		s.code = code
+		return code
+	}
+	return nil
 }
 
 // CodeSize returns the size of the contract/validator code associated with this object,
