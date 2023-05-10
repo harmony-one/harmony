@@ -111,6 +111,7 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(dumpConfigLegacyCmd)
 	rootCmd.AddCommand(dumpDBCmd)
+	rootCmd.AddCommand(inspectDBCmd)
 
 	if err := registerRootCmdFlags(); err != nil {
 		os.Exit(2)
@@ -119,6 +120,9 @@ func init() {
 		os.Exit(2)
 	}
 	if err := registerDumpDBFlags(); err != nil {
+		os.Exit(2)
+	}
+	if err := registerInspectionFlags(); err != nil {
 		os.Exit(2)
 	}
 }
