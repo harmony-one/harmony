@@ -296,7 +296,6 @@ func (s *stat) Count() string {
 
 // InspectDatabase traverses the entire database and checks the size
 // of all different categories of data.
-// This function is NOT used, just ported over from the Ethereum
 func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 	it := db.NewIterator(keyPrefix, keyStart)
 	defer it.Release()
