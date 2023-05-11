@@ -20,6 +20,7 @@ message DownloaderRequest {
     UNKNOWN = 6;
     BLOCKHEADER = 7;
     BLOCKBYHEIGHT = 8;
+    PEERS = 9;
   }
 
   // Request type.

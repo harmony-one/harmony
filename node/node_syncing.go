@@ -145,13 +145,13 @@ type DNSSyncingPeerProvider struct {
 
 // NewDNSSyncingPeerProvider returns a provider that uses given DNS name and
 // port number to resolve syncing peers.
-func NewDNSSyncingPeerProvider(zone, port string, selfAddrs []multiaddr.Multiaddr, knownhosts knownpeers.KnownPeers) *DNSSyncingPeerProvider {
+func NewDNSSyncingPeerProvider(zone, port string, selfAddrs []multiaddr.Multiaddr, knownPeers knownpeers.KnownPeers) *DNSSyncingPeerProvider {
 	return &DNSSyncingPeerProvider{
 		selfAddrs:  selfAddrs,
 		zone:       zone,
 		port:       port,
 		lookupHost: net.LookupHost,
-		knownpeers: knownhosts,
+		knownpeers: knownPeers,
 	}
 }
 
