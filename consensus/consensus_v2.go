@@ -253,7 +253,7 @@ func (consensus *Consensus) finalCommit() {
 		if block.IsLastBlockInEpoch() {
 			// No pipelining
 			go func() {
-				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
+				consensus.GetLogger().Info().Msg("[finalCommit] sending block proposal signal")
 				consensus.ReadySignal(SyncProposal)
 			}()
 		} else {
@@ -557,38 +557,36 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		return errors.Wrap(err, "[preCommitAndPropose] failed verifying last commit sig")
 	}
 
-	go func() {
-		blk.SetCurrentCommitSig(bareMinimumCommit)
+	blk.SetCurrentCommitSig(bareMinimumCommit)
 
-		// Send committed message to validators since 2/3 commit is already collected
-		if err := consensus.msgSender.SendWithRetry(
-			blk.NumberU64(),
-			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
-			p2p.ConstructMessage(msgToSend)); err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")
-		} else {
-			consensus.getLogger().Info().
-				Str("blockHash", blk.Hash().Hex()).
-				Uint64("blockNum", consensus.BlockNum()).
-				Hex("lastCommitSig", bareMinimumCommit).
-				Msg("[preCommitAndPropose] Sent Committed Message")
-		}
+	// Send committed message to validators since 2/3 commit is already collected
+	if err := consensus.msgSender.SendWithRetry(
+		blk.NumberU64(),
+		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+		},
+		p2p.ConstructMessage(msgToSend)); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")
+	} else {
+		consensus.getLogger().Info().
+			Str("blockHash", blk.Hash().Hex()).
+			Uint64("blockNum", consensus.BlockNum()).
+			Hex("lastCommitSig", bareMinimumCommit).
+			Msg("[preCommitAndPropose] Sent Committed Message")
+	}
 
-		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
-			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
-			return
-		}
+	if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+		return err
+	}
 
-		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
-		consensus.consensusTimeout[timeoutConsensus].Start()
+	consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
+	consensus.consensusTimeout[timeoutConsensus].Start()
 
-		// Send signal to Node to propose the new block for consensus
-		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
+	// Send signal to Node to propose the new block for consensus
+	consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
 
-		consensus.ReadySignal(AsyncProposal)
-	}()
+	consensus.ReadySignal(AsyncProposal)
 
 	return nil
 }
