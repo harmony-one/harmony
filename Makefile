@@ -164,3 +164,6 @@ go-test:
 
 docker:
 	docker build --pull -t harmonyone/$(PKGNAME):latest -f scripts/docker/Dockerfile .
+
+travis_go_checker:
+	bash ./scripts/travis_go_checker.sh
