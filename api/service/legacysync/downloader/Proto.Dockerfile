@@ -1,7 +1,5 @@
 FROM golang:1.19-bullseye
 
-#bullseye
-
 RUN apt update
 RUN apt install -y protobuf-compiler
 RUN protoc --version
