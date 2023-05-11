@@ -314,7 +314,8 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
 		}
-		syncInstance.SyncLoop(bc, worker, false, node.Consensus, legacysync.LoopMinTime)
+		isBeacon := bc.ShardID() == shard.BeaconChainShardID
+		syncInstance.SyncLoop(bc, worker, isBeacon, node.Consensus, legacysync.LoopMinTime)
 		if willJoinConsensus {
 			node.IsSynchronized.Set()
 			node.Consensus.BlocksSynchronized()
