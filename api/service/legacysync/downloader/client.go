@@ -101,18 +101,6 @@ func (client *Client) GetBlockHashes(startHash []byte, size uint32, ip, port str
 	return response
 }
 
-// GetPeers gets block hashes from all the peers by calling grpc request.
-func (client *Client) GetPeers() *pb.DownloaderResponse {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_PEERS}
-	response, err := client.dlClient.Query(ctx, request)
-	if err != nil {
-		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[PEERS] GetPeers query failed")
-	}
-	return response
-}
-
 // GetBlocksByHeights gets blocks from peers by calling grpc request.
 func (client *Client) GetBlocksByHeights(heights []uint64) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
