@@ -412,7 +412,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		}
 		count++
 		if count%1000 == 0 && time.Since(logged) > 8*time.Second {
-			log.Info("Inspecting database", "count", count, "elapsed", common.PrettyDuration(time.Since(start)))
+			utils.Logger().Info().Int64("count", count).Interface("elapsed", common.PrettyDuration(time.Since(start))).Msg("Inspecting database")
 			logged = time.Now()
 		}
 	}
