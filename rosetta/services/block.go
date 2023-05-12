@@ -178,11 +178,11 @@ func (s *BlockAPI) BlockTransaction(
 			// check for contract related operations, if it is a plain transaction.
 			if txInfo.tx.To() != nil {
 				// possible call to existing contract so fetch relevant data
-				contractInfo.ContractCode = state.GetCode(*txInfo.tx.To(), false)
+				contractInfo.ContractCode = state.GetCode(*txInfo.tx.To())
 				contractInfo.ContractAddress = txInfo.tx.To()
 			} else {
 				// contract creation, so address is in receipt
-				contractInfo.ContractCode = state.GetCode(txInfo.receipt.ContractAddress, false)
+				contractInfo.ContractCode = state.GetCode(txInfo.receipt.ContractAddress)
 				contractInfo.ContractAddress = &txInfo.receipt.ContractAddress
 			}
 			contractInfo.ExecutionResult, rosettaError = s.getTransactionTrace(ctx, blk, txInfo)
