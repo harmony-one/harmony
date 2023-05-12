@@ -138,7 +138,7 @@ func lookupDelegatorShares(
 // Handle block rewards during pre-staking era
 func accumulateRewardsAndCountSigsBeforeStaking(
 	bc engine.ChainReader, state *state.DB,
-	header *block.Header, beaconChain engine.ChainReader, sigsReady chan bool,
+	header *block.Header, sigsReady chan bool,
 ) (reward.Reader, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 
@@ -252,7 +252,7 @@ func AccumulateRewardsAndCountSigs(
 
 	// Pre-staking era
 	if !bc.Config().IsStaking(epoch) {
-		return accumulateRewardsAndCountSigsBeforeStaking(bc, state, header, beaconChain, sigsReady)
+		return accumulateRewardsAndCountSigsBeforeStaking(bc, state, header, sigsReady)
 	}
 
 	// Rewards are accumulated only in the beaconchain, so just wait for commit sigs and return.
@@ -499,7 +499,6 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 	subComm := shard.Committee{ShardID: shard.BeaconChainShardID, Slots: members}
 
 	if err := availability.IncrementValidatorSigningCounts(
-		beaconChain,
 		subComm.StakedValidators(),
 		state,
 		payable,
@@ -587,7 +586,7 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 	staked := subComm.StakedValidators()
 	startTimeLocal = time.Now()
 	if err := availability.IncrementValidatorSigningCounts(
-		bc, staked, state, payableSigners, missing,
+		staked, state, payableSigners, missing,
 	); err != nil {
 		return nil, nil, err
 	}

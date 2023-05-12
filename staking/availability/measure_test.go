@@ -158,7 +158,7 @@ func TestIncrementValidatorSigningCounts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := IncrementValidatorSigningCounts(nil, ctx.staked, ctx.state, ctx.signers,
+		if err := IncrementValidatorSigningCounts(ctx.staked, ctx.state, ctx.signers,
 			ctx.missings); err != nil {
 
 			t.Fatal(err)

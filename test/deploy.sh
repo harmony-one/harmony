@@ -69,7 +69,7 @@ function launch_localnet() {
   if ${VERBOSE}; then
     verbosity=5
   else
-    verbosity=3
+    verbosity=5
   fi
 
   base_args=(--log_folder "${log_folder}" --min_peers "${MIN}" --bootnodes "${BN_MA}" "--network_type=$NETWORK" --blspass file:"${ROOT}/.hmy/blspass.txt" "--dns=false" "--verbosity=${verbosity}" "--p2p.security.max-conn-per-ip=100")
@@ -131,6 +131,7 @@ function launch_localnet() {
     esac
 
     # Start the node
+    echo "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}"
     ${DRYRUN} "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
   done <"${config}"
 }

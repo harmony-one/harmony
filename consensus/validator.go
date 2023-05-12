@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
+// onAnnounce intended for validator.
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	recvMsg, err := consensus.parseFBFTMessage(msg)
 	if err != nil {

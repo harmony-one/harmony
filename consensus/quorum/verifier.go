@@ -82,5 +82,11 @@ func (uv *uniformVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 }
 
 func (uv *uniformVerifier) thresholdKeyCount() int64 {
+	switch uv.pubKeyCnt {
+	case 2:
+		return 1
+	case 3:
+		return 2
+	}
 	return uv.pubKeyCnt*2/3 + 1
 }
