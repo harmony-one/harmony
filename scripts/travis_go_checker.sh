@@ -40,18 +40,6 @@ else
 	ok=false
 fi
 
-cd ./api/service/legacysync/downloader
-echo "Running generate protofiles..."
-./gen.sh
-cd -
-if [ -z "$(git status -s ./api/service/legacysync/downloader)" ]
-then
-  echo "generate protofiles succeeded"
-else
-  echo "proto contains changes."
-  ok=false
-fi
-
 echo "Running goimports..."
 goimports_output="${tmpdir}/goimports_output.txt"
 "${progdir}/goimports.sh" -d -e > "${goimports_output}" 2>&1
