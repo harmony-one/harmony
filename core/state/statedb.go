@@ -342,18 +342,18 @@ func (db *DB) BlockHash() common.Hash {
 	return db.bhash
 }
 
-func (db *DB) GetCode(addr common.Address, isValidatorCode bool) []byte {
+func (db *DB) GetCode(addr common.Address) []byte {
 	Object := db.getStateObject(addr)
 	if Object != nil {
-		return Object.Code(db.db, isValidatorCode)
+		return Object.Code(db.db)
 	}
 	return nil
 }
 
-func (db *DB) GetCodeSize(addr common.Address, isValidatorCode bool) int {
+func (db *DB) GetCodeSize(addr common.Address) int {
 	Object := db.getStateObject(addr)
 	if Object != nil {
-		return Object.CodeSize(db.db, isValidatorCode)
+		return Object.CodeSize(db.db)
 	}
 	return 0
 }
@@ -1241,13 +1241,11 @@ func (db *DB) ValidatorWrapper(
 		return copyValidatorWrapperIfNeeded(cached, sendOriginal, copyDelegations), nil
 	}
 
-	by := db.GetCode(addr, true)
+	by := db.GetCode(addr)
 	if len(by) == 0 {
-		by = db.GetCode(addr, false)
-		if len(by) == 0 {
-			return nil, ErrAddressNotPresent
-		}
+		return nil, ErrAddressNotPresent
 	}
+
 	val := stk.ValidatorWrapper{}
 	if err := rlp.DecodeBytes(by, &val); err != nil {
 		return nil, errors.Wrapf(
