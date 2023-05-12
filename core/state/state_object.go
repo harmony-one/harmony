@@ -527,13 +527,13 @@ func (s *Object) Code(db Database) []byte {
 	}
 	var err error
 	code := []byte{}
-	// if it's set for validator wrapper, no need to check contract code
+	// if it's not set for validator wrapper, then it may be either contract code or validator wrapper (old version of db
+	// don't have any prefix to differentiate between them)
+	// so, if it's not set for validator wrapper, we need to check contract code as well
 	if !s.validatorWrapper {
 		code, err = db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
 	}
-	// if it's not set for validator wrapper, then it may be either contract code or validator wrapper (old version of db
-	// don't have any prefix to differentiate between them)
-	// so if it couldn't load contract code or it is set to validator wrapper, then it tries to fetch validator wrapper code
+	// if it couldn't load contract code or it is set to validator wrapper, then it tries to fetch validator wrapper code
 	if s.validatorWrapper || err != nil {
 		vCode, errVCode := db.ValidatorCode(s.addrHash, common.BytesToHash(s.CodeHash()))
 		if errVCode == nil && vCode != nil {
@@ -541,9 +541,10 @@ func (s *Object) Code(db Database) []byte {
 			return vCode
 		}
 		if s.validatorWrapper {
-			s.setError(fmt.Errorf("can't load validator code hash %x : %v", s.CodeHash(), err))
+			s.setError(fmt.Errorf("can't load validator code hash %x for account address hash %x : %v", s.CodeHash(), s.addrHash, err))
 		} else {
-			s.setError(fmt.Errorf("can't load contract/validator code hash %x, contract code error: %v, validator code error: %v", s.CodeHash(), err, errVCode))
+			s.setError(fmt.Errorf("can't load contract/validator code hash %x for account address hash %x : contract code error: %v, validator code error: %v",
+				s.CodeHash(), s.addrHash, err, errVCode))
 		}
 	}
 	s.code = code
@@ -562,18 +563,24 @@ func (s *Object) CodeSize(db Database) int {
 	}
 	var err error
 	size := int(0)
+
+	// if it's not set for validator wrapper, then it may be either contract code or validator wrapper (old version of db
+	// don't have any prefix to differentiate between them)
+	// so, if it's not set for validator wrapper, we need to check contract code as well
 	if !s.validatorWrapper {
 		size, err = db.ContractCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
 	}
+	// if it couldn't get contract code or it is set to validator wrapper, then it tries to retrieve validator wrapper code
 	if s.validatorWrapper || err != nil {
 		vcSize, errVCSize := db.ValidatorCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
 		if errVCSize == nil && vcSize > 0 {
 			return size
 		}
 		if s.validatorWrapper {
-			s.setError(fmt.Errorf("can't load validator code size %x : %v", s.CodeHash(), err))
+			s.setError(fmt.Errorf("can't load validator code size %x for account address hash %x : %v", s.CodeHash(), s.addrHash, err))
 		} else {
-			s.setError(fmt.Errorf("can't load contract/validator code size %x, contract code size error: %v, validator code size error: %v", s.CodeHash(), err, errVCSize))
+			s.setError(fmt.Errorf("can't load contract/validator code size %x for account address hash %x : contract code size error: %v, validator code size error: %v",
+				s.CodeHash(), s.addrHash, err, errVCSize))
 		}
 		s.setError(fmt.Errorf("can't load code size %x (validator wrapper: %t): %v", s.CodeHash(), s.validatorWrapper, err))
 	}
