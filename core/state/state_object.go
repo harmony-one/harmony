@@ -531,7 +531,7 @@ func (s *Object) Code(db Database) []byte {
 	if !s.validatorWrapper {
 		code, err = db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
 	}
-	// if it's not set for validator wrapper, then it may be either contract code or validator wrapper (old version of db 
+	// if it's not set for validator wrapper, then it may be either contract code or validator wrapper (old version of db
 	// don't have any prefix to differentiate between them)
 	// so if it couldn't load contract code or it is set to validator wrapper, then it tries to fetch validator wrapper code
 	if s.validatorWrapper || err != nil {
