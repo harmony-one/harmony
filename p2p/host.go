@@ -75,6 +75,16 @@ type Peer struct {
 	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
 }
 
+// PeerFromIpPortUnchecked returns Peer from string representation of IP:Port.
+// It does not check if the IP:Port is valid.
+func PeerFromIpPortUnchecked(peer string) Peer {
+	parts := strings.Split(peer, ":")
+	if len(parts) != 2 {
+		return Peer{}
+	}
+	return Peer{IP: parts[0], Port: parts[1]}
+}
+
 const (
 	// SetAsideForConsensus set the number of active validation goroutines for the consensus topic
 	SetAsideForConsensus = 1 << 13
@@ -358,9 +368,10 @@ func (host *HostV2) PeerConnectivity() (int, int, int) {
 	peers := host.h.Peerstore().Peers()
 	for _, peer := range peers {
 		result := host.h.Network().Connectedness(peer)
-		if result == libp2p_network.Connected {
+		switch result {
+		case libp2p_network.Connected:
 			connected++
-		} else if result == libp2p_network.NotConnected {
+		case libp2p_network.NotConnected:
 			not++
 		}
 	}

@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	legacydownloader "github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	"github.com/harmony-one/harmony/api/service/peersexchange"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/registry"
@@ -417,6 +419,14 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		currentNode.RegisterExplorerServices()
 	}
 	currentNode.RegisterService(service.CrosslinkSending, crosslink_sending.New(currentNode, currentNode.Blockchain()))
+	currentNode.RegisterService(
+		service.PeersExchanger,
+		peersexchange.New(peersexchange.NewOptions(
+			currentNode.SyncingPeerProvider,
+			currentNode.Consensus.ShardID,
+			currentNode.KnownPeers(),
+			legacydownloader.ClientSetup,
+		)))
 	if hc.Pprof.Enabled {
 		setupPprofService(currentNode, hc)
 	}

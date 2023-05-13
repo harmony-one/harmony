@@ -56,14 +56,14 @@ const (
 type SyncPeerConfig struct {
 	peer        p2p.Peer
 	peerHash    []byte
-	client      *downloader.Client
+	client      downloader.Client
 	blockHashes [][]byte       // block hashes before node doing sync
 	newBlocks   []*types.Block // blocks after node doing sync
 	mux         sync.Mutex
 }
 
 // GetClient returns client pointer of downloader.Client
-func (peerConfig *SyncPeerConfig) GetClient() *downloader.Client {
+func (peerConfig *SyncPeerConfig) GetClient() downloader.Client {
 	return peerConfig.client
 }
 
@@ -334,7 +334,7 @@ func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
 }
 
 // CreateTestSyncPeerConfig used for testing.
-func CreateTestSyncPeerConfig(client *downloader.Client, blockHashes [][]byte) *SyncPeerConfig {
+func CreateTestSyncPeerConfig(client downloader.Client, blockHashes [][]byte) *SyncPeerConfig {
 	return &SyncPeerConfig{
 		client:      client,
 		blockHashes: blockHashes,
@@ -459,7 +459,7 @@ func (sc *SyncConfig) getHowManyMaxConsensus() (int, int) {
 }
 
 // InitForTesting used for testing.
-func (sc *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]byte) {
+func (sc *SyncConfig) InitForTesting(client downloader.Client, blockHashes [][]byte) {
 	sc.mtx.RLock()
 	defer sc.mtx.RUnlock()
 	for i := range sc.peers {

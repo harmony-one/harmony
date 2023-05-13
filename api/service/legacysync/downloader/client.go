@@ -11,8 +11,26 @@ import (
 	"google.golang.org/grpc/connectivity"
 )
 
+var _ Client = &ClientImpl{}
+
 // Client is the client model for downloader package.
-type Client struct {
+type Client interface {
+	IsReady() bool
+	IsConnecting() bool
+	State() connectivity.State
+	Close(reason string)
+	GetBlockHashes(startHash []byte, size uint32, ip, port string) *pb.DownloaderResponse
+	GetPeers() (*pb.DownloaderResponse, error)
+	GetBlockHeaders(hashes [][]byte) *pb.DownloaderResponse
+	Register(hash []byte, ip, port string) *pb.DownloaderResponse
+	GetBlockChainHeight() (*pb.DownloaderResponse, error)
+	GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse
+	WaitForConnection(t time.Duration) bool
+	GetBlocksByHeights(heights []uint64) *pb.DownloaderResponse
+	PushNewBlock(selfPeerHash [20]byte, blockBytes []byte, timeout bool) (*pb.DownloaderResponse, error)
+}
+
+type ClientImpl struct {
 	dlClient pb.DownloaderClient
 	opts     []grpc.DialOption
 	conn     *grpc.ClientConn
@@ -20,8 +38,8 @@ type Client struct {
 }
 
 // ClientSetup setups a Client given ip and port.
-func ClientSetup(ip, port string, withBlock bool) *Client {
-	client := Client{}
+func ClientSetup(ip, port string, withBlock bool) Client {
+	client := ClientImpl{}
 	client.opts = append(client.opts, grpc.WithInsecure())
 	if withBlock {
 		client.opts = append(client.opts, grpc.WithBlock())
@@ -42,22 +60,22 @@ func ClientSetup(ip, port string, withBlock bool) *Client {
 }
 
 // IsReady returns true if client is ready
-func (client *Client) IsReady() bool {
+func (client *ClientImpl) IsReady() bool {
 	return client.conn.GetState() == connectivity.Ready
 }
 
 // IsConnecting returns true if client is connecting
-func (client *Client) IsConnecting() bool {
+func (client *ClientImpl) IsConnecting() bool {
 	return client.conn.GetState() == connectivity.Connecting
 }
 
 // State returns current Connecting state
-func (client *Client) State() connectivity.State {
+func (client *ClientImpl) State() connectivity.State {
 	return client.conn.GetState()
 }
 
 // WaitForConnection waits for client to connect
-func (client *Client) WaitForConnection(t time.Duration) bool {
+func (client *ClientImpl) WaitForConnection(t time.Duration) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), t)
 	defer cancel()
 
@@ -73,7 +91,7 @@ func (client *Client) WaitForConnection(t time.Duration) bool {
 }
 
 // Close closes the Client.
-func (client *Client) Close(reason string) {
+func (client *ClientImpl) Close(reason string) {
 	err := client.conn.Close()
 	if err != nil {
 		utils.Logger().Info().
@@ -88,7 +106,7 @@ func (client *Client) Close(reason string) {
 }
 
 // GetBlockHashes gets block hashes from all the peers by calling grpc request.
-func (client *Client) GetBlockHashes(startHash []byte, size uint32, ip, port string) *pb.DownloaderResponse {
+func (client *ClientImpl) GetBlockHashes(startHash []byte, size uint32, ip, port string) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKHASH, BlockHash: startHash, Size: size}
@@ -102,19 +120,19 @@ func (client *Client) GetBlockHashes(startHash []byte, size uint32, ip, port str
 }
 
 // GetPeers gets block hashes from all the peers by calling grpc request.
-func (client *Client) GetPeers() *pb.DownloaderResponse {
+func (client *ClientImpl) GetPeers() (*pb.DownloaderResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_PEERS}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[PEERS] GetPeers query failed")
+		return nil, err
 	}
-	return response
+	return response, nil
 }
 
 // GetBlocksByHeights gets blocks from peers by calling grpc request.
-func (client *Client) GetBlocksByHeights(heights []uint64) *pb.DownloaderResponse {
+func (client *ClientImpl) GetBlocksByHeights(heights []uint64) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{
@@ -129,7 +147,7 @@ func (client *Client) GetBlocksByHeights(heights []uint64) *pb.DownloaderRespons
 }
 
 // GetBlockHeaders gets block headers in serialization byte array by calling a grpc request.
-func (client *Client) GetBlockHeaders(hashes [][]byte) *pb.DownloaderResponse {
+func (client *ClientImpl) GetBlockHeaders(hashes [][]byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKHEADER}
@@ -146,7 +164,7 @@ func (client *Client) GetBlockHeaders(hashes [][]byte) *pb.DownloaderResponse {
 }
 
 // GetBlocks gets blocks in serialization byte array by calling a grpc request.
-func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
+func (client *ClientImpl) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCK}
@@ -163,7 +181,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 }
 
 // GetBlocksAndSigs get blockWithSig in serialization byte array by calling a grpc request
-func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
+func (client *ClientImpl) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCK, GetBlocksWithSig: true}
@@ -181,7 +199,7 @@ func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
 
 // Register will register node's ip/port information to peers receive newly created blocks in future
 // hash is the bytes of "ip:port" string representation
-func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderResponse {
+func (client *ClientImpl) Register(hash []byte, ip, port string) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER, RegisterWithSig: true}
@@ -197,7 +215,7 @@ func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderRespo
 }
 
 // PushNewBlock will send the lastest verified block to registered nodes
-func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockBytes []byte, timeout bool) (*pb.DownloaderResponse, error) {
+func (client *ClientImpl) PushNewBlock(selfPeerHash [20]byte, blockBytes []byte, timeout bool) (*pb.DownloaderResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -219,7 +237,7 @@ func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockBytes []byte, tim
 }
 
 // GetBlockChainHeight gets the blockheight from peer
-func (client *Client) GetBlockChainHeight() (*pb.DownloaderResponse, error) {
+func (client *ClientImpl) GetBlockChainHeight() (*pb.DownloaderResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKHEIGHT}

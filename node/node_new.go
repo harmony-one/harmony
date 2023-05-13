@@ -49,7 +49,7 @@ func New(
 		crosslinks:           crosslinks.New(),
 		syncID:               GenerateSyncID(),
 		keysToAddrs:          lrucache.NewCache[uint64, map[string]common.Address](10),
-		knownPeers:           knownpeers.NewKnownHostsThreadSafe(),
+		knownPeers:           knownpeers.NewKnownPeersThreadSafe(),
 	}
 	if consensusObj == nil {
 		panic("consensusObj is nil")

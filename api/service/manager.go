@@ -24,6 +24,7 @@ const (
 	Synchronize
 	CrosslinkSending
 	StagedStreamSync
+	PeersExchanger
 )
 
 func (t Type) String() string {
@@ -48,6 +49,8 @@ func (t Type) String() string {
 		return "CrosslinkSending"
 	case StagedStreamSync:
 		return "StagedStreamSync"
+	case PeersExchanger:
+		return "PeersExchanger"
 	default:
 		return "Unknown"
 	}

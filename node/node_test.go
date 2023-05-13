@@ -72,7 +72,7 @@ func TestNewNode(t *testing.T) {
 func TestDNSSyncingPeerProvider(t *testing.T) {
 	t.Run("Happy", func(t *testing.T) {
 		addrs := make([]multiaddr.Multiaddr, 0)
-		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs, knownpeers.NewKnownHosts())
+		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs, knownpeers.NewKnownPeers())
 		lookupCount := 0
 		lookupName := ""
 		p.lookupHost = func(name string) (addrs []string, err error) {
@@ -96,7 +96,7 @@ func TestDNSSyncingPeerProvider(t *testing.T) {
 	})
 	t.Run("LookupError", func(t *testing.T) {
 		addrs := make([]multiaddr.Multiaddr, 0)
-		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs, knownpeers.NewKnownHosts())
+		p := NewDNSSyncingPeerProvider("example.com", "1234", addrs, knownpeers.NewKnownPeers())
 		p.lookupHost = func(_ string) ([]string, error) {
 			return nil, errors.New("omg")
 		}

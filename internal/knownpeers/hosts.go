@@ -2,7 +2,6 @@ package knownpeers
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -11,18 +10,6 @@ type hosts struct {
 	m map[string]struct{}
 	n []string
 	i int
-}
-
-// assume that `peer` is always valid.
-func peerFromString(peer string) p2p.Peer {
-	rs := strings.SplitN(peer, ":", 2)
-	if len(rs) != 2 {
-		return p2p.Peer{}
-	}
-	return p2p.Peer{
-		IP:   rs[0],
-		Port: rs[1],
-	}
 }
 
 func peerToString(peer p2p.Peer) string {
@@ -42,7 +29,7 @@ func (a *hosts) get(n uint16) []p2p.Peer {
 	out := make([]p2p.Peer, 0, n)
 	for n > 0 {
 		a.i %= len(a.n)
-		out = append(out, peerFromString(a.n[a.i]))
+		out = append(out, p2p.PeerFromIpPortUnchecked(a.n[a.i]))
 		n--
 		a.i++
 	}
@@ -77,50 +64,58 @@ func (a *hosts) remove(host string) (removed bool) {
 	return true
 }
 
-type knownHosts struct {
+func (a *hosts) count() int {
+	return len(a.n)
+}
+
+type knownPeers struct {
 	checkedHosts   *hosts
 	uncheckedHosts *hosts
 }
 
-func NewKnownHosts() KnownPeers {
-	return &knownHosts{
+func NewKnownPeers() KnownPeers {
+	return &knownPeers{
 		checkedHosts:   newHosts(),
 		uncheckedHosts: newHosts(),
 	}
 }
 
-func NewKnownHostsThreadSafe() KnownPeers {
-	return WrapThreadSafe(NewKnownHosts())
+func NewKnownPeersThreadSafe() KnownPeers {
+	return WrapThreadSafe(NewKnownPeers())
 }
 
-func (a *knownHosts) GetChecked(limit int) []p2p.Peer {
+func (a *knownPeers) GetChecked(limit int) []p2p.Peer {
 	if limit < 0 {
 		panic("limit must be non-negative")
 	}
 	return a.checkedHosts.get(uint16(limit))
 }
 
-func (a *knownHosts) GetUnchecked(limit int) []p2p.Peer {
+func (a *knownPeers) GetUnchecked(limit int) []p2p.Peer {
 	if limit < 0 {
 		panic("limit must be non-negative")
 	}
 	return a.uncheckedHosts.get(uint16(limit))
 }
 
-func (a *knownHosts) AddChecked(hosts ...p2p.Peer) {
+func (a *knownPeers) GetUncheckedCount() int {
+	return a.uncheckedHosts.count()
+}
+
+func (a *knownPeers) AddChecked(hosts ...p2p.Peer) {
 	for _, host := range hosts {
 		a.checkedHosts.add(peerToString(host))
 		a.uncheckedHosts.remove(peerToString(host))
 	}
 }
 
-func (a *knownHosts) AddUnchecked(hosts ...p2p.Peer) {
+func (a *knownPeers) AddUnchecked(hosts ...p2p.Peer) {
 	for _, host := range hosts {
 		a.addUnchecked(peerToString(host))
 	}
 }
 
-func (a *knownHosts) addUnchecked(host string) {
+func (a *knownPeers) addUnchecked(host string) {
 	if a.checkedHosts.has(host) {
 		return
 	}
