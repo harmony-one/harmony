@@ -39,7 +39,7 @@ import (
 // See GenerateChain for a detailed explanation.
 type BlockGen struct {
 	i        int
-	parent   *types.Block
+	parent   *block.Header
 	chain    []*types.Block
 	factory  blockfactory.Factory
 	header   *block.Header
@@ -140,19 +140,6 @@ func (b *BlockGen) AddUncle(h *block.Header) {
 	b.uncles = append(b.uncles, h)
 }
 
-// PrevBlock returns a previously generated block by number. It panics if
-// num is greater or equal to the number of the block being generated.
-// For index -1, PrevBlock returns the parent block given to GenerateChain.
-func (b *BlockGen) PrevBlock(index int) *types.Block {
-	if index >= b.i {
-		panic(fmt.Errorf("block index %d out of range (%d,%d)", index, -1, b.i))
-	}
-	if index == -1 {
-		return b.parent
-	}
-	return b.chain[index]
-}
-
 // GenerateChain creates a chain of n blocks. The first block's
 // parent will be the provided parent. db is used to store
 // intermediate states and should contain the parent's state trie.
@@ -166,7 +153,7 @@ func (b *BlockGen) PrevBlock(index int) *types.Block {
 // values. Inserting them into BlockChain requires use of FakePow or
 // a similar non-validating proof of work implementation.
 func GenerateChain(
-	config *params.ChainConfig, parent *types.Block,
+	config *params.ChainConfig, parent *block.Header,
 	engine consensus_engine.Engine, db ethdb.Database,
 	n int,
 	gen func(int, *BlockGen),
@@ -177,7 +164,7 @@ func GenerateChain(
 	factory := blockfactory.NewFactory(config)
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
 	chainreader := &fakeChainReader{config: config}
-	genblock := func(i int, parent *types.Block, statedb *state.DB) (*types.Block, types.Receipts) {
+	genblock := func(i int, parent *block.Header, statedb *state.DB) (*types.Block, types.Receipts) {
 		b := &BlockGen{
 			i:       i,
 			chain:   blocks,
@@ -187,7 +174,7 @@ func GenerateChain(
 			factory: factory,
 			engine:  engine,
 		}
-		b.header = makeHeader(chainreader, parent, statedb, b.engine, factory)
+		b.header = makeHeader(chainreader, parent, statedb, factory)
 
 		// Execute any user modifications to the block
 		if gen != nil {
@@ -223,12 +210,12 @@ func GenerateChain(
 		block, receipt := genblock(i, parent, statedb)
 		blocks[i] = block
 		receipts[i] = receipt
-		parent = block
+		parent = block.Header()
 	}
 	return blocks, receipts
 }
 
-func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine, factory blockfactory.Factory) *block.Header {
+func makeHeader(chain consensus_engine.ChainReader, parent *block.Header, state *state.DB, factory blockfactory.Factory) *block.Header {
 	var time *big.Int
 	if parent.Time() == nil {
 		time = big.NewInt(10)

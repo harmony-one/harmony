@@ -223,7 +223,7 @@ func main() {
 	//// Generate a small n-block chain and an uncle block for it
 	n := 3
 	if n > 0 {
-		blocks, _ := chain2.GenerateChain(chainConfig, genesis, chain.Engine(), database, n, func(i int, gen *chain2.BlockGen) {
+		blocks, _ := chain2.GenerateChain(chainConfig, genesis.Header(), chain.Engine(), database, n, func(i int, gen *chain2.BlockGen) {
 			gen.SetCoinbase(FaucetAddress)
 			gen.SetShardID(0)
 			gen.AddTx(pendingTxs[i].(*types.Transaction))
