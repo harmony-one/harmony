@@ -92,7 +92,7 @@ func (ss *EpochSync) SyncLoop(bc core.BlockChain, consensus *consensus.Consensus
 }
 
 func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
-	isBeacon := bc.ShardID() == 0
+	isBeacon := bc.ShardID() == shard.BeaconChainShardID
 	maxHeight, errMaxHeight := getMaxPeerHeight(syncConfig)
 	if errMaxHeight != nil {
 		utils.Logger().Info().

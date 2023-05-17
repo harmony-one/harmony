@@ -23,7 +23,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -297,7 +296,6 @@ func (s *stat) Count() string {
 
 // InspectDatabase traverses the entire database and checks the size
 // of all different categories of data.
-// This function is NOT used, just ported over from the Ethereum
 func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 	it := db.NewIterator(keyPrefix, keyStart)
 	defer it.Release()
@@ -332,6 +330,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		// Meta- and unaccounted data
 		metadata    stat
 		unaccounted stat
+		zeroval     stat
 
 		// Totals
 		total common.StorageSize
@@ -342,6 +341,9 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			key  = it.Key()
 			size = common.StorageSize(len(key) + len(it.Value()))
 		)
+		if len(it.Value()) == 0 {
+			zeroval.Add(1)
+		}
 		total += size
 		switch {
 		case bytes.HasPrefix(key, headerPrefix) && len(key) == (len(headerPrefix)+8+common.HashLength):
@@ -433,30 +435,22 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"Key-Value store", "Beacon sync headers", beaconHeaders.Size(), beaconHeaders.Count()},
 		{"Key-Value store", "Clique snapshots", cliqueSnaps.Size(), cliqueSnaps.Count()},
 		{"Key-Value store", "Singleton metadata", metadata.Size(), metadata.Count()},
+		{"Key-Value store", "Zero value keys", zeroval.Size(), zeroval.Count()},
+		{"Key-Value store", "Unaccounted", unaccounted.Size(), unaccounted.Count()},
 		{"Light client", "CHT trie nodes", chtTrieNodes.Size(), chtTrieNodes.Count()},
 		{"Light client", "Bloom trie nodes", bloomTrieNodes.Size(), bloomTrieNodes.Count()},
-	}
-	// Inspect all registered append-only file store then.
-	ancients, err := inspectFreezers(db)
-	if err != nil {
-		return err
-	}
-	for _, ancient := range ancients {
-		for _, table := range ancient.sizes {
-			stats = append(stats, []string{
-				fmt.Sprintf("Ancient store (%s)", strings.Title(ancient.name)),
-				strings.Title(table.name),
-				table.size.String(),
-				fmt.Sprintf("%d", ancient.count()),
-			})
-		}
-		total += ancient.size()
 	}
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Database", "Category", "Size", "Items"})
 	table.SetFooter([]string{"", "Total", total.String(), " "})
 	table.AppendBulk(stats)
 	table.Render()
+
+	if zeroval.count > 0 {
+		utils.Logger().Error().
+			Interface("count", zeroval).
+			Msg("Database contains zero value keys")
+	}
 
 	if unaccounted.size > 0 {
 		utils.Logger().Error().

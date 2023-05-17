@@ -915,3 +915,24 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
 
 	return true
 }
+
+// DeleteBlocksLessThan deletes blocks less than given block number
+func (consensus *Consensus) DeleteBlocksLessThan(number uint64) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.FBFTLog.deleteBlocksLessThan(number)
+}
+
+// DeleteMessagesLessThan deletes messages less than given block number.
+func (consensus *Consensus) DeleteMessagesLessThan(number uint64) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.FBFTLog.deleteMessagesLessThan(number)
+}
+
+// DeleteBlockByNumber deletes block by given block number.
+func (consensus *Consensus) DeleteBlockByNumber(number uint64) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.FBFTLog.deleteBlockByNumber(number)
+}
