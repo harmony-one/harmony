@@ -242,7 +242,7 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 		return nil, err
 	}
 	// validate not a contract (toAddress can still be a contract)
-	if len(evm.StateDB.GetCode(fromAddress, false)) > 0 && !evm.IsValidator(evm.StateDB, fromAddress) {
+	if len(evm.StateDB.GetCode(fromAddress)) > 0 && !evm.IsValidator(evm.StateDB, fromAddress) {
 		return nil, errors.New("cross shard xfer not yet implemented for contracts")
 	}
 	// can't have too many shards
