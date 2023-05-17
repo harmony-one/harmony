@@ -342,18 +342,18 @@ func (db *DB) BlockHash() common.Hash {
 	return db.bhash
 }
 
-func (db *DB) GetCode(addr common.Address, isValidatorCode bool) []byte {
+func (db *DB) GetCode(addr common.Address) []byte {
 	Object := db.getStateObject(addr)
 	if Object != nil {
-		return Object.Code(db.db, isValidatorCode)
+		return Object.Code(db.db)
 	}
 	return nil
 }
 
-func (db *DB) GetCodeSize(addr common.Address, isValidatorCode bool) int {
+func (db *DB) GetCodeSize(addr common.Address) int {
 	Object := db.getStateObject(addr)
 	if Object != nil {
-		return Object.CodeSize(db.db, isValidatorCode)
+		return Object.CodeSize(db.db)
 	}
 	return 0
 }
