@@ -107,7 +107,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 			Msg("disable cache, running in archival mode")
 	} else {
 		cacheConfig = &core.CacheConfig{
-			TrieNodeLimit: 256 * 1024 * 1024,
+			TrieNodeLimit: 256,
 			TrieTimeLimit: 2 * time.Minute,
 			TriesInMemory: 128,
 		}

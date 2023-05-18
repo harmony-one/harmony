@@ -126,16 +126,18 @@ const (
 // CacheConfig contains the configuration values for the trie caching/pruning
 // that's resident in a blockchain.
 type CacheConfig struct {
-	Disabled         bool          // Whether to disable trie write caching (archive node)
-	TrieNodeLimit    int           // Memory limit (MB) at which to flush the current in-memory trie to disk
-	TrieTimeLimit    time.Duration // Time limit after which to flush the current in-memory trie to disk
-	TriesInMemory    uint64        // Block number from the head stored in disk before exiting
-	TrieCleanLimit   int           // Memory allowance (MB) to use for caching trie nodes in memory
-	TrieCleanJournal string        // Disk journal for saving clean cache entries.
-	Preimages        bool          // Whether to store preimage of trie key to the disk
-	SnapshotLimit    int           // Memory allowance (MB) to use for caching snapshot entries in memory
-	SnapshotNoBuild  bool          // Whether the background generation is allowed
-	SnapshotWait     bool          // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
+	Disabled          bool          // Whether to disable trie write caching (archive node)
+	TrieNodeLimit     int           // Memory limit (MB) at which to flush the current in-memory trie to disk
+	TrieTimeLimit     time.Duration // Time limit after which to flush the current in-memory trie to disk
+	TriesInMemory     uint64        // Block number from the head stored in disk before exiting
+	TrieDirtyLimit    int           // Memory limit (MB) at which to start flushing dirty trie nodes to disk
+	TrieDirtyDisabled bool          // Whether to disable trie write caching and GC altogether (archive node)
+	TrieCleanLimit    int           // Memory allowance (MB) to use for caching trie nodes in memory
+	TrieCleanJournal  string        // Disk journal for saving clean cache entries.
+	Preimages         bool          // Whether to store preimage of trie key to the disk
+	SnapshotLimit     int           // Memory allowance (MB) to use for caching snapshot entries in memory
+	SnapshotNoBuild   bool          // Whether the background generation is allowed
+	SnapshotWait      bool          // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
 }
 
 // defaultCacheConfig are the default caching values if none are specified by the
@@ -143,14 +145,10 @@ type CacheConfig struct {
 var defaultCacheConfig = &CacheConfig{
 	Disabled:       false,
 	TrieCleanLimit: 256,
+	TrieDirtyLimit: 256,
 	TrieTimeLimit:  5 * time.Minute,
 	SnapshotLimit:  256,
 	SnapshotWait:   true,
-	// TrieNodeLimit:
-	// TriesInMemory:
-	// TrieCleanJournal:
-	// Preimages: false
-	// SnapshotNoBuild: false
 }
 
 type BlockChainImpl struct {
