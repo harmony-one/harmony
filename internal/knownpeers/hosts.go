@@ -12,7 +12,7 @@ type hosts struct {
 	i int
 }
 
-func peerToString(peer p2p.Peer) string {
+func PeerToString(peer p2p.Peer) string {
 	return fmt.Sprintf("%s:%s", peer.IP, peer.Port)
 }
 
@@ -104,14 +104,14 @@ func (a *knownPeers) GetUncheckedCount() int {
 
 func (a *knownPeers) AddChecked(hosts ...p2p.Peer) {
 	for _, host := range hosts {
-		a.checkedHosts.add(peerToString(host))
-		a.uncheckedHosts.remove(peerToString(host))
+		a.checkedHosts.add(PeerToString(host))
+		a.uncheckedHosts.remove(PeerToString(host))
 	}
 }
 
 func (a *knownPeers) AddUnchecked(hosts ...p2p.Peer) {
 	for _, host := range hosts {
-		a.addUnchecked(peerToString(host))
+		a.addUnchecked(PeerToString(host))
 	}
 }
 

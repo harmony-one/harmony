@@ -346,12 +346,10 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 		return nil, nil
 	}
 
-	ctx2, cancel := context.WithTimeout(ctx, discTimeout)
-	go func() { // avoid context leak
-		<-time.After(discTimeout)
-		cancel()
-	}()
-	return sm.pf.FindPeers(ctx2, protoID, discBatch)
+	ctx, cancel := context.WithTimeout(ctx, discTimeout)
+	// I don't think context leak is possible here, but go vet says differently.
+	time.AfterFunc(discTimeout, cancel)
+	return sm.pf.FindPeers(ctx, protoID, discBatch)
 }
 
 func (sm *streamManager) targetProtoID() string {

@@ -626,6 +626,13 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			out = append(out, blockBytes)
 		}
 		response.Payload = out
+	case downloader_pb.DownloaderRequest_PEERS:
+		const KnownPeersLimit = 10
+		rs := node.knownPeers.GetChecked(KnownPeersLimit)
+		response.Payload = make([][]byte, 0, len(rs))
+		for _, v := range rs {
+			response.Payload = append(response.Payload, []byte(knownpeers.PeerToString(v)))
+		}
 	}
 
 	return response, nil
