@@ -174,7 +174,7 @@ func (p *Protocol) Match(targetID string) bool {
 func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 	p.logger.Info().Str("stream", raw.ID()).Msg("handle new sync stream")
 	st := p.wrapStream(raw)
-	if err := p.sm.NewStream(st); err != nil {
+	if err := p.sm.AddStream(st); err != nil {
 		// Possibly we have reach the hard limit of the stream
 		p.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
 			Msg("failed to add new stream")
