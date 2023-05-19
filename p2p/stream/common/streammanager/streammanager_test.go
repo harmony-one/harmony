@@ -133,7 +133,7 @@ func TestStreamManager_HandleNewStream(t *testing.T) {
 		sm.Start()
 		time.Sleep(defTestWait)
 
-		err := sm.NewStream(test.stream)
+		err := sm.AddStream(test.stream)
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}

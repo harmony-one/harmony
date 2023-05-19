@@ -62,6 +62,7 @@ func (st *syncStream) run() {
 
 	go st.handleReqLoop()
 	go st.handleRespLoop()
+	go st.exchangePeers()
 	st.readMsgLoop()
 }
 
@@ -141,6 +142,10 @@ func (st *syncStream) handleRespLoop() {
 			return
 		}
 	}
+}
+
+func (st *syncStream) exchangePeers() {
+	// TODO: implement
 }
 
 // Close stops the stream handling and closes the underlying stream

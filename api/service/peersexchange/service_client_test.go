@@ -11,7 +11,9 @@ import (
 var _ downloader.Client = &client{}
 
 type client struct {
-	isReady bool
+	isReady  bool
+	response *pb.DownloaderResponse
+	err      error
 }
 
 func (c client) IsConnecting() bool {
@@ -65,8 +67,7 @@ func (c client) PushNewBlock(selfPeerHash [20]byte, blockBytes []byte, timeout b
 }
 
 func (c client) GetPeers() (*pb.DownloaderResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return c.response, c.err
 }
 
 func (c client) Close(reason string) {

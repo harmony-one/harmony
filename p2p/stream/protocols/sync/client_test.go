@@ -342,7 +342,7 @@ func (sm *testStreamManager) SubscribeRemoveStreamEvent(chan<- streammanager.Evt
 	return nil
 }
 
-func (sm *testStreamManager) NewStream(stream sttypes.Stream) error {
+func (sm *testStreamManager) AddStream(stream sttypes.Stream) error {
 	stid := stream.ID()
 	for _, id := range sm.streamIDs {
 		if id == stid {

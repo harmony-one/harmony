@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/api/service/peersexchange"
 	"github.com/harmony-one/harmony/internal/knownpeers"
 	"github.com/harmony-one/harmony/p2p"
@@ -14,6 +15,7 @@ import (
 type syncPeerProvider struct {
 }
 
+// SyncingPeers returns peer we will connect to.
 func (s syncPeerProvider) SyncingPeers(shardID uint32) ([]p2p.Peer, error) {
 	return []p2p.Peer{
 		p2p.PeerFromIpPortUnchecked("127.0.0.1:9090"),
@@ -27,7 +29,15 @@ func TestService_Exchange(t *testing.T) {
 		0,
 		p,
 		func(ip string, port string, true bool) downloader.Client {
-			return client{}
+			return client{
+				isReady: true,
+				response: &pb.DownloaderResponse{ // response from remote node
+					Payload: [][]byte{
+						[]byte("0.0.0.0:9000"),
+						[]byte("255.255.255.255:80"),
+					},
+				},
+			}
 		},
 	)
 
@@ -37,6 +47,6 @@ func TestService_Exchange(t *testing.T) {
 
 		service := peersexchange.New(opts)
 		service.Exchange(ctx, 0)
-		require.Len(t, p.GetUnchecked(1), 1)
+		require.Len(t, p.GetUnchecked(2), 2)
 	})
 }

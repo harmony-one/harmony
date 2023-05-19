@@ -141,7 +141,7 @@ func (h *testHost) NewStream(ctx context.Context, p libp2p_peer.ID, pids ...prot
 	h.streams[stid] = st
 	h.lock.Unlock()
 
-	err = h.sm.NewStream(st)
+	err = h.sm.AddStream(st)
 	return nil, err
 }
 

@@ -174,8 +174,8 @@ func (sm *streamManager) loop() {
 	}
 }
 
-// NewStream handles a new stream from stream handler protocol
-func (sm *streamManager) NewStream(stream sttypes.Stream) error {
+// AddStream handles a new stream from stream handler protocol
+func (sm *streamManager) AddStream(stream sttypes.Stream) error {
 	if err := sm.sanityCheckStream(stream); err != nil {
 		return errors.Wrap(err, "stream sanity check failed")
 	}
