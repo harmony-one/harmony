@@ -403,7 +403,7 @@ func (s *StagedStreamSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 		return err
 	}
 	if err := printLogs(tx, s.timings); err != nil {
-		return err
+		utils.Logger().Warn().Err(err).Msg("print timing logs failed")
 	}
 	s.currentStage = 0
 	return nil
@@ -440,8 +440,8 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 		}
 	}
 	if len(logCtx) > 0 {
-		utils.Logger().Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("Timings (slower than 50ms) %v", logCtx...)))
+		timingLog := fmt.Sprintf("Timings (slower than 50ms) %v", logCtx)
+		utils.Logger().Info().Msgf(WrapStagedSyncMsg(timingLog))
 	}
 
 	if tx == nil {
