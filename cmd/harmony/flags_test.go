@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harmony-one/harmony/common/denominations"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
 	"github.com/spf13/cobra"
@@ -171,6 +172,15 @@ func TestHarmonyFlags(t *testing.T) {
 					ShardCount:      4,
 					CacheTime:       10,
 					CacheSize:       512,
+				},
+				GPO: harmonyconfig.GasPriceOracleConfig{
+					Blocks:            defaultConfig.GPO.Blocks,
+					Transactions:      defaultConfig.GPO.Transactions,
+					Percentile:        defaultConfig.GPO.Percentile,
+					DefaultPrice:      defaultConfig.GPO.DefaultPrice,
+					MaxPrice:          defaultConfig.GPO.MaxPrice,
+					LowUsageThreshold: defaultConfig.GPO.LowUsageThreshold,
+					BlockGasLimit:     defaultConfig.GPO.BlockGasLimit,
 				},
 			},
 		},
@@ -1345,6 +1355,56 @@ func TestSysFlags(t *testing.T) {
 
 		if !reflect.DeepEqual(hc.Sys, test.expConfig) {
 			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Sys, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
+func TestGPOFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig harmonyconfig.GasPriceOracleConfig
+		expErr    error
+	}{
+		{
+			args: []string{},
+			expConfig: harmonyconfig.GasPriceOracleConfig{
+				Blocks:            defaultConfig.GPO.Blocks,
+				Transactions:      defaultConfig.GPO.Transactions,
+				Percentile:        defaultConfig.GPO.Percentile,
+				DefaultPrice:      defaultConfig.GPO.DefaultPrice,
+				MaxPrice:          defaultConfig.GPO.MaxPrice,
+				LowUsageThreshold: defaultConfig.GPO.LowUsageThreshold,
+				BlockGasLimit:     defaultConfig.GPO.BlockGasLimit,
+			},
+		},
+		{
+			args: []string{"--gpo.blocks", "5", "--gpo.transactions", "1", "--gpo.percentile", "2", "--gpo.defaultprice", "101000000000", "--gpo.maxprice", "400000000000", "--gpo.low-usage-threshold", "60", "--gpo.block-gas-limit", "10000000"},
+			expConfig: harmonyconfig.GasPriceOracleConfig{
+				Blocks:            5,
+				Transactions:      1,
+				Percentile:        2,
+				DefaultPrice:      101 * denominations.Nano,
+				MaxPrice:          400 * denominations.Nano,
+				LowUsageThreshold: 60,
+				BlockGasLimit:     10_000_000,
+			},
+		},
+	}
+
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, gpoFlags, applyGPOFlags)
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+
+		if !reflect.DeepEqual(hc.GPO, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.GPO, test.expConfig)
 		}
 		ts.tearDown()
 	}
