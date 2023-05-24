@@ -37,7 +37,7 @@ type (
 )
 
 // NewDownloader creates a new downloader
-func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config Config) *Downloader {
+func NewDownloader(host p2p.Host, bc core.BlockChain, dbDir string, isBeaconNode bool, config Config) *Downloader {
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{
@@ -68,7 +68,7 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	//TODO: use mem db should be in config file
-	stagedSyncInstance, err := CreateStagedSync(ctx, bc, false, isBeaconNode, sp, config, logger, config.LogProgress)
+	stagedSyncInstance, err := CreateStagedSync(ctx, bc, dbDir, false, isBeaconNode, sp, config, logger, config.LogProgress)
 	if err != nil {
 		cancel()
 		return nil
