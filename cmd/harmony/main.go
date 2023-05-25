@@ -249,6 +249,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
 	applyShardDataFlags(cmd, config)
+	applyGPOFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
@@ -262,7 +263,7 @@ func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 		utils.SetLogContext(ip, strconv.Itoa(port))
 	}
 
-	if config.Log.Console != true {
+	if !config.Log.Console {
 		utils.AddLogFile(logPath, config.Log.RotateSize, config.Log.RotateCount, config.Log.RotateMaxAge)
 	}
 }

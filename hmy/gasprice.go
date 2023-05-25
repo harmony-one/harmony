@@ -18,30 +18,20 @@ package hmy
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sort"
 	"sync"
 
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/eth/rpc"
+	"github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
 )
-
-const sampleNumber = 3 // Number of transactions sampled in a block
-
-var DefaultMaxPrice = big.NewInt(1e12) // 1000 gwei is the max suggested limit
-
-type GasPriceConfig struct {
-	Blocks     int
-	Percentile int
-	Default    *big.Int `toml:",omitempty"`
-	MaxPrice   *big.Int `toml:",omitempty"`
-}
 
 // OracleBackend includes all necessary background APIs for oracle.
 type OracleBackend interface {
@@ -50,8 +40,7 @@ type OracleBackend interface {
 	ChainConfig() *params.ChainConfig
 }
 
-// Oracle recommends gas prices based on the content of recent
-// blocks. Suitable for both light and full clients.
+// Oracle recommends gas prices based on the content of recent blocks.
 type Oracle struct {
 	backend   *Harmony
 	lastHead  common.Hash
@@ -60,38 +49,74 @@ type Oracle struct {
 	cacheLock sync.RWMutex
 	fetchLock sync.Mutex
 
-	checkBlocks int
-	percentile  int
+	checkBlocks       int
+	percentile        int
+	checkTxs          int
+	lowUsageThreshold float64
+	blockGasLimit     int
+	defaultPrice      *big.Int
+}
+
+var DefaultGPOConfig = harmony.GasPriceOracleConfig{
+	Blocks:            20,
+	Transactions:      3,
+	Percentile:        60,
+	DefaultPrice:      100 * denominations.Nano,  // 100 gwei
+	MaxPrice:          1000 * denominations.Nano, // 1000 gwei
+	LowUsageThreshold: 50,
+	BlockGasLimit:     0, // TODO should we set default to 30M?
 }
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
 // gasprice for newly created transaction.
-func NewOracle(backend *Harmony, params GasPriceConfig) *Oracle {
+func NewOracle(backend *Harmony, params *harmony.GasPriceOracleConfig) *Oracle {
 	blocks := params.Blocks
 	if blocks < 1 {
-		blocks = 1
-		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle sample blocks", "provided", params.Blocks, "updated", blocks))
+		blocks = DefaultGPOConfig.Blocks
+		utils.Logger().Warn().
+			Int("provided", params.Blocks).
+			Int("updated", blocks).
+			Msg("Sanitizing invalid gasprice oracle sample blocks")
 	}
-	percent := params.Percentile
-	if percent < 0 {
-		percent = 0
-		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent))
+	txs := params.Transactions
+	if txs < 1 {
+		txs = DefaultGPOConfig.Transactions
+		utils.Logger().Warn().
+			Int("provided", params.Transactions).
+			Int("updated", txs).
+			Msg("Sanitizing invalid gasprice oracle sample transactions")
 	}
-	if percent > 100 {
-		percent = 100
-		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent))
+	percentile := params.Percentile
+	if percentile < 0 || percentile > 100 {
+		percentile = DefaultGPOConfig.Percentile
+		utils.Logger().Warn().
+			Int("provided", params.Percentile).
+			Int("updated", percentile).
+			Msg("Sanitizing invalid gasprice oracle percentile")
 	}
-	maxPrice := params.MaxPrice
-	if maxPrice == nil || maxPrice.Int64() <= 0 {
-		maxPrice = DefaultMaxPrice
-		utils.Logger().Warn().Msg(fmt.Sprint("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPrice, "updated", maxPrice))
+	// no sanity check done, simply convert it
+	defaultPrice := big.NewInt(params.DefaultPrice)
+	maxPrice := big.NewInt(params.MaxPrice)
+	lowUsageThreshold := float64(params.LowUsageThreshold) / 100.0
+	if lowUsageThreshold < 0 || lowUsageThreshold > 1 {
+		lowUsageThreshold = float64(DefaultGPOConfig.LowUsageThreshold) / 100.0
+		utils.Logger().Warn().
+			Float64("provided", float64(params.LowUsageThreshold)/100.0).
+			Float64("updated", lowUsageThreshold).
+			Msg("Sanitizing invalid gasprice oracle lowUsageThreshold")
 	}
+	blockGasLimit := params.BlockGasLimit
 	return &Oracle{
-		backend:     backend,
-		lastPrice:   params.Default,
-		maxPrice:    maxPrice,
-		checkBlocks: blocks,
-		percentile:  percent,
+		backend:           backend,
+		lastPrice:         defaultPrice,
+		maxPrice:          maxPrice,
+		checkBlocks:       blocks,
+		percentile:        percentile,
+		checkTxs:          txs,
+		lowUsageThreshold: lowUsageThreshold,
+		blockGasLimit:     blockGasLimit,
+		// do not reference lastPrice
+		defaultPrice: new(big.Int).Set(defaultPrice),
 	}
 }
 
@@ -124,9 +149,10 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 		result    = make(chan getBlockPricesResult, gpo.checkBlocks)
 		quit      = make(chan struct{})
 		txPrices  []*big.Int
+		usageSum  float64
 	)
 	for sent < gpo.checkBlocks && number > 0 {
-		go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, sampleNumber, result, quit)
+		go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, gpo.checkTxs, result, quit)
 		sent++
 		exp++
 		number--
@@ -149,17 +175,25 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 		// meaningful returned, try to query more blocks. But the maximum
 		// is 2*checkBlocks.
 		if len(res.prices) == 1 && len(txPrices)+1+exp < gpo.checkBlocks*2 && number > 0 {
-			go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, sampleNumber, result, quit)
+			go gpo.getBlockPrices(ctx, types.MakeSigner(gpo.backend.ChainConfig(), big.NewInt(int64(number))), number, gpo.checkTxs, result, quit)
 			sent++
 			exp++
 			number--
 		}
 		txPrices = append(txPrices, res.prices...)
+		usageSum += res.usage
 	}
 	price := lastPrice
 	if len(txPrices) > 0 {
 		sort.Sort(bigIntArray(txPrices))
 		price = txPrices[(len(txPrices)-1)*gpo.percentile/100]
+	}
+	// `sent` is the number of queries that are sent, while `exp` and `number` count down at query resolved, and sent respectively
+	// each query is per block, therefore `sent` is the number of blocks for which the usage was (successfully) determined
+	// approximation that only holds when the gas limits, of all blocks that are sampled, are equal
+	usage := usageSum / float64(sent)
+	if usage < gpo.lowUsageThreshold {
+		price = new(big.Int).Set(gpo.defaultPrice)
 	}
 	if price.Cmp(gpo.maxPrice) > 0 {
 		price = new(big.Int).Set(gpo.maxPrice)
@@ -173,6 +207,7 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 
 type getBlockPricesResult struct {
 	prices []*big.Int
+	usage  float64
 	err    error
 }
 
@@ -192,7 +227,9 @@ func (gpo *Oracle) getBlockPrices(ctx context.Context, signer types.Signer, bloc
 	block, err := gpo.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
 	if block == nil {
 		select {
-		case result <- getBlockPricesResult{nil, err}:
+		// when no block is found, `err` is returned which short-circuits the oracle entirely
+		// therefore the `usage` becomes irrelevant
+		case result <- getBlockPricesResult{nil, 2.0, err}:
 		case <-quit:
 		}
 		return
@@ -212,8 +249,18 @@ func (gpo *Oracle) getBlockPrices(ctx context.Context, signer types.Signer, bloc
 			}
 		}
 	}
+	// HACK
+	var gasLimit float64
+	if gpo.blockGasLimit == 0 {
+		gasLimit = float64(block.GasLimit())
+	} else {
+		gasLimit = float64(gpo.blockGasLimit)
+	}
+	// if `gasLimit` is 0, no crash. +Inf is returned and percentile is applied
+	// this usage includes any transactions from the miner, which are excluded by the `prices` slice
+	usage := float64(block.GasUsed()) / gasLimit
 	select {
-	case result <- getBlockPricesResult{prices, nil}:
+	case result <- getBlockPricesResult{prices, usage, nil}:
 	case <-quit:
 	}
 }

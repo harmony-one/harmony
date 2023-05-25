@@ -2,11 +2,12 @@ package main
 
 import (
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/hmy"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.14"
+const tomlConfigVersion = "2.6.0"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -119,6 +120,15 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ShardCount:      4,
 		CacheTime:       10,
 		CacheSize:       512,
+	},
+	GPO: harmonyconfig.GasPriceOracleConfig{
+		Blocks:            hmy.DefaultGPOConfig.Blocks,
+		Transactions:      hmy.DefaultGPOConfig.Transactions,
+		Percentile:        hmy.DefaultGPOConfig.Percentile,
+		DefaultPrice:      hmy.DefaultGPOConfig.DefaultPrice,
+		MaxPrice:          hmy.DefaultGPOConfig.MaxPrice,
+		LowUsageThreshold: hmy.DefaultGPOConfig.LowUsageThreshold,
+		BlockGasLimit:     hmy.DefaultGPOConfig.BlockGasLimit,
 	},
 }
 
