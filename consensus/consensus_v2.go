@@ -301,7 +301,7 @@ func (consensus *Consensus) Start(
 	stopChan chan struct{},
 ) {
 	go func() {
-		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
+		consensus.GetLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		go func() {
 			ticker := time.NewTicker(250 * time.Millisecond)
 			defer ticker.Stop()
