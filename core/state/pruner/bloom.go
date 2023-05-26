@@ -22,8 +22,8 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/core/rawdb"
 	bloomfilter "github.com/holiman/bloomfilter/v2"
 )
 
