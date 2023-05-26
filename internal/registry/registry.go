@@ -5,15 +5,17 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/webhooks"
+	"github.com/harmony-one/harmony/internal/knownpeers"
 )
 
 // Registry consolidates services at one place.
 type Registry struct {
-	mu          sync.Mutex
-	blockchain  core.BlockChain
+	mu         sync.Mutex
+	blockchain core.BlockChain
+	txPool     *core.TxPool
+	knownPeers knownpeers.KnownPeers
 	beaconchain core.BlockChain
 	webHooks    *webhooks.Hooks
-	txPool      *core.TxPool
 	cxPool      *core.CxPool
 	isBackup    bool
 }
@@ -89,6 +91,23 @@ func (r *Registry) GetTxPool() *core.TxPool {
 	defer r.mu.Unlock()
 
 	return r.txPool
+}
+
+// SetKnownPeers sets the known peers to registry.
+func (r *Registry) SetKnownPeers(knownPeers knownpeers.KnownPeers) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.knownPeers = knownPeers
+	return r
+}
+
+// GetKnownPeers gets the known peers from registry.
+func (r *Registry) GetKnownPeers() knownpeers.KnownPeers {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.knownPeers
 }
 
 func (r *Registry) SetIsBackup(isBackup bool) *Registry {

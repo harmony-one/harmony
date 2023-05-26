@@ -68,7 +68,7 @@ func (s *Service) peersExchangeWithPeer(peer p2p.Peer) {
 		if l := len(peer); l == 0 || l > 50 {
 			continue
 		}
-		s.options.knownPeers.AddUnchecked(p2p.PeerFromIpPortUnchecked(string(peer)))
+		s.options.reg.GetKnownPeers().AddUnchecked(p2p.PeerFromIpPortUnchecked(string(peer)))
 	}
 }
 
@@ -78,13 +78,18 @@ func (s *Service) peersCheckUnchecked(ctx context.Context, timeout time.Duration
 		return
 	case <-time.After(timeout):
 	}
-	for _, peer := range s.options.knownPeers.GetUnchecked(s.options.knownPeers.GetUncheckedCount()) {
+	known := s.options.reg.GetKnownPeers()
+
+	unckeched := known.GetUnchecked(known.GetUncheckedCount())
+	for _, peer := range unckeched {
 		if ctx.Err() != nil {
 			return
 		}
 		client := downloader.ClientSetup(peer.IP, peer.Port, true)
 		if client != nil {
-			s.options.knownPeers.AddChecked(peer)
+			known.AddChecked(peer)
+		} else {
+			known.RemoveUnchecked(peer)
 		}
 	}
 	go s.peersCheckUnchecked(ctx, defaultCheckTimeout)

@@ -100,6 +100,7 @@ type DnsSync struct {
 	Client     bool   // replaces: Sync.LegacyClient
 	Server     bool   // replaces: Sync.LegacyServer
 	ServerPort int
+	ServerIP   string // public ip to connect to
 }
 
 type NetworkConfig struct {

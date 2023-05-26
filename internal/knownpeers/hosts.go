@@ -7,18 +7,23 @@ import (
 )
 
 type hosts struct {
-	m map[string]struct{}
-	n []string
-	i int
+	m     map[string]struct{}
+	n     []string
+	i     int
+	limit int
 }
 
 func PeerToString(peer p2p.Peer) string {
 	return fmt.Sprintf("%s:%s", peer.IP, peer.Port)
 }
 
-func newHosts() *hosts {
+func newHosts(limit int) *hosts {
+	if limit < 0 {
+		panic("limit must be non-negative")
+	}
 	return &hosts{
-		m: make(map[string]struct{}),
+		limit: limit,
+		m:     make(map[string]struct{}),
 	}
 }
 
@@ -37,6 +42,9 @@ func (a *hosts) get(n uint16) []p2p.Peer {
 }
 
 func (a *hosts) add(peer string) (added bool) {
+	if len(a.m) >= a.limit {
+		return false
+	}
 	if _, ok := a.m[peer]; ok {
 		return false
 	}
@@ -73,15 +81,15 @@ type knownPeers struct {
 	uncheckedHosts *hosts
 }
 
-func NewKnownPeers() KnownPeers {
+func NewKnownPeers(limitChecked, limitUnchecked int) KnownPeers {
 	return &knownPeers{
-		checkedHosts:   newHosts(),
-		uncheckedHosts: newHosts(),
+		checkedHosts:   newHosts(limitChecked),
+		uncheckedHosts: newHosts(limitUnchecked),
 	}
 }
 
 func NewKnownPeersThreadSafe() KnownPeers {
-	return WrapThreadSafe(NewKnownPeers())
+	return WrapThreadSafe(NewKnownPeers(200, 1000))
 }
 
 func (a *knownPeers) GetChecked(limit int) []p2p.Peer {
@@ -102,6 +110,10 @@ func (a *knownPeers) GetUncheckedCount() int {
 	return a.uncheckedHosts.count()
 }
 
+func (a *knownPeers) GetCheckedCount() int {
+	return a.checkedHosts.count()
+}
+
 func (a *knownPeers) AddChecked(hosts ...p2p.Peer) {
 	for _, host := range hosts {
 		a.checkedHosts.add(PeerToString(host))
@@ -120,4 +132,12 @@ func (a *knownPeers) addUnchecked(host string) {
 		return
 	}
 	a.uncheckedHosts.add(host)
+}
+
+func (a *knownPeers) RemoveUnchecked(hosts ...p2p.Peer) {
+	a.RemoveUnchecked(hosts...)
+}
+
+func (a *knownPeers) RemoveChecked(hosts ...p2p.Peer) {
+	a.RemoveChecked(hosts...)
 }

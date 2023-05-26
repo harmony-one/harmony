@@ -22,9 +22,9 @@ const (
 	Transaction MessageType = iota
 	Block
 	Client
-	_          // used to be Control
-	PING       // node send ip/pki to register with leader
-	ShardState // Deprecated
+	_             // used to be Control
+	PING          // node send ip/pki to register with leader
+	PeersExchange //
 	Staking
 )
 
@@ -61,6 +61,7 @@ var (
 	crossLinkB          = byte(CrossLink)
 	crossLinkHeardBeatB = byte(CrosslinkHeartbeat)
 	receiptB            = byte(Receipt)
+	pExchangeB          = byte(PeersExchange)
 	// H suffix means header
 	slashH              = []byte{nodeB, blockB, slashB}
 	transactionListH    = []byte{nodeB, txnB, sendB}
@@ -69,6 +70,7 @@ var (
 	crossLinkH          = []byte{nodeB, blockB, crossLinkB}
 	cxReceiptH          = []byte{nodeB, blockB, receiptB}
 	crossLinkHeartBeatH = []byte{nodeB, blockB, crossLinkHeardBeatB}
+	peersBroadcastH     = []byte{nodeB, pExchangeB, pExchangeB}
 )
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
@@ -151,4 +153,19 @@ func ConstructCXReceiptsProof(cxReceiptsProof *types.CXReceiptsProof) []byte {
 	}
 	byteBuffer.Write(by)
 	return byteBuffer.Bytes()
+}
+
+// ConstructPeerBroadcastMessage constructs serialized peers message.
+func ConstructPeerBroadcastMessage(endpoint string, shardID uint32) ([]byte, error) {
+	byteBuffer := bytes.NewBuffer(peersBroadcastH)
+	m := types.PeerBroadcastMessage{
+		Endpoints: []string{endpoint},
+		ShardID:   shardID,
+	}
+	txs, err := rlp.EncodeToBytes(&m)
+	if err != nil {
+		return nil, err
+	}
+	byteBuffer.Write(txs)
+	return byteBuffer.Bytes(), nil
 }

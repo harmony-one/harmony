@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/knownpeers"
 	"github.com/harmony-one/harmony/node/worker"
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
@@ -49,7 +48,6 @@ func New(
 		crosslinks:           crosslinks.New(),
 		syncID:               GenerateSyncID(),
 		keysToAddrs:          lrucache.NewCache[uint64, map[string]common.Address](10),
-		knownPeers:           knownpeers.NewKnownPeersThreadSafe(),
 	}
 	if consensusObj == nil {
 		panic("consensusObj is nil")

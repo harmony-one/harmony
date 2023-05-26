@@ -12,16 +12,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/knownpeers"
+	"github.com/ethereum/go-ethereum/rlp"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
-	"github.com/harmony-one/harmony/internal/utils/lrucache"
-
-	"github.com/ethereum/go-ethereum/rlp"
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/utils/crosslinks"
+	"github.com/harmony-one/harmony/internal/utils/lrucache"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -142,10 +140,8 @@ type Node struct {
 	Metrics metrics.Registry
 
 	// context control for pub-sub handling
-	psCtx      context.Context
-	psCancel   func()
-	registry   *registry.Registry
-	knownPeers knownpeers.KnownPeers
+	psCancel func()
+	registry *registry.Registry
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -459,6 +455,8 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	case proto_node.Staking:
 		// nothing much to validate staking message unless decode the RLP
 		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "staking_tx"}).Inc()
+	case proto_node.PeersExchange:
+		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "peers_exchange"}).Inc()
 	case proto_node.Block:
 		switch proto_node.BlockMessageType(payload[p2pNodeMsgPrefixSize]) {
 		case proto_node.Sync:
@@ -661,8 +659,8 @@ var (
 )
 
 // StartPubSub kicks off the node message handling
-func (node *Node) StartPubSub() error {
-	node.psCtx, node.psCancel = context.WithCancel(context.Background())
+func (node *Node) StartPubSub(psCtx context.Context, cancel func()) error {
+	node.psCancel = cancel
 
 	// groupID and whether this topic is used for consensus
 	type t struct {
@@ -860,11 +858,11 @@ func (node *Node) StartPubSub() error {
 		go func() {
 			for {
 				select {
-				case <-node.psCtx.Done():
+				case <-psCtx.Done():
 					return
 				case m := <-msgChanConsensus:
 					// should not take more than 30 seconds to process one message
-					ctx, cancel := context.WithTimeout(node.psCtx, 30*time.Second)
+					ctx, cancel := context.WithTimeout(psCtx, 30*time.Second)
 					msg := m
 					go func() {
 						defer cancel()
@@ -910,7 +908,7 @@ func (node *Node) StartPubSub() error {
 			for {
 				select {
 				case m := <-msgChanNode:
-					ctx, cancel := context.WithTimeout(node.psCtx, 10*time.Second)
+					ctx, cancel := context.WithTimeout(psCtx, 10*time.Second)
 					msg := m
 					go func() {
 						defer cancel()
@@ -934,7 +932,7 @@ func (node *Node) StartPubSub() error {
 							return
 						}
 					}()
-				case <-node.psCtx.Done():
+				case <-psCtx.Done():
 					return
 				}
 			}
@@ -942,7 +940,7 @@ func (node *Node) StartPubSub() error {
 
 		go func() {
 			for {
-				nextMsg, err := sub.Next(node.psCtx)
+				nextMsg, err := sub.Next(psCtx)
 				if err != nil {
 					if err == context.Canceled {
 						return
@@ -974,7 +972,7 @@ func (node *Node) StartPubSub() error {
 	go func() {
 		for {
 			select {
-			case <-node.psCtx.Done():
+			case <-psCtx.Done():
 				return
 			case e := <-errChan:
 				utils.SampledLogger().Info().
@@ -984,15 +982,19 @@ func (node *Node) StartPubSub() error {
 		}
 	}()
 
+	go func() {
+		for {
+			select {
+			case <-psCtx.Done():
+				return
+			case <-time.After(5 * time.Minute):
+				node.BroadcastPeersExchange()
+			}
+		}
+	}()
+
 	node.TraceLoopForExplorer()
 	return nil
-}
-
-// StopPubSub stops the pubsub handling
-func (node *Node) StopPubSub() {
-	if node.psCancel != nil {
-		node.psCancel()
-	}
 }
 
 // GetSyncID returns the syncID of this node
@@ -1076,27 +1078,6 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	return nil
 }
 
-func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		Beacon:       nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
-		ShardGroupID: node.NodeConfig.GetShardGroupID(),
-		Actions:      map[nodeconfig.GroupID]nodeconfig.ActionType{},
-	}
-
-	groups := []nodeconfig.GroupID{
-		node.NodeConfig.GetShardGroupID(),
-		node.NodeConfig.GetClientGroupID(),
-	}
-
-	// force the side effect of topic join
-	if err := node.host.SendMessageToGroups(groups, []byte{}); err != nil {
-		return nodeConfig, nil, err
-	}
-
-	return nodeConfig, chanPeer, nil
-}
-
 // ServiceManager ...
 func (node *Node) ServiceManager() *service.Manager {
 	return node.serviceManager
@@ -1120,7 +1101,8 @@ func (node *Node) ShutDown() {
 
 	// Currently pubSub need to be stopped after consensus.
 	utils.Logger().Info().Msg("stopping pub-sub")
-	node.StopPubSub()
+
+	node.psCancel()
 
 	utils.Logger().Info().Msg("stopping host")
 	if err := node.host.Close(); err != nil {
@@ -1279,8 +1261,4 @@ func (node *Node) syncFromTiKVWriter() {
 			}
 		})
 	}
-}
-
-func (node *Node) KnownPeers() knownpeers.KnownPeers {
-	return node.knownPeers
 }

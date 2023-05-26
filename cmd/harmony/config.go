@@ -84,6 +84,7 @@ func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 		Port:       port,
 		Zone:       zone,
 		ServerPort: nodeconfig.DefaultDNSPort,
+		ServerIP:   nodeconfig.DefaultDNSIP,
 	}
 	switch nt {
 	case nodeconfig.Mainnet:
@@ -160,7 +161,7 @@ var updateConfigCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		err := updateConfigFile(args[0])
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("updateConfigCmd", err)
 			os.Exit(128)
 		}
 	},
@@ -171,7 +172,7 @@ func dumpConfig(cmd *cobra.Command, args []string) {
 	config := getDefaultHmyConfigCopy(nt)
 
 	if err := writeHarmonyConfigToFile(config, args[0]); err != nil {
-		fmt.Println(err)
+		fmt.Println("dumpConfig", err)
 		os.Exit(128)
 	}
 }

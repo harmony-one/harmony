@@ -40,9 +40,8 @@ const (
 	DefaultPublicListenIP = "0.0.0.0"
 	// DefaultP2PPort is the key to be used for p2p communication
 	DefaultP2PPort = 9000
-	// DefaultLegacyDNSPort is the default legacy DNS port. The actual port used is DNSPort - 3000. This is a
-	// very bad design. Refactored to DefaultDNSPort
-	DefaultLegacyDNSPort = 9000
+	// DefaultDNSIP is public ip which is broadcast to other nodes.
+	DefaultDNSIP = ""
 	// DefaultDNSPort is the default DNS port for both remote node and local server.
 	DefaultDNSPort = 6000
 	// DefaultRPCPort is the default rpc port. The actual port used is 9000+500

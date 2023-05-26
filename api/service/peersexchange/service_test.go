@@ -8,6 +8,7 @@ import (
 	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/api/service/peersexchange"
 	"github.com/harmony-one/harmony/internal/knownpeers"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/stretchr/testify/require"
 )
@@ -23,11 +24,11 @@ func (s syncPeerProvider) SyncingPeers(shardID uint32) ([]p2p.Peer, error) {
 }
 
 func TestService_Exchange(t *testing.T) {
-	p := knownpeers.NewKnownPeers()
+	reg := registry.New().SetKnownPeers(knownpeers.NewKnownPeersThreadSafe())
 	opts := peersexchange.NewOptions(
 		syncPeerProvider{},
 		0,
-		p,
+		reg,
 		func(ip string, port string, true bool) downloader.Client {
 			return client{
 				isReady: true,
@@ -47,6 +48,6 @@ func TestService_Exchange(t *testing.T) {
 
 		service := peersexchange.New(opts)
 		service.Exchange(ctx, 0)
-		require.Len(t, p.GetUnchecked(2), 2)
+		require.Len(t, reg.GetKnownPeers().GetUnchecked(2), 2)
 	})
 }

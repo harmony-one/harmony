@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -19,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/peersexchange"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/chain"
+	"github.com/harmony-one/harmony/internal/knownpeers"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
@@ -318,8 +320,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 
 	// Update ethereum compatible chain ids
 	params.UpdateEthChainIDByShard(nodeConfig.ShardID)
-
-	currentNode := setupConsensusAndNode(hc, nodeConfig, registry.New())
+	reg := registry.New()
+	currentNode := setupConsensusAndNode(hc, nodeConfig, reg)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 	nodeconfig.GetDefaultConfig().Downloader = nodeConfig.Downloader
@@ -424,7 +426,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		peersexchange.New(peersexchange.NewOptions(
 			currentNode.SyncingPeerProvider,
 			currentNode.Consensus.ShardID,
-			currentNode.KnownPeers(),
+			reg,
 			legacydownloader.ClientSetup,
 		)))
 	if hc.Pprof.Enabled {
@@ -461,7 +463,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			Err(err).
 			Msg("Start Rosetta failed")
 	}
-
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
 	go listenOSSigAndShutDown(currentNode)
 
 	if !hc.General.IsOffline {
@@ -478,7 +481,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			}
 		}
 
-		if err := currentNode.StartPubSub(); err != nil {
+		if err := currentNode.StartPubSub(ctx, cancel); err != nil {
 			fmt.Fprint(os.Stderr, "could not begin network message handling for node", err.Error())
 			os.Exit(-1)
 		}
@@ -764,7 +767,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
-
+	registry.SetKnownPeers(knownpeers.NewKnownPeersThreadSafe())
 	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc, registry)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
@@ -785,7 +788,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
 	} else {
 		addrs := myHost.GetP2PHost().Addrs()
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.DNSSync.Zone, strconv.Itoa(hc.DNSSync.Port), addrs, currentNode.KnownPeers())
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.DNSSync.Zone, strconv.Itoa(hc.DNSSync.Port), addrs, registry)
 	}
 	currentNode.NodeConfig.DNSZone = hc.DNSSync.Zone
 

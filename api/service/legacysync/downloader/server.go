@@ -12,17 +12,13 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
-// Constants for downloader server.
-const (
-	DefaultDownloadPort = "6666"
-)
-
 // Server is the Server struct for downloader package.
 type Server struct {
 	pb.UnimplementedDownloaderServer
 	downloadInterface DownloadInterface
 	GrpcServer        *grpc.Server
 	Port              int
+	PublicIP          string
 }
 
 // Query returns the feature at the given point.
@@ -44,7 +40,7 @@ func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.
 
 // Start starts the Server on given ip and port.
 func (s *Server) Start() (*grpc.Server, error) {
-	addr := net.JoinHostPort("", strconv.Itoa(s.Port))
+	addr := net.JoinHostPort(s.PublicIP, strconv.Itoa(s.Port))
 	lis, err := net.Listen("tcp4", addr)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[SYNC] failed to start sync server")

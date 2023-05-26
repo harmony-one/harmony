@@ -2,7 +2,6 @@ package proto
 
 import (
 	"bytes"
-	"errors"
 )
 
 /*
@@ -38,41 +37,7 @@ const (
 	ProtocolVersion = 1
 	// MessageCategoryBytes is the number of bytes message category takes
 	MessageCategoryBytes = 1
-	// MessageTypeBytes is the number of bytes message type takes
-	MessageTypeBytes = 1
 )
-
-// GetMessageCategory gets the message category from the p2p message content
-func GetMessageCategory(message []byte) (MessageCategory, error) {
-	if len(message) < MessageCategoryBytes {
-		return 0, errors.New("failed to get message category: no data available")
-	}
-	return MessageCategory(message[MessageCategoryBytes-1]), nil
-}
-
-// GetMessageType gets the message type from the p2p message content
-func GetMessageType(message []byte) (byte, error) {
-	if len(message) < MessageCategoryBytes+MessageTypeBytes {
-		return 0, errors.New("failed to get message type: no data available")
-	}
-	return byte(message[MessageCategoryBytes+MessageTypeBytes-1]), nil
-}
-
-// GetMessagePayload gets the node message payload from the p2p message content
-func GetMessagePayload(message []byte) ([]byte, error) {
-	if len(message) < MessageCategoryBytes+MessageTypeBytes {
-		return []byte{}, errors.New("failed to get message payload: no data available")
-	}
-	return message[MessageCategoryBytes+MessageTypeBytes:], nil
-}
-
-// GetConsensusMessagePayload gets the consensus message payload from the p2p message content
-func GetConsensusMessagePayload(message []byte) ([]byte, error) {
-	if len(message) < MessageCategoryBytes {
-		return []byte{}, errors.New("failed to get message payload: no data available")
-	}
-	return message[MessageCategoryBytes:], nil
-}
 
 // ConstructConsensusMessage creates a message with the payload and returns as byte array.
 func ConstructConsensusMessage(payload []byte) []byte {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/internal/knownpeers"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/multiformats/go-multiaddr"
 
@@ -140,18 +141,18 @@ type DNSSyncingPeerProvider struct {
 	selfAddrs  []multiaddr.Multiaddr
 	zone, port string
 	lookupHost func(name string) (addrs []string, err error)
-	knownpeers knownpeers.KnownPeers
+	reg        *registry.Registry
 }
 
 // NewDNSSyncingPeerProvider returns a provider that uses given DNS name and
 // port number to resolve syncing peers.
-func NewDNSSyncingPeerProvider(zone, port string, selfAddrs []multiaddr.Multiaddr, knownPeers knownpeers.KnownPeers) *DNSSyncingPeerProvider {
+func NewDNSSyncingPeerProvider(zone, port string, selfAddrs []multiaddr.Multiaddr, reg *registry.Registry) *DNSSyncingPeerProvider {
 	return &DNSSyncingPeerProvider{
 		selfAddrs:  selfAddrs,
 		zone:       zone,
 		port:       port,
 		lookupHost: net.LookupHost,
-		knownpeers: knownPeers,
+		reg:        reg,
 	}
 }
 
@@ -171,7 +172,7 @@ func (p *DNSSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Peer,
 		peers = append(peers, p2p.Peer{IP: addr, Port: p.port})
 	}
 	// add additional peers
-	peers = append(peers, p.knownpeers.GetChecked(2)...)
+	peers = append(peers, p.reg.GetKnownPeers().GetChecked(2)...)
 	return peers, nil
 }
 
@@ -628,7 +629,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		response.Payload = out
 	case downloader_pb.DownloaderRequest_PEERS:
 		const KnownPeersLimit = 10
-		rs := node.knownPeers.GetChecked(KnownPeersLimit)
+		rs := node.registry.GetKnownPeers().GetChecked(KnownPeersLimit)
 		response.Payload = make([][]byte, 0, len(rs))
 		for _, v := range rs {
 			response.Payload = append(response.Payload, []byte(knownpeers.PeerToString(v)))

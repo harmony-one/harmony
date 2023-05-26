@@ -29,6 +29,7 @@ enum MessageType {
   DRAND_INIT = 10 [deprecated=true];
   DRAND_COMMIT = 11 [deprecated=true];
   LOTTERY_REQUEST = 12 [deprecated=true]; // it should be either ENTER or GETPLAYERS but it will be removed later.
+  PEERS_EXCHANGE = 13;
 }
 
 // This is universal message for all communication protocols.

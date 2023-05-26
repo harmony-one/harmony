@@ -15,15 +15,10 @@ var (
 	p4 = p2p.Peer{IP: "4", Port: "80"}
 )
 
-type Peer = p2p.Peer
 type Peers = []p2p.Peer
 
-func p(i string) p2p.Peer {
-	return p2p.Peer{IP: i, Port: "80"}
-}
-
 func TestKnownHosts_GetCheckedHosts(t *testing.T) {
-	n := knownpeers.NewKnownPeers()
+	n := knownpeers.NewKnownPeers(100, 100)
 	n.AddChecked(p1, p2, p3)
 	require.Equal(t, Peers{p1, p2}, n.GetChecked(2))
 	require.Equal(t, Peers{p3, p1}, n.GetChecked(2))
@@ -33,7 +28,7 @@ func TestKnownHosts_GetCheckedHosts(t *testing.T) {
 }
 
 func TestKnownHosts_Unchecked(t *testing.T) {
-	n := knownpeers.NewKnownPeers()
+	n := knownpeers.NewKnownPeers(100, 100)
 	n.AddUnchecked(p1, p2, p3)
 	require.Equal(t, Peers{p1, p2}, n.GetUnchecked(2))
 	require.Equal(t, Peers{p3, p1}, n.GetUnchecked(2))
@@ -51,7 +46,13 @@ func TestKnownHosts_Unchecked(t *testing.T) {
 }
 
 func TestKnownHosts_CheckEmpty(t *testing.T) {
-	n := knownpeers.NewKnownPeers()
+	n := knownpeers.NewKnownPeers(100, 100)
 	require.Empty(t, n.GetChecked(1))
 	require.Empty(t, n.GetUnchecked(1))
+}
+
+func TestKnownPeers_Limit(t *testing.T) {
+	n := knownpeers.NewKnownPeers(0, 2)
+	n.AddUnchecked(p1, p2, p3)
+	require.Equal(t, 2, n.GetUncheckedCount())
 }

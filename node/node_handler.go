@@ -28,7 +28,7 @@ import (
 )
 
 const p2pMsgPrefixSize = 5
-const p2pNodeMsgPrefixSize = proto.MessageTypeBytes + proto.MessageCategoryBytes
+const p2pNodeMsgPrefixSize = 1 /*MessageTypeBytes*/ + proto.MessageCategoryBytes
 
 // some messages have uninteresting fields in header, slash, receipt and crosslink are
 // such messages. This function assumes that input bytes are a slice which already
@@ -95,6 +95,10 @@ func (node *Node) HandleNodeMessage(
 			// skip first byte which is blockMsgType
 			node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 		}
+	case proto_node.PeersExchange:
+		node.peersMessageHandler(msgPayload)
+
+	case proto_node.PING:
 	default:
 		utils.Logger().Error().
 			Str("Unknown actionType", string(actionType))
@@ -116,6 +120,30 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			return
 		}
 		addPendingTransactions(node.registry, txs)
+	}
+}
+
+func (node *Node) peersMessageHandler(msgPayload []byte) {
+	if len(msgPayload) <= 1 {
+		utils.Logger().Error().
+			Int("msgPayloadLen", len(msgPayload)).
+			Msg("Invalid peer message")
+		return
+	}
+	msgPayload = msgPayload[1:]
+	m := types.PeerBroadcastMessage{}
+	err := rlp.DecodeBytes(msgPayload, &m)
+	if err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msg("Failed to deserialize peers message")
+		return
+	}
+
+	if node.Consensus.Blockchain().ShardID() == m.ShardID {
+		for _, p := range m.Endpoints {
+			node.registry.GetKnownPeers().AddUnchecked(p2p.PeerFromIpPortUnchecked(p))
+		}
 	}
 }
 

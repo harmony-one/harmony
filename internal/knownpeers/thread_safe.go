@@ -11,6 +11,18 @@ type threadSafe struct {
 	internal KnownPeers
 }
 
+func (a *threadSafe) RemoveChecked(hosts ...p2p.Peer) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.internal.RemoveChecked(hosts...)
+}
+
+func (a *threadSafe) RemoveUnchecked(hosts ...p2p.Peer) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.internal.RemoveUnchecked(hosts...)
+}
+
 func WrapThreadSafe(hosts KnownPeers) KnownPeers {
 	return &threadSafe{internal: hosts}
 }
@@ -43,4 +55,10 @@ func (a *threadSafe) GetUncheckedCount() int {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.internal.GetUncheckedCount()
+}
+
+func (a *threadSafe) GetCheckedCount() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.internal.GetCheckedCount()
 }
