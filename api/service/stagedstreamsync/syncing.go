@@ -3,6 +3,7 @@ package stagedstreamsync
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -37,6 +38,7 @@ var Buckets = []string{
 // CreateStagedSync creates an instance of staged sync
 func CreateStagedSync(ctx context.Context,
 	bc core.BlockChain,
+	dbDir string,
 	UseMemDB bool,
 	isBeaconNode bool,
 	protocol syncProtocol,
@@ -55,9 +57,9 @@ func CreateStagedSync(ctx context.Context,
 			dbs[i] = memdb.New()
 		}
 	} else {
-		mainDB = mdbx.NewMDBX(log.New()).Path(GetBlockDbPath(isBeacon, -1)).MustOpen()
+		mainDB = mdbx.NewMDBX(log.New()).Path(GetBlockDbPath(isBeacon, -1, dbDir)).MustOpen()
 		for i := 0; i < config.Concurrency; i++ {
-			dbPath := GetBlockDbPath(isBeacon, i)
+			dbPath := GetBlockDbPath(isBeacon, i, dbDir)
 			dbs[i] = mdbx.NewMDBX(log.New()).Path(dbPath).MustOpen()
 		}
 	}
@@ -137,18 +139,18 @@ func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB, concurrency int)
 }
 
 // GetBlockDbPath returns the path of the cache database which stores blocks
-func GetBlockDbPath(beacon bool, loopID int) string {
+func GetBlockDbPath(beacon bool, loopID int, dbDir string) string {
 	if beacon {
 		if loopID >= 0 {
-			return fmt.Sprintf("%s_%d", "cache/beacon_blocks_db", loopID)
+			return fmt.Sprintf("%s_%d", filepath.Join(dbDir, "cache/beacon_blocks_db"), loopID)
 		} else {
-			return "cache/beacon_blocks_db_main"
+			return filepath.Join(dbDir, "cache/beacon_blocks_db_main")
 		}
 	} else {
 		if loopID >= 0 {
-			return fmt.Sprintf("%s_%d", "cache/blocks_db", loopID)
+			return fmt.Sprintf("%s_%d", filepath.Join(dbDir, "cache/blocks_db"), loopID)
 		} else {
-			return "cache/blocks_db_main"
+			return filepath.Join(dbDir, "cache/blocks_db_main")
 		}
 	}
 }

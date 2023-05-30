@@ -109,9 +109,10 @@ func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
 	mutatedPort := strconv.Itoa(mySyncPort + legacysync.SyncingPortDifference)
 	role := node.NodeConfig.Role()
 	isExplorer := node.NodeConfig.Role() == nodeconfig.ExplorerNode
+	dbDir := node.NodeConfig.DBDir
 
 	if s, err := stagedsync.CreateStagedSync(node.SelfPeer.IP, mutatedPort,
-		node.GetSyncID(), bc, role, isExplorer,
+		node.GetSyncID(), bc, dbDir, role, isExplorer,
 		node.NodeConfig.StagedSyncTurboMode,
 		node.NodeConfig.UseMemDB,
 		node.NodeConfig.DoubleCheckBlockHashes,
