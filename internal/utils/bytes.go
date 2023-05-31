@@ -56,7 +56,7 @@ func BytesMiddle(a, b []byte) []byte {
 	if len(a) > len(b) {
 		tmp := make([]byte, len(a))
 		if b == nil {
-			for i, _ := range tmp {
+			for i := range tmp {
 				tmp[i] = 255
 			}
 		}
@@ -65,7 +65,7 @@ func BytesMiddle(a, b []byte) []byte {
 	} else if len(a) < len(b) {
 		tmp := make([]byte, len(b))
 		if a == nil {
-			for i, _ := range tmp {
+			for i := range tmp {
 				tmp[i] = 0
 			}
 		}

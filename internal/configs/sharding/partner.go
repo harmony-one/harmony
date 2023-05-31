@@ -16,10 +16,10 @@ var PartnerSchedule partnerSchedule
 var feeCollectEpochV1 = big.NewInt(574)
 
 var feeCollectorsDevnet = []FeeCollectors{
-	FeeCollectors{
+	{
 		mustAddress("0xb728AEaBF60fD01816ee9e756c18bc01dC91ba5D"): numeric.OneDec(),
 	},
-	FeeCollectors{
+	{
 		mustAddress("0xb728AEaBF60fD01816ee9e756c18bc01dC91ba5D"): numeric.MustNewDecFromStr("0.5"),
 		mustAddress("0xb41B6B8d9e68fD44caC8342BC2EEf4D59531d7d7"): numeric.MustNewDecFromStr("0.5"),
 	},

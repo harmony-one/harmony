@@ -15,7 +15,7 @@ func TestFBFTLog_id(t *testing.T) {
 			MessageType: msg_pb.MessageType_ANNOUNCE,
 			ViewID:      4,
 			BlockHash:   [32]byte{01, 02},
-			SenderPubkeys: []*bls.PublicKeyWrapper{&bls.PublicKeyWrapper{
+			SenderPubkeys: []*bls.PublicKeyWrapper{{
 				Bytes: bls.SerializedPublicKey{0x01, 0x02},
 			}},
 			SenderPubkeyBitmap: []byte{05, 07},

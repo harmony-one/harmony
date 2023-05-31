@@ -58,17 +58,20 @@ nodes. All message communication is via SendMessageToGroups function.
 
 - There would be 4 topics for sending and receiving of messages
 
-  - **GroupIDBeacon** This topic serves for consensus within the beaconchain
-  - **GroupIDBeaconClient** This topic serves for receipt of staking transactions by beacon chain and broadcast of blocks (by beacon leader)
-  - **GroupIDShard** (_under construction_) This topic serves for consensus related and pingpong messages within the shard
-  - **GroupIDShardClient** (_under construction_) This topic serves to receive transactions from client and send confirmed blocks back to client. The shard leader (only) sends back the confirmed blocks.
+    - **GroupIDBeacon** This topic serves for consensus within the beaconchain
+    - **GroupIDBeaconClient** This topic serves for receipt of staking transactions by beacon chain and broadcast of
+      blocks (by beacon leader)
+    - **GroupIDShard** (_under construction_) This topic serves for consensus related and pingpong messages within the
+      shard
+    - **GroupIDShardClient** (_under construction_) This topic serves to receive transactions from client and send
+      confirmed blocks back to client. The shard leader (only) sends back the confirmed blocks.
 
 - Beacon chain nodes need to subscribe to _TWO_ topics
 
-  - **GroupIDBeacon**
-  - **GroupIDBeaconClient**.
+    - **GroupIDBeacon**
+    - **GroupIDBeaconClient**.
 
 - Every new node other than beacon chain nodes
-  - **GroupIDBeaconClient**
-  - **GroupIDShard**
-  - **GroupIDShardClient**
+    - **GroupIDBeaconClient**
+    - **GroupIDShard**
+    - **GroupIDShardClient**

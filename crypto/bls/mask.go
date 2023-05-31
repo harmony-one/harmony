@@ -212,7 +212,7 @@ func (m *Mask) IndexEnabled(i int) (bool, error) {
 	}
 	byt := i >> 3
 	msk := byte(1) << uint(i&7)
-	return ((m.Bitmap[byt] & msk) != 0), nil
+	return (m.Bitmap[byt] & msk) != 0, nil
 }
 
 // KeyEnabled checks whether the index, corresponding to the given key, is

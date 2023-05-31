@@ -13,13 +13,13 @@ const (
 	// be have the same view change ID
 	viewChangeSlot = 45
 	// The duration of viewChangeTimeout for each view change
-	viewChangeDuration time.Duration = viewChangeTimeout * time.Second
+	viewChangeDuration = viewChangeTimeout * time.Second
 
 	// timeout duration for announce/prepare/commit
 	// shorten the duration from 60 to 45 seconds as the consensus is 5s
-	phaseDuration     time.Duration = viewChangeTimeout * time.Second
-	bootstrapDuration time.Duration = 120 * time.Second
-	maxLogSize        uint32        = 1000
+	phaseDuration            = viewChangeTimeout * time.Second
+	bootstrapDuration        = 120 * time.Second
+	maxLogSize        uint32 = 1000
 	// threshold between received consensus message blockNum and my blockNum
 	consensusBlockNumBuffer uint64 = 2
 )

@@ -1,6 +1,6 @@
 syntax = "proto3";
 package message;
-option go_package="./;message";
+option go_package = "./;message";
 
 
 // Client is the service used for any client-facing requests.
@@ -11,14 +11,14 @@ service ClientService {
 // ServiceType indicates which service used to generate this message.
 enum ServiceType {
   CONSENSUS = 0;
-  STAKING = 1 [deprecated=true];
-  DRAND = 2 [deprecated=true];
+  STAKING = 1 [deprecated = true];
+  DRAND = 2 [deprecated = true];
   CLIENT_SUPPORT = 3;
 }
 
 // MessageType indicates what is the type of this message.
 enum MessageType {
-  NEWNODE_BEACON_STAKING = 0 [deprecated=true];
+  NEWNODE_BEACON_STAKING = 0 [deprecated = true];
   ANNOUNCE = 1;
   PREPARE = 2;
   PREPARED = 3;
@@ -26,9 +26,9 @@ enum MessageType {
   COMMITTED = 5;
   VIEWCHANGE = 6;
   NEWVIEW = 7;
-  DRAND_INIT = 10 [deprecated=true];
-  DRAND_COMMIT = 11 [deprecated=true];
-  LOTTERY_REQUEST = 12 [deprecated=true]; // it should be either ENTER or GETPLAYERS but it will be removed later.
+  DRAND_INIT = 10 [deprecated = true];
+  DRAND_COMMIT = 11 [deprecated = true];
+  LOTTERY_REQUEST = 12 [deprecated = true]; // it should be either ENTER or GETPLAYERS but it will be removed later.
 }
 
 // This is universal message for all communication protocols.
@@ -41,12 +41,12 @@ message Message {
   MessageType type = 2;
   bytes signature = 3;
   oneof request {
-    StakingRequest staking = 4 [deprecated=true];
+    StakingRequest staking = 4 [deprecated = true];
     ConsensusRequest consensus = 5 ;
-    DrandRequest drand = 6 [deprecated=true];
+    DrandRequest drand = 6 [deprecated = true];
     ViewChangeRequest viewchange = 7;
     // Refactor this later after demo.
-    LotteryRequest lottery_request = 8 [deprecated=true];
+    LotteryRequest lottery_request = 8 [deprecated = true];
   }
 }
 
@@ -54,30 +54,30 @@ message Response {
   ServiceType service_type = 1;
   MessageType type = 2;
   oneof response {
-    LotteryResponse lottery_response = 3 [deprecated=true];
+    LotteryResponse lottery_response = 3 [deprecated = true];
   }
 }
 
 message LotteryResponse {
-  repeated string players = 2 [deprecated=true];
-  repeated string balances = 3 [deprecated=true];
+  repeated string players = 2 [deprecated = true];
+  repeated string balances = 3 [deprecated = true];
 }
 
 message LotteryRequest {
   enum Type {
-    ENTER = 0 [deprecated=true];
-    RESULT = 1 [deprecated=true];
-    PICK_WINNER = 2 [deprecated=true];
+    ENTER = 0 [deprecated = true];
+    RESULT = 1 [deprecated = true];
+    PICK_WINNER = 2 [deprecated = true];
   }
-  Type type = 1 [deprecated=true];
-  string private_key = 2 [deprecated=true];
-  int64 amount = 3 [deprecated=true];
+  Type type = 1 [deprecated = true];
+  string private_key = 2 [deprecated = true];
+  int64 amount = 3 [deprecated = true];
 }
 
 // Staking Request from new node to beacon node.
 message StakingRequest {
-  bytes transaction = 1 [deprecated=true];
-  string node_id = 2 [deprecated=true];
+  bytes transaction = 1 [deprecated = true];
+  string node_id = 2 [deprecated = true];
 }
 
 message ConsensusRequest {
@@ -92,10 +92,10 @@ message ConsensusRequest {
 }
 
 message DrandRequest {
-  uint32 shard_id = 1 [deprecated=true];
-  bytes sender_pubkey = 2 [deprecated=true];
-  bytes block_hash = 3 [deprecated=true];
-  bytes payload = 4 [deprecated=true];
+  uint32 shard_id = 1 [deprecated = true];
+  bytes sender_pubkey = 2 [deprecated = true];
+  bytes block_hash = 3 [deprecated = true];
+  bytes payload = 4 [deprecated = true];
 }
 
 message ViewChangeRequest {
@@ -113,6 +113,6 @@ message ViewChangeRequest {
   bytes m2_aggsigs = 9; // m2: |nil|
   bytes m2_bitmap = 10;
   bytes m3_aggsigs = 11; // m3: |viewID|
-  bytes m3_bitmap= 12;
+  bytes m3_bitmap = 12;
   bytes prepared_block = 13;
 }

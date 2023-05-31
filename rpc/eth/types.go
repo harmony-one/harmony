@@ -119,7 +119,7 @@ func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, bl
 	}
 
 	ethTxHash := tx.Hash()
-	for i, _ := range receipt.Logs {
+	for i := range receipt.Logs {
 		// Override log txHash with receipt's
 		receipt.Logs[i].TxHash = ethTxHash
 	}

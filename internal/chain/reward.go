@@ -369,7 +369,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		})
 	}
 
-	for addr, _ := range allValidatorPayable {
+	for addr := range allValidatorPayable {
 		allAddresses = append(allAddresses, addr)
 	}
 

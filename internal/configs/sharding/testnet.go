@@ -78,7 +78,7 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 
 	switch {
 	case blockNum >= firstBlock2s:
-		return ((blockNum-firstBlock2s)%ts.BlocksPerEpoch() == ts.BlocksPerEpoch()-1)
+		return (blockNum-firstBlock2s)%ts.BlocksPerEpoch() == ts.BlocksPerEpoch()-1
 	default: // genesis
 		return (blockNum+1)%ts.BlocksPerEpochOld() == 0
 	}

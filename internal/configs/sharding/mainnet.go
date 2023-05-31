@@ -42,9 +42,9 @@ const (
 var (
 	// map of epochs skipped due to staking launch on mainnet
 	skippedEpochs = map[uint32][]*big.Int{
-		1: []*big.Int{big.NewInt(181), big.NewInt(182), big.NewInt(183), big.NewInt(184), big.NewInt(185)},
-		2: []*big.Int{big.NewInt(184), big.NewInt(185)},
-		3: []*big.Int{big.NewInt(183), big.NewInt(184), big.NewInt(185)},
+		1: {big.NewInt(181), big.NewInt(182), big.NewInt(183), big.NewInt(184), big.NewInt(185)},
+		2: {big.NewInt(184), big.NewInt(185)},
+		3: {big.NewInt(183), big.NewInt(184), big.NewInt(185)},
 	}
 
 	feeCollectorsMainnet = FeeCollectors{
@@ -173,9 +173,9 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 		firstBlock2s := ms.twoSecondsFirstBlock()
 		switch {
 		case blockNum >= firstBlock2s:
-			return ((blockNum-firstBlock2s)%ms.BlocksPerEpoch() == ms.BlocksPerEpoch()-1)
+			return (blockNum-firstBlock2s)%ms.BlocksPerEpoch() == ms.BlocksPerEpoch()-1
 		default: // genesis
-			return ((blockNum-mainnetEpochBlock1)%ms.BlocksPerEpochOld() == ms.BlocksPerEpochOld()-1)
+			return (blockNum-mainnetEpochBlock1)%ms.BlocksPerEpochOld() == ms.BlocksPerEpochOld()-1
 		}
 	}
 }

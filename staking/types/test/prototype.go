@@ -48,7 +48,7 @@ var (
 
 	validatorPrototype = staking.Validator{
 		Address:              common.Address{},
-		SlotPubKeys:          []bls.SerializedPublicKey{bls.SerializedPublicKey{}},
+		SlotPubKeys:          []bls.SerializedPublicKey{{}},
 		LastEpochInCommittee: common.Big0,
 		MinSelfDelegation:    DefaultMinSelfDel,
 		MaxTotalDelegation:   DefaultMaxTotalDel,

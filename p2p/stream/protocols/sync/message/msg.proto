@@ -23,11 +23,11 @@ message Request {
 message GetBlockNumberRequest {}
 
 message GetBlockHashesRequest {
-  repeated uint64 nums = 1 [packed=true];
+  repeated uint64 nums = 1 [packed = true];
 }
 
 message GetBlocksByNumRequest {
-  repeated uint64 nums = 1 [packed=true];
+  repeated uint64 nums = 1 [packed = true];
 }
 
 message GetBlocksByHashesRequest {

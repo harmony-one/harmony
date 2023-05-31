@@ -270,7 +270,7 @@ func (ac *accountCache) scanAccounts() error {
 				Str("path", path).
 				Err(err).
 				Msg("Failed to decode keystore key")
-		case (addr == common.Address{}):
+		case addr == common.Address{}:
 			utils.Logger().Debug().
 				Str("path", path).
 				Err(err).
