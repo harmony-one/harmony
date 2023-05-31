@@ -2654,8 +2654,8 @@ func (bc *BlockChainImpl) ReadValidatorStats(
 	return rawdb.ReadValidatorStats(bc.db, addr)
 }
 
-func (bc *BlockChainImpl) UpdateValidatorVotingPower(
-	batch rawdb.DatabaseWriter,
+func UpdateValidatorVotingPower(
+	bc BlockChain,
 	block *types.Block,
 	newEpochSuperCommittee, currentEpochSuperCommittee *shard.State,
 	state *state.DB,
@@ -2681,7 +2681,7 @@ func (bc *BlockChainImpl) UpdateValidatorVotingPower(
 			// 	bc.db, currentValidator, currentEpochSuperCommittee.Epoch,
 			// )
 			// rawdb.DeleteValidatorStats(bc.db, currentValidator)
-			stats, err := rawdb.ReadValidatorStats(bc.db, currentValidator)
+			stats, err := rawdb.ReadValidatorStats(bc.ChainDb(), currentValidator)
 			if err != nil {
 				stats = staking.NewEmptyStats()
 			}
@@ -2731,7 +2731,7 @@ func (bc *BlockChainImpl) UpdateValidatorVotingPower(
 
 	networkWide := votepower.AggregateRosters(rosters)
 	for key, value := range networkWide {
-		stats, err := rawdb.ReadValidatorStats(bc.db, key)
+		stats, err := rawdb.ReadValidatorStats(bc.ChainDb(), key)
 		if err != nil {
 			stats = staking.NewEmptyStats()
 		}

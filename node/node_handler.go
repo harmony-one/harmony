@@ -25,7 +25,6 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
-	"github.com/pkg/errors"
 )
 
 const p2pMsgPrefixSize = 5
@@ -328,38 +327,6 @@ func getCrosslinkHeadersForShards(shardChain core.BlockChain, curBlock *types.Bl
 	return headers, nil
 }
 
-// VerifyNewBlock is called by consensus participants to verify the block (account model) they are
-// running consensus on.
-func VerifyNewBlock(nodeConfig *nodeconfig.ConfigType, blockChain core.BlockChain, beaconChain core.BlockChain) func(*types.Block) error {
-	return func(newBlock *types.Block) error {
-		if err := blockChain.ValidateNewBlock(newBlock, beaconChain); err != nil {
-			if hooks := nodeConfig.WebHooks.Hooks; hooks != nil {
-				if p := hooks.ProtocolIssues; p != nil {
-					url := p.OnCannotCommit
-					go func() {
-						webhooks.DoPost(url, map[string]interface{}{
-							"bad-header": newBlock.Header(),
-							"reason":     err.Error(),
-						})
-					}()
-				}
-			}
-			utils.Logger().Error().
-				Str("blockHash", newBlock.Hash().Hex()).
-				Int("numTx", len(newBlock.Transactions())).
-				Int("numStakingTx", len(newBlock.StakingTransactions())).
-				Err(err).
-				Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
-			return errors.Errorf(
-				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
-				newBlock.Hash().Hex(),
-				len(newBlock.Transactions()),
-			)
-		}
-		return nil
-	}
-}
-
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. [leader] send new block to the client
 // 2. [leader] send cross shard tx receipts to destination shard
@@ -373,6 +340,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 		node.BroadcastCXReceipts(newBlock)
 	} else {
 		if node.Consensus.Mode() != consensus.Listening {
+			numSignatures := node.Consensus.NumSignaturesIncludedInBlock(newBlock)
 			utils.Logger().Info().
 				Uint64("blockNum", newBlock.NumberU64()).
 				Uint64("epochNum", newBlock.Epoch().Uint64()).
@@ -380,11 +348,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 				Str("blockHash", newBlock.Hash().String()).
 				Int("numTxns", len(newBlock.Transactions())).
 				Int("numStakingTxns", len(newBlock.StakingTransactions())).
-				Uint32("numSignatures", node.Consensus.NumSignaturesIncludedInBlock(newBlock)).
+				Uint32("numSignatures", numSignatures).
 				Msg("BINGO !!! Reached Consensus")
 
-			numSig := float64(node.Consensus.NumSignaturesIncludedInBlock(newBlock))
-			node.Consensus.UpdateValidatorMetrics(numSig, float64(newBlock.NumberU64()))
+			node.Consensus.UpdateValidatorMetrics(float64(numSignatures), float64(newBlock.NumberU64()))
 
 			// 1% of the validator also need to do broadcasting
 			rnd := rand.Intn(100)

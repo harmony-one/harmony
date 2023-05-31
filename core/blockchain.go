@@ -255,13 +255,6 @@ type BlockChain interface {
 	ReadValidatorStats(
 		addr common.Address,
 	) (*types2.ValidatorStats, error)
-	// UpdateValidatorVotingPower writes the voting power for the committees.
-	UpdateValidatorVotingPower(
-		batch rawdb.DatabaseWriter,
-		block *types.Block,
-		newEpochSuperCommittee, currentEpochSuperCommittee *shard.State,
-		state *state.DB,
-	) (map[common.Address]*types2.ValidatorStats, error)
 	// ComputeAndUpdateAPR ...
 	ComputeAndUpdateAPR(
 		block *types.Block, now *big.Int,

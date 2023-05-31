@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/registry"
@@ -139,12 +140,18 @@ func (consensus *Consensus) Blockchain() core.BlockChain {
 	return consensus.registry.GetBlockchain()
 }
 
-func (consensus *Consensus) ReadySignal(p ProposalType) {
-	consensus.readySignal <- p
+// ChainReader returns the chain reader.
+// This is mostly the same as Blockchain, but it returns only read methods, so we assume it's safe for concurrent use.
+func (consensus *Consensus) ChainReader() engine.ChainReader {
+	return consensus.Blockchain()
 }
 
 func (consensus *Consensus) GetReadySignal() chan ProposalType {
 	return consensus.readySignal
+}
+
+func (consensus *Consensus) ReadySignal(p ProposalType) {
+	consensus.readySignal <- p
 }
 
 func (consensus *Consensus) CommitSigChannel() chan []byte {
@@ -153,6 +160,11 @@ func (consensus *Consensus) CommitSigChannel() chan []byte {
 
 func (consensus *Consensus) GetCommitSigChannel() chan []byte {
 	return consensus.commitSigChannel
+}
+
+// Beaconchain returns the beaconchain.
+func (consensus *Consensus) Beaconchain() core.BlockChain {
+	return consensus.registry.GetBeaconchain()
 }
 
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks.
@@ -232,8 +244,8 @@ func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 	return consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
-// SetBlockVerifier sets the block verifier
-func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
+// setBlockVerifier sets the block verifier
+func (consensus *Consensus) setBlockVerifier(verifier VerifyBlockFunc) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	consensus.BlockVerifier = verifier
@@ -288,7 +300,6 @@ func New(
 	// the blockchain during initialization as it was
 	// displayed on explorer as Height right now
 	consensus.SetCurBlockViewID(0)
-	consensus.ShardID = shard
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.readySignal = make(chan ProposalType)
 	consensus.commitSigChannel = make(chan []byte)
@@ -297,6 +308,8 @@ func New(
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	// Make Sure Verifier is not null
 	consensus.vc = newViewChange()
+	// TODO: reference to blockchain/beaconchain should be removed.
+	consensus.setBlockVerifier(VerifyNewBlock(registry.GetWebHooks(), consensus.Blockchain(), consensus.Beaconchain()))
 
 	// init prometheus metrics
 	initMetrics()

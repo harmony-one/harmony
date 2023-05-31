@@ -103,7 +103,7 @@ func TestVerifyNewBlock(t *testing.T) {
 		t.Fatal("cannot get blockchain")
 	}
 	reg := registry.New().SetBlockchain(blockchain)
-	consensus, err := consensus.New(
+	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
 	if err != nil {
@@ -112,7 +112,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, reg)
+	node := New(host, consensusObj, engine, collection, nil, nil, nil, archiveMode, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -129,7 +129,7 @@ func TestVerifyNewBlock(t *testing.T) {
 
 	// work around vrf verification as it's tested in another test.
 	node.Blockchain().Config().VRFEpoch = big.NewInt(2)
-	if err := VerifyNewBlock(nil, node.Blockchain(), node.Beaconchain())(block); err != nil {
+	if err := consensus.VerifyNewBlock(nil, node.Blockchain(), node.Beaconchain())(block); err != nil {
 		t.Error("New block is not verified successfully:", err)
 	}
 }
