@@ -168,6 +168,13 @@ func (b *StageBodies) runBlockWorkerLoop(gbm *blockDownloadManager, wg *sync.Wai
 				Msg(WrapStagedSyncMsg("downloadRawBlocks failed"))
 			err = errors.Wrap(err, "request error")
 			gbm.HandleRequestError(batch, err, stid)
+		} else if blockBytes == nil || len(blockBytes) == 0 {
+			utils.Logger().Warn().
+				Str("stream", string(stid)).
+				Interface("block numbers", batch).
+				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received empty blockBytes"))
+			err := errors.New("downloadRawBlocks received empty blockBytes")
+			gbm.HandleRequestError(batch, err, stid)
 		} else {
 			if err = b.saveBlocks(gbm.tx, batch, blockBytes, sigBytes, loopID, stid); err != nil {
 				panic(ErrSaveBlocksToDbFailed)
