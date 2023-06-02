@@ -14,6 +14,8 @@ func (consensus *Consensus) getConsensusPhase() string {
 
 // GetConsensusMode returns the current mode of the consensus
 func (consensus *Consensus) GetConsensusMode() string {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
 	return consensus.current.mode.String()
 }
 
