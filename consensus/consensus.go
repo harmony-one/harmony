@@ -188,6 +188,8 @@ func (consensus *Consensus) BlocksSynchronized() {
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
 func (consensus *Consensus) BlocksNotSynchronized() {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.syncNotReadyChan()
 }
 
