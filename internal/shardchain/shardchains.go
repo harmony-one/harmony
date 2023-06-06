@@ -107,7 +107,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 			Msg("disable cache, running in archival mode")
 	} else {
 		cacheConfig = &core.CacheConfig{
-			TrieNodeLimit: 256 * 1024 * 1024,
+			TrieNodeLimit: 256,
 			TrieTimeLimit: 2 * time.Minute,
 			TriesInMemory: 128,
 		}
@@ -172,9 +172,8 @@ func initStateCache(db ethdb.Database, sc *CollectionImpl, shardID uint32) (stat
 			return nil, err
 		}
 		return state.NewDatabaseWithCache(stateDB, 64), nil
-	} else {
-		return state.NewDatabase(db), nil
 	}
+	return nil, nil
 }
 
 // DisableCache disables caching mode for newly opened chains.

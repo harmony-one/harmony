@@ -46,7 +46,8 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChainImpl, *state.D
 	genesis := gspec.MustCommit(database)
 
 	// fake blockchain
-	chain, _ := NewBlockChain(database, state.NewDatabase(database), nil, nil, gspec.Config, engine, vm.Config{})
+	cacheConfig := &CacheConfig{SnapshotLimit: 0}
+	chain, _ := NewBlockChain(database, nil, nil, cacheConfig, gspec.Config, engine, vm.Config{})
 	db, _ := chain.StateAt(genesis.Root())
 
 	// make a fake block header (use epoch 1 so that locked tokens can be tested)
