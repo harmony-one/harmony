@@ -84,7 +84,7 @@ func (gbm *blockDownloadManager) HandleRequestResult(bns []uint64, blockBytes []
 
 	for i, bn := range bns {
 		delete(gbm.requesting, bn)
-		if len(blockBytes[i]) <= 1 {
+		if indexExists(blockBytes, i) && len(blockBytes[i]) <= 1 {
 			gbm.retries.push(bn)
 		} else {
 			gbm.processing[bn] = struct{}{}
@@ -95,6 +95,10 @@ func (gbm *blockDownloadManager) HandleRequestResult(bns []uint64, blockBytes []
 		}
 	}
 	return nil
+}
+
+func indexExists[T any](slice []T, index int) bool {
+	return index >= 0 && index < len(slice)
 }
 
 // SetDownloadDetails sets the download details for a batch of blocks
