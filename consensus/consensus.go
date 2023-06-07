@@ -146,16 +146,12 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 	return consensus.Blockchain()
 }
 
-func (consensus *Consensus) GetReadySignal() chan ProposalType {
-	return consensus.readySignal
-}
-
 func (consensus *Consensus) ReadySignal(p ProposalType) {
 	consensus.readySignal <- p
 }
 
-func (consensus *Consensus) CommitSigChannel() chan []byte {
-	return consensus.commitSigChannel
+func (consensus *Consensus) GetReadySignal() chan ProposalType {
+	return consensus.readySignal
 }
 
 func (consensus *Consensus) GetCommitSigChannel() chan []byte {
@@ -246,14 +242,6 @@ func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 	return consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
-// setBlockVerifier sets the block verifier
-func (consensus *Consensus) setBlockVerifier(verifier VerifyBlockFunc) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	consensus.BlockVerifier = verifier
-	consensus.vc.SetVerifyBlock(consensus.verifyBlock)
-}
-
 func (consensus *Consensus) IsBackup() bool {
 	return consensus.isBackup
 }
@@ -311,11 +299,21 @@ func New(
 	// Make Sure Verifier is not null
 	consensus.vc = newViewChange()
 	// TODO: reference to blockchain/beaconchain should be removed.
-	consensus.setBlockVerifier(VerifyNewBlock(registry.GetWebHooks(), consensus.Blockchain(), consensus.Beaconchain()))
+	verifier := VerifyNewBlock(registry.GetWebHooks(), consensus.Blockchain(), consensus.Beaconchain())
+	consensus.BlockVerifier = verifier
+	consensus.vc.verifyBlock = consensus.verifyBlock
 
 	// init prometheus metrics
 	initMetrics()
 	consensus.AddPubkeyMetrics()
 
 	return &consensus, nil
+}
+
+func (consensus *Consensus) GetHost() p2p.Host {
+	return consensus.host
+}
+
+func (consensus *Consensus) Registry() *registry.Registry {
+	return consensus.registry
 }

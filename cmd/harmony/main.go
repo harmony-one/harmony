@@ -741,8 +741,12 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		registry.SetBeaconchain(registry.GetBlockchain())
 	}
 
+	cxPool := core.NewCxPool(core.CxPoolSize)
+	registry.SetCxPool(cxPool)
+
 	// Consensus object.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, nodeConfig.ShardID)
+	registry.SetIsBackup(isBackup(hc))
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, registry, decider, minPeers, aggregateSig)
 
@@ -780,7 +784,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	)
 
 	nodeconfig.GetDefaultConfig().DBDir = nodeConfig.DBDir
-	currentConsensus.SetIsBackup(processNodeType(hc, currentNode))
+	processNodeType(hc, currentNode.NodeConfig)
 	currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 	currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
@@ -829,16 +833,23 @@ func setupTiKV(hc harmonyconfig.HarmonyConfig) shardchain.DBFactory {
 	return factory
 }
 
-func processNodeType(hc harmonyconfig.HarmonyConfig, currentNode *node.Node) (isBackup bool) {
+func processNodeType(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType) {
 	switch hc.General.NodeType {
 	case nodeTypeExplorer:
 		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
-		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
+		nodeConfig.SetRole(nodeconfig.ExplorerNode)
 
 	case nodeTypeValidator:
 		nodeconfig.SetDefaultRole(nodeconfig.Validator)
-		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
+		nodeConfig.SetRole(nodeconfig.Validator)
+	}
+}
 
+func isBackup(hc harmonyconfig.HarmonyConfig) (isBackup bool) {
+	switch hc.General.NodeType {
+	case nodeTypeExplorer:
+
+	case nodeTypeValidator:
 		return hc.General.IsBackup
 	}
 	return false

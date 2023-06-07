@@ -139,8 +139,8 @@ func (node *Node) stakingMessageHandler(msgPayload []byte) {
 // BroadcastNewBlock is called by consensus leader to sync new blocks with other clients/nodes.
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
-func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
-	groups := []nodeconfig.GroupID{node.NodeConfig.GetClientGroupID()}
+func (node *Node) BroadcastNewBlock(newBlock *types.Block, nodeConfig *nodeconfig.ConfigType) {
+	groups := []nodeconfig.GroupID{nodeConfig.GetClientGroupID()}
 	utils.Logger().Info().
 		Msgf(
 			"broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0],
@@ -335,9 +335,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 		if node.IsRunningBeaconChain() {
 			// TODO: consider removing this and letting other nodes broadcast new blocks.
 			// But need to make sure there is at least 1 node that will do the job.
-			node.BroadcastNewBlock(newBlock)
+			node.BroadcastNewBlock(newBlock, node.NodeConfig)
 		}
-		node.BroadcastCXReceipts(newBlock)
+		BroadcastCXReceipts(newBlock, node.Consensus)
 	} else {
 		if node.Consensus.Mode() != consensus.Listening {
 			numSignatures := node.Consensus.NumSignaturesIncludedInBlock(newBlock)
@@ -358,15 +358,15 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			if rnd < 1 {
 				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
 				if node.IsRunningBeaconChain() {
-					node.BroadcastNewBlock(newBlock)
+					node.BroadcastNewBlock(newBlock, node.NodeConfig)
 				}
-				node.BroadcastCXReceipts(newBlock)
+				BroadcastCXReceipts(newBlock, node.Consensus)
 			}
 		}
 	}
 
 	// Broadcast client requested missing cross shard receipts if there is any
-	node.BroadcastMissingCXReceipts()
+	BroadcastMissingCXReceipts(node.Consensus)
 
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
 		if h.Availability != nil {

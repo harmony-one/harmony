@@ -2629,10 +2629,10 @@ func (bc *BlockChainImpl) ReadCXReceipts(shardID uint32, blockNum uint64, blockH
 	return cxs, nil
 }
 
-func (bc *BlockChainImpl) CXMerkleProof(toShardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
-	proof := &types.CXMerkleProof{BlockNum: block.Number(), BlockHash: block.Hash(), ShardID: block.ShardID(), CXReceiptHash: block.Header().OutgoingReceiptHash(), CXShardHashes: []common.Hash{}, ShardIDs: []uint32{}}
+func (bc *BlockChainImpl) CXMerkleProof(toShardID uint32, block *block.Header) (*types.CXMerkleProof, error) {
+	proof := &types.CXMerkleProof{BlockNum: block.Number(), BlockHash: block.Hash(), ShardID: block.ShardID(), CXReceiptHash: block.OutgoingReceiptHash(), CXShardHashes: []common.Hash{}, ShardIDs: []uint32{}}
 
-	epoch := block.Header().Epoch()
+	epoch := block.Epoch()
 	shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
 

@@ -661,6 +661,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, nodeConfig *nodec
 }
 
 var (
+	errMsgHadNoHMYPayLoadAssumption      = errors.New("did not have sufficient size for hmy msg")
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
 )
 
@@ -1106,7 +1107,7 @@ func New(
 
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.registry.SetTxPool(node.TxPool)
-		node.CxPool = core.NewCxPool(core.CxPoolSize)
+		node.CxPool = node.registry.GetCxPool()
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, beaconChain, engine)
 
 		node.deciderCache, _ = lru.New(16)

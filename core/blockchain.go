@@ -214,7 +214,7 @@ type BlockChain interface {
 	// ReadCXReceipts retrieves the cross shard transaction receipts of a given shard.
 	ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error)
 	// CXMerkleProof calculates the cross shard transaction merkle proof of a given destination shard.
-	CXMerkleProof(toShardID uint32, block *types.Block) (*types.CXMerkleProof, error)
+	CXMerkleProof(toShardID uint32, block *block.Header) (*types.CXMerkleProof, error)
 	// WriteCXReceiptsProofSpent mark the CXReceiptsProof list with given unspent status
 	WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxps []*types.CXReceiptsProof) error
 	// IsSpent checks whether a CXReceiptsProof is spent.
