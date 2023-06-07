@@ -146,6 +146,10 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 	return consensus.Blockchain()
 }
 
+func (consensus *Consensus) ReadySignal(p ProposalType) {
+	consensus.readySignal <- p
+}
+
 func (consensus *Consensus) GetReadySignal() chan ProposalType {
 	return consensus.readySignal
 }
@@ -236,14 +240,6 @@ func (consensus *Consensus) getLeaderPrivateKey(leaderKey *bls_core.PublicKey) (
 // getConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
 func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
 	return consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
-}
-
-// setBlockVerifier sets the block verifier
-func (consensus *Consensus) setBlockVerifier(verifier VerifyBlockFunc) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	consensus.BlockVerifier = verifier
-	consensus.vc.SetVerifyBlock(consensus.verifyBlock)
 }
 
 func (consensus *Consensus) IsBackup() bool {

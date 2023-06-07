@@ -76,7 +76,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 							} else {
 								newCommitSigsChan <- sigs
 							}
-						case commitSigs := <-cs.CommitSigChannel():
+						case commitSigs := <-cs.GetCommitSigChannel():
 							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
 							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
 								newCommitSigsChan <- commitSigs
