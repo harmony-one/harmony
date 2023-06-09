@@ -77,13 +77,12 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 
 	numShortRangeCounterVec.With(s.state.promLabels()).Inc()
 
-	srCtx, cancel := context.WithTimeout(ctx, ShortRangeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, ShortRangeTimeout)
 	defer cancel()
 
 	//TODO: merge srHelper with StageEpochConfig
 	sh := &srHelper{
 		syncProtocol: s.state.protocol,
-		ctx:          srCtx,
 		config:       s.state.config,
 		logger:       utils.Logger().With().Str("mode", "epoch chain short range").Logger(),
 	}
@@ -110,7 +109,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	}
 
 	////////////////////////////////////////////////////////
-	hashChain, whitelist, err := sh.getHashChain(bns)
+	hashChain, whitelist, err := sh.getHashChain(ctx, bns)
 	if err != nil {
 		return 0, errors.Wrap(err, "getHashChain")
 	}
@@ -118,7 +117,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		// short circuit for no sync is needed
 		return 0, nil
 	}
-	blocks, streamID, err := sh.getBlocksByHashes(hashChain, whitelist)
+	blocks, streamID, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("epoch sync getBlocksByHashes failed")
 		if !errors.Is(err, context.Canceled) {

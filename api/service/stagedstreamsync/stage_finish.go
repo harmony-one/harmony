@@ -30,7 +30,7 @@ func (finish *StageFinish) Exec(ctx context.Context, firstCycle bool, invalidBlo
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = finish.configs.db.BeginRw(context.Background())
+		tx, err = finish.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}

@@ -81,15 +81,12 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 // 2. Get blocks by hashes from computed hash chain.
 // 3. Insert the blocks to blockchain.
 func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) (int, error) {
-
 	numShortRangeCounterVec.With(s.state.promLabels()).Inc()
-
-	srCtx, cancel := context.WithTimeout(ctx, ShortRangeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, ShortRangeTimeout)
 	defer cancel()
 
 	sh := &srHelper{
 		syncProtocol: s.state.protocol,
-		ctx:          srCtx,
 		config:       s.state.config,
 		logger:       utils.Logger().With().Str("mode", "short range").Logger(),
 	}
@@ -99,7 +96,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	}
 	curBN := sr.configs.bc.CurrentBlock().NumberU64()
 	blkNums := sh.prepareBlockHashNumbers(curBN)
-	hashChain, whitelist, err := sh.getHashChain(blkNums)
+	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums)
 	if err != nil {
 		return 0, errors.Wrap(err, "getHashChain")
 	}
@@ -123,7 +120,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 		s.state.status.finishSyncing()
 	}()
 
-	blocks, stids, err := sh.getBlocksByHashes(hashChain, whitelist)
+	blocks, stids, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("getBlocksByHashes failed")
 		if !errors.Is(err, context.Canceled) {

@@ -116,11 +116,11 @@ func (s *StagedStreamSync) NewRevertState(id SyncStageID, revertPoint uint64) *R
 	return &RevertState{id, revertPoint, s}
 }
 
-func (s *StagedStreamSync) CleanUpStageState(id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*CleanUpState, error) {
+func (s *StagedStreamSync) CleanUpStageState(ctx context.Context, id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*CleanUpState, error) {
 	var pruneProgress uint64
 	var err error
 
-	if errV := CreateView(context.Background(), db, tx, func(tx kv.Tx) error {
+	if errV := CreateView(ctx, db, tx, func(tx kv.Tx) error {
 		pruneProgress, err = GetStageCleanUpProgress(tx, id, s.isBeacon)
 		if err != nil {
 			return err
@@ -213,10 +213,10 @@ func (s *StagedStreamSync) SetCurrentStage(id SyncStageID) error {
 }
 
 // StageState retrieves the latest stage state from db
-func (s *StagedStreamSync) StageState(stage SyncStageID, tx kv.Tx, db kv.RwDB) (*StageState, error) {
+func (s *StagedStreamSync) StageState(ctx context.Context, stage SyncStageID, tx kv.Tx, db kv.RwDB) (*StageState, error) {
 	var blockNum uint64
 	var err error
-	if errV := CreateView(context.Background(), db, tx, func(rtx kv.Tx) error {
+	if errV := CreateView(ctx, db, tx, func(rtx kv.Tx) error {
 		blockNum, err = GetStageProgress(rtx, stage, s.isBeacon)
 		if err != nil {
 			return err
@@ -457,7 +457,7 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 // runStage executes stage
 func (s *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, invalidBlockRevert bool) (err error) {
 	start := time.Now()
-	stageState, err := s.StageState(stage.ID, tx, db)
+	stageState, err := s.StageState(ctx, stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
@@ -484,7 +484,7 @@ func (s *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.RwD
 // revertStage reverts stage
 func (s *StagedStreamSync) revertStage(ctx context.Context, firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
-	stageState, err := s.StageState(stage.ID, tx, db)
+	stageState, err := s.StageState(ctx, stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
@@ -518,12 +518,12 @@ func (s *StagedStreamSync) revertStage(ctx context.Context, firstCycle bool, sta
 func (s *StagedStreamSync) pruneStage(ctx context.Context, firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
 
-	stageState, err := s.StageState(stage.ID, tx, db)
+	stageState, err := s.StageState(ctx, stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
 
-	prune, err := s.CleanUpStageState(stage.ID, stageState.BlockNumber, tx, db)
+	prune, err := s.CleanUpStageState(ctx, stage.ID, stageState.BlockNumber, tx, db)
 	if err != nil {
 		return err
 	}

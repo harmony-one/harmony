@@ -218,7 +218,7 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 			continue
 		}
 		s.state.gbm.SetDownloadDetails(batch, 0, stid)
-		if errU := b.configs.blockDBs[0].Update(context.Background(), func(tx kv.RwTx) error {
+		if errU := b.configs.blockDBs[0].Update(ctx, func(tx kv.RwTx) error {
 			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, 0, stid); err != nil {
 				return errors.Errorf("[STAGED_STREAM_SYNC] saving re-downloaded bad block to db failed.")
 			}
