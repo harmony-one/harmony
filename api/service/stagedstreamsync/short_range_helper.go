@@ -148,7 +148,7 @@ func (sh *srHelper) prepareBlockHashNumbers(curNumber uint64) []uint64 {
 }
 
 func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64) ([]common.Hash, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	hashes, stid, err := sh.syncProtocol.GetBlockHashes(ctx, bns)
