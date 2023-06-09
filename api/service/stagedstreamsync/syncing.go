@@ -52,14 +52,14 @@ func CreateStagedSync(ctx context.Context,
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
 	if UseMemDB {
-		mainDB = memdb.New()
+		mainDB = memdb.New(getMemDbTempPath(dbDir, -1))
 		for i := 0; i < config.Concurrency; i++ {
-			dbs[i] = memdb.New()
+			dbs[i] = memdb.New(getMemDbTempPath(dbDir, i))
 		}
 	} else {
-		mainDB = mdbx.NewMDBX(log.New()).Path(GetBlockDbPath(isBeacon, -1, dbDir)).MustOpen()
+		mainDB = mdbx.NewMDBX(log.New()).Path(getBlockDbPath(isBeacon, -1, dbDir)).MustOpen()
 		for i := 0; i < config.Concurrency; i++ {
-			dbPath := GetBlockDbPath(isBeacon, i, dbDir)
+			dbPath := getBlockDbPath(isBeacon, i, dbDir)
 			dbs[i] = mdbx.NewMDBX(log.New()).Path(dbPath).MustOpen()
 		}
 	}
@@ -138,8 +138,16 @@ func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB, concurrency int)
 	return nil
 }
 
-// GetBlockDbPath returns the path of the cache database which stores blocks
-func GetBlockDbPath(beacon bool, loopID int, dbDir string) string {
+// getMemDbTempPath returns the path of the temporary cache database for memdb
+func getMemDbTempPath(dbDir string, dbIndex int) string {
+	if dbIndex >= 0 {
+		return fmt.Sprintf("%s_%d", filepath.Join(dbDir, "cache/memdb/db"), dbIndex)
+	}
+	return filepath.Join(dbDir, "cache/memdb/db_main")
+}
+
+// getBlockDbPath returns the path of the cache database which stores blocks
+func getBlockDbPath(beacon bool, loopID int, dbDir string) string {
 	if beacon {
 		if loopID >= 0 {
 			return fmt.Sprintf("%s_%d", filepath.Join(dbDir, "cache/beacon_blocks_db"), loopID)
