@@ -68,12 +68,12 @@ func CreateStagedSync(ctx context.Context,
 		return nil, errInitDB
 	}
 
-	stageHeadsCfg := NewStageHeadersCfg(ctx, bc, mainDB)
-	stageShortRangeCfg := NewStageShortRangeCfg(ctx, bc, mainDB)
-	stageSyncEpochCfg := NewStageEpochCfg(ctx, bc, mainDB)
-	stageBodiesCfg := NewStageBodiesCfg(ctx, bc, mainDB, dbs, config.Concurrency, protocol, isBeacon, logProgress)
-	stageStatesCfg := NewStageStatesCfg(ctx, bc, mainDB, dbs, config.Concurrency, logger, logProgress)
-	stageFinishCfg := NewStageFinishCfg(ctx, mainDB)
+	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
+	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
+	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
+	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeacon, logProgress)
+	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, logProgress)
+	stageFinishCfg := NewStageFinishCfg(mainDB)
 
 	stages := DefaultStages(ctx,
 		stageHeadsCfg,
@@ -84,7 +84,7 @@ func CreateStagedSync(ctx context.Context,
 		stageFinishCfg,
 	)
 
-	return New(ctx,
+	return New(
 		bc,
 		mainDB,
 		stages,
@@ -178,7 +178,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 	var estimatedHeight uint64
 	if initSync {
-		if h, err := s.estimateCurrentNumber(); err != nil {
+		if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
 			return 0, err
 		} else {
 			estimatedHeight = h
@@ -197,8 +197,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 	for {
 		ctx, cancel := context.WithCancel(downloaderContext)
-		s.ctx = ctx
-		s.SetNewContext(ctx)
 
 		n, err := s.doSyncCycle(ctx, initSync)
 		if err != nil {
@@ -234,7 +232,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context, initSync bool) (int,
 	var tx kv.RwTx
 	if canRunCycleInOneTransaction {
 		var err error
-		if tx, err = s.DB().BeginRw(context.Background()); err != nil {
+		if tx, err = s.DB().BeginRw(ctx); err != nil {
 			return totalInserted, err
 		}
 		defer tx.Rollback()
@@ -244,7 +242,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context, initSync bool) (int,
 
 	// Do one cycle of staged sync
 	initialCycle := s.currentCycle.Number == 0
-	if err := s.Run(s.DB(), tx, initialCycle); err != nil {
+	if err := s.Run(ctx, s.DB(), tx, initialCycle); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Bool("isBeacon", s.isBeacon).
@@ -294,7 +292,7 @@ func (s *StagedStreamSync) checkPrerequisites() error {
 
 // estimateCurrentNumber roughly estimates the current block number.
 // The block number does not need to be exact, but just a temporary target of the iteration
-func (s *StagedStreamSync) estimateCurrentNumber() (uint64, error) {
+func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, error) {
 	var (
 		cnResults = make(map[sttypes.StreamID]uint64)
 		lock      sync.Mutex
@@ -304,7 +302,7 @@ func (s *StagedStreamSync) estimateCurrentNumber() (uint64, error) {
 	for i := 0; i != s.config.Concurrency; i++ {
 		go func() {
 			defer wg.Done()
-			bn, stid, err := s.doGetCurrentNumberRequest()
+			bn, stid, err := s.doGetCurrentNumberRequest(ctx)
 			if err != nil {
 				s.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("getCurrentNumber request failed"))
@@ -322,8 +320,8 @@ func (s *StagedStreamSync) estimateCurrentNumber() (uint64, error) {
 
 	if len(cnResults) == 0 {
 		select {
-		case <-s.ctx.Done():
-			return 0, s.ctx.Err()
+		case <-ctx.Done():
+			return 0, ctx.Err()
 		default:
 		}
 		return 0, ErrZeroBlockResponse

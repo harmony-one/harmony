@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ledgerwatch/erigon-lib/kv"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 )
 
@@ -19,7 +18,6 @@ type StageStates struct {
 	configs StageStatesCfg
 }
 type StageStatesCfg struct {
-	ctx         context.Context
 	bc          core.BlockChain
 	db          kv.RwDB
 	blockDBs    []kv.RwDB
@@ -34,7 +32,7 @@ func NewStageStates(cfg StageStatesCfg) *StageStates {
 	}
 }
 
-func NewStageStatesCfg(ctx context.Context,
+func NewStageStatesCfg(
 	bc core.BlockChain,
 	db kv.RwDB,
 	blockDBs []kv.RwDB,
@@ -43,7 +41,6 @@ func NewStageStatesCfg(ctx context.Context,
 	logProgress bool) StageStatesCfg {
 
 	return StageStatesCfg{
-		ctx:         ctx,
 		bc:          bc,
 		db:          db,
 		blockDBs:    blockDBs,
@@ -53,13 +50,8 @@ func NewStageStatesCfg(ctx context.Context,
 	}
 }
 
-func (stg *StageStates) SetStageContext(ctx context.Context) {
-	stg.configs.ctx = ctx
-}
-
 // Exec progresses States stage in the forward direction
-func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
-
+func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 	// for short range sync, skip this step
 	if !s.state.initSync {
 		return nil
@@ -78,7 +70,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = stg.configs.db.BeginRw(stg.configs.ctx)
+		tx, err = stg.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -94,7 +86,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 	// prepare db transactions
 	txs := make([]kv.RwTx, stg.configs.concurrency)
 	for i := 0; i < stg.configs.concurrency; i++ {
-		txs[i], err = stg.configs.blockDBs[i].BeginRw(context.Background())
+		txs[i], err = stg.configs.blockDBs[i].BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -219,19 +211,11 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 	return nil
 }
 
-func (stg *StageStates) insertChain(gbm *blockDownloadManager,
-	protocol syncProtocol,
-	lbls prometheus.Labels,
-	targetBN uint64) {
-
-}
-
-func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
-
+func (stg *StageStates) saveProgress(ctx context.Context, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = stg.configs.db.BeginRw(context.Background())
+		tx, err = stg.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -254,10 +238,10 @@ func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 	return nil
 }
 
-func (stg *StageStates) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
+func (stg *StageStates) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = stg.configs.db.BeginRw(stg.configs.ctx)
+		tx, err = stg.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -276,10 +260,10 @@ func (stg *StageStates) Revert(firstCycle bool, u *RevertState, s *StageState, t
 	return nil
 }
 
-func (stg *StageStates) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
+func (stg *StageStates) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = stg.configs.db.BeginRw(stg.configs.ctx)
+		tx, err = stg.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
