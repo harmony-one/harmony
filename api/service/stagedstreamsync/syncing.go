@@ -52,9 +52,9 @@ func CreateStagedSync(ctx context.Context,
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
 	if UseMemDB {
-		mainDB = memdb.New()
+		mainDB = memdb.New("/tmp/eregon-sync")
 		for i := 0; i < config.Concurrency; i++ {
-			dbs[i] = memdb.New()
+			dbs[i] = memdb.New("/tmp/eregon-sync")
 		}
 	} else {
 		mainDB = mdbx.NewMDBX(log.New()).Path(GetBlockDbPath(isBeacon, -1, dbDir)).MustOpen()
