@@ -17,8 +17,8 @@ import (
 type StageBodies struct {
 	configs StageBodiesCfg
 }
+
 type StageBodiesCfg struct {
-	ctx         context.Context
 	bc          core.BlockChain
 	db          kv.RwDB
 	blockDBs    []kv.RwDB
@@ -34,9 +34,8 @@ func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
 	}
 }
 
-func NewStageBodiesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeacon bool, logProgress bool) StageBodiesCfg {
+func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeacon bool, logProgress bool) StageBodiesCfg {
 	return StageBodiesCfg{
-		ctx:         ctx,
 		bc:          bc,
 		db:          db,
 		blockDBs:    blockDBs,
@@ -47,17 +46,13 @@ func NewStageBodiesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, bloc
 	}
 }
 
-func (b *StageBodies) SetStageContext(ctx context.Context) {
-	b.configs.ctx = ctx
-}
-
 // Exec progresses Bodies stage in the forward direction
-func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
+func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	useInternalTx := tx == nil
 
 	if invalidBlockRevert {
-		return b.redownloadBadBlock(s)
+		return b.redownloadBadBlock(ctx, s)
 	}
 
 	// for short range sync, skip this stage
@@ -72,10 +67,8 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 	}
 	currProgress := uint64(0)
 	targetHeight := s.state.currentCycle.TargetHeight
-	// isBeacon := s.state.isBeacon
-	// isLastCycle := targetHeight >= maxHeight
 
-	if errV := CreateView(b.configs.ctx, b.configs.db, tx, func(etx kv.Tx) error {
+	if errV := CreateView(ctx, b.configs.db, tx, func(etx kv.Tx) error {
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
 			return err
 		}
@@ -85,7 +78,7 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 	}
 
 	if currProgress == 0 {
-		if err := b.cleanAllBlockDBs(); err != nil {
+		if err := b.cleanAllBlockDBs(ctx); err != nil {
 			return err
 		}
 		currProgress = currentHead
@@ -104,7 +97,7 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 
 	if useInternalTx {
 		var err error
-		tx, err = b.configs.db.BeginRw(context.Background())
+		tx, err = b.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -119,7 +112,7 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 
 	for i := 0; i != s.state.config.Concurrency; i++ {
 		wg.Add(1)
-		go b.runBlockWorkerLoop(s.state.gbm, &wg, i, startTime)
+		go b.runBlockWorkerLoop(ctx, s.state.gbm, &wg, i, startTime)
 	}
 
 	wg.Wait()
@@ -134,7 +127,7 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 }
 
 // runBlockWorkerLoop creates a work loop for download blocks
-func (b *StageBodies) runBlockWorkerLoop(gbm *blockDownloadManager, wg *sync.WaitGroup, loopID int, startTime time.Time) {
+func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownloadManager, wg *sync.WaitGroup, loopID int, startTime time.Time) {
 
 	currentBlock := int(b.configs.bc.CurrentBlock().NumberU64())
 
@@ -142,21 +135,21 @@ func (b *StageBodies) runBlockWorkerLoop(gbm *blockDownloadManager, wg *sync.Wai
 
 	for {
 		select {
-		case <-b.configs.ctx.Done():
+		case <-ctx.Done():
 			return
 		default:
 		}
 		batch := gbm.GetNextBatch()
 		if len(batch) == 0 {
 			select {
-			case <-b.configs.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-time.After(100 * time.Millisecond):
 				return
 			}
 		}
 
-		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(batch)
+		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
@@ -176,7 +169,7 @@ func (b *StageBodies) runBlockWorkerLoop(gbm *blockDownloadManager, wg *sync.Wai
 			err := errors.New("downloadRawBlocks received empty blockBytes")
 			gbm.HandleRequestError(batch, err, stid)
 		} else {
-			if err = b.saveBlocks(gbm.tx, batch, blockBytes, sigBytes, loopID, stid); err != nil {
+			if err = b.saveBlocks(ctx, gbm.tx, batch, blockBytes, sigBytes, loopID, stid); err != nil {
 				panic(ErrSaveBlocksToDbFailed)
 			}
 			gbm.HandleRequestResult(batch, blockBytes, sigBytes, loopID, stid)
@@ -197,7 +190,7 @@ func (b *StageBodies) runBlockWorkerLoop(gbm *blockDownloadManager, wg *sync.Wai
 }
 
 // redownloadBadBlock tries to redownload the bad block from other streams
-func (b *StageBodies) redownloadBadBlock(s *StageState) error {
+func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) error {
 
 	batch := make([]uint64, 1)
 	batch = append(batch, s.state.invalidBlock.Number)
@@ -206,7 +199,7 @@ func (b *StageBodies) redownloadBadBlock(s *StageState) error {
 		if b.configs.protocol.NumStreams() == 0 {
 			return errors.Errorf("re-download bad block from all streams failed")
 		}
-		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(batch)
+		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				b.configs.protocol.StreamFailed(stid, "tried to re-download bad block from this stream, but downloadRawBlocks failed")
@@ -225,8 +218,8 @@ func (b *StageBodies) redownloadBadBlock(s *StageState) error {
 			continue
 		}
 		s.state.gbm.SetDownloadDetails(batch, 0, stid)
-		if errU := b.configs.blockDBs[0].Update(context.Background(), func(tx kv.RwTx) error {
-			if err = b.saveBlocks(tx, batch, blockBytes, sigBytes, 0, stid); err != nil {
+		if errU := b.configs.blockDBs[0].Update(ctx, func(tx kv.RwTx) error {
+			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, 0, stid); err != nil {
 				return errors.Errorf("[STAGED_STREAM_SYNC] saving re-downloaded bad block to db failed.")
 			}
 			return nil
@@ -238,8 +231,8 @@ func (b *StageBodies) redownloadBadBlock(s *StageState) error {
 	return nil
 }
 
-func (b *StageBodies) downloadBlocks(bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(b.configs.ctx, 10*time.Second)
+func (b *StageBodies) downloadBlocks(ctx context.Context, bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	blocks, stid, err := b.configs.protocol.GetBlocksByNumber(ctx, bns)
@@ -252,8 +245,8 @@ func (b *StageBodies) downloadBlocks(bns []uint64) ([]*types.Block, sttypes.Stre
 	return blocks, stid, nil
 }
 
-func (b *StageBodies) downloadRawBlocks(bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(b.configs.ctx, 10*time.Second)
+func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
@@ -272,9 +265,9 @@ func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 }
 
 // saveBlocks saves the blocks into db
-func (b *StageBodies) saveBlocks(tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, stid sttypes.StreamID) error {
+func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, stid sttypes.StreamID) error {
 
-	tx, err := b.configs.blockDBs[loopID].BeginRw(context.Background())
+	tx, err := b.configs.blockDBs[loopID].BeginRw(ctx)
 	if err != nil {
 		return err
 	}
@@ -313,11 +306,11 @@ func (b *StageBodies) saveBlocks(tx kv.RwTx, bns []uint64, blockBytes [][]byte, 
 	return nil
 }
 
-func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (err error) {
+func (b *StageBodies) saveProgress(ctx context.Context, s *StageState, progress uint64, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = b.configs.db.BeginRw(context.Background())
+		tx, err = b.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -340,9 +333,8 @@ func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (
 	return nil
 }
 
-func (b *StageBodies) cleanBlocksDB(loopID int) (err error) {
-
-	tx, errb := b.configs.blockDBs[loopID].BeginRw(b.configs.ctx)
+func (b *StageBodies) cleanBlocksDB(ctx context.Context, loopID int) (err error) {
+	tx, errb := b.configs.blockDBs[loopID].BeginRw(ctx)
 	if errb != nil {
 		return errb
 	}
@@ -370,26 +362,26 @@ func (b *StageBodies) cleanBlocksDB(loopID int) (err error) {
 	return nil
 }
 
-func (b *StageBodies) cleanAllBlockDBs() (err error) {
+func (b *StageBodies) cleanAllBlockDBs(ctx context.Context) (err error) {
 	//clean all blocks DBs
 	for i := 0; i < b.configs.concurrency; i++ {
-		if err := b.cleanBlocksDB(i); err != nil {
+		if err := b.cleanBlocksDB(ctx, i); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (b *StageBodies) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
+func (b *StageBodies) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 
 	//clean all blocks DBs
-	if err := b.cleanAllBlockDBs(); err != nil {
+	if err := b.cleanAllBlockDBs(ctx); err != nil {
 		return err
 	}
 
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = b.configs.db.BeginRw(b.configs.ctx)
+		tx, err = b.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -416,10 +408,9 @@ func (b *StageBodies) Revert(firstCycle bool, u *RevertState, s *StageState, tx 
 	return nil
 }
 
-func (b *StageBodies) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
-
+func (b *StageBodies) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	//clean all blocks DBs
-	if err := b.cleanAllBlockDBs(); err != nil {
+	if err := b.cleanAllBlockDBs(ctx); err != nil {
 		return err
 	}
 

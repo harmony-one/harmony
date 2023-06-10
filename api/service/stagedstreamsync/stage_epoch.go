@@ -15,9 +15,8 @@ type StageEpoch struct {
 }
 
 type StageEpochCfg struct {
-	ctx context.Context
-	bc  core.BlockChain
-	db  kv.RwDB
+	bc core.BlockChain
+	db kv.RwDB
 }
 
 func NewStageEpoch(cfg StageEpochCfg) *StageEpoch {
@@ -26,19 +25,14 @@ func NewStageEpoch(cfg StageEpochCfg) *StageEpoch {
 	}
 }
 
-func NewStageEpochCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) StageEpochCfg {
+func NewStageEpochCfg(bc core.BlockChain, db kv.RwDB) StageEpochCfg {
 	return StageEpochCfg{
-		ctx: ctx,
-		bc:  bc,
-		db:  db,
+		bc: bc,
+		db: db,
 	}
 }
 
-func (sr *StageEpoch) SetStageContext(ctx context.Context) {
-	sr.configs.ctx = ctx
-}
-
-func (sr *StageEpoch) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
+func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
 
 	// no need to update epoch chain if we are redoing the stages because of bad block
 	if invalidBlockRevert {
@@ -54,7 +48,7 @@ func (sr *StageEpoch) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 	}
 
 	// doShortRangeSyncForEpochSync
-	n, err := sr.doShortRangeSyncForEpochSync(s)
+	n, err := sr.doShortRangeSyncForEpochSync(ctx, s)
 	s.state.inserted = n
 	if err != nil {
 		return err
@@ -63,7 +57,7 @@ func (sr *StageEpoch) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = sr.configs.db.BeginRw(sr.configs.ctx)
+		tx, err = sr.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -79,17 +73,16 @@ func (sr *StageEpoch) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 	return nil
 }
 
-func (sr *StageEpoch) doShortRangeSyncForEpochSync(s *StageState) (int, error) {
+func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *StageState) (int, error) {
 
 	numShortRangeCounterVec.With(s.state.promLabels()).Inc()
 
-	srCtx, cancel := context.WithTimeout(s.state.ctx, ShortRangeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, ShortRangeTimeout)
 	defer cancel()
 
 	//TODO: merge srHelper with StageEpochConfig
 	sh := &srHelper{
 		syncProtocol: s.state.protocol,
-		ctx:          srCtx,
 		config:       s.state.config,
 		logger:       utils.Logger().With().Str("mode", "epoch chain short range").Logger(),
 	}
@@ -116,7 +109,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(s *StageState) (int, error) {
 	}
 
 	////////////////////////////////////////////////////////
-	hashChain, whitelist, err := sh.getHashChain(bns)
+	hashChain, whitelist, err := sh.getHashChain(ctx, bns)
 	if err != nil {
 		return 0, errors.Wrap(err, "getHashChain")
 	}
@@ -124,7 +117,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(s *StageState) (int, error) {
 		// short circuit for no sync is needed
 		return 0, nil
 	}
-	blocks, streamID, err := sh.getBlocksByHashes(hashChain, whitelist)
+	blocks, streamID, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("epoch sync getBlocksByHashes failed")
 		if !errors.Is(err, context.Canceled) {
@@ -157,10 +150,10 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(s *StageState) (int, error) {
 	return n, nil
 }
 
-func (sr *StageEpoch) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
+func (sr *StageEpoch) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = sr.configs.db.BeginRw(context.Background())
+		tx, err = sr.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -179,10 +172,10 @@ func (sr *StageEpoch) Revert(firstCycle bool, u *RevertState, s *StageState, tx 
 	return nil
 }
 
-func (sr *StageEpoch) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
+func (sr *StageEpoch) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = sr.configs.db.BeginRw(context.Background())
+		tx, err = sr.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}

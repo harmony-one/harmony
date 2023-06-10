@@ -11,8 +11,7 @@ type StageFinish struct {
 }
 
 type StageFinishCfg struct {
-	ctx context.Context
-	db  kv.RwDB
+	db kv.RwDB
 }
 
 func NewStageFinish(cfg StageFinishCfg) *StageFinish {
@@ -21,22 +20,17 @@ func NewStageFinish(cfg StageFinishCfg) *StageFinish {
 	}
 }
 
-func NewStageFinishCfg(ctx context.Context, db kv.RwDB) StageFinishCfg {
+func NewStageFinishCfg(db kv.RwDB) StageFinishCfg {
 	return StageFinishCfg{
-		ctx: ctx,
-		db:  db,
+		db: db,
 	}
 }
 
-func (finish *StageFinish) SetStageContext(ctx context.Context) {
-	finish.configs.ctx = ctx
-}
-
-func (finish *StageFinish) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
+func (finish *StageFinish) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = finish.configs.db.BeginRw(context.Background())
+		tx, err = finish.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -54,11 +48,11 @@ func (finish *StageFinish) Exec(firstCycle bool, invalidBlockRevert bool, s *Sta
 	return nil
 }
 
-func (bh *StageFinish) clearBucket(tx kv.RwTx, isBeacon bool) error {
+func (finish *StageFinish) clearBucket(ctx context.Context, tx kv.RwTx, isBeacon bool) error {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = bh.configs.db.BeginRw(context.Background())
+		tx, err = finish.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -73,10 +67,10 @@ func (bh *StageFinish) clearBucket(tx kv.RwTx, isBeacon bool) error {
 	return nil
 }
 
-func (finish *StageFinish) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
+func (finish *StageFinish) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = finish.configs.db.BeginRw(finish.configs.ctx)
+		tx, err = finish.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -95,10 +89,10 @@ func (finish *StageFinish) Revert(firstCycle bool, u *RevertState, s *StageState
 	return nil
 }
 
-func (finish *StageFinish) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
+func (finish *StageFinish) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = finish.configs.db.BeginRw(finish.configs.ctx)
+		tx, err = finish.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}

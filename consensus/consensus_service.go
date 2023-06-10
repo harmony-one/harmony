@@ -682,7 +682,7 @@ func VerifyNewBlock(hooks *webhooks.Hooks, blockChain core.BlockChain, beaconCha
 				Int("numTx", len(newBlock.Transactions())).
 				Int("numStakingTx", len(newBlock.StakingTransactions())).
 				Err(err).
-				Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
+				Msgf("[VerifyNewBlock] Cannot Verify New Block!!!, blockHeight %d, myHeight %d", newBlock.NumberU64(), blockChain.CurrentHeader().NumberU64())
 			return errors.Errorf(
 				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
 				newBlock.Hash().Hex(),

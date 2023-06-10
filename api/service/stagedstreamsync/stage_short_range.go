@@ -16,9 +16,8 @@ type StageShortRange struct {
 }
 
 type StageShortRangeCfg struct {
-	ctx context.Context
-	bc  core.BlockChain
-	db  kv.RwDB
+	bc core.BlockChain
+	db kv.RwDB
 }
 
 func NewStageShortRange(cfg StageShortRangeCfg) *StageShortRange {
@@ -27,20 +26,14 @@ func NewStageShortRange(cfg StageShortRangeCfg) *StageShortRange {
 	}
 }
 
-func NewStageShortRangeCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) StageShortRangeCfg {
+func NewStageShortRangeCfg(bc core.BlockChain, db kv.RwDB) StageShortRangeCfg {
 	return StageShortRangeCfg{
-		ctx: ctx,
-		bc:  bc,
-		db:  db,
+		bc: bc,
+		db: db,
 	}
 }
 
-func (sr *StageShortRange) SetStageContext(ctx context.Context) {
-	sr.configs.ctx = ctx
-}
-
-func (sr *StageShortRange) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
-
+func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
 	// no need to do short range if we are redoing the stages because of bad block
 	if invalidBlockRevert {
 		return nil
@@ -56,7 +49,7 @@ func (sr *StageShortRange) Exec(firstCycle bool, invalidBlockRevert bool, s *Sta
 	}
 
 	// do short range sync
-	n, err := sr.doShortRangeSync(s)
+	n, err := sr.doShortRangeSync(ctx, s)
 	s.state.inserted = n
 	if err != nil {
 		return err
@@ -65,7 +58,7 @@ func (sr *StageShortRange) Exec(firstCycle bool, invalidBlockRevert bool, s *Sta
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = sr.configs.db.BeginRw(sr.configs.ctx)
+		tx, err = sr.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -87,16 +80,13 @@ func (sr *StageShortRange) Exec(firstCycle bool, invalidBlockRevert bool, s *Sta
 // 1. Obtain the block hashes and compute the longest hash chain..
 // 2. Get blocks by hashes from computed hash chain.
 // 3. Insert the blocks to blockchain.
-func (sr *StageShortRange) doShortRangeSync(s *StageState) (int, error) {
-
+func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) (int, error) {
 	numShortRangeCounterVec.With(s.state.promLabels()).Inc()
-
-	srCtx, cancel := context.WithTimeout(s.state.ctx, ShortRangeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, ShortRangeTimeout)
 	defer cancel()
 
 	sh := &srHelper{
 		syncProtocol: s.state.protocol,
-		ctx:          srCtx,
 		config:       s.state.config,
 		logger:       utils.Logger().With().Str("mode", "short range").Logger(),
 	}
@@ -106,7 +96,7 @@ func (sr *StageShortRange) doShortRangeSync(s *StageState) (int, error) {
 	}
 	curBN := sr.configs.bc.CurrentBlock().NumberU64()
 	blkNums := sh.prepareBlockHashNumbers(curBN)
-	hashChain, whitelist, err := sh.getHashChain(blkNums)
+	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums)
 	if err != nil {
 		return 0, errors.Wrap(err, "getHashChain")
 	}
@@ -130,7 +120,7 @@ func (sr *StageShortRange) doShortRangeSync(s *StageState) (int, error) {
 		s.state.status.finishSyncing()
 	}()
 
-	blocks, stids, err := sh.getBlocksByHashes(hashChain, whitelist)
+	blocks, stids, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("getBlocksByHashes failed")
 		if !errors.Is(err, context.Canceled) {
@@ -159,10 +149,10 @@ func (sr *StageShortRange) doShortRangeSync(s *StageState) (int, error) {
 	return n, nil
 }
 
-func (sr *StageShortRange) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
+func (sr *StageShortRange) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = sr.configs.db.BeginRw(context.Background())
+		tx, err = sr.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -181,10 +171,10 @@ func (sr *StageShortRange) Revert(firstCycle bool, u *RevertState, s *StageState
 	return nil
 }
 
-func (sr *StageShortRange) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
+func (sr *StageShortRange) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = sr.configs.db.BeginRw(context.Background())
+		tx, err = sr.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
