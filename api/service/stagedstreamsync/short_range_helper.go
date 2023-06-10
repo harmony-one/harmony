@@ -59,8 +59,7 @@ func (sh *srHelper) getBlocksChain(ctx context.Context, bns []uint64) ([]*types.
 }
 
 func (sh *srHelper) getBlocksByHashes(ctx context.Context, hashes []common.Hash, whitelist []sttypes.StreamID) ([]*types.Block, []sttypes.StreamID, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+
 	m := newGetBlocksByHashManager(hashes, whitelist)
 
 	var (
@@ -78,7 +77,8 @@ func (sh *srHelper) getBlocksByHashes(ctx context.Context, hashes []common.Hash,
 	for i := 0; i != concurrency; i++ {
 		go func(index int) {
 			defer wg.Done()
-			defer cancel() // it's ok to cancel context more than once
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
 			for {
 				if m.isDone() {
