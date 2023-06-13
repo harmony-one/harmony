@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/consensus"
@@ -38,7 +39,7 @@ type (
 )
 
 // NewDownloader creates a new downloader
-func NewDownloader(host p2p.Host, bc core.BlockChain, consensus *consensus.Consensus, dbDir string, isBeaconNode bool, config Config) *Downloader {
+func NewDownloader(host p2p.Host, bc core.BlockChain, consensus *consensus.Consensus, dbDir string, isBeaconNode bool, config Config, c *consensus.Consensus) *Downloader {
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{

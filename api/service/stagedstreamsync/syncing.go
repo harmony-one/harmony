@@ -46,8 +46,9 @@ func CreateStagedSync(ctx context.Context,
 	protocol syncProtocol,
 	config Config,
 	logger zerolog.Logger,
+	logProgress bool,
+	c *consensus.Consensus,
 ) (*StagedStreamSync, error) {
-
 	logger.Info().
 		Uint32("shard", bc.ShardID()).
 		Bool("beaconNode", isBeaconNode).
@@ -56,7 +57,6 @@ func CreateStagedSync(ctx context.Context,
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
 		Msg(WrapStagedSyncMsg("creating staged sync"))
-
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
 	if config.UseMemDB {
@@ -82,7 +82,7 @@ func CreateStagedSync(ctx context.Context,
 	}
 
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
-	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
+	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB, c)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
 	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)

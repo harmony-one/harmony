@@ -149,6 +149,10 @@ type Node struct {
 	registry *registry.Registry
 }
 
+func (node *Node) Host() p2p.Host {
+	return node.host
+}
+
 // Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() core.BlockChain {
 	return node.registry.GetBlockchain()

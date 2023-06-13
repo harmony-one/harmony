@@ -109,14 +109,6 @@ type BlockChain interface {
 	// but does not write any state. This is used to construct competing side forks
 	// up to the point where they exceed the canonical total difficulty.
 	WriteBlockWithoutState(block *types.Block, td *big.Int) (err error)
-	// WriteBlockWithState writes the block and all associated state to the database.
-	WriteBlockWithState(
-		block *types.Block, receipts []*types.Receipt,
-		cxReceipts []*types.CXReceipt,
-		stakeMsgs []types2.StakeMsg,
-		paid reward.Reader,
-		state *state.DB,
-	) (status WriteStatus, err error)
 	// GetMaxGarbageCollectedBlockNumber ..
 	GetMaxGarbageCollectedBlockNumber() int64
 	// InsertChain attempts to insert the given batch of blocks in to the canonical

@@ -404,16 +404,21 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 }
 
 // BootstrapConsensus is a goroutine to check number of peers and start the consensus
-func (node *Node) BootstrapConsensus() error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+func BootstrapConsensus(ctx context.Context, consensus *consensus.Consensus, host p2p.Host) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
-	min := node.Consensus.MinPeers
+	min := consensus.MinPeers
 	enoughMinPeers := make(chan struct{})
 	const checkEvery = 3 * time.Second
 	go func() {
 		for {
-			<-time.After(checkEvery)
-			numPeersNow := node.host.GetPeerCount()
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(checkEvery):
+			}
+
+			numPeersNow := host.GetPeerCount()
 			if numPeersNow >= min {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				enoughMinPeers <- struct{}{}
@@ -432,9 +437,7 @@ func (node *Node) BootstrapConsensus() error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-enoughMinPeers:
-		go func() {
-			node.Consensus.StartChannel()
-		}()
+		go consensus.StartChannel()
 		return nil
 	}
 }

@@ -1473,7 +1473,8 @@ func (bc *BlockChainImpl) WriteBlockWithoutState(block *types.Block, td *big.Int
 	return nil
 }
 
-func (bc *BlockChainImpl) WriteBlockWithState(
+// writeBlockWithState writes the block and all associated state to the database.
+func (bc *BlockChainImpl) writeBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
 	stakeMsgs []staking.StakeMsg,
@@ -1880,7 +1881,7 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 
 		// Write the block to the chain and get the status.
 		substart = time.Now()
-		status, err := bc.WriteBlockWithState(
+		status, err := bc.writeBlockWithState(
 			block, receipts, cxReceipts, stakeMsgs, payout, state,
 		)
 		if err != nil {
