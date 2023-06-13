@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -45,10 +46,9 @@ func CreateStagedSync(ctx context.Context,
 	config Config,
 	logger zerolog.Logger,
 	logProgress bool,
+	c *consensus.Consensus,
 ) (*StagedStreamSync, error) {
-
 	isBeacon := bc.ShardID() == shard.BeaconChainShardID
-
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
 	if UseMemDB {
@@ -69,7 +69,7 @@ func CreateStagedSync(ctx context.Context,
 	}
 
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
-	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
+	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB, c)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
 	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeacon, logProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, logProgress)
