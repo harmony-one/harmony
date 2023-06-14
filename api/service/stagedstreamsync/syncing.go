@@ -176,6 +176,9 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		return 0, err
 	}
 
+	s.startSyncing()
+	defer s.finishSyncing()
+
 	var estimatedHeight uint64
 	if initSync {
 		if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
@@ -191,8 +194,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			return 0, nil
 		}
 
-		s.startSyncing()
-		defer s.finishSyncing()
 	}
 
 	i := 0
