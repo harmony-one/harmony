@@ -246,7 +246,9 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	s.startSyncing()
 	defer s.finishSyncing()
 
+	i := 0
 	for {
+		i++
 		ctx, cancel := context.WithCancel(downloaderContext)
 		started := s.bc.CurrentHeader().NumberU64()
 		n, err := s.doSyncCycle(ctx, initSync)
@@ -255,6 +257,8 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			Uint64("from", started).
 			Int("returned", n).
 			Uint64("to", finished).
+			Bool("initSync", initSync).
+			Int("cycle", i).
 			Msg(WrapStagedSyncMsg("synced blocks"))
 		if err != nil {
 			utils.Logger().Error().
