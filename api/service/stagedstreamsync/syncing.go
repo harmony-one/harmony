@@ -379,6 +379,9 @@ func (s *StagedStreamSync) finishSyncing() {
 	if s.evtDownloadFinishedSubscribed {
 		s.evtDownloadFinished.Send(struct{}{})
 	}
+	utils.Logger().Info().
+		Bool("evtDownloadFinishedSubscribed", s.evtDownloadFinishedSubscribed).
+		Msg(WrapStagedSyncMsg("finished syncing"))
 }
 
 func (s *StagedStreamSync) checkPrerequisites() error {
