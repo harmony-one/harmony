@@ -323,8 +323,12 @@ func (bc *fakeBlockChain) CurrentHeader() *block.Header {
 func (bc *fakeBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block    { return nil }
 func (bc *fakeBlockChain) GetHeader(hash common.Hash, number uint64) *block.Header  { return nil }
 func (bc *fakeBlockChain) GetHeaderByHash(hash common.Hash) *block.Header           { return nil }
+func (bc *fakeBlockChain) GetReceiptsByHash(hash common.Hash) types.Receipts        { return nil }
+func (bc *fakeBlockChain) ContractCode(hash common.Hash) ([]byte, error)            { return []byte{}, nil }
+func (bc *fakeBlockChain) ValidatorCode(hash common.Hash) ([]byte, error)           { return []byte{}, nil }
 func (bc *fakeBlockChain) ShardID() uint32                                          { return 0 }
 func (bc *fakeBlockChain) ReadShardState(epoch *big.Int) (*shard.State, error)      { return nil, nil }
+func (bc *fakeBlockChain) TrieNode(hash common.Hash) ([]byte, error)                { return []byte{}, nil }
 func (bc *fakeBlockChain) WriteCommitSig(blockNum uint64, lastCommits []byte) error { return nil }
 func (bc *fakeBlockChain) GetHeaderByNumber(number uint64) *block.Header            { return nil }
 func (bc *fakeBlockChain) ReadValidatorList() ([]common.Address, error)             { return nil, nil }

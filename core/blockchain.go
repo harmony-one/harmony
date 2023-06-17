@@ -80,6 +80,21 @@ type BlockChain interface {
 	GetBlockByNumber(number uint64) *types.Block
 	// GetReceiptsByHash retrieves the receipts for all transactions in a given block.
 	GetReceiptsByHash(hash common.Hash) types.Receipts
+	// TrieNode retrieves a blob of data associated with a trie node
+	// either from ephemeral in-memory cache, or from persistent storage.
+	TrieNode(hash common.Hash) ([]byte, error)
+	// ContractCode retrieves a blob of data associated with a contract
+	// hash either from ephemeral in-memory cache, or from persistent storage.
+	//
+	// If the code doesn't exist in the in-memory cache, check the storage with
+	// new code scheme.
+	ContractCode(hash common.Hash) ([]byte, error)
+	// ValidatorCode retrieves a blob of data associated with a validator
+	// hash either from ephemeral in-memory cache, or from persistent storage.
+	//
+	// If the code doesn't exist in the in-memory cache, check the storage with
+	// new code scheme.
+	ValidatorCode(hash common.Hash) ([]byte, error)
 	// Stop stops the blockchain service. If any imports are currently in progress
 	// it will abort them using the procInterrupt.
 	Stop()

@@ -15,6 +15,34 @@ import (
 	"github.com/pkg/errors"
 )
 
+// FetchNodeData do fetch node data through sync stream protocol.
+// Return the state node data as result, and error
+func (p *Protocol) FetchNodeData(ctx context.Context, hashes []common.Hash, opts ...Option) (data [][]byte, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("fetchNodeData")
+	defer p.doMetricPostClientRequest("fetchNodeData", err, timer)
+
+	if len(hashes) == 0 {
+		err = fmt.Errorf("zero hashes array requested")
+		return
+	}
+	if len(hashes) > GetNodeDataCap {
+		err = fmt.Errorf("number of node data hashes cap of %v", GetNodeDataCap)
+		return
+	}
+
+	req := newGetNodeDataRequest(hashes)
+	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
+	if err != nil {
+		// At this point, error can be context canceled, context timed out, or waiting queue
+		// is already full.
+		return
+	}
+
+	// Parse and return blocks
+	data, err = req.getNodeDataResponse(resp)
+	return
+}
+
 // GetBlocksByNumber do getBlocksByNumberRequest through sync stream protocol.
 // Return the block as result, target stream id, and error
 func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...Option) (blocks []*types.Block, stid sttypes.StreamID, err error) {
@@ -386,4 +414,132 @@ func (req *getBlocksByHashesRequest) getBlocksFromResponse(resp sttypes.Response
 		blocks = append(blocks, block)
 	}
 	return blocks, nil
+}
+
+// getNodeDataRequest is the request for get node data which implements
+// sttypes.Request interface
+type getNodeDataRequest struct {
+	hashes []common.Hash
+	pbReq  *syncpb.Request
+}
+
+func newGetNodeDataRequest(hashes []common.Hash) *getNodeDataRequest {
+	pbReq := syncpb.MakeGetNodeDataRequest(hashes)
+	return &getNodeDataRequest{
+		hashes: hashes,
+		pbReq:  pbReq,
+	}
+}
+
+func (req *getNodeDataRequest) ReqID() uint64 {
+	return req.pbReq.GetReqId()
+}
+
+func (req *getNodeDataRequest) SetReqID(val uint64) {
+	req.pbReq.ReqId = val
+}
+
+func (req *getNodeDataRequest) String() string {
+	ss := make([]string, 0, len(req.hashes))
+	for _, h := range req.hashes {
+		ss = append(ss, h.String())
+	}
+	hsStr := strings.Join(ss, ",")
+	return fmt.Sprintf("REQUEST [GetNodeData: %s]", hsStr)
+}
+
+func (req *getNodeDataRequest) IsSupportedByProto(target sttypes.ProtoSpec) bool {
+	return target.Version.GreaterThanOrEqual(MinVersion)
+}
+
+func (req *getNodeDataRequest) Encode() ([]byte, error) {
+	msg := syncpb.MakeMessageFromRequest(req.pbReq)
+	return protobuf.Marshal(msg)
+}
+
+func (req *getNodeDataRequest) getNodeDataResponse(resp sttypes.Response) ([][]byte, error) {
+	sResp, ok := resp.(*syncResponse)
+	if !ok || sResp == nil {
+		return nil, errors.New("not sync response for node data")
+	}
+	dataBytes, err := req.parseNodeDataBytes(sResp)
+	if err != nil {
+		return nil, err
+	}
+	return dataBytes, nil
+}
+
+func (req *getNodeDataRequest) parseNodeDataBytes(resp *syncResponse) ([][]byte, error) {
+	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
+		return nil, errors.New(errResp.Error)
+	}
+	gbResp := resp.pb.GetGetNodeDataResponse()
+	if gbResp == nil {
+		return nil, errors.New("The response is not for GetNodeData")
+	}
+	return gbResp.DataBytes, nil
+}
+
+// getReceiptsRequest is the request for get receipts which implements
+// sttypes.Request interface
+type getReceiptsRequest struct {
+	hashes []common.Hash
+	pbReq  *syncpb.Request
+}
+
+func newGetReceiptsRequest(hashes []common.Hash) *getReceiptsRequest {
+	pbReq := syncpb.MakeGetReceiptsRequest(hashes)
+	return &getReceiptsRequest{
+		hashes: hashes,
+		pbReq:  pbReq,
+	}
+}
+
+func (req *getReceiptsRequest) ReqID() uint64 {
+	return req.pbReq.GetReqId()
+}
+
+func (req *getReceiptsRequest) SetReqID(val uint64) {
+	req.pbReq.ReqId = val
+}
+
+func (req *getReceiptsRequest) String() string {
+	ss := make([]string, 0, len(req.hashes))
+	for _, h := range req.hashes {
+		ss = append(ss, h.String())
+	}
+	hsStr := strings.Join(ss, ",")
+	return fmt.Sprintf("REQUEST [GetReceipts: %s]", hsStr)
+}
+
+func (req *getReceiptsRequest) IsSupportedByProto(target sttypes.ProtoSpec) bool {
+	return target.Version.GreaterThanOrEqual(MinVersion)
+}
+
+func (req *getReceiptsRequest) Encode() ([]byte, error) {
+	msg := syncpb.MakeMessageFromRequest(req.pbReq)
+	return protobuf.Marshal(msg)
+}
+
+func (req *getReceiptsRequest) getReceiptsResponse(resp sttypes.Response) ([][]byte, error) {
+	sResp, ok := resp.(*syncResponse)
+	if !ok || sResp == nil {
+		return nil, errors.New("not sync response for receipts")
+	}
+	receiptsBytes, err := req.parseGetReceiptsBytes(sResp)
+	if err != nil {
+		return nil, err
+	}
+	return receiptsBytes, nil
+}
+
+func (req *getReceiptsRequest) parseGetReceiptsBytes(resp *syncResponse) ([][]byte, error) {
+	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
+		return nil, errors.New(errResp.Error)
+	}
+	gbResp := resp.pb.GetGetReceiptsResponse()
+	if gbResp == nil {
+		return nil, errors.New("The response is not for GetReceipts")
+	}
+	return gbResp.ReceiptsBytes, nil
 }

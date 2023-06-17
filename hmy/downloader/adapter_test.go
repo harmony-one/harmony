@@ -88,12 +88,16 @@ func (bc *testBlockChain) changeBlockNumber(val uint64) {
 
 func (bc *testBlockChain) ShardID() uint32                                          { return 0 }
 func (bc *testBlockChain) ReadShardState(epoch *big.Int) (*shard.State, error)      { return nil, nil }
+func (bc *testBlockChain) TrieNode(hash common.Hash) ([]byte, error)                { return []byte{}, nil }
 func (bc *testBlockChain) Config() *params.ChainConfig                              { return nil }
 func (bc *testBlockChain) WriteCommitSig(blockNum uint64, lastCommits []byte) error { return nil }
 func (bc *testBlockChain) GetHeader(hash common.Hash, number uint64) *block.Header  { return nil }
 func (bc *testBlockChain) GetHeaderByNumber(number uint64) *block.Header            { return nil }
 func (bc *testBlockChain) GetHeaderByHash(hash common.Hash) *block.Header           { return nil }
 func (bc *testBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block    { return nil }
+func (bc *testBlockChain) GetReceiptsByHash(hash common.Hash) types.Receipts        { return nil }
+func (bc *testBlockChain) ContractCode(hash common.Hash) ([]byte, error)            { return []byte{}, nil }
+func (bc *testBlockChain) ValidatorCode(hash common.Hash) ([]byte, error)           { return []byte{}, nil }
 func (bc *testBlockChain) ReadValidatorList() ([]common.Address, error)             { return nil, nil }
 func (bc *testBlockChain) ReadCommitSig(blockNum uint64) ([]byte, error)            { return nil, nil }
 func (bc *testBlockChain) ReadBlockRewardAccumulator(uint64) (*big.Int, error)      { return nil, nil }

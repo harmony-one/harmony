@@ -46,6 +46,21 @@ func (tch *testChainHelper) getBlocksByHashes(hs []common.Hash) ([]*types.Block,
 	return bs, nil
 }
 
+func (tch *testChainHelper) getNodeData(hs []common.Hash) ([][]byte, error) {
+	data := makeTestNodeData(len(hs))
+	return data, nil
+}
+
+func (tch *testChainHelper) getReceipts(hs []common.Hash) ([][]byte, error) {
+	testReceipts := makeTestReceipts(len(hs), 3)
+	receipts := make([][]byte, 0, len(hs)*3)
+	for _, r := range testReceipts {
+		receiptByes, _ := rlp.EncodeToBytes(r)
+		receipts = append(receipts, receiptByes)
+	}
+	return receipts, nil
+}
+
 func numberToHash(bn uint64) common.Hash {
 	var h common.Hash
 	binary.LittleEndian.PutUint64(h[:], bn)
@@ -88,6 +103,32 @@ func makeTestBlock(bn uint64) *types.Block {
 	header := testHeader.Copy()
 	header.SetNumber(big.NewInt(int64(bn)))
 	return types.NewBlockWithHeader(&block.Header{Header: header})
+}
+
+// makeTestReceipts creates fake node data
+func makeTestNodeData(n int) [][]byte {
+	testData := make([][]byte, n)
+	for i := 0; i < n; i++ {
+		testData[i] = types.EmptyRootHash.Bytes()
+	}
+	return testData
+}
+
+// makeTestReceipts creates fake receipts
+func makeTestReceipts(n int, nPerBlock int) []types.Receipts {
+	receipts := make([]*types.Receipt, nPerBlock)
+	for i := 0; i < nPerBlock; i++ {
+		receipts[i] = &types.Receipt{
+			Status:            types.ReceiptStatusSuccessful,
+			CumulativeGasUsed: 0x888888888,
+			Logs:              make([]*types.Log, 5),
+		}
+	}
+	allReceipts := make([]types.Receipts, n)
+	for i := 0; i < n; i++ {
+		allReceipts[i] = receipts
+	}
+	return allReceipts
 }
 
 func decodeBlocksBytes(bbs [][]byte) ([]*types.Block, error) {

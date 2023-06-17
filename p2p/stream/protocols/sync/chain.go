@@ -2,10 +2,12 @@ package sync
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/keylocker"
 	"github.com/pkg/errors"
 )
@@ -16,6 +18,8 @@ type chainHelper interface {
 	getBlockHashes(bns []uint64) []common.Hash
 	getBlocksByNumber(bns []uint64) ([]*types.Block, error)
 	getBlocksByHashes(hs []common.Hash) ([]*types.Block, error)
+	getNodeData(hs []common.Hash) ([][]byte, error)
+	getReceipts(hs []common.Hash) ([][]byte, error)
 }
 
 type chainHelperImpl struct {
@@ -138,4 +142,53 @@ func (ch *chainHelperImpl) getBlockSigFromNextBlock(header *block.Header) []byte
 
 func (ch *chainHelperImpl) getBlockSigFromDB(header *block.Header) ([]byte, error) {
 	return ch.chain.ReadCommitSig(header.Number().Uint64())
+}
+
+// getNodeData assembles the response to a node data query.
+func (ch *chainHelperImpl) getNodeData(hs []common.Hash) ([][]byte, error) {
+	var (
+		bytes int
+		nodes [][]byte
+	)
+	for _, hash := range hs {
+		// Retrieve the requested state entry
+		entry, err := ch.chain.TrieNode(hash)
+		if len(entry) == 0 || err != nil {
+			// Read the contract/validator code with prefix only to save unnecessary lookups.
+			entry, err = ch.chain.ContractCode(hash)
+			if len(entry) == 0 || err != nil {
+				entry, err = ch.chain.ValidatorCode(hash)
+			}
+		}
+		if err == nil && len(entry) > 0 {
+			nodes = append(nodes, entry)
+			bytes += len(entry)
+		}
+	}
+	return nodes, nil
+}
+
+// getReceipts assembles the response to a receipt query.
+func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([][]byte, error) {
+	var (
+		bytes    int
+		receipts [][]byte
+	)
+	for _, hash := range hs {
+		// Retrieve the requested block's receipts
+		results := ch.chain.GetReceiptsByHash(hash)
+		if results == nil {
+			if header := ch.chain.GetHeaderByHash(hash); header == nil || header.ReceiptHash() != types.EmptyRootHash {
+				continue
+			}
+		}
+		// If known, encode and queue for response packet
+		if encoded, err := rlp.EncodeToBytes(results); err != nil {
+			utils.Logger().Err(err).Msg("Failed to encode receipt")
+		} else {
+			receipts = append(receipts, encoded)
+			bytes += len(encoded)
+		}
+	}
+	return receipts, nil
 }
