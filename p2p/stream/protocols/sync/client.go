@@ -135,7 +135,8 @@ func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts
 	return
 }
 
-// GetReceipts do getBlocksByHashesRequest through sync stream protocol.
+// GetReceipts do getReceiptsRequest through sync stream protocol.
+// Return the receipts as result, target stream id, and error
 func (p *Protocol) GetReceipts(ctx context.Context, hs []common.Hash, opts ...Option) (receipts []*types.Receipt, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getReceipts")
 	defer p.doMetricPostClientRequest("getReceipts", err, timer)
@@ -158,7 +159,7 @@ func (p *Protocol) GetReceipts(ctx context.Context, hs []common.Hash, opts ...Op
 }
 
 // GetNodeData do getNodeData through sync stream protocol.
-// Return the state node data as result, and error
+// Return the state node data as result, target stream id, and error
 func (p *Protocol) GetNodeData(ctx context.Context, hs []common.Hash, opts ...Option) (data [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getNodeData")
 	defer p.doMetricPostClientRequest("getNodeData", err, timer)
