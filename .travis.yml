@@ -1,5 +1,5 @@
 os: linux
-dist: bionic
+dist: jammy
 language: go
 go:
   - 1.19.5
