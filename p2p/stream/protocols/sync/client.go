@@ -15,34 +15,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// FetchNodeData do fetch node data through sync stream protocol.
-// Return the state node data as result, and error
-func (p *Protocol) FetchNodeData(ctx context.Context, hashes []common.Hash, opts ...Option) (data [][]byte, stid sttypes.StreamID, err error) {
-	timer := p.doMetricClientRequest("fetchNodeData")
-	defer p.doMetricPostClientRequest("fetchNodeData", err, timer)
-
-	if len(hashes) == 0 {
-		err = fmt.Errorf("zero hashes array requested")
-		return
-	}
-	if len(hashes) > GetNodeDataCap {
-		err = fmt.Errorf("number of node data hashes cap of %v", GetNodeDataCap)
-		return
-	}
-
-	req := newGetNodeDataRequest(hashes)
-	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
-	if err != nil {
-		// At this point, error can be context canceled, context timed out, or waiting queue
-		// is already full.
-		return
-	}
-
-	// Parse and return blocks
-	data, err = req.getNodeDataResponse(resp)
-	return
-}
-
 // GetBlocksByNumber do getBlocksByNumberRequest through sync stream protocol.
 // Return the block as result, target stream id, and error
 func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...Option) (blocks []*types.Block, stid sttypes.StreamID, err error) {
@@ -160,6 +132,51 @@ func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts
 		return
 	}
 	blocks, err = req.getBlocksFromResponse(resp)
+	return
+}
+
+// GetReceipts do getBlocksByHashesRequest through sync stream protocol.
+func (p *Protocol) GetReceipts(ctx context.Context, hs []common.Hash, opts ...Option) (receipts []*types.Receipt, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getReceipts")
+	defer p.doMetricPostClientRequest("getReceipts", err, timer)
+
+	if len(hs) == 0 {
+		err = fmt.Errorf("zero receipt hashes requested")
+		return
+	}
+	if len(hs) > GetReceiptsCap {
+		err = fmt.Errorf("number of requested hashes exceed limit")
+		return
+	}
+	req := newGetReceiptsRequest(hs)
+	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
+	if err != nil {
+		return
+	}
+	receipts, err = req.getReceiptsFromResponse(resp)
+	return
+}
+
+// GetNodeData do getNodeData through sync stream protocol.
+// Return the state node data as result, and error
+func (p *Protocol) GetNodeData(ctx context.Context, hs []common.Hash, opts ...Option) (data [][]byte, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getNodeData")
+	defer p.doMetricPostClientRequest("getNodeData", err, timer)
+
+	if len(hs) == 0 {
+		err = fmt.Errorf("zero node data hashes requested")
+		return
+	}
+	if len(hs) > GetNodeDataCap {
+		err = fmt.Errorf("number of requested hashes exceed limit")
+		return
+	}
+	req := newGetNodeDataRequest(hs)
+	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
+	if err != nil {
+		return
+	}
+	data, err = req.getNodeDataFromResponse(resp)
 	return
 }
 
@@ -457,10 +474,10 @@ func (req *getNodeDataRequest) Encode() ([]byte, error) {
 	return protobuf.Marshal(msg)
 }
 
-func (req *getNodeDataRequest) getNodeDataResponse(resp sttypes.Response) ([][]byte, error) {
+func (req *getNodeDataRequest) getNodeDataFromResponse(resp sttypes.Response) ([][]byte, error) {
 	sResp, ok := resp.(*syncResponse)
 	if !ok || sResp == nil {
-		return nil, errors.New("not sync response for node data")
+		return nil, errors.New("not sync response")
 	}
 	dataBytes, err := req.parseNodeDataBytes(sResp)
 	if err != nil {
@@ -473,11 +490,11 @@ func (req *getNodeDataRequest) parseNodeDataBytes(resp *syncResponse) ([][]byte,
 	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
 		return nil, errors.New(errResp.Error)
 	}
-	gbResp := resp.pb.GetGetNodeDataResponse()
-	if gbResp == nil {
-		return nil, errors.New("The response is not for GetNodeData")
+	ndResp := resp.pb.GetGetNodeDataResponse()
+	if ndResp == nil {
+		return nil, errors.New("response not GetNodeData")
 	}
-	return gbResp.DataBytes, nil
+	return ndResp.DataBytes, nil
 }
 
 // getReceiptsRequest is the request for get receipts which implements
@@ -521,25 +538,33 @@ func (req *getReceiptsRequest) Encode() ([]byte, error) {
 	return protobuf.Marshal(msg)
 }
 
-func (req *getReceiptsRequest) getReceiptsResponse(resp sttypes.Response) ([][]byte, error) {
+func (req *getReceiptsRequest) getReceiptsFromResponse(resp sttypes.Response) ([]*types.Receipt, error) {
 	sResp, ok := resp.(*syncResponse)
 	if !ok || sResp == nil {
-		return nil, errors.New("not sync response for receipts")
+		return nil, errors.New("not sync response")
 	}
-	receiptsBytes, err := req.parseGetReceiptsBytes(sResp)
+	receipts, err := req.parseGetReceiptsBytes(sResp)
 	if err != nil {
 		return nil, err
 	}
-	return receiptsBytes, nil
+	return receipts, nil
 }
 
-func (req *getReceiptsRequest) parseGetReceiptsBytes(resp *syncResponse) ([][]byte, error) {
+func (req *getReceiptsRequest) parseGetReceiptsBytes(resp *syncResponse) ([]*types.Receipt, error) {
 	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
 		return nil, errors.New(errResp.Error)
 	}
-	gbResp := resp.pb.GetGetReceiptsResponse()
-	if gbResp == nil {
-		return nil, errors.New("The response is not for GetReceipts")
+	grResp := resp.pb.GetGetReceiptsResponse()
+	if grResp == nil {
+		return nil, errors.New("response not GetReceipts")
 	}
-	return gbResp.ReceiptsBytes, nil
+	receipts := make([]*types.Receipt, 0, len(grResp.ReceiptsBytes))
+	for _, rcptBytes := range grResp.ReceiptsBytes {
+		var receipt *types.Receipt
+		if err := rlp.DecodeBytes(rcptBytes, &receipt); err != nil {
+			return nil, errors.Wrap(err, "[GetReceiptsResponse]")
+		}
+		receipts = append(receipts, receipt)
+	}
+	return receipts, nil
 }
