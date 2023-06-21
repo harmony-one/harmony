@@ -30,7 +30,7 @@ func (finish *StageFinish) Exec(ctx context.Context, firstCycle bool, invalidBlo
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = finish.configs.db.BeginRw(ctx)
+		tx, err = finish.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func (finish *StageFinish) clearBucket(ctx context.Context, tx kv.RwTx, isBeacon
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = finish.configs.db.BeginRw(ctx)
+		tx, err = finish.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}

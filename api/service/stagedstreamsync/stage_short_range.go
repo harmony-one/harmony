@@ -152,7 +152,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 func (sr *StageShortRange) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = sr.configs.db.BeginRw(ctx)
+		tx, err = sr.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}
@@ -174,7 +174,7 @@ func (sr *StageShortRange) Revert(ctx context.Context, firstCycle bool, u *Rever
 func (sr *StageShortRange) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = sr.configs.db.BeginRw(ctx)
+		tx, err = sr.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}

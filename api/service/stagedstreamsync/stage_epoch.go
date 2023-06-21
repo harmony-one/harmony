@@ -153,7 +153,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 func (sr *StageEpoch) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = sr.configs.db.BeginRw(ctx)
+		tx, err = sr.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}
@@ -175,7 +175,7 @@ func (sr *StageEpoch) Revert(ctx context.Context, firstCycle bool, u *RevertStat
 func (sr *StageEpoch) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = sr.configs.db.BeginRw(ctx)
+		tx, err = sr.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}

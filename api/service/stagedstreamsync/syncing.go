@@ -232,7 +232,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context, initSync bool) (int,
 	var tx kv.RwTx
 	if canRunCycleInOneTransaction {
 		var err error
-		if tx, err = s.DB().BeginRw(ctx); err != nil {
+		if tx, err = s.DB().BeginRw(context.Background()); err != nil {
 			return totalInserted, err
 		}
 		defer tx.Rollback()
