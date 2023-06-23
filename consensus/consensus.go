@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/registry"
@@ -139,6 +140,12 @@ func (consensus *Consensus) Blockchain() core.BlockChain {
 	return consensus.registry.GetBlockchain()
 }
 
+// ChainReader returns the chain reader.
+// This is mostly the same as Blockchain, but it returns only read methods, so we assume it's safe for concurrent use.
+func (consensus *Consensus) ChainReader() engine.ChainReader {
+	return consensus.Blockchain()
+}
+
 func (consensus *Consensus) ReadySignal(p ProposalType) {
 	consensus.readySignal <- p
 }
@@ -147,12 +154,13 @@ func (consensus *Consensus) GetReadySignal() chan ProposalType {
 	return consensus.readySignal
 }
 
-func (consensus *Consensus) CommitSigChannel() chan []byte {
+func (consensus *Consensus) GetCommitSigChannel() chan []byte {
 	return consensus.commitSigChannel
 }
 
-func (consensus *Consensus) GetCommitSigChannel() chan []byte {
-	return consensus.commitSigChannel
+// Beaconchain returns the beaconchain.
+func (consensus *Consensus) Beaconchain() core.BlockChain {
+	return consensus.registry.GetBeaconchain()
 }
 
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks.
@@ -176,6 +184,8 @@ func (consensus *Consensus) BlocksSynchronized() {
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
 func (consensus *Consensus) BlocksNotSynchronized() {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.syncNotReadyChan()
 }
 
@@ -232,14 +242,6 @@ func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 	return consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
-// SetBlockVerifier sets the block verifier
-func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	consensus.BlockVerifier = verifier
-	consensus.vc.SetVerifyBlock(consensus.verifyBlock)
-}
-
 func (consensus *Consensus) IsBackup() bool {
 	return consensus.isBackup
 }
@@ -288,7 +290,6 @@ func New(
 	// the blockchain during initialization as it was
 	// displayed on explorer as Height right now
 	consensus.SetCurBlockViewID(0)
-	consensus.ShardID = shard
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.readySignal = make(chan ProposalType)
 	consensus.commitSigChannel = make(chan []byte)
@@ -297,10 +298,22 @@ func New(
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	// Make Sure Verifier is not null
 	consensus.vc = newViewChange()
+	// TODO: reference to blockchain/beaconchain should be removed.
+	verifier := VerifyNewBlock(registry.GetWebHooks(), consensus.Blockchain(), consensus.Beaconchain())
+	consensus.BlockVerifier = verifier
+	consensus.vc.verifyBlock = consensus.verifyBlock
 
 	// init prometheus metrics
 	initMetrics()
 	consensus.AddPubkeyMetrics()
 
 	return &consensus, nil
+}
+
+func (consensus *Consensus) GetHost() p2p.Host {
+	return consensus.host
+}
+
+func (consensus *Consensus) Registry() *registry.Registry {
+	return consensus.registry
 }

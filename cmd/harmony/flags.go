@@ -249,6 +249,16 @@ var (
 		cacheSizeFlag,
 	}
 
+	gpoFlags = []cli.Flag{
+		gpoBlocksFlag,
+		gpoTransactionsFlag,
+		gpoPercentileFlag,
+		gpoDefaultPriceFlag,
+		gpoMaxPriceFlag,
+		gpoLowUsageThresholdFlag,
+		gpoBlockGasLimitFlag,
+	}
+
 	metricsFlags = []cli.Flag{
 		metricsETHFlag,
 		metricsExpensiveETHFlag,
@@ -364,6 +374,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
 	flags = append(flags, shardDataFlags...)
+	flags = append(flags, gpoFlags...)
 	flags = append(flags, metricsFlags...)
 
 	return flags
@@ -1932,6 +1943,45 @@ var (
 	}
 )
 
+// gas price oracle flags
+var (
+	gpoBlocksFlag = cli.IntFlag{
+		Name:     "gpo.blocks",
+		Usage:    "Number of recent blocks to check for gas prices",
+		DefValue: defaultConfig.GPO.Blocks,
+	}
+	gpoTransactionsFlag = cli.IntFlag{
+		Name:     "gpo.transactions",
+		Usage:    "Number of transactions to sample in a block",
+		DefValue: defaultConfig.GPO.Transactions,
+	}
+	gpoPercentileFlag = cli.IntFlag{
+		Name:     "gpo.percentile",
+		Usage:    "Suggested gas price is the given percentile of a set of recent transaction gas prices",
+		DefValue: defaultConfig.GPO.Percentile,
+	}
+	gpoDefaultPriceFlag = cli.Int64Flag{
+		Name:     "gpo.defaultprice",
+		Usage:    "The gas price to suggest before data is available, and the price to suggest when block utilization is low",
+		DefValue: defaultConfig.GPO.DefaultPrice,
+	}
+	gpoMaxPriceFlag = cli.Int64Flag{
+		Name:     "gpo.maxprice",
+		Usage:    "Maximum gasprice to be recommended by gpo",
+		DefValue: defaultConfig.GPO.MaxPrice,
+	}
+	gpoLowUsageThresholdFlag = cli.IntFlag{
+		Name:     "gpo.low-usage-threshold",
+		Usage:    "The block usage threshold below which the default gas price is suggested (0 to disable)",
+		DefValue: defaultConfig.GPO.LowUsageThreshold,
+	}
+	gpoBlockGasLimitFlag = cli.IntFlag{
+		Name:     "gpo.block-gas-limit",
+		Usage:    "The gas limit, per block. If set to 0, it is pulled from the block header",
+		DefValue: defaultConfig.GPO.BlockGasLimit,
+	}
+)
+
 // metrics flags required for the go-eth library
 // https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L35-L55
 var (
@@ -1963,5 +2013,29 @@ func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, cacheSizeFlag) {
 		cfg.ShardData.CacheSize = cli.GetIntFlagValue(cmd, cacheSizeFlag)
+	}
+}
+
+func applyGPOFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, gpoBlocksFlag) {
+		cfg.GPO.Blocks = cli.GetIntFlagValue(cmd, gpoBlocksFlag)
+	}
+	if cli.IsFlagChanged(cmd, gpoTransactionsFlag) {
+		cfg.GPO.Transactions = cli.GetIntFlagValue(cmd, gpoTransactionsFlag)
+	}
+	if cli.IsFlagChanged(cmd, gpoPercentileFlag) {
+		cfg.GPO.Percentile = cli.GetIntFlagValue(cmd, gpoPercentileFlag)
+	}
+	if cli.IsFlagChanged(cmd, gpoDefaultPriceFlag) {
+		cfg.GPO.DefaultPrice = cli.GetInt64FlagValue(cmd, gpoDefaultPriceFlag)
+	}
+	if cli.IsFlagChanged(cmd, gpoMaxPriceFlag) {
+		cfg.GPO.MaxPrice = cli.GetInt64FlagValue(cmd, gpoMaxPriceFlag)
+	}
+	if cli.IsFlagChanged(cmd, gpoLowUsageThresholdFlag) {
+		cfg.GPO.LowUsageThreshold = cli.GetIntFlagValue(cmd, gpoLowUsageThresholdFlag)
+	}
+	if cli.IsFlagChanged(cmd, gpoBlockGasLimitFlag) {
+		cfg.GPO.BlockGasLimit = cli.GetIntFlagValue(cmd, gpoBlockGasLimitFlag)
 	}
 }

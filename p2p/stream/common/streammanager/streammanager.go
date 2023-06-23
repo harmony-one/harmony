@@ -299,7 +299,7 @@ func (sm *streamManager) removeAllStreamOnClose() {
 	wg.Wait()
 
 	// Be nice. after close, the field is still accessible to prevent potential panics
-	sm.streams = newStreamSet()
+	sm.streams.Erase()
 }
 
 func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, error) {
@@ -401,6 +401,14 @@ func newStreamSet() *streamSet {
 		streams:    make(map[sttypes.StreamID]sttypes.Stream),
 		numByProto: make(map[sttypes.ProtoSpec]int),
 	}
+}
+
+func (ss *streamSet) Erase() {
+	ss.lock.Lock()
+	defer ss.lock.Unlock()
+
+	ss.streams = make(map[sttypes.StreamID]sttypes.Stream)
+	ss.numByProto = make(map[sttypes.ProtoSpec]int)
 }
 
 func (ss *streamSet) size() int {

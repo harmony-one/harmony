@@ -206,7 +206,8 @@ func New(config Config, diskdb ethdb.KeyValueStore, triedb *trie.Database, root 
 		utils.Logger().Warn().Err(err).Msg("Snapshot maintenance disabled (syncing)")
 		return snap, nil
 	}
-	// Create the building waiter iff the background generation is allowed
+
+	// Create the building waiter if the background generation is allowed
 	if !config.NoBuild && !config.AsyncBuild {
 		defer snap.waitBuild()
 	}

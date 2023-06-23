@@ -300,7 +300,7 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 
 // UpdateCurrent updates the current environment with the current state and header.
 func (w *Worker) UpdateCurrent() error {
-	parent := w.chain.CurrentBlock()
+	parent := w.chain.CurrentHeader()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
 
@@ -321,7 +321,7 @@ func (w *Worker) GetCurrentHeader() *block.Header {
 }
 
 // makeCurrent creates a new environment for the current cycle.
-func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
+func (w *Worker) makeCurrent(parent *block.Header, header *block.Header) error {
 	state, err := w.chain.StateAt(parent.Root())
 	if err != nil {
 		return err
@@ -586,7 +586,7 @@ func New(
 	worker.gasFloor = 80000000
 	worker.gasCeil = 120000000
 
-	parent := worker.chain.CurrentBlock()
+	parent := worker.chain.CurrentBlock().Header()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
 

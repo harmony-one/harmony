@@ -147,7 +147,7 @@ func (log *FBFTLog) GetBlocksByNumber(number uint64) []*types.Block {
 }
 
 // DeleteBlocksLessThan deletes blocks less than given block number
-func (log *FBFTLog) DeleteBlocksLessThan(number uint64) {
+func (log *FBFTLog) deleteBlocksLessThan(number uint64) {
 	for h, block := range log.blocks {
 		if block.NumberU64() < number {
 			delete(log.blocks, h)
@@ -157,7 +157,7 @@ func (log *FBFTLog) DeleteBlocksLessThan(number uint64) {
 }
 
 // DeleteBlockByNumber deletes block of specific number
-func (log *FBFTLog) DeleteBlockByNumber(number uint64) {
+func (log *FBFTLog) deleteBlockByNumber(number uint64) {
 	for h, block := range log.blocks {
 		if block.NumberU64() == number {
 			delete(log.blocks, h)
@@ -167,7 +167,7 @@ func (log *FBFTLog) DeleteBlockByNumber(number uint64) {
 }
 
 // DeleteMessagesLessThan deletes messages less than given block number
-func (log *FBFTLog) DeleteMessagesLessThan(number uint64) {
+func (log *FBFTLog) deleteMessagesLessThan(number uint64) {
 	for h, msg := range log.messages {
 		if msg.BlockNum < number {
 			delete(log.messages, h)
@@ -357,6 +357,6 @@ func (log *FBFTLog) GetCommittedBlockAndMsgsFromNumber(bn uint64, logger *zerolo
 
 // PruneCacheBeforeBlock prune all blocks before bn
 func (log *FBFTLog) PruneCacheBeforeBlock(bn uint64) {
-	log.DeleteBlocksLessThan(bn - 1)
-	log.DeleteMessagesLessThan(bn - 1)
+	log.deleteBlocksLessThan(bn - 1)
+	log.deleteMessagesLessThan(bn - 1)
 }

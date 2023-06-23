@@ -54,7 +54,6 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 }
 
 type StagedStreamSync struct {
-	ctx          context.Context
 	bc           core.BlockChain
 	isBeacon     bool
 	isExplorer   bool
@@ -101,7 +100,6 @@ type SyncCycle struct {
 }
 
 func (s *StagedStreamSync) Len() int                    { return len(s.stages) }
-func (s *StagedStreamSync) Context() context.Context    { return s.ctx }
 func (s *StagedStreamSync) Blockchain() core.BlockChain { return s.bc }
 func (s *StagedStreamSync) DB() kv.RwDB                 { return s.db }
 func (s *StagedStreamSync) IsBeacon() bool              { return s.isBeacon }
@@ -118,11 +116,11 @@ func (s *StagedStreamSync) NewRevertState(id SyncStageID, revertPoint uint64) *R
 	return &RevertState{id, revertPoint, s}
 }
 
-func (s *StagedStreamSync) CleanUpStageState(id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*CleanUpState, error) {
+func (s *StagedStreamSync) CleanUpStageState(ctx context.Context, id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*CleanUpState, error) {
 	var pruneProgress uint64
 	var err error
 
-	if errV := CreateView(context.Background(), db, tx, func(tx kv.Tx) error {
+	if errV := CreateView(ctx, db, tx, func(tx kv.Tx) error {
 		pruneProgress, err = GetStageCleanUpProgress(tx, id, s.isBeacon)
 		if err != nil {
 			return err
@@ -215,10 +213,10 @@ func (s *StagedStreamSync) SetCurrentStage(id SyncStageID) error {
 }
 
 // StageState retrieves the latest stage state from db
-func (s *StagedStreamSync) StageState(stage SyncStageID, tx kv.Tx, db kv.RwDB) (*StageState, error) {
+func (s *StagedStreamSync) StageState(ctx context.Context, stage SyncStageID, tx kv.Tx, db kv.RwDB) (*StageState, error) {
 	var blockNum uint64
 	var err error
-	if errV := CreateView(context.Background(), db, tx, func(rtx kv.Tx) error {
+	if errV := CreateView(ctx, db, tx, func(rtx kv.Tx) error {
 		blockNum, err = GetStageProgress(rtx, stage, s.isBeacon)
 		if err != nil {
 			return err
@@ -232,7 +230,7 @@ func (s *StagedStreamSync) StageState(stage SyncStageID, tx kv.Tx, db kv.RwDB) (
 }
 
 // cleanUp cleans up the stage by calling pruneStage
-func (s *StagedStreamSync) cleanUp(fromStage int, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
+func (s *StagedStreamSync) cleanUp(ctx context.Context, fromStage int, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	found := false
 	for i := 0; i < len(s.pruningOrder); i++ {
 		if s.pruningOrder[i].ID == s.stages[fromStage].ID {
@@ -241,7 +239,7 @@ func (s *StagedStreamSync) cleanUp(fromStage int, db kv.RwDB, tx kv.RwTx, firstC
 		if !found || s.pruningOrder[i] == nil || s.pruningOrder[i].Disabled {
 			continue
 		}
-		if err := s.pruneStage(firstCycle, s.pruningOrder[i], db, tx); err != nil {
+		if err := s.pruneStage(ctx, firstCycle, s.pruningOrder[i], db, tx); err != nil {
 			panic(err)
 		}
 	}
@@ -249,7 +247,7 @@ func (s *StagedStreamSync) cleanUp(fromStage int, db kv.RwDB, tx kv.RwTx, firstC
 }
 
 // New creates a new StagedStreamSync instance
-func New(ctx context.Context,
+func New(
 	bc core.BlockChain,
 	db kv.RwDB,
 	stagesList []*Stage,
@@ -288,7 +286,6 @@ func New(ctx context.Context,
 	status := newStatus()
 
 	return &StagedStreamSync{
-		ctx:          ctx,
 		bc:           bc,
 		isBeacon:     isBeacon,
 		db:           db,
@@ -309,8 +306,8 @@ func New(ctx context.Context,
 }
 
 // doGetCurrentNumberRequest returns estimated current block number and corresponding stream
-func (s *StagedStreamSync) doGetCurrentNumberRequest() (uint64, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
+func (s *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint64, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	bn, stid, err := s.protocol.GetCurrentBlockNumber(ctx, syncproto.WithHighPriority())
@@ -336,16 +333,8 @@ func (s *StagedStreamSync) checkHaveEnoughStreams() error {
 	return nil
 }
 
-// SetNewContext sets a new context for all stages
-func (s *StagedStreamSync) SetNewContext(ctx context.Context) error {
-	for _, s := range s.stages {
-		s.Handler.SetStageContext(ctx)
-	}
-	return nil
-}
-
 // Run runs a full cycle of stages
-func (s *StagedStreamSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
+func (s *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	s.prevRevertPoint = nil
 	s.timings = s.timings[:0]
 
@@ -358,7 +347,7 @@ func (s *StagedStreamSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 					if s.revertOrder[j] == nil || s.revertOrder[j].Disabled {
 						continue
 					}
-					if err := s.revertStage(firstCycle, s.revertOrder[j], db, tx); err != nil {
+					if err := s.revertStage(ctx, firstCycle, s.revertOrder[j], db, tx); err != nil {
 						utils.Logger().Error().
 							Err(err).
 							Interface("stage id", s.revertOrder[j].ID).
@@ -383,7 +372,7 @@ func (s *StagedStreamSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 			continue
 		}
 
-		if err := s.runStage(stage, db, tx, firstCycle, s.invalidBlock.Active); err != nil {
+		if err := s.runStage(ctx, stage, db, tx, firstCycle, s.invalidBlock.Active); err != nil {
 			utils.Logger().Error().
 				Err(err).
 				Interface("stage id", stage.ID).
@@ -393,7 +382,7 @@ func (s *StagedStreamSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 		s.NextStage()
 	}
 
-	if err := s.cleanUp(0, db, tx, firstCycle); err != nil {
+	if err := s.cleanUp(ctx, 0, db, tx, firstCycle); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msgf(WrapStagedSyncMsg("stages cleanup failed"))
@@ -403,7 +392,7 @@ func (s *StagedStreamSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 		return err
 	}
 	if err := printLogs(tx, s.timings); err != nil {
-		return err
+		utils.Logger().Warn().Err(err).Msg("print timing logs failed")
 	}
 	s.currentStage = 0
 	return nil
@@ -414,7 +403,7 @@ func CreateView(ctx context.Context, db kv.RwDB, tx kv.Tx, f func(tx kv.Tx) erro
 	if tx != nil {
 		return f(tx)
 	}
-	return db.View(context.Background(), func(etx kv.Tx) error {
+	return db.View(ctx, func(etx kv.Tx) error {
 		return f(etx)
 	})
 }
@@ -440,8 +429,8 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 		}
 	}
 	if len(logCtx) > 0 {
-		utils.Logger().Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("Timings (slower than 50ms) %v", logCtx...)))
+		timingLog := fmt.Sprintf("Timings (slower than 50ms) %v", logCtx)
+		utils.Logger().Info().Msgf(WrapStagedSyncMsg(timingLog))
 	}
 
 	if tx == nil {
@@ -466,14 +455,14 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 }
 
 // runStage executes stage
-func (s *StagedStreamSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, invalidBlockRevert bool) (err error) {
+func (s *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, invalidBlockRevert bool) (err error) {
 	start := time.Now()
-	stageState, err := s.StageState(stage.ID, tx, db)
+	stageState, err := s.StageState(ctx, stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
 
-	if err = stage.Handler.Exec(firstCycle, invalidBlockRevert, stageState, s, tx); err != nil {
+	if err = stage.Handler.Exec(ctx, firstCycle, invalidBlockRevert, stageState, s, tx); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Interface("stage id", stage.ID).
@@ -493,9 +482,9 @@ func (s *StagedStreamSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstC
 }
 
 // revertStage reverts stage
-func (s *StagedStreamSync) revertStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
+func (s *StagedStreamSync) revertStage(ctx context.Context, firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
-	stageState, err := s.StageState(stage.ID, tx, db)
+	stageState, err := s.StageState(ctx, stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
@@ -510,7 +499,7 @@ func (s *StagedStreamSync) revertStage(firstCycle bool, stage *Stage, db kv.RwDB
 		return err
 	}
 
-	err = stage.Handler.Revert(firstCycle, revert, stageState, tx)
+	err = stage.Handler.Revert(ctx, firstCycle, revert, stageState, tx)
 	if err != nil {
 		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
 	}
@@ -526,15 +515,15 @@ func (s *StagedStreamSync) revertStage(firstCycle bool, stage *Stage, db kv.RwDB
 }
 
 // pruneStage cleans up the stage and logs the timing
-func (s *StagedStreamSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
+func (s *StagedStreamSync) pruneStage(ctx context.Context, firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
 
-	stageState, err := s.StageState(stage.ID, tx, db)
+	stageState, err := s.StageState(ctx, stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
 
-	prune, err := s.CleanUpStageState(stage.ID, stageState.BlockNumber, tx, db)
+	prune, err := s.CleanUpStageState(ctx, stage.ID, stageState.BlockNumber, tx, db)
 	if err != nil {
 		return err
 	}
@@ -542,7 +531,7 @@ func (s *StagedStreamSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB,
 		return err
 	}
 
-	err = stage.Handler.CleanUp(firstCycle, prune, tx)
+	err = stage.Handler.CleanUp(ctx, firstCycle, prune, tx)
 	if err != nil {
 		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
 	}

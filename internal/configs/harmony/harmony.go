@@ -35,6 +35,7 @@ type HarmonyConfig struct {
 	TiKV       *TiKVConfig       `toml:",omitempty"`
 	DNSSync    DnsSync
 	ShardData  ShardDataConfig
+	GPO        GasPriceOracleConfig
 }
 
 func (hc HarmonyConfig) ToRPCServerConfig() nodeconfig.RPCServerConfig {
@@ -155,6 +156,25 @@ type ShardDataConfig struct {
 	ShardCount      int
 	CacheTime       int
 	CacheSize       int
+}
+
+type GasPriceOracleConfig struct {
+	// the number of blocks to sample
+	Blocks int
+	// the number of transactions to sample, per block
+	Transactions int
+	// the percentile to pick from there
+	Percentile int
+	// the default gas price, if the above data is not available
+	DefaultPrice int64
+	// the maximum suggested gas price
+	MaxPrice int64
+	// when block usage (gas) for last `Blocks` blocks is below `LowUsageThreshold`,
+	// we return the Default price
+	LowUsageThreshold int
+	// hack: our block header reports an 80m gas limit, but it is actually 30M.
+	// if set to non-zero, this is applied UNCHECKED
+	BlockGasLimit int
 }
 
 type ConsensusConfig struct {

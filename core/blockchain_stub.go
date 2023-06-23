@@ -289,7 +289,7 @@ func (a Stub) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.H
 	return nil, errors.Errorf("method ReadCXReceipts not implemented for %s", a.Name)
 }
 
-func (a Stub) CXMerkleProof(toShardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
+func (a Stub) CXMerkleProof(toShardID uint32, block *block.Header) (*types.CXMerkleProof, error) {
 	return nil, errors.Errorf("method CXMerkleProof not implemented for %s", a.Name)
 }
 

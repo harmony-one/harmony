@@ -1,3 +1,3 @@
 package message
 
-//go:generate protoc msg.proto --go_out=.
+//go:generate ./gen.sh

@@ -3,6 +3,7 @@ package stagedsync
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/c2h5oh/datasize"
@@ -50,6 +51,7 @@ func CreateStagedSync(
 	port string,
 	peerHash [20]byte,
 	bc core.BlockChain,
+	dbDir string,
 	role nodeconfig.Role,
 	isExplorer bool,
 	TurboMode bool,
@@ -82,9 +84,11 @@ func CreateStagedSync(
 		db = mdbx.NewMDBX(log.New()).MapSize(dbMapSize).InMem("cache_db").MustOpen()
 	} else {
 		if isBeacon {
-			db = mdbx.NewMDBX(log.New()).Path("cache_beacon_db").MustOpen()
+			dbPath := filepath.Join(dbDir, "cache_beacon_db")
+			db = mdbx.NewMDBX(log.New()).Path(dbPath).MustOpen()
 		} else {
-			db = mdbx.NewMDBX(log.New()).Path("cache_shard_db").MustOpen()
+			dbPath := filepath.Join(dbDir, "cache_shard_db")
+			db = mdbx.NewMDBX(log.New()).Path(dbPath).MustOpen()
 		}
 	}
 
@@ -93,8 +97,8 @@ func CreateStagedSync(
 	}
 
 	headsCfg := NewStageHeadersCfg(ctx, bc, db)
-	blockHashesCfg := NewStageBlockHashesCfg(ctx, bc, db, isBeacon, TurboMode, logProgress)
-	bodiesCfg := NewStageBodiesCfg(ctx, bc, db, isBeacon, TurboMode, logProgress)
+	blockHashesCfg := NewStageBlockHashesCfg(ctx, bc, dbDir, db, isBeacon, TurboMode, logProgress)
+	bodiesCfg := NewStageBodiesCfg(ctx, bc, dbDir, db, isBeacon, TurboMode, logProgress)
 	statesCfg := NewStageStatesCfg(ctx, bc, db, logProgress)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, db)
 	finishCfg := NewStageFinishCfg(ctx, db)

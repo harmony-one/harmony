@@ -298,7 +298,7 @@ func (st *syncStream) computeBlockNumberResp(rid uint64) *syncpb.Message {
 	return syncpb.MakeGetBlockNumberResponseMessage(rid, bn)
 }
 
-func (st syncStream) computeGetBlockHashesResp(rid uint64, bns []uint64) (*syncpb.Message, error) {
+func (st *syncStream) computeGetBlockHashesResp(rid uint64, bns []uint64) (*syncpb.Message, error) {
 	if len(bns) > GetBlockHashesAmountCap {
 		err := fmt.Errorf("GetBlockHashes amount exceed cap: %v>%v", len(bns), GetBlockHashesAmountCap)
 		return nil, err

@@ -68,7 +68,7 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			return errBlockBeforeCommit
 		}
 
-		commitPayload := signature.ConstructCommitPayload(node.Blockchain(),
+		commitPayload := signature.ConstructCommitPayload(node.Blockchain().Config(),
 			block.Epoch(), block.Hash(), block.Number().Uint64(), block.Header().ViewID().Uint64())
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 			utils.Logger().
@@ -148,7 +148,7 @@ func (node *Node) TraceLoopForExplorer() {
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	if node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
-		node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
+		node.Consensus.DeleteBlockByNumber(block.NumberU64())
 		return
 	}
 
@@ -159,7 +159,7 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 			node.Consensus.UpdateConsensusInformation()
 		}
 		// Clean up the blocks to avoid OOM.
-		node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
+		node.Consensus.DeleteBlockByNumber(block.NumberU64())
 
 		// if in tikv mode, only master writer node need dump all explorer block
 		if !node.HarmonyConfig.General.RunElasticMode || node.Blockchain().IsTikvWriterMaster() {
@@ -216,8 +216,8 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {
-		node.Consensus.FBFTLog.DeleteBlocksLessThan(curNum - 100)
-		node.Consensus.FBFTLog.DeleteMessagesLessThan(curNum - 100)
+		node.Consensus.DeleteBlocksLessThan(curNum - 100)
+		node.Consensus.DeleteMessagesLessThan(curNum - 100)
 	}
 }
 

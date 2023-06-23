@@ -57,11 +57,6 @@ func newViewChange() *viewChange {
 	return &vc
 }
 
-// SetVerifyBlock ..
-func (vc *viewChange) SetVerifyBlock(verifyBlock VerifyBlockFunc) {
-	vc.verifyBlock = verifyBlock
-}
-
 // AddViewIDKeyIfNotExist ..
 func (vc *viewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.PublicKeys) {
 	if _, ok := vc.bhpSigs[viewID]; !ok {

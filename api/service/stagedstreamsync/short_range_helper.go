@@ -15,13 +15,11 @@ import (
 
 type srHelper struct {
 	syncProtocol syncProtocol
-
-	ctx    context.Context
-	config Config
-	logger zerolog.Logger
+	config       Config
+	logger       zerolog.Logger
 }
 
-func (sh *srHelper) getHashChain(bns []uint64) ([]common.Hash, []sttypes.StreamID, error) {
+func (sh *srHelper) getHashChain(ctx context.Context, bns []uint64) ([]common.Hash, []sttypes.StreamID, error) {
 	results := newBlockHashResults(bns)
 
 	var wg sync.WaitGroup
@@ -31,7 +29,7 @@ func (sh *srHelper) getHashChain(bns []uint64) ([]common.Hash, []sttypes.StreamI
 		go func(index int) {
 			defer wg.Done()
 
-			hashes, stid, err := sh.doGetBlockHashesRequest(bns)
+			hashes, stid, err := sh.doGetBlockHashesRequest(ctx, bns)
 			if err != nil {
 				sh.logger.Warn().Err(err).Str("StreamID", string(stid)).
 					Msg(WrapStagedSyncMsg("doGetBlockHashes return error"))
@@ -43,10 +41,10 @@ func (sh *srHelper) getHashChain(bns []uint64) ([]common.Hash, []sttypes.StreamI
 	wg.Wait()
 
 	select {
-	case <-sh.ctx.Done():
-		sh.logger.Info().Err(sh.ctx.Err()).Int("num blocks", results.numBlocksWithResults()).
+	case <-ctx.Done():
+		sh.logger.Info().Err(ctx.Err()).Int("num blocks", results.numBlocksWithResults()).
 			Msg(WrapStagedSyncMsg("short range sync get hashes timed out"))
-		return nil, nil, sh.ctx.Err()
+		return nil, nil, ctx.Err()
 	default:
 	}
 
@@ -56,13 +54,12 @@ func (sh *srHelper) getHashChain(bns []uint64) ([]common.Hash, []sttypes.StreamI
 	return hashChain, wl, nil
 }
 
-func (sh *srHelper) getBlocksChain(bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
-	return sh.doGetBlocksByNumbersRequest(bns)
+func (sh *srHelper) getBlocksChain(ctx context.Context, bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
+	return sh.doGetBlocksByNumbersRequest(ctx, bns)
 }
 
-func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.StreamID) ([]*types.Block, []sttypes.StreamID, error) {
-	ctx, cancel := context.WithCancel(sh.ctx)
-	defer cancel()
+func (sh *srHelper) getBlocksByHashes(ctx context.Context, hashes []common.Hash, whitelist []sttypes.StreamID) ([]*types.Block, []sttypes.StreamID, error) {
+
 	m := newGetBlocksByHashManager(hashes, whitelist)
 
 	var (
@@ -80,7 +77,8 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 	for i := 0; i != concurrency; i++ {
 		go func(index int) {
 			defer wg.Done()
-			defer cancel() // it's ok to cancel context more than once
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
 			for {
 				if m.isDone() {
@@ -121,11 +119,11 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 		return nil, nil, gErr
 	}
 	select {
-	case <-sh.ctx.Done():
+	case <-ctx.Done():
 		res, _, _ := m.getResults()
-		sh.logger.Info().Err(sh.ctx.Err()).Int("num blocks", len(res)).
+		sh.logger.Info().Err(ctx.Err()).Int("num blocks", len(res)).
 			Msg(WrapStagedSyncMsg("short range sync get blocks timed out"))
-		return nil, nil, sh.ctx.Err()
+		return nil, nil, ctx.Err()
 	default:
 	}
 
@@ -149,8 +147,8 @@ func (sh *srHelper) prepareBlockHashNumbers(curNumber uint64) []uint64 {
 	return res
 }
 
-func (sh *srHelper) doGetBlockHashesRequest(bns []uint64) ([]common.Hash, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(sh.ctx, 1*time.Second)
+func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64) ([]common.Hash, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	hashes, stid, err := sh.syncProtocol.GetBlockHashes(ctx, bns)
@@ -171,8 +169,8 @@ func (sh *srHelper) doGetBlockHashesRequest(bns []uint64) ([]common.Hash, sttype
 	return hashes, stid, nil
 }
 
-func (sh *srHelper) doGetBlocksByNumbersRequest(bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(sh.ctx, 10*time.Second)
+func (sh *srHelper) doGetBlocksByNumbersRequest(ctx context.Context, bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	blocks, stid, err := sh.syncProtocol.GetBlocksByNumber(ctx, bns)
@@ -186,7 +184,7 @@ func (sh *srHelper) doGetBlocksByNumbersRequest(bns []uint64) ([]*types.Block, s
 }
 
 func (sh *srHelper) doGetBlocksByHashesRequest(ctx context.Context, hashes []common.Hash, wl []sttypes.StreamID) ([]*types.Block, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(sh.ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	blocks, stid, err := sh.syncProtocol.GetBlocksByHashes(ctx, hashes,

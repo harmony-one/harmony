@@ -114,7 +114,14 @@ func (consensus *Consensus) spinUpStateSync() {
 			v.Stop()
 		}
 	} else {
-		consensus.spinLegacyStateSync()
+		select {
+		case consensus.BlockNumLowChan <- struct{}{}:
+			consensus.current.SetMode(Syncing)
+			for _, v := range consensus.consensusTimeout {
+				v.Stop()
+			}
+		default:
+		}
 	}
 }
 

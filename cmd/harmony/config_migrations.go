@@ -378,6 +378,33 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.5.14"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("GPO.Blocks") == nil {
+			confTree.Set("GPO.Blocks", defaultConfig.GPO.Blocks)
+		}
+		if confTree.Get("GPO.Transactions") == nil {
+			confTree.Set("GPO.Transactions", defaultConfig.GPO.Transactions)
+		}
+		if confTree.Get("GPO.Percentile") == nil {
+			confTree.Set("GPO.Percentile", defaultConfig.GPO.Percentile)
+		}
+		if confTree.Get("GPO.DefaultPrice") == nil {
+			confTree.Set("GPO.DefaultPrice", defaultConfig.GPO.DefaultPrice)
+		}
+		if confTree.Get("GPO.MaxPrice") == nil {
+			confTree.Set("GPO.MaxPrice", defaultConfig.GPO.MaxPrice)
+		}
+		if confTree.Get("GPO.LowUsageThreshold") == nil {
+			confTree.Set("GPO.LowUsageThreshold", defaultConfig.GPO.LowUsageThreshold)
+		}
+		if confTree.Get("GPO.BlockGasLimit") == nil {
+			confTree.Set("GPO.BlockGasLimit", defaultConfig.GPO.BlockGasLimit)
+		}
+		// upgrade minor version because of `GPO` section introduction
+		confTree.Set("Version", "2.6.0")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {

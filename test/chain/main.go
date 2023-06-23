@@ -15,7 +15,6 @@ import (
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core"
 	core_state "github.com/harmony-one/harmony/core/state"
-	harmonyState "github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -206,7 +205,7 @@ func playFaucetContract(chain core.BlockChain) {
 
 func main() {
 	genesis := gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, harmonyState.NewDatabase(database), nil, nil, gspec.Config, chain.Engine(), vm.Config{})
+	chain, _ := core.NewBlockChain(database, nil, nil, nil, gspec.Config, chain.Engine(), vm.Config{})
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain, types.NewTransactionErrorSink())
 
 	backend := &testWorkerBackend{
@@ -223,7 +222,7 @@ func main() {
 	//// Generate a small n-block chain and an uncle block for it
 	n := 3
 	if n > 0 {
-		blocks, _ := chain2.GenerateChain(chainConfig, genesis, chain.Engine(), database, n, func(i int, gen *chain2.BlockGen) {
+		blocks, _ := chain2.GenerateChain(chainConfig, genesis.Header(), chain.Engine(), database, n, func(i int, gen *chain2.BlockGen) {
 			gen.SetCoinbase(FaucetAddress)
 			gen.SetShardID(0)
 			gen.AddTx(pendingTxs[i].(*types.Transaction))

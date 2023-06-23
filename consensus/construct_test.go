@@ -10,6 +10,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
@@ -31,7 +32,8 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	blsPriKey := bls.RandPrivateKey()
-	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false)
+	reg := registry.New()
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), reg, decider, 3, false)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
@@ -63,7 +65,8 @@ func TestConstructPreparedMessage(test *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	blsPriKey := bls.RandPrivateKey()
-	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false)
+	reg := registry.New()
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), reg, decider, 3, false)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -143,7 +146,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 	)
 
 	consensus, err := New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey1), nil, decider, 3, false,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey1), registry.New(), decider, 3, false,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
@@ -234,7 +237,7 @@ func TestConstructCommitMessage(test *testing.T) {
 		quorum.SuperMajorityStake, shard.BeaconChainShardID,
 	)
 
-	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey1), nil, decider, 3, false)
+	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey1), registry.New(), decider, 3, false)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
@@ -316,7 +319,7 @@ func TestPopulateMessageFields(t *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), nil, decider, 3, false,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), registry.New(), decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

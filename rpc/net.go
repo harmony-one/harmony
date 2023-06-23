@@ -69,3 +69,8 @@ func (s *PublicNetService) Version(ctx context.Context) interface{} {
 		return fmt.Sprintf("%d", s.chainID)
 	}
 }
+
+// Listening returns an indication if the node is listening for network connections.
+func (s *PublicNetService) Listening() bool {
+	return true // always listening
+}

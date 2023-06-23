@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -37,8 +38,8 @@ func NewStageBlockHashes(cfg StageBlockHashesCfg) *StageBlockHashes {
 	}
 }
 
-func NewStageBlockHashesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, isBeacon bool, turbo bool, logProgress bool) StageBlockHashesCfg {
-	cachedb, err := initHashesCacheDB(ctx, isBeacon)
+func NewStageBlockHashesCfg(ctx context.Context, bc core.BlockChain, dbDir string, db kv.RwDB, isBeacon bool, turbo bool, logProgress bool) StageBlockHashesCfg {
+	cachedb, err := initHashesCacheDB(ctx, dbDir, isBeacon)
 	if err != nil {
 		panic("can't initialize sync caches")
 	}
@@ -53,13 +54,14 @@ func NewStageBlockHashesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB,
 	}
 }
 
-func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err error) {
+func initHashesCacheDB(ctx context.Context, dbDir string, isBeacon bool) (db kv.RwDB, err error) {
 	// create caches db
 	cachedbName := BlockHashesCacheDB
 	if isBeacon {
 		cachedbName = "beacon_" + cachedbName
 	}
-	cachedb := mdbx.NewMDBX(log.New()).Path(cachedbName).MustOpen()
+	dbPath := filepath.Join(dbDir, cachedbName)
+	cachedb := mdbx.NewMDBX(log.New()).Path(dbPath).MustOpen()
 	// create transaction on cachedb
 	tx, errRW := cachedb.BeginRw(ctx)
 	if errRW != nil {

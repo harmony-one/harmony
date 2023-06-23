@@ -248,7 +248,7 @@ func Verify(
 			publicKey.Add(publicKeyObj)
 		}
 		// slash verification only happens in staking era, therefore want commit payload for staking epoch
-		commitPayload := consensus_sig.ConstructCommitPayload(chain,
+		commitPayload := consensus_sig.ConstructCommitPayload(chain.Config(),
 			candidate.Evidence.Epoch, ballot.BlockHeaderHash, candidate.Evidence.Height, candidate.Evidence.ViewID)
 		utils.Logger().Debug().
 			Uint64("epoch", candidate.Evidence.Epoch.Uint64()).

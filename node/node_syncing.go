@@ -109,9 +109,10 @@ func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
 	mutatedPort := strconv.Itoa(mySyncPort + legacysync.SyncingPortDifference)
 	role := node.NodeConfig.Role()
 	isExplorer := node.NodeConfig.Role() == nodeconfig.ExplorerNode
+	dbDir := node.NodeConfig.DBDir
 
 	if s, err := stagedsync.CreateStagedSync(node.SelfPeer.IP, mutatedPort,
-		node.GetSyncID(), bc, role, isExplorer,
+		node.GetSyncID(), bc, dbDir, role, isExplorer,
 		node.NodeConfig.StagedSyncTurboMode,
 		node.NodeConfig.UseMemDB,
 		node.NodeConfig.DoubleCheckBlockHashes,
@@ -314,7 +315,8 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
 		}
-		syncInstance.SyncLoop(bc, worker, false, node.Consensus, legacysync.LoopMinTime)
+		isBeacon := bc.ShardID() == shard.BeaconChainShardID
+		syncInstance.SyncLoop(bc, worker, isBeacon, node.Consensus, legacysync.LoopMinTime)
 		if willJoinConsensus {
 			node.IsSynchronized.Set()
 			node.Consensus.BlocksSynchronized()
