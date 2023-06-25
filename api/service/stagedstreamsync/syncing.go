@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -84,9 +85,11 @@ func CreateStagedSync(ctx context.Context,
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
 	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
+	
 	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)
+	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, common.Hash{}, config.Concurrency, protocol, logger, config.LogProgress)
 	stageFinishCfg := NewStageFinishCfg(mainDB)
 
 	stages := DefaultStages(ctx,
@@ -94,6 +97,7 @@ func CreateStagedSync(ctx context.Context,
 		stageSyncEpochCfg,
 		stageShortRangeCfg,
 		stageBodiesCfg,
+		stageStateSyncCfg,
 		stageStatesCfg,
 		lastMileCfg,
 		stageFinishCfg,

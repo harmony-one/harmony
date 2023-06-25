@@ -13,6 +13,7 @@ var DefaultForwardOrder = ForwardOrder{
 	SyncEpoch,
 	ShortRange,
 	BlockBodies,
+	StateSync,
 	// Stages below don't use Internet
 	States,
 	LastMile,
@@ -23,6 +24,7 @@ var DefaultRevertOrder = RevertOrder{
 	Finish,
 	LastMile,
 	States,
+	StateSync,
 	BlockBodies,
 	ShortRange,
 	SyncEpoch,
@@ -33,6 +35,7 @@ var DefaultCleanUpOrder = CleanUpOrder{
 	Finish,
 	LastMile,
 	States,
+	StateSync,
 	BlockBodies,
 	ShortRange,
 	SyncEpoch,
@@ -44,6 +47,7 @@ func DefaultStages(ctx context.Context,
 	seCfg StageEpochCfg,
 	srCfg StageShortRangeCfg,
 	bodiesCfg StageBodiesCfg,
+	stateSyncCfg StageStateSyncCfg,
 	statesCfg StageStatesCfg,
 	lastMileCfg StageLastMileCfg,
 	finishCfg StageFinishCfg,
@@ -53,6 +57,7 @@ func DefaultStages(ctx context.Context,
 	handlerStageShortRange := NewStageShortRange(srCfg)
 	handlerStageEpochSync := NewStageEpoch(seCfg)
 	handlerStageBodies := NewStageBodies(bodiesCfg)
+	handlerStageStateSync := NewStageStateSync(stateSyncCfg)
 	handlerStageStates := NewStageStates(statesCfg)
 	handlerStageLastMile := NewStageLastMile(lastMileCfg)
 	handlerStageFinish := NewStageFinish(finishCfg)
@@ -77,6 +82,11 @@ func DefaultStages(ctx context.Context,
 			ID:          BlockBodies,
 			Description: "Retrieve Block Bodies",
 			Handler:     handlerStageBodies,
+		},
+		{
+			ID:          StateSync,
+			Description: "Retrieve States",
+			Handler:     handlerStageStateSync,
 		},
 		{
 			ID:          States,
