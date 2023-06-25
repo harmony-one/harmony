@@ -51,9 +51,11 @@ type viewChange struct {
 }
 
 // newViewChange returns a new viewChange object
-func newViewChange() *viewChange {
+func newViewChange(verifyBlock VerifyBlockFunc) *viewChange {
 	vc := viewChange{}
 	vc.Reset()
+	vc.verifyBlock = verifyBlock
+
 	return &vc
 }
 

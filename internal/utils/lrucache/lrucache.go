@@ -25,3 +25,9 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 func (c *Cache[K, V]) Set(key K, value V) {
 	c.cache.Add(key, value)
 }
+
+// Contains checks if a key is in the cache, without updating the
+// recent-ness or deleting it for being stale.
+func (c *Cache[K, V]) Contains(key K) bool {
+	return c.cache.Contains(key)
+}

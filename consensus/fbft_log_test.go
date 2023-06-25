@@ -65,7 +65,7 @@ func TestGetMessagesByTypeSeqViewHash(t *testing.T) {
 		ViewID:      3,
 		BlockHash:   [32]byte{01, 02},
 	}
-	log := NewFBFTLog()
+	log := NewFBFTLog(nil)
 	log.AddVerifiedMessage(&pbftMsg)
 
 	found := log.GetMessagesByTypeSeqViewHash(
@@ -90,7 +90,7 @@ func TestHasMatchingAnnounce(t *testing.T) {
 		ViewID:      3,
 		BlockHash:   [32]byte{01, 02},
 	}
-	log := NewFBFTLog()
+	log := NewFBFTLog(nil)
 	log.AddVerifiedMessage(&pbftMsg)
 	found := log.HasMatchingViewAnnounce(2, 3, [32]byte{01, 02})
 	if !found {

@@ -45,7 +45,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 			Interface("preparedMsg", preparedMsg).
 			Msg("[constructViewChangeMessage] found prepared msg")
 		if block != nil {
-			if err := consensus.verifyBlock(block); err == nil {
+			if err := consensus.FBFTLog.verifyBlock(block); err == nil {
 				tmpEncoded, err := rlp.EncodeToBytes(block)
 				if err != nil {
 					consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed encoding block")

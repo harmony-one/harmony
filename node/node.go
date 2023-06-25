@@ -559,7 +559,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 // validate shardID
 // validate public key size
 // verify message signature
-func validateShardBoundMessage(consensus *consensus.Consensus, nodeConfig *nodeconfig.ConfigType, payload []byte,
+func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.ID, nodeConfig *nodeconfig.ConfigType, payload []byte,
 ) (*msg_pb.Message, *bls.SerializedPublicKey, bool, error) {
 	var (
 		m msg_pb.Message
@@ -740,6 +740,7 @@ func (node *Node) StartPubSub() error {
 	// p2p consensus message handler function
 	type p2pHandlerConsensus func(
 		ctx context.Context,
+		peer libp2p_peer.ID,
 		msg *msg_pb.Message,
 		key *bls.SerializedPublicKey,
 	) error
@@ -753,6 +754,7 @@ func (node *Node) StartPubSub() error {
 
 	// interface pass to p2p message validator
 	type validated struct {
+		peerID         libp2p_peer.ID
 		consensusBound bool
 		handleC        p2pHandlerConsensus
 		handleCArg     *msg_pb.Message
@@ -810,7 +812,7 @@ func (node *Node) StartPubSub() error {
 
 					// validate consensus message
 					validMsg, senderPubKey, ignore, err := validateShardBoundMessage(
-						node.Consensus, node.NodeConfig, openBox[proto.MessageCategoryBytes:],
+						node.Consensus, peer, node.NodeConfig, openBox[proto.MessageCategoryBytes:],
 					)
 
 					if err != nil {
@@ -824,6 +826,7 @@ func (node *Node) StartPubSub() error {
 					}
 
 					msg.ValidatorData = validated{
+						peerID:         peer,
 						consensusBound: true,
 						handleC:        node.Consensus.HandleMessageUpdate,
 						handleCArg:     validMsg,
@@ -854,6 +857,7 @@ func (node *Node) StartPubSub() error {
 						}
 					}
 					msg.ValidatorData = validated{
+						peerID:         peer,
 						consensusBound: false,
 						handleE:        node.HandleNodeMessage,
 						handleEArg:     validMsg,
@@ -905,7 +909,7 @@ func (node *Node) StartPubSub() error {
 									errChan <- withError{err, nil}
 								}
 							} else {
-								if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
+								if err := msg.handleC(ctx, msg.peerID, msg.handleCArg, msg.senderPubKey); err != nil {
 									errChan <- withError{err, msg.senderPubKey}
 								}
 							}
