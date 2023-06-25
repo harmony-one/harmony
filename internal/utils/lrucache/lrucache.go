@@ -31,3 +31,15 @@ func (c *Cache[K, V]) Set(key K, value V) {
 func (c *Cache[K, V]) Contains(key K) bool {
 	return c.cache.Contains(key)
 }
+
+func (c *Cache[K, V]) Len() int {
+	return c.cache.Len()
+}
+
+func (c *Cache[K, V]) Keys() []K {
+	out := make([]K, 0, c.cache.Len())
+	for _, v := range c.cache.Keys() {
+		out = append(out, v.(K))
+	}
+	return out
+}

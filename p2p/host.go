@@ -494,9 +494,7 @@ func (host *HostV2) ListPeer(topic string) []libp2p_peer.ID {
 
 // ListBlockedPeer returns list of blocked peer
 func (host *HostV2) ListBlockedPeer() []libp2p_peer.ID {
-	// TODO: this is a place holder for now
-	peers := make([]libp2p_peer.ID, 0)
-	return peers
+	return host.banned.Keys()
 }
 
 // GetPeerCount ...

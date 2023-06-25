@@ -18,6 +18,7 @@ func NewManager(size int) *Manager {
 
 func (m *Manager) IsBanned(key libp2p_peer.ID, now time.Time) bool {
 	future, ok := m.internal.Get(key)
+
 	if ok {
 		return future.After(now) // future > now
 	}
@@ -30,4 +31,12 @@ func (m *Manager) Ban(key libp2p_peer.ID, future time.Time) {
 
 func (m *Manager) Contains(key libp2p_peer.ID) bool {
 	return m.internal.Contains(key)
+}
+
+func (m *Manager) Len() int {
+	return m.internal.Len()
+}
+
+func (m *Manager) Keys() []libp2p_peer.ID {
+	return m.internal.Keys()
 }
