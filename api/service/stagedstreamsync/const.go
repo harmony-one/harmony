@@ -23,6 +23,14 @@ const (
 	// no more request will be assigned to workers to wait for InsertChain to finish.
 	SoftQueueCap int = 100
 
+	StatesPerRequest int = 10 // number of get nodes by hashes for each request
+
+	// DefaultConcurrency is the default settings for concurrency
+	DefaultConcurrency int = 4
+
+	// MaxTriesToFetchNodeData is the maximum number of tries to fetch node data
+	MaxTriesToFetchNodeData int = 5
+
 	// ShortRangeTimeout is the timeout for each short range sync, which allow short range sync
 	// to restart automatically when stuck in `getBlockHashes`
 	ShortRangeTimeout time.Duration = 1 * time.Minute
