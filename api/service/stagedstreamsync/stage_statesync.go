@@ -5,47 +5,22 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/rawdb"
-	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
-	"golang.org/x/crypto/sha3"
 )
 
 type StageStateSync struct {
 	configs StageStateSyncCfg
 }
 
-// trieTask represents a single trie node download task, containing a set of
-// peers already attempted retrieval from to detect stalled syncs and abort.
-type trieTask struct {
-	hash     common.Hash
-	path     [][]byte
-	attempts map[string]struct{}
-}
-
-// codeTask represents a single byte code download task, containing a set of
-// peers already attempted retrieval from to detect stalled syncs and abort.
-type codeTask struct {
-	attempts map[string]struct{}
-}
-
 type StageStateSyncCfg struct {
 	bc          core.BlockChain
-	protocol    syncProtocol
 	db          kv.RwDB
-	root        common.Hash               // State root currently being synced
-	sched       *trie.Sync                // State trie sync scheduler defining the tasks
-	keccak      crypto.KeccakState        // Keccak256 hasher to verify deliveries with
-	trieTasks   map[string]*trieTask      // Set of trie node tasks currently queued for retrieval, indexed by path
-	codeTasks   map[common.Hash]*codeTask // Set of byte code tasks currently queued for retrieval, indexed by hash
 	concurrency int
+	protocol    syncProtocol
 	logger      zerolog.Logger
 	logProgress bool
 }
@@ -58,7 +33,6 @@ func NewStageStateSync(cfg StageStateSyncCfg) *StageStateSync {
 
 func NewStageStateSyncCfg(bc core.BlockChain,
 	db kv.RwDB,
-	root common.Hash,
 	concurrency int,
 	protocol syncProtocol,
 	logger zerolog.Logger,
@@ -67,12 +41,8 @@ func NewStageStateSyncCfg(bc core.BlockChain,
 	return StageStateSyncCfg{
 		bc:          bc,
 		db:          db,
-		root:        root,
-		sched:       state.NewStateSync(root, bc.ChainDb(), nil, rawdb.HashScheme),
-		keccak:      sha3.NewLegacyKeccak256().(crypto.KeccakState),
-		trieTasks:   make(map[string]*trieTask),
-		codeTasks:   make(map[common.Hash]*codeTask),
 		concurrency: concurrency,
+		protocol:    protocol,
 		logger:      logger,
 		logProgress: logProgress,
 	}
