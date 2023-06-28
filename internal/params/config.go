@@ -71,8 +71,8 @@ var (
 		AllowlistEpoch:                         EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		FeeCollectEpoch:                        EpochTBD,
-		ValidatorCodeFixEpoch:                  EpochTBD,
+		FeeCollectEpoch:                        big.NewInt(1535), // 2023-07-20 05:51:07+00:00
+		ValidatorCodeFixEpoch:                  big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
