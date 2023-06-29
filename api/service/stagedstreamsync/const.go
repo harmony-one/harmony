@@ -23,7 +23,11 @@ const (
 	// no more request will be assigned to workers to wait for InsertChain to finish.
 	SoftQueueCap int = 100
 
-	StatesPerRequest int = 10 // number of get nodes by hashes for each request
+	// number of get nodes by hashes for each request
+	StatesPerRequest int = 100
+
+	// maximum number of blocks for get receipts request
+	ReceiptsPerRequest int = 10 
 
 	// DefaultConcurrency is the default settings for concurrency
 	DefaultConcurrency int = 4

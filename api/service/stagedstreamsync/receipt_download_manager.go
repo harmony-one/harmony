@@ -22,7 +22,6 @@ type receiptDownloadManager struct {
 	requesting map[uint64]struct{}               // receipt numbers that have been assigned to workers but not received
 	processing map[uint64]struct{}               // receipt numbers received requests but not inserted
 	retries    *prioritizedNumbers               // requests where error happens
-	rq         *resultQueue                      // result queue wait to be inserted into blockchain
 	rdd        map[uint64]ReceiptDownloadDetails // details about how this receipt was downloaded
 
 	logger zerolog.Logger
@@ -37,7 +36,6 @@ func newReceiptDownloadManager(tx kv.RwTx, chain blockChain, targetBN uint64, lo
 		requesting: make(map[uint64]struct{}),
 		processing: make(map[uint64]struct{}),
 		retries:    newPrioritizedNumbers(),
-		rq:         newResultQueue(),
 		rdd:        make(map[uint64]ReceiptDownloadDetails),
 		logger:     logger,
 	}
@@ -77,14 +75,14 @@ func (rdm *receiptDownloadManager) HandleRequestError(bns []uint64, err error, s
 	}
 }
 
-// HandleRequestResult handles get blocks result
-func (rdm *receiptDownloadManager) HandleRequestResult(bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, streamID sttypes.StreamID) error {
+// HandleRequestResult handles get receipts result
+func (rdm *receiptDownloadManager) HandleRequestResult(bns []uint64, receiptBytes [][]byte, sigBytes [][]byte, loopID int, streamID sttypes.StreamID) error {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
 	for i, bn := range bns {
 		delete(rdm.requesting, bn)
-		if indexExists(blockBytes, i) && len(blockBytes[i]) <= 1 {
+		if indexExists(receiptBytes, i) && len(receiptBytes[i]) <= 1 {
 			rdm.retries.push(bn)
 		} else {
 			rdm.processing[bn] = struct{}{}
@@ -111,7 +109,7 @@ func (rdm *receiptDownloadManager) SetDownloadDetails(bns []uint64, loopID int, 
 	return nil
 }
 
-// GetDownloadDetails returns the download details for a receipt
+// GetDownloadDetails returns the download details for a certain block number
 func (rdm *receiptDownloadManager) GetDownloadDetails(blockNumber uint64) (loopID int, streamID sttypes.StreamID) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
@@ -162,7 +160,7 @@ func (rdm *receiptDownloadManager) getBatchFromUnprocessed(cap int) []uint64 {
 }
 
 func (rdm *receiptDownloadManager) availableForMoreTasks() bool {
-	return rdm.rq.results.Len() < SoftQueueCap
+	return len(rdm.requesting) < SoftQueueCap
 }
 
 func (rdm *receiptDownloadManager) addBatchToRequesting(bns []uint64) {
