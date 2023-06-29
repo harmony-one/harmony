@@ -3,6 +3,7 @@ package stagedstreamsync
 import (
 	"sync"
 
+	"github.com/harmony-one/harmony/core/types"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/rs/zerolog"
@@ -76,13 +77,13 @@ func (rdm *receiptDownloadManager) HandleRequestError(bns []uint64, err error, s
 }
 
 // HandleRequestResult handles get receipts result
-func (rdm *receiptDownloadManager) HandleRequestResult(bns []uint64, receiptBytes [][]byte, sigBytes [][]byte, loopID int, streamID sttypes.StreamID) error {
+func (rdm *receiptDownloadManager) HandleRequestResult(bns []uint64, receipts []*types.Receipt, loopID int, streamID sttypes.StreamID) error {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
 	for i, bn := range bns {
 		delete(rdm.requesting, bn)
-		if indexExists(receiptBytes, i) && len(receiptBytes[i]) <= 1 {
+		if indexExists(receipts, i) {
 			rdm.retries.push(bn)
 		} else {
 			rdm.processing[bn] = struct{}{}

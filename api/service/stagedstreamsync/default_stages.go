@@ -13,9 +13,9 @@ var DefaultForwardOrder = ForwardOrder{
 	SyncEpoch,
 	ShortRange,
 	BlockBodies,
-	StateSync,
-	// Stages below don't use Internet
 	States,
+	StateSync,
+	Receipts,
 	LastMile,
 	Finish,
 }
@@ -23,8 +23,9 @@ var DefaultForwardOrder = ForwardOrder{
 var DefaultRevertOrder = RevertOrder{
 	Finish,
 	LastMile,
-	States,
+	Receipts,
 	StateSync,
+	States,
 	BlockBodies,
 	ShortRange,
 	SyncEpoch,
@@ -34,8 +35,9 @@ var DefaultRevertOrder = RevertOrder{
 var DefaultCleanUpOrder = CleanUpOrder{
 	Finish,
 	LastMile,
-	States,
+	Receipts,
 	StateSync,
+	States,
 	BlockBodies,
 	ShortRange,
 	SyncEpoch,
@@ -49,6 +51,7 @@ func DefaultStages(ctx context.Context,
 	bodiesCfg StageBodiesCfg,
 	stateSyncCfg StageStateSyncCfg,
 	statesCfg StageStatesCfg,
+	receiptsCfg StageReceiptsCfg,
 	lastMileCfg StageLastMileCfg,
 	finishCfg StageFinishCfg,
 ) []*Stage {
@@ -57,8 +60,9 @@ func DefaultStages(ctx context.Context,
 	handlerStageShortRange := NewStageShortRange(srCfg)
 	handlerStageEpochSync := NewStageEpoch(seCfg)
 	handlerStageBodies := NewStageBodies(bodiesCfg)
-	handlerStageStateSync := NewStageStateSync(stateSyncCfg)
 	handlerStageStates := NewStageStates(statesCfg)
+	handlerStageStateSync := NewStageStateSync(stateSyncCfg)
+	handlerStageReceipts := NewStageReceipts(receiptsCfg)
 	handlerStageLastMile := NewStageLastMile(lastMileCfg)
 	handlerStageFinish := NewStageFinish(finishCfg)
 
@@ -84,14 +88,19 @@ func DefaultStages(ctx context.Context,
 			Handler:     handlerStageBodies,
 		},
 		{
+			ID:          States,
+			Description: "Update Blockchain State",
+			Handler:     handlerStageStates,
+		},
+		{
 			ID:          StateSync,
 			Description: "Retrieve States",
 			Handler:     handlerStageStateSync,
 		},
 		{
-			ID:          States,
-			Description: "Update Blockchain State",
-			Handler:     handlerStageStates,
+			ID:          Receipts,
+			Description: "Retrieve Receipts",
+			Handler:     handlerStageReceipts,
 		},
 		{
 			ID:          LastMile,
