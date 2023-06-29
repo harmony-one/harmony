@@ -229,13 +229,13 @@ func (s *StateDownloadManager) HandleRequestError(codeHashes []common.Hash, trie
 
 	// add requested code hashes to retries
 	for _, h := range codeHashes {
-		s.retries.addCodeTask(h,s.requesting.codeTasks[h]) 
+		s.retries.addCodeTask(h, s.requesting.codeTasks[h])
 		delete(s.requesting.codeTasks, h)
 	}
 
 	// add requested trie paths to retries
 	for _, path := range triePaths {
-		s.retries.addTrieTask(path,s.requesting.trieTasks[path]) 
+		s.retries.addTrieTask(path, s.requesting.trieTasks[path])
 		delete(s.requesting.trieTasks, path)
 	}
 }
@@ -282,7 +282,7 @@ func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, tri
 	}
 
 	for _, hash := range codeHashes {
-		task:= s.requesting.getCodeTask(hash)
+		task := s.requesting.getCodeTask(hash)
 		// If the node did deliver something, missing items may be due to a protocol
 		// limit or a previous timeout + delayed delivery. Both cases should permit
 		// the node to retry the missing items (to avoid single-peer stalls).

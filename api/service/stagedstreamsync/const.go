@@ -27,7 +27,7 @@ const (
 	StatesPerRequest int = 100
 
 	// maximum number of blocks for get receipts request
-	ReceiptsPerRequest int = 10 
+	ReceiptsPerRequest int = 10
 
 	// DefaultConcurrency is the default settings for concurrency
 	DefaultConcurrency int = 4

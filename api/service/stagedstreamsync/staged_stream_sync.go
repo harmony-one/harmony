@@ -59,23 +59,23 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 }
 
 type StagedStreamSync struct {
-	bc             core.BlockChain
-	consensus      *consensus.Consensus
-	isBeacon       bool
-	isExplorer     bool
-	db             kv.RwDB
-	protocol       syncProtocol
-	isBeaconNode   bool
-	gbm            *blockDownloadManager // initialized when finished get block number
-	lastMileBlocks []*types.Block        // last mile blocks to catch up with the consensus
-	lastMileMux    sync.Mutex
-	inserted       int
-	config         Config
-	logger         zerolog.Logger
-	status         *status //TODO: merge this with currentSyncCycle
-	initSync       bool    // if sets to true, node start long range syncing
-	UseMemDB       bool
-
+	bc              core.BlockChain
+	consensus       *consensus.Consensus
+	isBeacon        bool
+	isExplorer      bool
+	db              kv.RwDB
+	protocol        syncProtocol
+	isBeaconNode    bool
+	gbm             *blockDownloadManager // initialized when finished get block number
+	rdm             *receiptDownloadManager
+	lastMileBlocks  []*types.Block // last mile blocks to catch up with the consensus
+	lastMileMux     sync.Mutex
+	inserted        int
+	config          Config
+	logger          zerolog.Logger
+	status          *status //TODO: merge this with currentSyncCycle
+	initSync        bool    // if sets to true, node start long range syncing
+	UseMemDB        bool
 	revertPoint     *uint64 // used to run stages
 	prevRevertPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
 	invalidBlock    InvalidBlock

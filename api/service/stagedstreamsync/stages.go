@@ -13,7 +13,7 @@ const (
 	SyncEpoch   SyncStageID = "SyncEpoch"   // epoch sync
 	BlockBodies SyncStageID = "BlockBodies" // Block bodies are downloaded, TxHash and UncleHash are getting verified
 	States      SyncStageID = "States"      // will construct most recent state from downloaded blocks
-	StateSync   SyncStageID = "StateSync"   // State sync 
+	StateSync   SyncStageID = "StateSync"   // State sync
 	Receipts    SyncStageID = "Receipts"    // Receipts
 	LastMile    SyncStageID = "LastMile"    // update blocks after sync and update last mile blocks as well
 	Finish      SyncStageID = "Finish"      // Nominal stage after all other stages
