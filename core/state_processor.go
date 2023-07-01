@@ -119,8 +119,8 @@ func (p *StateProcessor) Process(
 		usedGas        = new(uint64)
 		header         = block.Header()
 		allLogs        []*types.Log
-		gp                                = new(GasPool).AddGas(block.GasLimit())
-		blockStakeMsgs []staking.StakeMsg = make([]staking.StakeMsg, 0)
+		gp             = new(GasPool).AddGas(block.GasLimit())
+		blockStakeMsgs = make([]staking.StakeMsg, 0)
 	)
 
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
@@ -202,7 +202,7 @@ func (p *StateProcessor) Process(
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
 	)
 	if err != nil {
-		return nil, nil, nil, nil, 0, nil, statedb, errors.New("[Process] Cannot finalize block")
+		return nil, nil, nil, nil, 0, nil, statedb, errors.WithMessage(err, "[Process] Cannot finalize block")
 	}
 
 	result := &ProcessorResult{

@@ -63,10 +63,8 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 	)
-	commitSigs := make(chan []byte)
-	go func() {
-		commitSigs <- []byte{}
-	}()
+	commitSigs := make(chan []byte, 1)
+	commitSigs <- []byte{}
 
 	block, _ := node.Worker.FinalizeNewBlock(
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
