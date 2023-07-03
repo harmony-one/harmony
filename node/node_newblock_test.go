@@ -78,7 +78,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		t.Error("New block is not verified successfully:", err)
 	}
 
-	node.Blockchain().InsertChain(types.Blocks{block}, false)
+	node.Blockchain().InsertChain(types.Blocks{block}, false, true)
 
 	node.Worker.UpdateCurrent()
 

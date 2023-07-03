@@ -60,7 +60,7 @@ func (bc *testBlockChain) currentBlockNumber() uint64 {
 	return bc.curBN
 }
 
-func (bc *testBlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
+func (bc *testBlockChain) InsertChain(chain types.Blocks, verifyHeaders bool, blockExecution bool) (int, error) {
 	bc.lock.Lock()
 	defer bc.lock.Unlock()
 
@@ -169,11 +169,11 @@ type testInsertHelper struct {
 }
 
 func (ch *testInsertHelper) verifyAndInsertBlock(block *types.Block) error {
-	_, err := ch.bc.InsertChain(types.Blocks{block}, true)
+	_, err := ch.bc.InsertChain(types.Blocks{block}, true, true)
 	return err
 }
 func (ch *testInsertHelper) verifyAndInsertBlocks(blocks types.Blocks) (int, error) {
-	return ch.bc.InsertChain(blocks, true)
+	return ch.bc.InsertChain(blocks, true, true)
 }
 
 const (
