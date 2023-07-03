@@ -1005,6 +1005,7 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 
 	sConfig := stagedstreamsync.Config{
 		ServerOnly:           !hc.Sync.Downloader,
+		SyncMode:             stagedstreamsync.SyncMode(hc.Sync.SyncMode),
 		Network:              nodeconfig.NetworkType(hc.Network.NetworkType),
 		Concurrency:          hc.Sync.Concurrency,
 		MinStreams:           hc.Sync.MinPeers,

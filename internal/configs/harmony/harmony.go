@@ -329,6 +329,7 @@ type PrometheusConfig struct {
 type SyncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
 	Enabled              bool             // enable the stream sync protocol
+	SyncMode             uint32           // sync mode (default:Full sync, 1: Fast Sync, 2: Snap Sync(not implemented yet))
 	Downloader           bool             // start the sync downloader client
 	StagedSync           bool             // use staged sync
 	StagedSyncCfg        StagedSyncConfig // staged sync configurations
