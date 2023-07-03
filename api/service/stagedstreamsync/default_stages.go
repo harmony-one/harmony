@@ -8,40 +8,91 @@ type ForwardOrder []SyncStageID
 type RevertOrder []SyncStageID
 type CleanUpOrder []SyncStageID
 
-var DefaultForwardOrder = ForwardOrder{
-	Heads,
-	SyncEpoch,
-	ShortRange,
-	BlockBodies,
-	States,
-	StateSync,
-	Receipts,
-	LastMile,
-	Finish,
+var (
+	StagesForwardOrder ForwardOrder
+	StagesRevertOrder  RevertOrder
+	StagesCleanUpOrder CleanUpOrder
+)
+
+func initStagesOrder(syncMode SyncMode) {
+	switch syncMode {
+	case FullSync:
+		initFullSyncStagesOrder()
+	case FastSync:
+		initFastSyncStagesOrder()
+	default:
+		panic("not supported sync mode")
+	}
 }
 
-var DefaultRevertOrder = RevertOrder{
-	Finish,
-	LastMile,
-	Receipts,
-	StateSync,
-	States,
-	BlockBodies,
-	ShortRange,
-	SyncEpoch,
-	Heads,
+func initFullSyncStagesOrder() {
+	StagesForwardOrder = ForwardOrder{
+		Heads,
+		SyncEpoch,
+		ShortRange,
+		BlockBodies,
+		States,
+		LastMile,
+		Finish,
+	}
+
+	StagesRevertOrder = RevertOrder{
+		Finish,
+		LastMile,
+		States,
+		BlockBodies,
+		ShortRange,
+		SyncEpoch,
+		Heads,
+	}
+
+	StagesCleanUpOrder = CleanUpOrder{
+		Finish,
+		LastMile,
+		States,
+		BlockBodies,
+		ShortRange,
+		SyncEpoch,
+		Heads,
+	}
 }
 
-var DefaultCleanUpOrder = CleanUpOrder{
-	Finish,
-	LastMile,
-	Receipts,
-	StateSync,
-	States,
-	BlockBodies,
-	ShortRange,
-	SyncEpoch,
-	Heads,
+func initFastSyncStagesOrder() {
+	StagesForwardOrder = ForwardOrder{
+		Heads,
+		SyncEpoch,
+		ShortRange,
+		BlockBodies,
+		States,
+		StateSync,
+		Receipts,
+		LastMile,
+		Finish,
+	}
+
+	StagesRevertOrder = RevertOrder{
+		Finish,
+		LastMile,
+		Receipts,
+		StateSync,
+		States,
+		BlockBodies,
+		ShortRange,
+		SyncEpoch,
+		Heads,
+	}
+
+	StagesCleanUpOrder = CleanUpOrder{
+		Finish,
+		LastMile,
+		Receipts,
+		StateSync,
+		States,
+		BlockBodies,
+		ShortRange,
+		SyncEpoch,
+		Heads,
+	}
 }
 
 func DefaultStages(ctx context.Context,

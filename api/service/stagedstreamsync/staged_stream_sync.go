@@ -268,8 +268,21 @@ func New(
 	logger zerolog.Logger,
 ) *StagedStreamSync {
 
+	// init stages order based on sync mode
+	initStagesOrder(config.SyncMode)
+
+	forwardStages := make([]*Stage, len(stagesList))
+	for i, stageIndex := range StagesForwardOrder {
+		for _, s := range stagesList {
+			if s.ID == stageIndex {
+				forwardStages[i] = s
+				break
+			}
+		}
+	}
+
 	revertStages := make([]*Stage, len(stagesList))
-	for i, stageIndex := range DefaultRevertOrder {
+	for i, stageIndex := range StagesRevertOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
 				revertStages[i] = s
@@ -277,8 +290,9 @@ func New(
 			}
 		}
 	}
+
 	pruneStages := make([]*Stage, len(stagesList))
-	for i, stageIndex := range DefaultCleanUpOrder {
+	for i, stageIndex := range StagesCleanUpOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
 				pruneStages[i] = s
