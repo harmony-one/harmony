@@ -1,7 +1,7 @@
 ARG GOPATH_DEFAULT=/root/go
 ARG SRC_PATH=src/github.com/harmony-one
 
-FROM golang:1.18-bullseye as builder
+FROM golang:1.19-bullseye as builder
 
 ARG GOPATH_DEFAULT
 ARG SRC_PATH
