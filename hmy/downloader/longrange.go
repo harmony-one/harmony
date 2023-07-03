@@ -210,7 +210,7 @@ func (lsi *lrSyncIter) processBlocks(results []*blockResult, targetBN uint64) {
 	blocks := blockResultsToBlocks(results)
 
 	for i, block := range blocks {
-		if err := verifyAndInsertBlock(lsi.bc, block); err != nil {
+		if err := verifyAndInsertBlock(lsi.bc, block, true); err != nil {
 			lsi.logger.Warn().Err(err).Uint64("target block", targetBN).
 				Uint64("block number", block.NumberU64()).
 				Msg("insert blocks failed in long range")

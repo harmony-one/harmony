@@ -120,7 +120,7 @@ func (a Stub) Rollback(chain []common.Hash) error {
 	return errors.Errorf("method Rollback not implemented for %s", a.Name)
 }
 
-func (a Stub) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
+func (a Stub) WriteBlockWithoutState(block *types.Block) (err error) {
 	return errors.Errorf("method WriteBlockWithoutState not implemented for %s", a.Name)
 }
 
@@ -132,7 +132,7 @@ func (a Stub) GetMaxGarbageCollectedBlockNumber() int64 {
 	return 0
 }
 
-func (a Stub) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
+func (a Stub) InsertChain(chain types.Blocks, verifyHeaders bool, blockExecution bool) (int, error) {
 	return 0, errors.Errorf("method InsertChain not implemented for %s", a.Name)
 }
 

@@ -100,6 +100,18 @@ type BlockChain interface {
 	// Rollback is designed to remove a chain of links from the database that aren't
 	// certain enough to be valid.
 	Rollback(chain []common.Hash) error
+	// WriteBlockWithoutState writes only the block and its metadata to the database,
+	// but does not write any state. This is used to construct competing side forks
+	// up to the point where they exceed the canonical total difficulty.
+	WriteBlockWithoutState(block *types.Block) (err error)
+	// WriteBlockWithState writes the block and all associated state to the database.
+	WriteBlockWithState(
+		block *types.Block, receipts []*types.Receipt,
+		cxReceipts []*types.CXReceipt,
+		stakeMsgs []types2.StakeMsg,
+		paid reward.Reader,
+		state *state.DB,
+	) (status WriteStatus, err error)
 	// GetMaxGarbageCollectedBlockNumber ..
 	GetMaxGarbageCollectedBlockNumber() int64
 	// InsertChain attempts to insert the given batch of blocks in to the canonical
@@ -108,9 +120,9 @@ type BlockChain interface {
 	// wrong.
 	//
 	// After insertion is done, all accumulated events will be fired.
-	InsertChain(chain types.Blocks, verifyHeaders bool) (int, error)
-	// LeaderRotationMeta returns info about leader rotation.
-	LeaderRotationMeta() LeaderRotationMeta
+	InsertChain(chain types.Blocks, verifyHeaders bool, blockExecution bool) (int, error)
+	// LeaderRotationMeta returns the number of continuous blocks by the leader.
+	LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts uint64, err error)
 	// BadBlocks returns a list of the last 'bad blocks' that
 	// the client has seen on the network.
 	BadBlocks() []BadBlock

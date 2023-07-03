@@ -74,7 +74,7 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 	}
 	d.logger.Info().Int("num blocks", len(blocks)).Msg("getBlockByHashes result")
 
-	n, err := verifyAndInsertBlocks(d.bc, blocks)
+	n, err := verifyAndInsertBlocks(d.bc, true, blocks)
 	numBlocksInsertedShortRangeHistogramVec.With(d.promLabels()).Observe(float64(n))
 	if err != nil {
 		d.logger.Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
@@ -131,7 +131,7 @@ func (d *Downloader) doShortRangeSyncForEpochSync() (int, error) {
 		// short circuit for no sync is needed
 		return 0, nil
 	}
-	n, err := d.bc.InsertChain(blocks, true)
+	n, err := d.bc.InsertChain(blocks, true, true)
 	numBlocksInsertedShortRangeHistogramVec.With(d.promLabels()).Observe(float64(n))
 	if err != nil {
 		sh.removeStreams([]sttypes.StreamID{streamID}) // Data provided by remote nodes is corrupted

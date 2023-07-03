@@ -280,16 +280,16 @@ func (e *sigVerifyErr) Error() string {
 	return fmt.Sprintf("[VerifyHeaderSignature] %v", e.err.Error())
 }
 
-func verifyAndInsertBlocks(bc blockChain, blocks types.Blocks) (int, error) {
+func verifyAndInsertBlocks(bc blockChain, blockExecution bool, blocks types.Blocks) (int, error) {
 	for i, block := range blocks {
-		if err := verifyAndInsertBlock(bc, block, blocks[i+1:]...); err != nil {
+		if err := verifyAndInsertBlock(bc, block, blockExecution, blocks[i+1:]...); err != nil {
 			return i, err
 		}
 	}
 	return len(blocks), nil
 }
 
-func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*types.Block) error {
+func verifyAndInsertBlock(bc blockChain, block *types.Block, blockExecution bool, nextBlocks ...*types.Block) error {
 	var (
 		sigBytes bls.SerializedSignature
 		bitmap   []byte
@@ -314,7 +314,7 @@ func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*type
 	if err := bc.Engine().VerifyHeader(bc, block.Header(), true); err != nil {
 		return errors.Wrap(err, "[VerifyHeader]")
 	}
-	if _, err := bc.InsertChain(types.Blocks{block}, false); err != nil {
+	if _, err := bc.InsertChain(types.Blocks{block}, false, blockExecution); err != nil {
 		return errors.Wrap(err, "[InsertChain]")
 	}
 	return nil
