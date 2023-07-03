@@ -102,9 +102,10 @@ type Timing struct {
 }
 
 type SyncCycle struct {
-	Number       uint64
-	TargetHeight uint64
-	lock         sync.RWMutex
+	Number        uint64
+	TargetHeight  uint64
+	ReceiptHashes map[uint64]common.Hash
+	lock          sync.RWMutex
 }
 
 func (s *StagedStreamSync) Len() int                    { return len(s.stages) }

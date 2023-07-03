@@ -40,12 +40,25 @@ const (
 	ShortRangeTimeout time.Duration = 1 * time.Minute
 )
 
+// SyncMode represents the synchronization mode of the downloader.
+// It is a uint32 as it is used with atomic operations.
+type SyncMode uint32
+
+const (
+	FullSync SyncMode = iota // Synchronize the entire blockchain history from full blocks
+	FastSync                 // Download all blocks and states
+	SnapSync                 // Download the chain and the state via compact snapshots
+)
+
 type (
 	// Config is the downloader config
 	Config struct {
 		// Only run stream sync protocol as a server.
 		// TODO: remove this when stream sync is fully up.
 		ServerOnly bool
+
+		// Synchronization mode of the downloader
+		SyncMode SyncMode
 
 		// parameters
 		Network              nodeconfig.NetworkType

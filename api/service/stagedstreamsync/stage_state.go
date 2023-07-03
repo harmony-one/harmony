@@ -19,12 +19,13 @@ type StageStates struct {
 	configs StageStatesCfg
 }
 type StageStatesCfg struct {
-	bc          core.BlockChain
-	db          kv.RwDB
-	blockDBs    []kv.RwDB
-	concurrency int
-	logger      zerolog.Logger
-	logProgress bool
+	bc             core.BlockChain
+	db             kv.RwDB
+	blockDBs       []kv.RwDB
+	concurrency    int
+	blockExecution bool
+	logger         zerolog.Logger
+	logProgress    bool
 }
 
 func NewStageStates(cfg StageStatesCfg) *StageStates {
@@ -38,16 +39,18 @@ func NewStageStatesCfg(
 	db kv.RwDB,
 	blockDBs []kv.RwDB,
 	concurrency int,
+	blockExecution bool,
 	logger zerolog.Logger,
 	logProgress bool) StageStatesCfg {
 
 	return StageStatesCfg{
-		bc:          bc,
-		db:          db,
-		blockDBs:    blockDBs,
-		concurrency: concurrency,
-		logger:      logger,
-		logProgress: logProgress,
+		bc:             bc,
+		db:             db,
+		blockDBs:       blockDBs,
+		concurrency:    concurrency,
+		blockExecution: blockExecution,
+		logger:         logger,
+		logProgress:    logProgress,
 	}
 }
 
@@ -108,6 +111,8 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		fmt.Print("\033[s") // save the cursor position
 	}
 
+	s.state.currentCycle.ReceiptHashes = make(map[uint64]common.Hash)
+
 	for i := currProgress + 1; i <= targetHeight; i++ {
 		blkKey := marshalData(i)
 		loopID, streamID := gbm.GetDownloadDetails(i)
@@ -157,7 +162,7 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			return ErrInvalidBlockNumber
 		}
 
-		if err := verifyAndInsertBlock(stg.configs.bc, block); err != nil {
+		if err := verifyAndInsertBlock(stg.configs.bc, block, stg.configs.blockExecution); err != nil {
 			stg.configs.logger.Warn().Err(err).Uint64("cycle target block", targetHeight).
 				Uint64("block number", block.NumberU64()).
 				Msg(WrapStagedSyncMsg("insert blocks failed in long range"))
@@ -168,6 +173,10 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			longRangeFailInsertedBlockCounterVec.With(pl).Inc()
 			return err
 		}
+
+		// TODO: only for fast sync
+		// add receipt hash for next stage
+		s.state.currentCycle.ReceiptHashes[block.NumberU64()]=block.Header().ReceiptHash()
 
 		if invalidBlockRevert {
 			if s.state.invalidBlock.Number == i {
