@@ -149,9 +149,9 @@ func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 		var hashes []common.Hash
 		for _, bn := range batch {
 			/*
-			// TODO: check if we can directly use bc rather than receipt hashes map 
-			header := b.configs.bc.GetHeaderByNumber(bn)
-			hashes = append(hashes, header.ReceiptHash())
+				// TODO: check if we can directly use bc rather than receipt hashes map
+				header := b.configs.bc.GetHeaderByNumber(bn)
+				hashes = append(hashes, header.ReceiptHash())
 			*/
 			receiptHash := s.state.currentCycle.ReceiptHashes[bn]
 			hashes = append(hashes, receiptHash)

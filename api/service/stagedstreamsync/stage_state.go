@@ -176,7 +176,7 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 
 		// TODO: only for fast sync
 		// add receipt hash for next stage
-		s.state.currentCycle.ReceiptHashes[block.NumberU64()]=block.Header().ReceiptHash()
+		s.state.currentCycle.ReceiptHashes[block.NumberU64()] = block.Header().ReceiptHash()
 
 		if invalidBlockRevert {
 			if s.state.invalidBlock.Number == i {
