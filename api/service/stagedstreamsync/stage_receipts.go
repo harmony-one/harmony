@@ -110,7 +110,7 @@ func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 
 	for i := 0; i != s.state.config.Concurrency; i++ {
 		wg.Add(1)
-		go b.runReceiptWorkerLoop(ctx, s.state.rdm, &wg, i, startTime)
+		go b.runReceiptWorkerLoop(ctx, s.state.rdm, &wg, i, s, startTime)
 	}
 
 	wg.Wait()
@@ -125,7 +125,7 @@ func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 }
 
 // runReceiptWorkerLoop creates a work loop for download receipts
-func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDownloadManager, wg *sync.WaitGroup, loopID int, startTime time.Time) {
+func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, startTime time.Time) {
 
 	currentBlock := int(b.configs.bc.CurrentBlock().NumberU64())
 
@@ -148,8 +148,13 @@ func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 		}
 		var hashes []common.Hash
 		for _, bn := range batch {
+			/*
+			// TODO: check if we can directly use bc rather than receipt hashes map 
 			header := b.configs.bc.GetHeaderByNumber(bn)
 			hashes = append(hashes, header.ReceiptHash())
+			*/
+			receiptHash := s.state.currentCycle.ReceiptHashes[bn]
+			hashes = append(hashes, receiptHash)
 		}
 		receipts, stid, err := b.downloadReceipts(ctx, hashes)
 		if err != nil {
