@@ -274,7 +274,7 @@ func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, tri
 		} else if task.attempts[streamID] >= MaxTriesToFetchNodeData {
 			// If we've requested the node too many times already, it may be a malicious
 			// sync where nobody has the right data. Abort.
-			return fmt.Errorf("trie node %s failed with peer %s", task.hash.TerminalString(), task.attempts[streamID])
+			return fmt.Errorf("trie node %s failed with peer %s (%d tries)", task.hash.TerminalString(), streamID, task.attempts[streamID])
 		}
 		// Missing item, place into the retry queue.
 		s.retries.addTrieTask(path, task)
@@ -291,7 +291,7 @@ func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, tri
 		} else if task.attempts[streamID] >= MaxTriesToFetchNodeData {
 			// If we've requested the node too many times already, it may be a malicious
 			// sync where nobody has the right data. Abort.
-			return fmt.Errorf("byte code %s failed with peer %s", hash.TerminalString(), task.attempts[streamID])
+			return fmt.Errorf("byte code %s failed with peer %s (%d tries)", hash.TerminalString(), streamID, task.attempts[streamID])
 		}
 		// Missing item, place into the retry queue.
 		s.retries.addCodeTask(hash, task)
