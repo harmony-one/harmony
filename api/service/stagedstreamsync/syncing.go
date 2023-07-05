@@ -81,14 +81,14 @@ func CreateStagedSync(ctx context.Context,
 		return nil, errInitDB
 	}
 
-	fastSync := config.SyncMode == FastSync
+	blockExecution := config.SyncMode == FullSync
+	extractReceiptHashes := config.SyncMode == FastSync || config.SyncMode == SnapSync
 
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
 	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
-
-	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
-	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, !fastSync, logger, config.LogProgress)
+	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, extractReceiptHashes, config.LogProgress)
+	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, blockExecution, logger, config.LogProgress)
 	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)	
