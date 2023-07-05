@@ -40,12 +40,10 @@ import (
 	"github.com/harmony-one/harmony/api/service/pprof"
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/stagedstreamsync"
-	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/common/ntp"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/hmy/downloader"
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -405,12 +403,9 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 
 	// Setup services
 	if hc.Sync.Enabled {
-		if hc.Sync.StagedSync {
-			setupStagedSyncService(currentNode, myHost, hc)
-		} else {
-			setupSyncService(currentNode, myHost, hc)
-		}
+		setupSyncService(currentNode, myHost, hc)
 	}
+
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		currentNode.RegisterValidatorServices()
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
@@ -896,41 +891,6 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 		blockchains = append(blockchains, node.EpochChain())
 	}
 
-	dConfig := downloader.Config{
-		ServerOnly:   !hc.Sync.Downloader,
-		Network:      nodeconfig.NetworkType(hc.Network.NetworkType),
-		Concurrency:  hc.Sync.Concurrency,
-		MinStreams:   hc.Sync.MinPeers,
-		InitStreams:  hc.Sync.InitStreams,
-		SmSoftLowCap: hc.Sync.DiscSoftLowCap,
-		SmHardLowCap: hc.Sync.DiscHardLowCap,
-		SmHiCap:      hc.Sync.DiscHighCap,
-		SmDiscBatch:  hc.Sync.DiscBatch,
-	}
-	// If we are running side chain, we will need to do some extra works for beacon
-	// sync.
-	if !node.IsRunningBeaconChain() {
-		dConfig.BHConfig = &downloader.BeaconHelperConfig{
-			BlockC:     node.BeaconBlockChannel,
-			InsertHook: node.BeaconSyncHook,
-		}
-	}
-	s := synchronize.NewService(host, blockchains, dConfig)
-
-	node.RegisterService(service.Synchronize, s)
-
-	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
-	if hc.Sync.Downloader && hc.General.NodeType != nodeTypeExplorer {
-		node.Consensus.SetDownloader(d) // Set downloader when stream client is active
-	}
-}
-
-func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyConfig) {
-	blockchains := []core.BlockChain{node.Blockchain()}
-	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-		blockchains = append(blockchains, node.EpochChain())
-	}
-
 	sConfig := stagedstreamsync.Config{
 		ServerOnly:           !hc.Sync.Downloader,
 		Network:              nodeconfig.NetworkType(hc.Network.NetworkType),
@@ -956,7 +916,7 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 	//Setup stream sync service
 	s := stagedstreamsync.NewService(host, blockchains, sConfig, hc.General.DataDir)
 
-	node.RegisterService(service.StagedStreamSync, s)
+	node.RegisterService(service.Synchronize, s)
 
 	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
 	if hc.Sync.Downloader && hc.General.NodeType != nodeTypeExplorer {
