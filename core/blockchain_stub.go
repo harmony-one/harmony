@@ -136,6 +136,10 @@ func (a Stub) InsertChain(chain types.Blocks, verifyHeaders bool, blockExecution
 	return 0, errors.Errorf("method InsertChain not implemented for %s", a.Name)
 }
 
+func (a Stub) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
+	return 0, errors.Errorf("method InsertReceiptChain not implemented for %s", a.Name)
+}
+
 func (a Stub) BadBlocks() []BadBlock {
 	return nil
 }

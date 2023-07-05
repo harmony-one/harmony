@@ -121,6 +121,9 @@ type BlockChain interface {
 	//
 	// After insertion is done, all accumulated events will be fired.
 	InsertChain(chain types.Blocks, verifyHeaders bool, blockExecution bool) (int, error)
+	// InsertReceiptChain attempts to complete an already existing header chain with
+	// transaction and receipt data.
+	InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error)
 	// LeaderRotationMeta returns the number of continuous blocks by the leader.
 	LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts uint64, err error)
 	// BadBlocks returns a list of the last 'bad blocks' that
