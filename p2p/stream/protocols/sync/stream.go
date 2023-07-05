@@ -437,8 +437,20 @@ func (st *syncStream) computeGetReceipts(rid uint64, hs []common.Hash) (*syncpb.
 	if err != nil {
 		return nil, err
 	}
-
-	return syncpb.MakeGetReceiptsResponseMessage(rid, [][]byte(receipts)), nil
+	var normalizedReceipts = make(map[uint64]*syncpb.Receipts, len(receipts))
+	for i, blkReceipts := range receipts {
+		normalizedReceipts[uint64(i)] = &syncpb.Receipts{
+			ReceiptBytes: make([][]byte, 0),
+		}
+		for _, receipt := range blkReceipts {
+			receiptBytes, err := rlp.EncodeToBytes(receipt)
+			if err != nil {
+				return nil, err
+			}
+			normalizedReceipts[uint64(i)].ReceiptBytes = append(normalizedReceipts[uint64(i)].ReceiptBytes, receiptBytes)
+		}
+	}
+	return syncpb.MakeGetReceiptsResponseMessage(rid, normalizedReceipts), nil
 }
 
 func bytesToHashes(bs [][]byte) []common.Hash {

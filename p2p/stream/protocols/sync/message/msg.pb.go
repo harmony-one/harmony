@@ -976,18 +976,65 @@ func (x *GetNodeDataResponse) GetDataBytes() [][]byte {
 	return nil
 }
 
+type Receipts struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ReceiptBytes [][]byte `protobuf:"bytes,1,rep,name=receipt_bytes,json=receiptBytes,proto3" json:"receipt_bytes,omitempty"`
+}
+
+func (x *Receipts) Reset() {
+	*x = Receipts{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_msg_proto_msgTypes[15]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Receipts) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Receipts) ProtoMessage() {}
+
+func (x *Receipts) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[15]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Receipts.ProtoReflect.Descriptor instead.
+func (*Receipts) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *Receipts) GetReceiptBytes() [][]byte {
+	if x != nil {
+		return x.ReceiptBytes
+	}
+	return nil
+}
+
 type GetReceiptsResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ReceiptsBytes [][]byte `protobuf:"bytes,1,rep,name=receipts_bytes,json=receiptsBytes,proto3" json:"receipts_bytes,omitempty"`
+	Receipts map[uint64]*Receipts `protobuf:"bytes,1,rep,name=receipts,proto3" json:"receipts,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *GetReceiptsResponse) Reset() {
 	*x = GetReceiptsResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_msg_proto_msgTypes[15]
+		mi := &file_msg_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1000,7 +1047,7 @@ func (x *GetReceiptsResponse) String() string {
 func (*GetReceiptsResponse) ProtoMessage() {}
 
 func (x *GetReceiptsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_msg_proto_msgTypes[15]
+	mi := &file_msg_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1013,12 +1060,12 @@ func (x *GetReceiptsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReceiptsResponse.ProtoReflect.Descriptor instead.
 func (*GetReceiptsResponse) Descriptor() ([]byte, []int) {
-	return file_msg_proto_rawDescGZIP(), []int{15}
+	return file_msg_proto_rawDescGZIP(), []int{16}
 }
 
-func (x *GetReceiptsResponse) GetReceiptsBytes() [][]byte {
+func (x *GetReceiptsResponse) GetReceipts() map[uint64]*Receipts {
 	if x != nil {
-		return x.ReceiptsBytes
+		return x.Receipts
 	}
 	return nil
 }
@@ -1174,12 +1221,25 @@ var file_msg_proto_rawDesc = []byte{
 	0x53, 0x69, 0x67, 0x22, 0x34, 0x0a, 0x13, 0x47, 0x65, 0x74, 0x4e, 0x6f, 0x64, 0x65, 0x44, 0x61,
 	0x74, 0x61, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x1d, 0x0a, 0x0a, 0x64, 0x61,
 	0x74, 0x61, 0x5f, 0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x09,
-	0x64, 0x61, 0x74, 0x61, 0x42, 0x79, 0x74, 0x65, 0x73, 0x22, 0x3c, 0x0a, 0x13, 0x47, 0x65, 0x74,
-	0x52, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
-	0x12, 0x25, 0x0a, 0x0e, 0x72, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x5f, 0x62, 0x79, 0x74,
-	0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x0d, 0x72, 0x65, 0x63, 0x65, 0x69, 0x70,
-	0x74, 0x73, 0x42, 0x79, 0x74, 0x65, 0x73, 0x42, 0x0c, 0x5a, 0x0a, 0x2e, 0x2f, 0x3b, 0x6d, 0x65,
-	0x73, 0x73, 0x61, 0x67, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x64, 0x61, 0x74, 0x61, 0x42, 0x79, 0x74, 0x65, 0x73, 0x22, 0x2f, 0x0a, 0x08, 0x52, 0x65, 0x63,
+	0x65, 0x69, 0x70, 0x74, 0x73, 0x12, 0x23, 0x0a, 0x0d, 0x72, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74,
+	0x5f, 0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x0c, 0x72, 0x65,
+	0x63, 0x65, 0x69, 0x70, 0x74, 0x42, 0x79, 0x74, 0x65, 0x73, 0x22, 0xd5, 0x01, 0x0a, 0x13, 0x47,
+	0x65, 0x74, 0x52, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x5a, 0x0a, 0x08, 0x72, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x18, 0x01,
+	0x20, 0x03, 0x28, 0x0b, 0x32, 0x3e, 0x2e, 0x68, 0x61, 0x72, 0x6d, 0x6f, 0x6e, 0x79, 0x2e, 0x73,
+	0x74, 0x72, 0x65, 0x61, 0x6d, 0x2e, 0x73, 0x79, 0x6e, 0x63, 0x2e, 0x6d, 0x65, 0x73, 0x73, 0x61,
+	0x67, 0x65, 0x2e, 0x47, 0x65, 0x74, 0x52, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x52, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x45,
+	0x6e, 0x74, 0x72, 0x79, 0x52, 0x08, 0x72, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x1a, 0x62,
+	0x0a, 0x0d, 0x52, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12,
+	0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x6b, 0x65,
+	0x79, 0x12, 0x3b, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x25, 0x2e, 0x68, 0x61, 0x72, 0x6d, 0x6f, 0x6e, 0x79, 0x2e, 0x73, 0x74, 0x72, 0x65, 0x61,
+	0x6d, 0x2e, 0x73, 0x79, 0x6e, 0x63, 0x2e, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x52,
+	0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02,
+	0x38, 0x01, 0x42, 0x0c, 0x5a, 0x0a, 0x2e, 0x2f, 0x3b, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1194,7 +1254,7 @@ func file_msg_proto_rawDescGZIP() []byte {
 	return file_msg_proto_rawDescData
 }
 
-var file_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_msg_proto_goTypes = []interface{}{
 	(*Message)(nil),                   // 0: harmony.stream.sync.message.Message
 	(*Request)(nil),                   // 1: harmony.stream.sync.message.Request
@@ -1211,7 +1271,9 @@ var file_msg_proto_goTypes = []interface{}{
 	(*GetBlocksByNumResponse)(nil),    // 12: harmony.stream.sync.message.GetBlocksByNumResponse
 	(*GetBlocksByHashesResponse)(nil), // 13: harmony.stream.sync.message.GetBlocksByHashesResponse
 	(*GetNodeDataResponse)(nil),       // 14: harmony.stream.sync.message.GetNodeDataResponse
-	(*GetReceiptsResponse)(nil),       // 15: harmony.stream.sync.message.GetReceiptsResponse
+	(*Receipts)(nil),                  // 15: harmony.stream.sync.message.Receipts
+	(*GetReceiptsResponse)(nil),       // 16: harmony.stream.sync.message.GetReceiptsResponse
+	nil,                               // 17: harmony.stream.sync.message.GetReceiptsResponse.ReceiptsEntry
 }
 var file_msg_proto_depIdxs = []int32{
 	1,  // 0: harmony.stream.sync.message.Message.req:type_name -> harmony.stream.sync.message.Request
@@ -1228,12 +1290,14 @@ var file_msg_proto_depIdxs = []int32{
 	12, // 11: harmony.stream.sync.message.Response.get_blocks_by_num_response:type_name -> harmony.stream.sync.message.GetBlocksByNumResponse
 	13, // 12: harmony.stream.sync.message.Response.get_blocks_by_hashes_response:type_name -> harmony.stream.sync.message.GetBlocksByHashesResponse
 	14, // 13: harmony.stream.sync.message.Response.get_node_data_response:type_name -> harmony.stream.sync.message.GetNodeDataResponse
-	15, // 14: harmony.stream.sync.message.Response.get_receipts_response:type_name -> harmony.stream.sync.message.GetReceiptsResponse
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	16, // 14: harmony.stream.sync.message.Response.get_receipts_response:type_name -> harmony.stream.sync.message.GetReceiptsResponse
+	17, // 15: harmony.stream.sync.message.GetReceiptsResponse.receipts:type_name -> harmony.stream.sync.message.GetReceiptsResponse.ReceiptsEntry
+	15, // 16: harmony.stream.sync.message.GetReceiptsResponse.ReceiptsEntry.value:type_name -> harmony.stream.sync.message.Receipts
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_msg_proto_init() }
@@ -1423,6 +1487,18 @@ func file_msg_proto_init() {
 			}
 		}
 		file_msg_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Receipts); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_msg_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetReceiptsResponse); i {
 			case 0:
 				return &v.state
@@ -1462,7 +1538,7 @@ func file_msg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_msg_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

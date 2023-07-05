@@ -179,18 +179,18 @@ func MakeGetNodeDataResponse(rid uint64, nodeData [][]byte) *Response {
 }
 
 // MakeGetReceiptsResponseMessage makes the GetReceiptsResponse of Message type
-func MakeGetReceiptsResponseMessage(rid uint64, receiptsBytes [][]byte) *Message {
-	resp := MakeGetReceiptsResponse(rid, receiptsBytes)
+func MakeGetReceiptsResponseMessage(rid uint64, receipts map[uint64]*Receipts) *Message {
+	resp := MakeGetReceiptsResponse(rid, receipts)
 	return makeMessageFromResponse(resp)
 }
 
 // MakeGetReceiptsResponse make the GetReceiptsResponse of Response type
-func MakeGetReceiptsResponse(rid uint64, receiptsBytes [][]byte) *Response {
+func MakeGetReceiptsResponse(rid uint64, receipts map[uint64]*Receipts) *Response {
 	return &Response{
 		ReqId: rid,
 		Response: &Response_GetReceiptsResponse{
 			GetReceiptsResponse: &GetReceiptsResponse{
-				ReceiptsBytes: receiptsBytes,
+				Receipts: receipts,
 			},
 		},
 	}

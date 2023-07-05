@@ -83,8 +83,10 @@ message GetNodeDataResponse {
   repeated bytes data_bytes = 1;
 }
 
-message GetReceiptsResponse {
-  repeated bytes receipts_bytes = 1;
+message Receipts {
+  repeated bytes receipt_bytes = 1;
 }
 
-
+message GetReceiptsResponse {
+  map<uint64, Receipts> receipts = 1;
+}

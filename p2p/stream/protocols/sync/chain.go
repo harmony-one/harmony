@@ -2,12 +2,10 @@ package sync
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/keylocker"
 	"github.com/pkg/errors"
 )
@@ -19,7 +17,7 @@ type chainHelper interface {
 	getBlocksByNumber(bns []uint64) ([]*types.Block, error)
 	getBlocksByHashes(hs []common.Hash) ([]*types.Block, error)
 	getNodeData(hs []common.Hash) ([][]byte, error)
-	getReceipts(hs []common.Hash) ([][]byte, error)
+	getReceipts(hs []common.Hash) ([]types.Receipts, error)
 }
 
 type chainHelperImpl struct {
@@ -169,12 +167,10 @@ func (ch *chainHelperImpl) getNodeData(hs []common.Hash) ([][]byte, error) {
 }
 
 // getReceipts assembles the response to a receipt query.
-func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([][]byte, error) {
-	var (
-		bytes    int
-		receipts [][]byte
-	)
-	for _, hash := range hs {
+func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([]types.Receipts, error) {
+	var receipts []types.Receipts
+
+	for i, hash := range hs {
 		// Retrieve the requested block's receipts
 		results := ch.chain.GetReceiptsByHash(hash)
 		if results == nil {
@@ -182,13 +178,7 @@ func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([][]byte, error) {
 				continue
 			}
 		}
-		// If known, encode and queue for response packet
-		if encoded, err := rlp.EncodeToBytes(results); err != nil {
-			utils.Logger().Err(err).Msg("Failed to encode receipt")
-		} else {
-			receipts = append(receipts, encoded)
-			bytes += len(encoded)
-		}
+		receipts[i] = append(receipts[i], results...)
 	}
 	return receipts, nil
 }

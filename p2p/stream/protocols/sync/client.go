@@ -137,7 +137,7 @@ func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts
 
 // GetReceipts do getReceiptsRequest through sync stream protocol.
 // Return the receipts as result, target stream id, and error
-func (p *Protocol) GetReceipts(ctx context.Context, hs []common.Hash, opts ...Option) (receipts []*types.Receipt, stid sttypes.StreamID, err error) {
+func (p *Protocol) GetReceipts(ctx context.Context, hs []common.Hash, opts ...Option) (receipts []types.Receipts, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getReceipts")
 	defer p.doMetricPostClientRequest("getReceipts", err, timer)
 
@@ -539,7 +539,7 @@ func (req *getReceiptsRequest) Encode() ([]byte, error) {
 	return protobuf.Marshal(msg)
 }
 
-func (req *getReceiptsRequest) getReceiptsFromResponse(resp sttypes.Response) ([]*types.Receipt, error) {
+func (req *getReceiptsRequest) getReceiptsFromResponse(resp sttypes.Response) ([]types.Receipts, error) {
 	sResp, ok := resp.(*syncResponse)
 	if !ok || sResp == nil {
 		return nil, errors.New("not sync response")
@@ -551,7 +551,7 @@ func (req *getReceiptsRequest) getReceiptsFromResponse(resp sttypes.Response) ([
 	return receipts, nil
 }
 
-func (req *getReceiptsRequest) parseGetReceiptsBytes(resp *syncResponse) ([]*types.Receipt, error) {
+func (req *getReceiptsRequest) parseGetReceiptsBytes(resp *syncResponse) ([]types.Receipts, error) {
 	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
 		return nil, errors.New(errResp.Error)
 	}
@@ -559,13 +559,15 @@ func (req *getReceiptsRequest) parseGetReceiptsBytes(resp *syncResponse) ([]*typ
 	if grResp == nil {
 		return nil, errors.New("response not GetReceipts")
 	}
-	receipts := make([]*types.Receipt, 0, len(grResp.ReceiptsBytes))
-	for _, rcptBytes := range grResp.ReceiptsBytes {
-		var receipt *types.Receipt
-		if err := rlp.DecodeBytes(rcptBytes, &receipt); err != nil {
-			return nil, errors.Wrap(err, "[GetReceiptsResponse]")
+	receipts := make([]types.Receipts, len(grResp.Receipts))
+	for i, blockReceipts := range grResp.Receipts {
+		for _, rcptBytes := range blockReceipts.ReceiptBytes {
+			var receipt *types.Receipt
+			if err := rlp.DecodeBytes(rcptBytes, &receipt); err != nil {
+				return nil, errors.Wrap(err, "[GetReceiptsResponse]")
+			}
+			receipts[i] = append(receipts[i], receipt)
 		}
-		receipts = append(receipts, receipt)
 	}
 	return receipts, nil
 }
