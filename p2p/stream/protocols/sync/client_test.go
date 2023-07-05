@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p/stream/common/ratelimiter"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
+	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 )
@@ -59,7 +60,10 @@ var (
 
 	testBlocksByHashesResponse = syncpb.MakeGetBlocksByHashesResponse(0, [][]byte{testBlockBytes}, make([][]byte, 1))
 
-	testReceiptResponse = syncpb.MakeGetReceiptsResponse(0, [][]byte{testReceiptBytes})
+	testReceipsMap = map[uint64]*message.Receipts{
+		0: {ReceiptBytes: [][]byte{testReceiptBytes}},
+	}
+	testReceiptResponse = syncpb.MakeGetReceiptsResponse(0, testReceipsMap)
 
 	testNodeDataResponse = syncpb.MakeGetNodeDataResponse(0, [][]byte{testNodeDataBytes})
 
@@ -357,6 +361,9 @@ func TestProtocol_GetReceipts(t *testing.T) {
 		if test.expErr == nil {
 			if len(receipts) != 1 {
 				t.Errorf("Test %v: size not 1", i)
+			}
+			if len(receipts[0]) != 1 {
+				t.Errorf("Test %v: block receipts size not 1", i)
 			}
 		}
 	}

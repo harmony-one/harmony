@@ -51,12 +51,11 @@ func (tch *testChainHelper) getNodeData(hs []common.Hash) ([][]byte, error) {
 	return data, nil
 }
 
-func (tch *testChainHelper) getReceipts(hs []common.Hash) ([][]byte, error) {
+func (tch *testChainHelper) getReceipts(hs []common.Hash) ([]types.Receipts, error) {
 	testReceipts := makeTestReceipts(len(hs), 3)
-	receipts := make([][]byte, 0, len(hs)*3)
-	for _, r := range testReceipts {
-		receiptByes, _ := rlp.EncodeToBytes(r)
-		receipts = append(receipts, receiptByes)
+	receipts := make([]types.Receipts, len(hs)*3)
+	for i, _ := range hs {
+		receipts[i] = testReceipts
 	}
 	return receipts, nil
 }
@@ -115,7 +114,7 @@ func makeTestNodeData(n int) [][]byte {
 }
 
 // makeTestReceipts creates fake receipts
-func makeTestReceipts(n int, nPerBlock int) []types.Receipts {
+func makeTestReceipts(n int, nPerBlock int) []*types.Receipt {
 	receipts := make([]*types.Receipt, nPerBlock)
 	for i := 0; i < nPerBlock; i++ {
 		receipts[i] = &types.Receipt{
@@ -124,11 +123,7 @@ func makeTestReceipts(n int, nPerBlock int) []types.Receipts {
 			Logs:              make([]*types.Log, 5),
 		}
 	}
-	allReceipts := make([]types.Receipts, n)
-	for i := 0; i < n; i++ {
-		allReceipts[i] = receipts
-	}
-	return allReceipts
+	return receipts
 }
 
 func decodeBlocksBytes(bbs [][]byte) ([]*types.Block, error) {
