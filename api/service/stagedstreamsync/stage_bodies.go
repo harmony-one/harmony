@@ -21,14 +21,14 @@ type StageBodies struct {
 }
 
 type StageBodiesCfg struct {
-	bc          core.BlockChain
-	db          kv.RwDB
-	blockDBs    []kv.RwDB
-	concurrency int
-	protocol    syncProtocol
-	isBeacon    bool
+	bc                   core.BlockChain
+	db                   kv.RwDB
+	blockDBs             []kv.RwDB
+	concurrency          int
+	protocol             syncProtocol
+	isBeacon             bool
 	extractReceiptHashes bool
-	logProgress bool
+	logProgress          bool
 }
 
 func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
@@ -39,14 +39,14 @@ func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
 
 func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeacon bool, extractReceiptHashes bool, logProgress bool) StageBodiesCfg {
 	return StageBodiesCfg{
-		bc:          bc,
-		db:          db,
-		blockDBs:    blockDBs,
-		concurrency: concurrency,
-		protocol:    protocol,
-		isBeacon:    isBeacon,
+		bc:                   bc,
+		db:                   db,
+		blockDBs:             blockDBs,
+		concurrency:          concurrency,
+		protocol:             protocol,
+		isBeacon:             isBeacon,
 		extractReceiptHashes: extractReceiptHashes,
-		logProgress: logProgress,
+		logProgress:          logProgress,
 	}
 }
 

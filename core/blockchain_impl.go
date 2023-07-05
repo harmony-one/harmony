@@ -1659,7 +1659,7 @@ func (bc *BlockChainImpl) insertChainWithBlockExecution(chain types.Blocks, veri
 	return 0, events, coalescedLogs, nil
 }
 
-//receiptChain []types.Receipts,
+// insertChainWithoutBlockExecution adds a set of blocks to blockchain without adding states
 func (bc *BlockChainImpl) insertChainWithoutBlockExecution(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
