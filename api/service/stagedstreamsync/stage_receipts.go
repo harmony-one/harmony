@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -89,6 +90,22 @@ func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	// size := uint64(0)
 	startTime := time.Now()
 	// startBlock := currProgress
+
+	// prepare db transactions
+	txs := make([]kv.RwTx, b.configs.concurrency)
+	for i := 0; i < b.configs.concurrency; i++ {
+		txs[i], err = b.configs.blockDBs[i].BeginRw(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	defer func() {
+		for i := 0; i < b.configs.concurrency; i++ {
+			txs[i].Rollback()
+		}
+	}()
+
 	if b.configs.logProgress {
 		fmt.Print("\033[s") // save the cursor position
 	}
@@ -110,7 +127,7 @@ func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 
 	for i := 0; i != s.state.config.Concurrency; i++ {
 		wg.Add(1)
-		go b.runReceiptWorkerLoop(ctx, s.state.rdm, &wg, i, s, startTime)
+		go b.runReceiptWorkerLoop(ctx, s.state.rdm, &wg, i, s, txs, startTime)
 	}
 
 	wg.Wait()
@@ -125,9 +142,10 @@ func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 }
 
 // runReceiptWorkerLoop creates a work loop for download receipts
-func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, startTime time.Time) {
+func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, txs []kv.RwTx, startTime time.Time) {
 
 	currentBlock := int(b.configs.bc.CurrentBlock().NumberU64())
+	gbm := s.state.gbm
 
 	defer wg.Done()
 
@@ -137,6 +155,7 @@ func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 			return
 		default:
 		}
+		// get next batch of block numbers
 		batch := rdm.GetNextBatch()
 		if len(batch) == 0 {
 			select {
@@ -146,16 +165,43 @@ func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 				return
 			}
 		}
+		// retrieve corresponding blocks from cache db
 		var hashes []common.Hash
+		var blocks []*types.Block
 		for _, bn := range batch {
-			/*
-				// TODO: check if we can directly use bc rather than receipt hashes map
-				header := b.configs.bc.GetHeaderByNumber(bn)
-				hashes = append(hashes, header.ReceiptHash())
-			*/
-			receiptHash := s.state.currentCycle.ReceiptHashes[bn]
-			hashes = append(hashes, receiptHash)
+			blkKey := marshalData(bn)
+			loopID, _ := gbm.GetDownloadDetails(bn)
+			blockBytes, err := txs[loopID].GetOne(BlocksBucket, blkKey)
+			if err != nil {
+				return
+			}
+			sigBytes, err := txs[loopID].GetOne(BlockSignaturesBucket, blkKey)
+			if err != nil {
+				return
+			}
+			sz := len(blockBytes)
+			if sz <= 1 {
+				return
+			}
+			var block *types.Block
+			if err := rlp.DecodeBytes(blockBytes, &block); err != nil {
+				return
+			}
+			if sigBytes != nil {
+				block.SetCurrentCommitSig(sigBytes)
+			}
+			if block.NumberU64() != bn {
+				return
+			}
+			if block.Header().ReceiptHash() == emptyHash {
+				return
+			}
+			// receiptHash := s.state.currentCycle.ReceiptHashes[bn]
+			hashes = append(hashes, block.Header().ReceiptHash())
+			blocks = append(blocks, block)
 		}
+
+		// download receipts
 		receipts, stid, err := b.downloadReceipts(ctx, hashes)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
@@ -176,7 +222,17 @@ func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 			err := errors.New("downloadRawBlocks received empty reciptBytes")
 			rdm.HandleRequestError(batch, err, stid)
 		} else {
+			// insert block and receipts to chain
+			if inserted, err := b.configs.bc.InsertReceiptChain(blocks, receipts); err != nil {
+
+			} else {
+				if inserted != len(blocks) {
+
+				}
+			}
+
 			rdm.HandleRequestResult(batch, receipts, loopID, stid)
+
 			if b.configs.logProgress {
 				//calculating block download speed
 				dt := time.Now().Sub(startTime).Seconds()
@@ -193,7 +249,7 @@ func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 	}
 }
 
-func (b *StageReceipts) downloadReceipts(ctx context.Context, hs []common.Hash) ([]*types.Receipt, sttypes.StreamID, error) {
+func (b *StageReceipts) downloadReceipts(ctx context.Context, hs []common.Hash) ([]types.Receipts, sttypes.StreamID, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -207,14 +263,7 @@ func (b *StageReceipts) downloadReceipts(ctx context.Context, hs []common.Hash) 
 	return receipts, stid, nil
 }
 
-func (b *StageReceipts) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
-}
-
-func validateGetReceiptsResult(requested []common.Hash, result []*types.Receipt) error {
+func validateGetReceiptsResult(requested []common.Hash, result []types.Receipts) error {
 	// TODO: validate each receipt here
 
 	return nil

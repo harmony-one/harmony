@@ -77,7 +77,7 @@ func (rdm *receiptDownloadManager) HandleRequestError(bns []uint64, err error, s
 }
 
 // HandleRequestResult handles get receipts result
-func (rdm *receiptDownloadManager) HandleRequestResult(bns []uint64, receipts []*types.Receipt, loopID int, streamID sttypes.StreamID) error {
+func (rdm *receiptDownloadManager) HandleRequestResult(bns []uint64, receipts []types.Receipts, loopID int, streamID sttypes.StreamID) error {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
