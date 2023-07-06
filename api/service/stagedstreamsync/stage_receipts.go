@@ -48,8 +48,8 @@ func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, con
 	}
 }
 
-// Exec progresses Bodies stage in the forward direction
-func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
+// Exec progresses receipts stage in the forward direction
+func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	useInternalTx := tx == nil
 
@@ -63,14 +63,14 @@ func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	}
 
 	maxHeight := s.state.status.targetBN
-	currentHead := b.configs.bc.CurrentBlock().NumberU64()
+	currentHead := r.configs.bc.CurrentBlock().NumberU64()
 	if currentHead >= maxHeight {
 		return nil
 	}
 	currProgress := uint64(0)
 	targetHeight := s.state.currentCycle.TargetHeight
 
-	if errV := CreateView(ctx, b.configs.db, tx, func(etx kv.Tx) error {
+	if errV := CreateView(ctx, r.configs.db, tx, func(etx kv.Tx) error {
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
 			return err
 		}
@@ -92,27 +92,27 @@ func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	// startBlock := currProgress
 
 	// prepare db transactions
-	txs := make([]kv.RwTx, b.configs.concurrency)
-	for i := 0; i < b.configs.concurrency; i++ {
-		txs[i], err = b.configs.blockDBs[i].BeginRw(ctx)
+	txs := make([]kv.RwTx, r.configs.concurrency)
+	for i := 0; i < r.configs.concurrency; i++ {
+		txs[i], err = r.configs.blockDBs[i].BeginRw(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
 	defer func() {
-		for i := 0; i < b.configs.concurrency; i++ {
+		for i := 0; i < r.configs.concurrency; i++ {
 			txs[i].Rollback()
 		}
 	}()
 
-	if b.configs.logProgress {
+	if r.configs.logProgress {
 		fmt.Print("\033[s") // save the cursor position
 	}
 
 	if useInternalTx {
 		var err error
-		tx, err = b.configs.db.BeginRw(ctx)
+		tx, err = r.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -120,14 +120,14 @@ func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	}
 
 	// Fetch blocks from neighbors
-	s.state.rdm = newReceiptDownloadManager(tx, b.configs.bc, targetHeight, s.state.logger)
+	s.state.rdm = newReceiptDownloadManager(tx, r.configs.bc, targetHeight, s.state.logger)
 
 	// Setup workers to fetch blocks from remote node
 	var wg sync.WaitGroup
 
 	for i := 0; i != s.state.config.Concurrency; i++ {
 		wg.Add(1)
-		go b.runReceiptWorkerLoop(ctx, s.state.rdm, &wg, i, s, txs, startTime)
+		go r.runReceiptWorkerLoop(ctx, s.state.rdm, &wg, i, s, txs, startTime)
 	}
 
 	wg.Wait()
@@ -142,9 +142,9 @@ func (b *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 }
 
 // runReceiptWorkerLoop creates a work loop for download receipts
-func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, txs []kv.RwTx, startTime time.Time) {
+func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, txs []kv.RwTx, startTime time.Time) {
 
-	currentBlock := int(b.configs.bc.CurrentBlock().NumberU64())
+	currentBlock := int(r.configs.bc.CurrentBlock().NumberU64())
 	gbm := s.state.gbm
 
 	defer wg.Done()
@@ -202,10 +202,10 @@ func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 		}
 
 		// download receipts
-		receipts, stid, err := b.downloadReceipts(ctx, hashes)
+		receipts, stid, err := r.downloadReceipts(ctx, hashes)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
+				r.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
 			}
 			utils.Logger().Error().
 				Err(err).
@@ -223,37 +223,46 @@ func (b *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 			rdm.HandleRequestError(batch, err, stid)
 		} else {
 			// insert block and receipts to chain
-			if inserted, err := b.configs.bc.InsertReceiptChain(blocks, receipts); err != nil {
-
+			if inserted, err := r.configs.bc.InsertReceiptChain(blocks, receipts); err != nil {
+				utils.Logger().Err(err).
+					Str("stream", string(stid)).
+					Interface("block numbers", batch).
+					Msg(WrapStagedSyncMsg("InsertReceiptChain failed"))
+				err := errors.New("InsertReceiptChain failed")
+				rdm.HandleRequestError(batch, err, stid)
 			} else {
 				if inserted != len(blocks) {
-
+					utils.Logger().Warn().
+						Interface("block numbers", batch).
+						Int("inserted", inserted).
+						Int("blocks to insert", len(blocks)).
+						Msg(WrapStagedSyncMsg("InsertReceiptChain couldn't insert all downloaded blocks/receipts"))
 				}
 			}
-
+			// handle request result
 			rdm.HandleRequestResult(batch, receipts, loopID, stid)
-
-			if b.configs.logProgress {
+			// log progress
+			if r.configs.logProgress {
 				//calculating block download speed
 				dt := time.Now().Sub(startTime).Seconds()
 				speed := float64(0)
 				if dt > 0 {
 					speed = float64(len(rdm.rdd)) / dt
 				}
-				blockSpeed := fmt.Sprintf("%.2f", speed)
+				blockReceiptSpeed := fmt.Sprintf("%.2f", speed)
 
 				fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-				fmt.Println("downloaded blocks:", currentBlock+len(rdm.rdd), "/", int(rdm.targetBN), "(", blockSpeed, "blocks/s", ")")
+				fmt.Println("downloaded blocks and receipts:", currentBlock+len(rdm.rdd), "/", int(rdm.targetBN), "(", blockReceiptSpeed, "BlocksAndReceipts/s", ")")
 			}
 		}
 	}
 }
 
-func (b *StageReceipts) downloadReceipts(ctx context.Context, hs []common.Hash) ([]types.Receipts, sttypes.StreamID, error) {
+func (r *StageReceipts) downloadReceipts(ctx context.Context, hs []common.Hash) ([]types.Receipts, sttypes.StreamID, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	receipts, stid, err := b.configs.protocol.GetReceipts(ctx, hs)
+	receipts, stid, err := r.configs.protocol.GetReceipts(ctx, hs)
 	if err != nil {
 		return nil, stid, err
 	}
@@ -269,11 +278,11 @@ func validateGetReceiptsResult(requested []common.Hash, result []types.Receipts)
 	return nil
 }
 
-func (b *StageReceipts) saveProgress(ctx context.Context, s *StageState, progress uint64, tx kv.RwTx) (err error) {
+func (r *StageReceipts) saveProgress(ctx context.Context, s *StageState, progress uint64, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = b.configs.db.BeginRw(ctx)
+		tx, err = r.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -284,7 +293,7 @@ func (b *StageReceipts) saveProgress(ctx context.Context, s *StageState, progres
 	if err = s.Update(tx, progress); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed")
+			Msgf("[STAGED_SYNC] saving progress for receipt stage failed")
 		return ErrSavingBodiesProgressFail
 	}
 
@@ -296,67 +305,14 @@ func (b *StageReceipts) saveProgress(ctx context.Context, s *StageState, progres
 	return nil
 }
 
-func (b *StageReceipts) cleanBlocksDB(ctx context.Context, loopID int) (err error) {
-	tx, errb := b.configs.blockDBs[loopID].BeginRw(ctx)
-	if errb != nil {
-		return errb
-	}
-	defer tx.Rollback()
-
-	// clean block bodies db
-	if err = tx.ClearBucket(BlocksBucket); err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msgf("[STAGED_STREAM_SYNC] clear blocks bucket after revert failed")
-		return err
-	}
-	// clean block signatures db
-	if err = tx.ClearBucket(BlockSignaturesBucket); err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msgf("[STAGED_STREAM_SYNC] clear block signatures bucket after revert failed")
-		return err
-	}
-
-	if err = tx.Commit(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (b *StageReceipts) cleanAllBlockDBs(ctx context.Context) (err error) {
-	//clean all blocks DBs
-	for i := 0; i < b.configs.concurrency; i++ {
-		if err := b.cleanBlocksDB(ctx, i); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (b *StageReceipts) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
-
-	//clean all blocks DBs
-	if err := b.cleanAllBlockDBs(ctx); err != nil {
-		return err
-	}
-
+func (r *StageReceipts) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = b.configs.db.BeginRw(ctx)
+		tx, err = r.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
 		defer tx.Rollback()
-	}
-	// save progress
-	currentHead := b.configs.bc.CurrentBlock().NumberU64()
-	if err = s.Update(tx, currentHead); err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block bodies stage after revert failed")
-		return err
 	}
 
 	if err = u.Done(tx); err != nil {
@@ -371,11 +327,20 @@ func (b *StageReceipts) Revert(ctx context.Context, firstCycle bool, u *RevertSt
 	return nil
 }
 
-func (b *StageReceipts) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
-	//clean all blocks DBs
-	if err := b.cleanAllBlockDBs(ctx); err != nil {
-		return err
+func (r *StageReceipts) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
+	useInternalTx := tx == nil
+	if useInternalTx {
+		tx, err = r.configs.db.BeginRw(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
 	}
 
+	if useInternalTx {
+		if err = tx.Commit(); err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -111,8 +111,6 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		fmt.Print("\033[s") // save the cursor position
 	}
 
-	s.state.currentCycle.ReceiptHashes = make(map[uint64]common.Hash)
-
 	for i := currProgress + 1; i <= targetHeight; i++ {
 		blkKey := marshalData(i)
 		loopID, streamID := gbm.GetDownloadDetails(i)

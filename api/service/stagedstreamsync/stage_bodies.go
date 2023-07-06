@@ -238,8 +238,6 @@ func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte
 		if err := verifyBlock(b.configs.bc, block); err != nil {
 			return err
 		}
-		// add receipt hash for next stage
-		s.state.currentCycle.ReceiptHashes[block.NumberU64()] = block.Header().ReceiptHash()
 	}
 	return nil
 }
