@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -211,4 +212,8 @@ func GetPort() int {
 		}
 	}
 	return 0
+}
+
+func ShowShard(shardID uint32) string {
+	return fmt.Sprintf("[%sX%s]", strings.Repeat(" ", int(shardID)), strings.Repeat(" ", int(3-shardID)))
 }

@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
 	"github.com/rs/zerolog"
 
-	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -37,7 +38,7 @@ type (
 )
 
 // NewDownloader creates a new downloader
-func NewDownloader(host p2p.Host, bc core.BlockChain, dbDir string, isBeaconNode bool, config Config) *Downloader {
+func NewDownloader(host p2p.Host, bc core.BlockChain, dbDir string, isBeaconNode bool, config Config, c *consensus.Consensus) *Downloader {
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{
@@ -68,7 +69,7 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, dbDir string, isBeaconNode
 	ctx, cancel := context.WithCancel(context.Background())
 
 	//TODO: use mem db should be in config file
-	stagedSyncInstance, err := CreateStagedSync(ctx, bc, dbDir, false, isBeaconNode, sp, config, logger, config.LogProgress)
+	stagedSyncInstance, err := CreateStagedSync(ctx, bc, c, dbDir, false, isBeaconNode, sp, config, logger, config.LogProgress)
 	if err != nil {
 		cancel()
 		return nil

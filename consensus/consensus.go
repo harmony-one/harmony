@@ -146,6 +146,14 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 	return consensus.Blockchain()
 }
 
+func (consensus *Consensus) CurrentBlock() *types.Block {
+	return consensus.Blockchain().CurrentBlock()
+}
+
+func (consensus *Consensus) InsertChain(blocks types.Blocks, verifyHeaders bool) (int, error) {
+	return consensus.Blockchain().InsertChain(blocks, verifyHeaders)
+}
+
 func (consensus *Consensus) ReadySignal(p ProposalType) {
 	consensus.readySignal <- p
 }

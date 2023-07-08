@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	syncproto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
@@ -55,6 +56,7 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 
 type StagedStreamSync struct {
 	bc           core.BlockChain
+	c            *consensus.Consensus
 	isBeacon     bool
 	isExplorer   bool
 	db           kv.RwDB
@@ -249,6 +251,7 @@ func (s *StagedStreamSync) cleanUp(ctx context.Context, fromStage int, db kv.RwD
 // New creates a new StagedStreamSync instance
 func New(
 	bc core.BlockChain,
+	c *consensus.Consensus,
 	db kv.RwDB,
 	stagesList []*Stage,
 	isBeacon bool,
@@ -286,6 +289,7 @@ func New(
 	status := newStatus()
 
 	return &StagedStreamSync{
+		c:            c,
 		bc:           bc,
 		isBeacon:     isBeacon,
 		db:           db,

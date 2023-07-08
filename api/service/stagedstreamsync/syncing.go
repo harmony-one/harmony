@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -38,6 +39,7 @@ var Buckets = []string{
 // CreateStagedSync creates an instance of staged sync
 func CreateStagedSync(ctx context.Context,
 	bc core.BlockChain,
+	c *consensus.Consensus,
 	dbDir string,
 	UseMemDB bool,
 	isBeaconNode bool,
@@ -86,6 +88,7 @@ func CreateStagedSync(ctx context.Context,
 
 	return New(
 		bc,
+		c,
 		mainDB,
 		stages,
 		isBeacon,
@@ -208,6 +211,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			return totalInserted + n, err
 		}
 		cancel()
+		s.c.BlocksSynchronized()
 
 		totalInserted += n
 
@@ -226,7 +230,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context, initSync bool) (int,
 	var totalInserted int
 
 	s.inserted = 0
-	startHead := s.bc.CurrentBlock().NumberU64()
+	startHead := s.c.CurrentBlock().NumberU64()
 	canRunCycleInOneTransaction := false
 
 	var tx kv.RwTx
@@ -246,7 +250,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context, initSync bool) (int,
 		utils.Logger().Error().
 			Err(err).
 			Bool("isBeacon", s.isBeacon).
-			Uint32("shard", s.bc.ShardID()).
+			Uint32("shard", s.c.ShardID).
 			Uint64("currentHeight", startHead).
 			Msgf(WrapStagedSyncMsg("sync cycle failed"))
 		return totalInserted, err
