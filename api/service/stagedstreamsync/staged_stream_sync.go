@@ -267,9 +267,6 @@ func New(
 	logger zerolog.Logger,
 ) *StagedStreamSync {
 
-	// init stages order based on sync mode
-	initStagesOrder(config.SyncMode)
-
 	forwardStages := make([]*Stage, len(stagesList))
 	for i, stageIndex := range StagesForwardOrder {
 		for _, s := range stagesList {

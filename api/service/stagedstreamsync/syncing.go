@@ -91,10 +91,13 @@ func CreateStagedSync(ctx context.Context,
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, blockExecution, logger, config.LogProgress)
 	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
-	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)	
+	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)
 	stageFinishCfg := NewStageFinishCfg(mainDB)
 
-	stages := DefaultStages(ctx,
+	// init stages order based on sync mode
+	initStagesOrder(config.SyncMode)
+
+	defaultStages := DefaultStages(ctx,
 		stageHeadsCfg,
 		stageSyncEpochCfg,
 		stageShortRangeCfg,
@@ -114,6 +117,17 @@ func CreateStagedSync(ctx context.Context,
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
 		Msg(WrapStagedSyncMsg("staged sync created successfully"))
+
+	var stages []*Stage
+	// if any of the default stages doesn't exist in forward order, delete it from the list of stages
+	for _, stg := range defaultStages {
+		for _, stageID := range StagesForwardOrder {
+			if stg.ID == stageID {
+				stages = append(stages, stg)
+				break
+			}
+		}
+	}
 
 	return New(
 		bc,
