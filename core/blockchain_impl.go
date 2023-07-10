@@ -221,7 +221,7 @@ type BlockChainImpl struct {
 	badBlocks              *lru.Cache // Bad block cache
 	pendingSlashes         slash.Records
 	maxGarbCollectedBlkNum int64
-	leaderRotationMeta     stored
+	leaderRotationMeta     leaderRotationMeta
 
 	options Options
 }
@@ -1705,7 +1705,7 @@ func (bc *BlockChainImpl) saveLeaderRotationMeta(h *block.Header) error {
 		return err
 	}
 
-	var s stored = bc.leaderRotationMeta
+	var s = bc.leaderRotationMeta
 
 	// increase counter only if the same leader and epoch
 	if bytes.Equal(s.pub, blockPubKey.Bytes[:]) && s.epoch == h.Epoch().Uint64() {
