@@ -182,6 +182,12 @@ func (st *syncStream) handleReq(req *syncpb.Request) error {
 	if bhReq := req.GetGetBlocksByHashesRequest(); bhReq != nil {
 		return st.handleGetBlocksByHashesRequest(req.ReqId, bhReq)
 	}
+	if ndReq := req.GetGetNodeDataRequest(); ndReq != nil {
+		return st.handleGetNodeDataRequest(req.ReqId, ndReq)
+	}
+	if rReq := req.GetGetReceiptsRequest(); rReq != nil {
+		return st.handleGetReceiptsRequest(req.ReqId, rReq)
+	}
 	// unsupported request type
 	return st.handleUnknownRequest(req.ReqId)
 }
@@ -258,6 +264,48 @@ func (st *syncStream) handleGetBlocksByHashesRequest(rid uint64, req *syncpb.Get
 		}
 	}
 	return errors.Wrap(err, "[GetBlocksByHashes]")
+}
+
+func (st *syncStream) handleGetNodeDataRequest(rid uint64, req *syncpb.GetNodeDataRequest) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getNodeData",
+	}).Inc()
+
+	hashes := bytesToHashes(req.NodeHashes)
+	resp, err := st.computeGetNodeData(rid, hashes)
+	if resp == nil && err != nil {
+		resp = syncpb.MakeErrorResponseMessage(rid, err)
+	}
+	if writeErr := st.writeMsg(resp); writeErr != nil {
+		if err == nil {
+			err = writeErr
+		} else {
+			err = fmt.Errorf("%v; [writeMsg] %v", err.Error(), writeErr)
+		}
+	}
+	return errors.Wrap(err, "[GetNodeData]")
+}
+
+func (st *syncStream) handleGetReceiptsRequest(rid uint64, req *syncpb.GetReceiptsRequest) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getReceipts",
+	}).Inc()
+
+	hashes := bytesToHashes(req.BlockHashes)
+	resp, err := st.computeGetReceipts(rid, hashes)
+	if resp == nil && err != nil {
+		resp = syncpb.MakeErrorResponseMessage(rid, err)
+	}
+	if writeErr := st.writeMsg(resp); writeErr != nil {
+		if err == nil {
+			err = writeErr
+		} else {
+			err = fmt.Errorf("%v; [writeMsg] %v", err.Error(), writeErr)
+		}
+	}
+	return errors.Wrap(err, "[GetReceipts]")
 }
 
 func (st *syncStream) handleUnknownRequest(rid uint64) error {
@@ -365,6 +413,44 @@ func (st *syncStream) computeRespFromBlockHashes(rid uint64, hs []common.Hash) (
 		sigs = append(sigs, sig)
 	}
 	return syncpb.MakeGetBlocksByHashesResponseMessage(rid, blocksBytes, sigs), nil
+}
+
+func (st *syncStream) computeGetNodeData(rid uint64, hs []common.Hash) (*syncpb.Message, error) {
+	if len(hs) > GetNodeDataCap {
+		err := fmt.Errorf("GetNodeData amount exceed cap: %v > %v", len(hs), GetNodeDataCap)
+		return nil, err
+	}
+	data, err := st.chain.getNodeData(hs)
+	if err != nil {
+		return nil, err
+	}
+
+	return syncpb.MakeGetNodeDataResponseMessage(rid, data), nil
+}
+
+func (st *syncStream) computeGetReceipts(rid uint64, hs []common.Hash) (*syncpb.Message, error) {
+	if len(hs) > GetReceiptsCap {
+		err := fmt.Errorf("GetReceipts amount exceed cap: %v > %v", len(hs), GetReceiptsCap)
+		return nil, err
+	}
+	receipts, err := st.chain.getReceipts(hs)
+	if err != nil {
+		return nil, err
+	}
+	var normalizedReceipts = make(map[uint64]*syncpb.Receipts, len(receipts))
+	for i, blkReceipts := range receipts {
+		normalizedReceipts[uint64(i)] = &syncpb.Receipts{
+			ReceiptBytes: make([][]byte, 0),
+		}
+		for _, receipt := range blkReceipts {
+			receiptBytes, err := rlp.EncodeToBytes(receipt)
+			if err != nil {
+				return nil, err
+			}
+			normalizedReceipts[uint64(i)].ReceiptBytes = append(normalizedReceipts[uint64(i)].ReceiptBytes, receiptBytes)
+		}
+	}
+	return syncpb.MakeGetReceiptsResponseMessage(rid, normalizedReceipts), nil
 }
 
 func bytesToHashes(bs [][]byte) []common.Hash {

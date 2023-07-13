@@ -62,6 +62,10 @@ func (a Stub) StateAt(common.Hash) (*state.DB, error) {
 	return nil, errors.Errorf("method StateAt not implemented for %s", a.Name)
 }
 
+func (a Stub) TrieNode(hash common.Hash) ([]byte, error) {
+	return []byte{}, errors.Errorf("method TrieNode not implemented for %s", a.Name)
+}
+
 func (a Stub) HasBlock(hash common.Hash, number uint64) bool {
 	return false
 }
@@ -88,6 +92,14 @@ func (a Stub) GetBlockByNumber(number uint64) *types.Block {
 
 func (a Stub) GetReceiptsByHash(hash common.Hash) types.Receipts {
 	return nil
+}
+
+func (a Stub) ContractCode(hash common.Hash) ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (a Stub) ValidatorCode(hash common.Hash) ([]byte, error) {
+	return []byte{}, nil
 }
 
 func (a Stub) Stop() {
