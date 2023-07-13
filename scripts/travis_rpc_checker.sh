@@ -5,9 +5,12 @@ echo $TRAVIS_PULL_REQUEST_BRANCH
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 echo $DIR
 echo $GOPATH
-cd $GOPATH/src/github.com/harmony-one/harmony-test
-git fetch
+cd $GOPATH/src/github.com/harmony-one/harmony
+git fetch --all
 git checkout $TRAVIS_PULL_REQUEST_BRANCH || true
+git pull
+git branch --show-current
+cd $GOPATH/src/github.com/harmony-one/harmony-test
 git pull
 git branch --show-current
 cd localnet
