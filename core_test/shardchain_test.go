@@ -80,40 +80,4 @@ func TestAddNewBlock(t *testing.T) {
 
 	err = blockchain.Rollback([]common.Hash{block.Hash()})
 	require.NoError(t, err, "error when rolling back")
-
-	t.Log("#", block.Header().NumberU64(), node.Blockchain().CurrentBlock().NumberU64(), block.Hash().Hex(), block.ParentHash())
-	//for i := 2; i < 20; i++ {
-	//	//txs := make(map[common.Address]types.Transactions)
-	//	//stks := staking.StakingTransactions{}
-	//	//node.Worker.CommitTransactions(
-	//	//	txs, stks, common.Address{},
-	//	//)
-	//
-	//	//if i > 0 {
-	//	//	node.Worker.GetCurrentHeader().SetParentHash(block.Hash())
-	//	//	node.Worker.GetCurrentHeader().SetNumber(uint64(i))
-	//	//}
-	//	//if i == 0 {
-	//	//
-	//	//}
-	//	//require.NoError(t, err, "error when finalizing new block")
-	//	t.Log("#", block.Header().NumberU64(), node.Blockchain().CurrentBlock().NumberU64(), block.Hash().Hex(), block.ParentHash())
-	//
-	//	//blockchain
-	//	_, err = blockchain.InsertChain([]*types.Block{block}, false)
-	//	require.NoError(t, err, "error when adding new block")
-	//
-	//	hash := block.Hash()
-	//	//fmt.Println("block hash", hash.Hex())
-	//	header := block.Header()
-	//	header.SetNumber(new(big.Int).SetUint64(uint64(i)))
-	//	header.SetParentHash(hash)
-	//	block = types.NewBlock(header, nil, nil, nil, nil, nil)
-	//	//header
-	//
-	//	//if node.Blockchain().CurrentBlock().NumberU64() != 1 {
-	//	//	t.Error("New block is not added successfully")
-	//	//}
-	//}
-
 }
