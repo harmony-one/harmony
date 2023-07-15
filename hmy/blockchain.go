@@ -67,10 +67,7 @@ func (hmy *Harmony) GetBlockSigners(
 			Object: key,
 		}
 	}
-	mask, err := internal_bls.NewMask(pubKeys, nil)
-	if err != nil {
-		return nil, nil, err
-	}
+	mask := internal_bls.NewMask(pubKeys)
 	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
 	if err != nil {
 		return nil, nil, err

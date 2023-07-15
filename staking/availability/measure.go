@@ -31,10 +31,7 @@ func BlockSigners(
 	if err != nil {
 		return nil, nil, err
 	}
-	mask, err := bls.NewMask(committerKeys, nil)
-	if err != nil {
-		return nil, nil, err
-	}
+	mask := bls.NewMask(committerKeys)
 	if err := mask.SetMask(bitmap); err != nil {
 		return nil, nil, err
 	}
