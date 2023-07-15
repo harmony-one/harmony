@@ -22,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -687,15 +686,25 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	return nil
 }
 
+type stored struct {
+	pub    []byte
+	epoch  uint64
+	count  uint64
+	shifts uint64 // count how much changes validator per epoch
+}
+
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	var (
-		bc     = consensus.Blockchain()
-		prev   = consensus.getLeaderPubKey()
-		leader = consensus.getLeaderPubKey()
+		bc        = consensus.Blockchain()
+		prev      = consensus.getLeaderPubKey()
+		leader    = consensus.getLeaderPubKey()
+		curBlock  = bc.CurrentBlock()
+		curNumber = curBlock.NumberU64()
+		curEpoch  = curBlock.Epoch().Uint64()
 	)
-	const blocksCountAliveness = 3
+	const blocksCountAliveness = 10
 
 	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
 	ss, err := bc.ReadShardState(epoch)
@@ -718,23 +727,22 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		utils.Logger().Error().Msg("[Rotating leader] slots count is 0")
 		return
 	}
-	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
-	rest := blocksPerEpoch % uint64(slotsCount)
-	const minimumBlocksForLeaderInRow = 3
-	if numBlocksProducedByLeader < minimumBlocksForLeaderInRow {
-		// mine no less than 3 blocks in a row
-		numBlocksProducedByLeader = minimumBlocksForLeaderInRow
-	}
-	s := bc.LeaderRotationMeta()
-	if !bytes.Equal(leader.Bytes[:], s.Pub) {
+	var (
+		s                           stored
+		minimumBlocksForLeaderInRow uint64 = 3 // mine no less than N blocks in a row
+		rest                               = blocksPerEpoch % uint64(slotsCount)
+		numBlocksToProduceByLeader         = utils.Max(blocksPerEpoch/uint64(slotsCount), minimumBlocksForLeaderInRow)
+	)
+	s.pub, s.epoch, s.count, s.shifts, _ = bc.LeaderRotationMeta()
+	if !bytes.Equal(leader.Bytes[:], s.pub) {
 		// Another leader.
 		return
 	}
 	// If it is the first validator producing blocks, it should also produce the remaining 'rest' of the blocks.
 	if s.Shifts == 0 {
-		numBlocksProducedByLeader += rest
+		numBlocksToProduceByLeader += rest
 	}
-	if s.Count < numBlocksProducedByLeader {
+	if s.Count < numBlocksToProduceByLeader {
 		// Not enough blocks produced by the leader, continue producing by the same leader.
 		return
 	}
@@ -744,19 +752,22 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	var (
 		wasFound bool
 		next     *bls.PublicKeyWrapper
+		offset   = 1
 	)
 
 	for {
 		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
-			wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, 1)
+			wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, offset)
 		} else {
-			wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
+			wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
 		}
 		if !wasFound {
 			utils.Logger().Error().Msg("Failed to get next leader")
 			// Seems like nothing we can do here.
 			return
 		}
+		members := consensus.Decider.Participants()
+		mask, _ := bls.NewMask(members, nil)
 		skipped := 0
 		for i := 0; i < blocksCountAliveness; i++ {
 			header := bc.GetHeaderByNumber(curNumber - uint64(i))

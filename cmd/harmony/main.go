@@ -788,16 +788,8 @@ func setupChain(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigTyp
 }
 
 func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType, registry *registry.Registry) *node.Node {
-	// Consensus object.
-	// TODO: consensus object shouldn't start here
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(hc.General.ShardID))
-	currentConsensus, err := consensus.New(
-		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider)
 
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
-		os.Exit(1)
-	}
 	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
 	var aggregateSig bool
@@ -831,7 +823,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	registry.SetCxPool(cxPool)
 
 	// Consensus object.
-	decider := quorum.NewDecider(quorum.SuperMajorityVote, nodeConfig.ShardID)
 	registry.SetIsBackup(isBackup(hc))
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, registry, decider, minPeers, aggregateSig)
