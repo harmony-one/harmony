@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/harmony-one/harmony/shard"
@@ -38,6 +39,7 @@ var Buckets = []string{
 // CreateStagedSync creates an instance of staged sync
 func CreateStagedSync(ctx context.Context,
 	bc core.BlockChain,
+	consensus *consensus.Consensus,
 	dbDir string,
 	UseMemDB bool,
 	isBeaconNode bool,
@@ -86,6 +88,7 @@ func CreateStagedSync(ctx context.Context,
 
 	return New(
 		bc,
+		consensus,
 		mainDB,
 		stages,
 		isBeacon,
@@ -213,10 +216,28 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 		// if it's not long range sync, skip loop
 		if n < LastMileBlocksThreshold || !initSync {
-			return totalInserted, nil
+			// return totalInserted, nil
+			break
 		}
 	}
 
+	// add consensus last mile blocks
+	if s.consensus != nil {
+		if err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Msg("[STAGED_SYNC] Add consensus last mile")
+		}
+		// TODO: move this to explorer handler code.
+		if s.isExplorer {
+			s.consensus.UpdateConsensusInformation()
+		}
+	}
+	s.purgeLastMileBlocksFromCache()
+	utils.Logger().Info().
+		Uint64("new height", s.Blockchain().CurrentBlock().NumberU64()).
+		Msgf("staged sync is executed")
+	return totalInserted, nil
 }
 
 func (s *StagedStreamSync) doSyncCycle(ctx context.Context, initSync bool) (int, error) {
