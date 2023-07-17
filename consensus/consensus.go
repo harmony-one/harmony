@@ -46,7 +46,7 @@ type VerifyBlockFunc func(*types.Block) error
 type Consensus struct {
 	Decider quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
-	FBFTLog *FBFTLog
+	fBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
 	phase FBFTPhase
 	// current indicates what state a node is in
@@ -84,7 +84,7 @@ type Consensus struct {
 	// IgnoreViewIDCheck determines whether to ignore viewID check
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
-	mutex sync.RWMutex
+	mutex *sync.RWMutex
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
@@ -140,6 +140,13 @@ func (consensus *Consensus) Blockchain() core.BlockChain {
 	return consensus.registry.GetBlockchain()
 }
 
+func (consensus *Consensus) FBFTLog() FBFT {
+	return threadsafeFBFTLog{
+		log: consensus.fBFTLog,
+		mu:  consensus.mutex,
+	}
+}
+
 // ChainReader returns the chain reader.
 // This is mostly the same as Blockchain, but it returns only read methods, so we assume it's safe for concurrent use.
 func (consensus *Consensus) ChainReader() engine.ChainReader {
@@ -165,11 +172,11 @@ func (consensus *Consensus) Beaconchain() core.BlockChain {
 
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks.
 func (consensus *Consensus) verifyBlock(block *types.Block) error {
-	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
+	if !consensus.fBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
 			return errors.Errorf("Block verification failed: %s", err)
 		}
-		consensus.FBFTLog.MarkBlockVerified(block)
+		consensus.fBFTLog.MarkBlockVerified(block)
 	}
 	return nil
 }
@@ -261,21 +268,21 @@ func New(
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
 	consensus := Consensus{
-		ShardID: shard,
+		mutex:           &sync.RWMutex{},
+		ShardID:         shard,
+		fBFTLog:         NewFBFTLog(),
+		phase:           FBFTAnnounce,
+		current:         State{mode: Normal},
+		Decider:         Decider,
+		registry:        registry,
+		MinPeers:        minPeers,
+		AggregateSig:    aggregateSig,
+		host:            host,
+		msgSender:       NewMessageSender(host),
+		BlockNumLowChan: make(chan struct{}, 1),
+		// FBFT timeout
+		consensusTimeout: createTimeout(),
 	}
-	consensus.Decider = Decider
-	consensus.registry = registry
-	consensus.MinPeers = minPeers
-	consensus.AggregateSig = aggregateSig
-	consensus.host = host
-	consensus.msgSender = NewMessageSender(host)
-	consensus.BlockNumLowChan = make(chan struct{}, 1)
-	// FBFT related
-	consensus.FBFTLog = NewFBFTLog()
-	consensus.phase = FBFTAnnounce
-	consensus.current = State{mode: Normal}
-	// FBFT timeout
-	consensus.consensusTimeout = createTimeout()
 
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey

@@ -22,7 +22,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 			); alreadyCastBallot != nil {
 				for _, pubKey1 := range alreadyCastBallot.SignerPubKeys {
 					if bytes.Compare(pubKey2.Bytes[:], pubKey1[:]) == 0 {
-						for _, blk := range consensus.FBFTLog.GetBlocksByNumber(recvMsg.BlockNum) {
+						for _, blk := range consensus.fBFTLog.GetBlocksByNumber(recvMsg.BlockNum) {
 							firstSignedHeader := blk.Header()
 							areHeightsEqual := firstSignedHeader.Number().Uint64() == recvMsg.BlockNum
 							areViewIDsEqual := firstSignedHeader.ViewID().Uint64() == recvMsg.ViewID
@@ -138,8 +138,8 @@ func (consensus *Consensus) couldThisBeADoubleSigner(
 	recvMsg *FBFTMessage,
 ) bool {
 	num, hash := consensus.BlockNum(), recvMsg.BlockHash
-	suspicious := !consensus.FBFTLog.HasMatchingAnnounce(num, hash) ||
-		!consensus.FBFTLog.HasMatchingPrepared(num, hash)
+	suspicious := !consensus.fBFTLog.HasMatchingAnnounce(num, hash) ||
+		!consensus.fBFTLog.HasMatchingPrepared(num, hash)
 	if suspicious {
 		consensus.getLogger().Debug().
 			Str("message", recvMsg.String()).

@@ -32,14 +32,14 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 		},
 	}
 
-	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
+	preparedMsgs := consensus.fBFTLog.GetMessagesByTypeSeq(
 		msg_pb.MessageType_PREPARED, consensus.getBlockNum(),
 	)
-	preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
+	preparedMsg := consensus.fBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
 	var encodedBlock []byte
 	if preparedMsg != nil {
-		block := consensus.FBFTLog.GetBlockByHash(preparedMsg.BlockHash)
+		block := consensus.fBFTLog.GetBlockByHash(preparedMsg.BlockHash)
 		consensus.getLogger().Info().
 			Interface("Block", block).
 			Interface("preparedMsg", preparedMsg).
@@ -115,7 +115,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.Payload, vcMsg.PreparedBlock = consensus.vc.GetPreparedBlock(consensus.FBFTLog)
+	vcMsg.Payload, vcMsg.PreparedBlock = consensus.vc.GetPreparedBlock(consensus.fBFTLog)
 	vcMsg.M2Aggsigs, vcMsg.M2Bitmap = consensus.vc.GetM2Bitmap(viewID)
 	vcMsg.M3Aggsigs, vcMsg.M3Bitmap = consensus.vc.GetM3Bitmap(viewID)
 	if vcMsg.M3Bitmap == nil || vcMsg.M3Aggsigs == nil {

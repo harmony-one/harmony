@@ -161,10 +161,10 @@ func (consensus *Consensus) finalCommit() {
 		network.Bytes,
 		network.FBFTMsg
 	commitSigAndBitmap := FBFTMsg.Payload
-	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
+	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
 	// find correct block content
 	curBlockHash := consensus.blockHash
-	block := consensus.FBFTLog.GetBlockByHash(curBlockHash)
+	block := consensus.fBFTLog.GetBlockByHash(curBlockHash)
 	if block == nil {
 		consensus.getLogger().Warn().
 			Str("blockHash", hex.EncodeToString(curBlockHash[:])).
@@ -278,7 +278,7 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 	lastCommits, err := consensus.Blockchain().ReadCommitSig(blockNum)
 	if err != nil ||
 		len(lastCommits) < bls.BLSSignatureSizeInBytes {
-		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
+		msgs := consensus.FBFTLog().GetMessagesByTypeSeq(
 			msg_pb.MessageType_COMMITTED, blockNum,
 		)
 		if len(msgs) != 1 {
@@ -482,7 +482,7 @@ func (consensus *Consensus) getLastMileBlockIter(bnStart uint64, cb func(iter *L
 	}
 	return cb(&LastMileBlockIter{
 		blockCandidates: blocks,
-		fbftLog:         consensus.FBFTLog,
+		fbftLog:         consensus.fBFTLog,
 		verify:          consensus.BlockVerifier,
 		curIndex:        0,
 		logger:          consensus.getLogger(),
@@ -513,7 +513,7 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 		msgs   []*FBFTMessage
 	)
 	for blockNum := bnStart; ; blockNum++ {
-		blk, msg, err := consensus.FBFTLog.GetCommittedBlockAndMsgsFromNumber(blockNum, consensus.getLogger())
+		blk, msg, err := consensus.fBFTLog.GetCommittedBlockAndMsgsFromNumber(blockNum, consensus.getLogger())
 		if err != nil {
 			if err == errFBFTLogNotFound {
 				break
@@ -551,7 +551,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		network.Bytes,
 		network.FBFTMsg
 	bareMinimumCommit := FBFTMsg.Payload
-	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
+	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
 
 	if err := consensus.verifyLastCommitSig(bareMinimumCommit, blk); err != nil {
 		return errors.Wrap(err, "[preCommitAndPropose] failed verifying last commit sig")
@@ -567,16 +567,16 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 			},
 			p2p.ConstructMessage(msgToSend)); err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")
+			consensus.GetLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")
 		} else {
-			consensus.getLogger().Info().
+			consensus.GetLogger().Info().
 				Str("blockHash", blk.Hash().Hex()).
 				Uint64("blockNum", consensus.BlockNum()).
 				Hex("lastCommitSig", bareMinimumCommit).
 				Msg("[preCommitAndPropose] Sent Committed Message")
 		}
 
-		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
+		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog().IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
 			return
 		}
@@ -661,7 +661,7 @@ func (consensus *Consensus) tryCatchup() error {
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
 	if consensus.Blockchain().CurrentBlock().NumberU64() < blk.NumberU64() {
-		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
+		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.fBFTLog.IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
 			return err
 		}
@@ -785,7 +785,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	if blk.IsLastBlockInEpoch() {
 		consensus.setMode(consensus.updateConsensusInformation())
 	}
-	consensus.FBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
+	consensus.fBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.resetState()
 }
 
@@ -920,19 +920,12 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
 func (consensus *Consensus) DeleteBlocksLessThan(number uint64) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.FBFTLog.deleteBlocksLessThan(number)
+	consensus.fBFTLog.deleteBlocksLessThan(number)
 }
 
 // DeleteMessagesLessThan deletes messages less than given block number.
 func (consensus *Consensus) DeleteMessagesLessThan(number uint64) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.FBFTLog.deleteMessagesLessThan(number)
-}
-
-// DeleteBlockByNumber deletes block by given block number.
-func (consensus *Consensus) DeleteBlockByNumber(number uint64) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	consensus.FBFTLog.deleteBlockByNumber(number)
+	consensus.fBFTLog.deleteMessagesLessThan(number)
 }

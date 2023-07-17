@@ -3,6 +3,7 @@ package consensus
 import (
 	"encoding/binary"
 	"fmt"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -97,6 +98,16 @@ func (m *FBFTMessage) id() fbftMsgID {
 	return id
 }
 
+type FBFT interface {
+	GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64) []*FBFTMessage
+	IsBlockVerified(hash common.Hash) bool
+	DeleteBlockByNumber(number uint64)
+	GetBlockByHash(hash common.Hash) *types.Block
+	AddVerifiedMessage(msg *FBFTMessage)
+	AddBlock(block *types.Block)
+	GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum uint64, blockHash common.Hash) []*FBFTMessage
+}
+
 // FBFTLog represents the log stored by a node during FBFT process
 type FBFTLog struct {
 	blocks         map[common.Hash]*types.Block // store blocks received in FBFT
@@ -157,7 +168,7 @@ func (log *FBFTLog) deleteBlocksLessThan(number uint64) {
 }
 
 // DeleteBlockByNumber deletes block of specific number
-func (log *FBFTLog) deleteBlockByNumber(number uint64) {
+func (log *FBFTLog) DeleteBlockByNumber(number uint64) {
 	for h, block := range log.blocks {
 		if block.NumberU64() == number {
 			delete(log.blocks, h)
@@ -359,4 +370,51 @@ func (log *FBFTLog) GetCommittedBlockAndMsgsFromNumber(bn uint64, logger *zerolo
 func (log *FBFTLog) PruneCacheBeforeBlock(bn uint64) {
 	log.deleteBlocksLessThan(bn - 1)
 	log.deleteMessagesLessThan(bn - 1)
+}
+
+type threadsafeFBFTLog struct {
+	log *FBFTLog
+	mu  *sync.RWMutex
+}
+
+func (t threadsafeFBFTLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64) []*FBFTMessage {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.log.GetMessagesByTypeSeq(typ, blockNum)
+}
+
+func (t threadsafeFBFTLog) IsBlockVerified(hash common.Hash) bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.log.IsBlockVerified(hash)
+}
+
+func (t threadsafeFBFTLog) DeleteBlockByNumber(number uint64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.log.DeleteBlockByNumber(number)
+}
+
+func (t threadsafeFBFTLog) GetBlockByHash(hash common.Hash) *types.Block {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.log.GetBlockByHash(hash)
+}
+
+func (t threadsafeFBFTLog) AddVerifiedMessage(msg *FBFTMessage) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.log.AddVerifiedMessage(msg)
+}
+
+func (t threadsafeFBFTLog) AddBlock(block *types.Block) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.log.AddBlock(block)
+}
+
+func (t threadsafeFBFTLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum uint64, blockHash common.Hash) []*FBFTMessage {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.log.GetMessagesByTypeSeqHash(typ, blockNum, blockHash)
 }
