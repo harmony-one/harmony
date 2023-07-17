@@ -233,7 +233,7 @@ func (d *Downloader) loop() {
 					trigger()
 				}()
 				time.Sleep(1 * time.Second)
-				break
+				continue
 			}
 			if initSync {
 				d.logger.Info().Int("block added", addedBN).
@@ -246,10 +246,10 @@ func (d *Downloader) loop() {
 			if addedBN != 0 {
 				// If block number has been changed, trigger another sync
 				go trigger()
-			}
-			// try to add last mile from pub-sub (blocking)
-			if d.bh != nil {
-				d.bh.insertSync()
+				// try to add last mile from pub-sub (blocking)
+				if d.bh != nil {
+					d.bh.insertSync()
+				}
 			}
 			initSync = false
 
