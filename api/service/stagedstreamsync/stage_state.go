@@ -146,7 +146,7 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			s.state.protocol.StreamFailed(streamID, "invalid block with unmatched number is received from stream")
 			if !invalidBlockRevert {
 				invalidBlockHash := block.Hash()
-				reverter.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), i, invalidBlockHash, streamID)	
+				reverter.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), i, invalidBlockHash, streamID)
 			}
 			return ErrInvalidBlockNumber
 		}

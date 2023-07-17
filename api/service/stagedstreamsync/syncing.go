@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/harmony-one/harmony/shard"
