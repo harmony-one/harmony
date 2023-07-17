@@ -75,6 +75,7 @@ func CreateStagedSync(ctx context.Context,
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
 	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeacon, logProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, logProgress)
+	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)
 	stageFinishCfg := NewStageFinishCfg(mainDB)
 
 	stages := DefaultStages(ctx,
@@ -83,6 +84,7 @@ func CreateStagedSync(ctx context.Context,
 		stageShortRangeCfg,
 		stageBodiesCfg,
 		stageStatesCfg,
+		lastMileCfg,
 		stageFinishCfg,
 	)
 
