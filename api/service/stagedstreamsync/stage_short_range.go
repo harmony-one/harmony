@@ -114,12 +114,6 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 
 	s.state.status.setTargetBN(expEndBN)
 
-	s.state.status.startSyncing()
-	defer func() {
-		utils.Logger().Info().Msg("short range finished syncing")
-		s.state.status.finishSyncing()
-	}()
-
 	blocks, stids, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("getBlocksByHashes failed")
