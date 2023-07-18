@@ -196,7 +196,11 @@ func (d *Downloader) loop() {
 	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
 
 	done := make(chan struct{})
-	d.downloadC <- struct{}{}
+
+	select {
+	case done <- struct{}{}:
+	default:
+	}
 
 	trigger := func() {
 		select {
@@ -208,6 +212,8 @@ func (d *Downloader) loop() {
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
+
+	go trigger()
 
 	for {
 		select {
