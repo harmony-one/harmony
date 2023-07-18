@@ -195,10 +195,10 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 				Msg(WrapStagedSyncMsg("early return of long range sync"))
 			return 0, nil
 		}
-
-		s.startSyncing()
-		defer s.finishSyncing()
 	}
+
+	s.startSyncing()
+	defer s.finishSyncing()
 
 	for {
 		ctx, cancel := context.WithCancel(downloaderContext)
@@ -228,7 +228,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		if err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
 			utils.Logger().Error().
 				Err(err).
-				Msg("[STAGED_SYNC] Add consensus last mile")
+				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
 		}
 		// TODO: move this to explorer handler code.
 		if s.isExplorer {
@@ -236,9 +236,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		}
 	}
 	s.purgeLastMileBlocksFromCache()
-	utils.Logger().Info().
-		Uint64("new height", s.Blockchain().CurrentBlock().NumberU64()).
-		Msgf("staged sync is executed")
 	return totalInserted, nil
 }
 
