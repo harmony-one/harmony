@@ -194,14 +194,20 @@ func (d *Downloader) loop() {
 	// make sure it goes through the long range sync first.
 	// for epoch chain we do only need to go through epoch sync process
 	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
+	
+	done := make(chan struct{})
+	d.downloadC <- struct{}{}
 
 	trigger := func() {
 		select {
-		case d.downloadC <- struct{}{}:
+		case <-done:
+			select {
+			case d.downloadC <- struct{}{}:
+			default:
+			}
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
-	go trigger()
 
 	for {
 		select {
@@ -223,7 +229,6 @@ func (d *Downloader) loop() {
 						//TODO: if we don't have any new or untried stream in the list, sleep or panic
 					}
 				}
-
 				// If any error happens, sleep 5 seconds and retry
 				d.logger.Error().
 					Err(err).
@@ -233,8 +238,7 @@ func (d *Downloader) loop() {
 					time.Sleep(5 * time.Second)
 					trigger()
 				}()
-				time.Sleep(1 * time.Second)
-				continue
+				break
 			}
 			if initSync {
 				d.logger.Info().Int("block added", addedBN).
@@ -243,7 +247,6 @@ func (d *Downloader) loop() {
 					Uint32("shard", d.bc.ShardID()).
 					Msg(WrapStagedSyncMsg("sync finished"))
 			}
-
 			if addedBN != 0 {
 				// If block number has been changed, trigger another sync
 				go trigger()
@@ -257,5 +260,7 @@ func (d *Downloader) loop() {
 		case <-d.closeC:
 			return
 		}
+
+		done <- struct{}{}
 	}
 }
