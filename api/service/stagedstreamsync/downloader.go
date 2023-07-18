@@ -194,7 +194,7 @@ func (d *Downloader) loop() {
 	// make sure it goes through the long range sync first.
 	// for epoch chain we do only need to go through epoch sync process
 	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
-	
+
 	done := make(chan struct{})
 	d.downloadC <- struct{}{}
 
