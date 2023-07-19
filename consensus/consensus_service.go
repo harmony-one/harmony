@@ -575,7 +575,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 	copy(blockHash[:], payload[:32])
 
 	// Leader sign and add commit message
-	block := consensus.FBFTLog.GetBlockByHash(blockHash)
+	block := consensus.fBFTLog.GetBlockByHash(blockHash)
 	if block == nil {
 		return errGetPreparedBlock
 	}

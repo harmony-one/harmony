@@ -274,7 +274,7 @@ func (consensus *Consensus) startViewChange() {
 
 	// init my own payload
 	if err := consensus.vc.InitPayload(
-		consensus.FBFTLog,
+		consensus.fBFTLog,
 		nextViewID,
 		consensus.getBlockNum(),
 		consensus.priKey,
@@ -394,7 +394,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	consensus.vc.AddViewIDKeyIfNotExist(recvMsg.ViewID, members)
 
 	// do it once only per viewID/Leader
-	if err := consensus.vc.InitPayload(consensus.FBFTLog,
+	if err := consensus.vc.InitPayload(consensus.fBFTLog,
 		recvMsg.ViewID,
 		recvMsg.BlockNum,
 		consensus.priKey,
@@ -403,7 +403,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 		return
 	}
 
-	err = consensus.vc.ProcessViewChangeMsg(consensus.FBFTLog, consensus.Decider, recvMsg)
+	err = consensus.vc.ProcessViewChangeMsg(consensus.fBFTLog, consensus.Decider, recvMsg)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Uint64("viewID", recvMsg.ViewID).
@@ -517,10 +517,10 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 
 		preparedMsg.SenderPubkeys = []*bls.PublicKeyWrapper{senderKey}
-		consensus.FBFTLog.AddVerifiedMessage(&preparedMsg)
+		consensus.fBFTLog.AddVerifiedMessage(&preparedMsg)
 
 		if preparedBlock != nil {
-			consensus.FBFTLog.AddBlock(preparedBlock)
+			consensus.fBFTLog.AddBlock(preparedBlock)
 		}
 	}
 

@@ -44,13 +44,13 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 	msgToSend, FPBTMsg := networkMessage.Bytes, networkMessage.FBFTMsg
 
-	consensus.FBFTLog.AddVerifiedMessage(FPBTMsg)
+	consensus.fBFTLog.AddVerifiedMessage(FPBTMsg)
 	consensus.getLogger().Debug().
 		Str("MsgBlockHash", FPBTMsg.BlockHash.Hex()).
 		Uint64("MsgViewID", FPBTMsg.ViewID).
 		Uint64("MsgBlockNum", FPBTMsg.BlockNum).
 		Msg("[Announce] Added Announce message in FPBT")
-	consensus.FBFTLog.AddBlock(block)
+	consensus.fBFTLog.AddBlock(block)
 
 	// Leader sign the block hash itself
 	for i, key := range consensus.priKey {
@@ -94,7 +94,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
-	if !consensus.FBFTLog.HasMatchingViewAnnounce(
+	if !consensus.fBFTLog.HasMatchingViewAnnounce(
 		consensus.getBlockNum(), consensus.getCurBlockViewID(), recvMsg.BlockHash,
 	) {
 		consensus.getLogger().Debug().
@@ -226,7 +226,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	}
 
 	// Must have the corresponding block to verify commit signature.
-	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+	blockObj := consensus.fBFTLog.GetBlockByHash(recvMsg.BlockHash)
 	if blockObj == nil {
 		consensus.getLogger().Info().
 			Uint64("blockNum", recvMsg.BlockNum).
@@ -295,7 +295,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
-		consensus.FBFTLog.MarkBlockVerified(blockObj)
+		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
 		if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems

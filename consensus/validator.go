@@ -37,7 +37,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Msg("[OnAnnounce] Announce message Added")
-	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
+	consensus.fBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.blockHash = recvMsg.BlockHash
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
@@ -77,10 +77,10 @@ func (consensus *Consensus) ValidateNewBlock(recvMsg *FBFTMessage) (*types.Block
 	return consensus.validateNewBlock(recvMsg)
 }
 func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block, error) {
-	if consensus.FBFTLog.IsBlockVerified(recvMsg.BlockHash) {
+	if consensus.fBFTLog.IsBlockVerified(recvMsg.BlockHash) {
 		var blockObj *types.Block
 
-		blockObj = consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+		blockObj = consensus.fBFTLog.GetBlockByHash(recvMsg.BlockHash)
 		if blockObj == nil {
 			var blockObj2 types.Block
 			if err := rlp.DecodeBytes(recvMsg.Block, &blockObj2); err != nil {
@@ -106,7 +106,7 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 		return nil, errors.New("Failed parsing new block")
 	}
 
-	consensus.FBFTLog.AddBlock(&blockObj)
+	consensus.fBFTLog.AddBlock(&blockObj)
 
 	// let this handle it own logs
 	if !consensus.newBlockSanityChecks(&blockObj, recvMsg) {
@@ -118,7 +118,7 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 	copy(blockPayload[:], recvMsg.Block[:])
 	consensus.block = blockPayload
 	recvMsg.Block = []byte{} // save memory space
-	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
+	consensus.fBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.getLogger().Debug().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -272,7 +272,7 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 		curBlockNum := consensus.BlockNum()
 		consensus.mutex.Lock()
 		defer consensus.mutex.Unlock()
-		for _, committedMsg := range consensus.FBFTLog.GetNotVerifiedCommittedMessages(blockObj.NumberU64(), blockObj.Header().ViewID().Uint64(), blockObj.Hash()) {
+		for _, committedMsg := range consensus.fBFTLog.GetNotVerifiedCommittedMessages(blockObj.NumberU64(), blockObj.Header().ViewID().Uint64(), blockObj.Hash()) {
 			if committedMsg != nil {
 				consensus.onCommitted(committedMsg)
 			}
@@ -309,10 +309,10 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	}
 
 	// Optimistically add committedMessage in case of receiving committed before prepared
-	consensus.FBFTLog.AddNotVerifiedMessage(recvMsg)
+	consensus.fBFTLog.AddNotVerifiedMessage(recvMsg)
 
 	// Must have the corresponding block to verify committed message.
-	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+	blockObj := consensus.fBFTLog.GetBlockByHash(recvMsg.BlockHash)
 	if blockObj == nil {
 		consensus.getLogger().Info().
 			Uint64("blockNum", recvMsg.BlockNum).
@@ -345,7 +345,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
 		return
 	}
-	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
+	consensus.fBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 

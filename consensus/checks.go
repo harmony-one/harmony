@@ -68,7 +68,7 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage) bool 
 }
 
 func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
-	logMsgs := consensus.FBFTLog.GetMessagesByTypeSeqView(
+	logMsgs := consensus.fBFTLog.GetMessagesByTypeSeqView(
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
 	)
 	if len(logMsgs) > 0 {

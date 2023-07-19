@@ -58,13 +58,13 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			return nil
 		}
 
-		block := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+		block := node.Consensus.FBFTLog().GetBlockByHash(recvMsg.BlockHash)
 
 		if block == nil {
 			utils.Logger().Info().
 				Uint64("msgBlock", recvMsg.BlockNum).
 				Msg("[Explorer] Haven't received the block before the committed msg")
-			node.Consensus.FBFTLog.AddVerifiedMessage(recvMsg)
+			node.Consensus.FBFTLog().AddVerifiedMessage(recvMsg)
 			return errBlockBeforeCommit
 		}
 
@@ -94,9 +94,9 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			return err
 		}
 		// Add the block into FBFT log.
-		node.Consensus.FBFTLog.AddBlock(blockObj)
+		node.Consensus.FBFTLog().AddBlock(blockObj)
 		// Try to search for MessageType_COMMITTED message from pbft log.
-		msgs := node.Consensus.FBFTLog.GetMessagesByTypeSeqHash(
+		msgs := node.Consensus.FBFTLog().GetMessagesByTypeSeqHash(
 			msg_pb.MessageType_COMMITTED,
 			blockObj.NumberU64(),
 			blockObj.Hash(),
@@ -148,7 +148,7 @@ func (node *Node) TraceLoopForExplorer() {
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	if node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
-		node.Consensus.DeleteBlockByNumber(block.NumberU64())
+		node.Consensus.FBFTLog().DeleteBlockByNumber(block.NumberU64())
 		return
 	}
 
@@ -159,7 +159,7 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 			node.Consensus.UpdateConsensusInformation()
 		}
 		// Clean up the blocks to avoid OOM.
-		node.Consensus.DeleteBlockByNumber(block.NumberU64())
+		node.Consensus.FBFTLog().DeleteBlockByNumber(block.NumberU64())
 
 		// if in tikv mode, only master writer node need dump all explorer block
 		if !node.HarmonyConfig.General.RunElasticMode || node.Blockchain().IsTikvWriterMaster() {
