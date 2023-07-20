@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 )
@@ -57,6 +58,11 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 
 	// for short range sync, skip this stage
 	if !s.state.initSync {
+		return nil
+	}
+
+	// shouldn't execute for epoch chain
+	if b.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
 		return nil
 	}
 
