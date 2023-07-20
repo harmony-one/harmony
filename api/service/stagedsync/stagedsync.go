@@ -315,7 +315,7 @@ func New(ctx context.Context,
 		VerifyHeaderBatchSize:  verifyHeaderBatchSize,
 		InsertChainBatchSize:   insertChainBatchSize,
 		LogProgress:            logProgress,
-		DebugMode: 				debugMode,
+		DebugMode:              debugMode,
 	}
 }
 
