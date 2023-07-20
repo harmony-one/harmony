@@ -93,6 +93,7 @@ type ConfigType struct {
 	VerifyAllSig           bool   // verify signatures for all blocks regardless of height and batch size
 	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
 	LogProgress            bool   // log the full sync progress in console
+	DebugMode              bool   // log every single process and error to help to debug the syncing issues
 	NtpServer              string
 	StringRole             string
 	P2PPriKey              p2p_crypto.PrivKey   `json:"-"`

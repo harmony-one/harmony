@@ -46,7 +46,6 @@ func CreateStagedSync(ctx context.Context,
 	protocol syncProtocol,
 	config Config,
 	logger zerolog.Logger,
-	logProgress bool,
 ) (*StagedStreamSync, error) {
 
 	isBeacon := bc.ShardID() == shard.BeaconChainShardID
@@ -73,8 +72,8 @@ func CreateStagedSync(ctx context.Context,
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
 	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
-	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeacon, logProgress)
-	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, logProgress)
+	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeacon, config.LogProgress)
+	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)
 	stageFinishCfg := NewStageFinishCfg(mainDB)
 
