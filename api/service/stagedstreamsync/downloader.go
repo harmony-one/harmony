@@ -195,16 +195,19 @@ func (d *Downloader) loop() {
 	// for epoch chain we do only need to go through epoch sync process
 	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
 
-	done := make(chan struct{})
+	doneC := make(chan struct{})
 
-	select {
-	case done <- struct{}{}:
-	default:
+	done := func() {
+		select {
+		case doneC <- struct{}{}:
+		default:
+		}
 	}
+	done()
 
 	trigger := func() {
 		select {
-		case <-done:
+		case <-doneC:
 			select {
 			case d.downloadC <- struct{}{}:
 			default:
@@ -212,7 +215,6 @@ func (d *Downloader) loop() {
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
-
 	go trigger()
 
 	for {
@@ -221,7 +223,11 @@ func (d *Downloader) loop() {
 			go trigger()
 
 		case <-d.downloadC:
+			d.stagedSyncInstance.Debug("downloader_loop/downloadC", "received signal from downloadC channel")
+			d.stagedSyncInstance.Debug("downloader_loop/downloadC/shardID", d.bc.ShardID())
 			addedBN, err := d.stagedSyncInstance.doSync(d.ctx, initSync)
+			d.stagedSyncInstance.Debug("downloader_loop/downloadC/addedBN", addedBN)
+			d.stagedSyncInstance.Debug("downloader_loop/downloadC/error", err)
 			if err != nil {
 				//TODO: if there is a bad block which can't be resolved
 				if d.stagedSyncInstance.invalidBlock.Active {
@@ -255,6 +261,7 @@ func (d *Downloader) loop() {
 			}
 			if addedBN != 0 {
 				// If block number has been changed, trigger another sync
+				done()
 				go trigger()
 				// try to add last mile from pub-sub (blocking)
 				if d.bh != nil {
@@ -266,7 +273,7 @@ func (d *Downloader) loop() {
 		case <-d.closeC:
 			return
 		}
-
-		done <- struct{}{}
+		d.stagedSyncInstance.Debug("downloader_loop/downloadC", "done")
+		done()
 	}
 }
