@@ -72,9 +72,7 @@ type Mask struct {
 }
 
 // NewMask returns a new participation bitmask for cosigning where all
-// cosigners are disabled by default. If a public key is given it verifies that
-// it is present in the list of keys and sets the corresponding index in the
-// bitmask to 1 (enabled).
+// cosigners are disabled by default.
 func NewMask(publics []PublicKeyWrapper) *Mask {
 	index := map[SerializedPublicKey]int{}
 	publicKeys := make([]*PublicKeyWrapper, len(publics))
