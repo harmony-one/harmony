@@ -44,6 +44,7 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 		return nil
 	}
 
+	// shouldn't execute for epoch chain
 	if sr.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
 		return nil
 	}
