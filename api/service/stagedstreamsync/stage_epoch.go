@@ -5,6 +5,7 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
+	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
@@ -34,6 +35,9 @@ func NewStageEpochCfg(bc core.BlockChain, db kv.RwDB) StageEpochCfg {
 
 func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
 
+	s.state.Debug("shard", sr.configs.bc.ShardID())
+	s.state.Debug("long_range", s.state.initSync)
+
 	// no need to update epoch chain if we are redoing the stages because of bad block
 	if invalidBlockRevert {
 		return nil
@@ -49,8 +53,11 @@ func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 
 	// doShortRangeSyncForEpochSync
 	n, err := sr.doShortRangeSyncForEpochSync(ctx, s)
+	s.state.Debug("doShortRangeSyncForEpochSync/n", n)
+	s.state.Debug("doShortRangeSyncForEpochSync/err", err)
 	s.state.inserted = n
 	if err != nil {
+		s.state.Debug("doShortRangeSyncForEpochSync/error", err)
 		return err
 	}
 
@@ -107,32 +114,16 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	if len(bns) == 0 {
 		return 0, nil
 	}
+	s.state.Debug("block numbers", bns)
 
-	////////////////////////////////////////////////////////
-	hashChain, whitelist, err := sh.getHashChain(ctx, bns)
+	blocks, streamID, err := sh.getBlocksChain(ctx, bns)
 	if err != nil {
+		s.state.Debug("getBlocksChain/error", err)
 		return 0, errors.Wrap(err, "getHashChain")
 	}
-	if len(hashChain) == 0 {
-		// short circuit for no sync is needed
-		return 0, nil
-	}
-	blocks, streamID, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("epoch sync getBlocksByHashes failed")
-		if !errors.Is(err, context.Canceled) {
-			sh.removeStreams(whitelist) // Remote nodes cannot provide blocks with target hashes
-		}
-		return 0, errors.Wrap(err, "epoch sync getBlocksByHashes")
-	}
-	///////////////////////////////////////////////////////
-	// TODO: check this
-	// blocks, streamID, err := sh.getBlocksChain(bns)
-	// if err != nil {
-	// 	return 0, errors.Wrap(err, "getHashChain")
-	// }
-	///////////////////////////////////////////////////////
 	if len(blocks) == 0 {
+		s.state.Debug("getBlocksChain", "returns empty blocks array")
+		sh.streamsFailed([]sttypes.StreamID{streamID}, "no returned blocks")
 		// short circuit for no sync is needed
 		return 0, nil
 	}
@@ -141,10 +132,11 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	if err != nil {
 		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
-		sh.removeStreams(streamID) // Data provided by remote nodes is corrupted
+		sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
 		return n, err
 	}
 	if n > 0 {
+		s.state.Debug("epoch_blocks_inserted", n)
 		utils.Logger().Info().Int("blocks inserted", n).Msg("Insert block success")
 	}
 	return n, nil
