@@ -204,7 +204,7 @@ func (s *StagedStreamSync) Debug(source string, msg interface{}) {
 // doSync does the long range sync.
 // One LongRangeSync consists of several iterations.
 // For each iteration, estimate the current block number, then fetch block & insert to blockchain
-func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bool) (int, error) {
+func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bool) (uint64, int, error) {
 
 	var totalInserted int
 
@@ -213,13 +213,13 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 	if err := s.checkPrerequisites(); err != nil {
 		s.Debug("checkPrerequisites/error", err)
-		return 0, err
+		return 0, 0, err
 	}
 
 	var estimatedHeight uint64
 	if initSync {
 		if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
-			return 0, err
+			return 0, 0, err
 		} else {
 			estimatedHeight = h
 			//TODO: use directly currentCycle var
@@ -229,7 +229,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		if curBN := s.bc.CurrentBlock().NumberU64(); estimatedHeight <= curBN {
 			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
 				Msg(WrapStagedSyncMsg("early return of long range sync"))
-			return 0, nil
+			return estimatedHeight, 0, nil
 		}
 	}
 
@@ -248,14 +248,14 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			numFailedDownloadCounterVec.With(pl).Inc()
 
 			cancel()
-			return totalInserted + n, err
+			return estimatedHeight, totalInserted + n, err
 		}
 		cancel()
 
 		totalInserted += n
 
 		// if it's not long range sync, skip loop
-		if n < LastMileBlocksThreshold || !initSync {
+		if n == 0 || !initSync {
 			s.Debug("loop_break", "either n is less than LastMileBlocksThreshold or it's not long range")
 			break
 		}
@@ -275,7 +275,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		}
 	}
 	s.purgeLastMileBlocksFromCache()
-	return totalInserted, nil
+	return estimatedHeight, totalInserted, nil
 }
 
 func (s *StagedStreamSync) doSyncCycle(ctx context.Context, initSync bool) (int, error) {
