@@ -23,6 +23,27 @@ type ChainReader interface {
 	// Config retrieves the blockchain's chain configuration.
 	Config() *params.ChainConfig
 
+	// TrieNode retrieves a blob of data associated with a trie node
+	// either from ephemeral in-memory cache, or from persistent storage.
+	TrieNode(hash common.Hash) ([]byte, error)
+
+	// ContractCode retrieves a blob of data associated with a contract
+	// hash either from ephemeral in-memory cache, or from persistent storage.
+	//
+	// If the code doesn't exist in the in-memory cache, check the storage with
+	// new code scheme.
+	ContractCode(hash common.Hash) ([]byte, error)
+
+	// ValidatorCode retrieves a blob of data associated with a validator
+	// hash either from ephemeral in-memory cache, or from persistent storage.
+	//
+	// If the code doesn't exist in the in-memory cache, check the storage with
+	// new code scheme.
+	ValidatorCode(hash common.Hash) ([]byte, error)
+
+	// GetReceiptsByHash retrieves the receipts for all transactions in a given block.
+	GetReceiptsByHash(hash common.Hash) types.Receipts
+
 	// CurrentHeader retrieves the current header from the local chain.
 	CurrentHeader() *block.Header
 

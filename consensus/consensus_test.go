@@ -22,7 +22,6 @@ func TestConsensusInitialization(t *testing.T) {
 	assert.NoError(t, err)
 
 	messageSender := &MessageSender{host: host, retryTimes: int(phaseDuration.Seconds()) / RetryIntervalInSec}
-	fbtLog := NewFBFTLog()
 	state := State{mode: Normal}
 
 	timeouts := createTimeout()
@@ -37,7 +36,7 @@ func TestConsensusInitialization(t *testing.T) {
 	assert.IsType(t, make(chan struct{}), consensus.BlockNumLowChan)
 
 	// FBFTLog
-	assert.Equal(t, fbtLog, consensus.FBFTLog)
+	assert.NotNil(t, consensus.FBFTLog())
 
 	assert.Equal(t, FBFTAnnounce, consensus.phase)
 

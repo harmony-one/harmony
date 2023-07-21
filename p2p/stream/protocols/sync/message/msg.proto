@@ -17,6 +17,8 @@ message Request {
     GetBlockHashesRequest get_block_hashes_request = 3;
     GetBlocksByNumRequest get_blocks_by_num_request = 4;
     GetBlocksByHashesRequest get_blocks_by_hashes_request = 5;
+    GetNodeDataRequest get_node_data_request = 6;
+    GetReceiptsRequest get_receipts_request = 7;
   }
 }
 
@@ -34,6 +36,14 @@ message GetBlocksByHashesRequest {
   repeated bytes block_hashes = 1;
 }
 
+message GetNodeDataRequest {
+  repeated bytes node_hashes = 1;
+}
+
+message GetReceiptsRequest {
+  repeated bytes block_hashes = 1;
+}
+
 message Response {
   uint64 req_id = 1;
   oneof response {
@@ -42,6 +52,8 @@ message Response {
     GetBlockHashesResponse get_block_hashes_response = 4;
     GetBlocksByNumResponse get_blocks_by_num_response = 5;
     GetBlocksByHashesResponse get_blocks_by_hashes_response = 6;
+    GetNodeDataResponse get_node_data_response = 7;
+    GetReceiptsResponse get_receipts_response = 8;
   }
 }
 
@@ -67,5 +79,14 @@ message GetBlocksByHashesResponse {
   repeated bytes commit_sig = 2;
 }
 
+message GetNodeDataResponse {
+  repeated bytes data_bytes = 1;
+}
 
+message Receipts {
+  repeated bytes receipt_bytes = 1;
+}
 
+message GetReceiptsResponse {
+  map<uint64, Receipts> receipts = 1;
+}

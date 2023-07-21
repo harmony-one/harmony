@@ -1098,6 +1098,24 @@ func (bc *BlockChainImpl) GetBlocksFromHash(hash common.Hash, n int) (blocks []*
 	return
 }
 
+// ContractCode retrieves a blob of data associated with a contract
+// hash either from ephemeral in-memory cache, or from persistent storage.
+//
+// If the code doesn't exist in the in-memory cache, check the storage with
+// new code scheme.
+func (bc *BlockChainImpl) ContractCode(hash common.Hash) ([]byte, error) {
+	return bc.stateCache.ContractCode(common.Hash{}, hash)
+}
+
+// ValidatorCode retrieves a blob of data associated with a validator
+// hash either from ephemeral in-memory cache, or from persistent storage.
+//
+// If the code doesn't exist in the in-memory cache, check the storage with
+// new code scheme.
+func (bc *BlockChainImpl) ValidatorCode(hash common.Hash) ([]byte, error) {
+	return bc.stateCache.ValidatorCode(common.Hash{}, hash)
+}
+
 func (bc *BlockChainImpl) GetUnclesInChain(b *types.Block, length int) []*block.Header {
 	uncles := []*block.Header{}
 	for i := 0; b != nil && i < length; i++ {

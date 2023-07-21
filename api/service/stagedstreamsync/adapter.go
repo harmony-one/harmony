@@ -18,6 +18,8 @@ type syncProtocol interface {
 	GetRawBlocksByNumber(ctx context.Context, bns []uint64, opts ...syncproto.Option) ([][]byte, [][]byte, sttypes.StreamID, error)
 	GetBlockHashes(ctx context.Context, bns []uint64, opts ...syncproto.Option) ([]common.Hash, sttypes.StreamID, error)
 	GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts ...syncproto.Option) ([]*types.Block, sttypes.StreamID, error)
+	GetReceipts(ctx context.Context, hs []common.Hash, opts ...syncproto.Option) (receipts []types.Receipts, stid sttypes.StreamID, err error)
+	GetNodeData(ctx context.Context, hs []common.Hash, opts ...syncproto.Option) (data [][]byte, stid sttypes.StreamID, err error)
 
 	RemoveStream(stID sttypes.StreamID) // If a stream delivers invalid data, remove the stream
 	StreamFailed(stID sttypes.StreamID, reason string)

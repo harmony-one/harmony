@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p/stream/common/ratelimiter"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
+	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 )
@@ -22,6 +23,7 @@ import (
 var (
 	_ sttypes.Request  = &getBlocksByNumberRequest{}
 	_ sttypes.Request  = &getBlockNumberRequest{}
+	_ sttypes.Request  = &getReceiptsRequest{}
 	_ sttypes.Response = &syncResponse{&syncpb.Response{}}
 )
 
@@ -35,11 +37,20 @@ var (
 )
 
 var (
-	testHeader         = &block.Header{Header: headerV3.NewHeader()}
-	testBlock          = types.NewBlockWithHeader(testHeader)
-	testHeaderBytes, _ = rlp.EncodeToBytes(testHeader)
-	testBlockBytes, _  = rlp.EncodeToBytes(testBlock)
-	testBlockResponse  = syncpb.MakeGetBlocksByNumResponse(0, [][]byte{testBlockBytes}, make([][]byte, 1))
+	testHeader  = &block.Header{Header: headerV3.NewHeader()}
+	testBlock   = types.NewBlockWithHeader(testHeader)
+	testReceipt = &types.Receipt{
+		Status:            types.ReceiptStatusSuccessful,
+		CumulativeGasUsed: 0x888888888,
+		Logs:              []*types.Log{},
+	}
+	testNodeData         = numberToHash(123456789).Bytes()
+	testHeaderBytes, _   = rlp.EncodeToBytes(testHeader)
+	testBlockBytes, _    = rlp.EncodeToBytes(testBlock)
+	testReceiptBytes, _  = rlp.EncodeToBytes(testReceipt)
+	testNodeDataBytes, _ = rlp.EncodeToBytes(testNodeData)
+
+	testBlockResponse = syncpb.MakeGetBlocksByNumResponse(0, [][]byte{testBlockBytes}, make([][]byte, 1))
 
 	testCurBlockNumber      uint64 = 100
 	testBlockNumberResponse        = syncpb.MakeGetBlockNumberResponse(0, testCurBlockNumber)
@@ -48,6 +59,13 @@ var (
 	testBlockHashesResponse = syncpb.MakeGetBlockHashesResponse(0, []common.Hash{testHash})
 
 	testBlocksByHashesResponse = syncpb.MakeGetBlocksByHashesResponse(0, [][]byte{testBlockBytes}, make([][]byte, 1))
+
+	testReceipsMap = map[uint64]*message.Receipts{
+		0: {ReceiptBytes: [][]byte{testReceiptBytes}},
+	}
+	testReceiptResponse = syncpb.MakeGetReceiptsResponse(0, testReceipsMap)
+
+	testNodeDataResponse = syncpb.MakeGetNodeDataResponse(0, [][]byte{testNodeDataBytes})
 
 	testErrorResponse = syncpb.MakeErrorResponse(0, errors.New("test error"))
 )
@@ -283,6 +301,127 @@ func TestProtocol_GetBlocksByHashes(t *testing.T) {
 		}
 		if test.expErr == nil {
 			if len(blocks) != 1 {
+				t.Errorf("Test %v: size not 1", i)
+			}
+		}
+	}
+}
+
+func TestProtocol_GetReceipts(t *testing.T) {
+	tests := []struct {
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
+	}{
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testReceiptResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testBlockResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("response not GetReceipts"),
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testErrorResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
+		},
+	}
+
+	for i, test := range tests {
+		protocol := makeTestProtocol(test.getResponse)
+		receipts, stid, err := protocol.GetReceipts(context.Background(), []common.Hash{numberToHash(100)})
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
+		}
+		if stid != test.expStID {
+			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
+		}
+		if test.expErr == nil {
+			if len(receipts) != 1 {
+				t.Errorf("Test %v: size not 1", i)
+			}
+			if len(receipts[0]) != 1 {
+				t.Errorf("Test %v: block receipts size not 1", i)
+			}
+		}
+	}
+}
+
+func TestProtocol_GetNodeData(t *testing.T) {
+	tests := []struct {
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
+	}{
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testNodeDataResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testBlockResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("response not GetNodeData"),
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testErrorResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
+		},
+	}
+
+	for i, test := range tests {
+		protocol := makeTestProtocol(test.getResponse)
+		receipts, stid, err := protocol.GetNodeData(context.Background(), []common.Hash{numberToHash(100)})
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
+		}
+		if stid != test.expStID {
+			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
+		}
+		if test.expErr == nil {
+			if len(receipts) != 1 {
 				t.Errorf("Test %v: size not 1", i)
 			}
 		}

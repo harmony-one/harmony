@@ -46,6 +46,28 @@ func MakeGetBlocksByHashesRequest(hashes []common.Hash) *Request {
 	}
 }
 
+// MakeGetNodeDataRequest makes the GetNodeData request
+func MakeGetNodeDataRequest(hashes []common.Hash) *Request {
+	return &Request{
+		Request: &Request_GetNodeDataRequest{
+			GetNodeDataRequest: &GetNodeDataRequest{
+				NodeHashes: hashesToBytes(hashes),
+			},
+		},
+	}
+}
+
+// MakeGetReceiptsRequest makes the GetReceipts request
+func MakeGetReceiptsRequest(hashes []common.Hash) *Request {
+	return &Request{
+		Request: &Request_GetReceiptsRequest{
+			GetReceiptsRequest: &GetReceiptsRequest{
+				BlockHashes: hashesToBytes(hashes),
+			},
+		},
+	}
+}
+
 // MakeErrorResponse makes the error response
 func MakeErrorResponseMessage(rid uint64, err error) *Message {
 	resp := MakeErrorResponse(rid, err)
@@ -133,6 +155,42 @@ func MakeGetBlocksByHashesResponse(rid uint64, blocksBytes [][]byte, sigs [][]by
 			GetBlocksByHashesResponse: &GetBlocksByHashesResponse{
 				BlocksBytes: blocksBytes,
 				CommitSig:   sigs,
+			},
+		},
+	}
+}
+
+// MakeGetNodeDataResponseMessage makes the GetNodeDataResponse of Message type
+func MakeGetNodeDataResponseMessage(rid uint64, nodeData [][]byte) *Message {
+	resp := MakeGetNodeDataResponse(rid, nodeData)
+	return makeMessageFromResponse(resp)
+}
+
+// MakeGetNodeDataResponse make the GetNodeDataResponse of Response type
+func MakeGetNodeDataResponse(rid uint64, nodeData [][]byte) *Response {
+	return &Response{
+		ReqId: rid,
+		Response: &Response_GetNodeDataResponse{
+			GetNodeDataResponse: &GetNodeDataResponse{
+				DataBytes: nodeData,
+			},
+		},
+	}
+}
+
+// MakeGetReceiptsResponseMessage makes the GetReceiptsResponse of Message type
+func MakeGetReceiptsResponseMessage(rid uint64, receipts map[uint64]*Receipts) *Message {
+	resp := MakeGetReceiptsResponse(rid, receipts)
+	return makeMessageFromResponse(resp)
+}
+
+// MakeGetReceiptsResponse make the GetReceiptsResponse of Response type
+func MakeGetReceiptsResponse(rid uint64, receipts map[uint64]*Receipts) *Response {
+	return &Response{
+		ReqId: rid,
+		Response: &Response_GetReceiptsResponse{
+			GetReceiptsResponse: &GetReceiptsResponse{
+				Receipts: receipts,
 			},
 		},
 	}

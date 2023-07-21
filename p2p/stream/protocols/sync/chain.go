@@ -16,6 +16,8 @@ type chainHelper interface {
 	getBlockHashes(bns []uint64) []common.Hash
 	getBlocksByNumber(bns []uint64) ([]*types.Block, error)
 	getBlocksByHashes(hs []common.Hash) ([]*types.Block, error)
+	getNodeData(hs []common.Hash) ([][]byte, error)
+	getReceipts(hs []common.Hash) ([]types.Receipts, error)
 }
 
 type chainHelperImpl struct {
@@ -138,4 +140,45 @@ func (ch *chainHelperImpl) getBlockSigFromNextBlock(header *block.Header) []byte
 
 func (ch *chainHelperImpl) getBlockSigFromDB(header *block.Header) ([]byte, error) {
 	return ch.chain.ReadCommitSig(header.Number().Uint64())
+}
+
+// getNodeData assembles the response to a node data query.
+func (ch *chainHelperImpl) getNodeData(hs []common.Hash) ([][]byte, error) {
+	var (
+		bytes int
+		nodes [][]byte
+	)
+	for _, hash := range hs {
+		// Retrieve the requested state entry
+		entry, err := ch.chain.TrieNode(hash)
+		if len(entry) == 0 || err != nil {
+			// Read the contract/validator code with prefix only to save unnecessary lookups.
+			entry, err = ch.chain.ContractCode(hash)
+			if len(entry) == 0 || err != nil {
+				entry, err = ch.chain.ValidatorCode(hash)
+			}
+		}
+		if err == nil && len(entry) > 0 {
+			nodes = append(nodes, entry)
+			bytes += len(entry)
+		}
+	}
+	return nodes, nil
+}
+
+// getReceipts assembles the response to a receipt query.
+func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([]types.Receipts, error) {
+	var receipts []types.Receipts
+
+	for i, hash := range hs {
+		// Retrieve the requested block's receipts
+		results := ch.chain.GetReceiptsByHash(hash)
+		if results == nil {
+			if header := ch.chain.GetHeaderByHash(hash); header == nil || header.ReceiptHash() != types.EmptyRootHash {
+				continue
+			}
+		}
+		receipts[i] = append(receipts[i], results...)
+	}
+	return receipts, nil
 }
