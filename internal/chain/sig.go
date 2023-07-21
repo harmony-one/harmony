@@ -40,11 +40,7 @@ func DecodeSigBitmap(sigBytes bls.SerializedSignature, bitmap []byte, pubKeys []
 	if err != nil {
 		return nil, nil, errors.New("unable to deserialize multi-signature from payload")
 	}
-	mask, err := bls.NewMask(pubKeys, nil)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("onNewView unable to setup mask for prepared message")
-		return nil, nil, errors.New("unable to setup mask from payload")
-	}
+	mask := bls.NewMask(pubKeys)
 	if err := mask.SetMask(bitmap); err != nil {
 		utils.Logger().Warn().Err(err).Msg("mask.SetMask failed")
 		return nil, nil, errors.New("mask.SetMask failed")

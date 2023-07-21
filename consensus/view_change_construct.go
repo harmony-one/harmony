@@ -69,15 +69,15 @@ func (vc *viewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.Pub
 		vc.viewIDSigs[viewID] = map[string]*bls_core.Sign{}
 	}
 	if _, ok := vc.bhpBitmap[viewID]; !ok {
-		bhpBitmap, _ := bls_cosi.NewMask(members, nil)
+		bhpBitmap := bls_cosi.NewMask(members)
 		vc.bhpBitmap[viewID] = bhpBitmap
 	}
 	if _, ok := vc.nilBitmap[viewID]; !ok {
-		nilBitmap, _ := bls_cosi.NewMask(members, nil)
+		nilBitmap := bls_cosi.NewMask(members)
 		vc.nilBitmap[viewID] = nilBitmap
 	}
 	if _, ok := vc.viewIDBitmap[viewID]; !ok {
-		viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
+		viewIDBitmap := bls_cosi.NewMask(members)
 		vc.viewIDBitmap[viewID] = viewIDBitmap
 	}
 }
@@ -290,7 +290,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 		}
 		vc.bhpSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewchangeSig
 		if _, ok := vc.bhpBitmap[recvMsg.ViewID]; !ok {
-			bhpBitmap, _ := bls_cosi.NewMask(decider.Participants(), nil)
+			bhpBitmap := bls_cosi.NewMask(decider.Participants())
 			vc.bhpBitmap[recvMsg.ViewID] = bhpBitmap
 		}
 		vc.bhpBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true) // Set the bitmap indicating that this validator signed.
@@ -305,7 +305,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 		vc.viewIDSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewidSig
 
 		if _, ok := vc.viewIDBitmap[recvMsg.ViewID]; !ok {
-			viewIDBitmap, _ := bls_cosi.NewMask(decider.Participants(), nil)
+			viewIDBitmap := bls_cosi.NewMask(decider.Participants())
 			vc.viewIDBitmap[recvMsg.ViewID] = viewIDBitmap
 		}
 		// Set the bitmap indicating that this validator signed.
@@ -350,7 +350,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 	vc.nilSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewchangeSig
 
 	if _, ok := vc.nilBitmap[recvMsg.ViewID]; !ok {
-		nilBitmap, _ := bls_cosi.NewMask(decider.Participants(), nil)
+		nilBitmap := bls_cosi.NewMask(decider.Participants())
 		vc.nilBitmap[recvMsg.ViewID] = nilBitmap
 	}
 	vc.nilBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true) // Set the bitmap indicating that this validator signed.
@@ -366,7 +366,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 
 	// Set the bitmap indicating that this validator signed.
 	if _, ok := vc.viewIDBitmap[recvMsg.ViewID]; !ok {
-		viewIDBitmap, _ := bls_cosi.NewMask(decider.Participants(), nil)
+		viewIDBitmap := bls_cosi.NewMask(decider.Participants())
 		vc.viewIDBitmap[recvMsg.ViewID] = viewIDBitmap
 	}
 	vc.viewIDBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true)
@@ -411,7 +411,7 @@ func (vc *viewChange) InitPayload(
 					for _, key := range privKeys {
 						// update the dictionary key if the viewID is first time received
 						if _, ok := vc.bhpBitmap[viewID]; !ok {
-							bhpBitmap, _ := bls_cosi.NewMask(members, nil)
+							bhpBitmap := bls_cosi.NewMask(members)
 							vc.bhpBitmap[viewID] = bhpBitmap
 						}
 						if err := vc.bhpBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
@@ -435,7 +435,7 @@ func (vc *viewChange) InitPayload(
 			vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M2 (NIL) type messaage")
 			for _, key := range privKeys {
 				if _, ok := vc.nilBitmap[viewID]; !ok {
-					nilBitmap, _ := bls_cosi.NewMask(members, nil)
+					nilBitmap := bls_cosi.NewMask(members)
 					vc.nilBitmap[viewID] = nilBitmap
 				}
 				if err := vc.nilBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
@@ -467,7 +467,7 @@ func (vc *viewChange) InitPayload(
 		vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M3 (ViewID) type messaage")
 		for _, key := range privKeys {
 			if _, ok := vc.viewIDBitmap[viewID]; !ok {
-				viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
+				viewIDBitmap := bls_cosi.NewMask(members)
 				vc.viewIDBitmap[viewID] = viewIDBitmap
 			}
 			if err := vc.viewIDBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {

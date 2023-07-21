@@ -82,11 +82,7 @@ func (consensus *Consensus) construct(
 		)
 	} else {
 		// TODO: use a persistent bitmap to report bitmap
-		mask, err := bls.NewMask(consensus.Decider.Participants(), nil)
-		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("unable to setup mask for multi-sig message")
-			return nil, err
-		}
+		mask := bls.NewMask(consensus.Decider.Participants())
 		for _, key := range priKeys {
 			mask.SetKey(key.Pub.Bytes, true)
 		}

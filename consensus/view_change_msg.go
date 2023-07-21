@@ -222,10 +222,7 @@ func ParseNewViewMessage(msg *msg_pb.Message, members multibls.PublicKeys) (*FBF
 		if err != nil {
 			return nil, err
 		}
-		m3mask, err := bls_cosi.NewMask(members, nil)
-		if err != nil {
-			return nil, err
-		}
+		m3mask := bls_cosi.NewMask(members)
 		m3mask.SetMask(vcMsg.M3Bitmap)
 		FBFTMsg.M3AggSig = &m3Sig
 		FBFTMsg.M3Bitmap = m3mask
@@ -237,10 +234,7 @@ func ParseNewViewMessage(msg *msg_pb.Message, members multibls.PublicKeys) (*FBF
 		if err != nil {
 			return nil, err
 		}
-		m2mask, err := bls_cosi.NewMask(members, nil)
-		if err != nil {
-			return nil, err
-		}
+		m2mask := bls_cosi.NewMask(members)
 		m2mask.SetMask(vcMsg.M2Bitmap)
 		FBFTMsg.M2AggSig = &m2Sig
 		FBFTMsg.M2Bitmap = m2mask

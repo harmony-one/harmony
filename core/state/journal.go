@@ -156,7 +156,8 @@ func (v validatorWrapperChange) dirtied() *common.Address {
 }
 
 // revert undoes the changes introduced by this journal entry.
-func (v validatorWrapperChange) revert(*DB) {
+func (v validatorWrapperChange) revert(s *DB) {
+	s.stateValidators[*(v.address)] = v.prev
 }
 
 func (ch createObjectChange) revert(s *DB) {
