@@ -225,7 +225,8 @@ func (d *Downloader) loop() {
 		case <-d.downloadC:
 			d.stagedSyncInstance.Debug("downloader_loop/downloadC", "received signal from downloadC channel")
 			d.stagedSyncInstance.Debug("downloader_loop/downloadC/shardID", d.bc.ShardID())
-			addedBN, err := d.stagedSyncInstance.doSync(d.ctx, initSync)
+			bnBeforeSync := d.bc.CurrentBlock().NumberU64()
+			estimatedHeight, addedBN, err := d.stagedSyncInstance.doSync(d.ctx, initSync)
 			d.stagedSyncInstance.Debug("downloader_loop/downloadC/addedBN", addedBN)
 			d.stagedSyncInstance.Debug("downloader_loop/downloadC/error", err)
 			if err != nil {
@@ -268,7 +269,19 @@ func (d *Downloader) loop() {
 					d.bh.insertSync()
 				}
 			}
-			initSync = false
+			// if last doSync needed only to add a few blocks less than LastMileBlocksThreshold and
+			// the node is fully synced now, then switch to short range
+			// the reason why we need to check distanceBeforeSync is because, if it was long distance,
+			// very likely, there are a couple of new blocks have been added to the other nodes which
+			// we should still stay in long range and check them.
+			bnAfterSync := d.bc.CurrentBlock().NumberU64()
+			distanceBeforeSync := estimatedHeight - bnBeforeSync
+			distanceAfterSync := estimatedHeight - bnAfterSync
+			if estimatedHeight > 0 && addedBN != 0 &&
+				distanceBeforeSync <= uint64(LastMileBlocksThreshold) &&
+				distanceAfterSync <= uint64(LastMileBlocksThreshold) {
+				initSync = false
+			}
 
 		case <-d.closeC:
 			return
