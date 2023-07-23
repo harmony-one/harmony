@@ -215,7 +215,7 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 		isOneOfTheBadStreams := false
 		for _, id := range s.state.invalidBlock.StreamID {
 			if id == stid {
-				b.configs.protocol.RemoveStream(stid)
+				b.configs.protocol.StreamFailed(stid, "re-download bad block from this stream failed")
 				isOneOfTheBadStreams = true
 				break
 			}
