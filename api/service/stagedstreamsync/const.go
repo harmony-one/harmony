@@ -53,6 +53,9 @@ type (
 		// config for beacon config
 		BHConfig *BeaconHelperConfig
 
+		// use memory db
+		UseMemDB bool
+		
 		// log the stage progress
 		LogProgress bool
 		DebugMode   bool // logs every single process and error to help debugging stream sync

@@ -264,7 +264,6 @@ func New(
 	isBeacon bool,
 	protocol syncProtocol,
 	isBeaconNode bool,
-	useMemDB bool,
 	config Config,
 	logger zerolog.Logger,
 ) *StagedStreamSync {
@@ -313,7 +312,7 @@ func New(
 		revertOrder:    revertStages,
 		pruningOrder:   pruneStages,
 		logPrefixes:    logPrefixes,
-		UseMemDB:       useMemDB,
+		UseMemDB:       config.UseMemDB,
 	}
 }
 

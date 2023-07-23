@@ -943,8 +943,9 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 		SmHardLowCap:         hc.Sync.DiscHardLowCap,
 		SmHiCap:              hc.Sync.DiscHighCap,
 		SmDiscBatch:          hc.Sync.DiscBatch,
-		LogProgress:          node.NodeConfig.LogProgress,
-		DebugMode:            node.NodeConfig.DebugMode,
+		UseMemDB:             hc.Sync.StagedSyncCfg.UseMemDB,
+		LogProgress:          hc.Sync.StagedSyncCfg.LogProgress,
+		DebugMode:            hc.Sync.StagedSyncCfg.DebugMode,
 	}
 
 	// If we are running side chain, we will need to do some extra works for beacon

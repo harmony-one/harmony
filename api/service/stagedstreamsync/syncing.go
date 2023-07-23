@@ -42,7 +42,6 @@ func CreateStagedSync(ctx context.Context,
 	bc core.BlockChain,
 	consensus *consensus.Consensus,
 	dbDir string,
-	UseMemDB bool,
 	isBeaconNode bool,
 	protocol syncProtocol,
 	config Config,
@@ -51,14 +50,15 @@ func CreateStagedSync(ctx context.Context,
 
 	if config.DebugMode {
 		fmt.Printf("[SSSD:CreateStagedSync] creating staged sync for shard:%d beaconNode:%t memdb:%t dbDir:%s serverOnly:%t minStreams:%d\n",
-			bc.ShardID(), isBeaconNode, UseMemDB, dbDir, config.ServerOnly, config.MinStreams)
+			bc.ShardID(), isBeaconNode, config.UseMemDB, dbDir, config.ServerOnly, config.MinStreams)
 	}
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
-	if UseMemDB {
-		mainDB = memdb.New(getMemDbTempPath(dbDir, -1))
+	if config.UseMemDB {
+		mainDB = memdb.New(getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir))
 		for i := 0; i < config.Concurrency; i++ {
-			dbs[i] = memdb.New(getMemDbTempPath(dbDir, i))
+			dbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, i, dbDir)
+			dbs[i] = memdb.New(dbPath)
 		}
 	} else {
 		if config.DebugMode {
@@ -102,7 +102,6 @@ func CreateStagedSync(ctx context.Context,
 		isBeaconNode,
 		protocol,
 		isBeaconNode,
-		UseMemDB,
 		config,
 		logger,
 	), nil
