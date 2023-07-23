@@ -131,7 +131,7 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 		Hex("blockHash", recvMsg.BlockHash[:]).
 		Msg("[validateNewBlock] Prepared message and block added")
 
-	if err := consensus.FBFTLog.verifyBlock(&blockObj); err != nil {
+	if err := consensus.fBFTLog.verifyBlock(&blockObj); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[validateNewBlock] Block verification failed")
 		return nil, errors.Errorf("Block verification failed: %s", err.Error())
 	}

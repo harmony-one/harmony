@@ -268,7 +268,7 @@ func New(
 	consensus := Consensus{
 		mutex:           &sync.RWMutex{},
 		ShardID:         shard,
-		fBFTLog:         NewFBFTLog(),
+		fBFTLog:         NewFBFTLog(VerifyNewBlock(registry.GetWebHooks(), registry.GetBlockchain(), registry.GetBeaconchain())),
 		phase:           FBFTAnnounce,
 		current:         State{mode: Normal},
 		Decider:         Decider,
@@ -302,7 +302,7 @@ func New(
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	// Make Sure Verifier is not null
-	consensus.vc = newViewChange(consensus.FBFTLog.BlockVerify)
+	consensus.vc = newViewChange(consensus.fBFTLog.BlockVerify)
 	// init prometheus metrics
 	initMetrics()
 	consensus.AddPubkeyMetrics()

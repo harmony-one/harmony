@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"math/big"
 	"sync/atomic"
 	"time"
+
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/ethereum/go-ethereum/common"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
@@ -631,7 +632,7 @@ func (consensus *Consensus) tryCatchup() error {
 		}
 		blk.SetCurrentCommitSig(msg.Payload)
 
-		if err := consensus.FBFTLog.verifyBlock(blk); err != nil {
+		if err := consensus.fBFTLog.verifyBlock(blk); err != nil {
 			consensus.getLogger().Err(err).Msg("[TryCatchup] failed block verifier")
 			return err
 		}
