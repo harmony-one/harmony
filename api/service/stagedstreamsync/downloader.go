@@ -68,8 +68,8 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, consensus *consensus.Conse
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	//TODO: use mem db should be in config file
-	stagedSyncInstance, err := CreateStagedSync(ctx, bc, consensus, dbDir, false, isBeaconNode, sp, config, logger)
+	// create an instance of staged sync for the downloader
+	stagedSyncInstance, err := CreateStagedSync(ctx, bc, consensus, dbDir, isBeaconNode, sp, config, logger)
 	if err != nil {
 		cancel()
 		return nil
