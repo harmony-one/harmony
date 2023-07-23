@@ -127,7 +127,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 		s.state.Debug("getBlocksByHashes/error", err)
 		utils.Logger().Warn().Err(err).Msg("getBlocksByHashes failed")
 		if !errors.Is(err, context.Canceled) {
-			sh.removeStreams(whitelist) // Remote nodes cannot provide blocks with target hashes
+			sh.streamsFailed(whitelist, "remote nodes cannot provide blocks with target hashes")
 		}
 		return 0, errors.Wrap(err, "getBlocksByHashes")
 	}
@@ -139,11 +139,11 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 		s.state.Debug("verifyAndInsertBlocks/error", err)
 		utils.Logger().Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
 		if sh.blameAllStreams(blocks, n, err) {
-			sh.removeStreams(whitelist) // Data provided by remote nodes is corrupted
+			sh.streamsFailed(whitelist, "data provided by remote nodes is corrupted")
 		} else {
 			// It is the last block gives a wrong commit sig. Blame the provider of the last block.
 			st2Blame := stids[len(stids)-1]
-			sh.removeStreams([]sttypes.StreamID{st2Blame})
+			sh.streamsFailed([]sttypes.StreamID{st2Blame}, "the last block provided by stream gives a wrong commit sig")
 		}
 		return n, err
 	}
