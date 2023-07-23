@@ -52,7 +52,7 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 	}
 
 	maxHeight := s.state.status.targetBN
-	maxBlocksPerSyncCycle := uint64(1024) // TODO: should be in config -> s.state.MaxBlocksPerSyncCycle
+	maxBlocksPerSyncCycle := s.state.config.MaxBlocksPerSyncCycle
 	currentHeight := heads.configs.bc.CurrentBlock().NumberU64()
 	s.state.currentCycle.TargetHeight = maxHeight
 	targetHeight := uint64(0)

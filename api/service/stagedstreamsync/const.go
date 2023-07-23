@@ -36,11 +36,14 @@ type (
 		ServerOnly bool
 
 		// parameters
-		Network              nodeconfig.NetworkType
-		Concurrency          int // Number of concurrent sync requests
-		MinStreams           int // Minimum number of streams to do sync
-		InitStreams          int // Number of streams requirement for initial bootstrap
-		MaxAdvertiseWaitTime int // maximum time duration between protocol advertisements
+		Network               nodeconfig.NetworkType
+		Concurrency           int    // Number of concurrent sync requests
+		MinStreams            int    // Minimum number of streams to do sync
+		InitStreams           int    // Number of streams requirement for initial bootstrap
+		MaxAdvertiseWaitTime  int    // maximum time duration between protocol advertisements
+		MaxBlocksPerSyncCycle uint64 // maximum number of blocks per each sync cycle, if set to zero, all blocks will be synced in one full cycle
+		MaxMemSyncCycleSize   uint64 // maximum number of blocks to use in a single transaction for staged sync
+
 		// stream manager config
 		SmSoftLowCap int
 		SmHardLowCap int
