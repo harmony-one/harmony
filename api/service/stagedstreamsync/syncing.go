@@ -284,7 +284,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		}
 	}
 	s.purgeLastMileBlocksFromCache()
-	
+
 	return estimatedHeight, totalInserted, nil
 }
 
