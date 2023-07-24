@@ -83,7 +83,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return errV
 	}
 
-	if currProgress == 0 {
+	if currProgress <= currentHead {
 		if err := b.cleanAllBlockDBs(ctx); err != nil {
 			return err
 		}
