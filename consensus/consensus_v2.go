@@ -652,7 +652,7 @@ func (consensus *Consensus) tryCatchup() error {
 		default:
 			consensus.getLogger().Info().
 				Str("blockHash", blk.Hash().String()).
-				Msg("[TryCatchup] consensus verified block send to chain failed")
+				Msg("[TryCatchup] consensus verified block send to chan failed")
 			continue
 		}
 	}
