@@ -138,6 +138,14 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	if err != nil {
 		s.state.Debug("verifyAndInsertBlocks/error", err)
 		utils.Logger().Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
+		// rollback all added new blocks
+		s.state.Debug("verifyAndInsertBlocks/Rollback", hashChain)
+		if rbErr := sr.configs.bc.Rollback(hashChain); rbErr != nil {
+			s.state.Debug("verifyAndInsertBlocks/Rollback/error", rbErr)
+			utils.Logger().Error().Err(rbErr).Msg("short range failed to rollback")
+			return 0, rbErr
+		}
+		// fail streams
 		if sh.blameAllStreams(blocks, n, err) {
 			sh.streamsFailed(whitelist, "data provided by remote nodes is corrupted")
 		} else {
@@ -145,9 +153,9 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 			st2Blame := stids[len(stids)-1]
 			sh.streamsFailed([]sttypes.StreamID{st2Blame}, "the last block provided by stream gives a wrong commit sig")
 		}
-		return n, err
+		return 0, err
 	}
-	utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block success")
+	utils.Logger().Info().Int("blocks inserted", n).Msg("short range insert block success")
 
 	return n, nil
 }
