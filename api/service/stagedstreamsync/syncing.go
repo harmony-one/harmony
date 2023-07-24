@@ -262,18 +262,29 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 	// add consensus last mile blocks
 	if s.consensus != nil {
-		if err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
-			utils.Logger().Error().
-				Err(err).
+		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
+			utils.Logger().Error().Err(err).
 				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
+			utils.Logger().Info().
+				Interface("block", s.bc.CurrentBlock()).
+				Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
+			if err := s.bc.Rollback(hashes); err != nil {
+				utils.Logger().Error().Err(err).
+					Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
+				return estimatedHeight, totalInserted, nil
+			}
+			return estimatedHeight, totalInserted, err
+		} else {
+			totalInserted += len(hashes)
+			s.Debug("addConsensusLastMile/n", len(hashes))
 		}
-		s.Debug("addConsensusLastMile", "last mile blocks added")
 		// TODO: move this to explorer handler code.
 		if s.isExplorer {
 			s.consensus.UpdateConsensusInformation()
 		}
 	}
 	s.purgeLastMileBlocksFromCache()
+	
 	return estimatedHeight, totalInserted, nil
 }
 

@@ -625,9 +625,11 @@ func (ss *StagedStreamSync) getBlockFromLastMileBlocksByParentHash(parentHash co
 	return nil
 }
 
-func (ss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) error {
+func (ss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) ([]common.Hash, error) {
 	curNumber := bc.CurrentBlock().NumberU64()
-	return cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
+	var hashes []common.Hash
+
+	err := cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
 		for {
 			block := blockIter.Next()
 			if block == nil {
@@ -636,9 +638,11 @@ func (ss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consens
 			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
 				return errors.Wrap(err, "failed to InsertChain")
 			}
+			hashes = append(hashes, block.Header().Hash())
 		}
 		return nil
 	})
+	return hashes, err
 }
 
 // UpdateBlockAndStatus updates block and its status in db
@@ -669,7 +673,7 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 			}
 			utils.Logger().Debug().
 				Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).
-				Msg("[STAGED_SYNC] VerifyHeaderSignature")
+				Msg("[STAGED_STREAM_SYNC] VerifyHeaderSignature")
 		}
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 		if err == engine.ErrUnknownAncestor {
@@ -678,21 +682,7 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 			utils.Logger().Error().
 				Err(err).
 				Uint64("block number", block.NumberU64()).
-				Msgf("[STAGED_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block")
-
-			if !verifyAllSig {
-				utils.Logger().Info().
-					Interface("block", bc.CurrentBlock()).
-					Msg("[STAGED_SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
-				for i := uint64(0); i < VerifyHeaderBatchSize-1; i++ {
-					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
-						utils.Logger().Error().
-							Err(rbErr).
-							Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
-						return err
-					}
-				}
-			}
+				Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block")
 			return err
 		}
 	}
@@ -703,7 +693,7 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 			Err(err).
 			Uint64("block number", block.NumberU64()).
 			Uint32("shard", block.ShardID()).
-			Msgf("[STAGED_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain")
+			Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain")
 		return err
 	}
 	utils.Logger().Info().
@@ -711,13 +701,10 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 		Uint64("blockEpoch", block.Epoch().Uint64()).
 		Str("blockHex", block.Hash().Hex()).
 		Uint32("ShardID", block.ShardID()).
-		Msg("[STAGED_SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
+		Msg("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
 
 	for i, tx := range block.StakingTransactions() {
-		utils.Logger().Info().
-			Msgf(
-				"StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage(),
-			)
+		utils.Logger().Info().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
 	}
 	return nil
 }
