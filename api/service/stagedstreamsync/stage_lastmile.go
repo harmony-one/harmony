@@ -3,7 +3,9 @@ package stagedstreamsync
 import (
 	"context"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
@@ -47,18 +49,35 @@ func (lm *StageLastMile) Exec(ctx context.Context, firstCycle bool, invalidBlock
 
 	// update last mile blocks if any
 	parentHash := bc.CurrentBlock().Hash()
+	var hashes []common.Hash
 	for {
 		block := s.state.getBlockFromLastMileBlocksByParentHash(parentHash)
 		if block == nil {
 			break
 		}
-		err = s.state.UpdateBlockAndStatus(block, bc, false)
+		err = s.state.UpdateBlockAndStatus(block, bc, true)
 		if err != nil {
-			break
+			lm.RollbackLastMileBlocks(ctx, hashes)
+			return err
 		}
+		hashes = append(hashes, block.Hash())
 		parentHash = block.Hash()
 	}
+	s.state.purgeLastMileBlocksFromCache()
 
+	return nil
+}
+
+func (lm *StageLastMile) RollbackLastMileBlocks(ctx context.Context, hashes []common.Hash) error {
+	bc := lm.configs.bc
+	utils.Logger().Info().
+		Interface("block", bc.CurrentBlock()).
+		Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
+	if err := bc.Rollback(hashes); err != nil {
+		utils.Logger().Error().Err(err).
+			Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
+		return err
+	}
 	return nil
 }
 
