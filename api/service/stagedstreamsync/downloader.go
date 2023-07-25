@@ -236,7 +236,10 @@ func (d *Downloader) loop() {
 					// if many streams couldn't solve it, then that's an unresolvable bad block
 					if numTriedStreams >= d.config.InitStreams {
 						if !d.stagedSyncInstance.invalidBlock.IsLogged {
-							fmt.Println("unresolvable bad block:", d.stagedSyncInstance.invalidBlock.Number)
+							d.stagedSyncInstance.Debug("downloader_loop/downloadC/badBlock/unresolvable/number", d.stagedSyncInstance.invalidBlock.Number)
+							d.logger.Error().
+								Uint64("bad block number", d.stagedSyncInstance.invalidBlock.Number).
+								Msg(WrapStagedSyncMsg("unresolvable bad block"))
 							d.stagedSyncInstance.invalidBlock.IsLogged = true
 						}
 						//TODO: if we don't have any new or untried stream in the list, sleep or panic
@@ -277,7 +280,7 @@ func (d *Downloader) loop() {
 			bnAfterSync := d.bc.CurrentBlock().NumberU64()
 			distanceBeforeSync := estimatedHeight - bnBeforeSync
 			distanceAfterSync := estimatedHeight - bnAfterSync
-			if estimatedHeight > 0 && addedBN != 0 &&
+			if estimatedHeight > 0 &&
 				distanceBeforeSync <= uint64(LastMileBlocksThreshold) &&
 				distanceAfterSync <= uint64(LastMileBlocksThreshold) {
 				initSync = false
