@@ -195,7 +195,7 @@ func (d *Downloader) loop() {
 	// for epoch chain we do only need to go through epoch sync process
 	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
 
-	doneC := make(chan struct{})
+	doneC := make(chan struct{}, 1)
 
 	done := func() {
 		select {
