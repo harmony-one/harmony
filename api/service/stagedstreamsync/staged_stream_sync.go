@@ -645,6 +645,21 @@ func (ss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consens
 	return hashes, err
 }
 
+func (ss *StagedStreamSync) RollbackLastMileBlocks(ctx context.Context, hashes []common.Hash) error {
+	if len(hashes) == 0 {
+		return nil
+	}
+	utils.Logger().Info().
+		Interface("block", ss.bc.CurrentBlock()).
+		Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
+	if err := ss.bc.Rollback(hashes); err != nil {
+		utils.Logger().Error().Err(err).
+			Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
+		return err
+	}
+	return nil
+}
+
 // UpdateBlockAndStatus updates block and its status in db
 func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {

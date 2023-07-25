@@ -265,14 +265,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
-			utils.Logger().Info().
-				Interface("block", s.bc.CurrentBlock()).
-				Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
-			if err := s.bc.Rollback(hashes); err != nil {
-				utils.Logger().Error().Err(err).
-					Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
-				return estimatedHeight, totalInserted, nil
-			}
+			s.RollbackLastMileBlocks(downloaderContext, hashes)
 			return estimatedHeight, totalInserted, err
 		} else {
 			totalInserted += len(hashes)

@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
@@ -57,7 +56,7 @@ func (lm *StageLastMile) Exec(ctx context.Context, firstCycle bool, invalidBlock
 		}
 		err = s.state.UpdateBlockAndStatus(block, bc, true)
 		if err != nil {
-			lm.RollbackLastMileBlocks(ctx, hashes)
+			s.state.RollbackLastMileBlocks(ctx, hashes)
 			return err
 		}
 		hashes = append(hashes, block.Hash())
@@ -65,19 +64,6 @@ func (lm *StageLastMile) Exec(ctx context.Context, firstCycle bool, invalidBlock
 	}
 	s.state.purgeLastMileBlocksFromCache()
 
-	return nil
-}
-
-func (lm *StageLastMile) RollbackLastMileBlocks(ctx context.Context, hashes []common.Hash) error {
-	bc := lm.configs.bc
-	utils.Logger().Info().
-		Interface("block", bc.CurrentBlock()).
-		Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
-	if err := bc.Rollback(hashes); err != nil {
-		utils.Logger().Error().Err(err).
-			Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
-		return err
-	}
 	return nil
 }
 
