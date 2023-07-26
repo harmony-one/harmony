@@ -119,6 +119,9 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	blocks, streamID, err := sh.getBlocksChain(ctx, bns)
 	if err != nil {
 		s.state.Debug("getBlocksChain/error", err)
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return 0, nil
+		}
 		return 0, errors.Wrap(err, "getHashChain")
 	}
 	if len(blocks) == 0 {
