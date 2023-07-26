@@ -54,7 +54,7 @@ func (lm *StageLastMile) Exec(ctx context.Context, firstCycle bool, invalidBlock
 		if block == nil {
 			break
 		}
-		err = s.state.UpdateBlockAndStatus(block, bc, true)
+		err = s.state.UpdateBlockAndStatus(block, bc, false)
 		if err != nil {
 			s.state.RollbackLastMileBlocks(ctx, hashes)
 			return err
