@@ -123,7 +123,6 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	}
 	if len(blocks) == 0 {
 		s.state.Debug("getBlocksChain", "returns empty blocks array")
-		sh.streamsFailed([]sttypes.StreamID{streamID}, "no returned blocks")
 		// short circuit for no sync is needed
 		return 0, nil
 	}
