@@ -616,6 +616,8 @@ func (ss *StagedStreamSync) AddLastMileBlock(block *types.Block) {
 }
 
 func (ss *StagedStreamSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Hash) *types.Block {
+	ss.lastMileMux.Lock()
+	defer ss.lastMileMux.Unlock()
 	for _, block := range ss.lastMileBlocks {
 		ph := block.ParentHash()
 		if bytes.Equal(ph[:], parentHash[:]) {
@@ -692,7 +694,7 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 		}
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 		if err == engine.ErrUnknownAncestor {
-			return err
+			return nil
 		} else if err != nil {
 			utils.Logger().Error().
 				Err(err).
