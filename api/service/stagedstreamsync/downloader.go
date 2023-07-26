@@ -195,15 +195,15 @@ func (d *Downloader) loop() {
 	// for epoch chain we do only need to go through epoch sync process
 	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
 
-	doneC := make(chan struct{}, 1)
+	doneC := make(chan struct{})
 
 	done := func() {
 		select {
 		case doneC <- struct{}{}:
-		default:
+		case <-time.After(100 * time.Millisecond):
 		}
 	}
-	done()
+	go done()
 
 	trigger := func() {
 		select {
@@ -263,15 +263,6 @@ func (d *Downloader) loop() {
 					Uint32("shard", d.bc.ShardID()).
 					Msg(WrapStagedSyncMsg("sync finished"))
 			}
-			if addedBN != 0 {
-				// If block number has been changed, trigger another sync
-				done()
-				go trigger()
-				// try to add last mile from pub-sub (blocking)
-				if d.bh != nil {
-					d.bh.insertSync()
-				}
-			}
 			// if last doSync needed only to add a few blocks less than LastMileBlocksThreshold and
 			// the node is fully synced now, then switch to short range
 			// the reason why we need to check distanceBeforeSync is because, if it was long distance,
@@ -285,11 +276,21 @@ func (d *Downloader) loop() {
 				distanceAfterSync <= uint64(LastMileBlocksThreshold) {
 				initSync = false
 			}
+			// If block number has been changed, trigger another sync
+			if addedBN != 0 {
+				// try to add last mile from pub-sub (blocking)
+				if d.bh != nil {
+					d.bh.insertSync()
+				}
+
+				go done()
+				go trigger()
+			}
 
 		case <-d.closeC:
 			return
 		}
 		d.stagedSyncInstance.Debug("downloader_loop/downloadC", "done")
-		done()
+		go done()
 	}
 }
