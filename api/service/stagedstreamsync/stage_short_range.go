@@ -101,6 +101,9 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums)
 	if err != nil {
 		s.state.Debug("getHashChain/error", err)
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return 0, nil
+		}
 		return 0, errors.Wrap(err, "getHashChain")
 	}
 
@@ -126,10 +129,10 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	if err != nil {
 		s.state.Debug("getBlocksByHashes/error", err)
 		utils.Logger().Warn().Err(err).Msg("getBlocksByHashes failed")
-		if !errors.Is(err, context.Canceled) {
-			sh.streamsFailed(whitelist, "remote nodes cannot provide blocks with target hashes")
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return 0, errors.Wrap(err, "getBlocksByHashes")
 		}
-		return 0, errors.Wrap(err, "getBlocksByHashes")
+		sh.streamsFailed(whitelist, "remote nodes cannot provide blocks with target hashes")
 	}
 
 	n, err := verifyAndInsertBlocks(sr.configs.bc, blocks)
