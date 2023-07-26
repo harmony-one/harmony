@@ -3,6 +3,7 @@ package stagedstreamsync
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -190,28 +191,19 @@ func (d *Downloader) waitForBootFinish() {
 func (d *Downloader) loop() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
+
+	// isProcessing helps to prevent concurrent running the same download process
+	var isProcessing atomic.Value
+	isProcessing.Store(false)
+
 	// for shard chain and beacon chain node, first we start with initSync=true to
 	// make sure it goes through the long range sync first.
 	// for epoch chain we do only need to go through epoch sync process
 	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
 
-	doneC := make(chan struct{})
-
-	done := func() {
-		select {
-		case doneC <- struct{}{}:
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
-	go done()
-
 	trigger := func() {
 		select {
-		case <-doneC:
-			select {
-			case d.downloadC <- struct{}{}:
-			default:
-			}
+		case d.downloadC <- struct{}{}:
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
@@ -223,6 +215,10 @@ func (d *Downloader) loop() {
 			go trigger()
 
 		case <-d.downloadC:
+			if isProcessing.Load().(bool) {
+				break
+			}
+			isProcessing.Store(true)
 			d.stagedSyncInstance.Debug("downloader_loop/downloadC", "received signal from downloadC channel")
 			d.stagedSyncInstance.Debug("downloader_loop/downloadC/shardID", d.bc.ShardID())
 			bnBeforeSync := d.bc.CurrentBlock().NumberU64()
@@ -254,6 +250,7 @@ func (d *Downloader) loop() {
 					time.Sleep(5 * time.Second)
 					trigger()
 				}()
+				isProcessing.Store(false)
 				break
 			}
 			if initSync {
@@ -282,15 +279,12 @@ func (d *Downloader) loop() {
 				if d.bh != nil {
 					d.bh.insertSync()
 				}
-
-				go done()
 				go trigger()
 			}
+			isProcessing.Store(false)
 
 		case <-d.closeC:
 			return
 		}
-		d.stagedSyncInstance.Debug("downloader_loop/downloadC", "done")
-		go done()
 	}
 }
