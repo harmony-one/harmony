@@ -241,6 +241,7 @@ func (d *Downloader) loop() {
 					time.Sleep(5 * time.Second)
 					trigger()
 				}()
+				time.Sleep(1 * time.Second)
 				break
 			}
 			if initSync {
@@ -250,19 +251,6 @@ func (d *Downloader) loop() {
 					Uint32("shard", d.bc.ShardID()).
 					Msg(WrapStagedSyncMsg("sync finished"))
 			}
-			// if last doSync needed only to add a few blocks less than LastMileBlocksThreshold and
-			// the node is fully synced now, then switch to short range
-			// the reason why we need to check distanceBeforeSync is because, if it was long distance,
-			// very likely, there are a couple of new blocks have been added to the other nodes which
-			// we should still stay in long range and check them.
-			bnAfterSync := d.bc.CurrentBlock().NumberU64()
-			distanceBeforeSync := estimatedHeight - bnBeforeSync
-			distanceAfterSync := estimatedHeight - bnAfterSync
-			if estimatedHeight > 0 &&
-				distanceBeforeSync <= uint64(LastMileBlocksThreshold) &&
-				distanceAfterSync <= uint64(LastMileBlocksThreshold) {
-				initSync = false
-			}
 			// If block number has been changed, trigger another sync
 			if addedBN != 0 {
 				go trigger()
@@ -271,7 +259,20 @@ func (d *Downloader) loop() {
 					d.bh.insertSync()
 				}
 			}
-
+			// if last doSync needed only to add a few blocks less than LastMileBlocksThreshold and
+			// the node is fully synced now, then switch to short range
+			// the reason why we need to check distanceBeforeSync is because, if it was long distance,
+			// very likely, there are a couple of new blocks have been added to the other nodes which
+			// we should still stay in long range and check them.
+			bnAfterSync := d.bc.CurrentBlock().NumberU64()
+			distanceBeforeSync := estimatedHeight - bnBeforeSync
+			distanceAfterSync := estimatedHeight - bnAfterSync
+			if estimatedHeight > 0 && addedBN > 0 &&
+				distanceBeforeSync <= uint64(LastMileBlocksThreshold) &&
+				distanceAfterSync <= uint64(LastMileBlocksThreshold) {
+				initSync = false
+			}
+			
 		case <-d.closeC:
 			return
 		}

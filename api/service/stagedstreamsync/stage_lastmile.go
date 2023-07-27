@@ -35,7 +35,8 @@ func NewStageLastMileCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) St
 
 func (lm *StageLastMile) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
-	if s.state.initSync {
+	// no need to download the last mile blocks if we are redoing the stages because of bad block
+	if invalidBlockRevert {
 		return nil
 	}
 

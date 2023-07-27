@@ -158,7 +158,9 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 		}
 		return 0, err
 	}
-	utils.Logger().Info().Int("blocks inserted", n).Msg("short range insert block success")
+	if n > 0 {
+		utils.Logger().Info().Int("blocks inserted", n).Msg("short range insert block success")
+	}
 
 	return n, nil
 }
