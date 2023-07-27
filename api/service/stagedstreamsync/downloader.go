@@ -272,7 +272,7 @@ func (d *Downloader) loop() {
 				distanceAfterSync <= uint64(LastMileBlocksThreshold) {
 				initSync = false
 			}
-			
+
 		case <-d.closeC:
 			return
 		}
