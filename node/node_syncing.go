@@ -352,7 +352,7 @@ func (node *Node) NodeSyncing() {
 		if node.HarmonyConfig.TiKV.Role == tikv.RoleWriter {
 			node.supportSyncing() // the writer needs to be in sync with it's other peers
 		}
-	} else if !node.HarmonyConfig.General.IsOffline && node.HarmonyConfig.DNSSync.Client {
+	} else if !node.HarmonyConfig.General.IsOffline && (node.HarmonyConfig.DNSSync.Client || node.HarmonyConfig.Sync.Downloader) {
 		node.supportSyncing() // for non-writer-reader mode a.k.a tikv nodes
 	}
 }
