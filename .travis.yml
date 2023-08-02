@@ -12,6 +12,16 @@ env:
   - TEST="bash ./scripts/travis_go_checker.sh"
   - TEST="bash ./scripts/travis_rpc_checker.sh"
   - TEST="bash ./scripts/travis_rosetta_checker.sh"
+
+# update to the newest stable version of docker on ubuntu due to GLIBC version
+# conflict Travis CI default daemon vs image
+# See the issue for this: https://github.com/moby/moby/pull/42681
+before_install:
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
+
 install:
   # default working directory with source code is automatically set to
   #   /home/travis/gopath/src/github.com/harmony-one/harmony
