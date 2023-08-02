@@ -373,7 +373,7 @@ func (node *Node) supportSyncing() {
 		go node.SendNewBlockToUnsync()
 	}
 
-	// if stream sync client is running, don't create other sync client instances 
+	// if stream sync client is running, don't create other sync client instances
 	if node.HarmonyConfig.Sync.Downloader {
 		return
 	}
