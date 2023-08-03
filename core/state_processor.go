@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -50,11 +49,9 @@ const (
 //
 // StateProcessor implements Processor.
 type StateProcessor struct {
-	config      *params.ChainConfig     // Chain configuration options
-	bc          BlockChain              // Canonical blockchain
-	beacon      BlockChain              // Beacon chain
-	engine      consensus_engine.Engine // Consensus engine used for block rewards
-	resultCache *lru.Cache              // Cache for result after a certain block is processed
+	bc          BlockChain // Canonical blockchain
+	beacon      BlockChain // Beacon chain
+	resultCache *lru.Cache // Cache for result after a certain block is processed
 }
 
 // this structure is cached, and each individual element is returned
@@ -70,7 +67,7 @@ type ProcessorResult struct {
 
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(
-	config *params.ChainConfig, bc BlockChain, beacon BlockChain, engine consensus_engine.Engine,
+	bc BlockChain, beacon BlockChain,
 ) *StateProcessor {
 	if bc == nil {
 		panic("bc is nil")
@@ -80,13 +77,13 @@ func NewStateProcessor(
 	}
 	resultCache, _ := lru.New(resultCacheLimit)
 	return &StateProcessor{
-		config:      config,
 		bc:          bc,
 		beacon:      beacon,
-		engine:      engine,
 		resultCache: resultCache,
 	}
 }
+
+type UsedGas = uint64
 
 // Process processes the state changes according to the Ethereum rules by running
 // the transaction messages using the statedb and applying any rewards to both
@@ -99,7 +96,7 @@ func (p *StateProcessor) Process(
 	block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool,
 ) (
 	types.Receipts, types.CXReceipts, []staking.StakeMsg,
-	[]*types.Log, uint64, reward.Reader, *state.DB, error,
+	[]*types.Log, UsedGas, reward.Reader, *state.DB, error,
 ) {
 	cacheKey := block.Hash()
 	if readCache {
@@ -133,7 +130,7 @@ func (p *StateProcessor) Process(
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
 		receipt, cxReceipt, stakeMsgs, _, err := ApplyTransaction(
-			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+			p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
 			return nil, nil, nil, nil, 0, nil, statedb, err
@@ -155,7 +152,7 @@ func (p *StateProcessor) Process(
 	for i, tx := range block.StakingTransactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
 		receipt, _, err := ApplyStakingTransaction(
-			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+			p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
 			return nil, nil, nil, nil, 0, nil, statedb, err
@@ -169,7 +166,7 @@ func (p *StateProcessor) Process(
 	// after transactions (to be consistent with the block proposal)
 	for _, cx := range block.IncomingReceipts() {
 		if err := ApplyIncomingReceipt(
-			p.config, statedb, header, cx,
+			p.bc.Config(), statedb, header, cx,
 		); err != nil {
 			return nil, nil,
 				nil, nil, 0, nil, statedb, errors.New("[Process] Cannot apply incoming receipts")
@@ -195,7 +192,7 @@ func (p *StateProcessor) Process(
 		// Block processing don't need to block on reward computation as in block proposal
 		sigsReady <- true
 	}()
-	_, payout, err := p.engine.Finalize(
+	_, payout, err := p.bc.Engine().Finalize(
 		p.bc,
 		p.beacon,
 		header, statedb, block.Transactions(),
@@ -246,8 +243,9 @@ func getTransactionType(
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, []staking.StakeMsg, uint64, error) {
-	txType := getTransactionType(config, header, tx)
+func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, []staking.StakeMsg, uint64, error) {
+	config := bc.Config()
+	txType := getTransactionType(bc.Config(), header, tx)
 	if txType == types.InvalidTx {
 		return nil, nil, nil, 0, errors.New("Invalid Transaction Type")
 	}
@@ -350,9 +348,9 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 // indicating the block was invalid.
 // staking transaction will use the code field in the account to store the staking information
 func ApplyStakingTransaction(
-	config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB,
+	bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB,
 	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gas uint64, err error) {
-
+	config := bc.Config()
 	msg, err := StakingToMessage(tx, header.Number())
 	if err != nil {
 		return nil, 0, err

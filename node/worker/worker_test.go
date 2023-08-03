@@ -50,7 +50,7 @@ func TestNewWorker(t *testing.T) {
 		t.Error(err)
 	}
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, nil, engine)
+	worker := New(chain, nil)
 
 	if worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(testBankKey.PublicKey)).Cmp(testBankFunds) != 0 {
 		t.Error("Worker state is not setup correctly")
@@ -75,7 +75,7 @@ func TestCommitTransactions(t *testing.T) {
 	chain, _ := core.NewBlockChain(database, nil, nil, cacheConfig, gspec.Config, engine, vm.Config{})
 
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, nil, engine)
+	worker := New(chain, nil)
 
 	// Generate a test tx
 	baseNonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
