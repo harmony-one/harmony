@@ -18,7 +18,7 @@ addons:
     sources:
       - sourceline: deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable
     packages:
-    - docker-ce
+    - docker.io
 
 # before_install:
 #   # upgrade docker to the latest supported by the OS loaded in the travis image
@@ -36,7 +36,7 @@ install:
   - sudo systemctl --type=service
   - docker --version
   - which docker
-  - sudo systemctl restart docker
+#  - sudo systemctl restart docker
   - sudo docker ps
   - sudo docker info 
   # default working directory with source code is automatically set to
