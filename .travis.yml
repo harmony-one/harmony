@@ -14,6 +14,7 @@ env:
   - TEST="bash ./scripts/travis_rosetta_checker.sh"
 
 before_install:
+  # upgrade docker to the latest supported by the OS loaded in the travis image
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
   - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
   - sudo apt-get update
