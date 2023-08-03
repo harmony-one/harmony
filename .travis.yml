@@ -33,9 +33,12 @@ addons:
 #   - docker info
 
 install:
+  - sudo systemctl --type=service
+  - docker --version
+  - which docker
   - sudo systemctl restart docker
-  - docker ps
-  - docker info 
+  - sudo docker ps
+  - sudo docker info 
   # default working directory with source code is automatically set to
   #   /home/travis/gopath/src/github.com/harmony-one/harmony
   # https://docs.travis-ci.com/user/languages/go/#go-import-path
