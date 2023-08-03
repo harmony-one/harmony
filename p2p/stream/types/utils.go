@@ -11,7 +11,7 @@ import (
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/hashicorp/go-version"
-	libp2p_proto "github.com/libp2p/go-libp2p-core/protocol"
+	libp2p_proto "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/pkg/errors"
 )
 

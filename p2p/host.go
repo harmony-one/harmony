@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2p_config "github.com/libp2p/go-libp2p/config"
