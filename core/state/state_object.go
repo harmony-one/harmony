@@ -561,7 +561,7 @@ func (s *Object) CodeSize(db Database) int {
 	if s.validatorWrapper || err != nil {
 		vcSize, errVCSize := db.ValidatorCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
 		if errVCSize == nil && vcSize > 0 {
-			return size
+			return vcSize
 		}
 		if s.validatorWrapper {
 			s.setError(fmt.Errorf("can't load validator code size %x for account address hash %x : %v", s.CodeHash(), s.addrHash, err))
