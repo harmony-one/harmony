@@ -48,6 +48,15 @@ func CreateStagedSync(ctx context.Context,
 	logger zerolog.Logger,
 ) (*StagedStreamSync, error) {
 
+	logger.Info().
+		Uint32("shard", bc.ShardID()).
+		Bool("beaconNode", isBeaconNode).
+		Bool("memdb", config.UseMemDB).
+		Str("dbDir", dbDir).
+		Bool("serverOnly", config.ServerOnly).
+		Int("minStreams", config.MinStreams).
+		Msg(WrapStagedSyncMsg("creating staged sync"))
+
 	if config.DebugMode {
 		fmt.Printf("[SSSD:CreateStagedSync] creating staged sync for shard:%d beaconNode:%t memdb:%t dbDir:%s serverOnly:%t minStreams:%d\n",
 			bc.ShardID(), isBeaconNode, config.UseMemDB, dbDir, config.ServerOnly, config.MinStreams)
@@ -93,6 +102,15 @@ func CreateStagedSync(ctx context.Context,
 		lastMileCfg,
 		stageFinishCfg,
 	)
+
+	logger.Info().
+		Uint32("shard", bc.ShardID()).
+		Bool("beaconNode", isBeaconNode).
+		Bool("memdb", config.UseMemDB).
+		Str("dbDir", dbDir).
+		Bool("serverOnly", config.ServerOnly).
+		Int("minStreams", config.MinStreams).
+		Msg(WrapStagedSyncMsg("staged sync created successfully"))
 
 	return New(
 		bc,
