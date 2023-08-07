@@ -2,7 +2,6 @@ package sync
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -181,7 +180,7 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 		return
 	}
 	//to get my ID use raw.Conn().LocalPeer().String()
-	fmt.Println("Connected to", raw.Conn().RemotePeer().String(), "(", st.ProtoID(), ")")
+	p.logger.Info().Msgf("Connected to %s (%s)", raw.Conn().RemotePeer().String(), st.ProtoID())
 	st.run()
 }
 

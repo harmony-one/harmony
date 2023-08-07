@@ -53,7 +53,11 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 	n, err := sr.doShortRangeSync(ctx, s)
 	s.state.inserted = n
 	if err != nil {
+		utils.Logger().Info().Err(err).Msg("short range sync failed")
 		return err
+	}
+	if n > 0 {
+		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("short range blocks inserted successfully")
 	}
 
 	useInternalTx := tx == nil
@@ -93,14 +97,12 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	}
 
 	if err := sh.checkPrerequisites(); err != nil {
-		s.state.Debug("checkPrerequisites/error", err)
 		return 0, errors.Wrap(err, "prerequisite")
 	}
 	curBN := sr.configs.bc.CurrentBlock().NumberU64()
 	blkNums := sh.prepareBlockHashNumbers(curBN)
 	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums)
 	if err != nil {
-		s.state.Debug("getHashChain/error", err)
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, nil
 		}
@@ -118,16 +120,10 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 		Interface("hashChain", hashChain).
 		Msg("short range start syncing")
 
-	s.state.Debug("getHashChain/curBN", curBN)
-	s.state.Debug("getHashChain/lenReqBlocks", len(blkNums))
-	s.state.Debug("getHashChain/lenHashChain", len(hashChain))
-	s.state.Debug("getHashChain/expEndBN", expEndBN)
-
 	s.state.status.setTargetBN(expEndBN)
 
 	blocks, stids, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
-		s.state.Debug("getBlocksByHashes/error", err)
 		utils.Logger().Warn().Err(err).Msg("getBlocksByHashes failed")
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, errors.Wrap(err, "getBlocksByHashes")
@@ -136,15 +132,11 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	}
 
 	n, err := verifyAndInsertBlocks(sr.configs.bc, blocks)
-	s.state.Debug("verifyAndInsertBlocks/n", n)
 	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	if err != nil {
-		s.state.Debug("verifyAndInsertBlocks/error", err)
 		utils.Logger().Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
 		// rollback all added new blocks
-		s.state.Debug("verifyAndInsertBlocks/Rollback", hashChain)
 		if rbErr := sr.configs.bc.Rollback(hashChain); rbErr != nil {
-			s.state.Debug("verifyAndInsertBlocks/Rollback/error", rbErr)
 			utils.Logger().Error().Err(rbErr).Msg("short range failed to rollback")
 			return 0, rbErr
 		}
@@ -157,9 +149,6 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 			sh.streamsFailed([]sttypes.StreamID{st2Blame}, "the last block provided by stream gives a wrong commit sig")
 		}
 		return 0, err
-	}
-	if n > 0 {
-		utils.Logger().Info().Int("blocks inserted", n).Msg("short range insert block success")
 	}
 
 	return n, nil

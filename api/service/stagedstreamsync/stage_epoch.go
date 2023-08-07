@@ -35,9 +35,6 @@ func NewStageEpochCfg(bc core.BlockChain, db kv.RwDB) StageEpochCfg {
 
 func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
 
-	s.state.Debug("shard", sr.configs.bc.ShardID())
-	s.state.Debug("long_range", s.state.initSync)
-
 	// no need to update epoch chain if we are redoing the stages because of bad block
 	if invalidBlockRevert {
 		return nil
@@ -53,14 +50,14 @@ func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 
 	// doShortRangeSyncForEpochSync
 	n, err := sr.doShortRangeSyncForEpochSync(ctx, s)
-	s.state.Debug("doShortRangeSyncForEpochSync/n", n)
-	s.state.Debug("doShortRangeSyncForEpochSync/err", err)
 	s.state.inserted = n
 	if err != nil {
-		s.state.Debug("doShortRangeSyncForEpochSync/error", err)
+		utils.Logger().Info().Err(err).Msg("short range for epoch sync failed")
 		return err
 	}
-
+	if n > 0 {
+		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("epoch sync short range blocks inserted successfully")
+	}
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
@@ -114,18 +111,15 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	if len(bns) == 0 {
 		return 0, nil
 	}
-	s.state.Debug("block numbers", bns)
 
 	blocks, streamID, err := sh.getBlocksChain(ctx, bns)
 	if err != nil {
-		s.state.Debug("getBlocksChain/error", err)
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, nil
 		}
 		return 0, errors.Wrap(err, "getHashChain")
 	}
 	if len(blocks) == 0 {
-		s.state.Debug("getBlocksChain", "returns empty blocks array")
 		// short circuit for no sync is needed
 		return 0, nil
 	}
@@ -136,10 +130,6 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
 		sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
 		return n, err
-	}
-	if n > 0 {
-		s.state.Debug("epoch_blocks_inserted", n)
-		utils.Logger().Info().Int("blocks inserted", n).Msg("Insert block success")
 	}
 	return n, nil
 }

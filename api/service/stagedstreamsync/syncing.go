@@ -57,10 +57,6 @@ func CreateStagedSync(ctx context.Context,
 		Int("minStreams", config.MinStreams).
 		Msg(WrapStagedSyncMsg("creating staged sync"))
 
-	if config.DebugMode {
-		fmt.Printf("[SSSD:CreateStagedSync] creating staged sync for shard:%d beaconNode:%t memdb:%t dbDir:%s serverOnly:%t minStreams:%d\n",
-			bc.ShardID(), isBeaconNode, config.UseMemDB, dbDir, config.ServerOnly, config.MinStreams)
-	}
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
 	if config.UseMemDB {
@@ -70,9 +66,9 @@ func CreateStagedSync(ctx context.Context,
 			dbs[i] = memdb.New(dbPath)
 		}
 	} else {
-		if config.DebugMode {
-			fmt.Println("[SSSD:CreateStagedSync] creating main db in path:", getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir))
-		}
+		logger.Info().
+			Str("path", getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)).
+			Msg(WrapStagedSyncMsg("creating main db"))
 		mainDB = mdbx.NewMDBX(log.New()).Path(getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)).MustOpen()
 		for i := 0; i < config.Concurrency; i++ {
 			dbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, i, dbDir)
@@ -226,10 +222,8 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	var totalInserted int
 
 	s.initSync = initSync
-	s.Debug("initSync", initSync)
 
 	if err := s.checkPrerequisites(); err != nil {
-		s.Debug("checkPrerequisites/error", err)
 		return 0, 0, err
 	}
 
@@ -241,11 +235,10 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			estimatedHeight = h
 			//TODO: use directly currentCycle var
 			s.status.setTargetBN(estimatedHeight)
-			s.Debug("estimatedHeight", estimatedHeight)
 		}
 		if curBN := s.bc.CurrentBlock().NumberU64(); estimatedHeight <= curBN {
 			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
-				Msg(WrapStagedSyncMsg("early return of long range sync"))
+				Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
 			return estimatedHeight, 0, nil
 		}
 	}
@@ -257,9 +250,14 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		ctx, cancel := context.WithCancel(downloaderContext)
 
 		n, err := s.doSyncCycle(ctx, initSync)
-		s.Debug("doSyncCycle/n", n)
-		s.Debug("doSyncCycle/error", err)
 		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Bool("initSync", s.initSync).
+				Bool("isBeacon", s.isBeacon).
+				Uint32("shard", s.bc.ShardID()).
+				Msg(WrapStagedSyncMsg("sync cycle failed"))
+
 			pl := s.promLabels()
 			pl["error"] = err.Error()
 			numFailedDownloadCounterVec.With(pl).Inc()
@@ -273,9 +271,17 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 		// if it's not long range sync, skip loop
 		if n == 0 || !initSync {
-			s.Debug("loop_break", "either n is less than LastMileBlocksThreshold or it's not long range")
 			break
 		}
+	}
+
+	if totalInserted > 0 {
+		utils.Logger().Info().
+			Bool("initSync", s.initSync).
+			Bool("isBeacon", s.isBeacon).
+			Uint32("shard", s.bc.ShardID()).
+			Int("blocks", totalInserted).
+			Msg(WrapStagedSyncMsg("sync cycle blocks inserted successfully"))
 	}
 
 	// add consensus last mile blocks
@@ -287,7 +293,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			return estimatedHeight, totalInserted, err
 		} else {
 			totalInserted += len(hashes)
-			s.Debug("addConsensusLastMile/n", len(hashes))
 		}
 		// TODO: move this to explorer handler code.
 		if s.isExplorer {
@@ -323,7 +328,6 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context, initSync bool) (int,
 	// Do one cycle of staged sync
 	initialCycle := s.currentCycle.Number == 0
 	if err := s.Run(ctx, s.DB(), tx, initialCycle); err != nil {
-		s.Debug("Run/error", err)
 		utils.Logger().Error().
 			Err(err).
 			Bool("isBeacon", s.isBeacon).

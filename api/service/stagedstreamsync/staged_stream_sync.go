@@ -384,7 +384,6 @@ func (s *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firs
 		}
 
 		if err := s.runStage(ctx, stage, db, tx, firstCycle, s.invalidBlock.Active); err != nil {
-			s.Debug("runStage/error", err)
 			utils.Logger().Error().
 				Err(err).
 				Interface("stage id", stage.ID).

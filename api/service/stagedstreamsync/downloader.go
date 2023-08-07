@@ -210,12 +210,8 @@ func (d *Downloader) loop() {
 			go trigger()
 
 		case <-d.downloadC:
-			d.stagedSyncInstance.Debug("downloader_loop/downloadC", "received signal from downloadC channel")
-			d.stagedSyncInstance.Debug("downloader_loop/downloadC/shardID", d.bc.ShardID())
 			bnBeforeSync := d.bc.CurrentBlock().NumberU64()
 			estimatedHeight, addedBN, err := d.stagedSyncInstance.doSync(d.ctx, initSync)
-			d.stagedSyncInstance.Debug("downloader_loop/downloadC/addedBN", addedBN)
-			d.stagedSyncInstance.Debug("downloader_loop/downloadC/error", err)
 			if err != nil {
 				//TODO: if there is a bad block which can't be resolved
 				if d.stagedSyncInstance.invalidBlock.Active {
@@ -223,7 +219,6 @@ func (d *Downloader) loop() {
 					// if many streams couldn't solve it, then that's an unresolvable bad block
 					if numTriedStreams >= d.config.InitStreams {
 						if !d.stagedSyncInstance.invalidBlock.IsLogged {
-							d.stagedSyncInstance.Debug("downloader_loop/downloadC/badBlock/unresolvable/number", d.stagedSyncInstance.invalidBlock.Number)
 							d.logger.Error().
 								Uint64("bad block number", d.stagedSyncInstance.invalidBlock.Number).
 								Msg(WrapStagedSyncMsg("unresolvable bad block"))
