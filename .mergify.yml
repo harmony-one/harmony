@@ -1,0 +1,59 @@
+pull_request_rules:
+  - name: Squash merge rule to dev
+    conditions:
+      # applied for merge to the dev branch
+      - base=dev
+      # no unresolved threads
+      - "#review-threads-unresolved=0"
+      # Approved by two reviewers
+      - "#approved-reviews-by>=2"
+      # no unverified commit
+      - "#commits-unverified=0"
+      # Travis ci succeeded
+      - "check-success=Travis CI - Pull Request"
+      # git guardian succeeded
+      - "check-success=GitGuardian Security Checks"
+      # PR is not a draft
+      - -draft
+      # PR is not conflicting with the base branch
+      - -conflict
+      # conditions to avoid auto merge mistakes
+      # PR title doesn't have wip (not case sensitive)
+      - -title~=(?i)wip
+      # PR doesn't have WIP label (not case sensitive)
+      - label!=(?i)wip
+      # ready-to-merge is required to trigger the merge
+      - label=ready-to-merge
+    actions:
+      merge:
+        method: squash
+  - name: merge rule to main
+    conditions:
+      # from the dev branch : no direct PR to main
+      - head=dev
+      # applied for merge to the dev branch
+      - base=main
+      # no unresolved threads
+      - "#review-threads-unresolved=0"
+      # Approved by two reviewers
+      - "#approved-reviews-by>=2"
+      # no unverified commit
+      - "#commits-unverified=0"
+      # Travis ci succeeded
+      - "check-success=Travis CI - Pull Request"
+      # git guardian succeeded
+      - "check-success=GitGuardian Security Checks"
+      # PR is not a draft
+      - -draft
+      # PR is not conflicting with the base branch
+      - -conflict
+      # conditions to avoid auto merge mistakes
+      # PR title doesn't have wip (not case sensitive)
+      - -title~=(?i)wip
+      # PR doesn't have WIP label (not case sensitive)
+      - label!=(?i)wip
+      # ready-to-merge is required to trigger the merge
+      - label=ready-to-merge
+    actions:
+      merge:
+        method: merge
