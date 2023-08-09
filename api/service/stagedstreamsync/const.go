@@ -58,7 +58,10 @@ type (
 
 		// log the stage progress
 		LogProgress bool
-		DebugMode   bool // logs every single process and error to help debugging stream sync
+
+		// logs every single process and error to help debugging stream sync
+		// DebugMode is not accessible to the end user and is only an aid for development
+		DebugMode bool
 	}
 
 	// BeaconHelperConfig is the extra config used for beaconHelper which uses

@@ -84,6 +84,7 @@ type StagedSync struct {
 	// log the full sync progress in console
 	LogProgress bool
 	// log every single process and error to help to debug the syncing
+	// DebugMode is not accessible to the end user and is only an aid for development
 	DebugMode bool
 }
 
