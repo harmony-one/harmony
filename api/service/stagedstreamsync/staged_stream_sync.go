@@ -1,7 +1,6 @@
 package stagedstreamsync
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -619,7 +618,7 @@ func (ss *StagedStreamSync) getBlockFromLastMileBlocksByParentHash(parentHash co
 	defer ss.lastMileMux.Unlock()
 	for _, block := range ss.lastMileBlocks {
 		ph := block.ParentHash()
-		if bytes.Equal(ph[:], parentHash[:]) {
+		if ph == parentHash {
 			return block
 		}
 	}
