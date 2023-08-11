@@ -46,13 +46,11 @@ func TestAddNewBlock(t *testing.T) {
 		t.Fatal("cannot get blockchain")
 	}
 	reg := registry.New().SetBlockchain(blockchain)
-	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
-	)
+	consensus, err := consensus.New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	nodeconfig.SetNetworkType(nodeconfig.Devnet)
+	nodeconfig.SetNetworkType(nodeconfig.Testnet)
 	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)

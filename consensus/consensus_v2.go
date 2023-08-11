@@ -157,10 +157,11 @@ func (consensus *Consensus) finalCommit() {
 			Msg("[finalCommit] Unable to construct Committed message")
 		return
 	}
-	msgToSend, FBFTMsg :=
-		network.Bytes,
-		network.FBFTMsg
-	commitSigAndBitmap := FBFTMsg.Payload
+	var (
+		msgToSend          = network.Bytes
+		FBFTMsg            = network.FBFTMsg
+		commitSigAndBitmap = FBFTMsg.Payload
+	)
 	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
 	// find correct block content
 	curBlockHash := consensus.blockHash

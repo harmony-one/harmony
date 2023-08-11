@@ -1,7 +1,7 @@
-package node
+package core_test
 
 import (
-	"strings"
+	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,16 +16,18 @@ import (
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
+	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/stretchr/testify/require"
 )
 
-func TestFinalizeNewBlockAsync(t *testing.T) {
+var testDBFactory = &shardchain.MemDBFactory{}
+
+func TestAddNewBlock(t *testing.T) {
 	blsKey := bls.RandPrivateKey()
 	pubKey := blsKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9882", ConsensusPubKey: pubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
 		Self:   &leader,
@@ -34,55 +36,48 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	var testDBFactory = &shardchain.MemDBFactory{}
 	engine := chain.NewEngine()
 	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
 		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
 	)
-	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
-	require.NoError(t, err)
-
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	reg := registry.New().SetBlockchain(blockchain).SetBeaconchain(blockchain)
-	consensusObj, err := consensus.New(
+	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
+	if err != nil {
+		t.Fatal("cannot get blockchain")
+	}
+	reg := registry.New().SetBlockchain(blockchain)
+	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-
-	node := New(host, consensusObj, engine, collection, nil, nil, nil, nil, nil, registry.New().SetBlockchain(blockchain))
-
-	node.Worker.UpdateCurrent()
-
-	txs := make(map[common.Address]types.Transactions)
-	stks := staking.StakingTransactions{}
-	node.Worker.CommitTransactions(
-		txs, stks, common.Address{},
-	)
+	nodeconfig.SetNetworkType(nodeconfig.Testnet)
+	var block *types.Block
+	node := node.New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
 	commitSigs := make(chan []byte, 1)
 	commitSigs <- []byte{}
-
-	block, _ := node.Worker.FinalizeNewBlock(
-		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
+	block, err = node.Worker.FinalizeNewBlock(
+		commitSigs, func() uint64 { return uint64(0) }, common.Address{}, nil, nil,
 	)
-
-	if err := consensus.VerifyNewBlock(nil, blockchain, nil)(block); err != nil {
-		t.Error("New block is not verified successfully:", err)
+	if err != nil {
+		t.Fatal("cannot finalize new block")
 	}
 
-	node.Blockchain().InsertChain(types.Blocks{block}, false)
+	nn := node.Blockchain().CurrentBlock()
+	t.Log("[*]", nn.NumberU64(), nn.Hash().Hex(), nn.ParentHash())
 
-	node.Worker.UpdateCurrent()
+	_, err = blockchain.InsertChain([]*types.Block{block}, false)
+	require.NoError(t, err, "error when adding new block")
 
-	_, err = node.Worker.FinalizeNewBlock(
-		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
-	)
+	pk, epoch, count, shifts, err := blockchain.LeaderRotationMeta()
+	fmt.Println("pk", pk, "epoch", epoch, "count", count, "shifts", shifts, "err", err)
 
-	if !strings.Contains(err.Error(), "cannot finalize block") {
-		t.Error("expect timeout on FinalizeNewBlock")
-	}
+	t.Log("#", block.Header().NumberU64(), node.Blockchain().CurrentBlock().NumberU64(), block.Hash().Hex(), block.ParentHash())
+
+	err = blockchain.Rollback([]common.Hash{block.Hash()})
+	require.NoError(t, err, "error when rolling back")
 }
