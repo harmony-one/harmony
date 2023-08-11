@@ -606,6 +606,7 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	nodeConfig.VerifyHeaderBatchSize = hc.Sync.StagedSyncCfg.VerifyHeaderBatchSize
 	nodeConfig.InsertChainBatchSize = hc.Sync.StagedSyncCfg.InsertChainBatchSize
 	nodeConfig.LogProgress = hc.Sync.StagedSyncCfg.LogProgress
+	nodeConfig.DebugMode = hc.Sync.StagedSyncCfg.DebugMode
 	// P2P private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(hc.P2P.KeyFile)
 	if err != nil {
@@ -942,7 +943,9 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 		SmHardLowCap:         hc.Sync.DiscHardLowCap,
 		SmHiCap:              hc.Sync.DiscHighCap,
 		SmDiscBatch:          hc.Sync.DiscBatch,
-		LogProgress:          node.NodeConfig.LogProgress,
+		UseMemDB:             hc.Sync.StagedSyncCfg.UseMemDB,
+		LogProgress:          hc.Sync.StagedSyncCfg.LogProgress,
+		DebugMode:            hc.Sync.StagedSyncCfg.DebugMode,
 	}
 
 	// If we are running side chain, we will need to do some extra works for beacon
@@ -954,7 +957,7 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 		}
 	}
 	//Setup stream sync service
-	s := stagedstreamsync.NewService(host, blockchains, sConfig, hc.General.DataDir)
+	s := stagedstreamsync.NewService(host, blockchains, node.Consensus, sConfig, hc.General.DataDir)
 
 	node.RegisterService(service.StagedStreamSync, s)
 

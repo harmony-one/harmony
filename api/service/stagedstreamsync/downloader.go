@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/rs/zerolog"
 
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -37,7 +38,7 @@ type (
 )
 
 // NewDownloader creates a new downloader
-func NewDownloader(host p2p.Host, bc core.BlockChain, dbDir string, isBeaconNode bool, config Config) *Downloader {
+func NewDownloader(host p2p.Host, bc core.BlockChain, consensus *consensus.Consensus, dbDir string, isBeaconNode bool, config Config) *Downloader {
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{
@@ -67,8 +68,8 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, dbDir string, isBeaconNode
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	//TODO: use mem db should be in config file
-	stagedSyncInstance, err := CreateStagedSync(ctx, bc, dbDir, false, isBeaconNode, sp, config, logger, config.LogProgress)
+	// create an instance of staged sync for the downloader
+	stagedSyncInstance, err := CreateStagedSync(ctx, bc, consensus, dbDir, isBeaconNode, sp, config, logger)
 	if err != nil {
 		cancel()
 		return nil
@@ -189,6 +190,7 @@ func (d *Downloader) waitForBootFinish() {
 func (d *Downloader) loop() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
+
 	// for shard chain and beacon chain node, first we start with initSync=true to
 	// make sure it goes through the long range sync first.
 	// for epoch chain we do only need to go through epoch sync process
@@ -208,7 +210,8 @@ func (d *Downloader) loop() {
 			go trigger()
 
 		case <-d.downloadC:
-			addedBN, err := d.stagedSyncInstance.doSync(d.ctx, initSync)
+			bnBeforeSync := d.bc.CurrentBlock().NumberU64()
+			estimatedHeight, addedBN, err := d.stagedSyncInstance.doSync(d.ctx, initSync)
 			if err != nil {
 				//TODO: if there is a bad block which can't be resolved
 				if d.stagedSyncInstance.invalidBlock.Active {
@@ -216,13 +219,14 @@ func (d *Downloader) loop() {
 					// if many streams couldn't solve it, then that's an unresolvable bad block
 					if numTriedStreams >= d.config.InitStreams {
 						if !d.stagedSyncInstance.invalidBlock.IsLogged {
-							fmt.Println("unresolvable bad block:", d.stagedSyncInstance.invalidBlock.Number)
+							d.logger.Error().
+								Uint64("bad block number", d.stagedSyncInstance.invalidBlock.Number).
+								Msg(WrapStagedSyncMsg("unresolvable bad block"))
 							d.stagedSyncInstance.invalidBlock.IsLogged = true
 						}
 						//TODO: if we don't have any new or untried stream in the list, sleep or panic
 					}
 				}
-
 				// If any error happens, sleep 5 seconds and retry
 				d.logger.Error().
 					Err(err).
@@ -242,16 +246,27 @@ func (d *Downloader) loop() {
 					Uint32("shard", d.bc.ShardID()).
 					Msg(WrapStagedSyncMsg("sync finished"))
 			}
-
+			// If block number has been changed, trigger another sync
 			if addedBN != 0 {
-				// If block number has been changed, trigger another sync
 				go trigger()
+				// try to add last mile from pub-sub (blocking)
+				if d.bh != nil {
+					d.bh.insertSync()
+				}
 			}
-			// try to add last mile from pub-sub (blocking)
-			if d.bh != nil {
-				d.bh.insertSync()
+			// if last doSync needed only to add a few blocks less than LastMileBlocksThreshold and
+			// the node is fully synced now, then switch to short range
+			// the reason why we need to check distanceBeforeSync is because, if it was long distance,
+			// very likely, there are a couple of new blocks have been added to the other nodes which
+			// we should still stay in long range and check them.
+			bnAfterSync := d.bc.CurrentBlock().NumberU64()
+			distanceBeforeSync := estimatedHeight - bnBeforeSync
+			distanceAfterSync := estimatedHeight - bnAfterSync
+			if estimatedHeight > 0 && addedBN > 0 &&
+				distanceBeforeSync <= uint64(LastMileBlocksThreshold) &&
+				distanceAfterSync <= uint64(LastMileBlocksThreshold) {
+				initSync = false
 			}
-			initSync = false
 
 		case <-d.closeC:
 			return

@@ -207,6 +207,12 @@ func (sh *srHelper) removeStreams(sts []sttypes.StreamID) {
 	}
 }
 
+func (sh *srHelper) streamsFailed(sts []sttypes.StreamID, reason string) {
+	for _, st := range sts {
+		sh.syncProtocol.StreamFailed(st, reason)
+	}
+}
+
 // blameAllStreams only not to blame all whitelisted streams when the it's not the last block signature verification failed.
 func (sh *srHelper) blameAllStreams(blocks types.Blocks, errIndex int, err error) bool {
 	if errors.As(err, &emptySigVerifyErr) && errIndex == len(blocks)-1 {

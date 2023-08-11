@@ -8,11 +8,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
 	syncproto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 )
@@ -54,19 +59,22 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 }
 
 type StagedStreamSync struct {
-	bc           core.BlockChain
-	isBeacon     bool
-	isExplorer   bool
-	db           kv.RwDB
-	protocol     syncProtocol
-	isBeaconNode bool
-	gbm          *blockDownloadManager // initialized when finished get block number
-	inserted     int
-	config       Config
-	logger       zerolog.Logger
-	status       *status //TODO: merge this with currentSyncCycle
-	initSync     bool    // if sets to true, node start long range syncing
-	UseMemDB     bool
+	bc             core.BlockChain
+	consensus      *consensus.Consensus
+	isBeacon       bool
+	isExplorer     bool
+	db             kv.RwDB
+	protocol       syncProtocol
+	isBeaconNode   bool
+	gbm            *blockDownloadManager // initialized when finished get block number
+	lastMileBlocks []*types.Block        // last mile blocks to catch up with the consensus
+	lastMileMux    sync.Mutex
+	inserted       int
+	config         Config
+	logger         zerolog.Logger
+	status         *status //TODO: merge this with currentSyncCycle
+	initSync       bool    // if sets to true, node start long range syncing
+	UseMemDB       bool
 
 	revertPoint     *uint64 // used to run stages
 	prevRevertPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
@@ -249,12 +257,12 @@ func (s *StagedStreamSync) cleanUp(ctx context.Context, fromStage int, db kv.RwD
 // New creates a new StagedStreamSync instance
 func New(
 	bc core.BlockChain,
+	consensus *consensus.Consensus,
 	db kv.RwDB,
 	stagesList []*Stage,
 	isBeacon bool,
 	protocol syncProtocol,
 	isBeaconNode bool,
-	useMemDB bool,
 	config Config,
 	logger zerolog.Logger,
 ) *StagedStreamSync {
@@ -286,22 +294,24 @@ func New(
 	status := newStatus()
 
 	return &StagedStreamSync{
-		bc:           bc,
-		isBeacon:     isBeacon,
-		db:           db,
-		protocol:     protocol,
-		isBeaconNode: isBeaconNode,
-		gbm:          nil,
-		status:       &status,
-		inserted:     0,
-		config:       config,
-		logger:       logger,
-		stages:       stagesList,
-		currentStage: 0,
-		revertOrder:  revertStages,
-		pruningOrder: pruneStages,
-		logPrefixes:  logPrefixes,
-		UseMemDB:     useMemDB,
+		bc:             bc,
+		consensus:      consensus,
+		isBeacon:       isBeacon,
+		db:             db,
+		protocol:       protocol,
+		isBeaconNode:   isBeaconNode,
+		lastMileBlocks: []*types.Block{},
+		gbm:            nil,
+		status:         &status,
+		inserted:       0,
+		config:         config,
+		logger:         logger,
+		stages:         stagesList,
+		currentStage:   0,
+		revertOrder:    revertStages,
+		pruningOrder:   pruneStages,
+		logPrefixes:    logPrefixes,
+		UseMemDB:       config.UseMemDB,
 	}
 }
 
@@ -582,4 +592,134 @@ func (s *StagedStreamSync) EnableStages(ids ...SyncStageID) {
 			s.stages[i].Disabled = false
 		}
 	}
+}
+
+func (ss *StagedStreamSync) purgeLastMileBlocksFromCache() {
+	ss.lastMileMux.Lock()
+	ss.lastMileBlocks = nil
+	ss.lastMileMux.Unlock()
+}
+
+// AddLastMileBlock adds the latest a few block into queue for syncing
+// only keep the latest blocks with size capped by LastMileBlocksSize
+func (ss *StagedStreamSync) AddLastMileBlock(block *types.Block) {
+	ss.lastMileMux.Lock()
+	defer ss.lastMileMux.Unlock()
+	if ss.lastMileBlocks != nil {
+		if len(ss.lastMileBlocks) >= LastMileBlocksSize {
+			ss.lastMileBlocks = ss.lastMileBlocks[1:]
+		}
+		ss.lastMileBlocks = append(ss.lastMileBlocks, block)
+	}
+}
+
+func (ss *StagedStreamSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Hash) *types.Block {
+	ss.lastMileMux.Lock()
+	defer ss.lastMileMux.Unlock()
+	for _, block := range ss.lastMileBlocks {
+		ph := block.ParentHash()
+		if ph == parentHash {
+			return block
+		}
+	}
+	return nil
+}
+
+func (ss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) ([]common.Hash, error) {
+	curNumber := bc.CurrentBlock().NumberU64()
+	var hashes []common.Hash
+
+	err := cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
+		for {
+			block := blockIter.Next()
+			if block == nil {
+				break
+			}
+			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+				return errors.Wrap(err, "failed to InsertChain")
+			}
+			hashes = append(hashes, block.Header().Hash())
+		}
+		return nil
+	})
+	return hashes, err
+}
+
+func (ss *StagedStreamSync) RollbackLastMileBlocks(ctx context.Context, hashes []common.Hash) error {
+	if len(hashes) == 0 {
+		return nil
+	}
+	utils.Logger().Info().
+		Interface("block", ss.bc.CurrentBlock()).
+		Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
+	if err := ss.bc.Rollback(hashes); err != nil {
+		utils.Logger().Error().Err(err).
+			Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
+		return err
+	}
+	return nil
+}
+
+// UpdateBlockAndStatus updates block and its status in db
+func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
+	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
+		utils.Logger().Debug().
+			Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).
+			Uint64("receivedBlockNum", block.NumberU64()).
+			Msg("[STAGED_STREAM_SYNC] Inappropriate block number, ignore!")
+		return nil
+	}
+
+	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
+	// Verify block signatures
+	if block.NumberU64() > 1 {
+		// Verify signature every N blocks (which N is verifyHeaderBatchSize and can be adjusted in configs)
+		verifySeal := block.NumberU64()%VerifyHeaderBatchSize == 0 || verifyAllSig
+		verifyCurrentSig := verifyAllSig && haveCurrentSig
+		if verifyCurrentSig {
+			sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
+			if err != nil {
+				return errors.Wrap(err, "parse commitSigAndBitmap")
+			}
+
+			startTime := time.Now()
+			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
+				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
+			}
+			utils.Logger().Debug().
+				Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).
+				Msg("[STAGED_STREAM_SYNC] VerifyHeaderSignature")
+		}
+		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
+		if err == engine.ErrUnknownAncestor {
+			return nil
+		} else if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Uint64("block number", block.NumberU64()).
+				Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block")
+			return err
+		}
+	}
+
+	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
+	if err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint64("block number", block.NumberU64()).
+			Uint32("shard", block.ShardID()).
+			Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain")
+		return err
+	}
+	utils.Logger().Info().
+		Uint64("blockHeight", block.NumberU64()).
+		Uint64("blockEpoch", block.Epoch().Uint64()).
+		Str("blockHex", block.Hash().Hex()).
+		Uint32("ShardID", block.ShardID()).
+		Msg("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
+
+	for i, tx := range block.StakingTransactions() {
+		utils.Logger().Info().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
+	}
+	return nil
 }

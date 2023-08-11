@@ -178,6 +178,7 @@ var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
 	MaxMemSyncCycleSize:    1024,  // max number of blocks to use a single transaction for staged sync
 	UseMemDB:               true,  // it uses memory by default. set it to false to use disk
 	LogProgress:            false, // log the full sync progress in console
+	DebugMode:              false, // log every single process and error to help to debug the syncing (DebugMode is not accessible to the end user and is only an aid for development)
 }
 
 var (
