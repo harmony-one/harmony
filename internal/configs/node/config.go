@@ -58,6 +58,31 @@ const (
 	Localnet  = "localnet"
 )
 
+// ChainConfig returns the chain configuration for the network type.
+func (t NetworkType) ChainConfig() params.ChainConfig {
+	switch t {
+	case Mainnet:
+		return *params.MainnetChainConfig
+	case Pangaea:
+		return *params.PangaeaChainConfig
+	case Partner:
+		return *params.PartnerChainConfig
+	case Stressnet:
+		return *params.StressnetChainConfig
+	case Localnet:
+		return *params.LocalnetChainConfig
+	default:
+		return *params.TestnetChainConfig
+	}
+}
+
+func (n NetworkType) String() string {
+	if n == "" {
+		return Testnet // default to testnet
+	}
+	return string(n)
+}
+
 // Global is the index of the global node configuration
 const (
 	Global    = 0
@@ -93,6 +118,7 @@ type ConfigType struct {
 	VerifyAllSig           bool   // verify signatures for all blocks regardless of height and batch size
 	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
 	LogProgress            bool   // log the full sync progress in console
+	DebugMode              bool   // log every single process and error to help to debug the syncing issues
 	NtpServer              string
 	StringRole             string
 	P2PPriKey              p2p_crypto.PrivKey   `json:"-"`
@@ -350,22 +376,4 @@ func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys multibls.Publi
 		return errors.Errorf("bls keys do not belong to same shard\n%s", strings.Join(keyShardStrs, "\n"))
 	}
 	return nil
-}
-
-// ChainConfig returns the chain configuration for the network type.
-func (t NetworkType) ChainConfig() params.ChainConfig {
-	switch t {
-	case Mainnet:
-		return *params.MainnetChainConfig
-	case Pangaea:
-		return *params.PangaeaChainConfig
-	case Partner:
-		return *params.PartnerChainConfig
-	case Stressnet:
-		return *params.StressnetChainConfig
-	case Localnet:
-		return *params.LocalnetChainConfig
-	default:
-		return *params.TestnetChainConfig
-	}
 }

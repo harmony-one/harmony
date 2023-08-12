@@ -83,6 +83,9 @@ type StagedSync struct {
 	StagedSyncTurboMode bool
 	// log the full sync progress in console
 	LogProgress bool
+	// log every single process and error to help to debug the syncing
+	// DebugMode is not accessible to the end user and is only an aid for development
+	DebugMode bool
 }
 
 // BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
@@ -258,7 +261,8 @@ func New(ctx context.Context,
 	verifyAllSig bool,
 	verifyHeaderBatchSize uint64,
 	insertChainBatchSize int,
-	logProgress bool) *StagedSync {
+	logProgress bool,
+	debugMode bool) *StagedSync {
 
 	revertStages := make([]*Stage, len(stagesList))
 	for i, stageIndex := range revertOrder {
@@ -312,6 +316,7 @@ func New(ctx context.Context,
 		VerifyHeaderBatchSize:  verifyHeaderBatchSize,
 		InsertChainBatchSize:   insertChainBatchSize,
 		LogProgress:            logProgress,
+		DebugMode:              debugMode,
 	}
 }
 

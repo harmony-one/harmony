@@ -15,11 +15,13 @@ var DefaultForwardOrder = ForwardOrder{
 	BlockBodies,
 	// Stages below don't use Internet
 	States,
+	LastMile,
 	Finish,
 }
 
 var DefaultRevertOrder = RevertOrder{
 	Finish,
+	LastMile,
 	States,
 	BlockBodies,
 	ShortRange,
@@ -29,6 +31,7 @@ var DefaultRevertOrder = RevertOrder{
 
 var DefaultCleanUpOrder = CleanUpOrder{
 	Finish,
+	LastMile,
 	States,
 	BlockBodies,
 	ShortRange,
@@ -42,6 +45,7 @@ func DefaultStages(ctx context.Context,
 	srCfg StageShortRangeCfg,
 	bodiesCfg StageBodiesCfg,
 	statesCfg StageStatesCfg,
+	lastMileCfg StageLastMileCfg,
 	finishCfg StageFinishCfg,
 ) []*Stage {
 
@@ -50,6 +54,7 @@ func DefaultStages(ctx context.Context,
 	handlerStageEpochSync := NewStageEpoch(seCfg)
 	handlerStageBodies := NewStageBodies(bodiesCfg)
 	handlerStageStates := NewStageStates(statesCfg)
+	handlerStageLastMile := NewStageLastMile(lastMileCfg)
 	handlerStageFinish := NewStageFinish(finishCfg)
 
 	return []*Stage{
@@ -77,6 +82,11 @@ func DefaultStages(ctx context.Context,
 			ID:          States,
 			Description: "Update Blockchain State",
 			Handler:     handlerStageStates,
+		},
+		{
+			ID:          LastMile,
+			Description: "update status for blocks after sync and update last mile blocks as well",
+			Handler:     handlerStageLastMile,
 		},
 		{
 			ID:          Finish,

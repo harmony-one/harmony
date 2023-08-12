@@ -343,6 +343,7 @@ type StagedSyncConfig struct {
 	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
 	UseMemDB               bool   // it uses memory by default. set it to false to use disk
 	LogProgress            bool   // log the full sync progress in console
+	DebugMode              bool   // log every single process and error to help to debug syncing issues (DebugMode is not accessible to the end user and is only an aid for development)
 }
 
 type PriceLimit int64

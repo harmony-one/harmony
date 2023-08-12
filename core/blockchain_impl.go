@@ -221,6 +221,7 @@ type BlockChainImpl struct {
 	badBlocks              *lru.Cache // Bad block cache
 	pendingSlashes         slash.Records
 	maxGarbCollectedBlkNum int64
+	leaderRotationMeta     leaderRotationMeta
 
 	options Options
 }
@@ -357,6 +358,12 @@ func newBlockChainWithOptions(
 			AsyncBuild: !bc.cacheConfig.SnapshotWait,
 		}
 		bc.snaps, _ = snapshot.New(snapconfig, bc.db, bc.triedb, head.Hash())
+	}
+
+	curHeader := bc.CurrentBlock().Header()
+	err = bc.buildLeaderRotationMeta(curHeader)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to build leader rotation meta")
 	}
 
 	// Take ownership of this particular state
@@ -1479,8 +1486,11 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 	defer bc.mu.Unlock()
 
 	currentBlock := bc.CurrentBlock()
-	if currentBlock == nil || block.ParentHash() != currentBlock.Hash() {
-		return NonStatTy, errors.New("Hash of parent block doesn't match the current block hash")
+	if currentBlock == nil {
+		return NonStatTy, errors.New("Current block is nil")
+	}
+	if block.ParentHash() != currentBlock.Hash() {
+		return NonStatTy, errors.Errorf("Hash of parent block %s doesn't match the current block hash %s", currentBlock.Hash().Hex(), block.ParentHash().Hex())
 	}
 
 	// Commit state object changes to in-memory trie
@@ -1650,20 +1660,52 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 	return n, err
 }
 
+// buildLeaderRotationMeta builds leader rotation meta if feature is activated.
+func (bc *BlockChainImpl) buildLeaderRotationMeta(curHeader *block.Header) error {
+	if !bc.chainConfig.IsLeaderRotation(curHeader.Epoch()) {
+		return nil
+	}
+	if curHeader.NumberU64() == 0 {
+		return errors.New("current header is genesis")
+	}
+	curPubKey, err := bc.getLeaderPubKeyFromCoinbase(curHeader)
+	if err != nil {
+		return err
+	}
+	for i := curHeader.NumberU64() - 1; i >= 0; i-- {
+		header := bc.GetHeaderByNumber(i)
+		if header == nil {
+			return errors.New("header is nil")
+		}
+		blockPubKey, err := bc.getLeaderPubKeyFromCoinbase(header)
+		if err != nil {
+			return err
+		}
+		if curPubKey.Bytes != blockPubKey.Bytes || curHeader.Epoch().Uint64() != header.Epoch().Uint64() {
+			for j := i; i <= curHeader.NumberU64(); j++ {
+				header := bc.GetHeaderByNumber(i)
+				if header == nil {
+					return errors.New("header is nil")
+				}
+				err := bc.saveLeaderRotationMeta(header)
+				if err != nil {
+					utils.Logger().Error().Err(err).Msg("save leader continuous blocks count error")
+					return err
+				}
+			}
+			return nil
+		}
+	}
+	return errors.New("no leader rotation meta to save")
+}
+
 func (bc *BlockChainImpl) saveLeaderRotationMeta(h *block.Header) error {
 	blockPubKey, err := bc.getLeaderPubKeyFromCoinbase(h)
 	if err != nil {
 		return err
 	}
-	type stored struct {
-		pub    []byte
-		epoch  uint64
-		count  uint64
-		shifts uint64
-	}
-	var s stored
-	// error is possible here only on the first iteration, so we can ignore it
-	s.pub, s.epoch, s.count, s.shifts, _ = rawdb.ReadLeaderRotationMeta(bc.db)
+
+	var s = bc.leaderRotationMeta
 
 	// increase counter only if the same leader and epoch
 	if bytes.Equal(s.pub, blockPubKey.Bytes[:]) && s.epoch == h.Epoch().Uint64() {
@@ -1679,11 +1721,9 @@ func (bc *BlockChainImpl) saveLeaderRotationMeta(h *block.Header) error {
 	if s.epoch != h.Epoch().Uint64() {
 		s.shifts = 0
 	}
+	s.epoch = h.Epoch().Uint64()
+	bc.leaderRotationMeta = s
 
-	err = rawdb.WriteLeaderRotationMeta(bc.db, blockPubKey.Bytes[:], h.Epoch().Uint64(), s.count, s.shifts)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

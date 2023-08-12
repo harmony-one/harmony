@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 )
@@ -60,6 +61,11 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return nil
 	}
 
+	// shouldn't execute for epoch chain
+	if b.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+		return nil
+	}
+
 	maxHeight := s.state.status.targetBN
 	currentHead := b.configs.bc.CurrentBlock().NumberU64()
 	if currentHead >= maxHeight {
@@ -77,7 +83,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return errV
 	}
 
-	if currProgress == 0 {
+	if currProgress <= currentHead {
 		if err := b.cleanAllBlockDBs(ctx); err != nil {
 			return err
 		}
@@ -209,7 +215,7 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 		isOneOfTheBadStreams := false
 		for _, id := range s.state.invalidBlock.StreamID {
 			if id == stid {
-				b.configs.protocol.RemoveStream(stid)
+				b.configs.protocol.StreamFailed(stid, "re-download bad block from this stream failed")
 				isOneOfTheBadStreams = true
 				break
 			}

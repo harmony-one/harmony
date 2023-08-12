@@ -122,7 +122,8 @@ func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
 		node.NodeConfig.VerifyAllSig,
 		node.NodeConfig.VerifyHeaderBatchSize,
 		node.NodeConfig.InsertChainBatchSize,
-		node.NodeConfig.LogProgress); err != nil {
+		node.NodeConfig.LogProgress,
+		node.NodeConfig.DebugMode); err != nil {
 		return nil
 	} else {
 		return s
@@ -352,7 +353,7 @@ func (node *Node) NodeSyncing() {
 		if node.HarmonyConfig.TiKV.Role == tikv.RoleWriter {
 			node.supportSyncing() // the writer needs to be in sync with it's other peers
 		}
-	} else if !node.HarmonyConfig.General.IsOffline && node.HarmonyConfig.DNSSync.Client {
+	} else if !node.HarmonyConfig.General.IsOffline && (node.HarmonyConfig.DNSSync.Client || node.HarmonyConfig.Sync.Downloader) {
 		node.supportSyncing() // for non-writer-reader mode a.k.a tikv nodes
 	}
 }
@@ -370,6 +371,11 @@ func (node *Node) supportSyncing() {
 	// TODO: leo this pushing logic has to be removed
 	if joinConsensus {
 		go node.SendNewBlockToUnsync()
+	}
+
+	// if stream sync client is running, don't create other sync client instances
+	if node.HarmonyConfig.Sync.Downloader {
+		return
 	}
 
 	if !node.NodeConfig.StagedSync && node.stateSync == nil {

@@ -64,6 +64,7 @@ func CreateStagedSync(
 	verifyHeaderBatchSize uint64,
 	insertChainBatchSize int,
 	logProgress bool,
+	debugMode bool,
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
@@ -134,6 +135,7 @@ func CreateStagedSync(
 		verifyHeaderBatchSize,
 		insertChainBatchSize,
 		logProgress,
+		debugMode,
 	), nil
 }
 

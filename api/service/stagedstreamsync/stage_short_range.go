@@ -44,6 +44,7 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 		return nil
 	}
 
+	// shouldn't execute for epoch chain
 	if sr.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
 		return nil
 	}
@@ -52,7 +53,11 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 	n, err := sr.doShortRangeSync(ctx, s)
 	s.state.inserted = n
 	if err != nil {
+		utils.Logger().Info().Err(err).Msg("short range sync failed")
 		return err
+	}
+	if n > 0 {
+		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("short range blocks inserted successfully")
 	}
 
 	useInternalTx := tx == nil
@@ -98,6 +103,9 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	blkNums := sh.prepareBlockHashNumbers(curBN)
 	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return 0, nil
+		}
 		return 0, errors.Wrap(err, "getHashChain")
 	}
 
@@ -114,37 +122,34 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 
 	s.state.status.setTargetBN(expEndBN)
 
-	s.state.status.startSyncing()
-	defer func() {
-		utils.Logger().Info().Msg("short range finished syncing")
-		s.state.status.finishSyncing()
-	}()
-
 	blocks, stids, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("getBlocksByHashes failed")
-		if !errors.Is(err, context.Canceled) {
-			sh.removeStreams(whitelist) // Remote nodes cannot provide blocks with target hashes
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return 0, errors.Wrap(err, "getBlocksByHashes")
 		}
-		return 0, errors.Wrap(err, "getBlocksByHashes")
+		sh.streamsFailed(whitelist, "remote nodes cannot provide blocks with target hashes")
 	}
-
-	utils.Logger().Info().Int("num blocks", len(blocks)).Msg("getBlockByHashes result")
 
 	n, err := verifyAndInsertBlocks(sr.configs.bc, blocks)
 	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	if err != nil {
 		utils.Logger().Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
+		// rollback all added new blocks
+		if rbErr := sr.configs.bc.Rollback(hashChain); rbErr != nil {
+			utils.Logger().Error().Err(rbErr).Msg("short range failed to rollback")
+			return 0, rbErr
+		}
+		// fail streams
 		if sh.blameAllStreams(blocks, n, err) {
-			sh.removeStreams(whitelist) // Data provided by remote nodes is corrupted
+			sh.streamsFailed(whitelist, "data provided by remote nodes is corrupted")
 		} else {
 			// It is the last block gives a wrong commit sig. Blame the provider of the last block.
 			st2Blame := stids[len(stids)-1]
-			sh.removeStreams([]sttypes.StreamID{st2Blame})
+			sh.streamsFailed([]sttypes.StreamID{st2Blame}, "the last block provided by stream gives a wrong commit sig")
 		}
-		return n, err
+		return 0, err
 	}
-	utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block success")
 
 	return n, nil
 }

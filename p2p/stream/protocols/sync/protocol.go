@@ -2,7 +2,6 @@ package sync
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -180,7 +179,8 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 			Msg("failed to add new stream")
 		return
 	}
-	fmt.Println("Connected to", raw.Conn().RemotePeer().String(), "(", st.ProtoID(), ")", "my ID: ", raw.Conn().LocalPeer().String())
+	//to get my ID use raw.Conn().LocalPeer().String()
+	p.logger.Info().Msgf("Connected to %s (%s)", raw.Conn().RemotePeer().String(), st.ProtoID())
 	st.run()
 }
 

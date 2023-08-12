@@ -132,7 +132,7 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 
 	if err := consensus.verifyBlock(&blockObj); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[validateNewBlock] Block verification failed")
-		return nil, errors.New("Block verification failed")
+		return nil, errors.Errorf("Block verification failed: %s", err.Error())
 	}
 	return &blockObj, nil
 }

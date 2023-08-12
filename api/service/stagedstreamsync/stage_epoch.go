@@ -5,6 +5,7 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
+	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
@@ -51,9 +52,12 @@ func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	n, err := sr.doShortRangeSyncForEpochSync(ctx, s)
 	s.state.inserted = n
 	if err != nil {
+		utils.Logger().Info().Err(err).Msg("short range for epoch sync failed")
 		return err
 	}
-
+	if n > 0 {
+		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("epoch sync short range blocks inserted successfully")
+	}
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
@@ -108,30 +112,13 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		return 0, nil
 	}
 
-	////////////////////////////////////////////////////////
-	hashChain, whitelist, err := sh.getHashChain(ctx, bns)
+	blocks, streamID, err := sh.getBlocksChain(ctx, bns)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return 0, nil
+		}
 		return 0, errors.Wrap(err, "getHashChain")
 	}
-	if len(hashChain) == 0 {
-		// short circuit for no sync is needed
-		return 0, nil
-	}
-	blocks, streamID, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("epoch sync getBlocksByHashes failed")
-		if !errors.Is(err, context.Canceled) {
-			sh.removeStreams(whitelist) // Remote nodes cannot provide blocks with target hashes
-		}
-		return 0, errors.Wrap(err, "epoch sync getBlocksByHashes")
-	}
-	///////////////////////////////////////////////////////
-	// TODO: check this
-	// blocks, streamID, err := sh.getBlocksChain(bns)
-	// if err != nil {
-	// 	return 0, errors.Wrap(err, "getHashChain")
-	// }
-	///////////////////////////////////////////////////////
 	if len(blocks) == 0 {
 		// short circuit for no sync is needed
 		return 0, nil
@@ -141,11 +128,8 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	if err != nil {
 		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
-		sh.removeStreams(streamID) // Data provided by remote nodes is corrupted
+		sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
 		return n, err
-	}
-	if n > 0 {
-		utils.Logger().Info().Int("blocks inserted", n).Msg("Insert block success")
 	}
 	return n, nil
 }
