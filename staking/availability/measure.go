@@ -18,10 +18,24 @@ import (
 var (
 	measure = numeric.NewDec(2).Quo(numeric.NewDec(3))
 
-	MinCommissionRate = numeric.MustNewDecFromStr("0.05")
+	minCommissionRateEra1 = numeric.MustNewDecFromStr("0.05")
+	minCommissionRateEra2 = numeric.MustNewDecFromStr("0.07")
 	// ErrDivByZero ..
 	ErrDivByZero = errors.New("toSign of availability cannot be 0, mistake in protocol")
 )
+
+// Returns the minimum commission rate between the two options.
+// The later rate supersedes the earlier rate.
+// If neither is applicable, returns 0.
+func GetMinCommissionRate(era1, era2 bool) numeric.Dec {
+	if era2 {
+		return minCommissionRateEra2
+	}
+	if era1 {
+		return minCommissionRateEra1
+	}
+	return numeric.ZeroDec()
+}
 
 // BlockSigners ..
 func BlockSigners(
@@ -224,6 +238,7 @@ func UpdateMinimumCommissionFee(
 	electionEpoch *big.Int,
 	state *state.DB,
 	addr common.Address,
+	minRate numeric.Dec,
 	promoPeriod int64,
 ) error {
 	utils.Logger().Info().Msg("begin update min commission fee")
@@ -236,13 +251,14 @@ func UpdateMinimumCommissionFee(
 	firstElectionEpoch := state.GetValidatorFirstElectionEpoch(addr)
 
 	if firstElectionEpoch.Uint64() != 0 && big.NewInt(0).Sub(electionEpoch, firstElectionEpoch).Int64() >= int64(promoPeriod) {
-		if wrapper.Rate.LT(MinCommissionRate) {
+		if wrapper.Rate.LT(minRate) {
 			utils.Logger().Info().
 				Str("addr", addr.Hex()).
 				Str("old rate", wrapper.Rate.String()).
+				Str("new rate", minRate.String()).
 				Str("firstElectionEpoch", firstElectionEpoch.String()).
 				Msg("updating min commission rate")
-			wrapper.Rate.SetBytes(MinCommissionRate.Bytes())
+			wrapper.Rate.SetBytes(minRate.Bytes())
 		}
 	}
 	return nil

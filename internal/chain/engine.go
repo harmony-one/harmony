@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
 
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
@@ -406,13 +407,17 @@ func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *pa
 		// Set last epoch in committee
 		wrapper.LastEpochInCommittee = newShardState.Epoch
 
-		if config.IsMinCommissionRate(newShardState.Epoch) {
-			// Set first election epoch
+		// newShardState is referring to information of the next epoch
+		minRate := availability.GetMinCommissionRate(
+			config.IsMinCommissionRate(newShardState.Epoch),
+			config.IsHIP30(newShardState.Epoch),
+		)
+		if !minRate.Equal(numeric.ZeroDec()) {
+			// Set first election epoch (only set when it's not previously set)
 			state.SetValidatorFirstElectionEpoch(addr, newShardState.Epoch)
-
 			// Update minimum commission fee
 			if err := availability.UpdateMinimumCommissionFee(
-				newShardState.Epoch, state, addr, config.MinCommissionPromoPeriod.Int64(),
+				newShardState.Epoch, state, addr, minRate, config.MinCommissionPromoPeriod.Int64(),
 			); err != nil {
 				return err
 			}
