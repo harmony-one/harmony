@@ -317,7 +317,7 @@ func New(
 		inserted:       0,
 		config:         config,
 		logger:         logger,
-		stages:         stagesList,
+		stages:         forwardStages,
 		currentStage:   0,
 		revertOrder:    revertStages,
 		pruningOrder:   pruneStages,
