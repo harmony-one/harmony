@@ -265,7 +265,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
-	node.Worker.ApplyTestnetShardReduction()
+	node.Worker.ApplyShardReduction()
 	// Prepare shard state
 	var shardState *shard.State
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(

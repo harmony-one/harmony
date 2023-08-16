@@ -592,10 +592,16 @@ func (c *ChainConfig) mustValid() {
 	// min commission increase 2.0 must happen on or after 1.0
 	require(c.HIP30Epoch.Cmp(c.MinCommissionRateEpoch) >= 0,
 		"must satisfy: HIP30Epoch > MinCommissionRateEpoch")
-	// the HIP30 style distribution of rewards is only implemented
+	// the HIP30 split distribution of rewards is only implemented
 	// for the post aggregated epoch
 	require(c.HIP30Epoch.Cmp(c.AggregatedRewardEpoch) >= 0,
-		"must satisfy: HIP30Epoch > MinCommissionRateEpoch")
+		"must satisfy: HIP30Epoch >= MinCommissionRateEpoch")
+	// the migration of shard 2 and 3 balances assumes S3
+	require(c.HIP30Epoch.Cmp(c.S3Epoch) >= 0,
+		"must satisfy: HIP30Epoch >= S3Epoch")
+	// capabilities required to transfer balance across shards
+	require(c.HIP30Epoch.Cmp(c.CrossTxEpoch) > 0,
+		"must satisfy: HIP30Epoch > CrossTxEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.

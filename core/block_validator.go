@@ -21,11 +21,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -103,16 +105,34 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.DB, re
 		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash(), receiptSha)
 	}
 
+	skipValidation := false
 	if v.config.AcceptsCrossTx(block.Epoch()) {
-		cxsSha := cxReceipts.ComputeMerkleRoot()
-		if cxsSha != header.OutgoingReceiptHash() {
-			legacySha := types.DeriveMultipleShardsSha(cxReceipts)
-			if legacySha != header.OutgoingReceiptHash() {
-				return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x, legacy: %x)", header.OutgoingReceiptHash(), cxsSha, legacySha)
+		// here, we are comparing that the local `cxReceipts` hash out
+		// to match the remote `OutgoingReceiptHash`. this does not
+		// happen during HIP30 migration, because local `cxReceipts`
+		// will be nil
+		epoch := header.Epoch()
+		nxtEpoch := new(big.Int).Add(epoch, common.Big1)
+		skipValidation = shard.Schedule.InstanceForEpoch(epoch).NumShards() !=
+			shard.Schedule.InstanceForEpoch(nxtEpoch).NumShards()
+		epochLastBlock := shard.Schedule.EpochLastBlock(
+			epoch.Uint64(),
+		)
+		skipValidation = skipValidation &&
+			epochLastBlock - 5 <= block.NumberU64() &&
+			block.NumberU64() <= epochLastBlock - 1
+		if !skipValidation {
+			cxsSha := cxReceipts.ComputeMerkleRoot()
+			if cxsSha != header.OutgoingReceiptHash() {
+				legacySha := types.DeriveMultipleShardsSha(cxReceipts)
+				if legacySha != header.OutgoingReceiptHash() {
+					return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x, legacy: %x)", header.OutgoingReceiptHash(), cxsSha, legacySha)
+				}
 			}
 		}
 	}
 
+	// TODO set up some way for non leader nodes to compute the state root
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
 	if root := statedb.IntermediateRoot(v.config.IsS3(header.Epoch())); header.Root() != root {

@@ -17,6 +17,8 @@
 package core
 
 import (
+	"encoding/binary"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -28,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -442,7 +445,8 @@ func StakingToMessage(
 	return msg, nil
 }
 
-// MayShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
+// MayShardReduction handles the change in the number of Shards.
+// It will mark the affected validator as inactive.
 // This function does not handle all cases, only for ShardNum from 4 to 2.
 func MayShardReduction(bc ChainContext, statedb *state.DB, header *block.Header) error {
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
@@ -499,4 +503,96 @@ func MayShardReduction(bc ChainContext, statedb *state.DB, header *block.Header)
 	}
 	statedb.IntermediateRoot(bc.Config().IsS3(header.Epoch()))
 	return nil
+}
+
+// GenerateMigrationMessages returns a list of `howMany` cross shard
+// receipts to migrate balance from `myShard` to `dstShard`.
+// It sets the balance of the affected addresses to 0 as well.
+func GenerateMigrationMessages(
+	statedb *state.DB,
+	parentRoot common.Hash,
+	number uint64,
+	myShard uint32,
+	dstShard uint32,
+	howMany uint64,
+) (res []*types.CXReceipt, err error) {
+	// set up txHash prefix
+	txHash := make([]byte,
+		8 + // block number
+		1 + // my shard
+		8,  // how many
+	)
+	binary.LittleEndian.PutUint64(txHash, number)
+	txHash[8] = byte(myShard)
+	// upon failure, restore all balances
+	defer func() {
+		if err != nil {
+			for _, cx := range res {
+				statedb.AddBalance(cx.From, cx.Amount)
+				// move from dirty to pending, same as b/w 2 txs
+				statedb.Finalise(true)
+			}
+		}
+	}()
+	res = make(
+		[]*types.CXReceipt, 0, howMany,
+	)
+	// open the trie, as of previous block.
+	// in this block we aren't processing transactions anyway.
+	trie, err := statedb.Database().OpenTrie(
+		parentRoot,
+	)
+	if err != nil {
+		return
+	}
+	// disk db, for use by rawdb
+	// this is same as blockchain.ChainDb
+	db := statedb.Database().DiskDB()
+	// start the iteration
+	accountIterator := trie.NodeIterator(nil)
+	for accountIterator.Next(true) {
+		// leaf means leaf node of the MPT, which is an account
+		// the leaf key is the address
+		if accountIterator.Leaf() {
+			key := accountIterator.LeafKey()
+			preimage := rawdb.ReadPreimage(db, common.BytesToHash(key))
+			if len(preimage) == 0 {
+				err = errors.New(
+					fmt.Sprintf(
+						"cannot find preimage for %x", key,
+					),
+				)
+				return
+			}
+			address := common.BytesToAddress(preimage)
+			// blank address
+			if address == (common.Address{}) {
+				continue
+			}
+			balance := statedb.GetBalance(address)
+			// no (or negative?) balance
+			if balance.Cmp(common.Big0) <= 0 {
+				continue
+			}
+			// adds a journal entry (dirtied)
+			statedb.SubBalance(address, balance)
+			// create the receipt
+			binary.LittleEndian.PutUint64(txHash[9:], uint64(len(res)))
+			receipt := &types.CXReceipt{
+				From: address,
+				To: &address,
+				ShardID: myShard,
+				ToShardID: dstShard,
+				Amount: balance,
+				TxHash: common.BytesToHash(txHash),
+			}
+			res = append(res, receipt)
+			// move from dirty to pending, same as b/w 2 txs
+			statedb.Finalise(true)
+			if len(res) >= int(howMany) {
+				break
+			}
+		}
+	}
+	return
 }

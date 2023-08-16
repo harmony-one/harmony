@@ -25,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -150,6 +151,50 @@ func (w *Worker) CommitTransactions(
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
 
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Mainnet {
+		// balance migration can occur here
+		epoch := w.current.header.Epoch()
+		nextEpoch := new(big.Int).Add(epoch, common.Big1)
+		curShards := shard.Schedule.InstanceForEpoch(epoch).NumShards()
+		nxtShards := shard.Schedule.InstanceForEpoch(nextEpoch).NumShards()
+		if curShards != nxtShards {
+			if curShards != 4 && nxtShards != 2 {
+				return errors.New("can only handle the reduction from 4 to 2")
+			}
+			if myShard := w.chain.ShardID(); myShard >= nxtShards {
+				// we start adding cx receipts for migration
+				// at last block - 5, to last block - 1
+				epochLastBlock := shard.Schedule.EpochLastBlock(
+					epoch.Uint64(),
+				)
+				number := w.current.header.NumberU64()
+				if epochLastBlock - 5 <= number && number <= epochLastBlock - 1 {
+					dstShard := myShard % nxtShards
+					costPerCx := uint64(23_000)
+					// overridden gas limit!
+					nbCxs := uint64(30_000_000) / costPerCx
+					parentRoot := w.chain.GetBlockByHash(
+						w.current.header.ParentHash(),
+					).Root()
+					cxs, err := core.GenerateMigrationMessages(
+						w.current.state, parentRoot,
+						number, myShard, dstShard, nbCxs,
+					)
+					if err != nil {
+						return err
+					}
+					// set cxs to finalise and broadcast
+					w.current.outcxs = append(w.current.outcxs, cxs...)
+					// subtract gas used
+					w.current.gasPool.SubGas(
+						nbCxs * costPerCx,
+					)
+					return nil
+				}
+			}
+		}
+	}
+
 	// HARMONY TXNS
 	normalTxns := types.NewTransactionsByPriceAndNonce(w.current.signer, w.current.ethSigner, pendingNormal)
 
@@ -224,9 +269,8 @@ func (w *Worker) commitStakingTransaction(
 	return nil
 }
 
-// ApplyTestnetShardReduction only used to reduce shards of Testnet
-func (w *Worker) ApplyTestnetShardReduction() {
-	core.MayTestnetShardReduction(w.chain, w.current.state, w.current.header)
+func (w *Worker) ApplyShardReduction() {
+	core.MayShardReduction(w.chain, w.current.state, w.current.header)
 }
 
 var (
