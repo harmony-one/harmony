@@ -563,6 +563,10 @@ func (c *ChainConfig) mustValid() {
 			panic(err)
 		}
 	}
+	// to ensure at least RewardFrequency blocks have passed
+	require(c.AggregatedRewardEpoch.Cmp(common.Big0) > 0,
+		"must satisfy: AggregatedRewardEpoch > 0",
+	)
 	// before staking epoch, fees were sent to coinbase
 	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0,
 		"must satisfy: FeeCollectEpoch >= StakingEpoch")
@@ -587,6 +591,10 @@ func (c *ChainConfig) mustValid() {
 		"must satisfy: HIP30Epoch > StakingEpoch")
 	// min commission increase 2.0 must happen on or after 1.0
 	require(c.HIP30Epoch.Cmp(c.MinCommissionRateEpoch) >= 0,
+		"must satisfy: HIP30Epoch > MinCommissionRateEpoch")
+	// the HIP30 style distribution of rewards is only implemented
+	// for the post aggregated epoch
+	require(c.HIP30Epoch.Cmp(c.AggregatedRewardEpoch) >= 0,
 		"must satisfy: HIP30Epoch > MinCommissionRateEpoch")
 }
 

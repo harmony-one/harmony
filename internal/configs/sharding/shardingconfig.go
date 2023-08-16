@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 
@@ -85,6 +86,14 @@ type Instance interface {
 
 	// FeeCollector returns a mapping of address to decimal % of fee
 	FeeCollectors() FeeCollectors
+
+	// HIP30RecoveryAddress returns the address to which
+	// HIP30EmissionSplit % income is sent
+	HIP30RecoveryAddress() ethCommon.Address
+
+	// HIP30EmissionFraction is the percentage of the emission
+	// sent to the Recovery Address
+	HIP30EmissionFraction() numeric.Dec
 }
 
 // genShardingStructure return sharding structure, given shard number and its patterns.
