@@ -565,17 +565,29 @@ func GenerateMigrationMessages(
 				return
 			}
 			address := common.BytesToAddress(preimage)
-			// blank address
+			// skip blank address
 			if address == (common.Address{}) {
 				continue
 			}
-			balance := statedb.GetBalance(address)
-			// no (or negative?) balance
-			if balance.Cmp(common.Big0) <= 0 {
+			// deserialize
+			var account state.Account
+			if err = rlp.DecodeBytes(accountIterator.LeafBlob(), &account); err != nil {
+				return
+			}
+			// skip contracts
+			if common.BytesToHash(account.CodeHash) != state.EmptyCodeHash {
+				continue
+			}
+			// skip anything with storage
+			if account.Root != state.EmptyRootHash {
+				continue
+			}
+			// skip no (or negative?) balance
+			if account.Balance.Cmp(common.Big0) <= 0 {
 				continue
 			}
 			// adds a journal entry (dirtied)
-			statedb.SubBalance(address, balance)
+			statedb.SubBalance(address, account.Balance)
 			// create the receipt
 			binary.LittleEndian.PutUint64(txHash[9:], uint64(len(res)))
 			receipt := &types.CXReceipt{
@@ -583,7 +595,7 @@ func GenerateMigrationMessages(
 				To: &address,
 				ShardID: myShard,
 				ToShardID: dstShard,
-				Amount: balance,
+				Amount: account.Balance,
 				TxHash: common.BytesToHash(txHash),
 			}
 			res = append(res, receipt)
