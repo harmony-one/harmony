@@ -185,7 +185,7 @@ func (p *StateProcessor) Process(
 		}
 	}
 
-	if err := MayTestnetShardReduction(p.bc, statedb, header); err != nil {
+	if err := MayShardReduction(p.bc, statedb, header); err != nil {
 		return nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
@@ -442,13 +442,16 @@ func StakingToMessage(
 	return msg, nil
 }
 
-// MayTestnetShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
+// MayShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
 // This function does not handle all cases, only for ShardNum from 4 to 2.
-func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.Header) error {
+func MayShardReduction(bc ChainContext, statedb *state.DB, header *block.Header) error {
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isLastBlock := shard.Schedule.IsLastBlock(header.Number().Uint64())
-	isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
-	if !(isTestnet && isBeaconChain && isLastBlock) {
+	networkType := nodeconfig.GetDefaultConfig().GetNetworkType()
+	isTestnet := networkType == nodeconfig.Testnet
+	isMainnet := networkType == nodeconfig.Mainnet
+	isReducenet := isMainnet || isTestnet
+	if !(isReducenet && isBeaconChain && isLastBlock) {
 		return nil
 	}
 	curInstance := shard.Schedule.InstanceForEpoch(header.Epoch())
@@ -479,6 +482,15 @@ func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.
 		for _, pubKey := range validator.SlotPubKeys {
 			curShard := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(curNumShards))).Uint64()
 			nextShard := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(nextNumShards))).Uint64()
+			// background: any editValidator transactions take effect at next epoch.
+			// assumption: shard reduction happens at epoch X.
+			// validators who wish to continue validating after the shard reduction occurs
+			// must have a different node running with a key from shard 0 or 1.
+			// this key must be added to the validator during epoch X - 1
+			// and keys belonging to shards 2 and 3 removed at that point in time.
+			// the different node running will be unelected, but continue syncing in X - 1.
+			// if elected, it will start validating in epoch X.
+			// once epoch X begins, they can terminate servers from shards 2 and 3.
 			if curShard >= uint64(nextNumShards) || curShard != nextShard {
 				validator.Status = effective.Inactive
 				break
