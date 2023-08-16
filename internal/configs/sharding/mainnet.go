@@ -362,8 +362,10 @@ var (
 		mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch(),
 	)
 	mainnetV4 = MustNewInstance(
-		2, 200, 25, 0.06,
-		numeric.MustNewDecFromStr("0.49"), genesis.HarmonyAccounts,
+		// internal slots are 10% of total slots
+		2, 200, 20, 0.06,
+		numeric.MustNewDecFromStr("0.49"),
+		genesis.HarmonyAccountsPostHIP30,
 		genesis.FoundationalNodeAccountsV1_5, emptyAllowlist,
 		feeCollectorsMainnet, numeric.MustNewDecFromStr("0.25"),
 		hip30CollectionAddress, mainnetReshardingEpoch,
