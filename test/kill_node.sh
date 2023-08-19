@@ -10,7 +10,7 @@ do
   if [ $NAME == "Darwin" ]; then
     pkill -9 "^(${pname})$"
   else
-    sudo pkill -9 -e "^(${pname})$"
+    pkill -9 -e "^(${pname})$"
   fi
 done
 
