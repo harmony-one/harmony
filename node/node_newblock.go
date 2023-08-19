@@ -22,7 +22,7 @@ import (
 const (
 	SleepPeriod           = 20 * time.Millisecond
 	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
-	maxBlockTimeout       = 5 * time.Second
+	maxBlockTimeout       = 3 * time.Second
 )
 
 // WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
@@ -112,6 +112,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 // ProposeNewBlock proposes a new block...
 func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) {
 	currentHeader := node.Blockchain().CurrentHeader()
+	blockchain := node.Blockchain()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
 	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)
 	defer utils.AnalysisEnd("ProposeNewBlock", nowEpoch, blockNow)
@@ -161,7 +162,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
 		// Prepare normal and staking transactions retrieved from transaction pool
 		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
-		for started := time.Now(); started.Add(maxBlockTimeout).After(time.Now()); {
+		for started := time.Now(); ; {
 
 			pendingPoolTxs, err := node.TxPool.Pending()
 			if err != nil {
@@ -190,8 +191,16 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 					pendingPlainTxs[addr] = plainTxsPerAcc
 				}
 			}
+			var (
+				blockIsEmpty     = len(pendingPlainTxs) == 0 && len(pendingStakingTxs) == 0
+				featureActivated = blockchain.Config().IsOneSecond(header.Epoch())
+				notTooLong       = started.Add(maxBlockTimeout).After(time.Now()) // we can delay block creation for maxBlockTimeout
+				// TODO
+				notEpochChangingBlocks = true // better not to delay that blocks, because they are needed asap
+			)
 
-			if len(pendingPlainTxs) == 0 && len(pendingStakingTxs) == 0 {
+			if blockIsEmpty && featureActivated && notTooLong && notEpochChangingBlocks {
+				// then we can skip block creating and wait for more transactions
 				<-time.After(250 * time.Millisecond)
 				continue
 			}

@@ -286,6 +286,7 @@ var (
 		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  big.NewInt(2),
 		HIP30Epoch:                             EpochTBD,
+		OneSecondEpoch:                         big.NewInt(3),
 	}
 
 	// AllProtocolChanges ...
@@ -330,6 +331,7 @@ var (
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 		big.NewInt(0),                      // HIP30Epoch
+		big.NewInt(0), //
 	}
 
 	// TestChainConfig ...
@@ -374,6 +376,7 @@ var (
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 		big.NewInt(0),        // HIP30Epoch
+		big.NewInt(0),        //
 	}
 
 	// TestRules ...
@@ -537,6 +540,8 @@ type ChainConfig struct {
 	// 3. Change from 250 to 200 nodes for remaining shards (mainnet and localnet)
 	// 4. Change the minimum validator commission from 5 to 7% (all nets)
 	HIP30Epoch *big.Int `json:"hip30-epoch,omitempty"`
+
+	OneSecondEpoch *big.Int `json:"one-second-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -657,6 +662,11 @@ func (c *ChainConfig) IsFiveSeconds(epoch *big.Int) bool {
 // IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
 func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
 	return isForked(c.TwoSecondsEpoch, epoch)
+}
+
+// IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
+func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
+	return isForked(c.OneSecondEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%
@@ -795,7 +805,7 @@ func (c *ChainConfig) IsHIP30(epoch *big.Int) bool {
 	return isForked(c.HIP30Epoch, epoch)
 }
 
-// During this epoch, shards 2 and 3 will start sending
+// IsEpochBeforeHIP30 During this epoch, shards 2 and 3 will start sending
 // their balances over to shard 0 or 1.
 func (c *ChainConfig) IsEpochBeforeHIP30(epoch *big.Int) bool {
 	return isForked(new(big.Int).Sub(c.HIP30Epoch, common.Big1), epoch)
