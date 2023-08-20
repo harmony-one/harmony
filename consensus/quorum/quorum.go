@@ -217,7 +217,35 @@ func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bl
 	return found, &s.publicKeys[idx]
 }
 
-// NthNextHmy return the Nth next pubkey of Harmony nodes, next can be negative number
+// NthNextValidatorHmy return the Nth next pubkey nodes, but from another validator.
+func (s *cIdentities) NthNextValidatorHmy(instance shardingconfig.Instance, slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+	found := false
+
+	publicToAddress := make(map[bls.SerializedPublicKey]common.Address)
+	for _, slot := range slotList {
+		publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
+	}
+
+	idx := s.IndexOf(pubKey.Bytes)
+	if idx != -1 {
+		found = true
+	} else {
+		utils.Logger().Error().
+			Str("key", pubKey.Bytes.Hex()).
+			Msg("[NthNextHmy] pubKey not found")
+	}
+	for {
+		numNodes := len(s.publicKeys)
+		idx = (idx + next) % numNodes
+		if publicToAddress[s.publicKeys[idx].Bytes] == publicToAddress[pubKey.Bytes] {
+			// same validator, go next
+			idx++
+			continue
+		}
+		return found, &s.publicKeys[idx]
+	}
+}
+
 func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
