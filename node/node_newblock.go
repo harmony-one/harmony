@@ -169,6 +169,16 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
 				return nil, err
 			}
+			var (
+				blockIsEmpty     = len(pendingPoolTxs) == 0
+				featureActivated = blockchain.Config().IsOneSecond(header.Epoch())
+				notTooLong       = started.Add(maxBlockTimeout).After(time.Now()) // we can delay block creation for maxBlockTimeout
+			)
+			if blockIsEmpty && featureActivated && notTooLong {
+				// then we can skip block creating and wait for more transactions
+				<-time.After(250 * time.Millisecond)
+				continue
+			}
 			pendingPlainTxs := map[common.Address]types.Transactions{}
 			pendingStakingTxs := staking.StakingTransactions{}
 			for addr, poolTxs := range pendingPoolTxs {
@@ -190,19 +200,6 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				if plainTxsPerAcc.Len() > 0 {
 					pendingPlainTxs[addr] = plainTxsPerAcc
 				}
-			}
-			var (
-				blockIsEmpty     = len(pendingPlainTxs) == 0 && len(pendingStakingTxs) == 0
-				featureActivated = blockchain.Config().IsOneSecond(header.Epoch())
-				notTooLong       = started.Add(maxBlockTimeout).After(time.Now()) // we can delay block creation for maxBlockTimeout
-				// TODO
-				notEpochChangingBlocks = true // better not to delay that blocks, because they are needed asap
-			)
-
-			if blockIsEmpty && featureActivated && notTooLong && notEpochChangingBlocks {
-				// then we can skip block creating and wait for more transactions
-				<-time.After(250 * time.Millisecond)
-				continue
 			}
 
 			// Try commit normal and staking transactions based on the current state
