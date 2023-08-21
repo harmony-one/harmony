@@ -162,8 +162,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
 		// Prepare normal and staking transactions retrieved from transaction pool
 		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
+		defer utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 		for started := time.Now(); ; {
-
 			pendingPoolTxs, err := node.TxPool.Pending()
 			if err != nil {
 				utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
@@ -214,7 +214,6 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				return nil, err
 			}
 		}
-		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 	}
 
 	// Prepare cross shard transaction receipts
