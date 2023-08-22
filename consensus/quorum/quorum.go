@@ -438,7 +438,7 @@ func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 	return ballots
 }
 
-func newBallotsBackedSignatureReader() *cIdentities {
+func newCIdentities() *cIdentities {
 	return &cIdentities{
 		publicKeys:  []bls.PublicKeyWrapper{},
 		keyIndexMap: map[bls.SerializedPublicKey]int{},
@@ -446,6 +446,10 @@ func newBallotsBackedSignatureReader() *cIdentities {
 		commit:      votepower.NewRound(),
 		viewChange:  votepower.NewRound(),
 	}
+}
+
+func newBallotsBackedSignatureReader() *cIdentities {
+	return newCIdentities()
 }
 
 // NewDecider ..
