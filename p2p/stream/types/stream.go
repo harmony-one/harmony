@@ -85,11 +85,14 @@ func (st *BaseStream) FailedTimes() int {
 }
 
 func (st *BaseStream) AddFailedTimes(faultRecoveryThreshold time.Duration) {
-	durationSinceLastFailure := time.Now().Sub(st.lastFailureTime)
-	if durationSinceLastFailure >= faultRecoveryThreshold {
-		st.ResetFailedTimes()
+	if st.failedTimes > 0 {
+		durationSinceLastFailure := time.Now().Sub(st.lastFailureTime)
+		if durationSinceLastFailure >= faultRecoveryThreshold {
+			st.ResetFailedTimes()
+		}
 	}
 	st.failedTimes++
+	st.lastFailureTime = time.Now()
 }
 
 func (st *BaseStream) ResetFailedTimes() {
