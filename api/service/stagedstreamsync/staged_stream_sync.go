@@ -337,8 +337,9 @@ func (s *StagedStreamSync) promLabels() prometheus.Labels {
 func (s *StagedStreamSync) checkHaveEnoughStreams() error {
 	numStreams := s.protocol.NumStreams()
 	if numStreams < s.config.MinStreams {
-		return fmt.Errorf("number of streams smaller than minimum: %v < %v",
+		s.logger.Debug().Msgf("number of streams smaller than minimum: %v < %v",
 			numStreams, s.config.MinStreams)
+		return ErrNotEnoughStreams
 	}
 	return nil
 }

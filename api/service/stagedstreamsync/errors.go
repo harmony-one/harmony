@@ -14,7 +14,7 @@ var (
 	ErrUnexpectedNumberOfBlockHashes = WrapStagedSyncError("unexpected number of getBlocksByHashes result")
 	ErrUnexpectedBlockHashes         = WrapStagedSyncError("unexpected get block hashes result delivered")
 	ErrNilBlock                      = WrapStagedSyncError("nil block found")
-	ErrNotEnoughStreams              = WrapStagedSyncError("not enough streams")
+	ErrNotEnoughStreams              = WrapStagedSyncError("number of streams smaller than minimum required")
 	ErrParseCommitSigAndBitmapFail   = WrapStagedSyncError("parse commitSigAndBitmap failed")
 	ErrVerifyHeaderFail              = WrapStagedSyncError("verify header failed")
 	ErrInsertChainFail               = WrapStagedSyncError("insert to chain failed")
