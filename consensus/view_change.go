@@ -149,7 +149,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 // It reads the current leader's pubkey based on the blockchain data and returns
 // the next leader based on the gap of the viewID of the view change and the last
 // know view id of the block.
-func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrapper {
+func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Committee) *bls.PublicKeyWrapper {
 	gap := 1
 
 	cur := consensus.getCurBlockViewID()
@@ -204,7 +204,8 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 	var next *bls.PublicKeyWrapper
 	if blockchain != nil && blockchain.Config().IsLeaderRotation(epoch) {
 		if blockchain.Config().IsLeaderRotationExternalValidatorsAllowed(epoch, consensus.ShardID) {
-			wasFound, next = consensus.Decider.NthNext(
+			wasFound, next = consensus.Decider.NthNextValidator(
+				committee.Slots,
 				lastLeaderPubKey,
 				gap)
 		} else {
@@ -249,13 +250,24 @@ func (consensus *Consensus) startViewChange() {
 	consensus.current.SetMode(ViewChanging)
 	nextViewID, duration := consensus.getNextViewID()
 	consensus.setViewChangingID(nextViewID)
+	epoch := consensus.Blockchain().CurrentHeader().Epoch()
+	ss, err := consensus.Blockchain().ReadShardState(epoch)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
+		return
+	}
+	committee, err := ss.FindCommitteeByID(consensus.ShardID)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to find committee")
+		return
+	}
 	// TODO: set the Leader PubKey to the next leader for view change
 	// this is dangerous as the leader change is not succeeded yet
 	// we use it this way as in many code we validate the messages
 	// aganist the consensus.LeaderPubKey variable.
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
-	consensus.LeaderPubKey = consensus.getNextLeaderKey(nextViewID)
+	consensus.LeaderPubKey = consensus.getNextLeaderKey(nextViewID, committee)
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).

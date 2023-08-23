@@ -75,7 +75,8 @@ type ParticipantTracker interface {
 	Participants() multibls.PublicKeys
 	IndexOf(bls.SerializedPublicKey) int
 	ParticipantsCount() int64
-	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
+	// NthNextValidator returns key for next validator. It assumes external validators and leader rotation.
+	NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmyExt(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
@@ -217,8 +218,8 @@ func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bl
 	return found, &s.publicKeys[idx]
 }
 
-// NthNextValidatorHmy return the Nth next pubkey nodes, but from another validator.
-func (s *cIdentities) NthNextValidatorHmy(instance shardingconfig.Instance, slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+// NthNextValidator return the Nth next pubkey nodes, but from another validator.
+func (s *cIdentities) NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
 	publicToAddress := make(map[bls.SerializedPublicKey]common.Address)

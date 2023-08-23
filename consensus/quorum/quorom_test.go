@@ -619,7 +619,7 @@ func TestCIdentities_NthNextValidatorHmy(t *testing.T) {
 
 	c := newCIdentities()
 	c.UpdateParticipants(list, []bls.PublicKeyWrapper{})
-	found, key := c.NthNextValidatorHmy(nil, slots, &list[0], 1)
+	found, key := c.NthNextValidator(slots, &list[0], 1)
 	require.Equal(t, true, found)
 	// because we skip 3 keys of current validator
 	require.Equal(t, 3, c.IndexOf(key.Bytes))
