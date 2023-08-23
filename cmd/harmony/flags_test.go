@@ -1509,6 +1509,75 @@ func TestRevertFlags(t *testing.T) {
 	}
 }
 
+func TestPreimageFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig harmonyconfig.PreimageConfig
+		expErr    error
+	}{
+		{
+			args: []string{},
+			expConfig: harmonyconfig.PreimageConfig{
+				ImportFrom:    defaultPreimageConfig.ImportFrom,
+				ExportTo:      defaultPreimageConfig.ExportTo,
+				GenerateStart: defaultPreimageConfig.GenerateStart,
+				GenerateEnd:   defaultPreimageConfig.GenerateEnd,
+			},
+		},
+		{
+			args: []string{"--preimage.import", "/path/to/source.csv"},
+			expConfig: harmonyconfig.PreimageConfig{
+				ImportFrom:    "/path/to/source.csv",
+				ExportTo:      defaultPreimageConfig.ExportTo,
+				GenerateStart: defaultPreimageConfig.GenerateStart,
+				GenerateEnd:   defaultPreimageConfig.GenerateEnd,
+			},
+		},
+		{
+			args: []string{"--preimage.export", "/path/to/destination.csv"},
+			expConfig: harmonyconfig.PreimageConfig{
+				ImportFrom:    defaultPreimageConfig.ImportFrom,
+				ExportTo:      "/path/to/destination.csv",
+				GenerateStart: defaultPreimageConfig.GenerateStart,
+				GenerateEnd:   defaultPreimageConfig.GenerateEnd,
+			},
+		},
+		{
+			args: []string{"--preimage.start", "1"},
+			expConfig: harmonyconfig.PreimageConfig{
+				ImportFrom:    defaultPreimageConfig.ImportFrom,
+				ExportTo:      defaultPreimageConfig.ExportTo,
+				GenerateStart: 1,
+				GenerateEnd:   defaultPreimageConfig.GenerateEnd,
+			},
+		},
+		{
+			args: []string{"--preimage.end", "2"},
+			expConfig: harmonyconfig.PreimageConfig{
+				ImportFrom:    defaultPreimageConfig.ImportFrom,
+				ExportTo:      defaultPreimageConfig.ExportTo,
+				GenerateStart: defaultPreimageConfig.GenerateStart,
+				GenerateEnd:   2,
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, preimageFlags, applyPreimageFlags)
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		if !reflect.DeepEqual(hc.Preimage, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Preimage, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
 func TestDNSSyncFlags(t *testing.T) {
 	tests := []struct {
 		args      []string

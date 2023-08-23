@@ -246,6 +246,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applySysFlags(cmd, config)
 	applyDevnetFlags(cmd, config)
 	applyRevertFlags(cmd, config)
+	applyPreimageFlags(cmd, config)
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
 	applyShardDataFlags(cmd, config)

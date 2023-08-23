@@ -205,6 +205,13 @@ var (
 		revertBeforeFlag,
 	}
 
+	preimageFlags = []cli.Flag{
+		preimageImportFlag,
+		preimageExportFlag,
+		preimageGenerateStartFlag,
+		preimageGenerateEndFlag,
+	}
+
 	legacyRevertFlags = []cli.Flag{
 		legacyRevertBeaconFlag,
 		legacyRevertBeforeFlag,
@@ -1653,6 +1660,52 @@ func applyRevertFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		if cli.IsFlagChanged(cmd, legacyRevertToFlag) {
 			config.Revert.RevertTo = cli.GetIntFlagValue(cmd, legacyRevertToFlag)
 		}
+	}
+}
+
+var (
+	preimageImportFlag = cli.StringFlag{
+		Name: 	  "preimage.import",
+		Usage: 	  "Import pre-images from CSV file",
+		Hidden:   true,
+		DefValue: defaultPreimageConfig.ImportFrom,
+	}
+	preimageExportFlag = cli.StringFlag{
+		Name:     "preimage.export",
+		Usage:    "Export pre-images to CSV file",
+		Hidden:   true,
+		DefValue: defaultPreimageConfig.ExportTo,
+	}
+	preimageGenerateStartFlag = cli.Uint64Flag{
+		Name:     "preimage.start",
+		Usage:    "The block number from which pre-images are to be generated",
+		Hidden:   true,
+		DefValue: defaultPreimageConfig.GenerateStart,
+	}
+	preimageGenerateEndFlag = cli.Uint64Flag{
+		Name:     "preimage.end",
+		Usage:    "The block number upto and including which pre-images are to be generated",
+		Hidden:   true,
+		DefValue: defaultPreimageConfig.GenerateEnd,
+	}
+)
+
+func applyPreimageFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+	if cli.HasFlagsChanged(cmd, preimageFlags) {
+		cfg := getDefaultPreimageConfigCopy()
+		config.Preimage = cfg
+	}
+	if cli.IsFlagChanged(cmd, preimageImportFlag) {
+		config.Preimage.ImportFrom = cli.GetStringFlagValue(cmd, preimageImportFlag)
+	}
+	if cli.IsFlagChanged(cmd, preimageExportFlag) {
+		config.Preimage.ExportTo = cli.GetStringFlagValue(cmd, preimageExportFlag)
+	}
+	if cli.IsFlagChanged(cmd, preimageGenerateStartFlag) {
+		config.Preimage.GenerateStart = cli.GetUint64FlagValue(cmd, preimageGenerateStartFlag)
+	}
+	if cli.IsFlagChanged(cmd, preimageGenerateEndFlag) {
+		config.Preimage.GenerateEnd = cli.GetUint64FlagValue(cmd, preimageGenerateEndFlag)
 	}
 }
 

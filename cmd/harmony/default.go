@@ -149,6 +149,13 @@ var defaultRevertConfig = harmonyconfig.RevertConfig{
 	RevertTo:     0,
 }
 
+var defaultPreimageConfig = harmonyconfig.PreimageConfig{
+	ImportFrom:    "",
+	ExportTo:      "",
+	GenerateStart: 0,
+	GenerateEnd:   0,
+}
+
 var defaultLogContext = harmonyconfig.LogContext{
 	IP:   "127.0.0.1",
 	Port: 9000,
@@ -288,6 +295,11 @@ func getDefaultDevnetConfigCopy() harmonyconfig.DevnetConfig {
 
 func getDefaultRevertConfigCopy() harmonyconfig.RevertConfig {
 	config := defaultRevertConfig
+	return config
+}
+
+func getDefaultPreimageConfigCopy() harmonyconfig.PreimageConfig {
+	config := defaultPreimageConfig
 	return config
 }
 

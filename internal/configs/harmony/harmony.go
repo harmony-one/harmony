@@ -36,6 +36,7 @@ type HarmonyConfig struct {
 	DNSSync    DnsSync
 	ShardData  ShardDataConfig
 	GPO        GasPriceOracleConfig
+	Preimage   PreimageConfig
 }
 
 func (hc HarmonyConfig) ToRPCServerConfig() nodeconfig.RPCServerConfig {
@@ -301,6 +302,13 @@ type RevertConfig struct {
 	RevertBeacon bool
 	RevertTo     int
 	RevertBefore int
+}
+
+type PreimageConfig struct {
+	ImportFrom    string
+	ExportTo   	  string
+	GenerateStart uint64
+	GenerateEnd   uint64
 }
 
 type LegacyConfig struct {
