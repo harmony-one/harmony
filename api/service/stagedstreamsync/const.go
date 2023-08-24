@@ -74,7 +74,7 @@ func (c *Config) fixValues() {
 		c.Concurrency = c.MinStreams
 	}
 	if c.Concurrency > c.MinStreams {
-		c.Concurrency = c.MinStreams 
+		c.Concurrency = c.MinStreams
 	}
 	if c.MinStreams > c.InitStreams {
 		c.InitStreams = c.MinStreams
