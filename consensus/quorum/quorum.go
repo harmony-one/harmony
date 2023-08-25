@@ -222,6 +222,13 @@ func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bl
 func (s *cIdentities) NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
+	if len(s.publicKeys) == 0 {
+		return false, pubKey
+	}
+	if next < 0 {
+		return false, pubKey
+	}
+
 	publicToAddress := make(map[bls.SerializedPublicKey]common.Address)
 	for _, slot := range slotList {
 		publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
