@@ -171,20 +171,9 @@ func GeneratePreimages(chain core.BlockChain, start, end uint64) error {
 		return fmt.Errorf("error committing preimages %s", err)
 	}
 	// save information about generated pre-images start and end nbs
-	toWrite := []uint64{0, 0}
-	existingStart, err := rawdb.ReadPreImageStartBlock(chain.ChainDb())
-	if err != nil || existingStart > startingBlock.NumberU64() + 1 {
-		toWrite[0] = startingBlock.NumberU64() + 1
-	} else {
-		toWrite[0] = existingStart
-	}
-	existingEnd, err := rawdb.ReadPreImageEndBlock(chain.ChainDb())
-	if err != nil || existingEnd < end {
-		toWrite[1] = end
-	} else {
-		toWrite[1] = existingEnd
-	}
-	if err := rawdb.WritePreImageStartEndBlock(chain.ChainDb(), toWrite[0], toWrite[1]); err != nil {
+	var gauge1, gauge2 uint64
+	var err error
+	if gauge1, gauge2, err = rawdb.WritePreImageStartEndBlock(chain.ChainDb(), startingBlock.NumberU64() + 1, end); err != nil {
 		return fmt.Errorf("error writing pre-image gen blocks %s", err)
 	}
 	// add prometheus metrics as well
@@ -207,7 +196,47 @@ func GeneratePreimages(chain core.BlockChain, start, end uint64) error {
 	prometheus.PromRegistry().MustRegister(
 		startGauge, endGauge,
 	)
-	startGauge.Set(float64(toWrite[0]))
-	endGauge.Set(float64(toWrite[1]))
+	startGauge.Set(float64(gauge1))
+	endGauge.Set(float64(gauge2))
 	return nil
+}
+
+func FindMissingRange(
+	imported, start, end, current uint64,
+) (uint64, uint64) {
+	// both are unset
+	if start == 0 && end == 0 {
+		if imported < current {
+			return imported + 1, current
+		} else {
+			return 0, 0
+		}
+	}
+	// constraints: start <= end <= current
+	// in regular usage, we should have end == current
+	// however, with the GenerateFlag usage, we can have end < current
+	check1 := start <= end
+	if !check1 {
+		panic("Start > End")
+	}
+	check2 := end <= current
+	if !check2 {
+		panic("End > Current")
+	}
+	// imported can sit in any of the 4 ranges
+	if imported < start {
+		// both inclusive
+		return imported + 1, start - 1
+	}
+	if imported < end {
+		return end + 1, current
+	}
+	if imported < current {
+		return imported + 1, current
+	}
+	// future data imported
+	if current < imported {
+		return 0, 0
+	}
+	return 0, 0
 }

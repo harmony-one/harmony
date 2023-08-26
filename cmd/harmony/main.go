@@ -393,6 +393,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			csvReader := csv.NewReader(reader)
 			chain := currentNode.Blockchain()
 			dbReader := chain.ChainDb()
+			imported := uint64(0)
 			for {
 				record, err := csvReader.Read()
 				if err == io.EOF {
@@ -431,6 +432,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 							}
 						}
 						// this is the last record
+						imported = blockNumber
 						break
 					}
 				}
@@ -447,6 +449,21 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 						key: value,
 					},
 				)
+			}
+			// now, at this point, we will have to generate missing pre-images
+			if imported != 0 {
+				genStart, _ := rawdb.ReadPreImageStartBlock(dbReader)
+				genEnd, _ := rawdb.ReadPreImageEndBlock(dbReader)
+				current := chain.CurrentBlock().NumberU64()
+				toGenStart, toGenEnd := rpc.FindMissingRange(imported, genStart, genEnd, current)
+				if toGenStart != 0 && toGenEnd != 0 {
+					if err := rpc.GeneratePreimages(
+						chain, toGenStart, toGenEnd,
+					); err != nil {
+						fmt.Println("Error generating", err)
+						os.Exit(1)
+					}
+				}
 			}
 			os.Exit(0)
 		} else if exportPath := hc.Preimage.ExportTo; exportPath != "" {

@@ -160,14 +160,38 @@ func ReadPreimageImportBlock(db ethdb.KeyValueReader) (uint64, error) {
 	return decodeBlockNumber(val), nil
 }
 
-func WritePreImageStartEndBlock(db ethdb.KeyValueWriter, start, end uint64) error {
-	if err1 := db.Put(preImageGenStartKey, encodeBlockNumber(start)); err1 != nil {
-		return err1
+func WritePreImageStartEndBlock(
+	db ethdb.KeyValueStore,
+	start uint64,
+	end uint64,
+) (
+	uint64,
+	uint64,
+	error,
+) {
+	returnStart := start
+	returnEnd := end
+	if start != 0 {
+		existingStart, err := ReadPreImageStartBlock(db)
+		if err != nil || existingStart > start {
+			if err := db.Put(preImageGenStartKey, encodeBlockNumber(start)); err != nil {
+				return 0, 0, err
+			} else {
+				returnStart = existingStart
+			}
+		}
 	}
-	if err2 := db.Put(preImageGenEndKey, encodeBlockNumber(end)); err2 != nil {
-		return err2
+	if end != 0 {
+		existingEnd, err := ReadPreImageEndBlock(db)
+		if err != nil || existingEnd < end {
+			if err := db.Put(preImageGenEndKey, encodeBlockNumber(end)); err != nil {
+				return 0, 0, err
+			} else {
+				returnEnd = existingEnd
+			}
+		}
 	}
-	return nil
+	return returnStart, returnEnd, nil
 }
 
 func ReadPreImageStartBlock(db ethdb.KeyValueReader) (uint64, error) {

@@ -367,6 +367,12 @@ func newBlockChainWithOptions(
 		return nil, errors.WithMessage(err, "failed to build leader rotation meta")
 	}
 
+	if cacheConfig.Preimages {
+		if _, _, err := rawdb.WritePreImageStartEndBlock(bc.ChainDb(), curHeader.NumberU64() + 1, 0); err != nil {
+			return nil, errors.WithMessage(err, "failed to write pre-image start end blocks")
+		}
+	}
+
 	// Take ownership of this particular state
 	go bc.update()
 	return bc, nil
@@ -1209,6 +1215,10 @@ func (bc *BlockChainImpl) Stop() {
 	// Flush the collected preimages to disk
 	if err := bc.stateCache.TrieDB().CommitPreimages(); err != nil {
 		utils.Logger().Error().Interface("err", err).Msg("Failed to commit trie preimages")
+	} else {
+		if _, _, err := rawdb.WritePreImageStartEndBlock(bc.ChainDb(), 0, bc.CurrentBlock().NumberU64()); err != nil {
+			utils.Logger().Error().Interface("err", err).Msg("Failed to mark preimages end block")
+		}
 	}
 	// Ensure all live cached entries be saved into disk, so that we can skip
 	// cache warmup when node restarts.
