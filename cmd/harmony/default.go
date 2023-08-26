@@ -65,6 +65,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		RateLimterEnabled:  true,
 		RequestsPerSecond:  nodeconfig.DefaultRPCRateLimit,
 		EvmCallTimeout:     nodeconfig.DefaultEvmCallTimeout,
+		PreimagesEnabled:   false,
 	},
 	BLSKeys: harmonyconfig.BlsConfig{
 		KeyDir:   "./.hmy/blskeys",

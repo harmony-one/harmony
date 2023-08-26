@@ -92,6 +92,7 @@ func TestHarmonyFlags(t *testing.T) {
 					RateLimterEnabled:  true,
 					RequestsPerSecond:  1000,
 					EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+					PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 				},
 				WS: harmonyconfig.WsConfig{
 					Enabled:  true,
@@ -752,6 +753,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -766,6 +768,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -780,6 +783,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -794,6 +798,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -808,6 +813,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -822,6 +828,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -836,6 +843,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  2000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -850,6 +858,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  false,
 				RequestsPerSecond:  2000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -864,6 +873,22 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     "10s",
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
+			},
+		},
+
+		{
+			args: []string{"--rpc.preimages"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   true,
 			},
 		},
 	}

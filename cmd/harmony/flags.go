@@ -90,6 +90,7 @@ var (
 
 	rpcOptFlags = []cli.Flag{
 		rpcDebugEnabledFlag,
+		rpcPreimagesEnabledFlag,
 		rpcEthRPCsEnabledFlag,
 		rpcStakingRPCsEnabledFlag,
 		rpcLegacyRPCsEnabledFlag,
@@ -834,6 +835,12 @@ var (
 		DefValue: defaultConfig.RPCOpt.DebugEnabled,
 		Hidden:   true,
 	}
+	rpcPreimagesEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.preimages",
+		Usage:    "enable preimages export api",
+		DefValue: defaultConfig.RPCOpt.PreimagesEnabled,
+		Hidden:   true,	// not for end users
+	}
 
 	rpcEthRPCsEnabledFlag = cli.BoolFlag{
 		Name:     "rpc.eth",
@@ -885,6 +892,9 @@ var (
 func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
 		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcPreimagesEnabledFlag) {
+		config.RPCOpt.PreimagesEnabled = cli.GetBoolFlagValue(cmd, rpcPreimagesEnabledFlag)
 	}
 	if cli.IsFlagChanged(cmd, rpcEthRPCsEnabledFlag) {
 		config.RPCOpt.EthRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcEthRPCsEnabledFlag)
