@@ -200,7 +200,13 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 	}
 
-	// Prepare cross shard transaction receipts
+	// Prepare incoming cross shard transaction receipts
+	// These are accepted even during the epoch before hip-30
+	// because the destination shard only receives them after
+	// balance is deducted on source shard. to prevent this from
+	// being a significant problem, the source shards will stop
+	// accepting txs destined to the shards which are shutting down
+	// one epoch prior the shut down
 	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {
 		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
