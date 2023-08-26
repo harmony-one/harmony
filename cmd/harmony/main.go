@@ -23,7 +23,6 @@ import (
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
-	"github.com/harmony-one/harmony/rpc"
 
 	"github.com/harmony-one/harmony/api/service/crosslink_sending"
 	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
@@ -455,9 +454,9 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				genStart, _ := rawdb.ReadPreImageStartBlock(dbReader)
 				genEnd, _ := rawdb.ReadPreImageEndBlock(dbReader)
 				current := chain.CurrentBlock().NumberU64()
-				toGenStart, toGenEnd := rpc.FindMissingRange(imported, genStart, genEnd, current)
+				toGenStart, toGenEnd := core.FindMissingRange(imported, genStart, genEnd, current)
 				if toGenStart != 0 && toGenEnd != 0 {
-					if err := rpc.GeneratePreimages(
+					if err := core.GeneratePreimages(
 						chain, toGenStart, toGenEnd,
 					); err != nil {
 						fmt.Println("Error generating", err)
@@ -467,7 +466,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			}
 			os.Exit(0)
 		} else if exportPath := hc.Preimage.ExportTo; exportPath != "" {
-			if err := rpc.ExportPreimages(
+			if err := core.ExportPreimages(
 				currentNode.Blockchain(),
 				exportPath,
 			); err != nil {
@@ -486,7 +485,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				)
 				end = number
 			}
-			if err := rpc.GeneratePreimages(
+			if err := core.GeneratePreimages(
 				chain,
 				hc.Preimage.GenerateStart, end,
 			); err != nil {
