@@ -128,7 +128,7 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	if startingBlock == nil || startingState == nil {
 		return fmt.Errorf("no eligible starting block with state found")
 	}
-	
+
 	// now execute block T+1 based on starting state
 	for i := startingBlock.NumberU64() + 1; i <= end; i++ {
 		block := chain.GetBlockByNumber(i)
@@ -149,7 +149,7 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	// save information about generated pre-images start and end nbs
 	var gauge1, gauge2 uint64
 	var err error
-	if gauge1, gauge2, err = rawdb.WritePreImageStartEndBlock(chain.ChainDb(), startingBlock.NumberU64() + 1, end); err != nil {
+	if gauge1, gauge2, err = rawdb.WritePreImageStartEndBlock(chain.ChainDb(), startingBlock.NumberU64()+1, end); err != nil {
 		return fmt.Errorf("error writing pre-image gen blocks %s", err)
 	}
 	// add prometheus metrics as well
