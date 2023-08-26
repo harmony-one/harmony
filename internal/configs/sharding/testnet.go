@@ -3,6 +3,7 @@ package shardingconfig
 import (
 	"math/big"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
@@ -19,6 +20,8 @@ var feeCollectorsTestnet = FeeCollectors{
 	mustAddress("0xb728AEaBF60fD01816ee9e756c18bc01dC91ba5D"): numeric.MustNewDecFromStr("0.5"),
 	mustAddress("0xb41B6B8d9e68fD44caC8342BC2EEf4D59531d7d7"): numeric.MustNewDecFromStr("0.5"),
 }
+
+var hip30CollectionAddressTestnet = mustAddress("0x58dB8BeCe892F343350D125ff22B242784a8BA38")
 
 type testnetSchedule struct{}
 
@@ -39,6 +42,8 @@ const (
 
 func (ts testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.TestnetChainConfig.IsHIP30(epoch):
+		return testnetV5
 	case params.TestnetChainConfig.IsFeeCollectEpoch(epoch):
 		return testnetV4
 	case epoch.Cmp(shardReductionEpoch) >= 0:
@@ -121,9 +126,47 @@ var testnetReshardingEpoch = []*big.Int{
 }
 
 var (
-	testnetV0 = MustNewInstance(4, 8, 8, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-	testnetV1 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.70"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-	testnetV2 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-	testnetV3 = MustNewInstance(2, 30, 8, 0.15, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1, genesis.TNFoundationalAccounts, emptyAllowlist, nil, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-	testnetV4 = MustNewInstance(2, 30, 8, 0.15, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1, genesis.TNFoundationalAccounts, emptyAllowlist, feeCollectorsTestnet, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+	testnetV0 = MustNewInstance(
+		4, 8, 8, 0,
+		numeric.OneDec(), genesis.TNHarmonyAccounts,
+		genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+		numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV1 = MustNewInstance(
+		4, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.70"), genesis.TNHarmonyAccounts,
+		genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+		numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV2 = MustNewInstance(
+		4, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts,
+		genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+		numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV3 = MustNewInstance(
+		2, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1,
+		genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+		numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV4 = MustNewInstance(
+		2, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1,
+		genesis.TNFoundationalAccounts, emptyAllowlist,
+		feeCollectorsTestnet, numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV5 = MustNewInstance(
+		2, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1,
+		genesis.TNFoundationalAccounts, emptyAllowlist,
+		feeCollectorsTestnet, numeric.MustNewDecFromStr("0.25"),
+		hip30CollectionAddressTestnet, testnetReshardingEpoch,
+		TestnetSchedule.BlocksPerEpoch(),
+	)
 )
