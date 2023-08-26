@@ -447,7 +447,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				os.Exit(1)
 			}
 			os.Exit(0)
-		// both must be set
+			// both must be set
 		} else if hc.Preimage.GenerateStart > 0 && hc.Preimage.GenerateEnd > 0 {
 			// TODO
 		}

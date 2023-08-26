@@ -1541,7 +1541,7 @@ func TestPreimageFlags(t *testing.T) {
 		expErr    error
 	}{
 		{
-			args: []string{},
+			args:      []string{},
 			expConfig: nil,
 		},
 		{

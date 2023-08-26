@@ -839,7 +839,7 @@ var (
 		Name:     "rpc.preimages",
 		Usage:    "enable preimages export api",
 		DefValue: defaultConfig.RPCOpt.PreimagesEnabled,
-		Hidden:   true,	// not for end users
+		Hidden:   true, // not for end users
 	}
 
 	rpcEthRPCsEnabledFlag = cli.BoolFlag{
@@ -1675,8 +1675,8 @@ func applyRevertFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 var (
 	preimageImportFlag = cli.StringFlag{
-		Name: 	  "preimage.import",
-		Usage: 	  "Import pre-images from CSV file",
+		Name:     "preimage.import",
+		Usage:    "Import pre-images from CSV file",
 		Hidden:   true,
 		DefValue: defaultPreimageConfig.ImportFrom,
 	}

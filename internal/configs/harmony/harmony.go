@@ -289,7 +289,7 @@ type RpcOptConfig struct {
 	RateLimterEnabled  bool   // Enable Rate limiter for RPC
 	RequestsPerSecond  int    // for RPC rate limiter
 	EvmCallTimeout     string // Timeout for eth_call
-	PreimagesEnabled   bool	  // Expose preimage API
+	PreimagesEnabled   bool   // Expose preimage API
 }
 
 type DevnetConfig struct {
@@ -308,7 +308,7 @@ type RevertConfig struct {
 
 type PreimageConfig struct {
 	ImportFrom    string
-	ExportTo   	  string
+	ExportTo      string
 	GenerateStart uint64
 	GenerateEnd   uint64
 }
