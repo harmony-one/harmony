@@ -9,6 +9,8 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -121,8 +123,52 @@ func ExportPreimages(chain core.BlockChain, path string) error {
 }
 
 func GeneratePreimages(chain core.BlockChain, start, end uint64) error {
+	if start < 2 {
+		return fmt.Errorf("too low starting point %d", start)
+	}
 	// fetch all the blocks, from start and end both inclusive
 	// then execute them - the execution will write the pre-images
 	// to disk and we are good to go
+
+	// attempt to find a block number for which we have block and state
+	// with number < start
+	var startingState *state.DB
+	var startingBlock *types.Block
+	for i := start - 1; i > 0; i-- {
+		startingBlock = chain.GetBlockByNumber(i)
+		if startingBlock == nil {
+			// rewound too much in snapdb, so exit loop
+			// although this is only designed for s2/s3 nodes in mind
+			// which do not have such a snapdb
+			break
+		}
+		state, err := chain.StateAt(startingBlock.Root())
+		if err == nil {
+			continue
+		}
+		startingState = state
+		break
+	}
+	if startingBlock == nil || startingState == nil {
+		return fmt.Errorf("no eligible starting block with state found")
+	}
+	
+	// now execute block T+1 based on starting state
+	for i := startingBlock.NumberU64() + 1; i <= end; i++ {
+		block := chain.GetBlockByNumber(i)
+		if block == nil {
+			// because we have startingBlock we must have all following
+			return fmt.Errorf("block %d not found", i)
+		}
+		_, _, _, _, _, _, endingState, err := chain.Processor().Process(block, startingState, *chain.GetVMConfig(), false)
+		if err == nil {
+			return fmt.Errorf("error executing block #%d: %s", i, err)
+		}
+		startingState = endingState
+	}
+	// force any pre-images in memory so far to go to disk, if they haven't already
+	if err := chain.CommitPreimages(); err != nil {
+		return fmt.Errorf("error committing preimages %s", err)
+	}
 	return nil
 }

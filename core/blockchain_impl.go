@@ -3695,6 +3695,10 @@ func (bc *BlockChainImpl) InitTiKV(conf *harmonyconfig.TiKVConfig) {
 	go bc.tikvCleanCache()
 }
 
+func (bc *BlockChainImpl) CommitPreimages() error {
+	return bc.stateCache.TrieDB().CommitPreimages()
+}
+
 var (
 	leveldbErrSpec         = "leveldb"
 	tooManyOpenFilesErrStr = "Too many open files"

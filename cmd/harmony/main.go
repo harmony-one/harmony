@@ -449,7 +449,23 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			os.Exit(0)
 			// both must be set
 		} else if hc.Preimage.GenerateStart > 0 && hc.Preimage.GenerateEnd > 0 {
-			// TODO
+			chain := currentNode.Blockchain()
+			end := hc.Preimage.GenerateEnd
+			if number := chain.CurrentBlock().NumberU64(); number > end {
+				fmt.Printf(
+					"Cropping generate endpoint from %d to %d\n",
+					number, end,
+				)
+				end = number
+			}
+			if err := rpc.GeneratePreimages(
+				chain,
+				hc.Preimage.GenerateStart, end,
+			); err != nil {
+				fmt.Println("Error generating", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
 		}
 		os.Exit(0)
 	}
