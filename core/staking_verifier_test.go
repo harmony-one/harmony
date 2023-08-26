@@ -676,7 +676,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 				return msg
 			}(),
 
-			expErr: errCommissionRateChangeTooLow,
+			expErr: errCommissionRateChangeTooLowT,
 		},
 		{
 			// 15: Rate is ok within the promo period
