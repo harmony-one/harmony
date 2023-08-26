@@ -149,9 +149,9 @@ var (
 
 	CliqueSnapshotPrefix = []byte("clique-")
 
-	preImageImportKey = []byte("preimage-import")
+	preImageImportKey   = []byte("preimage-import")
 	preImageGenStartKey = []byte("preimage-gen-start")
-	preImageGenEndKey = []byte("preimage-gen-end")
+	preImageGenEndKey   = []byte("preimage-gen-end")
 )
 
 // LegacyTxLookupEntry is the legacy TxLookupEntry definition with some unnecessary

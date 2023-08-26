@@ -368,7 +368,7 @@ func newBlockChainWithOptions(
 	}
 
 	if cacheConfig.Preimages {
-		if _, _, err := rawdb.WritePreImageStartEndBlock(bc.ChainDb(), curHeader.NumberU64() + 1, 0); err != nil {
+		if _, _, err := rawdb.WritePreImageStartEndBlock(bc.ChainDb(), curHeader.NumberU64()+1, 0); err != nil {
 			return nil, errors.WithMessage(err, "failed to write pre-image start end blocks")
 		}
 	}
