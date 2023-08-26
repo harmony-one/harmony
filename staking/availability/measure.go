@@ -254,7 +254,7 @@ func UpdateMinimumCommissionFee(
 	// this can take decades of time without overflowing
 	first := firstElectionEpoch.Uint64()
 	election := electionEpoch.Uint64()
-	if first != 0 && election - first >= promoPeriod && election >= first {
+	if first != 0 && election-first >= promoPeriod && election >= first {
 		if wrapper.Rate.LT(minRate) {
 			utils.Logger().Info().
 				Str("addr", addr.Hex()).

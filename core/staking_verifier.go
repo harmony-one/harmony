@@ -180,11 +180,11 @@ func VerifyAndEditValidatorFromMsg(
 		promoPeriod := chainContext.Config().MinCommissionPromoPeriod.Int64()
 		if firstEpoch.Uint64() != 0 && big.NewInt(0).Sub(epoch, firstEpoch).Int64() >= promoPeriod {
 			return nil,
-			errors.Errorf(
-				"%s %d%%",
-				errCommissionRateChangeTooLowT,
-				minRate.MulInt64(100).Int64(),
-			)
+				errors.Errorf(
+					"%s %d%%",
+					errCommissionRateChangeTooLowT,
+					minRate.MulInt64(100).Int64(),
+				)
 		}
 	}
 
