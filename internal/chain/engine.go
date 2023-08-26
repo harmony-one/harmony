@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 
@@ -312,7 +313,7 @@ func (e *engineImpl) Finalize(
 
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	payout, err := AccumulateRewardsAndCountSigs(
+	remainder, payout, err := AccumulateRewardsAndCountSigs(
 		chain, state, header, beacon, sigsReady,
 	)
 	if err != nil {
@@ -332,6 +333,23 @@ func (e *engineImpl) Finalize(
 	// TODO: make the viewID fetch from caller of the block proposal.
 	header.SetViewID(new(big.Int).SetUint64(viewID()))
 
+	// Add the emission recovery split to the balance
+	if chain.Config().IsHIP30(header.Epoch()) {
+		// convert to ONE - note that numeric.Dec
+		// is designed for staking decimals and not
+		// ONE balances so we use big.Int for this math
+		remainderOne := new(big.Int).Div(
+			remainder.Int, big.NewInt(denominations.One),
+		)
+		// this goes directly to the balance (on shard 0, of course)
+		// because the reward mechanism isn't built to handle
+		// rewards not obtained from any delegations
+		state.AddBalance(
+			shard.Schedule.InstanceForEpoch(header.Epoch()).
+				HIP30RecoveryAddress(),
+			remainderOne,
+		)
+	}
 	// Finalize the state root
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
