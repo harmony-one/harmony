@@ -1693,7 +1693,7 @@ var (
 func applyPreimageFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.HasFlagsChanged(cmd, preimageFlags) {
 		cfg := getDefaultPreimageConfigCopy()
-		config.Preimage = cfg
+		config.Preimage = &cfg
 	}
 	if cli.IsFlagChanged(cmd, preimageImportFlag) {
 		config.Preimage.ImportFrom = cli.GetStringFlagValue(cmd, preimageImportFlag)

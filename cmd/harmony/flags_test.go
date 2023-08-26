@@ -1512,21 +1512,16 @@ func TestRevertFlags(t *testing.T) {
 func TestPreimageFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig harmonyconfig.PreimageConfig
+		expConfig *harmonyconfig.PreimageConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: harmonyconfig.PreimageConfig{
-				ImportFrom:    defaultPreimageConfig.ImportFrom,
-				ExportTo:      defaultPreimageConfig.ExportTo,
-				GenerateStart: defaultPreimageConfig.GenerateStart,
-				GenerateEnd:   defaultPreimageConfig.GenerateEnd,
-			},
+			expConfig: nil,
 		},
 		{
 			args: []string{"--preimage.import", "/path/to/source.csv"},
-			expConfig: harmonyconfig.PreimageConfig{
+			expConfig: &harmonyconfig.PreimageConfig{
 				ImportFrom:    "/path/to/source.csv",
 				ExportTo:      defaultPreimageConfig.ExportTo,
 				GenerateStart: defaultPreimageConfig.GenerateStart,
@@ -1535,7 +1530,7 @@ func TestPreimageFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--preimage.export", "/path/to/destination.csv"},
-			expConfig: harmonyconfig.PreimageConfig{
+			expConfig: &harmonyconfig.PreimageConfig{
 				ImportFrom:    defaultPreimageConfig.ImportFrom,
 				ExportTo:      "/path/to/destination.csv",
 				GenerateStart: defaultPreimageConfig.GenerateStart,
@@ -1544,7 +1539,7 @@ func TestPreimageFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--preimage.start", "1"},
-			expConfig: harmonyconfig.PreimageConfig{
+			expConfig: &harmonyconfig.PreimageConfig{
 				ImportFrom:    defaultPreimageConfig.ImportFrom,
 				ExportTo:      defaultPreimageConfig.ExportTo,
 				GenerateStart: 1,
@@ -1553,7 +1548,7 @@ func TestPreimageFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--preimage.end", "2"},
-			expConfig: harmonyconfig.PreimageConfig{
+			expConfig: &harmonyconfig.PreimageConfig{
 				ImportFrom:    defaultPreimageConfig.ImportFrom,
 				ExportTo:      defaultPreimageConfig.ExportTo,
 				GenerateStart: defaultPreimageConfig.GenerateStart,

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -21,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
+	"github.com/harmony-one/harmony/rpc"
 
 	"github.com/harmony-one/harmony/api/service/crosslink_sending"
 	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
@@ -30,6 +33,8 @@ import (
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -60,6 +65,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
+	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 // Host
@@ -374,6 +380,78 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				Msg("Revert finished.")
 			os.Exit(1)
 		}
+	}
+
+	//// code to handle pre-image export, import and generation
+	if hc.Preimage != nil {
+		if hc.Preimage.ImportFrom != "" {
+			reader, err := os.Open(hc.Preimage.ImportFrom)
+			if err != nil {
+				fmt.Println("Could not open file for reading", err)
+				os.Exit(1)
+			}
+			csvReader := csv.NewReader(reader)
+			chain := currentNode.Blockchain()
+			dbReader := chain.ChainDb()
+			for {
+				record, err := csvReader.Read()
+				if err == io.EOF {
+					fmt.Println("MyBlockNumber field missing, cannot proceed")
+					os.Exit(1)
+				}
+				if err != nil {
+					fmt.Println("Could not read from reader", err)
+					os.Exit(1)
+				}
+				// this means the address is a number
+				if blockNumber, err := strconv.ParseInt(record[1], 10, 64); err == nil {
+					if record[0] == "MyBlockNumber" {
+						// export blockNumber to prometheus
+						gauge := prom.NewGauge(
+							prom.GaugeOpts{
+								Namespace: "hmy",
+								Subsystem: "blockchain",
+								Name:      "last_preimage_import",
+								Help:      "the last known block for which preimages were imported",
+							},
+						)
+						prometheus.PromRegistry().MustRegister(
+							gauge,
+						)
+						gauge.Set(float64(blockNumber))
+						// this is the last record
+						break
+					}
+				}
+				key := ethCommon.BytesToHash([]byte(record[0]))
+				value := []byte(record[1])
+				// validate
+				if crypto.Keccak256Hash(value) != key {
+					fmt.Println("Data mismatch: skipping", record)
+					continue
+				}
+				// add to database
+				rawdb.WritePreimages(
+					dbReader, map[ethCommon.Hash][]byte{
+						key: value,
+					},
+				)
+			}
+			os.Exit(0)
+		} else if exportPath := hc.Preimage.ExportTo; exportPath != "" {
+			if err := rpc.ExportPreimages(
+				currentNode.Blockchain(),
+				exportPath,
+			); err != nil {
+				fmt.Println("Error exporting", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		// both must be set
+		} else if hc.Preimage.GenerateStart > 0 && hc.Preimage.GenerateEnd > 0 {
+			// TODO
+		}
+		os.Exit(0)
 	}
 
 	startMsg := "==== New Harmony Node ===="

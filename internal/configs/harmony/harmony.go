@@ -36,7 +36,7 @@ type HarmonyConfig struct {
 	DNSSync    DnsSync
 	ShardData  ShardDataConfig
 	GPO        GasPriceOracleConfig
-	Preimage   PreimageConfig
+	Preimage   *PreimageConfig
 }
 
 func (hc HarmonyConfig) ToRPCServerConfig() nodeconfig.RPCServerConfig {
