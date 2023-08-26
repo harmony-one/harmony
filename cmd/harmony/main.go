@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
+	"github.com/harmony-one/harmony/rpc"
 
 	"github.com/harmony-one/harmony/api/service/crosslink_sending"
 	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
