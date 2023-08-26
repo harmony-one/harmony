@@ -147,3 +147,41 @@ func DeleteValidatorCode(db ethdb.KeyValueWriter, hash common.Hash) {
 		utils.Logger().Error().Err(err).Msg("Failed to delete validator code")
 	}
 }
+
+func WritePreimageImportBlock(db ethdb.KeyValueWriter, number uint64) error {
+	return db.Put(preImageImportKey, encodeBlockNumber(number))
+}
+
+func ReadPreimageImportBlock(db ethdb.KeyValueReader) (uint64, error) {
+	val, err := db.Get(preImageImportKey)
+	if err != nil {
+		return 0, err
+	}
+	return decodeBlockNumber(val), nil
+}
+
+func WritePreImageStartEndBlock(db ethdb.KeyValueWriter, start, end uint64) error {
+	if err1 := db.Put(preImageGenStartKey, encodeBlockNumber(start)); err1 != nil {
+		return err1
+	}
+	if err2 := db.Put(preImageGenEndKey, encodeBlockNumber(end)); err2 != nil {
+		return err2
+	}
+	return nil
+}
+
+func ReadPreImageStartBlock(db ethdb.KeyValueReader) (uint64, error) {
+	val, err := db.Get(preImageGenStartKey)
+	if err != nil {
+		return 0, err
+	}
+	return decodeBlockNumber(val), nil
+}
+
+func ReadPreImageEndBlock(db ethdb.KeyValueReader) (uint64, error) {
+	val, err := db.Get(preImageGenEndKey)
+	if err != nil {
+		return 0, err
+	}
+	return decodeBlockNumber(val), nil
+}

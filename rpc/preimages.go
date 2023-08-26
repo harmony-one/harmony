@@ -7,6 +7,7 @@ import (
 	"os"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
@@ -14,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/utils"
+	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 type PreimagesService struct {
@@ -97,10 +99,8 @@ func ExportPreimages(chain core.BlockChain, path string) error {
 			address := ethCommon.BytesToAddress(preimage)
 			// key value format, so hash of value is first
 			csvWriter.Write([]string{
-				// no 0x prefix, stored as hash
 				fmt.Sprintf("%x", asHash.Bytes()),
-				// with 0x prefix, stored as bytes
-				address.Hex(),
+				fmt.Sprintf("%x", address.Bytes()),
 			})
 		}
 	}
@@ -170,5 +170,44 @@ func GeneratePreimages(chain core.BlockChain, start, end uint64) error {
 	if err := chain.CommitPreimages(); err != nil {
 		return fmt.Errorf("error committing preimages %s", err)
 	}
+	// save information about generated pre-images start and end nbs
+	toWrite := []uint64{0, 0}
+	existingStart, err := rawdb.ReadPreImageStartBlock(chain.ChainDb())
+	if err != nil || existingStart > startingBlock.NumberU64() + 1 {
+		toWrite[0] = startingBlock.NumberU64() + 1
+	} else {
+		toWrite[0] = existingStart
+	}
+	existingEnd, err := rawdb.ReadPreImageEndBlock(chain.ChainDb())
+	if err != nil || existingEnd < end {
+		toWrite[1] = end
+	} else {
+		toWrite[1] = existingEnd
+	}
+	if err := rawdb.WritePreImageStartEndBlock(chain.ChainDb(), toWrite[0], toWrite[1]); err != nil {
+		return fmt.Errorf("error writing pre-image gen blocks %s", err)
+	}
+	// add prometheus metrics as well
+	startGauge := prom.NewGauge(
+		prom.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "blockchain",
+			Name:      "preimage_start",
+			Help:      "the first block for which pre-image generation ran locally",
+		},
+	)
+	endGauge := prom.NewGauge(
+		prom.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "blockchain",
+			Name:      "preimage_end",
+			Help:      "the last block for which pre-image generation ran locally",
+		},
+	)
+	prometheus.PromRegistry().MustRegister(
+		startGauge, endGauge,
+	)
+	startGauge.Set(float64(toWrite[0]))
+	endGauge.Set(float64(toWrite[1]))
 	return nil
 }

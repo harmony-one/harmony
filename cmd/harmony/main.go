@@ -33,7 +33,6 @@ import (
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
@@ -50,6 +49,7 @@ import (
 	"github.com/harmony-one/harmony/common/ntp"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/hmy/downloader"
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/internal/common"
@@ -404,27 +404,38 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 					os.Exit(1)
 				}
 				// this means the address is a number
-				if blockNumber, err := strconv.ParseInt(record[1], 10, 64); err == nil {
+				if blockNumber, err := strconv.ParseUint(record[1], 10, 64); err == nil {
 					if record[0] == "MyBlockNumber" {
-						// export blockNumber to prometheus
-						gauge := prom.NewGauge(
-							prom.GaugeOpts{
-								Namespace: "hmy",
-								Subsystem: "blockchain",
-								Name:      "last_preimage_import",
-								Help:      "the last known block for which preimages were imported",
-							},
-						)
-						prometheus.PromRegistry().MustRegister(
-							gauge,
-						)
-						gauge.Set(float64(blockNumber))
+						// set this value in database, and prometheus, if needed
+						prev, err := rawdb.ReadPreimageImportBlock(dbReader)
+						if err != nil {
+							fmt.Println("No prior value found, overwriting")
+						}
+						if blockNumber > prev {
+							// export blockNumber to prometheus
+							gauge := prom.NewGauge(
+								prom.GaugeOpts{
+									Namespace: "hmy",
+									Subsystem: "blockchain",
+									Name:      "last_preimage_import",
+									Help:      "the last known block for which preimages were imported",
+								},
+							)
+							prometheus.PromRegistry().MustRegister(
+								gauge,
+							)
+							gauge.Set(float64(blockNumber))
+							if rawdb.WritePreimageImportBlock(dbReader, blockNumber) != nil {
+								fmt.Println("Error saving last import block", err)
+								os.Exit(1)
+							}
+						}
 						// this is the last record
 						break
 					}
 				}
-				key := ethCommon.BytesToHash([]byte(record[0]))
-				value := []byte(record[1])
+				key := ethCommon.HexToHash(record[0])
+				value := ethCommon.Hex2Bytes(record[1])
 				// validate
 				if crypto.Keccak256Hash(value) != key {
 					fmt.Println("Data mismatch: skipping", record)
