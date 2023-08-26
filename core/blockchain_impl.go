@@ -149,6 +149,7 @@ var defaultCacheConfig = &CacheConfig{
 	TrieTimeLimit:  5 * time.Minute,
 	SnapshotLimit:  256,
 	SnapshotWait:   true,
+	Preimages:      true,
 }
 
 type BlockChainImpl struct {
@@ -236,7 +237,7 @@ func NewBlockChainWithOptions(
 
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum validator and
-// Processor.
+// Processor. As of Aug-23, this is only used by tests
 func NewBlockChain(
 	db ethdb.Database, stateCache state.Database, beaconChain BlockChain, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
