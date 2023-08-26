@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
 
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
@@ -285,7 +286,7 @@ func (e *engineImpl) Finalize(
 		// depends on the old LastEpochInCommittee
 
 		startTime = time.Now()
-		if err := setElectionEpochAndMinFee(header, state, chain.Config()); err != nil {
+		if err := setElectionEpochAndMinFee(chain, header, state, chain.Config()); err != nil {
 			return nil, nil, err
 		}
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("SetElectionEpochAndMinFee")
@@ -390,12 +391,23 @@ func IsCommitteeSelectionBlock(chain engine.ChainReader, header *block.Header) b
 	return isBeaconChain && header.IsLastBlockInEpoch() && inPreStakingEra
 }
 
-func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *params.ChainConfig) error {
+func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, state *state.DB, config *params.ChainConfig) error {
 	newShardState, err := header.GetShardState()
 	if err != nil {
 		const msg = "[Finalize] failed to read shard state"
 		return errors.New(msg)
 	}
+	// these 2 should be created outside of loop to optimize
+	minRate := availability.MinCommissionRate(
+		config.IsMinCommissionRate(newShardState.Epoch),
+		config.IsHIP30(newShardState.Epoch),
+	)
+	minRateNotZero := !minRate.Equal(numeric.ZeroDec())
+	// elected validators have their fee updated, if required to do so
+	isElected := make(
+		map[common.Address]struct{},
+		len(newShardState.StakedValidators().Addrs),
+	)
 	for _, addr := range newShardState.StakedValidators().Addrs {
 		wrapper, err := state.ValidatorWrapper(addr, true, false)
 		if err != nil {
@@ -405,14 +417,32 @@ func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *pa
 		}
 		// Set last epoch in committee
 		wrapper.LastEpochInCommittee = newShardState.Epoch
-
-		if config.IsMinCommissionRate(newShardState.Epoch) {
-			// Set first election epoch
+		if minRateNotZero {
+			// Set first election epoch (applies only if previously unset)
 			state.SetValidatorFirstElectionEpoch(addr, newShardState.Epoch)
-
 			// Update minimum commission fee
-			if err := availability.UpdateMinimumCommissionFee(
-				newShardState.Epoch, state, addr, config.MinCommissionPromoPeriod.Int64(),
+			if _, err := availability.UpdateMinimumCommissionFee(
+				newShardState.Epoch, state, addr, minRate,
+				config.MinCommissionPromoPeriod.Uint64(),
+			); err != nil {
+				return err
+			}
+		}
+		isElected[addr] = struct{}{}
+	}
+	// due to a bug in the old implementation of the minimum fee,
+	// unelected validators did not have their fee updated even
+	// when the protocol required them to do so. here we fix it,
+	// but only after the HIP-30 hard fork is effective.
+	if config.IsHIP30(newShardState.Epoch) {
+		for _, addr := range chain.ValidatorCandidates() {
+			// skip elected validator
+			if _, ok := isElected[addr]; ok {
+				continue
+			}
+			if _, err := availability.UpdateMinimumCommissionFee(
+				newShardState.Epoch, state, addr, minRate,
+				config.MinCommissionPromoPeriod.Uint64(),
 			); err != nil {
 				return err
 			}
