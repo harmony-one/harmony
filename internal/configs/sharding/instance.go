@@ -37,8 +37,8 @@ type instance struct {
 	slotsLimit                      int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 	allowlist                       Allowlist
 	feeCollectors                   FeeCollectors
-	emissionFraction				numeric.Dec
-	recoveryAddress					ethCommon.Address
+	emissionFraction                numeric.Dec
+	recoveryAddress                 ethCommon.Address
 }
 
 type FeeCollectors map[ethCommon.Address]numeric.Dec
@@ -122,8 +122,8 @@ func NewInstance(
 		blocksPerEpoch:                  blocksE,
 		slotsLimit:                      slotsLimit,
 		feeCollectors:                   feeCollectors,
-		recoveryAddress: 				 recoveryAddress,
-		emissionFraction:    			 emissionFractionToRecovery,
+		recoveryAddress:                 recoveryAddress,
+		emissionFraction:                emissionFractionToRecovery,
 	}, nil
 }
 

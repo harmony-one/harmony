@@ -228,7 +228,7 @@ func (ms mainnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch), big.NewInt(mainnetV1_3Epoch), big.NewInt(mainnetV1_4Epoch), big.NewInt(mainnetV1_5Epoch), big.NewInt(mainnetV2_0Epoch), big.NewInt(mainnetV2_1Epoch), big.NewInt(mainnetV2_2Epoch), params.MainnetChainConfig.TwoSecondsEpoch, params.MainnetChainConfig.SixtyPercentEpoch, params.MainnetChainConfig.HIP6And8Epoch}
 
 var (
-	mainnetV0   = MustNewInstance(
+	mainnetV0 = MustNewInstance(
 		4, 150, 112, 0,
 		numeric.OneDec(), genesis.HarmonyAccounts,
 		genesis.FoundationalNodeAccounts, emptyAllowlist, nil,
@@ -263,7 +263,7 @@ var (
 		numeric.ZeroDec(), ethCommon.Address{},
 		mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld(),
 	)
-	mainnetV1   = MustNewInstance(
+	mainnetV1 = MustNewInstance(
 		4, 250, 170, 0,
 		numeric.OneDec(), genesis.HarmonyAccounts,
 		genesis.FoundationalNodeAccountsV1, emptyAllowlist, nil,
@@ -326,7 +326,7 @@ var (
 		numeric.ZeroDec(), ethCommon.Address{},
 		mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld(),
 	)
-	mainnetV3   = MustNewInstance(
+	mainnetV3 = MustNewInstance(
 		4, 250, 90, 0,
 		numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts,
 		genesis.FoundationalNodeAccountsV1_5, emptyAllowlist, nil,
