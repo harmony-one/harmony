@@ -71,7 +71,7 @@ type Int64Flag struct {
 	Usage      string
 	Deprecated string
 	Hidden     bool
-	DefValue int64
+	DefValue   int64
 }
 
 // RegisterTo register the int flag to FlagSet
