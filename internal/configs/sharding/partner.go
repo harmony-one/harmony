@@ -3,6 +3,7 @@ package shardingconfig
 import (
 	"math/big"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/numeric"
 
 	"github.com/harmony-one/harmony/internal/genesis"
@@ -92,7 +93,31 @@ var partnerReshardingEpoch = []*big.Int{
 	params.PartnerChainConfig.StakingEpoch,
 }
 
-var partnerV0 = MustNewInstance(2, 5, 5, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
-var partnerV1 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
-var partnerV2 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, feeCollectorsDevnet[0], partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
-var partnerV3 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, feeCollectorsDevnet[1], partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV0 = MustNewInstance(
+	2, 5, 5, 0,
+	numeric.OneDec(), genesis.TNHarmonyAccounts,
+	genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+	numeric.ZeroDec(), ethCommon.Address{},
+	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
+)
+var partnerV1 = MustNewInstance(
+	2, 5, 4, 0,
+	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
+	genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+	numeric.ZeroDec(), ethCommon.Address{},
+	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
+)
+var partnerV2 = MustNewInstance(
+	2, 5, 4, 0,
+	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
+	genesis.TNFoundationalAccounts, emptyAllowlist,
+	feeCollectorsDevnet[0], numeric.ZeroDec(), ethCommon.Address{},
+	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
+)
+var partnerV3 = MustNewInstance(
+	2, 5, 4, 0,
+	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
+	genesis.TNFoundationalAccounts, emptyAllowlist,
+	feeCollectorsDevnet[1], numeric.ZeroDec(), ethCommon.Address{},
+	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
+)

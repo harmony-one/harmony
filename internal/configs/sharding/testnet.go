@@ -3,6 +3,7 @@ package shardingconfig
 import (
 	"math/big"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
@@ -121,9 +122,39 @@ var testnetReshardingEpoch = []*big.Int{
 }
 
 var (
-	testnetV0 = MustNewInstance(4, 8, 8, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-	testnetV1 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.70"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-	testnetV2 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-	testnetV3 = MustNewInstance(2, 30, 8, 0.15, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1, genesis.TNFoundationalAccounts, emptyAllowlist, nil, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-	testnetV4 = MustNewInstance(2, 30, 8, 0.15, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1, genesis.TNFoundationalAccounts, emptyAllowlist, feeCollectorsTestnet, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+	testnetV0 = MustNewInstance(
+		4, 8, 8, 0,
+		numeric.OneDec(), genesis.TNHarmonyAccounts,
+		genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+		numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV1 = MustNewInstance(
+		4, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.70"), genesis.TNHarmonyAccounts,
+		genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+		numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV2 = MustNewInstance(
+		4, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts,
+		genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+		numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV3 = MustNewInstance(
+		2, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1,
+		genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+		numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV4 = MustNewInstance(
+		2, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1,
+		genesis.TNFoundationalAccounts, emptyAllowlist,
+		feeCollectorsTestnet, numeric.ZeroDec(), ethCommon.Address{},
+		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
 )

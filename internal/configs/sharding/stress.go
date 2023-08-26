@@ -3,6 +3,7 @@ package shardingconfig
 import (
 	"math/big"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/numeric"
 
 	"github.com/harmony-one/harmony/internal/genesis"
@@ -78,6 +79,24 @@ var stressnetReshardingEpoch = []*big.Int{
 	params.StressnetChainConfig.StakingEpoch,
 }
 
-var stressnetV0 = MustNewInstance(2, 10, 10, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
-var stressnetV1 = MustNewInstance(2, 30, 10, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
-var stressnetV2 = MustNewInstance(2, 30, 10, 0, numeric.MustNewDecFromStr("0.6"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, nil, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
+var stressnetV0 = MustNewInstance(
+	2, 10, 10, 0,
+	numeric.OneDec(), genesis.TNHarmonyAccounts,
+	genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+	numeric.ZeroDec(), ethCommon.Address{},
+	stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch(),
+)
+var stressnetV1 = MustNewInstance(
+	2, 30, 10, 0,
+	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
+	genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+	numeric.ZeroDec(), ethCommon.Address{},
+	stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch(),
+)
+var stressnetV2 = MustNewInstance(
+	2, 30, 10, 0,
+	numeric.MustNewDecFromStr("0.6"), genesis.TNHarmonyAccounts,
+	genesis.TNFoundationalAccounts, emptyAllowlist, nil,
+	numeric.ZeroDec(), ethCommon.Address{},
+	stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch(),
+)
