@@ -22,6 +22,9 @@ var feeCollectorsLocalnet = FeeCollectors{
 	mustAddress("0x1563915e194D8CfBA1943570603F7606A3115508"): numeric.MustNewDecFromStr("0.5"),
 }
 
+// pk: 0x3333333333333333333333333333333333333333333333333333333333333333
+var hip30CollectionAddressLocalnet = mustAddress("0x5CbDd86a2FA8Dc4bDdd8a8f69dBa48572EeC07FB")
+
 type localnetSchedule struct{}
 
 const (
@@ -36,6 +39,8 @@ const (
 
 func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.LocalnetChainConfig.IsHIP30(epoch):
+		return localnetV4
 	case params.LocalnetChainConfig.IsFeeCollectEpoch(epoch):
 		return localnetV3_2
 	case params.LocalnetChainConfig.IsSixtyPercent(epoch):
@@ -201,6 +206,13 @@ var (
 		genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2,
 		emptyAllowlist, feeCollectorsLocalnet,
 		numeric.ZeroDec(), ethCommon.Address{},
+		localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch(),
+	)
+	localnetV4 = MustNewInstance(
+		2, 9, 6, 0, numeric.MustNewDecFromStr("0.68"),
+		genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2,
+		emptyAllowlist, feeCollectorsLocalnet,
+		numeric.MustNewDecFromStr("0.25"), hip30CollectionAddressLocalnet,
 		localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch(),
 	)
 )
