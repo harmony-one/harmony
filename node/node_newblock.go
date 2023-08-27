@@ -170,11 +170,11 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				return nil, err
 			}
 			var (
-				blockIsEmpty     = len(pendingPoolTxs) == 0
-				featureActivated = blockchain.Config().IsOneSecond(header.Epoch())
-				notTooLong       = started.Add(maxBlockTimeout).After(time.Now()) // we can delay block creation for maxBlockTimeout
+				featureIsActivated = blockchain.Config().IsOneSecond(header.Epoch())
+				blockIsEmpty       = len(pendingPoolTxs) == 0
+				notTooLong         = started.Add(maxBlockTimeout).After(time.Now()) // we can delay block creation for maxBlockTimeout
 			)
-			if blockIsEmpty && featureActivated && notTooLong {
+			if featureIsActivated && blockIsEmpty && notTooLong {
 				// then we can skip block creating and wait for more transactions
 				<-time.After(250 * time.Millisecond)
 				continue

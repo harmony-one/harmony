@@ -167,3 +167,6 @@ docker:
 
 travis_go_checker:
 	bash ./scripts/travis_go_checker.sh
+
+travis_rpc_checker:
+	bash ./scripts/travis_rpc_checker.sh

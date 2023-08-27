@@ -664,7 +664,7 @@ func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
 	return isForked(c.TwoSecondsEpoch, epoch)
 }
 
-// IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
+// IsOneSecond determines whether it is the epoch to change to 1 seconds block time
 func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
 	return isForked(c.OneSecondEpoch, epoch)
 }
