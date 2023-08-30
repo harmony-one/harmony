@@ -749,7 +749,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		next     *bls.PublicKeyWrapper
 	)
 	if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch, consensus.ShardID) {
-		wasFound, next = consensus.Decider.NthNext(leader, 1)
+		wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, 1)
 	} else {
 		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
 	}
