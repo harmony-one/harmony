@@ -37,6 +37,8 @@ type instance struct {
 	slotsLimit                      int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 	allowlist                       Allowlist
 	feeCollectors                   FeeCollectors
+	emissionFraction                numeric.Dec
+	recoveryAddress                 ethCommon.Address
 }
 
 type FeeCollectors map[ethCommon.Address]numeric.Dec
@@ -44,11 +46,17 @@ type FeeCollectors map[ethCommon.Address]numeric.Dec
 // NewInstance creates and validates a new sharding configuration based
 // upon given parameters.
 func NewInstance(
-	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit int, harmonyVotePercent numeric.Dec,
+	numShards uint32,
+	numNodesPerShard,
+	numHarmonyOperatedNodesPerShard,
+	slotsLimit int,
+	harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	allowlist Allowlist,
 	feeCollectors FeeCollectors,
+	emissionFractionToRecovery numeric.Dec,
+	recoveryAddress ethCommon.Address,
 	reshardingEpoch []*big.Int, blocksE uint64,
 ) (Instance, error) {
 	if numShards < 1 {
@@ -94,6 +102,12 @@ func NewInstance(
 			)
 		}
 	}
+	if emissionFractionToRecovery.LT(numeric.ZeroDec()) ||
+		emissionFractionToRecovery.GT(numeric.OneDec()) {
+		return nil, errors.Errorf(
+			"emission split must be within [0, 1]",
+		)
+	}
 
 	return instance{
 		numShards:                       numShards,
@@ -108,6 +122,8 @@ func NewInstance(
 		blocksPerEpoch:                  blocksE,
 		slotsLimit:                      slotsLimit,
 		feeCollectors:                   feeCollectors,
+		recoveryAddress:                 recoveryAddress,
+		emissionFraction:                emissionFractionToRecovery,
 	}, nil
 }
 
@@ -122,12 +138,16 @@ func MustNewInstance(
 	fnAccounts []genesis.DeployAccount,
 	allowlist Allowlist,
 	feeCollectors FeeCollectors,
+	emissionFractionToRecovery numeric.Dec,
+	recoveryAddress ethCommon.Address,
 	reshardingEpoch []*big.Int, blocksPerEpoch uint64,
 ) Instance {
 	slotsLimit := int(float32(numNodesPerShard-numHarmonyOperatedNodesPerShard) * slotsLimitPercent)
 	sc, err := NewInstance(
-		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit, harmonyVotePercent,
-		hmyAccounts, fnAccounts, allowlist, feeCollectors, reshardingEpoch, blocksPerEpoch,
+		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard,
+		slotsLimit, harmonyVotePercent, hmyAccounts, fnAccounts,
+		allowlist, feeCollectors, emissionFractionToRecovery,
+		recoveryAddress, reshardingEpoch, blocksPerEpoch,
 	)
 	if err != nil {
 		panic(err)
@@ -222,4 +242,12 @@ func (sc instance) ExternalAllowlist() []bls.PublicKeyWrapper {
 // ExternalAllowlistLimit returns the maximum number of external leader keys on each shard
 func (sc instance) ExternalAllowlistLimit() int {
 	return sc.allowlist.MaxLimitPerShard
+}
+
+func (sc instance) HIP30RecoveryAddress() ethCommon.Address {
+	return sc.recoveryAddress
+}
+
+func (sc instance) HIP30EmissionFraction() numeric.Dec {
+	return sc.emissionFraction
 }

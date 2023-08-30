@@ -73,6 +73,7 @@ var (
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(1535), // 2023-07-20 05:51:07+00:00
+		HIP30Epoch:                             EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -114,6 +115,7 @@ var (
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(1296), // 2023-04-28 07:14:20+00:00
+		HIP30Epoch:                             EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -155,6 +157,7 @@ var (
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        EpochTBD,
 		ValidatorCodeFixEpoch:                  EpochTBD,
+		HIP30Epoch:                             EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -197,6 +200,7 @@ var (
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(848), // 2023-04-28 04:33:33+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(848),
+		HIP30Epoch:                             EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -239,6 +243,7 @@ var (
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		ValidatorCodeFixEpoch:                  EpochTBD,
+		HIP30Epoch:                             EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -280,6 +285,7 @@ var (
 		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
 		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  big.NewInt(2),
+		HIP30Epoch:                             EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -323,6 +329,7 @@ var (
 		big.NewInt(1),                      // LeaderRotationExternalBeaconLeaders
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
+		big.NewInt(0),                      // HIP30Epoch
 	}
 
 	// TestChainConfig ...
@@ -366,6 +373,7 @@ var (
 		big.NewInt(1),        // LeaderRotationExternalBeaconLeaders
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
+		big.NewInt(0),        // HIP30Epoch
 	}
 
 	// TestRules ...
@@ -522,6 +530,13 @@ type ChainConfig struct {
 	// Contracts can check the (presence of) validator code by calling the following:
 	// extcodesize, extcodecopy and extcodehash.
 	ValidatorCodeFixEpoch *big.Int `json:"validator-code-fix-epoch,omitempty"`
+
+	// The epoch at which HIP30 goes into effect.
+	// 1. Number of shards decrease from 4 to 2 (mainnet and localnet)
+	// 2. Split emission into 75% for staking rewards, and 25% for recovery (all nets)
+	// 3. Change from 250 to 200 nodes for remaining shards (mainnet and localnet)
+	// 4. Change the minimum validator commission from 5 to 7% (all nets)
+	HIP30Epoch *big.Int `json:"hip30-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -548,6 +563,10 @@ func (c *ChainConfig) mustValid() {
 			panic(err)
 		}
 	}
+	// to ensure at least RewardFrequency blocks have passed
+	require(c.AggregatedRewardEpoch.Cmp(common.Big0) > 0,
+		"must satisfy: AggregatedRewardEpoch > 0",
+	)
 	// before staking epoch, fees were sent to coinbase
 	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0,
 		"must satisfy: FeeCollectEpoch >= StakingEpoch")
@@ -567,6 +586,22 @@ func (c *ChainConfig) mustValid() {
 	// we accept validator creation transactions starting at PreStakingEpoch
 	require(c.ValidatorCodeFixEpoch.Cmp(c.PreStakingEpoch) >= 0,
 		"must satisfy: ValidatorCodeFixEpoch >= PreStakingEpoch")
+	// staking epoch must pass for validator count reduction
+	require(c.HIP30Epoch.Cmp(c.StakingEpoch) > 0,
+		"must satisfy: HIP30Epoch > StakingEpoch")
+	// min commission increase 2.0 must happen on or after 1.0
+	require(c.HIP30Epoch.Cmp(c.MinCommissionRateEpoch) >= 0,
+		"must satisfy: HIP30Epoch > MinCommissionRateEpoch")
+	// the HIP30 split distribution of rewards is only implemented
+	// for the post aggregated epoch
+	require(c.HIP30Epoch.Cmp(c.AggregatedRewardEpoch) >= 0,
+		"must satisfy: HIP30Epoch >= MinCommissionRateEpoch")
+	// the migration of shard 2 and 3 balances assumes S3
+	require(c.HIP30Epoch.Cmp(c.S3Epoch) >= 0,
+		"must satisfy: HIP30Epoch >= S3Epoch")
+	// capabilities required to transfer balance across shards
+	require(c.HIP30Epoch.Cmp(c.CrossTxEpoch) > 0,
+		"must satisfy: HIP30Epoch > CrossTxEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -754,6 +789,16 @@ func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsValidatorCodeFix(epoch *big.Int) bool {
 	return isForked(c.ValidatorCodeFixEpoch, epoch)
+}
+
+func (c *ChainConfig) IsHIP30(epoch *big.Int) bool {
+	return isForked(c.HIP30Epoch, epoch)
+}
+
+// During this epoch, shards 2 and 3 will start sending
+// their balances over to shard 0 or 1.
+func (c *ChainConfig) IsEpochBeforeHIP30(epoch *big.Int) bool {
+	return isForked(new(big.Int).Sub(c.HIP30Epoch, common.Big1), epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
