@@ -331,7 +331,7 @@ var (
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 		big.NewInt(0),                      // HIP30Epoch
-		big.NewInt(0), //
+		big.NewInt(0),                      // OneSecondEpoch
 	}
 
 	// TestChainConfig ...
