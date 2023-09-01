@@ -210,6 +210,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 				return nil, err
 			}
+			break
 		}
 	}
 
