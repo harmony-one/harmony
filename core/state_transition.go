@@ -40,7 +40,7 @@ var (
 	errNoDelegationToUndelegate    = errors.New("no delegation to undelegate")
 	errCommissionRateChangeTooFast = errors.New("change on commission rate can not be more than max change rate within the same epoch")
 	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than maximum commission rate")
-	errCommissionRateChangeTooLow  = errors.New("commission rate can not be lower than min rate of 5%")
+	errCommissionRateChangeTooLowT = errors.New("commission rate can not be lower than min rate of ")
 	errNoRewardsToCollect          = errors.New("no rewards to collect")
 	errNegativeAmount              = errors.New("amount can not be negative")
 	errDupIdentity                 = errors.New("validator identity exists")

@@ -171,11 +171,20 @@ func VerifyAndEditValidatorFromMsg(
 		return nil, errCommissionRateChangeTooHigh
 	}
 
-	if chainContext.Config().IsMinCommissionRate(epoch) && newRate.LT(availability.MinCommissionRate) {
+	minRate := availability.MinCommissionRate(
+		chainContext.Config().IsMinCommissionRate(epoch),
+		chainContext.Config().IsHIP30(epoch),
+	)
+	if newRate.LT(minRate) {
 		firstEpoch := stateDB.GetValidatorFirstElectionEpoch(msg.ValidatorAddress)
 		promoPeriod := chainContext.Config().MinCommissionPromoPeriod.Int64()
 		if firstEpoch.Uint64() != 0 && big.NewInt(0).Sub(epoch, firstEpoch).Int64() >= promoPeriod {
-			return nil, errCommissionRateChangeTooLow
+			return nil,
+				errors.Errorf(
+					"%s %d%%",
+					errCommissionRateChangeTooLowT,
+					minRate.MulInt64(100).Int64(),
+				)
 		}
 	}
 
