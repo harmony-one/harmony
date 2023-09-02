@@ -21,6 +21,8 @@ var feeCollectorsTestnet = FeeCollectors{
 	mustAddress("0xb41B6B8d9e68fD44caC8342BC2EEf4D59531d7d7"): numeric.MustNewDecFromStr("0.5"),
 }
 
+var hip30CollectionAddressTestnet = mustAddress("0x58dB8BeCe892F343350D125ff22B242784a8BA38")
+
 type testnetSchedule struct{}
 
 const (
@@ -40,6 +42,8 @@ const (
 
 func (ts testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.TestnetChainConfig.IsHIP30(epoch):
+		return testnetV5
 	case params.TestnetChainConfig.IsFeeCollectEpoch(epoch):
 		return testnetV4
 	case epoch.Cmp(shardReductionEpoch) >= 0:
@@ -156,5 +160,14 @@ var (
 		genesis.TNFoundationalAccounts, emptyAllowlist,
 		feeCollectorsTestnet, numeric.ZeroDec(), ethCommon.Address{},
 		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
+	)
+
+	testnetV5 = MustNewInstance(
+		2, 30, 8, 0.15,
+		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1,
+		genesis.TNFoundationalAccounts, emptyAllowlist,
+		feeCollectorsTestnet, numeric.MustNewDecFromStr("0.25"),
+		hip30CollectionAddressTestnet, testnetReshardingEpoch,
+		TestnetSchedule.BlocksPerEpoch(),
 	)
 )

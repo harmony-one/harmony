@@ -108,6 +108,20 @@ func NewInstance(
 			"emission split must be within [0, 1]",
 		)
 	}
+	if !emissionFractionToRecovery.Equal(numeric.ZeroDec()) {
+		if recoveryAddress == (ethCommon.Address{}) {
+			return nil, errors.Errorf(
+				"have non-zero emission split but no target address",
+			)
+		}
+	}
+	if recoveryAddress != (ethCommon.Address{}) {
+		if emissionFractionToRecovery.Equal(numeric.ZeroDec()) {
+			return nil, errors.Errorf(
+				"have target address but no emission split",
+			)
+		}
+	}
 
 	return instance{
 		numShards:                       numShards,

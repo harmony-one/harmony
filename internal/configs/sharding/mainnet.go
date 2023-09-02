@@ -54,8 +54,8 @@ var (
 		mustAddress("0xbdFeE8587d347Cd8df002E6154763325265Fa84c"): numeric.MustNewDecFromStr("0.5"),
 	}
 
-	hip30CollectionAddress = ethCommon.Address{}
-	// hip30CollectionAddress = mustAddress("0xMustAddress")
+	// Emission DAO
+	hip30CollectionAddress = mustAddress("0xD8194284df879f465ed61DBA6fa8300940cacEA3")
 )
 
 func mustAddress(addrStr string) ethCommon.Address {
