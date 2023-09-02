@@ -75,7 +75,8 @@ type ParticipantTracker interface {
 	Participants() multibls.PublicKeys
 	IndexOf(bls.SerializedPublicKey) int
 	ParticipantsCount() int64
-	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
+	// NthNextValidator returns key for next validator. It assumes external validators and leader rotation.
+	NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmyExt(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
@@ -217,7 +218,42 @@ func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bl
 	return found, &s.publicKeys[idx]
 }
 
-// NthNextHmy return the Nth next pubkey of Harmony nodes, next can be negative number
+// NthNextValidator return the Nth next pubkey nodes, but from another validator.
+func (s *cIdentities) NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+	found := false
+
+	if len(s.publicKeys) == 0 {
+		return false, pubKey
+	}
+	if next < 0 {
+		return false, pubKey
+	}
+
+	publicToAddress := make(map[bls.SerializedPublicKey]common.Address)
+	for _, slot := range slotList {
+		publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
+	}
+
+	idx := s.IndexOf(pubKey.Bytes)
+	if idx != -1 {
+		found = true
+	} else {
+		utils.Logger().Error().
+			Str("key", pubKey.Bytes.Hex()).
+			Msg("[NthNextHmy] pubKey not found")
+	}
+	for {
+		numNodes := len(s.publicKeys)
+		idx = (idx + next) % numNodes
+		if publicToAddress[s.publicKeys[idx].Bytes] == publicToAddress[pubKey.Bytes] {
+			// same validator, go next
+			idx++
+			continue
+		}
+		return found, &s.publicKeys[idx]
+	}
+}
+
 func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
@@ -410,7 +446,7 @@ func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 	return ballots
 }
 
-func newBallotsBackedSignatureReader() *cIdentities {
+func newCIdentities() *cIdentities {
 	return &cIdentities{
 		publicKeys:  []bls.PublicKeyWrapper{},
 		keyIndexMap: map[bls.SerializedPublicKey]int{},
@@ -418,6 +454,10 @@ func newBallotsBackedSignatureReader() *cIdentities {
 		commit:      votepower.NewRound(),
 		viewChange:  votepower.NewRound(),
 	}
+}
+
+func newBallotsBackedSignatureReader() *cIdentities {
+	return newCIdentities()
 }
 
 // NewDecider ..
