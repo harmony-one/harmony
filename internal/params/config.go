@@ -285,7 +285,7 @@ var (
 		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
 		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  big.NewInt(2),
-		HIP30Epoch:                             EpochTBD,
+		HIP30Epoch:                             big.NewInt(3),
 	}
 
 	// AllProtocolChanges ...
