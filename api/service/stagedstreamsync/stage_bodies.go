@@ -187,12 +187,6 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 			gbm.HandleRequestError(batch, err, stid)
 			b.configs.protocol.RemoveStream(stid)
 		} else {
-			if b.configs.extractReceiptHashes {
-				if err = b.verifyBlockAndExtractReceiptsData(blockBytes, sigBytes, s); err != nil {
-					gbm.HandleRequestError(batch, err, stid)
-					continue
-				}
-			}
 			if err = b.saveBlocks(ctx, gbm.tx, batch, blockBytes, sigBytes, loopID, stid); err != nil {
 				panic(ErrSaveBlocksToDbFailed)
 			}
@@ -231,10 +225,9 @@ func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte
 			block.SetCurrentCommitSig(sigBytes)
 		}
 
-		if block.NumberU64() != i {
-			return ErrInvalidBlockNumber
-		}
-
+		// if block.NumberU64() != i {
+		// 	return ErrInvalidBlockNumber
+		// }
 		if err := verifyBlock(b.configs.bc, block); err != nil {
 			return err
 		}
