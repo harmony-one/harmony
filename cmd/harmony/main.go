@@ -412,6 +412,10 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 							fmt.Println("No prior value found, overwriting")
 						}
 						if blockNumber > prev {
+							if rawdb.WritePreimageImportBlock(dbReader, blockNumber) != nil {
+								fmt.Println("Error saving last import block", err)
+								os.Exit(1)
+							}
 							// export blockNumber to prometheus
 							gauge := prom.NewGauge(
 								prom.GaugeOpts{
@@ -425,10 +429,6 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 								gauge,
 							)
 							gauge.Set(float64(blockNumber))
-							if rawdb.WritePreimageImportBlock(dbReader, blockNumber) != nil {
-								fmt.Println("Error saving last import block", err)
-								os.Exit(1)
-							}
 						}
 						// this is the last record
 						imported = blockNumber
