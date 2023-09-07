@@ -160,7 +160,7 @@ func (w *Worker) CommitTransactions(
 	// but the balance will immediately be returned to shard 1
 	cx, err := core.MayBalanceMigration(
 		w.current.gasPool,
-		w.beacon.CurrentHeader(),
+		w.chain.CurrentHeader(),
 		w.current.state,
 		w.chain,
 		w.chain.Config(),

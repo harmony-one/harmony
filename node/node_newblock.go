@@ -255,7 +255,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 					len(crossLinksToPropose), len(allPending),
 				)
 		} else {
-			utils.Logger().Error().Err(err).Msgf(
+			utils.Logger().Warn().Err(err).Msgf(
 				"[ProposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
 				len(allPending),
 			)
