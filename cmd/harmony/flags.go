@@ -378,6 +378,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, sysFlags...)
 	flags = append(flags, devnetFlags...)
 	flags = append(flags, revertFlags...)
+	flags = append(flags, preimageFlags...)
 	flags = append(flags, legacyMiscFlags...)
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
