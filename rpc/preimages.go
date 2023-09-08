@@ -32,7 +32,7 @@ func (s *PreimagesService) Generate(ctx context.Context, start, end uint64) erro
 	if number := s.hmy.CurrentBlock().NumberU64(); number > end {
 		fmt.Printf(
 			"Cropping generate endpoint from %d to %d\n",
-			number, end,
+			end, number,
 		)
 		end = number
 	}
