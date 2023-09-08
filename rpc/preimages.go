@@ -32,6 +32,7 @@ func (s *PreimagesService) Export(ctx context.Context, path string) error {
 	return core.ExportPreimages(s.hmy.BlockChain, path)
 }
 func (s *PreimagesService) Generate(ctx context.Context, start, end uint64) error {
+	fmt.Printf("Generating preimage from block %d to %d\n", start, end)
 	if number := s.hmy.CurrentBlock().NumberU64(); number > end {
 		fmt.Printf(
 			"Cropping generate endpoint from %d to %d\n",
