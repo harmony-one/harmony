@@ -3,7 +3,11 @@ package core
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
+	"strconv"
+
+	"github.com/ethereum/go-ethereum/crypto"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/api/service/prometheus"
@@ -13,6 +17,86 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	prom "github.com/prometheus/client_golang/prometheus"
 )
+
+// ImportPreimages is public so `main.go` can call it directly`
+func ImportPreimages(chain BlockChain, path string) error {
+	reader, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("could not open file for reading: %s", err)
+	}
+	csvReader := csv.NewReader(reader)
+	dbReader := chain.ChainDb()
+	imported := uint64(0)
+	for {
+		record, err := csvReader.Read()
+		if err == io.EOF {
+			return fmt.Errorf("MyBlockNumber field missing, cannot proceed")
+		}
+		if err != nil {
+			return fmt.Errorf("could not read from reader: %s", err)
+		}
+		// this means the address is a number
+		if blockNumber, err := strconv.ParseUint(record[1], 10, 64); err == nil {
+			if record[0] == "MyBlockNumber" {
+				// set this value in database, and prometheus, if needed
+				prev, err := rawdb.ReadPreimageImportBlock(dbReader)
+				if err != nil {
+					return fmt.Errorf("no prior value found, overwriting: %s", err)
+				}
+				if blockNumber > prev {
+					if rawdb.WritePreimageImportBlock(dbReader, blockNumber) != nil {
+						return fmt.Errorf("error saving last import block: %s", err)
+					}
+					// export blockNumber to prometheus
+					gauge := prom.NewGauge(
+						prom.GaugeOpts{
+							Namespace: "hmy",
+							Subsystem: "blockchain",
+							Name:      "last_preimage_import",
+							Help:      "the last known block for which preimages were imported",
+						},
+					)
+					prometheus.PromRegistry().MustRegister(
+						gauge,
+					)
+					gauge.Set(float64(blockNumber))
+				}
+				// this is the last record
+				imported = blockNumber
+				break
+			}
+		}
+		key := ethCommon.HexToHash(record[0])
+		value := ethCommon.Hex2Bytes(record[1])
+		// validate
+		if crypto.Keccak256Hash(value) != key {
+			fmt.Println("Data mismatch: skipping", record)
+			continue
+		}
+		// add to database
+		_ = rawdb.WritePreimages(
+			dbReader, map[ethCommon.Hash][]byte{
+				key: value,
+			},
+		)
+	}
+	// now, at this point, we will have to generate missing pre-images
+	if imported != 0 {
+		genStart, _ := rawdb.ReadPreImageStartBlock(dbReader)
+		genEnd, _ := rawdb.ReadPreImageEndBlock(dbReader)
+		current := chain.CurrentBlock().NumberU64()
+		toGenStart, toGenEnd := FindMissingRange(imported, genStart, genEnd, current)
+		if toGenStart != 0 && toGenEnd != 0 {
+			if err := GeneratePreimages(
+				chain, toGenStart, toGenEnd,
+			); err != nil {
+				return fmt.Errorf("error generating: %s", err)
+			}
+		}
+	}
+
+	return nil
+}
 
 // ExportPreimages is public so `main.go` can call it directly`
 func ExportPreimages(chain BlockChain, path string) error {
