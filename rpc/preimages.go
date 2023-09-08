@@ -37,6 +37,14 @@ func (s *PreimagesService) Generate(ctx context.Context, start, end uint64) erro
 		)
 		end = number
 	}
+
+	if start >= end {
+		fmt.Printf(
+			"Cropping generate startpoint from %d to %d\n",
+			start, end-100,
+		)
+		start = end - 100
+	}
 	// these are by default not blocking
 	return core.GeneratePreimages(s.hmy.BlockChain, start, end)
 }
