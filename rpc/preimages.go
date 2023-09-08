@@ -31,6 +31,10 @@ func (s *PreimagesService) Export(_ context.Context, path string) error {
 	// these are by default not blocking
 	return core.ExportPreimages(s.hmy.BlockChain, path)
 }
+func (s *PreimagesService) Import(_ context.Context, path string) error {
+	// these are by default not blocking
+	return core.ImportPreimages(s.hmy.BlockChain, path)
+}
 func (s *PreimagesService) Generate(_ context.Context, start, end rpc.BlockNumber) error {
 	// earliestBlock: the number of blocks in the past where you can generate the preimage from the last block
 	earliestBlock := uint64(10) // TODO: change it for the actual value
