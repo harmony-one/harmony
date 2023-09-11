@@ -540,7 +540,7 @@ type ChainConfig struct {
 	// 4. Change the minimum validator commission from 5 to 7% (all nets)
 	HIP30Epoch *big.Int `json:"hip30-epoch,omitempty"`
 
-	BlockGas30M *big.Int `json:"block-gas-30m,omitempty"`
+	BlockGas30MEpoch *big.Int `json:"block-gas-30m-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -777,7 +777,7 @@ func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
 }
 
 func (c *ChainConfig) IsBlockGas30M(epoch *big.Int) bool {
-	return isForked(c.BlockGas30M, epoch)
+	return isForked(c.BlockGas30MEpoch, epoch)
 }
 
 func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int, shardID uint32) bool {
