@@ -224,7 +224,9 @@ func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uin
 		}
 	} else {
 		// Mainnet (other nets):
-		if bc.Config().IsTwoSeconds(epoch) {
+		if bc.Config().IsHIP30(epoch) {
+			defaultReward = stakingReward.HIP30StakedBlocks
+		} else if bc.Config().IsTwoSeconds(epoch) {
 			defaultReward = stakingReward.TwoSecStakedBlocks
 		} else if bc.Config().IsFiveSeconds(epoch) {
 			defaultReward = stakingReward.FiveSecStakedBlocks

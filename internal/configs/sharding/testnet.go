@@ -161,7 +161,6 @@ var (
 		feeCollectorsTestnet, numeric.ZeroDec(), ethCommon.Address{},
 		testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch(),
 	)
-
 	testnetV5 = MustNewInstance(
 		2, 30, 8, 0.15,
 		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1,
