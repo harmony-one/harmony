@@ -90,6 +90,7 @@ var (
 
 	rpcOptFlags = []cli.Flag{
 		rpcDebugEnabledFlag,
+		rpcPreimagesEnabledFlag,
 		rpcEthRPCsEnabledFlag,
 		rpcStakingRPCsEnabledFlag,
 		rpcLegacyRPCsEnabledFlag,
@@ -203,6 +204,13 @@ var (
 		revertBeaconFlag,
 		revertToFlag,
 		revertBeforeFlag,
+	}
+
+	preimageFlags = []cli.Flag{
+		preimageImportFlag,
+		preimageExportFlag,
+		preimageGenerateStartFlag,
+		preimageGenerateEndFlag,
 	}
 
 	legacyRevertFlags = []cli.Flag{
@@ -370,6 +378,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, sysFlags...)
 	flags = append(flags, devnetFlags...)
 	flags = append(flags, revertFlags...)
+	flags = append(flags, preimageFlags...)
 	flags = append(flags, legacyMiscFlags...)
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
@@ -827,6 +836,12 @@ var (
 		DefValue: defaultConfig.RPCOpt.DebugEnabled,
 		Hidden:   true,
 	}
+	rpcPreimagesEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.preimages",
+		Usage:    "enable preimages export api",
+		DefValue: defaultConfig.RPCOpt.PreimagesEnabled,
+		Hidden:   true, // not for end users
+	}
 
 	rpcEthRPCsEnabledFlag = cli.BoolFlag{
 		Name:     "rpc.eth",
@@ -878,6 +893,9 @@ var (
 func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
 		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcPreimagesEnabledFlag) {
+		config.RPCOpt.PreimagesEnabled = cli.GetBoolFlagValue(cmd, rpcPreimagesEnabledFlag)
 	}
 	if cli.IsFlagChanged(cmd, rpcEthRPCsEnabledFlag) {
 		config.RPCOpt.EthRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcEthRPCsEnabledFlag)
@@ -1653,6 +1671,52 @@ func applyRevertFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		if cli.IsFlagChanged(cmd, legacyRevertToFlag) {
 			config.Revert.RevertTo = cli.GetIntFlagValue(cmd, legacyRevertToFlag)
 		}
+	}
+}
+
+var (
+	preimageImportFlag = cli.StringFlag{
+		Name:     "preimage.import",
+		Usage:    "Import pre-images from CSV file",
+		Hidden:   true,
+		DefValue: defaultPreimageConfig.ImportFrom,
+	}
+	preimageExportFlag = cli.StringFlag{
+		Name:     "preimage.export",
+		Usage:    "Export pre-images to CSV file",
+		Hidden:   true,
+		DefValue: defaultPreimageConfig.ExportTo,
+	}
+	preimageGenerateStartFlag = cli.Uint64Flag{
+		Name:     "preimage.start",
+		Usage:    "The block number from which pre-images are to be generated",
+		Hidden:   true,
+		DefValue: defaultPreimageConfig.GenerateStart,
+	}
+	preimageGenerateEndFlag = cli.Uint64Flag{
+		Name:     "preimage.end",
+		Usage:    "The block number upto and including which pre-images are to be generated",
+		Hidden:   true,
+		DefValue: defaultPreimageConfig.GenerateEnd,
+	}
+)
+
+func applyPreimageFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+	if cli.HasFlagsChanged(cmd, preimageFlags) {
+		cfg := getDefaultPreimageConfigCopy()
+		config.Preimage = &cfg
+	}
+	if cli.IsFlagChanged(cmd, preimageImportFlag) {
+		config.Preimage.ImportFrom = cli.GetStringFlagValue(cmd, preimageImportFlag)
+	}
+	if cli.IsFlagChanged(cmd, preimageExportFlag) {
+		config.Preimage.ExportTo = cli.GetStringFlagValue(cmd, preimageExportFlag)
+	}
+	if cli.IsFlagChanged(cmd, preimageGenerateStartFlag) {
+		config.Preimage.GenerateStart = cli.GetUint64FlagValue(cmd, preimageGenerateStartFlag)
+	}
+	if cli.IsFlagChanged(cmd, preimageGenerateEndFlag) {
+		config.Preimage.GenerateEnd = cli.GetUint64FlagValue(cmd, preimageGenerateEndFlag)
 	}
 }
 
