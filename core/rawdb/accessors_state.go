@@ -147,3 +147,65 @@ func DeleteValidatorCode(db ethdb.KeyValueWriter, hash common.Hash) {
 		utils.Logger().Error().Err(err).Msg("Failed to delete validator code")
 	}
 }
+
+func WritePreimageImportBlock(db ethdb.KeyValueWriter, number uint64) error {
+	return db.Put(preImageImportKey, encodeBlockNumber(number))
+}
+
+func ReadPreimageImportBlock(db ethdb.KeyValueReader) (uint64, error) {
+	val, err := db.Get(preImageImportKey)
+	if err != nil {
+		return 0, err
+	}
+	return decodeBlockNumber(val), nil
+}
+
+func WritePreImageStartEndBlock(
+	db ethdb.KeyValueStore,
+	start uint64,
+	end uint64,
+) (
+	uint64,
+	uint64,
+	error,
+) {
+	returnStart := start
+	returnEnd := end
+	if start != 0 {
+		existingStart, err := ReadPreImageStartBlock(db)
+		if err != nil || existingStart > start {
+			if err := db.Put(preImageGenStartKey, encodeBlockNumber(start)); err != nil {
+				return 0, 0, err
+			} else {
+				returnStart = existingStart
+			}
+		}
+	}
+	if end != 0 {
+		existingEnd, err := ReadPreImageEndBlock(db)
+		if err != nil || existingEnd < end {
+			if err := db.Put(preImageGenEndKey, encodeBlockNumber(end)); err != nil {
+				return 0, 0, err
+			} else {
+				returnEnd = existingEnd
+			}
+		}
+	}
+	return returnStart, returnEnd, nil
+}
+
+func ReadPreImageStartBlock(db ethdb.KeyValueReader) (uint64, error) {
+	val, err := db.Get(preImageGenStartKey)
+	if err != nil {
+		return 0, err
+	}
+	return decodeBlockNumber(val), nil
+}
+
+func ReadPreImageEndBlock(db ethdb.KeyValueReader) (uint64, error) {
+	val, err := db.Get(preImageGenEndKey)
+	if err != nil {
+		return 0, err
+	}
+	return decodeBlockNumber(val), nil
+}

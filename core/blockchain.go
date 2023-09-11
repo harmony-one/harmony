@@ -346,6 +346,7 @@ type BlockChain interface {
 	) (status WriteStatus, err error)
 
 	GetLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error)
+	CommitPreimages() error
 
 	// ========== Only For Tikv Start ==========
 

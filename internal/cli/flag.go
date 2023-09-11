@@ -71,13 +71,28 @@ type Int64Flag struct {
 	Usage      string
 	Deprecated string
 	Hidden     bool
-
-	DefValue int64
+	DefValue   int64
 }
 
 // RegisterTo register the int flag to FlagSet
 func (f Int64Flag) RegisterTo(fs *pflag.FlagSet) error {
 	fs.Int64P(f.Name, f.Shorthand, f.DefValue, f.Usage)
+	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
+}
+
+// Uint64Flag is the flag with uint64 value, used for block number configurations
+type Uint64Flag struct {
+	Name       string
+	Shorthand  string
+	Usage      string
+	Deprecated string
+	Hidden     bool
+	DefValue   uint64
+}
+
+// RegisterTo register the int flag to FlagSet
+func (f Uint64Flag) RegisterTo(fs *pflag.FlagSet) error {
+	fs.Uint64P(f.Name, f.Shorthand, f.DefValue, f.Usage)
 	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
 }
 
@@ -142,6 +157,8 @@ func getFlagName(flag Flag) string {
 	case IntSliceFlag:
 		return f.Name
 	case Int64Flag:
+		return f.Name
+	case Uint64Flag:
 		return f.Name
 	}
 	return ""

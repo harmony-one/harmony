@@ -71,6 +71,9 @@ func (n Version) Namespace() string {
 func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig, rpcOpt harmony.RpcOptConfig) error {
 	apis = append(apis, getAPIs(hmy, config)...)
 	authApis := append(apis, getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
+	if rpcOpt.PreimagesEnabled {
+		authApis = append(authApis, NewPreimagesAPI(hmy, "preimages"))
+	}
 	// load method filter from file (if exist)
 	var rmf rpc.RpcMethodFilter
 	rpcFilterFilePath := strings.TrimSpace(rpcOpt.RpcFilterFile)
