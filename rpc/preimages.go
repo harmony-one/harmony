@@ -5,9 +5,6 @@ import (
 	"fmt"
 
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/rawdb"
-	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 )
