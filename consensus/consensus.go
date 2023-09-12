@@ -6,20 +6,20 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/registry"
+	"github.com/servprotocolorg/harmony/core"
+	"github.com/servprotocolorg/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/internal/registry"
 
-	"github.com/harmony-one/abool"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core/types"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/abool"
+	bls_core "github.com/servprotocolorg/bls/ffi/go/bls"
+	"github.com/servprotocolorg/harmony/consensus/quorum"
+	"github.com/servprotocolorg/harmony/core/types"
+	bls_cosi "github.com/servprotocolorg/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/multibls"
+	"github.com/servprotocolorg/harmony/p2p"
+	"github.com/servprotocolorg/harmony/staking/slash"
 )
 
 const (

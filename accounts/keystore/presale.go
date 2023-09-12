@@ -26,8 +26,8 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/pborman/uuid"
+	"github.com/servprotocolorg/harmony/accounts"
 	"golang.org/x/crypto/pbkdf2"
 )
 

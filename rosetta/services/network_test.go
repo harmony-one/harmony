@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/harmony-one/harmony/rosetta/common"
-	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/servprotocolorg/harmony/rosetta/common"
+	commonRPC "github.com/servprotocolorg/harmony/rpc/common"
 )
 
 func TestErrors(t *testing.T) {

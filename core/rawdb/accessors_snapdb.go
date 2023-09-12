@@ -3,9 +3,9 @@ package rawdb
 import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/block"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/block"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // SnapdbInfo only used by cmd/harmony/dumpdb.go

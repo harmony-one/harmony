@@ -22,8 +22,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // ReadDatabaseVersion retrieves the version number of the database.

@@ -12,12 +12,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/harmony-one/harmony/common/denominations"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/eth/rpc"
-	"github.com/harmony-one/harmony/hmy"
-	hmyCommon "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/common/denominations"
+	"github.com/servprotocolorg/harmony/core"
+	"github.com/servprotocolorg/harmony/eth/rpc"
+	"github.com/servprotocolorg/harmony/hmy"
+	hmyCommon "github.com/servprotocolorg/harmony/internal/common"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 const (

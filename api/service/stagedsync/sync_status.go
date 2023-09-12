@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
 )
 
 const (

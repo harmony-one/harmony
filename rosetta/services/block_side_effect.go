@@ -8,9 +8,9 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/harmony-one/harmony/core"
-	hmytypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/rosetta/common"
+	"github.com/servprotocolorg/harmony/core"
+	hmytypes "github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/rosetta/common"
 )
 
 // containsSideEffectTransaction checks if the block contains any side effect operations to report.

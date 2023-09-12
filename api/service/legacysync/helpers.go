@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/api/service/legacysync/downloader"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/p2p"
 )
 
 // getMaxPeerHeight gets the maximum blockchain heights from peers

@@ -26,7 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/core/vm"
+	"github.com/servprotocolorg/harmony/core/vm"
 )
 
 type action struct {

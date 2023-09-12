@@ -10,9 +10,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/p2p/stream/common/streammanager"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 // requestManager implements RequestManager. It is responsible for matching response

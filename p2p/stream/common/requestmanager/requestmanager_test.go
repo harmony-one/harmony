@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 var (

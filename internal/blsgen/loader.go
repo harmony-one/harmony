@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/multibls"
+	bls_core "github.com/servprotocolorg/bls/ffi/go/bls"
+	"github.com/servprotocolorg/harmony/multibls"
 )
 
 // LoadKeys load all BLS keys with the given config. If loading keys from files, the

@@ -4,7 +4,7 @@ Version: {{ VER }}
 License: MIT
 Vendor: Harmony blockchain
 Architecture: amd64
-Source: https://github.com/harmony-one/harmony
+Source: https://github.com/servprotocolorg/harmony
 Maintainer: Leo Chen <leo@harmony.one>
 Section: net
 Priority: extra

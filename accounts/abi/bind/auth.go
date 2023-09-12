@@ -26,10 +26,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/accounts/external"
-	"github.com/harmony-one/harmony/accounts/keystore"
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/servprotocolorg/harmony/accounts"
+	"github.com/servprotocolorg/harmony/accounts/external"
+	"github.com/servprotocolorg/harmony/accounts/keystore"
+	"github.com/servprotocolorg/harmony/core/types"
 )
 
 // ErrNoChainID is returned whenever the user failed to specify a chain id.

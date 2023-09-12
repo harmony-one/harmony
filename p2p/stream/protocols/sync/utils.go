@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	protobuf "github.com/golang/protobuf/proto"
-	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
-	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/p2p/stream/common/requestmanager"
+	syncpb "github.com/servprotocolorg/harmony/p2p/stream/protocols/sync/message"
 )
 
 var (

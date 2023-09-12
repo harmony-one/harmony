@@ -3,10 +3,10 @@ package stagedstreamsync
 import (
 	"fmt"
 
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/internal/chain"
 )
 
 var emptySigVerifyErr *sigVerifyErr

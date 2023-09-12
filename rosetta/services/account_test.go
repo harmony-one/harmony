@@ -8,7 +8,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	internalCommon "github.com/harmony-one/harmony/internal/common"
+	internalCommon "github.com/servprotocolorg/harmony/internal/common"
 )
 
 func TestNewAccountIdentifier(t *testing.T) {

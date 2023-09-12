@@ -3,7 +3,7 @@ package crosslinks
 import (
 	"sync/atomic"
 
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/servprotocolorg/harmony/core/types"
 )
 
 // Crosslinks is helper for processing crosslinks. It has meaning only for shards.

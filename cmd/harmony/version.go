@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/harmony-one/harmony/internal/cli"
+	"github.com/servprotocolorg/harmony/internal/cli"
 	"github.com/spf13/cobra"
 )
 

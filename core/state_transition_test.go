@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/params"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/core/vm"
+	"github.com/servprotocolorg/harmony/internal/params"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 )
 
 type applyStakingMessageTest struct {

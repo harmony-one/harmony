@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/accounts/abi"
-	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/accounts/abi"
+	stakingTypes "github.com/servprotocolorg/harmony/staking/types"
 )
 
 var abiStaking abi.ABI

@@ -5,14 +5,14 @@ import (
 	"net"
 	"strings"
 
-	"github.com/harmony-one/harmony/eth/rpc"
-	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/internal/configs/harmony"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
-	eth "github.com/harmony-one/harmony/rpc/eth"
-	v1 "github.com/harmony-one/harmony/rpc/v1"
-	v2 "github.com/harmony-one/harmony/rpc/v2"
+	"github.com/servprotocolorg/harmony/eth/rpc"
+	"github.com/servprotocolorg/harmony/hmy"
+	"github.com/servprotocolorg/harmony/internal/configs/harmony"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	eth "github.com/servprotocolorg/harmony/rpc/eth"
+	v1 "github.com/servprotocolorg/harmony/rpc/v1"
+	v2 "github.com/servprotocolorg/harmony/rpc/v2"
 )
 
 // Version enum

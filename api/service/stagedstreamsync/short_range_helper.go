@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/types"
-	syncProto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/servprotocolorg/harmony/core/types"
+	syncProto "github.com/servprotocolorg/harmony/p2p/stream/protocols/sync"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 type srHelper struct {

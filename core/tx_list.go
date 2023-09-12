@@ -23,11 +23,11 @@ import (
 	"math/big"
 	"sort"
 
-	staking "github.com/harmony-one/harmony/staking/types"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // nonceHeap is a heap.Interface implementation over 64bit unsigned integers for

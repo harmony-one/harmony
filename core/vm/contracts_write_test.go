@@ -9,10 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/params"
-	stakingTypes "github.com/harmony-one/harmony/staking/types"
+	"github.com/servprotocolorg/harmony/core/state"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/internal/params"
+	stakingTypes "github.com/servprotocolorg/harmony/staking/types"
 )
 
 type writeCapablePrecompileTest struct {

@@ -3,14 +3,14 @@ package consensus
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/shard"
+	msg_pb "github.com/servprotocolorg/harmony/api/proto/message"
+	"github.com/servprotocolorg/harmony/consensus/quorum"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/multibls"
+	"github.com/servprotocolorg/harmony/p2p"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 func TestSignAndMarshalConsensusMessage(t *testing.T) {

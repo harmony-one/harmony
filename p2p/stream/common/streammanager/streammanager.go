@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/abool"
-	"github.com/harmony-one/harmony/internal/utils"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/servprotocolorg/abool"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 var (

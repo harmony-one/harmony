@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	staking "github.com/harmony-one/harmony/staking/types"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 )
 
 // Reader ..

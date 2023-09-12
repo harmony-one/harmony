@@ -2,7 +2,7 @@ package streammanager
 
 import (
 	"github.com/ethereum/go-ethereum/event"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 // EvtStreamAdded is the event of adding a new stream

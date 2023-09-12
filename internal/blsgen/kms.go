@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
+	bls_core "github.com/servprotocolorg/bls/ffi/go/bls"
 )
 
 // AwsCfgSrcType is the type of src to load aws config. Four options available:

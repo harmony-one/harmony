@@ -3,9 +3,9 @@ package downloader
 import (
 	"time"
 
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/rs/zerolog"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // lastMileCache keeps the last 50 number blocks in memory cache

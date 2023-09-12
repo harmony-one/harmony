@@ -1,10 +1,10 @@
 package hmy
 
 import (
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	commonRPC "github.com/harmony-one/harmony/rpc/common"
-	"github.com/harmony-one/harmony/staking/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	commonRPC "github.com/servprotocolorg/harmony/rpc/common"
+	"github.com/servprotocolorg/harmony/staking/network"
 )
 
 // GetCurrentUtilityMetrics ..

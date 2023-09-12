@@ -29,17 +29,17 @@ import (
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/internal/params"
 
-	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
-	hmyCommon "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/servprotocolorg/harmony/block"
+	"github.com/servprotocolorg/harmony/core/state"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/core/vm"
+	hmyCommon "github.com/servprotocolorg/harmony/internal/common"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/shard"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 )
 
 const (

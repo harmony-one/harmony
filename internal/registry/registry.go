@@ -3,7 +3,7 @@ package registry
 import (
 	"sync"
 
-	"github.com/harmony-one/harmony/core"
+	"github.com/servprotocolorg/harmony/core"
 )
 
 // Registry consolidates services at one place.

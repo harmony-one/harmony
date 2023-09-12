@@ -8,9 +8,9 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	hmytypes "github.com/harmony-one/harmony/core/types"
-	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
-	stakingTypes "github.com/harmony-one/harmony/staking/types"
+	hmytypes "github.com/servprotocolorg/harmony/core/types"
+	rpcV2 "github.com/servprotocolorg/harmony/rpc/v2"
+	stakingTypes "github.com/servprotocolorg/harmony/staking/types"
 )
 
 // CreateTestStakingTransaction creates a pre-signed staking transaction

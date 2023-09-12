@@ -30,9 +30,9 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/harmony-one/harmony/accounts"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/accounts"
+	common2 "github.com/servprotocolorg/harmony/internal/common"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // Minimum amount of time between cache reloads. This limit applies if the platform does

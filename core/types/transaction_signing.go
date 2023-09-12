@@ -25,9 +25,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/harmony-one/harmony/crypto/hash"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/crypto/hash"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/internal/params"
 )
 
 // Constants for transaction signing.

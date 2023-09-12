@@ -5,10 +5,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/harmony-one/harmony/internal/utils"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 type Security interface {

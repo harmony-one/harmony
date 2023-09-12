@@ -25,10 +25,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	ethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/rawdb"
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/servprotocolorg/harmony/block"
+	"github.com/servprotocolorg/harmony/core"
+	"github.com/servprotocolorg/harmony/core/rawdb"
+	"github.com/servprotocolorg/harmony/core/types"
 )
 
 const (

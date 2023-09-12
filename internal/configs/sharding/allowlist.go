@@ -3,7 +3,7 @@ package shardingconfig
 import (
 	"fmt"
 
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	bls_cosi "github.com/servprotocolorg/harmony/crypto/bls"
 )
 
 type Allowlist struct {

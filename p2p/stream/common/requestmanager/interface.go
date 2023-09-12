@@ -3,8 +3,8 @@ package requestmanager
 import (
 	"context"
 
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	p2ptypes "github.com/harmony-one/harmony/p2p/types"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
+	p2ptypes "github.com/servprotocolorg/harmony/p2p/types"
 )
 
 // Requester is the interface to do request

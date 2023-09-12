@@ -35,7 +35,7 @@ RPM is for Redhat/Fedora based Linux distributions, such as Amazon Linux and Cen
 ```bash
 # do the following once to add the harmony development repo
 curl -LsSf http://haochen-harmony-pub.s3.amazonaws.com/pub/yum/harmony-dev.repo | sudo tee -a /etc/yum.repos.d/harmony-dev.repo
-sudo rpm --import https://raw.githubusercontent.com/harmony-one/harmony-open/master/harmony-release/harmony-pub.key
+sudo rpm --import https://raw.githubusercontent.com/servprotocolorg/harmony-open/master/harmony-release/harmony-pub.key
 ```
 
 ## Deb Package
@@ -43,7 +43,7 @@ Deb is supported on Debian based Linux distributions, such as Ubuntu, MX Linux.
 
 ```bash
 # do the following once to add the harmony development repo
-curl -LsSf https://raw.githubusercontent.com/harmony-one/harmony-open/master/harmony-release/harmony-pub.key | sudo apt-key add
+curl -LsSf https://raw.githubusercontent.com/servprotocolorg/harmony-open/master/harmony-release/harmony-pub.key | sudo apt-key add
 echo "deb http://haochen-harmony-pub.s3.amazonaws.com/pub/repo bionic main" | sudo tee -a /etc/apt/sources.list
 
 ```
@@ -134,4 +134,4 @@ sudo vim /etc/harmony/harmony.conf
 ```
 
 # Support
-Please open new github issues in https://github.com/harmony-one/harmony/issues.
+Please open new github issues in https://github.com/servprotocolorg/harmony/issues.

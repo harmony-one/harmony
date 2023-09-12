@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	tmpDir    = filepath.Join(os.TempDir(), "harmony-one", "harmony", "p2p", "discovery")
+	tmpDir    = filepath.Join(os.TempDir(), "servprotocolorg", "harmony", "p2p", "discovery")
 	emptyFile = filepath.Join(tmpDir, "empty_file")
 	validPath = filepath.Join(tmpDir, "dht-1.1.1.1")
 )

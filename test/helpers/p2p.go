@@ -1,12 +1,12 @@
 package helpers
 
 import (
-	"github.com/harmony-one/bls/ffi/go/bls"
-	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/p2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/bls/ffi/go/bls"
+	harmony_bls "github.com/servprotocolorg/harmony/crypto/bls"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/p2p"
 )
 
 // Host - struct for representing a host (IP / Port)

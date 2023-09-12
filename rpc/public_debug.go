@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/eth/rpc"
-	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/eth/rpc"
+	"github.com/servprotocolorg/harmony/hmy"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // PublicDebugService Internal JSON RPC for debugging purpose

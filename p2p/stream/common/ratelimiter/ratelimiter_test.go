@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/servprotocolorg/harmony/p2p/stream/common/streammanager"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 func TestRateLimiter(t *testing.T) {

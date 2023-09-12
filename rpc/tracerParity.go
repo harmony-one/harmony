@@ -6,8 +6,8 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/eth/rpc"
-	"github.com/harmony-one/harmony/hmy"
+	"github.com/servprotocolorg/harmony/eth/rpc"
+	"github.com/servprotocolorg/harmony/hmy"
 )
 
 var (

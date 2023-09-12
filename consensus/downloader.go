@@ -2,8 +2,8 @@ package consensus
 
 import (
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/core/types"
 )
 
 // downloader is the adapter interface for downloader.Downloader, which is used for

@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
-	"github.com/harmony-one/harmony/block"
-	headerV3 "github.com/harmony-one/harmony/block/v3"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/servprotocolorg/harmony/api/service/legacysync/downloader"
+	"github.com/servprotocolorg/harmony/block"
+	headerV3 "github.com/servprotocolorg/harmony/block/v3"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/p2p"
 	"github.com/stretchr/testify/assert"
 )
 

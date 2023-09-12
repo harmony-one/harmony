@@ -3,7 +3,7 @@ package slashtest
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/staking/slash"
+	"github.com/servprotocolorg/harmony/staking/slash"
 )
 
 // CopyRecord makes a deep copy the slash Record

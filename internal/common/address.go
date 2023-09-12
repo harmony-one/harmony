@@ -11,9 +11,9 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/internal/bech32"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/internal/bech32"
+	"github.com/servprotocolorg/harmony/internal/utils"
 	"golang.org/x/crypto/sha3"
 )
 

@@ -8,13 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/rs/zerolog"
 
-	"github.com/harmony-one/harmony/core"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
-	"github.com/harmony-one/harmony/p2p/stream/protocols/sync"
-	"github.com/harmony-one/harmony/shard"
+	"github.com/servprotocolorg/harmony/core"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/p2p"
+	"github.com/servprotocolorg/harmony/p2p/stream/common/streammanager"
+	"github.com/servprotocolorg/harmony/p2p/stream/protocols/sync"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 type (

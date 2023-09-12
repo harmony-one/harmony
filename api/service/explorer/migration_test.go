@@ -7,8 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/abool"
 	"github.com/rs/zerolog"
+	"github.com/servprotocolorg/abool"
 )
 
 func TestMigrationToV100(t *testing.T) {

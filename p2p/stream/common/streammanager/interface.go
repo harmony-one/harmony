@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/event"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	p2ptypes "github.com/harmony-one/harmony/p2p/types"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
+	p2ptypes "github.com/servprotocolorg/harmony/p2p/types"
 )
 
 // StreamManager is the interface for streamManager

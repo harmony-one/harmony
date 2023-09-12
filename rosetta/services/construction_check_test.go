@@ -8,8 +8,8 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/pkg/errors"
 
-	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/rosetta/common"
+	"github.com/servprotocolorg/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/rosetta/common"
 )
 
 func TestConstructMetadataOptions(t *testing.T) {

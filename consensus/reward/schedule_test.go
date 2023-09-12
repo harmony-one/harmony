@@ -3,7 +3,7 @@ package reward
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/numeric"
+	"github.com/servprotocolorg/harmony/numeric"
 )
 
 func TestPercentageForTimeStamp(t *testing.T) {

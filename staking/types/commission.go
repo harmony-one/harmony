@@ -3,7 +3,7 @@ package types
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/numeric"
+	"github.com/servprotocolorg/harmony/numeric"
 )
 
 type (

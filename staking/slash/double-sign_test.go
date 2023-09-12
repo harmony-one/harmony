@@ -10,19 +10,19 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	blockfactory "github.com/harmony-one/harmony/block/factory"
-	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/effective"
-	staking "github.com/harmony-one/harmony/staking/types"
+	bls_core "github.com/servprotocolorg/bls/ffi/go/bls"
+	blockfactory "github.com/servprotocolorg/harmony/block/factory"
+	consensus_sig "github.com/servprotocolorg/harmony/consensus/signature"
+	"github.com/servprotocolorg/harmony/core/state"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/numeric"
+	"github.com/servprotocolorg/harmony/shard"
+	"github.com/servprotocolorg/harmony/staking/effective"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 )
 
 var (

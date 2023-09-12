@@ -7,8 +7,8 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/crypto/hash"
-	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/servprotocolorg/harmony/crypto/hash"
+	common2 "github.com/servprotocolorg/harmony/internal/common"
 )
 
 var (

@@ -3,8 +3,8 @@ package stagedstreamsync
 import (
 	"time"
 
-	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/core/types"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
 )
 
 const (

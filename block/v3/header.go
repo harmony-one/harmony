@@ -10,10 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/rs/zerolog"
 
-	blockif "github.com/harmony-one/harmony/block/interface"
-	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
+	blockif "github.com/servprotocolorg/harmony/block/interface"
+	"github.com/servprotocolorg/harmony/crypto/hash"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 // Header is the V3 block header.

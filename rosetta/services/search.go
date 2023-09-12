@@ -5,11 +5,11 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/rawdb"
-	hmyTypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy"
-	internal_common "github.com/harmony-one/harmony/internal/common"
-	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
+	"github.com/servprotocolorg/harmony/core/rawdb"
+	hmyTypes "github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/hmy"
+	internal_common "github.com/servprotocolorg/harmony/internal/common"
+	rosetta_common "github.com/servprotocolorg/harmony/rosetta/common"
 )
 
 // SearchAPI implements the server.SearchAPIServicer interface.

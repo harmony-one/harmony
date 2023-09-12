@@ -8,13 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/utils"
-	syncproto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/servprotocolorg/harmony/core"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	syncproto "github.com/servprotocolorg/harmony/p2p/stream/protocols/sync"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 type InvalidBlock struct {

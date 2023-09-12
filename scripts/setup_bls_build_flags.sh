@@ -11,7 +11,7 @@ case "${HMY_PATH+set}" in
    unset -v gopath
    gopath=$(go env GOPATH)
    # HMY_PATH is the common root directory of all harmony repos
-   HMY_PATH="${gopath%%:*}/src/github.com/harmony-one"
+   HMY_PATH="${gopath%%:*}/src/github.com/servprotocolorg"
    if [ ! -d $HMY_PATH ]; then
       # "env pwd" uses external pwd(1) implementation and not the Bash built-in,
       # which does not fully dereference symlinks.

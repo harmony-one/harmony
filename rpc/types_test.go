@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/pkg/errors"
+	internal_common "github.com/servprotocolorg/harmony/internal/common"
 	"github.com/stretchr/testify/require"
 )
 

@@ -31,12 +31,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p/discovery"
-	"github.com/harmony-one/harmony/p2p/security"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/servprotocolorg/bls/ffi/go/bls"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/p2p/discovery"
+	"github.com/servprotocolorg/harmony/p2p/security"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 type ConnectCallback func(net libp2p_network.Network, conn libp2p_network.Conn) error

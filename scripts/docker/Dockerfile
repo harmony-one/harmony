@@ -1,5 +1,5 @@
 ARG GOPATH_DEFAULT=/root/go
-ARG SRC_PATH=src/github.com/harmony-one
+ARG SRC_PATH=src/github.com/servprotocolorg
 
 FROM golang:1.18-bullseye as builder
 
@@ -18,10 +18,10 @@ RUN apt-get update && apt-get install -y $PACKAGES --no-install-recommends
 
 WORKDIR ${HMY_PATH}
 
-RUN git clone https://github.com/harmony-one/harmony.git harmony \
-  && git clone https://github.com/harmony-one/bls.git bls \
-  && git clone https://github.com/harmony-one/mcl.git mcl \
-  && git clone https://github.com/harmony-one/go-sdk.git go-sdk
+RUN git clone https://github.com/servprotocolorg/harmony.git harmony \
+  && git clone https://github.com/servprotocolorg/bls.git bls \
+  && git clone https://github.com/servprotocolorg/mcl.git mcl \
+  && git clone https://github.com/servprotocolorg/go-sdk.git go-sdk
 
 WORKDIR ${HMY_PATH}/harmony
 RUN make linux_static

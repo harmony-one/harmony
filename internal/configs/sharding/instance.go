@@ -4,10 +4,10 @@ import (
 	"math/big"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/genesis"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/internal/genesis"
+	"github.com/servprotocolorg/harmony/numeric"
 )
 
 // NetworkID is the network type of the blockchain.

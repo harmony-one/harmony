@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
-	"github.com/harmony-one/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/internal/params"
 	"golang.org/x/crypto/ripemd160"
 
 	//Needed for SHA3-256 FIPS202

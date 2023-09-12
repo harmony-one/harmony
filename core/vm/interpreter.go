@@ -21,7 +21,7 @@ import (
 	"hash"
 	"sync/atomic"
 
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"

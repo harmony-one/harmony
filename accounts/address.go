@@ -1,9 +1,9 @@
 package accounts
 
 import (
-	"github.com/harmony-one/harmony/internal/bech32"
-	"github.com/harmony-one/harmony/internal/common"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/internal/bech32"
+	"github.com/servprotocolorg/harmony/internal/common"
 )
 
 // MustBech32ToAddressH is a wrapper for casting ethCommon.Address to harmony's common.Address

@@ -7,14 +7,14 @@ RUN apt update -y && \
 
 ENV GOPATH=/root/go
 ENV GO111MODULE=on
-ENV HMY_PATH=${GOPATH}/src/github.com/harmony-one
+ENV HMY_PATH=${GOPATH}/src/github.com/servprotocolorg
 RUN mkdir -p $HMY_PATH
 
 WORKDIR $HMY_PATH
 
-RUN git clone https://github.com/harmony-one/harmony.git && \
-    git clone https://github.com/harmony-one/bls.git && \
-    git clone https://github.com/harmony-one/mcl.git
+RUN git clone https://github.com/servprotocolorg/harmony.git && \
+    git clone https://github.com/servprotocolorg/bls.git && \
+    git clone https://github.com/servprotocolorg/mcl.git
 
 WORKDIR $HMY_PATH/harmony
 

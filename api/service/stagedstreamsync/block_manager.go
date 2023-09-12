@@ -3,9 +3,9 @@ package stagedstreamsync
 import (
 	"sync"
 
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/rs/zerolog"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 type BlockDownloadDetails struct {

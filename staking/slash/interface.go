@@ -3,9 +3,9 @@ package slash
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/shard"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 // CommitteeReader ..

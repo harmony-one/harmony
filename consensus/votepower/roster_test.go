@@ -5,14 +5,14 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 
-	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	shardingconfig "github.com/servprotocolorg/harmony/internal/configs/sharding"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
+	bls_core "github.com/servprotocolorg/bls/ffi/go/bls"
+	"github.com/servprotocolorg/harmony/numeric"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 var (

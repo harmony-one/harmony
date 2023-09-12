@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 
-	"github.com/harmony-one/harmony/numeric"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/servprotocolorg/harmony/numeric"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 )
 
 // CheckValidatorWrapperEqual checks the equality of staking.ValidatorWrapper. If not equal, an

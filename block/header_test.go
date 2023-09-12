@@ -7,10 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	blockif "github.com/harmony-one/harmony/block/interface"
-	v0 "github.com/harmony-one/harmony/block/v0"
-	v1 "github.com/harmony-one/harmony/block/v1"
-	v2 "github.com/harmony-one/harmony/block/v2"
+	blockif "github.com/servprotocolorg/harmony/block/interface"
+	v0 "github.com/servprotocolorg/harmony/block/v0"
+	v1 "github.com/servprotocolorg/harmony/block/v1"
+	v2 "github.com/servprotocolorg/harmony/block/v2"
 )
 
 func TestHeader_EncodeRLP(t *testing.T) {

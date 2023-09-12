@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/block"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/block"
 )
 
 // CXReceipt represents a receipt for cross-shard transaction

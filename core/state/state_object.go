@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/harmony-one/harmony/staking"
+	"github.com/servprotocolorg/harmony/staking"
 )
 
 var emptyCodeHash = crypto.Keccak256(nil)

@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 type (

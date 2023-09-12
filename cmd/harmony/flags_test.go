@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	harmonyconfig "github.com/servprotocolorg/harmony/internal/configs/harmony"
 
 	"github.com/spf13/cobra"
 
-	"github.com/harmony-one/harmony/internal/cli"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/internal/cli"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
 )
 
 var (

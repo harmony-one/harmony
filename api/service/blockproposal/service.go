@@ -1,9 +1,9 @@
 package blockproposal
 
 import (
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/internal/utils"
+	msg_pb "github.com/servprotocolorg/harmony/api/proto/message"
+	"github.com/servprotocolorg/harmony/consensus"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // Service is a block proposal service.

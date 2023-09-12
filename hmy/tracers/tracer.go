@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/core/vm"
+	"github.com/servprotocolorg/harmony/core/vm"
 	duktape "gopkg.in/olebedev/go-duktape.v3"
 )
 

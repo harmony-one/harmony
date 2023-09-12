@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/servprotocolorg/harmony/core/types"
 )
 
 // GetPoolStats returns the number of pending and queued transactions

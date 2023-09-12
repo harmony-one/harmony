@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/consensus/reward"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
-	stakingReward "github.com/harmony-one/harmony/staking/reward"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/consensus/engine"
+	"github.com/servprotocolorg/harmony/consensus/reward"
+	common2 "github.com/servprotocolorg/harmony/internal/common"
+	"github.com/servprotocolorg/harmony/numeric"
+	"github.com/servprotocolorg/harmony/shard"
+	stakingReward "github.com/servprotocolorg/harmony/staking/reward"
 )
 
 // Circulating supply calculation

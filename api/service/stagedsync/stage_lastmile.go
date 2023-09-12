@@ -3,9 +3,9 @@ package stagedsync
 import (
 	"context"
 
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
+	"github.com/servprotocolorg/harmony/core"
+	"github.com/servprotocolorg/harmony/core/types"
 )
 
 type StageLastMile struct {

@@ -6,14 +6,14 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/numeric"
+	common2 "github.com/servprotocolorg/harmony/internal/common"
+	"github.com/servprotocolorg/harmony/numeric"
 )
 
-// medium.com/harmony-one/introducing-harmonys-effective-proof-of-stake-epos-2d39b4b8d58
+// medium.com/servprotocolorg/introducing-harmonys-effective-proof-of-stake-epos-2d39b4b8d58
 var (
 	two         = numeric.NewDecFromBigInt(big.NewInt(2))
 	c, _        = numeric.NewDecFromStr("0.15")

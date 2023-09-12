@@ -55,13 +55,13 @@ jobs:
       - name: Checkout dependence repo
         uses: actions/checkout@v3
         with:
-          repository: harmony-one/mcl
+          repository: servprotocolorg/mcl
           path: mcl
 
       - name: Checkout dependence repo
         uses: actions/checkout@v3
         with:
-          repository: harmony-one/bls
+          repository: servprotocolorg/bls
           path: bls
 
       - name: Checkout harmony core code

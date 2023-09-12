@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/internal/params"
 )
 
 // this test is here so we can cover the input = epoch.bytes() line as well

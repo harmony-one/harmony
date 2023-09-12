@@ -6,9 +6,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/ethdb/leveldb"
-	tikvCommon "github.com/harmony-one/harmony/internal/tikv/common"
-	"github.com/harmony-one/harmony/internal/tikv/prefix"
-	"github.com/harmony-one/harmony/internal/tikv/remote"
+	tikvCommon "github.com/servprotocolorg/harmony/internal/tikv/common"
+	"github.com/servprotocolorg/harmony/internal/tikv/prefix"
+	"github.com/servprotocolorg/harmony/internal/tikv/remote"
 )
 
 // database is an adapter for *leveldb.DB

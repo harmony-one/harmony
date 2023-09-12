@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 const (

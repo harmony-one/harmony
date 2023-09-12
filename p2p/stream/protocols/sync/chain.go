@@ -2,12 +2,12 @@ package sync
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/core/types"
-	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/internal/utils/keylocker"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/block"
+	"github.com/servprotocolorg/harmony/consensus/engine"
+	"github.com/servprotocolorg/harmony/core/types"
+	shardingconfig "github.com/servprotocolorg/harmony/internal/configs/sharding"
+	"github.com/servprotocolorg/harmony/internal/utils/keylocker"
 )
 
 // chainHelper is the adapter for blockchain which is friendly to unit test.

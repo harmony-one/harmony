@@ -4,13 +4,13 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/core"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/bls/ffi/go/bls"
+	"github.com/servprotocolorg/harmony/consensus/quorum"
+	"github.com/servprotocolorg/harmony/consensus/signature"
+	"github.com/servprotocolorg/harmony/core"
+	bls_cosi "github.com/servprotocolorg/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 var (

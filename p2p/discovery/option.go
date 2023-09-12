@@ -3,10 +3,10 @@ package discovery
 import (
 	"github.com/pkg/errors"
 
-	p2ptypes "github.com/harmony-one/harmony/p2p/types"
 	badger "github.com/ipfs/go-ds-badger"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_dht "github.com/libp2p/go-libp2p-kad-dht"
+	p2ptypes "github.com/servprotocolorg/harmony/p2p/types"
 )
 
 // DHTConfig is the configurable DHT options.

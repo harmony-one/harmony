@@ -1,10 +1,10 @@
 # Harmony
 
-[![Build Status](https://travis-ci.com/harmony-one/harmony.svg?branch=main)](https://travis-ci.com/harmony-one/harmony)
+[![Build Status](https://travis-ci.com/servprotocolorg/harmony.svg?branch=main)](https://travis-ci.com/servprotocolorg/harmony)
 ![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-45%25-brightgreen.svg?longCache=true&style=flat)
 ![Discord](https://img.shields.io/discord/532383335348043777.svg)
-[![Github Action](https://github.com/harmony-one/harmony/actions/workflows/ci.yaml/badge.svg?event=push)](https://github.com/harmony-one/harmony/actions/workflows/ci.yaml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/harmony-one/harmony)](https://goreportcard.com/report/github.com/harmony-one/harmony)
+[![Github Action](https://github.com/servprotocolorg/harmony/actions/workflows/ci.yaml/badge.svg?event=push)](https://github.com/servprotocolorg/harmony/actions/workflows/ci.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/servprotocolorg/harmony)](https://goreportcard.com/report/github.com/servprotocolorg/harmony)
 
 ## General Documentation
 
@@ -47,23 +47,23 @@ For macOS, you can reference this [guide](http://tldrdevnotes.com/bash-upgrade-3
 
 ## Dev Environment
 
-**Most repos from [harmony-one](https://github.com/harmony-one) assumes the GOPATH convention. More information [here](https://github.com/golang/go/wiki/GOPATH).**
+**Most repos from [servprotocolorg](https://github.com/servprotocolorg) assumes the GOPATH convention. More information [here](https://github.com/golang/go/wiki/GOPATH).**
 
 ### First Install
 Clone and set up all of the repos with the following set of commands:
 
 1. Create the appropriate directories:
 ```bash
-mkdir -p $(go env GOPATH)/src/github.com/harmony-one
-cd $(go env GOPATH)/src/github.com/harmony-one
+mkdir -p $(go env GOPATH)/src/github.com/servprotocolorg
+cd $(go env GOPATH)/src/github.com/servprotocolorg
 ```
 > If you get 'unknown command' or something along those lines, make sure to install [golang](https://golang.org/doc/install) first.
 
 2. Clone this repo & dependent repos.
 ```bash
-git clone https://github.com/harmony-one/mcl.git
-git clone https://github.com/harmony-one/bls.git
-git clone https://github.com/harmony-one/harmony.git
+git clone https://github.com/servprotocolorg/mcl.git
+git clone https://github.com/servprotocolorg/bls.git
+git clone https://github.com/servprotocolorg/harmony.git
 cd harmony
 ```
 
@@ -83,7 +83,7 @@ with our C/C++ based library dependencies (`libbls` and `mcl`) set up correctly 
 
 You can build the docker image for yourself with the following commands:
 ```bash
-cd $(go env GOPATH)/src/github.com/harmony-one/harmony
+cd $(go env GOPATH)/src/github.com/servprotocolorg/harmony
 make clean
 docker build -t harmony .
 ```
@@ -97,7 +97,7 @@ docker build -t harmony .
 
 Then you can start your docker container with the following command:
 ```bash
-docker run --rm --name harmony -it -v "$(go env GOPATH)/src/github.com/harmony-one/harmony:/root/go/src/github.com/harmony-one/harmony" harmony /bin/bash
+docker run --rm --name harmony -it -v "$(go env GOPATH)/src/github.com/servprotocolorg/harmony:/root/go/src/github.com/servprotocolorg/harmony" harmony /bin/bash
 ```
 > Note that the harmony repo will be shared between your docker container and your host machine. However, everything else in the docker container will be ephemeral.
 
@@ -114,9 +114,9 @@ The `make` command should automatically build the Harmony binary & all dependent
 
 However, if you wish to bypass the Makefile, first export the build flags:
 ```bash
-export CGO_CFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include -I/opt/homebrew/opt/openssl@1.1/include"
-export CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L/opt/homebrew/opt/openssl@1.1/lib"
-export LD_LIBRARY_PATH=$GOPATH/src/github.com/harmony-one/bls/lib:$GOPATH/src/github.com/harmony-one/mcl/lib:/opt/homebrew/opt/openssl@1.1/lib
+export CGO_CFLAGS="-I$GOPATH/src/github.com/servprotocolorg/bls/include -I$GOPATH/src/github.com/servprotocolorg/mcl/include -I/opt/homebrew/opt/openssl@1.1/include"
+export CGO_LDFLAGS="-L$GOPATH/src/github.com/servprotocolorg/bls/lib -L/opt/homebrew/opt/openssl@1.1/lib"
+export LD_LIBRARY_PATH=$GOPATH/src/github.com/servprotocolorg/bls/lib:$GOPATH/src/github.com/servprotocolorg/mcl/lib:/opt/homebrew/opt/openssl@1.1/lib
 export LIBRARY_PATH=$LD_LIBRARY_PATH
 export DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
 export GO111MODULE=on
@@ -175,7 +175,7 @@ make test-rpc
 ```
 This test starts a localnet (within the Docker container), **ensures it reaches a consensus**, and runs a series of tests to ensure correct RPC behavior.
 This test also acts as a preliminary integration test (more through tests are done on the testnets).
-> The tests ran by this command can be found [here](https://github.com/harmony-one/harmony-test/tree/master/localnet).
+> The tests ran by this command can be found [here](https://github.com/servprotocolorg/harmony-test/tree/master/localnet).
 
 If you wish to debug further with the localnet after the tests are done, open a new shell and run:
 ```bash
@@ -195,7 +195,7 @@ make test-rosetta
 ```
 This test starts a localnet (within the Docker container), **ensures it reaches a consensus**, and runs the Construction & Data API checks using the [rosetta-cli](https://github.com/coinbase/rosetta-cli).
 This test also acts as a preliminary integration test (more through tests are done on the testnets).
-> The config for this test can be found [here](https://github.com/harmony-one/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s0.json) & [here](https://github.com/harmony-one/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s1.json)
+> The config for this test can be found [here](https://github.com/servprotocolorg/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s0.json) & [here](https://github.com/servprotocolorg/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s1.json)
 
 Similar to the RPC tests, if you wish to debug further with the localnet after the tests are done, open a new shell and run:
 ```bash

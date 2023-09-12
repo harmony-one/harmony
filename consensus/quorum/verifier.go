@@ -3,11 +3,11 @@ package quorum
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/consensus/votepower"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/consensus/votepower"
+	bls_cosi "github.com/servprotocolorg/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/numeric"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 // Verifier is the interface to verify the whether the quorum is achieved by mask at each epoch.

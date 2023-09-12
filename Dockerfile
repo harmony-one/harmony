@@ -7,7 +7,7 @@ SHELL ["/bin/bash", "-c"]
 
 ENV GOPATH=/root/go
 ENV GO111MODULE=on
-ENV HMY_PATH=${GOPATH}/src/github.com/harmony-one
+ENV HMY_PATH=${GOPATH}/src/github.com/servprotocolorg
 ENV OPENSSL_DIR=/usr/lib/ssl
 ENV MCL_DIR=${HMY_PATH}/mcl
 ENV BLS_DIR=${HMY_PATH}/bls
@@ -29,13 +29,13 @@ RUN mkdir ~/bin && \
 
 RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})"
 
-RUN git clone https://github.com/harmony-one/harmony.git ${HMY_PATH}/harmony
+RUN git clone https://github.com/servprotocolorg/harmony.git ${HMY_PATH}/harmony
 
-RUN git clone https://github.com/harmony-one/bls.git ${HMY_PATH}/bls
+RUN git clone https://github.com/servprotocolorg/bls.git ${HMY_PATH}/bls
 
-RUN git clone https://github.com/harmony-one/mcl.git ${HMY_PATH}/mcl
+RUN git clone https://github.com/servprotocolorg/mcl.git ${HMY_PATH}/mcl
 
-RUN git clone https://github.com/harmony-one/go-sdk.git ${HMY_PATH}/go-sdk
+RUN git clone https://github.com/servprotocolorg/go-sdk.git ${HMY_PATH}/go-sdk
 
 RUN cd ${HMY_PATH}/bls && make -j8 BLS_SWAP_G=1
 

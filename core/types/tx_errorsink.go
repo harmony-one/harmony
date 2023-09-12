@@ -5,8 +5,8 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 )
 
 const (

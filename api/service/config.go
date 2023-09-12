@@ -1,7 +1,7 @@
 package service
 
 import (
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
 )
 
 // NodeConfig defines a structure of node configuration
@@ -9,7 +9,7 @@ import (
 // This is to pass node configuration to services and prvent
 // cyclic imports
 type NodeConfig struct {
-	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
+	// The three groupID design, please refer to https://github.com/servprotocolorg/harmony/blob/master/node/node.md#libp2p-integration
 	Beacon       nodeconfig.GroupID                           // the beacon group ID
 	ShardGroupID nodeconfig.GroupID                           // the group ID of the shard
 	Client       nodeconfig.GroupID                           // the client group ID of the shard

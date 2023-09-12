@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/harmony-one/harmony/core/types"
-	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/servprotocolorg/harmony/core/types"
+	hmytypes "github.com/servprotocolorg/harmony/core/types"
 )
 
 // Block represents a basic block which is further amended by BlockWithTxHash or BlockWithFullTx

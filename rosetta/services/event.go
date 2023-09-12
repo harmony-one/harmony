@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
-	hmyTypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy"
+	hmyTypes "github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/hmy"
 )
 
 // EventAPI implements the server.EventsAPIServicer interface.

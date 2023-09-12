@@ -8,8 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/servprotocolorg/harmony/p2p/stream/common/streammanager"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 var testProtoID = sttypes.ProtoID("harmony/sync/unitest/0/1.0.0")

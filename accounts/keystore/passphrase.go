@@ -41,8 +41,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/pborman/uuid"
+	"github.com/servprotocolorg/harmony/accounts"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/scrypt"
 )

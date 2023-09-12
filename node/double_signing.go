@@ -2,8 +2,8 @@ package node
 
 import (
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/staking/slash"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/staking/slash"
 )
 
 // ProcessSlashCandidateMessage ..

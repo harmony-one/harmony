@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	p2ptypes "github.com/harmony-one/harmony/p2p/types"
-	"github.com/harmony-one/harmony/test/helpers"
+	p2ptypes "github.com/servprotocolorg/harmony/p2p/types"
+	"github.com/servprotocolorg/harmony/test/helpers"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -20,7 +20,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	stk "github.com/harmony-one/harmony/staking/types"
+	stk "github.com/servprotocolorg/harmony/staking/types"
 )
 
 // journalEntry is a modification entry in the state change journal that can be

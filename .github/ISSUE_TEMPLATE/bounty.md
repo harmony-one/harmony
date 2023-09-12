@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 # About The Bounty
-https://github.com/harmony-one/harmony-open/blob/master/README.md
+https://github.com/servprotocolorg/harmony-open/blob/master/README.md
 
 # Category
 - [ ] bug
@@ -25,4 +25,4 @@ https://github.com/harmony-one/harmony-open/blob/master/README.md
 # Time Estimation
 
 # Explore All Bounties
-https://gitcoin.co/profile/harmony-one
+https://gitcoin.co/profile/servprotocolorg

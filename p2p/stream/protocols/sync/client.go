@@ -9,10 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
-	"github.com/harmony-one/harmony/core/types"
-	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/core/types"
+	syncpb "github.com/servprotocolorg/harmony/p2p/stream/protocols/sync/message"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 // GetBlocksByNumber do getBlocksByNumberRequest through sync stream protocol.

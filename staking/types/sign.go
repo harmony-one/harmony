@@ -24,7 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/servprotocolorg/harmony/crypto/hash"
 )
 
 // sigCache is used to cache the derived sender and contains

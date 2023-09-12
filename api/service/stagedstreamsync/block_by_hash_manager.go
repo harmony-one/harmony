@@ -4,9 +4,9 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/types"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/core/types"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 type getBlocksByHashManager struct {

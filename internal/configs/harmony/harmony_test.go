@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -15,10 +15,10 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/crypto/bls"
 	p2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/pkg/errors"
+	bls_core "github.com/servprotocolorg/bls/ffi/go/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 )
 
 var lock sync.Mutex

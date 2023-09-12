@@ -11,11 +11,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	core2 "github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
+	core2 "github.com/servprotocolorg/harmony/core"
+	"github.com/servprotocolorg/harmony/core/types"
+	common2 "github.com/servprotocolorg/harmony/internal/common"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 )
 
 type oneAddress string

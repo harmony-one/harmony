@@ -3,7 +3,7 @@ package staketest
 import (
 	"testing"
 
-	staking "github.com/harmony-one/harmony/staking/types"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 )
 
 func TestCheckValidatorWrapperEqual(t *testing.T) {

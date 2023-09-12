@@ -3,9 +3,9 @@ package service
 import (
 	"fmt"
 
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // Type is service type.

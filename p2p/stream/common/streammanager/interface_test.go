@@ -7,10 +7,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 var _ StreamManager = &streamManager{}

@@ -36,9 +36,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/core/types"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/servprotocolorg/harmony/accounts"
+	"github.com/servprotocolorg/harmony/core/types"
+	staking "github.com/servprotocolorg/harmony/staking/types"
 )
 
 // ErrLocked ...

@@ -7,12 +7,12 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/harmony-one/harmony/eth/rpc"
-	"github.com/harmony-one/harmony/hmy"
-	internal_common "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/rosetta/common"
-	rpc2 "github.com/harmony-one/harmony/rpc"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/eth/rpc"
+	"github.com/servprotocolorg/harmony/hmy"
+	internal_common "github.com/servprotocolorg/harmony/internal/common"
+	"github.com/servprotocolorg/harmony/rosetta/common"
+	rpc2 "github.com/servprotocolorg/harmony/rpc"
 )
 
 var CallMethod = []string{

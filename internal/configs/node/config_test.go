@@ -3,12 +3,12 @@ package nodeconfig
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 
-	"github.com/harmony-one/harmony/internal/blsgen"
-	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/internal/blsgen"
+	shardingconfig "github.com/servprotocolorg/harmony/internal/configs/sharding"
+	"github.com/servprotocolorg/harmony/multibls"
 )
 
 func TestNodeConfigSingleton(t *testing.T) {

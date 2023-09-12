@@ -14,10 +14,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/metrics"
 	eth_prometheus "github.com/ethereum/go-ethereum/metrics/prometheus"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // Config is the config for the prometheus service

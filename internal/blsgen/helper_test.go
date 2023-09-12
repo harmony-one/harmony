@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/servprotocolorg/bls/ffi/go/bls"
 )
 
 const (

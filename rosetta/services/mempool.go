@@ -7,10 +7,10 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
-	hmyTypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/rosetta/common"
-	"github.com/harmony-one/harmony/staking"
+	hmyTypes "github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/hmy"
+	"github.com/servprotocolorg/harmony/rosetta/common"
+	"github.com/servprotocolorg/harmony/staking"
 )
 
 // MempoolAPI implements the server.MempoolAPIServicer interface

@@ -23,14 +23,14 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/taggedrlp"
+	"github.com/servprotocolorg/taggedrlp"
 
-	"github.com/harmony-one/harmony/block"
-	blockfactory "github.com/harmony-one/harmony/block/factory"
-	blockif "github.com/harmony-one/harmony/block/interface"
-	v0 "github.com/harmony-one/harmony/block/v0"
-	v1 "github.com/harmony-one/harmony/block/v1"
-	v2 "github.com/harmony-one/harmony/block/v2"
+	"github.com/servprotocolorg/harmony/block"
+	blockfactory "github.com/servprotocolorg/harmony/block/factory"
+	blockif "github.com/servprotocolorg/harmony/block/interface"
+	v0 "github.com/servprotocolorg/harmony/block/v0"
+	v1 "github.com/servprotocolorg/harmony/block/v1"
+	v2 "github.com/servprotocolorg/harmony/block/v2"
 )
 
 var (

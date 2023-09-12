@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/vm"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/core"
+	"github.com/servprotocolorg/harmony/core/vm"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
 	"github.com/stretchr/testify/require"
 )
 

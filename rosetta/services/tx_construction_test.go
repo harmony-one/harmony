@@ -8,9 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	hmyTypes "github.com/harmony-one/harmony/core/types"
-	internalCommon "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/rosetta/common"
+	hmyTypes "github.com/servprotocolorg/harmony/core/types"
+	internalCommon "github.com/servprotocolorg/harmony/internal/common"
+	"github.com/servprotocolorg/harmony/rosetta/common"
 )
 
 func TestConstructPlainTransaction(t *testing.T) {

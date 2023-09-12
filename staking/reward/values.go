@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/harmony-one/harmony/common/denominations"
-	"github.com/harmony-one/harmony/consensus/engine"
-	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
+	"github.com/servprotocolorg/harmony/common/denominations"
+	"github.com/servprotocolorg/harmony/consensus/engine"
+	shardingconfig "github.com/servprotocolorg/harmony/internal/configs/sharding"
+	"github.com/servprotocolorg/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/numeric"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 var (
@@ -84,7 +84,7 @@ func getPreStakingRewardsFromBlockNumber(id shardingconfig.NetworkID, blockNum *
 // WARNING: the data collected here are calculated from a consumer of the Rosetta API.
 // If data becomes mission critical, implement a cross-link based approach.
 //
-// Data Source: https://github.com/harmony-one/jupyter
+// Data Source: https://github.com/servprotocolorg/jupyter
 //
 // TODO (dm): use first crosslink of all shards to compute rewards on network instead of relying on constants.
 var (

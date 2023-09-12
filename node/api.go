@@ -1,16 +1,16 @@
 package node
 
 import (
-	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/eth/rpc"
-	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/internal/tikv"
-	"github.com/harmony-one/harmony/rosetta"
-	hmy_rpc "github.com/harmony-one/harmony/rpc"
-	rpc_common "github.com/harmony-one/harmony/rpc/common"
-	"github.com/harmony-one/harmony/rpc/filters"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/servprotocolorg/harmony/consensus/quorum"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/eth/rpc"
+	"github.com/servprotocolorg/harmony/hmy"
+	"github.com/servprotocolorg/harmony/internal/tikv"
+	"github.com/servprotocolorg/harmony/rosetta"
+	hmy_rpc "github.com/servprotocolorg/harmony/rpc"
+	rpc_common "github.com/servprotocolorg/harmony/rpc/common"
+	"github.com/servprotocolorg/harmony/rpc/filters"
 )
 
 // IsCurrentlyLeader exposes if node is currently the leader node

@@ -7,9 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	p2ptypes "github.com/harmony-one/harmony/p2p/types"
+	"github.com/servprotocolorg/harmony/p2p/stream/common/streammanager"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
+	p2ptypes "github.com/servprotocolorg/harmony/p2p/types"
 	"go.uber.org/ratelimit"
 )
 

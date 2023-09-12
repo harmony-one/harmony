@@ -23,13 +23,13 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/eth/rpc"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/block"
+	"github.com/servprotocolorg/harmony/eth/rpc"
+	"github.com/servprotocolorg/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/servprotocolorg/harmony/core/types"
 )
 
 const sampleNumber = 3 // Number of transactions sampled in a block

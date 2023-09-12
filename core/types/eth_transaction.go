@@ -22,13 +22,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/internal/params"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
 
-	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/servprotocolorg/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

@@ -13,11 +13,11 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 
-	"github.com/harmony-one/harmony/hmy"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/rosetta/common"
-	"github.com/harmony-one/harmony/rosetta/services"
+	"github.com/servprotocolorg/harmony/hmy"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/rosetta/common"
+	"github.com/servprotocolorg/harmony/rosetta/services"
 )
 
 var listener net.Listener

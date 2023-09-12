@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/core/types"
-	syncproto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/servprotocolorg/harmony/core/types"
+	syncproto "github.com/servprotocolorg/harmony/p2p/stream/protocols/sync"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 // doLongRangeSync does the long range sync.

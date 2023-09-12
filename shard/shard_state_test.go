@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/numeric"
+	"github.com/servprotocolorg/harmony/numeric"
 )
 
 var (

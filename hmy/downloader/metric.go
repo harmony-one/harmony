@@ -3,8 +3,8 @@ package downloader
 import (
 	"fmt"
 
-	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
+	prom "github.com/servprotocolorg/harmony/api/service/prometheus"
 )
 
 func init() {

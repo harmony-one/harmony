@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/utils"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/discovery"
@@ -12,6 +11,7 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	libp2p_dis "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/rs/zerolog"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // Discovery is the interface for the underlying peer discovery protocol.

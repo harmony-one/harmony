@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	common2 "github.com/harmony-one/harmony/internal/common"
+	common2 "github.com/servprotocolorg/harmony/internal/common"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/internal/utils"
 )
 
 // HarmonyConfig contains all the configs user can set for running harmony binary. Served as the bridge

@@ -6,15 +6,15 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
+	bls_core "github.com/servprotocolorg/bls/ffi/go/bls"
+	msg_pb "github.com/servprotocolorg/harmony/api/proto/message"
+	"github.com/servprotocolorg/harmony/consensus/quorum"
+	"github.com/servprotocolorg/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/internal/utils"
+	"github.com/servprotocolorg/harmony/multibls"
+	"github.com/servprotocolorg/harmony/p2p"
+	"github.com/servprotocolorg/harmony/shard"
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {

@@ -26,8 +26,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/harmony/accounts/abi"
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/servprotocolorg/harmony/accounts/abi"
+	"github.com/servprotocolorg/harmony/core/types"
 )
 
 // SignerFn is a signer function callback when a contract requires a method to

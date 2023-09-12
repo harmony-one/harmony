@@ -3,7 +3,7 @@ package registry
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/core"
+	"github.com/servprotocolorg/harmony/core"
 	"github.com/stretchr/testify/require"
 )
 

@@ -10,13 +10,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/block"
-	headerV3 "github.com/harmony-one/harmony/block/v3"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/p2p/stream/common/ratelimiter"
-	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
-	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/servprotocolorg/harmony/block"
+	headerV3 "github.com/servprotocolorg/harmony/block/v3"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/p2p/stream/common/ratelimiter"
+	"github.com/servprotocolorg/harmony/p2p/stream/common/streammanager"
+	syncpb "github.com/servprotocolorg/harmony/p2p/stream/protocols/sync/message"
+	sttypes "github.com/servprotocolorg/harmony/p2p/stream/types"
 )
 
 var (

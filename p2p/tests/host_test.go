@@ -3,7 +3,7 @@ package p2ptests
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/test/helpers"
+	"github.com/servprotocolorg/harmony/test/helpers"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/staking/slash"
+	"github.com/servprotocolorg/harmony/staking/slash"
 )
 
 func TestCopyRecord(t *testing.T) {

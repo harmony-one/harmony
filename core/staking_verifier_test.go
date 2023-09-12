@@ -7,23 +7,23 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/harmony-one/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/internal/params"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/block"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/effective"
-	staking "github.com/harmony-one/harmony/staking/types"
-	staketest "github.com/harmony-one/harmony/staking/types/test"
+	"github.com/servprotocolorg/harmony/block"
+	consensus_engine "github.com/servprotocolorg/harmony/consensus/engine"
+	"github.com/servprotocolorg/harmony/core/state"
+	"github.com/servprotocolorg/harmony/core/vm"
+	"github.com/servprotocolorg/harmony/crypto/hash"
+	"github.com/servprotocolorg/harmony/numeric"
+	"github.com/servprotocolorg/harmony/shard"
+	"github.com/servprotocolorg/harmony/staking/effective"
+	staking "github.com/servprotocolorg/harmony/staking/types"
+	staketest "github.com/servprotocolorg/harmony/staking/types/test"
 )
 
 const (
@@ -1796,11 +1796,11 @@ func (chain *fakeErrChainContext) ReadValidatorSnapshot(common.Address) (*stakin
 }
 
 func makeIdentityStr(item interface{}) string {
-	return fmt.Sprintf("harmony-one-%v", item)
+	return fmt.Sprintf("servprotocolorg-%v", item)
 }
 
 func makeTestAddr(item interface{}) common.Address {
-	s := fmt.Sprintf("harmony-one-%v", item)
+	s := fmt.Sprintf("servprotocolorg-%v", item)
 	return common.BytesToAddress([]byte(s))
 }
 

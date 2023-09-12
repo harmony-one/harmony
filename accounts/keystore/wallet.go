@@ -21,8 +21,8 @@ import (
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/servprotocolorg/harmony/accounts"
+	"github.com/servprotocolorg/harmony/core/types"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original

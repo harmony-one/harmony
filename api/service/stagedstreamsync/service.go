@@ -1,8 +1,8 @@
 package stagedstreamsync
 
 import (
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/servprotocolorg/harmony/core"
+	"github.com/servprotocolorg/harmony/p2p"
 )
 
 // StagedStreamSyncService is simply a adapter of downloaders, which support block synchronization

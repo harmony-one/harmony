@@ -20,7 +20,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/harmony-one/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/internal/params"
 )
 
 // Gas costs

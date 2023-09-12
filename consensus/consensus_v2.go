@@ -9,24 +9,24 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls2 "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/consensus/signature"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
+	bls2 "github.com/servprotocolorg/bls/ffi/go/bls"
+	"github.com/servprotocolorg/harmony/consensus/signature"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
+	"github.com/servprotocolorg/harmony/internal/utils"
 
 	"github.com/rs/zerolog"
 
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto/bls"
-	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/vdf/src/vdf_go"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	msg_pb "github.com/servprotocolorg/harmony/api/proto/message"
+	"github.com/servprotocolorg/harmony/block"
+	"github.com/servprotocolorg/harmony/consensus/quorum"
+	"github.com/servprotocolorg/harmony/core/types"
+	"github.com/servprotocolorg/harmony/crypto/bls"
+	vrf_bls "github.com/servprotocolorg/harmony/crypto/vrf/bls"
+	"github.com/servprotocolorg/harmony/p2p"
+	"github.com/servprotocolorg/harmony/shard"
+	"github.com/servprotocolorg/vdf/src/vdf_go"
 )
 
 var (

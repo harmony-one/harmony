@@ -1,9 +1,9 @@
 package bls
 
 import (
-	"github.com/harmony-one/bls/ffi/go/bls"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/bls/ffi/go/bls"
 )
 
 const (

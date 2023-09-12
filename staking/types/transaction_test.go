@@ -6,12 +6,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	numeric "github.com/harmony-one/harmony/numeric"
+	bls_core "github.com/servprotocolorg/bls/ffi/go/bls"
+	common2 "github.com/servprotocolorg/harmony/internal/common"
+	numeric "github.com/servprotocolorg/harmony/numeric"
 )
 
 // for testing purpose

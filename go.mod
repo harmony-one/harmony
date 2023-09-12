@@ -1,4 +1,4 @@
-module github.com/harmony-one/harmony
+module github.com/servprotocolorg/harmony
 
 go 1.19
 
@@ -22,10 +22,10 @@ require (
 	github.com/golangci/golangci-lint v1.22.2
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/harmony-one/abool v1.0.1
-	github.com/harmony-one/bls v0.0.6
-	github.com/harmony-one/taggedrlp v0.1.4
-	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
+	github.com/servprotocolorg/abool v1.0.1
+	github.com/servprotocolorg/bls v0.0.6
+	github.com/servprotocolorg/taggedrlp v0.1.4
+	github.com/servprotocolorg/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/ipfs/go-ds-badger v0.3.0

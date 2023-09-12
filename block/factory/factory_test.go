@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/harmony-one/harmony/internal/params"
+	"github.com/servprotocolorg/harmony/internal/params"
 )
 
 func Test_factory_NewHeader(t *testing.T) {

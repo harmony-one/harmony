@@ -32,16 +32,16 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/servprotocolorg/harmony/core/types"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/harmony/numeric"
-	stk "github.com/harmony-one/harmony/staking/types"
-	staketest "github.com/harmony-one/harmony/staking/types/test"
+	"github.com/servprotocolorg/harmony/crypto/bls"
+	"github.com/servprotocolorg/harmony/crypto/hash"
+	"github.com/servprotocolorg/harmony/numeric"
+	stk "github.com/servprotocolorg/harmony/staking/types"
+	staketest "github.com/servprotocolorg/harmony/staking/types/test"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/servprotocolorg/harmony/common/denominations"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to

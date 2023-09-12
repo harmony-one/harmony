@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/accounts"
+	"github.com/servprotocolorg/harmony/accounts"
 )
 
 var testSigData = make([]byte, 32)

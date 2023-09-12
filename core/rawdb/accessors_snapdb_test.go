@@ -6,8 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
-	blockfactory "github.com/harmony-one/harmony/block/factory"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	blockfactory "github.com/servprotocolorg/harmony/block/factory"
+	nodeconfig "github.com/servprotocolorg/harmony/internal/configs/node"
 )
 
 func TestSnapdbInfo(t *testing.T) {

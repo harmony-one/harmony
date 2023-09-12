@@ -10,10 +10,10 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/parser"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	hmytypes "github.com/harmony-one/harmony/core/types"
-	internalCommon "github.com/harmony-one/harmony/internal/common"
-	stakingTypes "github.com/harmony-one/harmony/staking/types"
-	"github.com/harmony-one/harmony/test/helpers"
+	hmytypes "github.com/servprotocolorg/harmony/core/types"
+	internalCommon "github.com/servprotocolorg/harmony/internal/common"
+	stakingTypes "github.com/servprotocolorg/harmony/staking/types"
+	"github.com/servprotocolorg/harmony/test/helpers"
 )
 
 var (

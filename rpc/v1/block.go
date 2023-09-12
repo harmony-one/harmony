@@ -1,9 +1,9 @@
 package v1
 
 import (
-	"github.com/harmony-one/harmony/core/types"
-	rpc_common "github.com/harmony-one/harmony/rpc/common"
 	"github.com/pkg/errors"
+	"github.com/servprotocolorg/harmony/core/types"
+	rpc_common "github.com/servprotocolorg/harmony/rpc/common"
 )
 
 // BlockFactory is the factory for v1 rpc block

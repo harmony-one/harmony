@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/block"
+	"github.com/servprotocolorg/harmony/block"
 )
 
 // CrossLink is only used on beacon chain to store the hash links from other shards

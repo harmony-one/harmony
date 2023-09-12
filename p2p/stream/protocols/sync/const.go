@@ -7,13 +7,13 @@ const (
 	GetBlockHashesAmountCap = 50
 
 	// GetBlocksByNumAmountCap is the cap of request of a single GetBlocksByNum request.
-	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
+	// This number has an effect on maxMsgBytes as 20MB defined in github.com/servprotocolorg/harmony/p2p/stream/types.
 	// Since we have an assumption that rlp encoded block size is smaller than 2MB (p2p.node.MaxMessageSize),
 	// so the max size of a stream message is capped at 2MB * 10 = 20MB.
 	GetBlocksByNumAmountCap = 10
 
 	// GetBlocksByHashesAmountCap is the cap of request of single GetBlocksByHashes request
-	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
+	// This number has an effect on maxMsgBytes as 20MB defined in github.com/servprotocolorg/harmony/p2p/stream/types.
 	// See comments for GetBlocksByNumAmountCap.
 	GetBlocksByHashesAmountCap = 10
 

@@ -1,9 +1,9 @@
 package downloader
 
 import (
-	"github.com/harmony-one/abool"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/servprotocolorg/abool"
+	"github.com/servprotocolorg/harmony/core"
+	"github.com/servprotocolorg/harmony/p2p"
 )
 
 // Downloaders is the set of downloaders
