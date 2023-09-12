@@ -56,6 +56,7 @@ trace-pointer:
 	bash ./scripts/go_executable_build.sh -t
 
 debug:
+	rm -rf .dht-127.0.0.1*
 	bash ./test/debug.sh
 
 debug-kill:
@@ -167,3 +168,6 @@ docker:
 
 travis_go_checker:
 	bash ./scripts/travis_go_checker.sh
+
+travis_rpc_checker:
+	bash ./scripts/travis_rpc_checker.sh
