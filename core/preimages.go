@@ -195,13 +195,16 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	var startingState *state.DB
 	var startingBlock *types.Block
 	for i := start - 1; i > 0; i-- {
+		fmt.Println("finding block number", i)
 		startingBlock = chain.GetBlockByNumber(i)
 		if startingBlock == nil {
+			fmt.Println("not found block number", i)
 			// rewound too much in snapdb, so exit loop
 			// although this is only designed for s2/s3 nodes in mind
 			// which do not have such a snapdb
 			break
 		}
+		fmt.Println("found block number", startingBlock.NumberU64(), startingBlock.Root().Hex())
 		state, err := chain.StateAt(startingBlock.Root())
 		if err == nil {
 			continue
