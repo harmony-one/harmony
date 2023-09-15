@@ -34,17 +34,17 @@ func (s *PreimagesService) Import(_ context.Context, path string) error {
 }
 func (s *PreimagesService) Generate(_ context.Context, start, end rpc.BlockNumber) error {
 	// earliestBlock: the number of blocks in the past where you can generate the preimage from the last block
-	earliestBlock := uint64(10) // TODO: change it for the actual value
+	earliestBlock := uint64(2)
 	currentBlockNum := s.hmy.CurrentBlock().NumberU64()
 
 	var startBlock uint64
 	switch start {
 	case rpc.EarliestBlockNumber:
-		startBlock = currentBlockNum - earliestBlock
+		startBlock = earliestBlock
 	case rpc.LatestBlockNumber:
-		startBlock = currentBlockNum - earliestBlock
+		startBlock = earliestBlock
 	case rpc.PendingBlockNumber:
-		startBlock = currentBlockNum - earliestBlock
+		startBlock = earliestBlock
 	default:
 		startBlock = uint64(start)
 	}
@@ -52,7 +52,7 @@ func (s *PreimagesService) Generate(_ context.Context, start, end rpc.BlockNumbe
 	var endBlock = uint64(end)
 	switch end {
 	case rpc.EarliestBlockNumber:
-		endBlock = currentBlockNum - earliestBlock
+		endBlock = currentBlockNum
 	case rpc.LatestBlockNumber:
 		endBlock = currentBlockNum
 	case rpc.PendingBlockNumber:
