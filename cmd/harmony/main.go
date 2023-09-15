@@ -407,6 +407,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				)
 				end = number
 			}
+			fmt.Println("Starting generation")
 			if err := core.GeneratePreimages(
 				chain,
 				hc.Preimage.GenerateStart, end,
@@ -414,6 +415,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				fmt.Println("Error generating", err)
 				os.Exit(1)
 			}
+			fmt.Println("Generation successful")
 			os.Exit(0)
 		}
 		os.Exit(0)
