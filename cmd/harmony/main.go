@@ -401,10 +401,10 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			chain := currentNode.Blockchain()
 			end := hc.Preimage.GenerateEnd
 			current := chain.CurrentBlock().NumberU64()
-			if current > end {
+			if end > current {
 				fmt.Printf(
 					"Cropping generate endpoint from %d to %d\n",
-					current, end,
+					end, current,
 				)
 				end = current
 			}
