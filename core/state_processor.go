@@ -312,7 +312,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("apply failed from='%s' to='%s': %w", msg.From().Hex(), msg.To().Hex(), err)
+		return nil, nil, nil, 0, fmt.Errorf("apply failed from='%s' to='%s' balance='%s': %w", msg.From().Hex(), msg.To().Hex(), statedb.GetBalance(msg.From()).String(), err)
 	}
 	// Update the state with pending changes
 	var root []byte
