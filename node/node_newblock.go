@@ -157,7 +157,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
-	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+	// Execute all the time except for last block of epoch for shard 0
+	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) || node.Consensus.ShardID != 0 {
 		// Prepare normal and staking transactions retrieved from transaction pool
 		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
 
@@ -255,7 +256,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 					len(crossLinksToPropose), len(allPending),
 				)
 		} else {
-			utils.Logger().Error().Err(err).Msgf(
+			utils.Logger().Warn().Err(err).Msgf(
 				"[ProposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
 				len(allPending),
 			)
