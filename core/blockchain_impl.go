@@ -1682,8 +1682,8 @@ func (bc *BlockChainImpl) buildLeaderRotationMeta(curHeader *block.Header) error
 			return err
 		}
 		if curPubKey.Bytes != blockPubKey.Bytes || curHeader.Epoch().Uint64() != header.Epoch().Uint64() {
-			for j := i; i <= curHeader.NumberU64(); j++ {
-				header := bc.GetHeaderByNumber(i)
+			for j := i; j <= curHeader.NumberU64(); j++ {
+				header := bc.GetHeaderByNumber(j)
 				if header == nil {
 					return errors.New("header is nil")
 				}
