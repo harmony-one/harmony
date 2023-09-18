@@ -157,7 +157,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
-	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) || node.Consensus.ShardID != 0 {
 		// Prepare normal and staking transactions retrieved from transaction pool
 		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
 
@@ -255,7 +255,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 					len(crossLinksToPropose), len(allPending),
 				)
 		} else {
-			utils.Logger().Error().Err(err).Msgf(
+			utils.Logger().Warn().Err(err).Msgf(
 				"[ProposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
 				len(allPending),
 			)
@@ -291,7 +291,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed finalizing the new block")
 		return nil, err
 	}
-	utils.Logger().Info().Msg("[ProposeNewBlock] verifying the new block header")
+	utils.Logger().Info().Msgf("[ProposeNewBlock] verifying the new block: shard %d, number %d, epoch %d", finalizedBlock.ShardID(), finalizedBlock.NumberU64(), finalizedBlock.Epoch().Uint64())
 	err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
 
 	if err != nil {

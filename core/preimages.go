@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/crypto"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/api/service/prometheus"
@@ -142,26 +144,28 @@ func ExportPreimages(chain BlockChain, path string) error {
 	dbReader := chain.ChainDb()
 	for accountIterator.Next(true) {
 		// the leaf nodes of the MPT represent accounts
-		if accountIterator.Leaf() {
-			// the leaf key is the hashed address
-			hashed := accountIterator.LeafKey()
-			asHash := ethCommon.BytesToHash(hashed)
-			// obtain the corresponding address
-			preimage := rawdb.ReadPreimage(
-				dbReader, asHash,
-			)
-			if len(preimage) == 0 {
-				utils.Logger().Warn().
-					Msgf("Address not found for %x", asHash)
-				continue
-			}
-			address := ethCommon.BytesToAddress(preimage)
-			// key value format, so hash of value is first
-			csvWriter.Write([]string{
-				fmt.Sprintf("%x", asHash.Bytes()),
-				fmt.Sprintf("%x", address.Bytes()),
-			})
+		if !accountIterator.Leaf() {
+			continue
 		}
+		// the leaf key is the hashed address
+		hashed := accountIterator.LeafKey()
+		asHash := ethCommon.BytesToHash(hashed)
+		// obtain the corresponding address
+		preimage := rawdb.ReadPreimage(
+			dbReader, asHash,
+		)
+		if len(preimage) == 0 {
+			utils.Logger().Warn().
+				Msgf("Address not found for %x", asHash)
+			continue
+		}
+		address := ethCommon.BytesToAddress(preimage)
+		// key value format, so hash of value is first
+		csvWriter.Write([]string{
+			fmt.Sprintf("%x", asHash.Bytes()),
+			fmt.Sprintf("%x", address.Bytes()),
+		})
+
 	}
 	// lastly, write the block number
 	csvWriter.Write(

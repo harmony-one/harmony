@@ -141,11 +141,11 @@ func (p *StateProcessor) Process(
 		gp, header, statedb, p.bc, p.config,
 	)
 	if err != nil {
-		if err == ErrNoMigrationPossible {
+		if errors.Is(err, ErrNoMigrationPossible) {
 			// ran out of accounts
 			processTxsAndStxs = false
 		}
-		if err != ErrNoMigrationRequired {
+		if !errors.Is(err, ErrNoMigrationRequired) {
 			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 	} else {
@@ -538,7 +538,7 @@ func MayBalanceMigration(
 ) (*types.CXReceipt, error) {
 	isMainnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Mainnet
 	if isMainnet {
-		if config.IsEpochBeforeHIP30(header.Epoch()) {
+		if config.IsOneEpochBeforeHIP30(header.Epoch()) {
 			nxtShards := shard.Schedule.InstanceForEpoch(
 				new(big.Int).Add(header.Epoch(), common.Big1),
 			).NumShards()
@@ -574,24 +574,30 @@ func MayBalanceMigration(
 	isDevnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Devnet
 	isLocalnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Localnet
 	if isDevnet || isLocalnet {
-		if config.IsEpochBeforeHIP30(header.Epoch()) {
+		if config.IsOneEpochBeforeHIP30(header.Epoch()) {
 			if myShard := chain.ShardID(); myShard != shard.BeaconChainShardID {
-				parentRoot := chain.GetBlockByHash(
+				parent := chain.GetBlockByHash(
 					header.ParentHash(),
-				).Root() // for examining MPT at this root, should exist
+				)
+				if parent == nil {
+					return nil, errors.Wrap(ErrNoMigrationPossible, "parent is nil")
+				}
+				parentRoot := parent.Root()
+				// for examining MPT at this root, should exist
 				cx, err := generateOneMigrationMessage(
 					db, parentRoot,
 					header.NumberU64(),
 					myShard, shard.BeaconChainShardID, // dstShard
 				)
 				if err != nil {
-					return nil, err
+					return nil, errors.Wrap(err, "generateOneMigrationMessage")
 				}
 				if cx != nil {
 					gasPool.SubGas(params.TxGasXShard)
 					return cx, nil
 				}
-				return nil, ErrNoMigrationPossible
+				//return nil, errors.Wrap(ErrNoMigrationPossible, "MayBalanceMigration: cx is nil")
+				return nil, nil
 			}
 		}
 	}
@@ -635,11 +641,13 @@ func generateOneMigrationMessage(
 			key := accountIterator.LeafKey()
 			preimage := rawdb.ReadPreimage(db, common.BytesToHash(key))
 			if len(preimage) == 0 {
-				return nil, errors.New(
+				e := errors.New(
 					fmt.Sprintf(
 						"cannot find preimage for %x", key,
 					),
 				)
+				fmt.Println(e)
+				continue
 			}
 			address := common.BytesToAddress(preimage)
 			// skip blank address

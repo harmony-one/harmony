@@ -160,17 +160,18 @@ func (w *Worker) CommitTransactions(
 	// but the balance will immediately be returned to shard 1
 	cx, err := core.MayBalanceMigration(
 		w.current.gasPool,
-		w.beacon.CurrentHeader(),
+		w.GetCurrentHeader(),
 		w.current.state,
 		w.chain,
 		w.chain.Config(),
 	)
 	if err != nil {
-		if err == core.ErrNoMigrationPossible {
+		if errors.Is(err, core.ErrNoMigrationPossible) {
 			// means we do not accept transactions from the network
 			return nil
 		}
-		if err != core.ErrNoMigrationRequired {
+		if !errors.Is(err, core.ErrNoMigrationRequired) {
+
 			// this shard not migrating => ErrNoMigrationRequired
 			// any other error means exit this block
 			return err
@@ -411,16 +412,6 @@ func (w *Worker) GetNewEpoch() *big.Int {
 // GetCurrentReceipts get the receipts generated starting from the last state.
 func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 	return w.current.receipts
-}
-
-// OutgoingReceipts get the receipts generated starting from the last state.
-func (w *Worker) OutgoingReceipts() []*types.CXReceipt {
-	return w.current.outcxs
-}
-
-// IncomingReceipts get incoming receipts in destination shard that is received from source shard
-func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
-	return w.current.incxs
 }
 
 // CollectVerifiedSlashes sets w.current.slashes only to those that

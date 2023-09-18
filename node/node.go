@@ -261,7 +261,7 @@ func addPendingTransactions(registry *registry.Registry, newTxs types.Transactio
 		poolTxs       = types.PoolTransactions{}
 		epoch         = bc.CurrentHeader().Epoch()
 		acceptCx      = bc.Config().AcceptsCrossTx(epoch)
-		isBeforeHIP30 = bc.Config().IsEpochBeforeHIP30(epoch)
+		isBeforeHIP30 = bc.Config().IsOneEpochBeforeHIP30(epoch)
 		nxtShards     = shard.Schedule.InstanceForEpoch(new(big.Int).Add(epoch, common.Big1)).NumShards()
 	)
 	for _, tx := range newTxs {
@@ -497,7 +497,8 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			if err := rlp.DecodeBytes(blocksPayload, &blocks); err != nil {
 				return nil, 0, errors.Wrap(err, "block decode error")
 			}
-			curBeaconHeight := node.Beaconchain().CurrentBlock().NumberU64()
+			curBeaconBlock := node.EpochChain().CurrentBlock()
+			curBeaconHeight := curBeaconBlock.NumberU64()
 			for _, block := range blocks {
 				// Ban blocks number that is smaller than tolerance
 				if block.NumberU64()+beaconBlockHeightTolerance <= curBeaconHeight {
@@ -507,7 +508,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 				} else if block.NumberU64()-beaconBlockHeightTolerance > curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
-					return nil, 0, errors.New("beacon block height too much higher than current height beyond tolerance")
+					return nil, 0, errors.Errorf("beacon block height too much higher than current height beyond tolerance, block %d, current %d, epoch %d , current %d", block.NumberU64(), curBeaconHeight, block.Epoch().Uint64(), curBeaconBlock.Epoch().Uint64())
 				} else if block.NumberU64() <= curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")
