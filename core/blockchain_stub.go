@@ -113,7 +113,7 @@ func (a Stub) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error
 	return errors.Errorf("method WriteBlockWithoutState not implemented for %s", a.Name)
 }
 
-func (a Stub) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, stakeMsgs []staking.StakeMsg, paid reward.Reader, state *state.DB) (status WriteStatus, err error) {
+func (a Stub) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, stakeMsgs []staking.StakeMsg, delegationsToRemove map[common.Address][]common.Address, paid reward.Reader, state *state.DB) (status WriteStatus, err error) {
 	return 0, errors.Errorf("method WriteBlockWithState not implemented for %s", a.Name)
 }
 
@@ -373,7 +373,7 @@ func (a Stub) ReadDelegationsByDelegatorAt(delegator common.Address, blockNum *b
 	return nil, errors.Errorf("method ReadDelegationsByDelegatorAt not implemented for %s", a.Name)
 }
 
-func (a Stub) UpdateStakingMetaData(batch rawdb.DatabaseWriter, block *types.Block, stakeMsgs []staking.StakeMsg, state *state.DB, epoch, newEpoch *big.Int) (newValidators []common.Address, err error) {
+func (a Stub) UpdateStakingMetaData(batch rawdb.DatabaseWriter, block *types.Block, stakeMsgs []staking.StakeMsg, delegationsToRemove map[common.Address][]common.Address, state *state.DB, epoch, newEpoch *big.Int) (newValidators []common.Address, err error) {
 	return nil, errors.Errorf("method UpdateStakingMetaData not implemented for %s", a.Name)
 }
 
@@ -412,7 +412,7 @@ func (a Stub) IsEnablePruneBeaconChainFeature() bool {
 	return false
 }
 
-func (a Stub) CommitOffChainData(batch rawdb.DatabaseWriter, block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, stakeMsgs []staking.StakeMsg, payout reward.Reader, state *state.DB) (status WriteStatus, err error) {
+func (a Stub) CommitOffChainData(batch rawdb.DatabaseWriter, block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, stakeMsgs []staking.StakeMsg, delegationsToRemove map[common.Address][]common.Address, payout reward.Reader, state *state.DB) (status WriteStatus, err error) {
 	return 0, errors.Errorf("method CommitOffChainData not implemented for %s", a.Name)
 }
 

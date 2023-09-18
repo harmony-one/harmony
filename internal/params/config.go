@@ -74,6 +74,7 @@ var (
 		FeeCollectEpoch:                        big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                             EpochTBD,
+		NoNilDelegationsEpoch:        			EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -116,6 +117,7 @@ var (
 		FeeCollectEpoch:                        big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                             EpochTBD,
+		NoNilDelegationsEpoch:         			EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -158,6 +160,7 @@ var (
 		FeeCollectEpoch:                        EpochTBD,
 		ValidatorCodeFixEpoch:                  EpochTBD,
 		HIP30Epoch:                             EpochTBD,
+		NoNilDelegationsEpoch:         EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -201,6 +204,7 @@ var (
 		FeeCollectEpoch:                        big.NewInt(848), // 2023-04-28 04:33:33+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(848),
 		HIP30Epoch:                             EpochTBD,
+		NoNilDelegationsEpoch:         EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -244,6 +248,7 @@ var (
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		ValidatorCodeFixEpoch:                  EpochTBD,
 		HIP30Epoch:                             EpochTBD,
+		NoNilDelegationsEpoch:         big.NewInt(2),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -286,6 +291,7 @@ var (
 		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  big.NewInt(2),
 		HIP30Epoch:                             EpochTBD,
+		NoNilDelegationsEpoch:         big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
@@ -330,6 +336,7 @@ var (
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 		big.NewInt(0),                      // HIP30Epoch
+		big.NewInt(0),                      // NoNilDelegationsEpoch
 	}
 
 	// TestChainConfig ...
@@ -374,6 +381,7 @@ var (
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 		big.NewInt(0),        // HIP30Epoch
+		big.NewInt(0),        // NoNilDelegationsEpoch
 	}
 
 	// TestRules ...
@@ -513,6 +521,9 @@ type ChainConfig struct {
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
 
+	// The first epoch at the end of which stale delegations are removed
+	NoNilDelegationsEpoch *big.Int `json:"no-nil-delegations-epoch,omitempty"`
+
 	LeaderRotationExternalNonBeaconLeaders *big.Int `json:"leader-rotation-external-non-beacon-leaders,omitempty"`
 
 	LeaderRotationExternalBeaconLeaders *big.Int `json:"leader-rotation-external-beacon-leaders,omitempty"`
@@ -541,7 +552,19 @@ type ChainConfig struct {
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v}",
+	// use string1 + string2 here instead of concatening in the end
+	return fmt.Sprintf("{ChainID: %v "+
+		"EthCompatibleChainID: %v "+
+		"EIP155: %v "+
+		"CrossTx: %v "+
+		"Staking: %v "+
+		"CrossLink: %v "+
+		"ReceiptLog: %v "+
+		"SHA3Epoch: %v "+
+		"StakingPrecompileEpoch: %v "+
+		"ChainIdFixEpoch: %v "+
+		"CrossShardXferPrecompileEpoch: %v "+
+		"NoNilDelegationsEpoch: %v}",	
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -553,6 +576,7 @@ func (c *ChainConfig) String() string {
 		c.StakingPrecompileEpoch,
 		c.ChainIdFixEpoch,
 		c.CrossShardXferPrecompileEpoch,
+		c.NoNilDelegationsEpoch,
 	)
 }
 
@@ -746,11 +770,18 @@ func (c *ChainConfig) IsHIP6And8Epoch(epoch *big.Int) bool {
 	return isForked(c.HIP6And8Epoch, epoch)
 }
 
-// IsStakingPrecompileEpoch determines whether staking
+// IsStakingPrecompile determines whether staking
 // precompiles are available in the EVM
 func (c *ChainConfig) IsStakingPrecompile(epoch *big.Int) bool {
 	return isForked(c.StakingPrecompileEpoch, epoch)
 }
+
+// IsNoNilDelegations determines whether to clear
+// nil delegations regularly (and of course also once)
+func (c *ChainConfig) IsNoNilDelegations(epoch *big.Int) bool {
+	return isForked(c.NoNilDelegationsEpoch, epoch)
+}
+
 
 // IsCrossShardXferPrecompile determines whether the
 // Cross Shard Transfer Precompile is available in the EVM
@@ -859,6 +890,7 @@ type Rules struct {
 	// eip-155 chain id fix
 	IsChainIdFix bool
 	IsValidatorCodeFix bool
+	IsNoNilDelegations bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -884,5 +916,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsCrossShardXferPrecompile: c.IsCrossShardXferPrecompile(epoch),
 		IsChainIdFix:               c.IsChainIdFix(epoch),
 		IsValidatorCodeFix:         c.IsValidatorCodeFix(epoch),
+		IsNoNilDelegations:         c.IsNoNilDelegations(epoch),
 	}
 }

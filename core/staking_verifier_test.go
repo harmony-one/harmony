@@ -1194,8 +1194,9 @@ func TestVerifyAndUndelegateFromMsg(t *testing.T) {
 		epoch *big.Int
 		msg   staking.Undelegate
 
-		expVWrapper staking.ValidatorWrapper
-		expErr      error
+		expVWrapper           staking.ValidatorWrapper
+		expErr                error
+		noNilDelegationsEpoch *big.Int
 	}{
 		{
 			// 0: Undelegate at delegation with an entry already exist at the same epoch.
@@ -1362,9 +1363,70 @@ func TestVerifyAndUndelegateFromMsg(t *testing.T) {
 
 			expErr: errNoDelegationToUndelegate,
 		},
+
+		{
+			// 12: Undelegate with NoNilDelegationsEpoch set
+			// such that remaining < minimum
+			sdb:   makeDefaultStateForUndelegate(t), // delegatorAddr has 15k ones delegated
+			epoch: big.NewInt(defaultEpoch),
+			msg: func() staking.Undelegate {
+				msg := defaultMsgUndelegate()
+				msg.Amount = new(big.Int).Mul(oneBig, big.NewInt(14901))
+				return msg
+			}(),
+			expVWrapper:           makeDefaultSnapVWrapperForUndelegate(t),
+			expErr:                staking.ErrUndelegationRemaining,
+			noNilDelegationsEpoch: big.NewInt(defaultEpoch),
+		},
+		{
+			// 13: Undelegate with NoNilDelegationsEpoch set
+			// such that remaining == minimum
+			// delegatorAddr has 15k ones delegated and 5k in Undelegations at defaultEpoch
+			sdb:   makeDefaultStateForUndelegate(t),
+			epoch: big.NewInt(defaultEpoch),
+			msg: func() staking.Undelegate {
+				msg := defaultMsgUndelegate()
+				msg.Amount = new(big.Int).Mul(oneBig, big.NewInt(14900))
+				return msg
+			}(),
+			expVWrapper: func(t *testing.T) staking.ValidatorWrapper {
+				w := makeDefaultSnapVWrapperForUndelegate(t)
+				w.Delegations[1].Amount = new(big.Int).Mul(oneBig, big.NewInt(100))
+				w.Delegations[1].Undelegations[0].Amount = new(big.Int).Mul(oneBig, big.NewInt(19900))
+				return w
+			}(t),
+			noNilDelegationsEpoch: big.NewInt(defaultEpoch),
+		},
+		{
+			// 14: Undelegate with NoNilDelegationsEpoch set
+			// such that remaining == 0
+			// delegatorAddr has 15k ones delegated and 5k in Undelegations at defaultEpoch
+			sdb:   makeDefaultStateForUndelegate(t),
+			epoch: big.NewInt(defaultEpoch),
+			msg: func() staking.Undelegate {
+				msg := defaultMsgUndelegate()
+				msg.Amount = fifteenKOnes
+				return msg
+			}(),
+			expVWrapper: func(t *testing.T) staking.ValidatorWrapper {
+				w := makeDefaultSnapVWrapperForUndelegate(t)
+				w.Delegations[1].Amount = common.Big0
+				w.Delegations[1].Undelegations[0].Amount = twentyKOnes
+				return w
+			}(t),
+			noNilDelegationsEpoch: big.NewInt(defaultEpoch),
+		},
+
+
 	}
 	for i, test := range tests {
-		w, err := VerifyAndUndelegateFromMsg(test.sdb, test.epoch, &test.msg)
+		config := &params.ChainConfig{}
+		if test.noNilDelegationsEpoch != nil {
+			config.NoNilDelegationsEpoch = test.noNilDelegationsEpoch
+		} else {
+			config.NoNilDelegationsEpoch = big.NewInt(10000000) // EpochTBD
+		}
+		w, err := VerifyAndUndelegateFromMsg(test.sdb, test.epoch, config, &test.msg)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
@@ -1383,7 +1445,7 @@ func makeDefaultSnapVWrapperForUndelegate(t *testing.T) staking.ValidatorWrapper
 	w := makeVWrapperByIndex(validatorIndex)
 
 	newDelegation := staking.NewDelegation(delegatorAddr, new(big.Int).Set(twentyKOnes))
-	if err := newDelegation.Undelegate(big.NewInt(defaultEpoch), fiveKOnes); err != nil {
+	if err := newDelegation.Undelegate(big.NewInt(defaultEpoch), fiveKOnes, nil); err != nil {
 		t.Fatal(err)
 	}
 	w.Delegations = append(w.Delegations, newDelegation)

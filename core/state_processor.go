@@ -63,6 +63,7 @@ type ProcessorResult struct {
 	UsedGas    uint64
 	Reward     reward.Reader
 	State      *state.DB
+	DelegationsToRemove map[common.Address][]common.Address
 }
 
 // NewStateProcessor initialises a new StateProcessor.
@@ -96,6 +97,7 @@ func (p *StateProcessor) Process(
 	block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool,
 ) (
 	types.Receipts, types.CXReceipts, []staking.StakeMsg,
+	map[common.Address][]common.Address,
 	[]*types.Log, UsedGas, reward.Reader, *state.DB, error,
 ) {
 	cacheKey := block.Hash()
@@ -105,7 +107,7 @@ func (p *StateProcessor) Process(
 			// Only the successful results are cached in case for retry.
 			result := cached.(*ProcessorResult)
 			utils.Logger().Info().Str("block num", block.Number().String()).Msg("result cache hit.")
-			return result.Receipts, result.CxReceipts, result.StakeMsgs, result.Logs, result.UsedGas, result.Reward, result.State, nil
+			return result.Receipts, result.CxReceipts, result.StakeMsgs, result.DelegationsToRemove, result.Logs, result.UsedGas, result.Reward, result.State, nil
 		}
 	}
 
@@ -122,7 +124,7 @@ func (p *StateProcessor) Process(
 
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
 	if err != nil {
-		return nil, nil, nil, nil, 0, nil, statedb, err
+		return nil, nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
 	startTime := time.Now()
@@ -133,7 +135,7 @@ func (p *StateProcessor) Process(
 			p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
-			return nil, nil, nil, nil, 0, nil, statedb, err
+			return nil, nil, nil, nil, nil, 0, nil, statedb, err
 		}
 		receipts = append(receipts, receipt)
 		if cxReceipt != nil {
@@ -155,7 +157,7 @@ func (p *StateProcessor) Process(
 			p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
-			return nil, nil, nil, nil, 0, nil, statedb, err
+			return nil, nil, nil, nil, nil, 0, nil, statedb, err
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
@@ -168,7 +170,7 @@ func (p *StateProcessor) Process(
 		if err := ApplyIncomingReceipt(
 			p.bc.Config(), statedb, header, cx,
 		); err != nil {
-			return nil, nil,
+			return nil, nil, nil,
 				nil, nil, 0, nil, statedb, errors.New("[Process] Cannot apply incoming receipts")
 		}
 	}
@@ -176,14 +178,13 @@ func (p *StateProcessor) Process(
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, nil, 0, nil, statedb, errors.New(
-				"[Process] Cannot finalize block",
-			)
+			return nil, nil, nil, nil, nil, 0, nil, statedb, errors.Wrap(err,
+				"[Process] Cannot finalize block")
 		}
 	}
 
 	if err := MayTestnetShardReduction(p.bc, statedb, header); err != nil {
-		return nil, nil, nil, nil, 0, nil, statedb, err
+		return nil, nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
@@ -192,14 +193,14 @@ func (p *StateProcessor) Process(
 		// Block processing don't need to block on reward computation as in block proposal
 		sigsReady <- true
 	}()
-	_, payout, err := p.bc.Engine().Finalize(
+	_, delegationsToRemove, payout, err := p.bc.Engine().Finalize(
 		p.bc,
 		p.beacon,
 		header, statedb, block.Transactions(),
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
 	)
 	if err != nil {
-		return nil, nil, nil, nil, 0, nil, statedb, errors.WithMessage(err, "[Process] Cannot finalize block")
+		return nil, nil, nil, nil, nil, 0, nil, statedb, errors.WithMessage(err, "[Process] Cannot finalize block")
 	}
 
 	result := &ProcessorResult{
@@ -210,9 +211,10 @@ func (p *StateProcessor) Process(
 		UsedGas:    *usedGas,
 		Reward:     payout,
 		State:      statedb,
+		DelegationsToRemove: delegationsToRemove,
 	}
 	p.resultCache.Add(cacheKey, result)
-	return receipts, outcxs, blockStakeMsgs, allLogs, *usedGas, payout, statedb, nil
+	return receipts, outcxs, blockStakeMsgs, delegationsToRemove, allLogs, *usedGas, payout, statedb, nil
 }
 
 // CacheProcessorResult caches the process result on the cache key.

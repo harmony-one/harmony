@@ -243,7 +243,7 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
 	// moved from state_transition.go to here, with some modifications
 	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, undelegate *stakingTypes.Undelegate) error {
-		wrapper, err := VerifyAndUndelegateFromMsg(db, ref.Epoch(), undelegate)
+		wrapper, err := VerifyAndUndelegateFromMsg(db, ref.Epoch(), chain.Config(), undelegate)
 		if err != nil {
 			return err
 		}

@@ -48,6 +48,7 @@ type environment struct {
 	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
 	slashes    slash.Records
 	stakeMsgs  []staking.StakeMsg
+	delegationsToRemove map[common.Address][]common.Address
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -344,6 +345,7 @@ func (w *Worker) GetCurrentResult() *core.ProcessorResult {
 		Reward:     w.current.reward,
 		State:      w.current.state,
 		StakeMsgs:  w.current.stakeMsgs,
+		DelegationsToRemove: w.current.delegationsToRemove,
 	}
 }
 
@@ -555,7 +557,7 @@ func (w *Worker) FinalizeNewBlock(
 		}
 	}()
 
-	block, payout, err := w.chain.Engine().Finalize(
+	block, delegationsToRemove, payout, err := w.chain.Engine().Finalize(
 		w.chain,
 		w.beacon,
 		copyHeader, state, w.current.txs, w.current.receipts,
@@ -566,6 +568,7 @@ func (w *Worker) FinalizeNewBlock(
 		return nil, errors.Wrapf(err, "cannot finalize block")
 	}
 	w.current.reward = payout
+	w.current.delegationsToRemove = delegationsToRemove
 	return block, nil
 }
 

@@ -933,7 +933,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
 
-		_, err = VerifyAndUndelegateFromMsg(pool.currentState, pool.pendingEpoch(), stkMsg)
+		_, err = VerifyAndUndelegateFromMsg(pool.currentState, pool.pendingEpoch(), pool.chainconfig, stkMsg)
 		return err
 	case staking.DirectiveCollectRewards:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCollectRewards)
