@@ -145,7 +145,7 @@ func (p *StateProcessor) Process(
 			// ran out of accounts
 			processTxsAndStxs = false
 		}
-		if err != ErrNoMigrationRequired {
+		if err != ErrNoMigrationPossible && err != ErrNoMigrationRequired {
 			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 	} else {
