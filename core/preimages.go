@@ -187,6 +187,7 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 		return fmt.Errorf("too low starting point %d", start)
 	}
 	fmt.Println("generating from", start, "to", end)
+
 	// fetch all the blocks, from start and end both inclusive
 	// then execute them - the execution will write the pre-images
 	// to disk and we are good to go
@@ -235,6 +236,7 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	}
 	// force any pre-images in memory so far to go to disk, if they haven't already
 	fmt.Println("committing images")
+
 	if err := chain.CommitPreimages(); err != nil {
 		return fmt.Errorf("error committing preimages %s", err)
 	}
