@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -252,6 +253,12 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		for key, value := range account.Storage {
 			statedb.SetState(addr, key, value)
 		}
+		//statedb.AddPreimage(crypto.Keccak256Hash((addr[:])), addr.Bytes()[:])
+		rawdb.WritePreimages(
+			statedb.Database().DiskDB(), map[ethCommon.Hash][]byte{
+				crypto.Keccak256Hash((addr.Bytes())): addr.Bytes(),
+			},
+		)
 	}
 	root := statedb.IntermediateRoot(false)
 	shardStateBytes, err := shard.EncodeWrapper(g.ShardState, false)
