@@ -255,20 +255,37 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 // Add new transactions to the pending transaction list.
 func addPendingTransactions(registry *registry.Registry, newTxs types.Transactions) []error {
 	var (
-		errs     []error
-		bc       = registry.GetBlockchain()
-		txPool   = registry.GetTxPool()
-		poolTxs  = types.PoolTransactions{}
-		acceptCx = bc.Config().AcceptsCrossTx(bc.CurrentHeader().Epoch())
+		errs          []error
+		bc            = registry.GetBlockchain()
+		txPool        = registry.GetTxPool()
+		poolTxs       = types.PoolTransactions{}
+		epoch         = bc.CurrentHeader().Epoch()
+		acceptCx      = bc.Config().AcceptsCrossTx(epoch)
+		isBeforeHIP30 = bc.Config().IsEpochBeforeHIP30(epoch)
+		nxtShards     = shard.Schedule.InstanceForEpoch(new(big.Int).Add(epoch, common.Big1)).NumShards()
 	)
 	for _, tx := range newTxs {
-		if tx.ShardID() != tx.ToShardID() && !acceptCx {
-			errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
-			continue
+		if tx.ShardID() != tx.ToShardID() {
+			if !acceptCx {
+				errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
+				continue
+			}
+			if isBeforeHIP30 {
+				if tx.ToShardID() >= nxtShards {
+					errs = append(errs, errors.New("shards 2 and 3 are shutting down in the next epoch"))
+					continue
+				}
+			}
 		}
 		if tx.IsEthCompatible() && !bc.Config().IsEthCompatible(bc.CurrentBlock().Epoch()) {
 			errs = append(errs, errors.WithMessage(errInvalidEpoch, "ethereum tx not accepted yet"))
 			continue
+		}
+		if isBeforeHIP30 {
+			if bc.ShardID() >= nxtShards {
+				errs = append(errs, errors.New("shards 2 and 3 are shutting down in the next epoch"))
+				continue
+			}
 		}
 		poolTxs = append(poolTxs, tx)
 	}

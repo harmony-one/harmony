@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/csv"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -32,7 +30,6 @@ import (
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -48,7 +45,6 @@ import (
 	"github.com/harmony-one/harmony/common/ntp"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/hmy/downloader"
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/internal/common"
@@ -64,7 +60,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
-	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 // Host
@@ -384,85 +379,12 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	//// code to handle pre-image export, import and generation
 	if hc.Preimage != nil {
 		if hc.Preimage.ImportFrom != "" {
-			reader, err := os.Open(hc.Preimage.ImportFrom)
-			if err != nil {
-				fmt.Println("Could not open file for reading", err)
+			if err := core.ImportPreimages(
+				currentNode.Blockchain(),
+				hc.Preimage.ImportFrom,
+			); err != nil {
+				fmt.Println("Error importing", err)
 				os.Exit(1)
-			}
-			csvReader := csv.NewReader(reader)
-			chain := currentNode.Blockchain()
-			dbReader := chain.ChainDb()
-			imported := uint64(0)
-			for {
-				record, err := csvReader.Read()
-				if err == io.EOF {
-					fmt.Println("MyBlockNumber field missing, cannot proceed")
-					os.Exit(1)
-				}
-				if err != nil {
-					fmt.Println("Could not read from reader", err)
-					os.Exit(1)
-				}
-				// this means the address is a number
-				if blockNumber, err := strconv.ParseUint(record[1], 10, 64); err == nil {
-					if record[0] == "MyBlockNumber" {
-						// set this value in database, and prometheus, if needed
-						prev, err := rawdb.ReadPreimageImportBlock(dbReader)
-						if err != nil {
-							fmt.Println("No prior value found, overwriting")
-						}
-						if blockNumber > prev {
-							if rawdb.WritePreimageImportBlock(dbReader, blockNumber) != nil {
-								fmt.Println("Error saving last import block", err)
-								os.Exit(1)
-							}
-							// export blockNumber to prometheus
-							gauge := prom.NewGauge(
-								prom.GaugeOpts{
-									Namespace: "hmy",
-									Subsystem: "blockchain",
-									Name:      "last_preimage_import",
-									Help:      "the last known block for which preimages were imported",
-								},
-							)
-							prometheus.PromRegistry().MustRegister(
-								gauge,
-							)
-							gauge.Set(float64(blockNumber))
-						}
-						// this is the last record
-						imported = blockNumber
-						break
-					}
-				}
-				key := ethCommon.HexToHash(record[0])
-				value := ethCommon.Hex2Bytes(record[1])
-				// validate
-				if crypto.Keccak256Hash(value) != key {
-					fmt.Println("Data mismatch: skipping", record)
-					continue
-				}
-				// add to database
-				rawdb.WritePreimages(
-					dbReader, map[ethCommon.Hash][]byte{
-						key: value,
-					},
-				)
-			}
-			// now, at this point, we will have to generate missing pre-images
-			if imported != 0 {
-				genStart, _ := rawdb.ReadPreImageStartBlock(dbReader)
-				genEnd, _ := rawdb.ReadPreImageEndBlock(dbReader)
-				current := chain.CurrentBlock().NumberU64()
-				toGenStart, toGenEnd := core.FindMissingRange(imported, genStart, genEnd, current)
-				if toGenStart != 0 && toGenEnd != 0 {
-					if err := core.GeneratePreimages(
-						chain, toGenStart, toGenEnd,
-					); err != nil {
-						fmt.Println("Error generating", err)
-						os.Exit(1)
-					}
-				}
 			}
 			os.Exit(0)
 		} else if exportPath := hc.Preimage.ExportTo; exportPath != "" {
@@ -475,16 +397,23 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			}
 			os.Exit(0)
 			// both must be set
-		} else if hc.Preimage.GenerateStart > 0 && hc.Preimage.GenerateEnd > 0 {
+		} else if hc.Preimage.GenerateStart > 0 {
 			chain := currentNode.Blockchain()
 			end := hc.Preimage.GenerateEnd
-			if number := chain.CurrentBlock().NumberU64(); number > end {
+			current := chain.CurrentBlock().NumberU64()
+			if end > current {
 				fmt.Printf(
 					"Cropping generate endpoint from %d to %d\n",
-					number, end,
+					end, current,
 				)
-				end = number
+				end = current
 			}
+
+			if end == 0 {
+				end = current
+			}
+
+			fmt.Println("Starting generation")
 			if err := core.GeneratePreimages(
 				chain,
 				hc.Preimage.GenerateStart, end,
@@ -492,6 +421,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				fmt.Println("Error generating", err)
 				os.Exit(1)
 			}
+			fmt.Println("Generation successful")
 			os.Exit(0)
 		}
 		os.Exit(0)
