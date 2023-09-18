@@ -171,6 +171,7 @@ func (w *Worker) CommitTransactions(
 			return nil
 		}
 		if !errors.Is(err, core.ErrNoMigrationRequired) {
+
 			// this shard not migrating => ErrNoMigrationRequired
 			// any other error means exit this block
 			return err

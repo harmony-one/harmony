@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
@@ -188,6 +189,8 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	if start < 2 {
 		return fmt.Errorf("too low starting point %d", start)
 	}
+	fmt.Println("generating from", start, "to", end)
+
 	// fetch all the blocks, from start and end both inclusive
 	// then execute them - the execution will write the pre-images
 	// to disk and we are good to go
@@ -197,15 +200,18 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	var startingState *state.DB
 	var startingBlock *types.Block
 	for i := start - 1; i > 0; i-- {
+		fmt.Println("finding block number", i)
 		startingBlock = chain.GetBlockByNumber(i)
 		if startingBlock == nil {
+			fmt.Println("not found block number", i)
 			// rewound too much in snapdb, so exit loop
 			// although this is only designed for s2/s3 nodes in mind
 			// which do not have such a snapdb
 			break
 		}
+		fmt.Println("found block number", startingBlock.NumberU64(), startingBlock.Root().Hex())
 		state, err := chain.StateAt(startingBlock.Root())
-		if err == nil {
+		if err != nil {
 			continue
 		}
 		startingState = state
@@ -217,18 +223,23 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 
 	// now execute block T+1 based on starting state
 	for i := startingBlock.NumberU64() + 1; i <= end; i++ {
+		if i%100000 == 0 {
+			fmt.Println("processing block", i)
+		}
 		block := chain.GetBlockByNumber(i)
 		if block == nil {
 			// because we have startingBlock we must have all following
 			return fmt.Errorf("block %d not found", i)
 		}
 		_, _, _, _, _, _, endingState, err := chain.Processor().Process(block, startingState, *chain.GetVMConfig(), false)
-		if err == nil {
+		if err != nil {
 			return fmt.Errorf("error executing block #%d: %s", i, err)
 		}
 		startingState = endingState
 	}
 	// force any pre-images in memory so far to go to disk, if they haven't already
+	fmt.Println("committing images")
+
 	if err := chain.CommitPreimages(); err != nil {
 		return fmt.Errorf("error committing preimages %s", err)
 	}
