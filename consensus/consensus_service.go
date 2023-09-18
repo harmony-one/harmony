@@ -95,7 +95,7 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	if len(allKeys) != 0 {
 		consensus.LeaderPubKey = &allKeys[0]
 		consensus.getLogger().Info().
-			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
+			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("Setting leader as first validator, because provided new keys")
 	} else {
 		consensus.getLogger().Error().
 			Msg("[UpdatePublicKeys] Participants is empty")
