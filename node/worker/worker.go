@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -59,7 +58,6 @@ type Worker struct {
 	chain    core.BlockChain
 	beacon   core.BlockChain
 	current  *environment // An environment for current running cycle.
-	engine   consensus_engine.Engine
 	gasFloor uint64
 	gasCeil  uint64
 }
@@ -96,7 +94,7 @@ func (w *Worker) CommitSortedTransactions(
 		from, _ := types.Sender(signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
-		if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
+		if tx.Protected() && !w.chain.Config().IsEIP155(w.current.header.Epoch()) {
 			utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
 			txs.Pop()
 			continue
@@ -202,7 +200,7 @@ func (w *Worker) commitStakingTransaction(
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
 	receipt, _, err := core.ApplyStakingTransaction(
-		w.config, w.chain, &coinbase, w.current.gasPool,
+		w.chain, &coinbase, w.current.gasPool,
 		w.current.state, w.current.header, tx, &gasUsed, vm.Config{},
 	)
 	w.current.header.SetGasUsed(gasUsed)
@@ -239,7 +237,6 @@ func (w *Worker) commitTransaction(
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
 	receipt, cx, stakeMsgs, _, err := core.ApplyTransaction(
-		w.config,
 		w.chain,
 		&coinbase,
 		w.current.gasPool,
@@ -558,7 +555,7 @@ func (w *Worker) FinalizeNewBlock(
 		}
 	}()
 
-	block, payout, err := w.engine.Finalize(
+	block, payout, err := w.chain.Engine().Finalize(
 		w.chain,
 		w.beacon,
 		copyHeader, state, w.current.txs, w.current.receipts,
@@ -574,14 +571,13 @@ func (w *Worker) FinalizeNewBlock(
 
 // New create a new worker object.
 func New(
-	config *params.ChainConfig, chain core.BlockChain, beacon core.BlockChain, engine consensus_engine.Engine,
+	chain core.BlockChain, beacon core.BlockChain,
 ) *Worker {
 	worker := &Worker{
-		config:  config,
-		factory: blockfactory.NewFactory(config),
+		config:  chain.Config(),
+		factory: blockfactory.NewFactory(chain.Config()),
 		chain:   chain,
 		beacon:  beacon,
-		engine:  engine,
 	}
 	worker.gasFloor = 80000000
 	worker.gasCeil = 120000000
