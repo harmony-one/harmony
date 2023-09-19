@@ -208,11 +208,11 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 			break
 		}
 		fmt.Println("found block number", startingBlock.NumberU64(), startingBlock.Root().Hex())
-		state, err := chain.StateAt(startingBlock.Root())
+		stateAt, err := chain.StateAt(startingBlock.Root())
 		if err != nil {
 			continue
 		}
-		startingState = state
+		startingState = stateAt
 		break
 	}
 	if startingBlock == nil || startingState == nil {
