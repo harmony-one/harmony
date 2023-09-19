@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/eth/rpc"
@@ -28,4 +27,3 @@ func (s *PreimagesService) Export(_ context.Context, path string) error {
 	// these are by default not blocking
 	return core.ExportPreimages(s.hmy.BlockChain, path)
 }
-
