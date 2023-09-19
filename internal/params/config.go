@@ -335,6 +335,7 @@ var (
 		big.NewInt(1),                      // LeaderRotationExternalBeaconLeaders
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
+		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // HIP30Epoch
 		big.NewInt(0),                      // NoNilDelegationsEpoch
 	}
@@ -382,6 +383,7 @@ var (
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 		big.NewInt(0),        // HIP30Epoch
 		big.NewInt(0),        // NoNilDelegationsEpoch
+		big.NewInt(0),        // BlockGas30M
 	}
 
 	// TestRules ...
@@ -548,6 +550,8 @@ type ChainConfig struct {
 	// 3. Change from 250 to 200 nodes for remaining shards (mainnet and localnet)
 	// 4. Change the minimum validator commission from 5 to 7% (all nets)
 	HIP30Epoch *big.Int `json:"hip30-epoch,omitempty"`
+
+	BlockGas30MEpoch *big.Int `json:"block-gas-30m-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -801,6 +805,10 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
 	return isForked(c.LeaderRotationExternalNonBeaconLeaders, epoch)
+}
+
+func (c *ChainConfig) IsBlockGas30M(epoch *big.Int) bool {
+	return isForked(c.BlockGas30MEpoch, epoch)
 }
 
 func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int, shardID uint32) bool {
