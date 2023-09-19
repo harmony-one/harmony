@@ -145,7 +145,7 @@ func (p *StateProcessor) Process(
 			// ran out of accounts
 			processTxsAndStxs = false
 		}
-		if !errors.Is(err, ErrNoMigrationRequired) {
+		if !errors.Is(err, ErrNoMigrationRequired) && !errors.Is(err, ErrNoMigrationPossible) {
 			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 	} else {
@@ -576,13 +576,9 @@ func MayBalanceMigration(
 	if isDevnet || isLocalnet {
 		if config.IsOneEpochBeforeHIP30(header.Epoch()) {
 			if myShard := chain.ShardID(); myShard != shard.BeaconChainShardID {
-				parent := chain.GetBlockByHash(
+				parentRoot := chain.GetBlockByHash(
 					header.ParentHash(),
-				)
-				if parent == nil {
-					return nil, errors.Wrap(ErrNoMigrationPossible, "parent is nil")
-				}
-				parentRoot := parent.Root()
+				).Root() // for examining MPT at this root, should exist
 				// for examining MPT at this root, should exist
 				cx, err := generateOneMigrationMessage(
 					db, parentRoot,
@@ -641,13 +637,11 @@ func generateOneMigrationMessage(
 			key := accountIterator.LeafKey()
 			preimage := rawdb.ReadPreimage(db, common.BytesToHash(key))
 			if len(preimage) == 0 {
-				e := errors.New(
+				return nil, errors.New(
 					fmt.Sprintf(
 						"cannot find preimage for %x", key,
 					),
 				)
-				fmt.Println(e)
-				continue
 			}
 			address := common.BytesToAddress(preimage)
 			// skip blank address

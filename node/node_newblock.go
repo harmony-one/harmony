@@ -157,6 +157,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
+	// Execute all the time except for last block of epoch for shard 0
 	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) || node.Consensus.ShardID != 0 {
 		// Prepare normal and staking transactions retrieved from transaction pool
 		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")

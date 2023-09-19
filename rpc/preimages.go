@@ -23,7 +23,7 @@ func NewPreimagesAPI(hmy *hmy.Harmony, version string) rpc.API {
 	}
 }
 
-func (s *PreimagesService) Export(_ context.Context, path string) error {
+func (s *PreimagesService) Export(ctx context.Context, path string) error {
 	// these are by default not blocking
 	return core.ExportPreimages(s.hmy.BlockChain, path)
 }
