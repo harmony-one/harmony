@@ -7,8 +7,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/ethereum/go-ethereum/crypto"
-
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/api/service/prometheus"
