@@ -79,3 +79,19 @@ func (msg *Message) GetBlocksByHashesResponse() (*GetBlocksByHashesResponse, err
 	}
 	return gbResp, nil
 }
+
+// GetReceiptsResponse parse the message to GetReceiptsResponse
+func (msg *Message) GetReceiptsResponse() (*GetReceiptsResponse, error) {
+	resp := msg.GetResp()
+	if resp == nil {
+		return nil, errors.New("not response message")
+	}
+	if errResp := resp.GetErrorResponse(); errResp != nil {
+		return nil, &ResponseError{errResp.Error}
+	}
+	grResp := resp.GetGetReceiptsResponse()
+	if grResp == nil {
+		return nil, errors.New("not GetGetReceiptsResponse")
+	}
+	return grResp, nil
+}

@@ -168,7 +168,7 @@ func (ch *chainHelperImpl) getNodeData(hs []common.Hash) ([][]byte, error) {
 
 // getReceipts assembles the response to a receipt query.
 func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([]types.Receipts, error) {
-	receipts := make([]types.Receipts, 0, len(hs))
+	receipts := make([]types.Receipts, len(hs))
 	for i, hash := range hs {
 		// Retrieve the requested block's receipts
 		results := ch.chain.GetReceiptsByHash(hash)
@@ -178,7 +178,7 @@ func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([]types.Receipts, erro
 			}
 			return nil, errors.New("invalid hashes to get receipts")
 		}
-		receipts[i] = append(receipts[i], results...)
+		receipts[i] = results
 	}
 	return receipts, nil
 }
