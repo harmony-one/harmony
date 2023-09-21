@@ -3,6 +3,8 @@ package core
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/core/state/snapshot"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
@@ -442,4 +444,12 @@ func (a Stub) LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts 
 
 func (a Stub) CommitPreimages() error {
 	return errors.Errorf("method CommitPreimages not implemented for %s", a.Name)
+}
+
+func (a Stub) GetStateCache() state.Database {
+	return nil
+}
+
+func (a Stub) GetSnapshotTrie() *snapshot.Tree {
+	return nil
 }
