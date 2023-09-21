@@ -233,7 +233,12 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 		if err != nil {
 			return fmt.Errorf("error executing block #%d: %s", i, err)
 		}
-		startingState = endingState
+		stateAt, err := chain.StateAt(block.Root())
+		if err == nil && stateAt != nil {
+			startingState = stateAt
+		} else {
+			startingState = endingState
+		}
 	}
 	// force any pre-images in memory so far to go to disk, if they haven't already
 	fmt.Println("committing images")

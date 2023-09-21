@@ -254,9 +254,9 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 			statedb.SetState(addr, key, value)
 		}
 		//statedb.AddPreimage(crypto.Keccak256Hash((addr[:])), addr.Bytes()[:])
-		rawdb.WritePreimages(
+		_ = rawdb.WritePreimages(
 			statedb.Database().DiskDB(), map[ethCommon.Hash][]byte{
-				crypto.Keccak256Hash((addr.Bytes())): addr.Bytes(),
+				crypto.Keccak256Hash(addr.Bytes()): addr.Bytes(),
 			},
 		)
 	}
