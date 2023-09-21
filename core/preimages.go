@@ -229,12 +229,13 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 			// because we have startingBlock we must have all following
 			return fmt.Errorf("block %d not found", i)
 		}
+		stateAt, _ := chain.StateAt(block.Root())
 		_, _, _, _, _, _, endingState, err := chain.Processor().Process(block, startingState, *chain.GetVMConfig(), false)
 		if err != nil {
 			return fmt.Errorf("error executing block #%d: %s", i, err)
 		}
-		stateAt, err := chain.StateAt(block.Root())
-		if err == nil && stateAt != nil {
+
+		if stateAt != nil {
 			startingState = stateAt
 		} else {
 			startingState = endingState
