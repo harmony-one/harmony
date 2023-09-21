@@ -3709,6 +3709,14 @@ func (bc *BlockChainImpl) CommitPreimages() error {
 	return bc.stateCache.TrieDB().CommitPreimages()
 }
 
+func (bc *BlockChainImpl) GetStateCache() state.Database {
+	return bc.stateCache
+}
+
+func (bc *BlockChainImpl) GetSnapshotTrie() *snapshot.Tree {
+	return bc.snaps
+}
+
 var (
 	leveldbErrSpec         = "leveldb"
 	tooManyOpenFilesErrStr = "Too many open files"

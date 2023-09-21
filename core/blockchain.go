@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/state/snapshot"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -347,6 +348,8 @@ type BlockChain interface {
 
 	GetLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error)
 	CommitPreimages() error
+	GetStateCache() state.Database
+	GetSnapshotTrie() *snapshot.Tree
 
 	// ========== Only For Tikv Start ==========
 

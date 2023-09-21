@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	prom "github.com/prometheus/client_golang/prometheus"
 )
@@ -184,7 +183,7 @@ func ExportPreimages(chain BlockChain, path string) error {
 }
 
 func GeneratePreimages(chain BlockChain, start, end uint64) error {
-	if start < 2 {
+	if start < 1 {
 		return fmt.Errorf("too low starting point %d", start)
 	}
 	fmt.Println("generating from", start, "to", end)
@@ -195,32 +194,13 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 
 	// attempt to find a block number for which we have block and state
 	// with number < start
-	var startingState *state.DB
-	var startingBlock *types.Block
-	for i := start - 1; i > 0; i-- {
-		fmt.Println("finding block number", i)
-		startingBlock = chain.GetBlockByNumber(i)
-		if startingBlock == nil {
-			fmt.Println("not found block number", i)
-			// rewound too much in snapdb, so exit loop
-			// although this is only designed for s2/s3 nodes in mind
-			// which do not have such a snapdb
-			break
-		}
-		fmt.Println("found block number", startingBlock.NumberU64(), startingBlock.Root().Hex())
-		stateAt, err := chain.StateAt(startingBlock.Root())
-		if err != nil {
-			continue
-		}
-		startingState = stateAt
-		break
-	}
-	if startingBlock == nil || startingState == nil {
-		return fmt.Errorf("no eligible starting block with state found")
+	parent := chain.GetBlockByNumber(start)
+	if parent == nil {
+		return fmt.Errorf("parent block %d not found", start)
 	}
 
 	// now execute block T+1 based on starting state
-	for i := startingBlock.NumberU64() + 1; i <= end; i++ {
+	for i := parent.NumberU64() + 1; i <= end; i++ {
 		if i%100000 == 0 {
 			fmt.Println("processing block", i)
 		}
@@ -229,11 +209,16 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 			// because we have startingBlock we must have all following
 			return fmt.Errorf("block %d not found", i)
 		}
-		_, _, _, _, _, _, endingState, err := chain.Processor().Process(block, startingState, *chain.GetVMConfig(), false)
+
+		stateDB, err := state.New(parent.Root(), chain.GetStateCache(), chain.GetSnapshotTrie())
 		if err != nil {
+			return fmt.Errorf("unable to init the stateDB: %w", err)
+		}
+
+		if _, _, _, _, _, _, _, err := chain.Processor().Process(block, stateDB, *chain.GetVMConfig(), false); err != nil {
 			return fmt.Errorf("error executing block #%d: %s", i, err)
 		}
-		startingState = endingState
+		parent = block
 	}
 	// force any pre-images in memory so far to go to disk, if they haven't already
 	fmt.Println("committing images")
