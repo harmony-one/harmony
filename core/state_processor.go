@@ -57,10 +57,9 @@ const (
 //
 // StateProcessor implements Processor.
 type StateProcessor struct {
-	config      *params.ChainConfig // Chain configuration options
-	bc          BlockChain          // Canonical blockchain
-	beacon      BlockChain          // Beacon chain
-	resultCache *lru.Cache          // Cache for result after a certain block is processed
+	bc          BlockChain // Canonical blockchain
+	beacon      BlockChain // Beacon chain
+	resultCache *lru.Cache // Cache for result after a certain block is processed
 }
 
 // this structure is cached, and each individual element is returned
@@ -135,9 +134,7 @@ func (p *StateProcessor) Process(
 	}
 
 	processTxsAndStxs := true
-	cxReceipt, err := MayBalanceMigration(
-		gp, header, statedb, p.bc, p.config,
-	)
+	cxReceipt, err := MayBalanceMigration(gp, header, statedb, p.bc)
 	if err != nil {
 		if errors.Is(err, ErrNoMigrationPossible) {
 			// ran out of accounts
@@ -534,8 +531,8 @@ func MayBalanceMigration(
 	header *block.Header,
 	db *state.DB,
 	chain BlockChain,
-	config *params.ChainConfig,
 ) (*types.CXReceipt, error) {
+	config := chain.Config()
 	isMainnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Mainnet
 	if isMainnet {
 		if config.IsOneEpochBeforeHIP30(header.Epoch()) {
