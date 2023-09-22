@@ -57,9 +57,10 @@ const (
 //
 // StateProcessor implements Processor.
 type StateProcessor struct {
-	bc          BlockChain // Canonical blockchain
-	beacon      BlockChain // Beacon chain
-	resultCache *lru.Cache // Cache for result after a certain block is processed
+	config      *params.ChainConfig // Chain configuration options
+	bc          BlockChain          // Canonical blockchain
+	beacon      BlockChain          // Beacon chain
+	resultCache *lru.Cache          // Cache for result after a certain block is processed
 }
 
 // this structure is cached, and each individual element is returned
@@ -152,14 +153,14 @@ func (p *StateProcessor) Process(
 			processTxsAndStxs = false
 		}
 	}
-  
+
 	if processTxsAndStxs {
 		startTime := time.Now()
 		// Iterate over and process the individual transactions
 		for i, tx := range block.Transactions() {
 			statedb.Prepare(tx.Hash(), block.Hash(), i)
 			receipt, cxReceipt, stakeMsgs, _, err := ApplyTransaction(
-				p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+				p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 			)
 			if err != nil {
 				return nil, nil, nil, nil, 0, nil, statedb, err
@@ -181,7 +182,7 @@ func (p *StateProcessor) Process(
 		for i, tx := range block.StakingTransactions() {
 			statedb.Prepare(tx.Hash(), block.Hash(), i+L)
 			receipt, _, err := ApplyStakingTransaction(
-				p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+				p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 			)
 			if err != nil {
 				return nil, nil, nil, nil, 0, nil, statedb, err

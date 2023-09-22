@@ -295,9 +295,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	}
 
 	utils.Logger().Info().Msg("[ProposeNewBlock] verifying the new block header")
-  // err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
+	// err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
 	err = core.NewBlockValidator(node.Blockchain()).ValidateHeader(finalizedBlock, true)
-
 
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed verifying the new block header")
