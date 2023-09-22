@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -292,8 +293,11 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed finalizing the new block")
 		return nil, err
 	}
-	utils.Logger().Info().Msgf("[ProposeNewBlock] verifying the new block: shard %d, number %d, epoch %d", finalizedBlock.ShardID(), finalizedBlock.NumberU64(), finalizedBlock.Epoch().Uint64())
-	err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
+
+	utils.Logger().Info().Msg("[ProposeNewBlock] verifying the new block header")
+  // err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
+	err = core.NewBlockValidator(node.Blockchain()).ValidateHeader(finalizedBlock, true)
+
 
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed verifying the new block header")
@@ -360,7 +364,7 @@ Loop:
 			}
 		}
 
-		if err := node.Blockchain().Validator().ValidateCXReceiptsProof(cxp); err != nil {
+		if err := core.NewBlockValidator(node.Blockchain()).ValidateCXReceiptsProof(cxp); err != nil {
 			if strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
 				pendingReceiptsList = append(pendingReceiptsList, cxp)
 			} else {

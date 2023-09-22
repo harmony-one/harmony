@@ -392,7 +392,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 	// Sanity checks
 
-	if err := node.Blockchain().Validator().ValidateCXReceiptsProof(receipts); err != nil {
+	if err := core.NewBlockValidator(node.Blockchain()).ValidateCXReceiptsProof(receipts); err != nil {
 		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
 			utils.Logger().Error().Err(err).Msg("[AddPendingReceipts] Invalid CXReceiptsProof")
 			return
@@ -1126,7 +1126,7 @@ func New(
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.registry.SetTxPool(node.TxPool)
 		node.CxPool = node.registry.GetCxPool()
-		node.Worker = worker.New(node.Blockchain().Config(), blockchain, beaconChain, engine)
+		node.Worker = worker.New(blockchain, beaconChain)
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)

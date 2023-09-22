@@ -216,8 +216,8 @@ type BlockChainImpl struct {
 	procInterrupt int32 // interrupt signaler for block processing
 
 	engine                 consensus_engine.Engine
-	processor              Processor // block processor interface
-	validator              Validator // block and state validator interface
+	processor              *StateProcessor // block processor interface
+	validator              *BlockValidator
 	vmConfig               vm.Config
 	badBlocks              *lru.Cache // Bad block cache
 	pendingSlashes         slash.Records
@@ -336,8 +336,8 @@ func newBlockChainWithOptions(
 		beaconChain = bc
 	}
 
-	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
-	bc.SetProcessor(NewStateProcessor(chainConfig, bc, beaconChain, engine))
+	bc.validator = NewBlockValidator(bc)
+	bc.processor = NewStateProcessor(bc, beaconChain)
 
 	// Load any existing snapshot, regenerating it if loading failed
 	if bc.cacheConfig.SnapshotLimit > 0 {
@@ -461,7 +461,7 @@ func VerifyIncomingReceipts(blockchain BlockChain, block *types.Block) error {
 			}
 		}
 
-		if err := blockchain.Validator().ValidateCXReceiptsProof(cxp); err != nil {
+		if err := NewBlockValidator(blockchain).ValidateCXReceiptsProof(cxp); err != nil {
 			return errors.Wrapf(err, "[verifyIncomingReceipts] verification failed")
 		}
 	}
@@ -493,7 +493,7 @@ func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block, beaconChain Block
 	if block.NumberU64() <= bc.CurrentBlock().NumberU64() {
 		return errors.Errorf("block with the same block number is already committed: %d", block.NumberU64())
 	}
-	if err := bc.Validator().ValidateHeader(block, true); err != nil {
+	if err := bc.validator.ValidateHeader(block, true); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", block.Hash().Hex()).
 			Err(err).
@@ -555,7 +555,7 @@ func (bc *BlockChainImpl) validateNewBlock(block *types.Block) error {
 	}
 
 	// Verify all the hash roots (state, txns, receipts, cross-shard)
-	if err := bc.Validator().ValidateState(
+	if err := bc.validator.ValidateState(
 		block, state, receipts, cxReceipts, usedGas,
 	); err != nil {
 		bc.reportBlock(block, receipts, err)
@@ -739,24 +739,6 @@ func (bc *BlockChainImpl) CurrentBlock() *types.Block {
 // chain. The block is retrieved from the blockchain's internal cache.
 func (bc *BlockChainImpl) CurrentFastBlock() *types.Block {
 	return bc.currentFastBlock.Load().(*types.Block)
-}
-
-func (bc *BlockChainImpl) SetProcessor(processor Processor) {
-	bc.procmu.Lock()
-	defer bc.procmu.Unlock()
-	bc.processor = processor
-}
-
-func (bc *BlockChainImpl) SetValidator(validator Validator) {
-	bc.procmu.Lock()
-	defer bc.procmu.Unlock()
-	bc.validator = validator
-}
-
-func (bc *BlockChainImpl) Validator() Validator {
-	bc.procmu.RLock()
-	defer bc.procmu.RUnlock()
-	return bc.validator
 }
 
 func (bc *BlockChainImpl) Processor() Processor {
@@ -1693,8 +1675,8 @@ func (bc *BlockChainImpl) buildLeaderRotationMeta(curHeader *block.Header) error
 			return err
 		}
 		if curPubKey.Bytes != blockPubKey.Bytes || curHeader.Epoch().Uint64() != header.Epoch().Uint64() {
-			for j := i; i <= curHeader.NumberU64(); j++ {
-				header := bc.GetHeaderByNumber(i)
+			for j := i; j <= curHeader.NumberU64(); j++ {
+				header := bc.GetHeaderByNumber(j)
 				if header == nil {
 					return errors.New("header is nil")
 				}
@@ -1815,7 +1797,7 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			err = <-verifyHeadersResults
 		}
 		if err == nil {
-			err = bc.Validator().ValidateBody(block)
+			err = NewBlockValidator(bc).ValidateBody(block)
 		}
 		switch {
 		case err == ErrKnownBlock:
@@ -1933,7 +1915,7 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 
 		// Validate the state using the default validator
 		substart = time.Now()
-		if err := bc.Validator().ValidateState(
+		if err := bc.validator.ValidateState(
 			block, state, receipts, cxReceipts, usedGas,
 		); err != nil {
 			bc.reportBlock(block, receipts, err)

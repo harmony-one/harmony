@@ -40,17 +40,13 @@ import (
 //
 // BlockValidator implements validator.
 type BlockValidator struct {
-	config *params.ChainConfig     // Chain configuration options
-	bc     BlockChain              // Canonical blockchain
-	engine consensus_engine.Engine // Consensus engine used for validating
+	bc BlockChain // Canonical blockchain
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
-func NewBlockValidator(config *params.ChainConfig, blockchain BlockChain, engine consensus_engine.Engine) *BlockValidator {
+func NewBlockValidator(blockchain BlockChain) *BlockValidator {
 	validator := &BlockValidator{
-		config: config,
-		engine: engine,
-		bc:     blockchain,
+		bc: blockchain,
 	}
 	return validator
 }
@@ -103,7 +99,7 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.DB, re
 		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash(), receiptSha)
 	}
 
-	if v.config.AcceptsCrossTx(block.Epoch()) {
+	if v.bc.Config().AcceptsCrossTx(block.Epoch()) {
 		cxsSha := cxReceipts.ComputeMerkleRoot()
 		if cxsSha != header.OutgoingReceiptHash() {
 			legacySha := types.DeriveMultipleShardsSha(cxReceipts)
@@ -115,7 +111,7 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.DB, re
 
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
-	if root := statedb.IntermediateRoot(v.config.IsS3(header.Epoch())); header.Root() != root {
+	if root := statedb.IntermediateRoot(v.bc.Config().IsS3(header.Epoch())); header.Root() != root {
 		dump, _ := rlp.EncodeToBytes(header)
 		const msg = "invalid merkle root (remote: %x local: %x, rlp dump %s)"
 		return fmt.Errorf(msg, header.Root(), root, hex.EncodeToString(dump))
@@ -131,23 +127,9 @@ func (v *BlockValidator) ValidateHeader(block *types.Block, seal bool) error {
 		return errors.New("block is nil")
 	}
 	if h := block.Header(); h != nil {
-		return v.engine.VerifyHeader(v.bc, h, true)
+		return v.bc.Engine().VerifyHeader(v.bc, h, true)
 	}
 	return errors.New("header field was nil")
-}
-
-// ValidateHeaders verifies a batch of blocks' headers concurrently. The method returns a quit channel
-// to abort the operations and a results channel to retrieve the async verifications
-func (v *BlockValidator) ValidateHeaders(chain []*types.Block) (chan<- struct{}, <-chan error) {
-	// Start the parallel header verifier
-	headers := make([]*block.Header, len(chain))
-	seals := make([]bool, len(chain))
-
-	for i, block := range chain {
-		headers[i] = block.Header()
-		seals[i] = true
-	}
-	return v.engine.VerifyHeaders(v.bc, headers, seals)
 }
 
 // CalcGasLimit computes the gas limit of the next block after parent. It aims
@@ -189,7 +171,7 @@ func CalcGasLimit(parent *block.Header, gasFloor, gasCeil uint64) uint64 {
 
 // ValidateCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
 func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) error {
-	if !v.config.AcceptsCrossTx(cxp.Header.Epoch()) {
+	if !v.bc.Config().AcceptsCrossTx(cxp.Header.Epoch()) {
 		return errors.New("[ValidateCXReceiptsProof] cross shard receipt received before cx fork")
 	}
 
@@ -249,5 +231,5 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	// (4) verify blockHeader with seal
 	var commitSig bls.SerializedSignature
 	copy(commitSig[:], cxp.CommitSig)
-	return v.engine.VerifyHeaderSignature(v.bc, cxp.Header, commitSig, cxp.CommitBitmap)
+	return v.bc.Engine().VerifyHeaderSignature(v.bc, cxp.Header, commitSig, cxp.CommitBitmap)
 }
