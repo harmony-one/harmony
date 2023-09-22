@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 	prom "github.com/prometheus/client_golang/prometheus"
 )
 
@@ -28,7 +29,7 @@ func ImportPreimages(chain BlockChain, path string) error {
 	imported := uint64(0)
 	for {
 		record, err := csvReader.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return fmt.Errorf("MyBlockNumber field missing, cannot proceed")
 		}
 		if err != nil {
@@ -163,7 +164,6 @@ func ExportPreimages(chain BlockChain, path string) error {
 			fmt.Sprintf("%x", asHash.Bytes()),
 			fmt.Sprintf("%x", address.Bytes()),
 		})
-
 	}
 	// lastly, write the block number
 	csvWriter.Write(
