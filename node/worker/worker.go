@@ -155,7 +155,6 @@ func (w *Worker) CommitTransactions(
 		w.GetCurrentHeader(),
 		w.current.state,
 		w.chain,
-		w.chain.Config(),
 	)
 	if err != nil {
 		if errors.Is(err, core.ErrNoMigrationPossible) {
