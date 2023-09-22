@@ -364,7 +364,7 @@ func ApplyStakingTransaction(
 	vmenv := vm.NewEVM(context, statedb, config, cfg)
 
 	// Apply the transaction to the current state (included in the env)
-	gas, err = ApplyStakingMessage(vmenv, msg, gp, bc)
+	gas, err = ApplyStakingMessage(vmenv, msg, gp)
 	if err != nil {
 		return nil, 0, err
 	}

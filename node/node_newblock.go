@@ -1,7 +1,6 @@
 package node
 
 import (
-	"errors"
 	"sort"
 	"strings"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/pkg/errors"
 
 	staking "github.com/harmony-one/harmony/staking/types"
 
@@ -116,16 +116,18 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)
 	defer utils.AnalysisEnd("ProposeNewBlock", nowEpoch, blockNow)
 
-	node.Worker.UpdateCurrent()
-
-	header := node.Worker.GetCurrentHeader()
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
-	leaderKey := node.Consensus.GetLeaderPubKey()
+	env, err := node.Worker.UpdateCurrent()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update worker")
+	}
+
 	var (
+		header      = env.CurrentHeader()
+		leaderKey   = node.Consensus.GetLeaderPubKey()
 		coinbase    = node.GetAddressForBLSKey(leaderKey.Object, header.Epoch())
 		beneficiary = coinbase
-		err         error
 	)
 
 	// After staking, all coinbase will be the address of bls pub key
@@ -134,8 +136,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		coinbase.SetBytes(blsPubKeyBytes[:])
 	}
 
-	emptyAddr := common.Address{}
-	if coinbase == emptyAddr {
+	if coinbase == (common.Address{}) {
 		return nil, errors.New("[ProposeNewBlock] Failed setting coinbase")
 	}
 
