@@ -221,7 +221,7 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 
 	// now execute block T+1 based on starting state
 	for i := startingBlock.NumberU64() + 1; i <= end; i++ {
-		if i%100000 == 0 {
+		if i%10000 == 0 {
 			fmt.Println("processing block", i)
 		}
 		block := chain.GetBlockByNumber(i)
