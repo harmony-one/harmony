@@ -7,13 +7,16 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/common"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/api/service/prometheus"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 	prom "github.com/prometheus/client_golang/prometheus"
 )
 
@@ -315,4 +318,48 @@ func FindMissingRange(
 		return 0, 0
 	}
 	return 0, 0
+}
+
+func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
+	var existingPreimages uint64
+	parentRoot := chain.GetBlockByHash(
+		header.ParentHash(),
+	).Root() // for examining MPT at this root, should exist
+
+	db, err := chain.StateAt(parentRoot)
+	if err != nil {
+		return 0, err
+	}
+
+	trie, err := db.Database().OpenTrie(parentRoot)
+	if err != nil {
+		return 0, err
+	}
+	diskDB := db.Database().DiskDB()
+	// start the iteration
+	accountIterator := trie.NodeIterator(nil)
+	for accountIterator.Next(true) {
+		// leaf means leaf node of the MPT, which is an account
+		// the leaf key is the address
+		if accountIterator.Leaf() {
+			key := accountIterator.LeafKey()
+			preimage := rawdb.ReadPreimage(diskDB, common.BytesToHash(key))
+			if len(preimage) == 0 {
+				return 0, errors.New(
+					fmt.Sprintf(
+						"cannot find preimage for %x", key,
+					),
+				)
+			}
+			address := common.BytesToAddress(preimage)
+			// skip blank address
+			if address == (common.Address{}) {
+				continue
+			}
+
+			existingPreimages++
+		}
+	}
+
+	return existingPreimages, nil
 }
