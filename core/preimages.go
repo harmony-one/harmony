@@ -222,6 +222,8 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 		return fmt.Errorf("no eligible starting block with state found")
 	}
 
+	var endingState *state.DB
+	var errProcess error
 	// now execute block T+1 based on starting state
 	for i := startingBlock.NumberU64() + 1; i <= end; i++ {
 		if i%10000 == 0 {
@@ -233,12 +235,19 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 			return fmt.Errorf("block %d not found", i)
 		}
 		stateAt, _ := chain.StateAt(block.Root())
-		_, _, _, _, _, _, endingState, err := chain.Processor().Process(block, startingState, *chain.GetVMConfig(), false)
-		if err != nil {
-			return fmt.Errorf("error executing block #%d: %s", i, err)
+		_, _, _, _, _, _, endingState, errProcess = chain.Processor().Process(block, startingState, *chain.GetVMConfig(), false)
+		if errProcess != nil {
+			return fmt.Errorf("error executing block #%d: %s", i, errProcess)
 		}
 
 		if stateAt != nil {
+			if _, err := endingState.Commit(false); err != nil {
+				return fmt.Errorf("unabe to commit state for block '%d': %w", i, err)
+			}
+
+			if err := chain.CommitPreimages(); err != nil {
+				return fmt.Errorf("error committing preimages for block '%d': %w", i, err)
+			}
 			startingState = stateAt
 		} else {
 			startingState = endingState
@@ -246,6 +255,9 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	}
 	// force any pre-images in memory so far to go to disk, if they haven't already
 	fmt.Println("committing images")
+	if _, err := endingState.Commit(false); err != nil {
+		return fmt.Errorf("unabe to commit state for block '%d': %w", i, err)
+	}
 
 	if err := chain.CommitPreimages(); err != nil {
 		return fmt.Errorf("error committing preimages %s", err)
