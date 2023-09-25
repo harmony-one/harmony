@@ -169,6 +169,8 @@ func (p *StateProcessor) Process(
 			if len(stakeMsgs) > 0 {
 				blockStakeMsgs = append(blockStakeMsgs, stakeMsgs...)
 			}
+
+			StorePreimageFromTx(statedb, tx)
 			allLogs = append(allLogs, receipt.Logs...)
 		}
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Normal Txns")
@@ -684,4 +686,16 @@ func generateOneMigrationMessage(
 		}
 	}
 	return nil, nil
+}
+
+func StorePreimageFromTx(statedb *state.DB, tx *types.Transaction) {
+	sender, _ := tx.SenderAddress()
+
+	_ = rawdb.WritePreimages(statedb.Database().DiskDB(),
+		map[common.Hash][]byte{
+			crypto.Keccak256Hash(sender.Bytes()):  append(sender.Bytes()),
+			crypto.Keccak256Hash(tx.To().Bytes()): append(tx.To().Bytes()),
+		},
+	)
+
 }

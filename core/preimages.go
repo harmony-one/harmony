@@ -347,7 +347,7 @@ func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
 			if len(preimage) == 0 {
 				return 0, errors.New(
 					fmt.Sprintf(
-						"cannot find preimage for %x", key,
+						"cannot find preimage for %x after '%d' accounts", key, existingPreimages,
 					),
 				)
 			}
