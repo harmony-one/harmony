@@ -256,7 +256,7 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	// force any pre-images in memory so far to go to disk, if they haven't already
 	fmt.Println("committing images")
 	if _, err := endingState.Commit(false); err != nil {
-		return fmt.Errorf("unabe to commit state for block '%d': %w", i, err)
+		return fmt.Errorf("unabe to commit state for block: %w", err)
 	}
 
 	if err := chain.CommitPreimages(); err != nil {
