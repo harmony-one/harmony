@@ -52,6 +52,11 @@ type BlockChain interface {
 	// CurrentBlock retrieves the current head block of the canonical chain. The
 	// block is retrieved from the blockchain's internal cache.
 	CurrentBlock() *types.Block
+	// CurrentFastBlock retrieves the current fast-sync head block of the canonical
+	// block is retrieved from the blockchain's internal cache.
+	CurrentFastBlock() *types.Block
+	// Validator returns the current validator.
+	Validator() Validator
 	// Processor returns the current processor.
 	Processor() Processor
 	// State returns a new mutable state based on the current HEAD block.

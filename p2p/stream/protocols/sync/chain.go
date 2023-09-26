@@ -171,7 +171,10 @@ func (ch *chainHelperImpl) getNodeData(hs []common.Hash) ([][]byte, error) {
 				entry, err = ch.chain.ValidatorCode(hash)
 			}
 		}
-		if err == nil && len(entry) > 0 {
+		if err != nil {
+			return nil, err
+		}
+		if len(entry) > 0 {
 			nodes = append(nodes, entry)
 			bytes += len(entry)
 		}

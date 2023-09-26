@@ -1285,11 +1285,14 @@ func (bc *BlockChainImpl) InsertReceiptChain(blockChain types.Blocks, receiptCha
 		receipts := receiptChain[i]
 		// Short circuit insertion if shutting down or processing failed
 		if atomic.LoadInt32(&bc.procInterrupt) == 1 {
-			return 0, nil
+			return 0, fmt.Errorf("Premature abort during blocks processing")
 		}
-		// Short circuit if the owner header is unknown
+		// Add header if the owner header is unknown
 		if !bc.HasHeader(block.Hash(), block.NumberU64()) {
-			return 0, fmt.Errorf("containing header #%d [%x…] unknown", block.Number(), block.Hash().Bytes()[:4])
+			if err := rawdb.WriteHeader(batch, block.Header()); err != nil {
+				return 0, err
+			}
+			// return 0, fmt.Errorf("containing header #%d [%x…] unknown", block.Number(), block.Hash().Bytes()[:4])
 		}
 		// Skip if the entire data is already known
 		if bc.HasBlock(block.Hash(), block.NumberU64()) {
@@ -1332,17 +1335,9 @@ func (bc *BlockChainImpl) InsertReceiptChain(blockChain types.Blocks, receiptCha
 	}
 
 	// Update the head fast sync block if better
-	bc.mu.Lock()
 	head := blockChain[len(blockChain)-1]
-	if td := bc.GetTd(head.Hash(), head.NumberU64()); td != nil { // Rewind may have occurred, skip in that case
-		currentFastBlock := bc.CurrentFastBlock()
-		if bc.GetTd(currentFastBlock.Hash(), currentFastBlock.NumberU64()).Cmp(td) < 0 {
-			rawdb.WriteHeadFastBlockHash(bc.db, head.Hash())
-			bc.currentFastBlock.Store(head)
-			headFastBlockGauge.Update(int64(head.NumberU64()))
-		}
-	}
-	bc.mu.Unlock()
+	rawdb.WriteHeadFastBlockHash(bc.db, head.Hash())
+	bc.currentFastBlock.Store(head)
 
 	utils.Logger().Info().
 		Int32("count", stats.processed).
@@ -1354,7 +1349,7 @@ func (bc *BlockChainImpl) InsertReceiptChain(blockChain types.Blocks, receiptCha
 		Int32("ignored", stats.ignored).
 		Msg("Imported new block receipts")
 
-	return 0, nil
+	return int(stats.processed), nil
 }
 
 var lastWrite uint64

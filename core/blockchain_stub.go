@@ -49,6 +49,10 @@ func (a Stub) CurrentBlock() *types.Block {
 	return nil
 }
 
+func (a Stub) CurrentFastBlock() *types.Block {
+	return nil
+}
+
 func (a Stub) Validator() Validator {
 	return nil
 }
