@@ -310,7 +310,7 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("apply failed from='%s' balance='%s' type='%s' value='%s': %w", msg.From().Hex(), statedb.GetBalance(msg.From()).String(), txType, tx.Value().String(), err)
+		return nil, nil, nil, 0, errors.Wrapf(err, "apply failed from='%s' to='%s' balance='%s'", msg.From().Hex(), msg.To().Hex(), statedb.GetBalance(msg.From()).String())
 	}
 	// Update the state with pending changes
 	var root []byte

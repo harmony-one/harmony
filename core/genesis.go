@@ -253,17 +253,19 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		for key, value := range account.Storage {
 			statedb.SetState(addr, key, value)
 		}
-		//statedb.AddPreimage(crypto.Keccak256Hash((addr[:])), addr.Bytes()[:])
-		_ = rawdb.WritePreimages(
+		if err := rawdb.WritePreimages(
 			statedb.Database().DiskDB(), map[ethCommon.Hash][]byte{
 				crypto.Keccak256Hash(addr.Bytes()): addr.Bytes(),
 			},
-		)
+		); err != nil {
+			utils.Logger().Error().Err(err).Msg("Failed to store preimage")
+			os.Exit(1)
+		}
 	}
 	root := statedb.IntermediateRoot(false)
 	shardStateBytes, err := shard.EncodeWrapper(g.ShardState, false)
 	if err != nil {
-		utils.Logger().Error().Msg("failed to rlp-serialize genesis shard state")
+		utils.Logger().Error().Err(err).Msg("failed to rlp-serialize genesis shard state")
 		os.Exit(1)
 	}
 	head := g.Factory.NewHeader(common.Big0).With().

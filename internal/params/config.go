@@ -285,7 +285,7 @@ var (
 		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
 		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  big.NewInt(2),
-		HIP30Epoch:                             big.NewInt(3),
+		HIP30Epoch:                             EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -807,7 +807,6 @@ func (c *ChainConfig) IsHIP30(epoch *big.Int) bool {
 // their balances over to shard 0 or 1.
 func (c *ChainConfig) IsOneEpochBeforeHIP30(epoch *big.Int) bool {
 	return epoch.Sub(c.HIP30Epoch, epoch).Cmp(common.Big1) == 0
-	//return isForked(new(big.Int).Sub(c.HIP30Epoch, common.Big1), epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
