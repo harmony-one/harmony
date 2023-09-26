@@ -240,8 +240,10 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 		}
 
 		if stateAt != nil {
-			if _, err := endingState.Commit(false); err != nil {
+			if root, err := endingState.Commit(false); err != nil {
 				return fmt.Errorf("unabe to commit state for block '%d': %w", i, err)
+			} else if root.Hex() != block.Root().Hex() {
+				return fmt.Errorf("block root hashes different after commit commitRoot='%s' blockRoot='%s'", root.Hex(), block.Root().Hex())
 			}
 
 			if err := chain.CommitPreimages(); err != nil {
