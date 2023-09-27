@@ -328,11 +328,13 @@ func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
 			key := accountIterator.LeafKey()
 			preimage := rawdb.ReadPreimage(diskDB, common.BytesToHash(key))
 			if len(preimage) == 0 {
-				return 0, errors.New(
+				err := errors.New(
 					fmt.Sprintf(
 						"cannot find preimage for %x after '%d' accounts", key, existingPreimages,
 					),
 				)
+				utils.Logger().Warn().Msg(err.Error())
+				return existingPreimages, err
 			}
 			address := common.BytesToAddress(preimage)
 			// skip blank address

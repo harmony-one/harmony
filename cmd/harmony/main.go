@@ -504,9 +504,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			Msg("Start Rosetta failed")
 	}
 
-	go func() {
-		core.WritePreimagesMetricsIntoPrometheus(currentNode.Blockchain(), currentNode.Consensus.UpdatePreimageGenerationMetrics)
-	}()
+	go core.WritePreimagesMetricsIntoPrometheus(
+		currentNode.Blockchain(),
+		currentNode.Consensus.UpdatePreimageGenerationMetrics,
+	)
+
 	go listenOSSigAndShutDown(currentNode)
 
 	if !hc.General.IsOffline {
