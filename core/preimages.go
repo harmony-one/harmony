@@ -88,6 +88,9 @@ func ImportPreimages(chain BlockChain, path string) error {
 
 // ExportPreimages is public so `main.go` can call it directly`
 func ExportPreimages(chain BlockChain, path string) error {
+	if err := chain.CommitPreimages(); err != nil {
+		return fmt.Errorf("unable to commit preimages: %w", err)
+	}
 	// set up csv
 	writer, err := os.Create(path)
 	if err != nil {
@@ -310,6 +313,11 @@ func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	if err := chain.CommitPreimages(); err != nil {
+		return 0, fmt.Errorf("unable to commit preimages: %w", err)
+	}
+
 	diskDB := db.Database().DiskDB()
 	// start the iteration
 	accountIterator := trie.NodeIterator(nil)
