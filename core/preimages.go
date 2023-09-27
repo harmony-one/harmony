@@ -347,8 +347,9 @@ func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
 	return existingPreimages, nil
 }
 
-func WritePreimagesMetricsIntoPrometheus(chain BlockChain, sendMetrics func(preimageStart, preimageEnd, lastPreimageImport, verifiedAddresses uint64)) {
-	if chain.ShardID() < 2 {
+func WritePreimagesMetricsIntoPrometheus(chain BlockChain, sendMetrics func(preimageStart, preimageEnd, lastPreimageImport, verifiedAddresses uint64, shard uint32)) {
+	shardID := chain.ShardID()
+	if shardID < 2 {
 		return
 	}
 
@@ -365,7 +366,7 @@ func WritePreimagesMetricsIntoPrometheus(chain BlockChain, sendMetrics func(prei
 			chain.CurrentBlock().NumberU64()
 			verify, _ := VerifyPreimages(chain.CurrentBlock().Header(), chain)
 
-			sendMetrics(startBlock, endBlock, lastImport, verify)
+			sendMetrics(startBlock, endBlock, lastImport, verify, shardID)
 		}
 	}
 }
