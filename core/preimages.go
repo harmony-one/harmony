@@ -6,11 +6,11 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
@@ -339,10 +339,25 @@ func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
 	return existingPreimages, nil
 }
 
-func WritePreimagesMetricsIntoPrometheus(dbReader ethdb.Database, sendMetrics func(preimageStart, preimageEnd, lastPreimageImport uint64)) {
-	lastImport, _ := rawdb.ReadPreimageImportBlock(dbReader)
-	startBlock, _ := rawdb.ReadPreImageStartBlock(dbReader)
-	endBlock, _ := rawdb.ReadPreImageEndBlock(dbReader)
+func WritePreimagesMetricsIntoPrometheus(chain BlockChain, sendMetrics func(preimageStart, preimageEnd, lastPreimageImport, verifiedAddresses uint64)) {
+	if chain.ShardID() < 2 {
+		return
+	}
 
-	sendMetrics(startBlock, endBlock, lastImport)
+	ticker := time.NewTicker(time.Minute * 5)
+	dbReader := chain.ChainDb()
+
+	for {
+		select {
+		case <-ticker.C:
+			lastImport, _ := rawdb.ReadPreimageImportBlock(dbReader)
+			startBlock, _ := rawdb.ReadPreImageStartBlock(dbReader)
+			endBlock, _ := rawdb.ReadPreImageEndBlock(dbReader)
+
+			chain.CurrentBlock().NumberU64()
+			verify, _ := VerifyPreimages(chain.CurrentBlock().Header(), chain)
+
+			sendMetrics(startBlock, endBlock, lastImport, verify)
+		}
+	}
 }

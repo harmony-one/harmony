@@ -25,7 +25,14 @@ var (
 			Help:      "the last block for which pre-image generation ran locally",
 		},
 	)
-
+	verifiedPreimagesGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "blockchain",
+			Name:      "verified_preimages",
+			Help:      "the number of verified preimages",
+		},
+	)
 	lastPreimageImportGauge = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: "hmy",
@@ -129,7 +136,7 @@ func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum flo
 	consensusCounterVec.With(prometheus.Labels{"consensus": "num_commits"}).Add(numCommits)
 	consensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(numCommits)
 }
-func (consensus *Consensus) UpdatePreimageGenerationMetrics(preimageStart, preimageEnd, lastPreimageImport uint64) {
+func (consensus *Consensus) UpdatePreimageGenerationMetrics(preimageStart, preimageEnd, lastPreimageImport, verifiedAddresses uint64) {
 	if lastPreimageImport > 0 {
 		lastPreimageImportGauge.Set(float64(lastPreimageImport))
 	}
@@ -138,6 +145,9 @@ func (consensus *Consensus) UpdatePreimageGenerationMetrics(preimageStart, preim
 	}
 	if preimageEnd > 0 {
 		preimageEndGauge.Set(float64(preimageEnd))
+	}
+	if verifiedAddresses > 0 {
+		verifiedPreimagesGauge.Set(float64(verifiedAddresses))
 	}
 }
 

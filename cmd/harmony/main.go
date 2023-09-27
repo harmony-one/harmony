@@ -505,7 +505,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	}
 
 	go func() {
-		core.WritePreimagesMetricsIntoPrometheus(currentNode.Blockchain().ChainDb(), currentNode.Consensus.UpdatePreimageGenerationMetrics)
+		core.WritePreimagesMetricsIntoPrometheus(currentNode.Blockchain(), currentNode.Consensus.UpdatePreimageGenerationMetrics)
 	}()
 	go listenOSSigAndShutDown(currentNode)
 
