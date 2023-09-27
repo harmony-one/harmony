@@ -10,14 +10,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/api/service/prometheus"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
-	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 // ImportPreimages is public so `main.go` can call it directly`
@@ -49,19 +48,6 @@ func ImportPreimages(chain BlockChain, path string) error {
 					if rawdb.WritePreimageImportBlock(dbReader, blockNumber) != nil {
 						return fmt.Errorf("error saving last import block: %s", err)
 					}
-					// export blockNumber to prometheus
-					gauge := prom.NewGauge(
-						prom.GaugeOpts{
-							Namespace: "hmy",
-							Subsystem: "blockchain",
-							Name:      "last_preimage_import",
-							Help:      "the last known block for which preimages were imported",
-						},
-					)
-					prometheus.PromRegistry().MustRegister(
-						gauge,
-					)
-					gauge.Set(float64(blockNumber))
 				}
 				// this is the last record
 				imported = blockNumber
@@ -263,34 +249,10 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	if err := chain.CommitPreimages(); err != nil {
 		return fmt.Errorf("error committing preimages %s", err)
 	}
-	// save information about generated pre-images start and end nbs
-	var gauge1, gauge2 uint64
-	var err error
-	if gauge1, gauge2, err = rawdb.WritePreImageStartEndBlock(chain.ChainDb(), startingBlock.NumberU64()+1, end); err != nil {
+
+	if _, _, err := rawdb.WritePreImageStartEndBlock(chain.ChainDb(), startingBlock.NumberU64()+1, end); err != nil {
 		return fmt.Errorf("error writing pre-image gen blocks %s", err)
 	}
-	// add prometheus metrics as well
-	startGauge := prom.NewGauge(
-		prom.GaugeOpts{
-			Namespace: "hmy",
-			Subsystem: "blockchain",
-			Name:      "preimage_start",
-			Help:      "the first block for which pre-image generation ran locally",
-		},
-	)
-	endGauge := prom.NewGauge(
-		prom.GaugeOpts{
-			Namespace: "hmy",
-			Subsystem: "blockchain",
-			Name:      "preimage_end",
-			Help:      "the last block for which pre-image generation ran locally",
-		},
-	)
-	prometheus.PromRegistry().MustRegister(
-		startGauge, endGauge,
-	)
-	startGauge.Set(float64(gauge1))
-	endGauge.Set(float64(gauge2))
 	return nil
 }
 func FindMissingRange(
@@ -375,4 +337,12 @@ func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
 	}
 
 	return existingPreimages, nil
+}
+
+func WritePreimagesMetricsIntoPrometheus(dbReader ethdb.Database, sendMetrics func(preimageStart, preimageEnd, lastPreimageImport uint64)) {
+	lastImport, _ := rawdb.ReadPreimageImportBlock(dbReader)
+	startBlock, _ := rawdb.ReadPreImageStartBlock(dbReader)
+	endBlock, _ := rawdb.ReadPreImageEndBlock(dbReader)
+
+	sendMetrics(startBlock, endBlock, lastImport)
 }

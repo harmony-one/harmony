@@ -9,6 +9,32 @@ import (
 )
 
 var (
+	preimageStartGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "blockchain",
+			Name:      "preimage_start",
+			Help:      "the first block for which pre-image generation ran locally",
+		},
+	)
+	preimageEndGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "blockchain",
+			Name:      "preimage_end",
+			Help:      "the last block for which pre-image generation ran locally",
+		},
+	)
+
+	lastPreimageImportGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "blockchain",
+			Name:      "last_preimage_import",
+			Help:      "the last known block for which preimages were imported",
+		},
+	)
+
 	// consensusCounterVec is used to keep track of consensus reached
 	consensusCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -103,6 +129,17 @@ func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum flo
 	consensusCounterVec.With(prometheus.Labels{"consensus": "num_commits"}).Add(numCommits)
 	consensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(numCommits)
 }
+func (consensus *Consensus) UpdatePreimageGenerationMetrics(preimageStart, preimageEnd, lastPreimageImport uint64) {
+	if lastPreimageImport > 0 {
+		lastPreimageImportGauge.Set(float64(lastPreimageImport))
+	}
+	if preimageStart > 0 {
+		preimageStartGauge.Set(float64(preimageStart))
+	}
+	if preimageEnd > 0 {
+		preimageEndGauge.Set(float64(preimageEnd))
+	}
+}
 
 // AddPubkeyMetrics add the list of blskeys to prometheus metrics
 func (consensus *Consensus) AddPubkeyMetrics() {
@@ -122,6 +159,9 @@ func initMetrics() {
 			consensusGaugeVec,
 			consensusPubkeyVec,
 			consensusFinalityHistogram,
+			lastPreimageImportGauge,
+			preimageEndGauge,
+			preimageStartGauge,
 		)
 	})
 }
