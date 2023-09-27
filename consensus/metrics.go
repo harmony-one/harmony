@@ -172,6 +172,7 @@ func initMetrics() {
 			lastPreimageImportGauge,
 			preimageEndGauge,
 			preimageStartGauge,
+			verifiedPreimagesGauge,
 		)
 	})
 }
