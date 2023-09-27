@@ -250,7 +250,7 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 		return fmt.Errorf("error committing preimages %s", err)
 	}
 
-	if _, _, err := rawdb.WritePreImageStartEndBlock(chain.ChainDb(), startingBlock.NumberU64()+1, end); err != nil {
+	if _, _, err := rawdb.WritePreImageStartEndBlock(chain.ChainDb(), startingBlock.NumberU64(), end); err != nil {
 		return fmt.Errorf("error writing pre-image gen blocks %s", err)
 	}
 	return nil
