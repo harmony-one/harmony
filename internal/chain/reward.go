@@ -412,7 +412,8 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("After Chain Reward (AddReward)")
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("After Chain Reward")
 
-	return remainingReward, network.NewStakingEraRewardForRound(
+	// remainingReward needs to be multipled with the number of crosslinks across all shards
+	return remainingReward.MulInt(big.NewInt(int64(len(allCrossLinks)))), network.NewStakingEraRewardForRound(
 		newRewards, payouts,
 	), nil
 }
