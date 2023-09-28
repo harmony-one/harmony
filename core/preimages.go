@@ -6,18 +6,17 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
-	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 // ImportPreimages is public so `main.go` can call it directly`
@@ -49,19 +48,6 @@ func ImportPreimages(chain BlockChain, path string) error {
 					if rawdb.WritePreimageImportBlock(dbReader, blockNumber) != nil {
 						return fmt.Errorf("error saving last import block: %s", err)
 					}
-					// export blockNumber to prometheus
-					gauge := prom.NewGauge(
-						prom.GaugeOpts{
-							Namespace: "hmy",
-							Subsystem: "blockchain",
-							Name:      "last_preimage_import",
-							Help:      "the last known block for which preimages were imported",
-						},
-					)
-					prometheus.PromRegistry().MustRegister(
-						gauge,
-					)
-					gauge.Set(float64(blockNumber))
 				}
 				// this is the last record
 				imported = blockNumber
@@ -102,6 +88,9 @@ func ImportPreimages(chain BlockChain, path string) error {
 
 // ExportPreimages is public so `main.go` can call it directly`
 func ExportPreimages(chain BlockChain, path string) error {
+	if err := chain.CommitPreimages(); err != nil {
+		return fmt.Errorf("unable to commit preimages: %w", err)
+	}
 	// set up csv
 	writer, err := os.Create(path)
 	if err != nil {
@@ -263,34 +252,10 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	if err := chain.CommitPreimages(); err != nil {
 		return fmt.Errorf("error committing preimages %s", err)
 	}
-	// save information about generated pre-images start and end nbs
-	var gauge1, gauge2 uint64
-	var err error
-	if gauge1, gauge2, err = rawdb.WritePreImageStartEndBlock(chain.ChainDb(), startingBlock.NumberU64()+1, end); err != nil {
+
+	if _, _, err := rawdb.WritePreImageStartEndBlock(chain.ChainDb(), startingBlock.NumberU64(), end); err != nil {
 		return fmt.Errorf("error writing pre-image gen blocks %s", err)
 	}
-	// add prometheus metrics as well
-	startGauge := prom.NewGauge(
-		prom.GaugeOpts{
-			Namespace: "hmy",
-			Subsystem: "blockchain",
-			Name:      "preimage_start",
-			Help:      "the first block for which pre-image generation ran locally",
-		},
-	)
-	endGauge := prom.NewGauge(
-		prom.GaugeOpts{
-			Namespace: "hmy",
-			Subsystem: "blockchain",
-			Name:      "preimage_end",
-			Help:      "the last block for which pre-image generation ran locally",
-		},
-	)
-	prometheus.PromRegistry().MustRegister(
-		startGauge, endGauge,
-	)
-	startGauge.Set(float64(gauge1))
-	endGauge.Set(float64(gauge2))
 	return nil
 }
 func FindMissingRange(
@@ -348,6 +313,11 @@ func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	if err := chain.CommitPreimages(); err != nil {
+		return 0, fmt.Errorf("unable to commit preimages: %w", err)
+	}
+
 	diskDB := db.Database().DiskDB()
 	// start the iteration
 	accountIterator := trie.NodeIterator(nil)
@@ -358,11 +328,13 @@ func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
 			key := accountIterator.LeafKey()
 			preimage := rawdb.ReadPreimage(diskDB, common.BytesToHash(key))
 			if len(preimage) == 0 {
-				return 0, errors.New(
+				err := errors.New(
 					fmt.Sprintf(
 						"cannot find preimage for %x after '%d' accounts", key, existingPreimages,
 					),
 				)
+				utils.Logger().Warn().Msg(err.Error())
+				return existingPreimages, err
 			}
 			address := common.BytesToAddress(preimage)
 			// skip blank address
@@ -375,4 +347,28 @@ func VerifyPreimages(header *block.Header, chain BlockChain) (uint64, error) {
 	}
 
 	return existingPreimages, nil
+}
+
+func WritePreimagesMetricsIntoPrometheus(chain BlockChain, sendMetrics func(preimageStart, preimageEnd, lastPreimageImport, verifiedAddresses uint64, shard uint32)) {
+	shardID := chain.ShardID()
+	if shardID < 2 {
+		return
+	}
+
+	ticker := time.NewTicker(time.Minute * 5)
+	dbReader := chain.ChainDb()
+
+	for {
+		select {
+		case <-ticker.C:
+			lastImport, _ := rawdb.ReadPreimageImportBlock(dbReader)
+			startBlock, _ := rawdb.ReadPreImageStartBlock(dbReader)
+			endBlock, _ := rawdb.ReadPreImageEndBlock(dbReader)
+
+			chain.CurrentBlock().NumberU64()
+			verify, _ := VerifyPreimages(chain.CurrentBlock().Header(), chain)
+
+			sendMetrics(startBlock, endBlock, lastImport, verify, shardID)
+		}
+	}
 }
