@@ -2537,7 +2537,9 @@ func (bc *BlockChainImpl) CachePendingCrossLinks(crossLinks []types.CrossLink) e
 	m := map[uint32]map[uint64]types.CrossLink{}
 	for _, cl := range crossLinks {
 		if _, ok := m[cl.ShardID()]; !ok {
-			m[cl.ShardID()] = map[uint64]types.CrossLink{}
+			m[cl.ShardID()] = map[uint64]types.CrossLink{
+				cl.BlockNum(): cl,
+			}
 		}
 		m[cl.ShardID()][cl.BlockNum()] = cl
 	}
@@ -2626,7 +2628,9 @@ func (bc *BlockChainImpl) DeleteFromPendingCrossLinks(crossLinks []types.CrossLi
 	m := map[uint32]map[uint64]struct{}{}
 	for _, cl := range crossLinks {
 		if _, ok := m[cl.ShardID()]; !ok {
-			m[cl.ShardID()] = map[uint64]struct{}{}
+			m[cl.ShardID()] = map[uint64]struct{}{
+				cl.BlockNum(): {},
+			}§
 		}
 		m[cl.ShardID()][cl.BlockNum()] = struct{}{}
 	}
