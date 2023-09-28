@@ -2630,7 +2630,7 @@ func (bc *BlockChainImpl) DeleteFromPendingCrossLinks(crossLinks []types.CrossLi
 		if _, ok := m[cl.ShardID()]; !ok {
 			m[cl.ShardID()] = map[uint64]struct{}{
 				cl.BlockNum(): {},
-			}§
+			}
 		}
 		m[cl.ShardID()][cl.BlockNum()] = struct{}{}
 	}
