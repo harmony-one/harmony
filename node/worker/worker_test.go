@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -99,4 +100,13 @@ func TestCommitTransactions(t *testing.T) {
 	if len(worker.current.txs) != 1 {
 		t.Error("Transaction is not committed")
 	}
+}
+
+func TestGasLimit(t *testing.T) {
+	w := newWorker(
+		&params.ChainConfig{
+			BlockGas30MEpoch: big.NewInt(10),
+		}, nil, nil)
+	require.EqualValues(t, 80_000_000, w.GasFloor(big.NewInt(3)))
+	require.EqualValues(t, 30_000_000, w.GasFloor(big.NewInt(10)))
 }

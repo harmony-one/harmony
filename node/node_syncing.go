@@ -29,7 +29,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -269,7 +268,7 @@ func (node *Node) doBeaconSyncing() {
 }
 
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
-func (node *Node) DoSyncing(bc core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
+func (node *Node) DoSyncing(bc core.BlockChain, willJoinConsensus bool) {
 	if node.NodeConfig.IsOffline {
 		return
 	}
@@ -280,15 +279,15 @@ func (node *Node) DoSyncing(bc core.BlockChain, worker *worker.Worker, willJoinC
 	for {
 		select {
 		case <-ticker.C:
-			node.doSync(bc, worker, willJoinConsensus)
+			node.doSync(bc, willJoinConsensus)
 		case <-node.Consensus.BlockNumLowChan:
-			node.doSync(bc, worker, willJoinConsensus)
+			node.doSync(bc, willJoinConsensus)
 		}
 	}
 }
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
-func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
+func (node *Node) doSync(bc core.BlockChain, willJoinConsensus bool) {
 
 	syncInstance := node.SyncInstance()
 	if syncInstance.GetActivePeerNumber() < legacysync.NumPeersLowBound {
@@ -317,7 +316,7 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 			node.Consensus.BlocksNotSynchronized()
 		}
 		isBeacon := bc.ShardID() == shard.BeaconChainShardID
-		syncInstance.SyncLoop(bc, worker, isBeacon, node.Consensus, legacysync.LoopMinTime)
+		syncInstance.SyncLoop(bc, isBeacon, node.Consensus, legacysync.LoopMinTime)
 		if willJoinConsensus {
 			node.IsSynchronized.Set()
 			node.Consensus.BlocksSynchronized()
@@ -388,7 +387,7 @@ func (node *Node) supportSyncing() {
 		utils.Logger().Debug().Msg("[SYNC] initialized state for staged sync")
 	}
 
-	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
+	go node.DoSyncing(node.Blockchain(), joinConsensus)
 }
 
 // InitSyncingServer starts downloader server.

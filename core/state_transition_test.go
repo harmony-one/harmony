@@ -76,7 +76,7 @@ func testApplyStakingMessage(test applyStakingMessageTest, t *testing.T) {
 		vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
 
 		// run the staking tx
-		_, err := ApplyStakingMessage(vmenv, msg, gp, chain)
+		_, err := ApplyStakingMessage(vmenv, msg, gp)
 		if err != nil {
 			if test.expectedError == nil {
 				t.Errorf(fmt.Sprintf("Got error %v but expected none", err))
@@ -193,7 +193,7 @@ func TestCollectGasRounding(t *testing.T) {
 
 	vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
 	gasPool := new(GasPool).AddGas(math.MaxUint64)
-	st := NewStateTransition(vmenv, msg, gasPool, nil)
+	st := NewStateTransition(vmenv, msg, gasPool)
 	// buy gas to set initial gas to 5: gasLimit * gasPrice
 	if err := st.buyGas(); err != nil {
 		t.Fatal(err)

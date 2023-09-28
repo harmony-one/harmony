@@ -7,10 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus/reward"
-
 	"github.com/harmony-one/harmony/consensus"
-
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -50,6 +48,10 @@ type environment struct {
 	stakeMsgs  []staking.StakeMsg
 }
 
+func (env *environment) CurrentHeader() *block.Header {
+	return env.header
+}
+
 // Worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type Worker struct {
@@ -60,6 +62,40 @@ type Worker struct {
 	current  *environment // An environment for current running cycle.
 	gasFloor uint64
 	gasCeil  uint64
+}
+
+// New create a new worker object.
+func New(
+	chain core.BlockChain, beacon core.BlockChain,
+) *Worker {
+	worker := newWorker(chain.Config(), chain, beacon)
+
+	parent := chain.CurrentBlock().Header()
+	num := parent.Number()
+	timestamp := time.Now().Unix()
+
+	epoch := GetNewEpoch(chain)
+	header := blockfactory.NewFactory(chain.Config()).NewHeader(epoch).With().
+		ParentHash(parent.Hash()).
+		Number(num.Add(num, common.Big1)).
+		GasLimit(worker.GasFloor(epoch)). //core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil)).
+		Time(big.NewInt(timestamp)).
+		ShardID(chain.ShardID()).
+		Header()
+	worker.makeCurrent(parent, header)
+
+	return worker
+}
+
+func newWorker(config *params.ChainConfig, chain, beacon core.BlockChain) *Worker {
+	return &Worker{
+		config:   config,
+		factory:  blockfactory.NewFactory(config),
+		chain:    chain,
+		beacon:   beacon,
+		gasFloor: 80000000,
+		gasCeil:  120000000,
+	}
 }
 
 // CommitSortedTransactions commits transactions for new block.
@@ -290,16 +326,16 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 }
 
 // UpdateCurrent updates the current environment with the current state and header.
-func (w *Worker) UpdateCurrent() error {
+func (w *Worker) UpdateCurrent() (Environment, error) {
 	parent := w.chain.CurrentHeader()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
 
-	epoch := w.GetNewEpoch()
+	epoch := GetNewEpoch(w.chain)
 	header := w.factory.NewHeader(epoch).With().
 		ParentHash(parent.Hash()).
 		Number(num.Add(num, common.Big1)).
-		GasLimit(core.CalcGasLimit(parent, w.GasFloor(epoch), w.gasCeil)).
+		GasLimit(core.CalcGasLimit(parent, w.GasFloor(epoch), w.GasCeil())).
 		Time(big.NewInt(timestamp)).
 		ShardID(w.chain.ShardID()).
 		Header()
@@ -312,20 +348,28 @@ func (w *Worker) GetCurrentHeader() *block.Header {
 }
 
 // makeCurrent creates a new environment for the current cycle.
-func (w *Worker) makeCurrent(parent *block.Header, header *block.Header) error {
-	state, err := w.chain.StateAt(parent.Root())
+func (w *Worker) makeCurrent(parent *block.Header, header *block.Header) (*environment, error) {
+	env, err := makeEnvironment(w.chain, parent, header)
 	if err != nil {
-		return err
-	}
-	env := &environment{
-		signer:    types.NewEIP155Signer(w.config.ChainID),
-		ethSigner: types.NewEIP155Signer(w.config.EthCompatibleChainID),
-		state:     state,
-		header:    header,
+		return nil, err
 	}
 
 	w.current = env
-	return nil
+	return w.current, nil
+}
+
+func makeEnvironment(chain core.BlockChain, parent *block.Header, header *block.Header) (*environment, error) {
+	state, err := chain.StateAt(parent.Root())
+	if err != nil {
+		return nil, err
+	}
+	env := &environment{
+		signer:    types.NewEIP155Signer(chain.Config().ChainID),
+		ethSigner: types.NewEIP155Signer(chain.Config().EthCompatibleChainID),
+		state:     state,
+		header:    header,
+	}
+	return env, nil
 }
 
 // GetCurrentResult gets the current block processing result.
@@ -347,14 +391,14 @@ func (w *Worker) GetCurrentState() *state.DB {
 }
 
 // GetNewEpoch gets the current epoch.
-func (w *Worker) GetNewEpoch() *big.Int {
-	parent := w.chain.CurrentBlock()
+func GetNewEpoch(chain core.BlockChain) *big.Int {
+	parent := chain.CurrentBlock()
 	epoch := new(big.Int).Set(parent.Header().Epoch())
 
 	shardState, err := parent.Header().GetShardState()
 	if err == nil &&
 		shardState.Epoch != nil &&
-		w.config.IsStaking(shardState.Epoch) {
+		chain.Config().IsStaking(shardState.Epoch) {
 		// For shard state of staking epochs, the shard state will
 		// have an epoch and it will decide the next epoch for following blocks
 		epoch = new(big.Int).Set(shardState.Epoch)
@@ -563,38 +607,8 @@ func (w *Worker) FinalizeNewBlock(
 	return block, nil
 }
 
-// New create a new worker object.
-func New(
-	chain core.BlockChain, beacon core.BlockChain,
-) *Worker {
-	worker := &Worker{
-		config:  chain.Config(),
-		factory: blockfactory.NewFactory(chain.Config()),
-		chain:   chain,
-		beacon:  beacon,
-	}
-	worker.gasFloor = 80000000
-	worker.gasCeil = 120000000
-
-	parent := worker.chain.CurrentBlock().Header()
-	num := parent.Number()
-	timestamp := time.Now().Unix()
-
-	epoch := worker.GetNewEpoch()
-	header := worker.factory.NewHeader(epoch).With().
-		ParentHash(parent.Hash()).
-		Number(num.Add(num, common.Big1)).
-		GasLimit(worker.gasFloor). //core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil)).
-		Time(big.NewInt(timestamp)).
-		ShardID(worker.chain.ShardID()).
-		Header()
-	worker.makeCurrent(parent, header)
-
-	return worker
-}
-
 func (w *Worker) GasFloor(epoch *big.Int) uint64 {
-	if w.chain.Config().IsBlockGas30M(epoch) {
+	if w.config.IsBlockGas30M(epoch) {
 		return 30_000_000
 	}
 
