@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -31,7 +32,6 @@ import (
 var (
 	errSenderPubKeyNotLeader  = errors.New("sender pubkey doesn't match leader")
 	errVerifyMessageSignature = errors.New("verify message signature failed")
-	errParsingFBFTMessage     = errors.New("failed parsing FBFT message")
 )
 
 // timeout constant
@@ -693,7 +693,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		prev   = consensus.getLeaderPubKey()
 		leader = consensus.getLeaderPubKey()
 	)
-	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotation(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch, consensus.ShardID))
+	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
@@ -721,24 +721,24 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		// mine no less than 3 blocks in a row
 		numBlocksProducedByLeader = minimumBlocksForLeaderInRow
 	}
-	type stored struct {
-		pub    []byte
-		epoch  uint64
-		count  uint64
-		shifts uint64 // count how much changes validator per epoch
-	}
-	var s stored
-	s.pub, s.epoch, s.count, s.shifts, _ = bc.LeaderRotationMeta()
-	if !bytes.Equal(leader.Bytes[:], s.pub) {
+	//type stored struct {
+	//	pub    []byte
+	//	epoch  uint64
+	//	count  uint64
+	//	shifts uint64 // count how much changes validator per epoch
+	//}
+	//var s stored
+	s := bc.LeaderRotationMeta()
+	if !bytes.Equal(leader.Bytes[:], s.Pub) {
 		// Another leader.
 		return
 	}
-	// if it is the first validator which produce blocks, then it should produce `rest` blocks too.
-	if s.shifts == 0 {
+	// If it is the first validator producing blocks, it should also produce the remaining 'rest' of the blocks.
+	if s.Shifts == 0 {
 		numBlocksProducedByLeader += rest
 	}
-	if s.count < numBlocksProducedByLeader {
-		// Not enough blocks produced by the leader.
+	if s.Count < numBlocksProducedByLeader {
+		// Not enough blocks produced by the leader, continue producing by the same leader.
 		return
 	}
 	// Passed all checks, we can change leader.
@@ -748,7 +748,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		wasFound bool
 		next     *bls.PublicKeyWrapper
 	)
-	if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch, consensus.ShardID) {
+	if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
 		wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, 1)
 	} else {
 		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
@@ -761,6 +761,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	}
 	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 		// leader changed
+		fmt.Println("!!!!Leader changed!!!", consensus.ShardID)
 		go func() {
 			consensus.ReadySignal(SyncProposal)
 		}()
@@ -778,7 +779,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	} else {
 		epoch = blk.Epoch()
 	}
-	if consensus.Blockchain().Config().IsLeaderRotation(epoch) {
+	if consensus.Blockchain().Config().IsLeaderRotationInternalValidators(epoch) {
 		consensus.rotateLeader(epoch)
 	}
 

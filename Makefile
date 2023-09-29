@@ -171,3 +171,12 @@ travis_go_checker:
 
 travis_rpc_checker:
 	bash ./scripts/travis_rpc_checker.sh
+
+travis_rosetta_checker:
+	bash ./scripts/travis_rosetta_checker.sh
+
+debug_external: clean
+	bash test/debug-external.sh
+
+build_localnet_validator:
+	bash test/build-localnet-validator.sh

@@ -222,7 +222,7 @@ type BlockChainImpl struct {
 	badBlocks              *lru.Cache // Bad block cache
 	pendingSlashes         slash.Records
 	maxGarbCollectedBlkNum int64
-	leaderRotationMeta     leaderRotationMeta
+	leaderRotationMeta     LeaderRotationMeta
 
 	options Options
 }
@@ -1653,75 +1653,8 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 	return n, err
 }
 
-// buildLeaderRotationMeta builds leader rotation meta if feature is activated.
-func (bc *BlockChainImpl) buildLeaderRotationMeta(curHeader *block.Header) error {
-	if !bc.chainConfig.IsLeaderRotation(curHeader.Epoch()) {
-		return nil
-	}
-	if curHeader.NumberU64() == 0 {
-		return errors.New("current header is genesis")
-	}
-	curPubKey, err := bc.getLeaderPubKeyFromCoinbase(curHeader)
-	if err != nil {
-		return err
-	}
-	for i := curHeader.NumberU64() - 1; i >= 0; i-- {
-		header := bc.GetHeaderByNumber(i)
-		if header == nil {
-			return errors.New("header is nil")
-		}
-		blockPubKey, err := bc.getLeaderPubKeyFromCoinbase(header)
-		if err != nil {
-			return err
-		}
-		if curPubKey.Bytes != blockPubKey.Bytes || curHeader.Epoch().Uint64() != header.Epoch().Uint64() {
-			for j := i; j <= curHeader.NumberU64(); j++ {
-				header := bc.GetHeaderByNumber(j)
-				if header == nil {
-					return errors.New("header is nil")
-				}
-				err := bc.saveLeaderRotationMeta(header)
-				if err != nil {
-					utils.Logger().Error().Err(err).Msg("save leader continuous blocks count error")
-					return err
-				}
-			}
-			return nil
-		}
-	}
-	return errors.New("no leader rotation meta to save")
-}
-
-func (bc *BlockChainImpl) saveLeaderRotationMeta(h *block.Header) error {
-	blockPubKey, err := bc.getLeaderPubKeyFromCoinbase(h)
-	if err != nil {
-		return err
-	}
-
-	var s = bc.leaderRotationMeta
-
-	// increase counter only if the same leader and epoch
-	if bytes.Equal(s.pub, blockPubKey.Bytes[:]) && s.epoch == h.Epoch().Uint64() {
-		s.count++
-	} else {
-		s.count = 1
-	}
-	// we should increase shifts if the leader is changed.
-	if !bytes.Equal(s.pub, blockPubKey.Bytes[:]) {
-		s.shifts++
-	}
-	// but set to zero if new
-	if s.epoch != h.Epoch().Uint64() {
-		s.shifts = 0
-	}
-	s.epoch = h.Epoch().Uint64()
-	bc.leaderRotationMeta = s
-
-	return nil
-}
-
-func (bc *BlockChainImpl) LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts uint64, err error) {
-	return rawdb.ReadLeaderRotationMeta(bc.db)
+func (bc *BlockChainImpl) LeaderRotationMeta() LeaderRotationMeta {
+	return bc.leaderRotationMeta.Clone()
 }
 
 // insertChain will execute the actual chain insertion and event aggregation. The

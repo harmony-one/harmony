@@ -75,6 +75,7 @@ func TestAddNewBlock(t *testing.T) {
 
 	pk, epoch, count, shifts, err := blockchain.LeaderRotationMeta()
 	fmt.Println("pk", pk, "epoch", epoch, "count", count, "shifts", shifts, "err", err)
+	require.NoError(t, err, "error when getting leader rotation meta")
 
 	t.Log("#", block.Header().NumberU64(), node.Blockchain().CurrentBlock().NumberU64(), block.Hash().Hex(), block.ParentHash())
 
