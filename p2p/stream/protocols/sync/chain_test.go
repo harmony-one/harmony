@@ -215,3 +215,18 @@ func checkBlocksByHashesResult(b []byte, hs []common.Hash) error {
 	}
 	return nil
 }
+
+func checkGetReceiptsResult(b []byte, hs []common.Hash) error {
+	var msg = &syncpb.Message{}
+	if err := protobuf.Unmarshal(b, msg); err != nil {
+		return err
+	}
+	bhResp, err := msg.GetReceiptsResponse()
+	if err != nil {
+		return err
+	}
+	if len(hs) != len(bhResp.Receipts) {
+		return errors.New("unexpected size")
+	}
+	return nil
+}

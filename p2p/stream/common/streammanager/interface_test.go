@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -74,7 +75,7 @@ func (st *testStream) FailedTimes() int {
 	return 0
 }
 
-func (st *testStream) AddFailedTimes() {
+func (st *testStream) AddFailedTimes(faultRecoveryThreshold time.Duration) {
 	return
 }
 

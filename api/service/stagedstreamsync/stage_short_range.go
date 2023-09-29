@@ -97,7 +97,12 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	}
 
 	if err := sh.checkPrerequisites(); err != nil {
-		return 0, errors.Wrap(err, "prerequisite")
+		// if error is ErrNotEnoughStreams but still two streams available,
+		// it can continue syncing, otherwise return error
+		// at least 2 streams are needed to do concurrent processes
+		if err != ErrNotEnoughStreams || s.state.protocol.NumStreams() < 2 {
+			return 0, errors.Wrap(err, "prerequisite")
+		}
 	}
 	curBN := sr.configs.bc.CurrentBlock().NumberU64()
 	blkNums := sh.prepareBlockHashNumbers(curBN)

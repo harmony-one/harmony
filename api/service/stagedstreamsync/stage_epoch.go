@@ -92,7 +92,12 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	}
 
 	if err := sh.checkPrerequisites(); err != nil {
-		return 0, errors.Wrap(err, "prerequisite")
+		// if error is ErrNotEnoughStreams but still some streams available,
+		// it can continue syncing, otherwise return error
+		// here we are not doing concurrent processes, so even 1 stream should be enough
+		if err != ErrNotEnoughStreams || s.state.protocol.NumStreams() == 0 {
+			return 0, errors.Wrap(err, "prerequisite")
+		}
 	}
 	curBN := s.state.bc.CurrentBlock().NumberU64()
 	bns := make([]uint64, 0, BlocksPerRequest)

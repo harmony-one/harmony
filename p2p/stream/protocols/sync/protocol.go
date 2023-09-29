@@ -272,13 +272,16 @@ func (p *Protocol) RemoveStream(stID sttypes.StreamID) {
 		st.Close()
 		// stream manager removes this stream from the list and triggers discovery if number of streams are not enough
 		p.sm.RemoveStream(stID) //TODO: double check to see if this part is needed
+		p.logger.Info().
+			Str("stream ID", string(stID)).
+			Msg("stream removed")
 	}
 }
 
 func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
 	st, exist := p.sm.GetStreamByID(stID)
 	if exist && st != nil {
-		st.AddFailedTimes()
+		st.AddFailedTimes(FaultRecoveryThreshold)
 		p.logger.Info().
 			Str("stream ID", string(st.ID())).
 			Int("num failures", st.FailedTimes()).

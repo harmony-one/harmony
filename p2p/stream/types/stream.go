@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"sync"
+	"time"
 
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	"github.com/pkg/errors"
@@ -22,7 +23,7 @@ type Stream interface {
 	Close() error
 	CloseOnExit() error
 	FailedTimes() int
-	AddFailedTimes()
+	AddFailedTimes(faultRecoveryThreshold time.Duration)
 	ResetFailedTimes()
 }
 
@@ -38,7 +39,8 @@ type BaseStream struct {
 	specErr  error
 	specOnce sync.Once
 
-	failedTimes int
+	failedTimes     int
+	lastFailureTime time.Time
 }
 
 // NewBaseStream creates BaseStream as the wrapper of libp2p Stream
@@ -82,8 +84,15 @@ func (st *BaseStream) FailedTimes() int {
 	return st.failedTimes
 }
 
-func (st *BaseStream) AddFailedTimes() {
+func (st *BaseStream) AddFailedTimes(faultRecoveryThreshold time.Duration) {
+	if st.failedTimes > 0 {
+		durationSinceLastFailure := time.Now().Sub(st.lastFailureTime)
+		if durationSinceLastFailure >= faultRecoveryThreshold {
+			st.ResetFailedTimes()
+		}
+	}
 	st.failedTimes++
+	st.lastFailureTime = time.Now()
 }
 
 func (st *BaseStream) ResetFailedTimes() {

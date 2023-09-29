@@ -23,9 +23,6 @@ const (
 	// no more request will be assigned to workers to wait for InsertChain to finish.
 	SoftQueueCap int = 100
 
-	// DefaultConcurrency is the default settings for concurrency
-	DefaultConcurrency int = 4
-
 	// ShortRangeTimeout is the timeout for each short range sync, which allow short range sync
 	// to restart automatically when stuck in `getBlockHashes`
 	ShortRangeTimeout time.Duration = 1 * time.Minute
@@ -74,10 +71,10 @@ type (
 
 func (c *Config) fixValues() {
 	if c.Concurrency == 0 {
-		c.Concurrency = DefaultConcurrency
+		c.Concurrency = c.MinStreams
 	}
 	if c.Concurrency > c.MinStreams {
-		c.MinStreams = c.Concurrency
+		c.Concurrency = c.MinStreams
 	}
 	if c.MinStreams > c.InitStreams {
 		c.InitStreams = c.MinStreams
