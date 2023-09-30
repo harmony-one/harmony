@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"hash/crc32"
 	"strconv"
+	"strings"
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -16,6 +17,18 @@ type LeaderRotationMeta struct {
 	Epoch  uint64
 	Count  uint64
 	Shifts uint64
+}
+
+func (a LeaderRotationMeta) ShortString() string {
+	s := strings.Builder{}
+	s.Write(a.Pub[3:])
+	s.WriteString(" ")
+	s.WriteString(strconv.FormatUint(a.Epoch, 10))
+	s.WriteString(" ")
+	s.WriteString(strconv.FormatUint(a.Count, 10))
+	s.WriteString(" ")
+	s.WriteString(strconv.FormatUint(a.Shifts, 10))
+	return s.String()
 }
 
 // Hash returns has of the struct

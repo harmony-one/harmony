@@ -90,7 +90,9 @@ var (
 	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
 
 	// ErrNoGenesis is the error when there is no genesis.
-	ErrNoGenesis = errors.New("Genesis not found in chain")
+	ErrNoGenesis          = errors.New("Genesis not found in chain")
+	ErrBlockAlreadyExists = errors.New("block already exists")
+	ErrEmptyChain         = errors.New("empty chain")
 	// errExceedMaxPendingSlashes ..
 	errExceedMaxPendingSlashes = errors.New("exceeed max pending slashes")
 	errNilEpoch                = errors.New("nil epoch for voting power computation")
@@ -1632,9 +1634,20 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 		return len(chain), nil
 	}
 
+	for _, b := range chain {
+		// check if blocks already exist
+		if bc.HasBlock(b.Hash(), b.NumberU64()) {
+			return 0, errors.Wrapf(ErrKnownBlock, "block %s %d already exists", b.Hash().Hex(), b.NumberU64())
+		}
+	}
+
+	prevHash := bc.CurrentBlock().Hash()
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
 	if err == nil {
+		if prevHash == bc.CurrentBlock().Hash() {
+			panic("insertChain failed to update current block")
+		}
 		// there should be only 1 block.
 		for _, b := range chain {
 			if b.Epoch().Uint64() > 0 {
@@ -1663,7 +1676,7 @@ func (bc *BlockChainImpl) LeaderRotationMeta() LeaderRotationMeta {
 func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
-		return 0, nil, nil, nil
+		return 0, nil, nil, ErrEmptyChain
 	}
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {

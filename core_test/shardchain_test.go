@@ -1,7 +1,6 @@
 package core_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -73,9 +72,8 @@ func TestAddNewBlock(t *testing.T) {
 	_, err = blockchain.InsertChain([]*types.Block{block}, false)
 	require.NoError(t, err, "error when adding new block")
 
-	pk, epoch, count, shifts, err := blockchain.LeaderRotationMeta()
-	fmt.Println("pk", pk, "epoch", epoch, "count", count, "shifts", shifts, "err", err)
-	require.NoError(t, err, "error when getting leader rotation meta")
+	meta := blockchain.LeaderRotationMeta()
+	require.NotEmptyf(t, meta, "error when getting leader rotation meta")
 
 	t.Log("#", block.Header().NumberU64(), node.Blockchain().CurrentBlock().NumberU64(), block.Hash().Hex(), block.ParentHash())
 
