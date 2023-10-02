@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -721,13 +720,6 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		// mine no less than 3 blocks in a row
 		numBlocksProducedByLeader = minimumBlocksForLeaderInRow
 	}
-	//type stored struct {
-	//	pub    []byte
-	//	epoch  uint64
-	//	count  uint64
-	//	shifts uint64 // count how much changes validator per epoch
-	//}
-	//var s stored
 	s := bc.LeaderRotationMeta()
 	if !bytes.Equal(leader.Bytes[:], s.Pub) {
 		// Another leader.
@@ -761,7 +753,6 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	}
 	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 		// leader changed
-		fmt.Println("!!!!Leader changed!!!", consensus.ShardID)
 		go func() {
 			consensus.ReadySignal(SyncProposal)
 		}()
