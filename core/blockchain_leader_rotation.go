@@ -39,9 +39,6 @@ func (a LeaderRotationMeta) Hash() []byte {
 	c.Write([]byte(strconv.FormatUint(a.Count, 10)))
 	c.Write([]byte(strconv.FormatUint(a.Shifts, 10)))
 	return c.Sum(nil)
-	//h := hash.C
-	//h.
-	// return
 }
 
 func (a LeaderRotationMeta) Clone() LeaderRotationMeta {
