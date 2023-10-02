@@ -12,13 +12,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+// LeaderRotationMeta contains information about leader rotation
 type LeaderRotationMeta struct {
-	Pub    []byte
-	Epoch  uint64
-	Count  uint64
-	Shifts uint64
+	Pub    []byte // bls public key of previous block miner
+	Epoch  uint64 // epoch number of previously inserted block
+	Count  uint64 // quantity of continuous blocks inserted by the same leader
+	Shifts uint64 // number of leader shifts, shift happens when leader changes
 }
 
+// ShortString returns string representation of the struct
 func (a LeaderRotationMeta) ShortString() string {
 	s := strings.Builder{}
 	s.Write(a.Pub[3:])
@@ -31,7 +33,7 @@ func (a LeaderRotationMeta) ShortString() string {
 	return s.String()
 }
 
-// Hash returns has of the struct
+// Hash returns hash of the struct
 func (a LeaderRotationMeta) Hash() []byte {
 	c := crc32.NewIEEE()
 	c.Write(a.Pub)
@@ -41,6 +43,7 @@ func (a LeaderRotationMeta) Hash() []byte {
 	return c.Sum(nil)
 }
 
+// Clone returns a copy of the struct
 func (a LeaderRotationMeta) Clone() LeaderRotationMeta {
 	return LeaderRotationMeta{
 		Pub:    append([]byte{}, a.Pub...),
@@ -89,6 +92,7 @@ func (bc *BlockChainImpl) buildLeaderRotationMeta(curHeader *block.Header) error
 	return errors.New("no leader rotation meta to save")
 }
 
+// saveLeaderRotationMeta saves leader rotation meta if feature is activated.
 func (bc *BlockChainImpl) saveLeaderRotationMeta(h *block.Header) error {
 	blockPubKey, err := bc.getLeaderPubKeyFromCoinbase(h)
 	if err != nil {
