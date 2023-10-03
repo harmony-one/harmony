@@ -685,6 +685,17 @@ func (bc *BlockChainImpl) CurrentBlock() *types.Block {
 	return bc.currentBlock.Load().(*types.Block)
 }
 
+// CurrentFastBlock retrieves the current fast-sync head block of the canonical
+// chain. The block is retrieved from the blockchain's internal cache.
+func (bc *BlockChainImpl) CurrentFastBlock() *types.Block {
+	return bc.currentFastBlock.Load().(*types.Block)
+}
+
+// Validator returns the current validator.
+func (bc *BlockChainImpl) Validator() Validator {
+	return bc.validator
+}
+
 func (bc *BlockChainImpl) Processor() Processor {
 	return bc.processor
 }
