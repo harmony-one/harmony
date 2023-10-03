@@ -51,14 +51,14 @@ var (
 	testGetReceiptsRequest    = syncpb.MakeGetReceiptsRequest(testGetReceipts)
 	testGetReceiptsRequestMsg = syncpb.MakeMessageFromRequest(testGetReceiptsRequest)
 
-	testGetNodes = []common.Hash{
+	testGetNodeData = []common.Hash{
 		numberToHash(1),
 		numberToHash(2),
 		numberToHash(3),
 		numberToHash(4),
 		numberToHash(5),
 	}
-	testGetNodeDataRequest    = syncpb.MakeGetNodeDataRequest(testGetNodes)
+	testGetNodeDataRequest    = syncpb.MakeGetNodeDataRequest(testGetNodeData)
 	testGetNodeDataRequestMsg = syncpb.MakeMessageFromRequest(testGetNodeDataRequest)
 
 	maxBytes = uint64(500)
@@ -312,7 +312,7 @@ func TestSyncStream_HandleGetNodeData(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	receivedBytes, _ := remoteSt.ReadBytes()
 
-	if err := checkGetNodeDataResult(receivedBytes, testGetBlockByHashes); err != nil {
+	if err := checkGetNodeDataResult(receivedBytes, testGetNodeData); err != nil {
 		t.Fatal(err)
 	}
 }
