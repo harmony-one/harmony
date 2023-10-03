@@ -125,7 +125,7 @@ type BlockChain interface {
 	// wrong.
 	//
 	// After insertion is done, all accumulated events will be fired.
-	InsertChain(chain types.Blocks, verifyHeaders bool, blockExecution bool) (int, error)
+	InsertChain(chain types.Blocks, verifyHeaders bool) (int, error)
 	// InsertReceiptChain attempts to complete an already existing header chain with
 	// transaction and receipt data.
 	InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error)

@@ -72,7 +72,7 @@ func TestAddNewBlock(t *testing.T) {
 	nn := node.Blockchain().CurrentBlock()
 	t.Log("[*]", nn.NumberU64(), nn.Hash().Hex(), nn.ParentHash())
 
-	_, err = blockchain.InsertChain([]*types.Block{block}, false, true)
+	_, err = blockchain.InsertChain([]*types.Block{block}, false)
 	require.NoError(t, err, "error when adding new block")
 
 	meta := blockchain.LeaderRotationMeta()

@@ -314,7 +314,7 @@ func verifyAndInsertBlock(bc blockChain, block *types.Block, blockExecution bool
 	if err := bc.Engine().VerifyHeader(bc, block.Header(), true); err != nil {
 		return errors.Wrap(err, "[VerifyHeader]")
 	}
-	if _, err := bc.InsertChain(types.Blocks{block}, false, blockExecution); err != nil {
+	if _, err := bc.InsertChain(types.Blocks{block}, false); err != nil {
 		return errors.Wrap(err, "[InsertChain]")
 	}
 	return nil

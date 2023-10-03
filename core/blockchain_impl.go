@@ -1530,7 +1530,7 @@ func (bc *BlockChainImpl) GetMaxGarbageCollectedBlockNumber() int64 {
 	return bc.maxGarbCollectedBlkNum
 }
 
-func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool, blockExecution bool) (int, error) {
+func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	// if in tikv mode, writer node need preempt master or come be a follower
 	if bc.isInitTiKV() && !bc.tikvPreemptMaster(bc.rangeBlock(chain)) {
 		return len(chain), nil
@@ -1574,17 +1574,10 @@ func (bc *BlockChainImpl) LeaderRotationMeta() LeaderRotationMeta {
 	return bc.leaderRotationMeta.Clone()
 }
 
-func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool, blockExecution bool) (int, []interface{}, []*types.Log, error) {
-	if blockExecution {
-		return bc.insertChainWithBlockExecution(chain, verifyHeaders)
-	}
-	return bc.insertChainWithoutBlockExecution(chain, verifyHeaders)
-}
-
 // insertChain will execute the actual chain insertion and event aggregation. The
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
-func (bc *BlockChainImpl) insertChainWithBlockExecution(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
+func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
 		return 0, nil, nil, ErrEmptyChain
@@ -1696,7 +1689,7 @@ func (bc *BlockChainImpl) insertChainWithBlockExecution(chain types.Blocks, veri
 			if len(winner) > 0 {
 				// Import all the pruned blocks to make the state available
 				bc.chainmu.Unlock()
-				_, evs, logs, err := bc.insertChainWithBlockExecution(winner, true /* verifyHeaders */)
+				_, evs, logs, err := bc.insertChain(winner, true /* verifyHeaders */)
 				bc.chainmu.Lock()
 				events, coalescedLogs = evs, logs
 

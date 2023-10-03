@@ -136,7 +136,7 @@ func (a Stub) GetMaxGarbageCollectedBlockNumber() int64 {
 	return 0
 }
 
-func (a Stub) InsertChain(chain types.Blocks, verifyHeaders bool, blockExecution bool) (int, error) {
+func (a Stub) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	return 0, errors.Errorf("method InsertChain not implemented for %s", a.Name)
 }
 

@@ -114,7 +114,7 @@ func (bc *EpochChain) Stop() {
 	})
 }
 
-func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool, _ bool) (int, error) {
+func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
 	if len(blocks) == 0 {
 		return 0, nil
 	}

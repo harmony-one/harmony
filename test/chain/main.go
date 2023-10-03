@@ -134,7 +134,7 @@ func fundFaucetContract(chain core.BlockChain) {
 	}()
 	block, _ := contractworker.
 		FinalizeNewBlock(commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil)
-	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */, true)
+	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -184,7 +184,7 @@ func callFaucetContractToFundAnAddress(chain core.BlockChain) {
 	block, _ := contractworker.FinalizeNewBlock(
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
 	)
-	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */, true)
+	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -227,7 +227,7 @@ func main() {
 			gen.SetShardID(0)
 			gen.AddTx(pendingTxs[i].(*types.Transaction))
 		})
-		if _, err := chain.InsertChain(blocks, true /* verifyHeaders */, true); err != nil {
+		if _, err := chain.InsertChain(blocks, true /* verifyHeaders */); err != nil {
 			log.Fatal(err)
 		}
 	}

@@ -131,7 +131,7 @@ func (d *Downloader) doShortRangeSyncForEpochSync() (int, error) {
 		// short circuit for no sync is needed
 		return 0, nil
 	}
-	n, err := d.bc.InsertChain(blocks, true, true)
+	n, err := d.bc.InsertChain(blocks, true)
 	numBlocksInsertedShortRangeHistogramVec.With(d.promLabels()).Observe(float64(n))
 	if err != nil {
 		sh.removeStreams([]sttypes.StreamID{streamID}) // Data provided by remote nodes is corrupted

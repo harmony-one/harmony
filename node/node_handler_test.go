@@ -69,7 +69,7 @@ func TestAddNewBlock(t *testing.T) {
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
 	)
 
-	_, err = node.Blockchain().InsertChain([]*types.Block{block}, true, true)
+	_, err = node.Blockchain().InsertChain([]*types.Block{block}, true)
 	if err != nil {
 		t.Errorf("error when adding new block %v", err)
 	}
