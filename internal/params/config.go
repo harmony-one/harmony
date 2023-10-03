@@ -194,17 +194,17 @@ var (
 		ReceiptLogEpoch:                        big.NewInt(0),
 		SHA3Epoch:                              big.NewInt(0),
 		HIP6And8Epoch:                          big.NewInt(0),
-		StakingPrecompileEpoch:                 big.NewInt(2),
-		ChainIdFixEpoch:                        big.NewInt(0),
+		StakingPrecompileEpoch:                 big.NewInt(5),
+		ChainIdFixEpoch:                        big.NewInt(5),
 		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch:          big.NewInt(1),
+		CrossShardXferPrecompileEpoch:          big.NewInt(5),
 		AllowlistEpoch:                         EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(5),
 		ValidatorCodeFixEpoch:                  big.NewInt(5),
-		HIP30Epoch:                             big.NewInt(8),
-		BlockGas30MEpoch:                       big.NewInt(0),
+		HIP30Epoch:                             big.NewInt(7),
+		BlockGas30MEpoch:                       big.NewInt(7),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
