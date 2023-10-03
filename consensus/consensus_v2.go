@@ -767,7 +767,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 			return
 		}
 		members := consensus.Decider.Participants()
-		mask, _ := bls.NewMask(members, nil)
+		mask := bls.NewMask(members)
 		skipped := 0
 		for i := 0; i < blocksCountAliveness; i++ {
 			header := bc.GetHeaderByNumber(curNumber - uint64(i))
