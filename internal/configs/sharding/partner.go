@@ -14,8 +14,6 @@ import (
 // configuration schedule.
 var PartnerSchedule partnerSchedule
 
-var feeCollectEpochV1 = big.NewInt(574)
-
 var feeCollectorsDevnet = []FeeCollectors{
 	FeeCollectors{
 		mustAddress("0xb728AEaBF60fD01816ee9e756c18bc01dC91ba5D"): numeric.OneDec(),
