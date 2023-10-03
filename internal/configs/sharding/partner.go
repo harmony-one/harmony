@@ -44,10 +44,6 @@ func (ps partnerSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case params.PartnerChainConfig.IsHIP30(epoch):
 		return partnerV4
-	case params.PartnerChainConfig.IsFeeCollectEpoch(epoch):
-		return partnerV3
-	case epoch.Cmp(feeCollectEpochV1) >= 0:
-		return partnerV2
 	case epoch.Cmp(params.PartnerChainConfig.StakingEpoch) >= 0:
 		return partnerV1
 	default: // genesis
