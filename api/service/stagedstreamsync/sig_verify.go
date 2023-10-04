@@ -20,9 +20,9 @@ func (e *sigVerifyErr) Error() string {
 	return fmt.Sprintf("[VerifyHeaderSignature] %v", e.err.Error())
 }
 
-func verifyAndInsertBlocks(bc blockChain, blocks types.Blocks, blockExecution bool) (int, error) {
+func verifyAndInsertBlocks(bc blockChain, blocks types.Blocks) (int, error) {
 	for i, block := range blocks {
-		if err := verifyAndInsertBlock(bc, block, blockExecution, blocks[i+1:]...); err != nil {
+		if err := verifyAndInsertBlock(bc, block, blocks[i+1:]...); err != nil {
 			return i, err
 		}
 	}
@@ -65,13 +65,13 @@ func verifyBlock(bc blockChain, block *types.Block, nextBlocks ...*types.Block) 
 	return nil
 }
 
-func verifyAndInsertBlock(bc blockChain, block *types.Block, blockExecution bool, nextBlocks ...*types.Block) error {
+func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*types.Block) error {
 	//verify block
 	if err := verifyBlock(bc, block, nextBlocks...); err != nil {
 		return err
 	}
 	// insert block
-	if _, err := bc.InsertChain(types.Blocks{block}, false, blockExecution); err != nil {
+	if _, err := bc.InsertChain(types.Blocks{block}, false); err != nil {
 		return errors.Wrap(err, "[InsertChain]")
 	}
 	return nil

@@ -23,7 +23,6 @@ type StageStatesCfg struct {
 	db             kv.RwDB
 	blockDBs       []kv.RwDB
 	concurrency    int
-	blockExecution bool
 	logger         zerolog.Logger
 	logProgress    bool
 }
@@ -39,7 +38,6 @@ func NewStageStatesCfg(
 	db kv.RwDB,
 	blockDBs []kv.RwDB,
 	concurrency int,
-	blockExecution bool,
 	logger zerolog.Logger,
 	logProgress bool) StageStatesCfg {
 
@@ -48,7 +46,6 @@ func NewStageStatesCfg(
 		db:             db,
 		blockDBs:       blockDBs,
 		concurrency:    concurrency,
-		blockExecution: blockExecution,
 		logger:         logger,
 		logProgress:    logProgress,
 	}
@@ -56,6 +53,13 @@ func NewStageStatesCfg(
 
 // Exec progresses States stage in the forward direction
 func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
+	// only execute this stage in full sync mode
+	if s.state.config.SyncMode != FullSync {
+		if s.state.status.pivotBlock != nil && s.state.bc.CurrentBlock().NumberU64() <= s.state.status.pivotBlock.NumberU64() {
+			return nil
+		}
+	}
+
 	// for short range sync, skip this step
 	if !s.state.initSync {
 		return nil
@@ -160,7 +164,7 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			return ErrInvalidBlockNumber
 		}
 
-		if err := verifyAndInsertBlock(stg.configs.bc, block, stg.configs.blockExecution); err != nil {
+		if err := verifyAndInsertBlock(stg.configs.bc, block); err != nil {
 			stg.configs.logger.Warn().Err(err).Uint64("cycle target block", targetHeight).
 				Uint64("block number", block.NumberU64()).
 				Msg(WrapStagedSyncMsg("insert blocks failed in long range"))

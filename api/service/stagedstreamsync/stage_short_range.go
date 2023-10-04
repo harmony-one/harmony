@@ -138,7 +138,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 
 	utils.Logger().Info().Int("num blocks", len(blocks)).Msg("getBlockByHashes result")
 
-	n, err := verifyAndInsertBlocks(sr.configs.bc, blocks, true)
+	n, err := verifyAndInsertBlocks(sr.configs.bc, blocks)
 	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	if err != nil {
 		utils.Logger().Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
