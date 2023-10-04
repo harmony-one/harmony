@@ -74,7 +74,7 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 	}
 	d.logger.Info().Int("num blocks", len(blocks)).Msg("getBlockByHashes result")
 
-	n, err := verifyAndInsertBlocks(d.bc, true, blocks)
+	n, err := verifyAndInsertBlocks(d.bc, blocks)
 	numBlocksInsertedShortRangeHistogramVec.With(d.promLabels()).Observe(float64(n))
 	if err != nil {
 		d.logger.Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
