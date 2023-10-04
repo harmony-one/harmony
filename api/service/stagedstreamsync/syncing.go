@@ -118,22 +118,11 @@ func CreateStagedSync(ctx context.Context,
 		Int("minStreams", config.MinStreams).
 		Msg(WrapStagedSyncMsg("staged sync created successfully"))
 
-	var stages []*Stage
-	// if any of the default stages doesn't exist in forward order, delete it from the list of stages
-	for _, stg := range defaultStages {
-		for _, stageID := range StagesForwardOrder {
-			if stg.ID == stageID {
-				stages = append(stages, stg)
-				break
-			}
-		}
-	}
-
 	return New(
 		bc,
 		consensus,
 		mainDB,
-		stages,
+		defaultStages,
 		isBeaconNode,
 		protocol,
 		isBeaconNode,

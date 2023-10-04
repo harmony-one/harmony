@@ -266,7 +266,7 @@ func New(
 	logger zerolog.Logger,
 ) *StagedStreamSync {
 
-	forwardStages := make([]*Stage, len(stagesList))
+	forwardStages := make([]*Stage, len(StagesForwardOrder))
 	for i, stageIndex := range StagesForwardOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
@@ -276,7 +276,7 @@ func New(
 		}
 	}
 
-	revertStages := make([]*Stage, len(stagesList))
+	revertStages := make([]*Stage, len(StagesRevertOrder))
 	for i, stageIndex := range StagesRevertOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
@@ -286,7 +286,7 @@ func New(
 		}
 	}
 
-	pruneStages := make([]*Stage, len(stagesList))
+	pruneStages := make([]*Stage, len(StagesCleanUpOrder))
 	for i, stageIndex := range StagesCleanUpOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
