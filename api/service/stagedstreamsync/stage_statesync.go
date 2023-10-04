@@ -55,17 +55,22 @@ func NewStageStateSyncCfg(bc core.BlockChain,
 // Exec progresses States stage in the forward direction
 func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
+	// only execute this stage in fast/snap sync mode and once we reach to pivot
+	if s.state.status.pivotBlock == nil || s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64()-1 {
+		return nil
+	}
+
 	// for short range sync, skip this step
 	if !s.state.initSync {
 		return nil
 	}
 
 	maxHeight := s.state.status.targetBN
-	currentHead := sss.configs.bc.CurrentBlock().NumberU64()
+	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
-	currProgress := sss.configs.bc.CurrentBlock().NumberU64()
+	currProgress := s.state.CurrentBlockNumber()
 	targetHeight := s.state.currentCycle.TargetHeight
 
 	if errV := CreateView(ctx, sss.configs.db, tx, func(etx kv.Tx) error {
@@ -97,19 +102,37 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 		fmt.Print("\033[s") // save the cursor position
 	}
 
-	// Fetch blocks from neighbors
-	root := sss.configs.bc.CurrentBlock().Root()
-	sdm := newStateDownloadManager(tx, sss.configs.bc, root, sss.configs.concurrency, s.state.logger)
-
-	// Setup workers to fetch blocks from remote node
+	// Fetch states from neighbors
+	pivotRootHash := s.state.status.pivotBlock.Root()
+	sdm := newStateDownloadManager(tx, sss.configs.bc, sss.configs.concurrency, s.state.logger)
+	sdm.setRootHash(pivotRootHash)
 	var wg sync.WaitGroup
-
-	for i := 0; i != s.state.config.Concurrency; i++ {
+	for i := 0; i < s.state.config.Concurrency; i++ {
 		wg.Add(1)
-		go sss.runStateWorkerLoop(ctx, sdm, &wg, i, startTime)
+		go sss.runStateWorkerLoop(ctx, sdm, &wg, i, startTime, s)
 	}
-
 	wg.Wait()
+
+	/*
+		gbm := s.state.gbm
+
+		// Setup workers to fetch states from remote node
+		var wg sync.WaitGroup
+		curHeight := s.state.CurrentBlockNumber()
+
+		for bn := curHeight + 1; bn <= gbm.targetBN; bn++ {
+			root := gbm.GetRootHash(bn)
+			if root == emptyHash {
+				continue
+			}
+			sdm.setRootHash(root)
+			for i := 0; i < s.state.config.Concurrency; i++ {
+				wg.Add(1)
+				go sss.runStateWorkerLoop(ctx, sdm, &wg, i, startTime, s)
+			}
+			wg.Wait()
+		}
+	*/
 
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
@@ -121,7 +144,8 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 }
 
 // runStateWorkerLoop creates a work loop for download states
-func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDownloadManager, wg *sync.WaitGroup, loopID int, startTime time.Time) {
+func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDownloadManager, wg *sync.WaitGroup, loopID int, startTime time.Time, s *StageState) {
+
 	defer wg.Done()
 
 	for {
@@ -130,8 +154,8 @@ func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDow
 			return
 		default:
 		}
-		nodes, paths, codes := sdm.GetNextBatch()
-		if len(nodes)+len(codes) == 0 {
+		nodes, paths, codes, err := sdm.GetNextBatch()
+		if len(nodes)+len(codes) == 0 || err != nil {
 			select {
 			case <-ctx.Done():
 				return
@@ -139,10 +163,9 @@ func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDow
 				return
 			}
 		}
-
 		data, stid, err := sss.downloadStates(ctx, nodes, codes)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) {
+			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				sss.configs.protocol.StreamFailed(stid, "downloadStates failed")
 			}
 			utils.Logger().Error().
@@ -157,19 +180,20 @@ func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDow
 				Msg(WrapStagedSyncMsg("downloadStates failed, received empty data bytes"))
 			err := errors.New("downloadStates received empty data bytes")
 			sdm.HandleRequestError(codes, paths, stid, err)
-		}
-		sdm.HandleRequestResult(nodes, paths, data, loopID, stid)
-		if sss.configs.logProgress {
-			//calculating block download speed
-			dt := time.Now().Sub(startTime).Seconds()
-			speed := float64(0)
-			if dt > 0 {
-				speed = float64(len(data)) / dt
-			}
-			stateDownloadSpeed := fmt.Sprintf("%.2f", speed)
+		} else {
+			sdm.HandleRequestResult(nodes, paths, data, loopID, stid)
+			if sss.configs.logProgress {
+				//calculating block download speed
+				dt := time.Now().Sub(startTime).Seconds()
+				speed := float64(0)
+				if dt > 0 {
+					speed = float64(len(data)) / dt
+				}
+				stateDownloadSpeed := fmt.Sprintf("%.2f", speed)
 
-			fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-			fmt.Println("state download speed:", stateDownloadSpeed, "states/s")
+				fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+				fmt.Println("state download speed:", stateDownloadSpeed, "states/s")
+			}
 		}
 	}
 }
@@ -216,7 +240,7 @@ func (stg *StageStateSync) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 	}
 
 	// save progress
-	if err = s.Update(tx, stg.configs.bc.CurrentBlock().NumberU64()); err != nil {
+	if err = s.Update(tx, s.state.CurrentBlockNumber()); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msgf("[STAGED_SYNC] saving progress for block States stage failed")

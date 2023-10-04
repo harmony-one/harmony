@@ -51,6 +51,11 @@ func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, con
 // Exec progresses receipts stage in the forward direction
 func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
+	// only execute this stage in fast/snap sync mode
+	if s.state.status.pivotBlock == nil || s.state.CurrentBlockNumber() >= s.state.status.pivotBlock.NumberU64() {
+		return nil
+	}
+
 	useInternalTx := tx == nil
 
 	if invalidBlockRevert {
@@ -63,7 +68,7 @@ func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	}
 
 	maxHeight := s.state.status.targetBN
-	currentHead := r.configs.bc.CurrentBlock().NumberU64()
+	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
@@ -91,21 +96,6 @@ func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	startTime := time.Now()
 	// startBlock := currProgress
 
-	// prepare db transactions
-	txs := make([]kv.RwTx, r.configs.concurrency)
-	for i := 0; i < r.configs.concurrency; i++ {
-		txs[i], err = r.configs.blockDBs[i].BeginRw(ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	defer func() {
-		for i := 0; i < r.configs.concurrency; i++ {
-			txs[i].Rollback()
-		}
-	}()
-
 	if r.configs.logProgress {
 		fmt.Print("\033[s") // save the cursor position
 	}
@@ -119,18 +109,52 @@ func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		defer tx.Rollback()
 	}
 
-	// Fetch blocks from neighbors
-	s.state.rdm = newReceiptDownloadManager(tx, r.configs.bc, targetHeight, s.state.logger)
+	for {
+		// check if there is no any more to download break the loop
+		curBn := s.state.CurrentBlockNumber()
+		if curBn == targetHeight {
+			break
+		}
 
-	// Setup workers to fetch blocks from remote node
-	var wg sync.WaitGroup
+		// calculate the block numbers range to download
+		toBn := curBn + uint64(ReceiptsPerRequest*s.state.config.Concurrency)
+		if toBn > targetHeight {
+			toBn = targetHeight
+		}
 
-	for i := 0; i != s.state.config.Concurrency; i++ {
-		wg.Add(1)
-		go r.runReceiptWorkerLoop(ctx, s.state.rdm, &wg, i, s, txs, startTime)
+		// Fetch receipts from connected peers
+		rdm := newReceiptDownloadManager(tx, r.configs.bc, toBn, s.state.logger)
+
+		// Setup workers to fetch blocks from remote node
+		var wg sync.WaitGroup
+
+		for i := 0; i < s.state.config.Concurrency; i++ {
+			wg.Add(1)
+			go func() {
+				// prepare db transactions
+				txs := make([]kv.RwTx, r.configs.concurrency)
+				for i := 0; i < r.configs.concurrency; i++ {
+					txs[i], err = r.configs.blockDBs[i].BeginRw(ctx)
+					if err != nil {
+						return
+					}
+				}
+				// rollback the transactions after worker loop
+				defer func() {
+					for i := 0; i < r.configs.concurrency; i++ {
+						txs[i].Rollback()
+					}
+				}()
+
+				r.runReceiptWorkerLoop(ctx, rdm, &wg, s, txs, startTime)
+			}()
+		}
+		wg.Wait()
+		// insert all downloaded blocks and receipts to chain
+		if err := r.insertBlocksAndReceipts(ctx, rdm, toBn, s); err != nil {
+			utils.Logger().Err(err).Msg(WrapStagedSyncMsg("InsertReceiptChain failed"))
+		}
 	}
-
-	wg.Wait()
 
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
@@ -141,10 +165,52 @@ func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	return nil
 }
 
-// runReceiptWorkerLoop creates a work loop for download receipts
-func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, txs []kv.RwTx, startTime time.Time) {
+func (r *StageReceipts) insertBlocksAndReceipts(ctx context.Context, rdm *receiptDownloadManager, toBn uint64, s *StageState) error {
+	if len(rdm.received) == 0 {
+		return nil
+	}
+	var (
+		bns       []uint64
+		blocks    []*types.Block
+		receipts  []types.Receipts
+		streamIDs []sttypes.StreamID
+	)
+	// populate blocks and receipts in separate array
+	// this way helps to sort blocks and receipts by block number
+	for bn := s.state.CurrentBlockNumber() + 1; bn <= toBn; bn++ {
+		if received, ok := rdm.received[bn]; !ok {
+			return errors.New("some blocks are missing")
+		} else {
+			bns = append(bns, bn)
+			blocks = append(blocks, received.block)
+			receipts = append(receipts, received.receipts)
+			streamIDs = append(streamIDs, received.streamID)
+		}
+	}
+	// insert sorted blocks and receipts to chain
+	if inserted, err := r.configs.bc.InsertReceiptChain(blocks, receipts); err != nil {
+		utils.Logger().Err(err).
+			Interface("streams", streamIDs).
+			Interface("block numbers", bns).
+			Msg(WrapStagedSyncMsg("InsertReceiptChain failed"))
+		rdm.HandleRequestError(bns, err)
+		return fmt.Errorf("InsertReceiptChain failed: %s", err.Error())
+	} else {
+		if inserted != len(blocks) {
+			utils.Logger().Warn().
+				Interface("block numbers", bns).
+				Int("inserted", inserted).
+				Int("blocks to insert", len(blocks)).
+				Msg(WrapStagedSyncMsg("InsertReceiptChain couldn't insert all downloaded blocks/receipts"))
+		}
+	}
+	return nil
+}
 
-	currentBlock := int(r.configs.bc.CurrentBlock().NumberU64())
+// runReceiptWorkerLoop creates a work loop for download receipts
+func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDownloadManager, wg *sync.WaitGroup, s *StageState, txs []kv.RwTx, startTime time.Time) {
+
+	currentBlock := int(s.state.CurrentBlockNumber())
 	gbm := s.state.gbm
 
 	defer wg.Done()
@@ -156,7 +222,8 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 		default:
 		}
 		// get next batch of block numbers
-		batch := rdm.GetNextBatch()
+		curHeight := s.state.CurrentBlockNumber()
+		batch := rdm.GetNextBatch(curHeight)
 		if len(batch) == 0 {
 			select {
 			case <-ctx.Done():
@@ -168,6 +235,7 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 		// retrieve corresponding blocks from cache db
 		var hashes []common.Hash
 		var blocks []*types.Block
+
 		for _, bn := range batch {
 			blkKey := marshalData(bn)
 			loopID, _ := gbm.GetDownloadDetails(bn)
@@ -197,7 +265,8 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 				return
 			}
 			// receiptHash := s.state.currentCycle.ReceiptHashes[bn]
-			hashes = append(hashes, block.Header().ReceiptHash())
+			gbm.SetRootHash(bn, block.Header().Root())
+			hashes = append(hashes, block.Header().Hash())
 			blocks = append(blocks, block)
 		}
 
@@ -213,34 +282,10 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 				Interface("block numbers", batch).
 				Msg(WrapStagedSyncMsg("downloadRawBlocks failed"))
 			err = errors.Wrap(err, "request error")
-			rdm.HandleRequestError(batch, err, stid)
-		} else if receipts == nil || len(receipts) == 0 {
-			utils.Logger().Warn().
-				Str("stream", string(stid)).
-				Interface("block numbers", batch).
-				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received empty reciptBytes"))
-			err := errors.New("downloadRawBlocks received empty reciptBytes")
-			rdm.HandleRequestError(batch, err, stid)
+			rdm.HandleRequestError(batch, err)
 		} else {
-			// insert block and receipts to chain
-			if inserted, err := r.configs.bc.InsertReceiptChain(blocks, receipts); err != nil {
-				utils.Logger().Err(err).
-					Str("stream", string(stid)).
-					Interface("block numbers", batch).
-					Msg(WrapStagedSyncMsg("InsertReceiptChain failed"))
-				err := errors.New("InsertReceiptChain failed")
-				rdm.HandleRequestError(batch, err, stid)
-			} else {
-				if inserted != len(blocks) {
-					utils.Logger().Warn().
-						Interface("block numbers", batch).
-						Int("inserted", inserted).
-						Int("blocks to insert", len(blocks)).
-						Msg(WrapStagedSyncMsg("InsertReceiptChain couldn't insert all downloaded blocks/receipts"))
-				}
-			}
 			// handle request result
-			rdm.HandleRequestResult(batch, receipts, loopID, stid)
+			rdm.HandleRequestResult(batch, receipts, blocks, stid)
 			// log progress
 			if r.configs.logProgress {
 				//calculating block download speed

@@ -3,13 +3,16 @@ package stagedstreamsync
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/rs/zerolog"
@@ -22,56 +25,12 @@ type codeTask struct {
 	attempts map[sttypes.StreamID]int
 }
 
-func (t *task) addCodeTask(h common.Hash, ct *codeTask) {
-	t.codeTasks[h] = &codeTask{
-		attempts: ct.attempts,
-	}
-}
-
-func (t *task) getCodeTask(h common.Hash) *codeTask {
-	return t.codeTasks[h]
-}
-
-func (t *task) addNewCodeTask(h common.Hash) {
-	t.codeTasks[h] = &codeTask{
-		attempts: make(map[sttypes.StreamID]int),
-	}
-}
-
-func (t *task) deleteCodeTask(hash common.Hash) {
-	delete(t.codeTasks, hash)
-}
-
 // trieTask represents a single trie node download task, containing a set of
 // peers already attempted retrieval from to detect stalled syncs and abort.
 type trieTask struct {
 	hash     common.Hash
 	path     [][]byte
 	attempts map[sttypes.StreamID]int
-}
-
-func (t *task) addTrieTask(path string, tt *trieTask) {
-	t.trieTasks[path] = &trieTask{
-		hash:     tt.hash,
-		path:     tt.path,
-		attempts: tt.attempts,
-	}
-}
-
-func (t *task) getTrieTask(path string) *trieTask {
-	return t.trieTasks[path]
-}
-
-func (t *task) addNewTrieTask(hash common.Hash, path string) {
-	t.trieTasks[path] = &trieTask{
-		hash:     hash,
-		path:     trie.NewSyncPath([]byte(path)),
-		attempts: make(map[sttypes.StreamID]int),
-	}
-}
-
-func (t *task) deleteTrieTask(path string) {
-	delete(t.trieTasks, path)
 }
 
 type task struct {
@@ -83,6 +42,76 @@ func newTask() *task {
 	return &task{
 		trieTasks: make(map[string]*trieTask),
 		codeTasks: make(map[common.Hash]*codeTask),
+	}
+}
+
+func (t *task) addCodeTask(h common.Hash, ct *codeTask) {
+	t.codeTasks[h] = &codeTask{
+		attempts: ct.attempts,
+	}
+}
+
+func (t *task) getCodeTask(h common.Hash) *codeTask {
+	if task, ok := t.codeTasks[h]; ok {
+		return task
+	}
+	return nil
+}
+
+func (t *task) addNewCodeTask(h common.Hash) {
+	t.codeTasks[h] = &codeTask{
+		attempts: make(map[sttypes.StreamID]int),
+	}
+}
+
+func (t *task) deleteCodeTask(hash common.Hash) {
+	if _, ok := t.codeTasks[hash]; ok {
+		delete(t.codeTasks, hash)
+	}
+}
+
+func (t *task) deleteCodeTaskAttempts(h common.Hash, stID sttypes.StreamID) {
+	if task, ok := t.codeTasks[h]; ok {
+		if _, ok := task.attempts[stID]; ok {
+			delete(t.codeTasks[h].attempts, stID)
+		}
+	}
+}
+
+func (t *task) addTrieTask(path string, tt *trieTask) {
+	t.trieTasks[path] = &trieTask{
+		hash:     tt.hash,
+		path:     tt.path,
+		attempts: tt.attempts,
+	}
+}
+
+func (t *task) getTrieTask(path string) *trieTask {
+	if task, ok := t.trieTasks[path]; ok {
+		return task
+	}
+	return nil
+}
+
+func (t *task) addNewTrieTask(hash common.Hash, path string) {
+	t.trieTasks[path] = &trieTask{
+		hash:     hash,
+		path:     trie.NewSyncPath([]byte(path)),
+		attempts: make(map[sttypes.StreamID]int),
+	}
+}
+
+func (t *task) deleteTrieTask(path string) {
+	if _, ok := t.trieTasks[path]; ok {
+		delete(t.trieTasks, path)
+	}
+}
+
+func (t *task) deleteTrieTaskAttempts(path string, stID sttypes.StreamID) {
+	if task, ok := t.trieTasks[path]; ok {
+		if _, ok := task.attempts[stID]; ok {
+			delete(t.trieTasks[path].attempts, stID)
+		}
 	}
 }
 
@@ -99,6 +128,9 @@ type StateDownloadManager struct {
 	logger      zerolog.Logger
 	lock        sync.Mutex
 
+	numUncommitted   int
+	bytesUncommitted int
+
 	tasks      *task
 	requesting *task
 	processing *task
@@ -107,15 +139,12 @@ type StateDownloadManager struct {
 
 func newStateDownloadManager(tx kv.RwTx,
 	bc core.BlockChain,
-	root common.Hash,
 	concurrency int,
 	logger zerolog.Logger) *StateDownloadManager {
 
 	return &StateDownloadManager{
 		bc:          bc,
 		tx:          tx,
-		root:        root,
-		sched:       state.NewStateSync(root, bc.ChainDb(), nil, rawdb.HashScheme),
 		keccak:      sha3.NewLegacyKeccak256().(crypto.KeccakState),
 		concurrency: concurrency,
 		logger:      logger,
@@ -126,9 +155,13 @@ func newStateDownloadManager(tx kv.RwTx,
 	}
 }
 
+func (s *StateDownloadManager) setRootHash(root common.Hash) {
+	s.root = root
+	s.sched = state.NewStateSync(root, s.bc.ChainDb(), nil, rawdb.HashScheme)
+}
+
 // fillTasks fills the tasks to send to the remote peer.
 func (s *StateDownloadManager) fillTasks(n int) error {
-	// Refill available tasks from the scheduler.
 	if fill := n - (len(s.tasks.trieTasks) + len(s.tasks.codeTasks)); fill > 0 {
 		paths, hashes, codes := s.sched.Missing(fill)
 		for i, path := range paths {
@@ -143,7 +176,7 @@ func (s *StateDownloadManager) fillTasks(n int) error {
 
 // getNextBatch returns objects with a maximum of n state download
 // tasks to send to the remote peer.
-func (s *StateDownloadManager) GetNextBatch() (nodes []common.Hash, paths []string, codes []common.Hash) {
+func (s *StateDownloadManager) GetNextBatch() (nodes []common.Hash, paths []string, codes []common.Hash, err error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -154,13 +187,57 @@ func (s *StateDownloadManager) GetNextBatch() (nodes []common.Hash, paths []stri
 	cap -= nItems
 
 	if cap > 0 {
+		// Refill available tasks from the scheduler.
+		if s.sched.Pending() == 0 {
+			return
+		}
+
+		if err = s.commit(false); err != nil {
+			return
+		}
+
+		if err = s.fillTasks(cap); err != nil {
+			return
+		}
 		newNodes, newPaths, newCodes := s.getBatchFromUnprocessed(cap)
 		nodes = append(nodes, newNodes...)
 		paths = append(paths, newPaths...)
 		codes = append(codes, newCodes...)
 	}
+	return
+}
 
-	return nodes, paths, codes
+func (s *StateDownloadManager) commit(force bool) error {
+	if !force && s.bytesUncommitted < ethdb.IdealBatchSize {
+		return nil
+	}
+	start := time.Now()
+	b := s.bc.ChainDb().NewBatch()
+	if err := s.sched.Commit(b); err != nil {
+		return err
+	}
+	if err := b.Write(); err != nil {
+		return fmt.Errorf("DB write error: %v", err)
+	}
+	s.updateStats(s.numUncommitted, 0, 0, time.Since(start))
+	s.numUncommitted = 0
+	s.bytesUncommitted = 0
+	return nil
+}
+
+// updateStats bumps the various state sync progress counters and displays a log
+// message for the user to see.
+func (s *StateDownloadManager) updateStats(written, duplicate, unexpected int, duration time.Duration) {
+	// TODO: here it updates the stats for total pending, processed, duplicates and unexpected
+
+	// for now, we just jog current stats
+	if written > 0 || duplicate > 0 || unexpected > 0 {
+		utils.Logger().Info().
+			Int("count", written).
+			Int("duplicate", duplicate).
+			Int("unexpected", unexpected).
+			Msg("Imported new state entries")
+	}
 }
 
 // getBatchFromUnprocessed returns objects with a maximum of n unprocessed state download
@@ -194,11 +271,11 @@ func (s *StateDownloadManager) getBatchFromUnprocessed(n int) (nodes []common.Ha
 }
 
 // getBatchFromRetries get the block number batch to be requested from retries.
-func (s *StateDownloadManager) getBatchFromRetries(n int) (nodes []common.Hash, paths []string, codes []common.Hash) {
+func (s *StateDownloadManager) getBatchFromRetries(n int) ([]common.Hash, []string, []common.Hash) {
 	// over trie nodes as those can be written to disk and forgotten about.
-	nodes = make([]common.Hash, 0, n)
-	paths = make([]string, 0, n)
-	codes = make([]common.Hash, 0, n)
+	nodes := make([]common.Hash, 0, n)
+	paths := make([]string, 0, n)
+	codes := make([]common.Hash, 0, n)
 
 	for hash, t := range s.retries.codeTasks {
 		// Stop when we've gathered enough requests
@@ -229,14 +306,16 @@ func (s *StateDownloadManager) HandleRequestError(codeHashes []common.Hash, trie
 
 	// add requested code hashes to retries
 	for _, h := range codeHashes {
-		s.retries.addCodeTask(h, s.requesting.codeTasks[h])
-		delete(s.requesting.codeTasks, h)
+		task := s.requesting.getCodeTask(h)
+		s.retries.addCodeTask(h, task)
+		s.requesting.deleteCodeTask(h)
 	}
 
 	// add requested trie paths to retries
 	for _, path := range triePaths {
-		s.retries.addTrieTask(path, s.requesting.trieTasks[path])
-		delete(s.requesting.trieTasks, path)
+		task := s.requesting.getTrieTask(path)
+		s.retries.addTrieTask(path, task)
+		s.requesting.deleteTrieTask(path)
 	}
 }
 
@@ -246,14 +325,14 @@ func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, tri
 	defer s.lock.Unlock()
 
 	// Collect processing stats and update progress if valid data was received
-	duplicate, unexpected, successful, numUncommitted, bytesUncommitted := 0, 0, 0, 0, 0
+	duplicate, unexpected, successful := 0, 0, 0
 
 	for _, blob := range response {
 		hash, err := s.processNodeData(codeHashes, triePaths, blob)
 		switch err {
 		case nil:
-			numUncommitted++
-			bytesUncommitted += len(blob)
+			s.numUncommitted++
+			s.bytesUncommitted += len(blob)
 			successful++
 		case trie.ErrNotRequested:
 			unexpected++
@@ -266,11 +345,16 @@ func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, tri
 
 	for _, path := range triePaths {
 		task := s.requesting.getTrieTask(path)
+		if task == nil {
+			// it is already removed from requesting
+			// either it has been completed and deleted by processNodeData or it does not exist
+			continue
+		}
 		// If the node did deliver something, missing items may be due to a protocol
 		// limit or a previous timeout + delayed delivery. Both cases should permit
 		// the node to retry the missing items (to avoid single-peer stalls).
 		if len(response) > 0 { //TODO: if timeout also do same
-			delete(s.requesting.trieTasks[path].attempts, streamID)
+			s.requesting.deleteTrieTaskAttempts(path, streamID)
 		} else if task.attempts[streamID] >= MaxTriesToFetchNodeData {
 			// If we've requested the node too many times already, it may be a malicious
 			// sync where nobody has the right data. Abort.
@@ -283,11 +367,16 @@ func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, tri
 
 	for _, hash := range codeHashes {
 		task := s.requesting.getCodeTask(hash)
+		if task == nil {
+			// it is already removed from requesting
+			// either it has been completed and deleted by processNodeData or it does not exist
+			continue
+		}
 		// If the node did deliver something, missing items may be due to a protocol
 		// limit or a previous timeout + delayed delivery. Both cases should permit
 		// the node to retry the missing items (to avoid single-peer stalls).
 		if len(response) > 0 { //TODO: if timeout also do same
-			delete(s.requesting.codeTasks[hash].attempts, streamID) //TODO: do we need delete attempts???
+			s.requesting.deleteCodeTaskAttempts(hash, streamID) //TODO: do we need delete attempts???
 		} else if task.attempts[streamID] >= MaxTriesToFetchNodeData {
 			// If we've requested the node too many times already, it may be a malicious
 			// sync where nobody has the right data. Abort.
@@ -325,6 +414,11 @@ func (s *StateDownloadManager) processNodeData(codeHashes []common.Hash, triePat
 	}
 	for _, path := range triePaths {
 		task := s.requesting.getTrieTask(path)
+		if task == nil {
+			// this shouldn't happen while the path is given from triPaths and triPaths
+			// are given from requesting queue
+			continue
+		}
 		if task.hash == hash {
 			err := s.sched.ProcessNode(trie.NodeSyncResult{
 				Path: path,

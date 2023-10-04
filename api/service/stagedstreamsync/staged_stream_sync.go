@@ -67,8 +67,7 @@ type StagedStreamSync struct {
 	protocol        syncProtocol
 	isBeaconNode    bool
 	gbm             *blockDownloadManager // initialized when finished get block number
-	rdm             *receiptDownloadManager
-	lastMileBlocks  []*types.Block // last mile blocks to catch up with the consensus
+	lastMileBlocks  []*types.Block        // last mile blocks to catch up with the consensus
 	lastMileMux     sync.Mutex
 	inserted        int
 	config          Config
@@ -338,6 +337,18 @@ func (s *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint6
 	return bn, stid, nil
 }
 
+// doGetBlockByNumberRequest returns block by its number and corresponding stream
+func (s *StagedStreamSync) doGetBlockByNumberRequest(ctx context.Context, bn uint64) (*types.Block, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	blocks, stid, err := s.protocol.GetBlocksByNumber(ctx, []uint64{bn}, syncproto.WithHighPriority())
+	if err != nil || len(blocks) != 1 {
+		return nil, stid, err
+	}
+	return blocks[0], stid, nil
+}
+
 // promLabels returns a prometheus labels for current shard id
 func (s *StagedStreamSync) promLabels() prometheus.Labels {
 	sid := s.bc.ShardID()
@@ -483,7 +494,6 @@ func (s *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.RwD
 	if err != nil {
 		return err
 	}
-
 	if err = stage.Handler.Exec(ctx, firstCycle, invalidBlockRevert, stageState, s, tx); err != nil {
 		utils.Logger().Error().
 			Err(err).

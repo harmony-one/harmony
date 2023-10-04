@@ -70,7 +70,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	}
 
 	maxHeight := s.state.status.targetBN
-	currentHead := b.configs.bc.CurrentBlock().NumberU64()
+	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
@@ -138,7 +138,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 // runBlockWorkerLoop creates a work loop for download blocks
 func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, startTime time.Time) {
 
-	currentBlock := int(b.configs.bc.CurrentBlock().NumberU64())
+	currentBlock := int(s.state.CurrentBlockNumber())
 
 	defer wg.Done()
 
@@ -148,7 +148,8 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 			return
 		default:
 		}
-		batch := gbm.GetNextBatch()
+		curHeight := s.state.CurrentBlockNumber()
+		batch := gbm.GetNextBatch(curHeight)
 		if len(batch) == 0 {
 			select {
 			case <-ctx.Done():
@@ -434,7 +435,7 @@ func (b *StageBodies) Revert(ctx context.Context, firstCycle bool, u *RevertStat
 		defer tx.Rollback()
 	}
 	// save progress
-	currentHead := b.configs.bc.CurrentBlock().NumberU64()
+	currentHead := s.state.CurrentBlockNumber()
 	if err = s.Update(tx, currentHead); err != nil {
 		utils.Logger().Error().
 			Err(err).

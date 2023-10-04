@@ -65,6 +65,7 @@ func initFastSyncStagesOrder() {
 		BlockBodies,
 		Receipts,
 		StateSync,
+		States,
 		LastMile,
 		Finish,
 	}
@@ -72,6 +73,7 @@ func initFastSyncStagesOrder() {
 	StagesRevertOrder = RevertOrder{
 		Finish,
 		LastMile,
+		States,
 		StateSync,
 		Receipts,
 		BlockBodies,
@@ -83,6 +85,7 @@ func initFastSyncStagesOrder() {
 	StagesCleanUpOrder = CleanUpOrder{
 		Finish,
 		LastMile,
+		States,
 		StateSync,
 		Receipts,
 		BlockBodies,

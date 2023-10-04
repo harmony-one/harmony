@@ -38,6 +38,10 @@ const (
 	// ShortRangeTimeout is the timeout for each short range sync, which allow short range sync
 	// to restart automatically when stuck in `getBlockHashes`
 	ShortRangeTimeout time.Duration = 1 * time.Minute
+
+	// pivot block distance ranges
+	MinPivotDistanceToHead uint64 = 1028
+	MaxPivotDistanceToHead uint64 = 2048
 )
 
 // SyncMode represents the synchronization mode of the downloader.

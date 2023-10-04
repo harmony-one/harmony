@@ -53,7 +53,7 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 
 	maxHeight := s.state.status.targetBN
 	maxBlocksPerSyncCycle := uint64(1024) // TODO: should be in config -> s.state.MaxBlocksPerSyncCycle
-	currentHeight := heads.configs.bc.CurrentBlock().NumberU64()
+	currentHeight := s.state.CurrentBlockNumber()
 	s.state.currentCycle.TargetHeight = maxHeight
 	targetHeight := uint64(0)
 	if errV := CreateView(ctx, heads.configs.db, tx, func(etx kv.Tx) (err error) {
@@ -87,6 +87,15 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 
 	if maxBlocksPerSyncCycle > 0 && targetHeight-currentHeight > maxBlocksPerSyncCycle {
 		targetHeight = currentHeight + maxBlocksPerSyncCycle
+	}
+
+	// check pivot: if chain hasn't reached to pivot yet
+	if s.state.status.pivotBlock != nil && s.state.CurrentBlockNumber() < s.state.status.pivotBlock.NumberU64() {
+		// set target height on the block before pivot
+		// pivot block would be downloaded by StateSync stage
+		if targetHeight >= s.state.status.pivotBlock.NumberU64() {
+			targetHeight = s.state.status.pivotBlock.NumberU64() - 1
+		}
 	}
 
 	s.state.currentCycle.TargetHeight = targetHeight

@@ -19,12 +19,12 @@ type StageStates struct {
 	configs StageStatesCfg
 }
 type StageStatesCfg struct {
-	bc             core.BlockChain
-	db             kv.RwDB
-	blockDBs       []kv.RwDB
-	concurrency    int
-	logger         zerolog.Logger
-	logProgress    bool
+	bc          core.BlockChain
+	db          kv.RwDB
+	blockDBs    []kv.RwDB
+	concurrency int
+	logger      zerolog.Logger
+	logProgress bool
 }
 
 func NewStageStates(cfg StageStatesCfg) *StageStates {
@@ -42,12 +42,12 @@ func NewStageStatesCfg(
 	logProgress bool) StageStatesCfg {
 
 	return StageStatesCfg{
-		bc:             bc,
-		db:             db,
-		blockDBs:       blockDBs,
-		concurrency:    concurrency,
-		logger:         logger,
-		logProgress:    logProgress,
+		bc:          bc,
+		db:          db,
+		blockDBs:    blockDBs,
+		concurrency: concurrency,
+		logger:      logger,
+		logProgress: logProgress,
 	}
 }
 
