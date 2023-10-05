@@ -113,6 +113,16 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 	}
 	wg.Wait()
 
+	// insert block
+	if err := sss.configs.bc.WriteHeadBlock(s.state.status.pivotBlock); err != nil {
+		sss.configs.logger.Warn().Err(err).
+			Uint64("pivot block number", s.state.status.pivotBlock.NumberU64()).
+			Msg(WrapStagedSyncMsg("insert pivot block failed"))
+		s.state.Debug("StateSync/pivot/insert/error", err)
+		// TODO: panic("pivot block is failed to insert in chain.")
+		return err
+	}
+
 	/*
 		gbm := s.state.gbm
 
