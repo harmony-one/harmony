@@ -19,11 +19,11 @@ const (
 
 	// GetNodeDataCap is the cap of request of single GetNodeData request
 	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
-	GetNodeDataCap = 10
+	GetNodeDataCap = 256
 
 	// GetReceiptsCap is the cap of request of single GetReceipts request
 	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
-	GetReceiptsCap = 10
+	GetReceiptsCap = 128
 
 	// MaxStreamFailures is the maximum allowed failures before stream gets removed
 	MaxStreamFailures = 5
