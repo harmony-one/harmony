@@ -50,6 +50,16 @@ var (
 	}
 	testGetReceiptsRequest    = syncpb.MakeGetReceiptsRequest(testGetReceipts)
 	testGetReceiptsRequestMsg = syncpb.MakeMessageFromRequest(testGetReceiptsRequest)
+
+	testGetNodeData = []common.Hash{
+		numberToHash(1),
+		numberToHash(2),
+		numberToHash(3),
+		numberToHash(4),
+		numberToHash(5),
+	}
+	testGetNodeDataRequest    = syncpb.MakeGetNodeDataRequest(testGetNodeData)
+	testGetNodeDataRequestMsg = syncpb.MakeMessageFromRequest(testGetNodeDataRequest)
 )
 
 func TestSyncStream_HandleGetBlocksByRequest(t *testing.T) {
@@ -152,7 +162,28 @@ func TestSyncStream_HandleGetReceipts(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	receivedBytes, _ := remoteSt.ReadBytes()
 
-	if err := checkGetReceiptsResult(receivedBytes, testGetBlockByHashes); err != nil {
+	if err := checkGetReceiptsResult(receivedBytes, testGetReceipts); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSyncStream_HandleGetNodeData(t *testing.T) {
+	st, remoteSt := makeTestSyncStream()
+
+	go st.run()
+	defer close(st.closeC)
+
+	req := testGetNodeDataRequestMsg
+	b, _ := protobuf.Marshal(req)
+	err := remoteSt.WriteBytes(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	receivedBytes, _ := remoteSt.ReadBytes()
+
+	if err := checkGetNodeDataResult(receivedBytes, testGetNodeData); err != nil {
 		t.Fatal(err)
 	}
 }

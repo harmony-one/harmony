@@ -75,6 +75,21 @@ func checkGetReceiptsResult(b []byte, hs []common.Hash) error {
 	return nil
 }
 
+func checkGetNodeDataResult(b []byte, hs []common.Hash) error {
+	var msg = &syncpb.Message{}
+	if err := protobuf.Unmarshal(b, msg); err != nil {
+		return err
+	}
+	bhResp, err := msg.GetNodeDataResponse()
+	if err != nil {
+		return err
+	}
+	if len(hs) != len(bhResp.DataBytes) {
+		return errors.New("unexpected size")
+	}
+	return nil
+}
+
 func numberToHash(bn uint64) common.Hash {
 	var h common.Hash
 	binary.LittleEndian.PutUint64(h[:], bn)
