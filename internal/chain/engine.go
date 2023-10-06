@@ -418,7 +418,7 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 	// these 2 should be created outside of loop to optimize
 	minRate := availability.MinCommissionRate(
 		config.IsMinCommissionRate(newShardState.Epoch),
-		config.IsHIP30(newShardState.Epoch),
+		config.IsOneEpochBeforeHIP30(newShardState.Epoch),
 	)
 	minRateNotZero := !minRate.Equal(numeric.ZeroDec())
 	// elected validators have their fee updated, if required to do so
