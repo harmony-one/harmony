@@ -18,6 +18,7 @@
 package state
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"sort"
@@ -1232,7 +1233,7 @@ func (db *DB) ValidatorWrapper(
 ) (*stk.ValidatorWrapper, error) {
 	// if cannot revert and ask for a copy
 	if sendOriginal && copyDelegations {
-		panic("'Cannot revert' must not expect copy of delegations")
+		return nil, errors.New("'sendOriginal' must not expect copy of delegations")
 	}
 
 	// Read cache first
@@ -1366,11 +1367,16 @@ func (db *DB) AddReward(
 	snapshot *stk.ValidatorWrapper,
 	reward *big.Int,
 	shareLookup map[common.Address]numeric.Dec,
+	nilDelegationsRemoved bool,
 ) error {
 	if reward.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().RawJSON("validator", []byte(snapshot.String())).
 			Msg("0 given as reward")
 		return nil
+	}
+
+	if len(snapshot.Delegations) != len(shareLookup) {
+		return errors.New("[AddReward] Snapshot and shareLookup mismatch")
 	}
 
 	curValidator, err := db.ValidatorWrapper(snapshot.Address, true, false)
@@ -1397,11 +1403,17 @@ func (db *DB) AddReward(
 		rewardPool.Sub(rewardPool, commissionInt)
 	}
 
+	// no sanity check for length of delegations between curValidator and snapshot
+	// if a delegation happens, len(curValidator) > len(snapshot)
+	// if it doesn't happen, curValidator == snapshot
+	// if there are only removals, curValidator < snapshot
+
 	// Payout each delegator's reward pro-rata
 	totalRewardForDelegators := big.NewInt(0).Set(rewardPool)
-	for i := range snapshot.Delegations {
-		delegation := snapshot.Delegations[i]
-		percentage, ok := shareLookup[delegation.DelegatorAddress]
+	if !nilDelegationsRemoved {
+		for i := range snapshot.Delegations {
+			delegation := snapshot.Delegations[i]
+			percentage, ok := shareLookup[delegation.DelegatorAddress]
 
 		if !ok {
 			return errors.Wrapf(err, "missing delegation shares for reward distribution")
@@ -1409,12 +1421,67 @@ func (db *DB) AddReward(
 
 		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
 		curDelegation := curValidator.Delegations[i]
+		// should we check that curDelegation.DelegatorAddress == delegation.DelegatorAddress ?
+		// wasn't there originally so I leave it for now
 		curDelegation.Reward.Add(curDelegation.Reward, rewardInt)
 		rewardPool.Sub(rewardPool, rewardInt)
 	}
+} else {
+	// iterate simply over snapshot delegations
+	// those added later to curValidator are new delegations which do not receive rewards immediately
+	// those removed from curValidator are stale delegations which do not receive rewards anyway
+	offset := 0
+	for i := 0; i < len(snapshot.Delegations); i++ {
+		delegationFromSnapshot := snapshot.Delegations[i]
+		percentage, ok := shareLookup[delegationFromSnapshot.DelegatorAddress]
+		if !ok {
+			return errors.Wrapf(err, "missing delegation shares for reward distribution")
+		}
+		if percentage.IsZero() { // stale delegation
+
+			offset++
+			continue
+		}
+		// try to find in wrapper
+		// this is O(N) even though order is not guaranteed
+		// for example, snapshot is A / B / C / D / E where C is a stale delegation
+		// wrapper then becomes A / B / D / E
+		// if C then delegates to this validator, the wrapper becomes A / B / D / E / C
+		// (1) snapshot = A / B / C / D / E and wrapper  = A / B / D / E / C (remove and re-add)
+		// for i in [0, 1] j = i - 0 (offset) works well
+		// for i = 2, offset becomes 1
+		// for i in [3, 4] use j = i - 1 (offset)
+		// other cases are
+		// (1) snapshot = A / B / C / D and wrapper = A / C / D (just remove B)
+		// (2) snapshot = A / B / C / D and wrapper = A / C / D / E (remove B and add E)
+		// (3) snapshot = A / B / C / D and wrapper = A / B / C / D / E (just add E)
+		// (4) snapshot and wrapper equal (no effort needed)
+		//		 even if a stale delegation is removed from the end and re-added this works
+		// (5) snapshot = A / B / C / D / E and wrapper = A / B / D / E / C / F (remove and re-add + add)
+
+		found := false
+		for j := i - offset; j < len(curValidator.Delegations) && !found; j++ {
+			delegationFromWrapper := curValidator.Delegations[j]
+			if bytes.Equal(
+				delegationFromWrapper.DelegatorAddress.Bytes(),
+				delegationFromSnapshot.DelegatorAddress.Bytes(),
+			) {
+				found = true
+				rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
+				delegationFromWrapper.Reward.Add(delegationFromWrapper.Reward, rewardInt)
+				rewardPool.Sub(rewardPool, rewardInt)
+			}
+		}
+			// delegation in snapshot with non zero reward but not in wrapper
+			if !found {
+				return errors.New("Non-zero reward found in snapshot but delegation missing in wrapper")
+			}
+		}
+	}
 
 	// The last remaining bit belongs to the validator (remember the validator's self delegation is
-	// always at index 0)
+	// always at index 0). We do not allow validator deletions (yet?) so a validator's
+	// self stake is never deleted even if otherwise stale
 	if rewardPool.Cmp(common.Big0) > 0 {
 		curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, rewardPool)
 	}

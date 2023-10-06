@@ -49,9 +49,7 @@ type StateDB interface {
 	UnsetValidatorFlag(common.Address)
 	IsValidator(common.Address) bool
 	GetValidatorFirstElectionEpoch(addr common.Address) *big.Int
-	//AddReward(*staking.ValidatorWrapper, *big.Int, map[common.Address]numeric.Dec, bool) error
-	AddReward(*staking.ValidatorWrapper, *big.Int, map[common.Address]numeric.Dec) error
-
+	AddReward(*staking.ValidatorWrapper, *big.Int, map[common.Address]numeric.Dec, bool) error
 	AddRefund(uint64)
 	SubRefund(uint64)
 	GetRefund() uint64
