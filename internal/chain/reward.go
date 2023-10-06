@@ -268,7 +268,8 @@ func AccumulateRewardsAndCountSigs(
 
 	// Handle rewards on pre-aggregated rewards era.
 	if !bc.Config().IsAggregatedRewardEpoch(header.Epoch()) {
-		return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
+		reader, err := distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
+		return numeric.ZeroDec(), reader, err; 
 	}
 
 	// Aggregated Rewards Era: Rewards are aggregated every 64 blocks.
@@ -283,7 +284,9 @@ func AccumulateRewardsAndCountSigs(
 		return numeric.ZeroDec(), network.EmptyPayout, nil
 	}
 
-	return distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
+	
+	reader, err := distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
+	return numeric.ZeroDec(), reader, err
 }
 
 func waitForCommitSigs(sigsReady chan bool) error {
@@ -299,17 +302,13 @@ func waitForCommitSigs(sigsReady chan bool) error {
 	return nil
 }
 
-func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
-	rewardToDistribute numeric.Dec) (numeric.Dec, reward.Reader, error) {
-	epoch := header.Epoch()
-	defaultReward := rewardToDistribute
-	remainingReward := numeric.ZeroDec()
-	if bc.Config().IsHIP30(epoch) {
-		fractionToRecovery := shard.Schedule.InstanceForEpoch(epoch).HIP30EmissionFraction()
-		fractionToValidators := numeric.OneDec().Sub(fractionToRecovery)
-		defaultReward = rewardToDistribute.Mul(fractionToValidators)
-		remainingReward = rewardToDistribute.Mul(fractionToRecovery)
-	}
+func distributeRewardAfterAggregateEpoch(
+	bc engine.ChainReader,
+	state *state.DB,
+	header *block.Header,
+	beaconChain engine.ChainReader,
+	defaultReward numeric.Dec,
+) (reward.Reader, error) {
 	newRewards, payouts :=
 		big.NewInt(0), []reward.Payout{}
 
@@ -340,7 +339,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		if cxLinks := curHeader.CrossLinks(); len(cxLinks) > 0 {
 			crossLinks := types.CrossLinks{}
 			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
-				return numeric.ZeroDec(), network.EmptyPayout, err
+				return network.EmptyPayout, err
 			}
 			allCrossLinks = append(allCrossLinks, crossLinks...)
 		}
@@ -355,7 +354,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		payables, _, err := processOneCrossLink(bc, state, cxLink, defaultReward, i)
 
 		if err != nil {
-			return numeric.ZeroDec(), network.EmptyPayout, err
+			return network.EmptyPayout, err
 		}
 
 		allPayables = append(allPayables, payables...)
@@ -394,29 +393,45 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	for _, addr := range allAddresses {
 		snapshot, err := bc.ReadValidatorSnapshot(addr)
 		if err != nil {
-			return numeric.ZeroDec(), network.EmptyPayout, err
+			return network.EmptyPayout, err
 		}
 		due := allValidatorPayable[addr]
 		newRewards.Add(newRewards, due)
 
 		shares, err := lookupDelegatorShares(snapshot)
 		if err != nil {
-			return numeric.ZeroDec(), network.EmptyPayout, err
+			return network.EmptyPayout, err
 		}
-		if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
-			return numeric.ZeroDec(), network.EmptyPayout, err
+		if err := state.AddReward(
+			snapshot.Validator,
+			due,
+			shares,
+			// epoch prior to no nil delegations
+			// block 32767 -> snapshot saved, rewards paid
+			// in no nil delegations epoch
+			// block 1 -> rewards not paid (unless schedule changes),
+			// and delegations pruned afterwards
+			bc.Config().IsNoNilDelegations(header.Epoch()),
+		); err != nil {
+			return network.EmptyPayout, err
 		}
 	}
-	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("After Chain Reward (AddReward)")
-	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("After Chain Reward")
-
-	return remainingReward, network.NewStakingEraRewardForRound(
+	utils.Logger().Debug().Int64("elapsed time", time.Since(startTimeLocal).Milliseconds()).Msg("After Chain Reward (AddReward)")
+	utils.Logger().Debug().Int64("elapsed time", time.Since(startTime).Milliseconds()).Msg("After Chain Reward")
+	
+	return network.NewStakingEraRewardForRound(
 		newRewards, payouts,
 	), nil
 }
 
-func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
-	defaultReward numeric.Dec, sigsReady chan bool) (numeric.Dec, reward.Reader, error) {
+func distributeRewardBeforeAggregateEpoch(
+	bc engine.ChainReader,
+	state *state.DB,
+	header *block.Header,
+	beaconChain engine.ChainReader,
+	defaultReward numeric.Dec,
+	sigsReady chan bool,
+) (reward.Reader, error) {
 	newRewards, payouts :=
 		big.NewInt(0), []reward.Payout{}
 
@@ -426,9 +441,9 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 		startTime := time.Now()
 		crossLinks := types.CrossLinks{}
 		if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
-			return numeric.ZeroDec(), network.EmptyPayout, err
+			return network.EmptyPayout, err
 		}
-		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Decode Cross Links")
+		utils.Logger().Debug().Int64("elapsed time", time.Since(startTime).Milliseconds()).Msg("Decode Cross Links")
 
 		startTime = time.Now()
 		for i := range crossLinks {
@@ -436,7 +451,7 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 			payables, _, err := processOneCrossLink(bc, state, cxLink, defaultReward, i)
 
 			if err != nil {
-				return numeric.ZeroDec(), network.EmptyPayout, err
+				return network.EmptyPayout, err
 			}
 
 			allPayables = append(allPayables, payables...)
@@ -470,17 +485,17 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 					payable.EcdsaAddress,
 				)
 				if err != nil {
-					return numeric.ZeroDec(), network.EmptyPayout, err
+					return network.EmptyPayout, err
 				}
 				due := resultsHandle[bucket][payThem].payout
 				newRewards.Add(newRewards, due)
 
 				shares, err := lookupDelegatorShares(snapshot)
 				if err != nil {
-					return numeric.ZeroDec(), network.EmptyPayout, err
+					return network.EmptyPayout, err
 				}
-				if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
-					return numeric.ZeroDec(), network.EmptyPayout, err
+				if err := state.AddReward(snapshot.Validator, due, shares, bc.Config().IsNoNilDelegations(header.Epoch())); err != nil {
+					return network.EmptyPayout, err
 				}
 				payouts = append(payouts, reward.Payout{
 					Addr:        payable.EcdsaAddress,
@@ -489,21 +504,21 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 				})
 			}
 		}
-		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (AddReward)")
-		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Shard Chain Reward")
+		utils.Logger().Debug().Int64("elapsed time", time.Since(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (AddReward)")
+		utils.Logger().Debug().Int64("elapsed time", time.Since(startTime).Milliseconds()).Msg("Shard Chain Reward")
 	}
 
 	// Block here until the commit sigs are ready or timeout.
 	// sigsReady signal indicates that the commit sigs are already populated in the header object.
 	if err := waitForCommitSigs(sigsReady); err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, err
+		return network.EmptyPayout, err
 	}
 
 	startTime := time.Now()
 	// Take care of my own beacon chain committee, _ is missing, for slashing
 	parentE, members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
 	if err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, errors.Wrapf(err, "shard 0 block %d reward error with bitmap %x", header.Number(), header.LastCommitBitmap())
+		return network.EmptyPayout, errors.Wrapf(err, "shard 0 block %d reward error with bitmap %x", header.Number(), header.LastCommitBitmap())
 	}
 	subComm := shard.Committee{ShardID: shard.BeaconChainShardID, Slots: members}
 
@@ -514,13 +529,13 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 		payable,
 		missing,
 	); err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, err
+		return network.EmptyPayout, err
 	}
 	votingPower, err := lookupVotingPower(
 		parentE, &subComm,
 	)
 	if err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, err
+		return network.EmptyPayout, err
 	}
 
 	allSignersShare := numeric.ZeroDec()
@@ -537,7 +552,7 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 		if !voter.IsHarmonyNode {
 			snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
 			if err != nil {
-				return numeric.ZeroDec(), network.EmptyPayout, err
+				return network.EmptyPayout, err
 			}
 			due := defaultReward.Mul(
 				voter.OverallPercent.Quo(allSignersShare),
@@ -546,10 +561,10 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 
 			shares, err := lookupDelegatorShares(snapshot)
 			if err != nil {
-				return numeric.ZeroDec(), network.EmptyPayout, err
+				return network.EmptyPayout, err
 			}
-			if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
-				return numeric.ZeroDec(), network.EmptyPayout, err
+			if err := state.AddReward(snapshot.Validator, due, shares, bc.Config().IsNoNilDelegations(header.Epoch())); err != nil {
+				return network.EmptyPayout, err
 			}
 			payouts = append(payouts, reward.Payout{
 				Addr:        voter.EarningAccount,
@@ -558,9 +573,9 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 			})
 		}
 	}
-	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Beacon Chain Reward")
+	utils.Logger().Debug().Int64("elapsed time", time.Since(startTime).Milliseconds()).Msg("Beacon Chain Reward")
 
-	return numeric.ZeroDec(), network.NewStakingEraRewardForRound(
+	return network.NewStakingEraRewardForRound(
 		newRewards, payouts,
 	), nil
 }
