@@ -56,7 +56,7 @@ func NewStageStateSyncCfg(bc core.BlockChain,
 func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	// only execute this stage in fast/snap sync mode and once we reach to pivot
-	if s.state.status.pivotBlock == nil || s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64()-1 {
+	if s.state.status.pivotBlock == nil || s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64() {
 		return nil
 	}
 
@@ -122,6 +122,9 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 		// TODO: panic("pivot block is failed to insert in chain.")
 		return err
 	}
+
+	// states should be fully synced in this stage
+	s.state.status.statesSynced = true
 
 	/*
 		gbm := s.state.gbm

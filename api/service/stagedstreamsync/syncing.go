@@ -224,11 +224,16 @@ func (s *StagedStreamSync) Debug(source string, msg interface{}) {
 	}
 }
 
-func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint64) (uint64, error) {
+// checkPivot checks pivot block and returns pivot block and cycle Sync mode
+func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint64, initSync bool) (*types.Block, SyncMode, error) {
+
+	if s.config.SyncMode == FullSync {
+		return nil, FullSync, nil
+	}
 
 	// do full sync if chain is at early stage
-	if estimatedHeight < MaxPivotDistanceToHead {
-		return 0, nil
+	if initSync && estimatedHeight < MaxPivotDistanceToHead {
+		return nil, FullSync, nil
 	}
 
 	pivotBlockNumber := uint64(0)
@@ -240,23 +245,21 @@ func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint6
 			if pivotBlockNumber < estimatedHeight-MaxPivotDistanceToHead {
 				pivotBlockNumber = estimatedHeight - MinPivotDistanceToHead
 				if err := rawdb.WriteLastPivotNumber(s.bc.ChainDb(), pivotBlockNumber); err != nil {
-					s.logger.Error().Err(err).
+					s.logger.Warn().Err(err).
 						Uint64("current pivot number", *curPivot).
 						Uint64("new pivot number", pivotBlockNumber).
 						Msg(WrapStagedSyncMsg("update pivot number failed"))
-					return pivotBlockNumber, err
+					pivotBlockNumber = *curPivot
 				}
 			}
 		}
 	} else {
-		pivot := estimatedHeight - MinPivotDistanceToHead
-		if s.config.SyncMode == FastSync && s.CurrentBlockNumber() < pivot {
-			pivotBlockNumber = pivot
+		if head := s.CurrentBlockNumber(); s.config.SyncMode == FastSync && head <= 1 {
+			pivotBlockNumber = estimatedHeight - MinPivotDistanceToHead
 			if err := rawdb.WriteLastPivotNumber(s.bc.ChainDb(), pivotBlockNumber); err != nil {
-				s.logger.Error().Err(err).
+				s.logger.Warn().Err(err).
 					Uint64("new pivot number", pivotBlockNumber).
 					Msg(WrapStagedSyncMsg("update pivot number failed"))
-				return pivotBlockNumber, err
 			}
 		}
 	}
@@ -265,17 +268,17 @@ func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint6
 			s.logger.Error().Err(err).
 				Uint64("pivot", pivotBlockNumber).
 				Msg(WrapStagedSyncMsg("query peers for pivot block failed"))
-			return pivotBlockNumber, err
+			return block, FastSync, err
 		} else {
 			s.status.pivotBlock = block
+			s.logger.Info().
+				Uint64("estimatedHeight", estimatedHeight).
+				Uint64("pivot number", pivotBlockNumber).
+				Msg(WrapStagedSyncMsg("fast/snap sync mode, pivot is set successfully"))
+			return block, FastSync, nil
 		}
-		s.logger.Info().
-			Uint64("estimatedHeight", estimatedHeight).
-			Uint64("pivot number", pivotBlockNumber).
-			Msg(WrapStagedSyncMsg("fast/snap sync mode, pivot is set successfully"))
 	}
-
-	return pivotBlockNumber, nil
+	return nil, FullSync, nil
 }
 
 // doSync does the long range sync.
@@ -310,9 +313,12 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 	// We are probably in full sync, but we might have rewound to before the
 	// fast/snap sync pivot, check if we should reenable
-	if _, err := s.checkPivot(downloaderContext, estimatedHeight); err != nil {
+	if pivotBlock, cycleSyncMode, err := s.checkPivot(downloaderContext, estimatedHeight, initSync); err != nil {
 		s.logger.Error().Err(err).Msg(WrapStagedSyncMsg("check pivot failed"))
 		return 0, 0, err
+	} else {
+		s.status.cycleSyncMode = cycleSyncMode
+		s.status.pivotBlock = pivotBlock
 	}
 
 	s.startSyncing()
@@ -451,7 +457,7 @@ func (s *StagedStreamSync) checkPrerequisites() error {
 
 func (s *StagedStreamSync) CurrentBlockNumber() uint64 {
 	// if current head is ahead of pivot block, return chain head regardless of sync mode
-	if s.status.pivotBlock != nil && s.bc.CurrentBlock().NumberU64() > s.status.pivotBlock.NumberU64() {
+	if s.status.pivotBlock != nil && s.bc.CurrentBlock().NumberU64() >= s.status.pivotBlock.NumberU64() {
 		return s.bc.CurrentBlock().NumberU64()
 	}
 

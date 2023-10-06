@@ -52,7 +52,7 @@ func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, con
 func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	// only execute this stage in fast/snap sync mode
-	if s.state.status.pivotBlock == nil || s.state.CurrentBlockNumber() >= s.state.status.pivotBlock.NumberU64() {
+	if s.state.status.cycleSyncMode == FullSync {
 		return nil
 	}
 

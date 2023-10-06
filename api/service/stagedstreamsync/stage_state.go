@@ -54,10 +54,8 @@ func NewStageStatesCfg(
 // Exec progresses States stage in the forward direction
 func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 	// only execute this stage in full sync mode
-	if s.state.config.SyncMode != FullSync {
-		if s.state.status.pivotBlock != nil && s.state.bc.CurrentBlock().NumberU64() < s.state.status.pivotBlock.NumberU64() {
-			return nil
-		}
+	if s.state.status.cycleSyncMode != FullSync {
+		return nil
 	}
 
 	// for short range sync, skip this step
