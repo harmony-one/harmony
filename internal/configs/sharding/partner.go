@@ -27,8 +27,8 @@ var feeCollectorsDevnet = []FeeCollectors{
 type partnerSchedule struct{}
 
 const (
-	// 12 hours per epoch (at 2s/block)
-	partnerBlocksPerEpoch = 21600
+	// 30 min per epoch (at 2s/block)
+	partnerBlocksPerEpoch = 900
 
 	partnerVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
