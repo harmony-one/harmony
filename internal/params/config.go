@@ -74,7 +74,7 @@ var (
 		FeeCollectEpoch:                       big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
-		BlockGas30MEpoch:                       big.NewInt(1673), // 2023-11-02 17:30:00+00:00
+		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -117,7 +117,7 @@ var (
 		FeeCollectEpoch:                       big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
-		BlockGas30MEpoch:                       big.NewInt(2176), // 2023-10-12 10:00:00+00:00
+		BlockGas30MEpoch:                      big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -160,7 +160,7 @@ var (
 		FeeCollectEpoch:                       EpochTBD,
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
-		BlockGas30MEpoch:                       big.NewInt(0),
+		BlockGas30MEpoch:                      big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -204,7 +204,7 @@ var (
 		FeeCollectEpoch:                       big.NewInt(5),
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
 		HIP30Epoch:                            big.NewInt(7),
-		BlockGas30MEpoch:                       big.NewInt(7),
+		BlockGas30MEpoch:                      big.NewInt(7),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -248,7 +248,7 @@ var (
 		LeaderRotationExternalValidatorsEpoch: EpochTBD,
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
-		BlockGas30MEpoch:                       big.NewInt(0),
+		BlockGas30MEpoch:                      big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -291,7 +291,7 @@ var (
 		FeeCollectEpoch:                       big.NewInt(2),
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            EpochTBD,
-		BlockGas30MEpoch:                       big.NewInt(0),
+		BlockGas30MEpoch:                      big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...

@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/rs/zerolog"
@@ -577,8 +578,13 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		}
 
 		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog().IsBlockVerified(blk.Hash())); err != nil {
-			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
-			return
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+				consensus.getLogger().Info().Msg("[preCommitAndPropose] Block already known")
+			default:
+				consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+				return
+			}
 		}
 
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
