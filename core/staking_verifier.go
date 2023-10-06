@@ -176,7 +176,7 @@ func VerifyAndEditValidatorFromMsg(
 
 	minRate := availability.MinCommissionRate(
 		chainContext.Config().IsMinCommissionRate(epoch),
-		chainContext.Config().IsOneEpochBeforeHIP30(epoch),
+		chainContext.Config().IsHIP30(epoch),
 	)
 	if newRate.LT(minRate) {
 		firstEpoch := stateDB.GetValidatorFirstElectionEpoch(msg.ValidatorAddress)
