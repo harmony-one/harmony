@@ -25,7 +25,6 @@ import (
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
@@ -932,7 +931,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 }
 
 // generateNewState will construct most recent state from downloaded blocks
-func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker) error {
+func (ss *StateSync) generateNewState(bc core.BlockChain) error {
 	// update blocks created before node start sync
 	parentHash := bc.CurrentBlock().Hash()
 
@@ -995,7 +994,7 @@ func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker)
 }
 
 // ProcessStateSync processes state sync from the blocks received but not yet processed so far
-func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc core.BlockChain, worker *worker.Worker) error {
+func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc core.BlockChain) error {
 	// Gets consensus hashes.
 	if err := ss.getConsensusHashes(startHash, size); err != nil {
 		return errors.Wrap(err, "getConsensusHashes")
@@ -1005,7 +1004,7 @@ func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc core.Blo
 	if ss.stateSyncTaskQueue.Len() > 0 {
 		ss.downloadBlocks(bc)
 	}
-	return ss.generateNewState(bc, worker)
+	return ss.generateNewState(bc)
 }
 
 func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte, ip, port string) error {
@@ -1076,7 +1075,7 @@ func (ss *StateSync) GetMaxPeerHeight() (uint64, error) {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration) {
+func (ss *StateSync) SyncLoop(bc core.BlockChain, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration) {
 	utils.Logger().Info().Msgf("legacy sync is executing ...")
 	if !isBeacon {
 		ss.RegisterNodeInfo()
@@ -1110,7 +1109,7 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		if size > SyncLoopBatchSize {
 			size = SyncLoopBatchSize
 		}
-		err := ss.ProcessStateSync(startHash[:], size, bc, worker)
+		err := ss.ProcessStateSync(startHash[:], size, bc)
 		if err != nil {
 			utils.Logger().Error().Err(err).
 				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",

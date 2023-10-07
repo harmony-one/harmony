@@ -14,8 +14,6 @@ import (
 // configuration schedule.
 var PartnerSchedule partnerSchedule
 
-var feeCollectEpochV1 = big.NewInt(574)
-
 var feeCollectorsDevnet = []FeeCollectors{
 	FeeCollectors{
 		mustAddress("0xb728AEaBF60fD01816ee9e756c18bc01dC91ba5D"): numeric.OneDec(),
@@ -29,8 +27,8 @@ var feeCollectorsDevnet = []FeeCollectors{
 type partnerSchedule struct{}
 
 const (
-	// 12 hours per epoch (at 2s/block)
-	partnerBlocksPerEpoch = 21600
+	// 30 min per epoch (at 2s/block)
+	partnerBlocksPerEpoch = 900
 
 	partnerVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
@@ -43,10 +41,6 @@ const (
 func (ps partnerSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case params.PartnerChainConfig.IsHIP30(epoch):
-		return partnerV4
-	case params.PartnerChainConfig.IsFeeCollectEpoch(epoch):
-		return partnerV3
-	case epoch.Cmp(feeCollectEpochV1) >= 0:
 		return partnerV2
 	case epoch.Cmp(params.PartnerChainConfig.StakingEpoch) >= 0:
 		return partnerV1
@@ -110,20 +104,6 @@ var partnerV1 = MustNewInstance(
 	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
 )
 var partnerV2 = MustNewInstance(
-	2, 5, 4, 0,
-	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
-	genesis.TNFoundationalAccounts, emptyAllowlist,
-	feeCollectorsDevnet[0], numeric.ZeroDec(), ethCommon.Address{},
-	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
-)
-var partnerV3 = MustNewInstance(
-	2, 5, 4, 0,
-	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
-	genesis.TNFoundationalAccounts, emptyAllowlist,
-	feeCollectorsDevnet[1], numeric.ZeroDec(), ethCommon.Address{},
-	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
-)
-var partnerV4 = MustNewInstance(
 	2, 5, 4, 0,
 	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
 	genesis.TNFoundationalAccounts, emptyAllowlist,

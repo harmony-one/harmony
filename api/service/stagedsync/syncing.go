@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 
@@ -163,7 +162,7 @@ func initDB(ctx context.Context, db kv.RwDB) error {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration) {
+func (s *StagedSync) SyncLoop(bc core.BlockChain, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration) {
 
 	utils.Logger().Info().
 		Uint64("current height", bc.CurrentBlock().NumberU64()).
@@ -204,7 +203,7 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		}
 		startTime := time.Now()
 
-		if err := s.runSyncCycle(bc, worker, isBeacon, consensus, maxPeersHeight); err != nil {
+		if err := s.runSyncCycle(bc, isBeacon, consensus, maxPeersHeight); err != nil {
 			utils.Logger().Error().
 				Err(err).
 				Bool("isBeacon", isBeacon).
@@ -266,7 +265,7 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 }
 
 // runSyncCycle will run one cycle of staged syncing
-func (s *StagedSync) runSyncCycle(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, maxPeersHeight uint64) error {
+func (s *StagedSync) runSyncCycle(bc core.BlockChain, isBeacon bool, consensus *consensus.Consensus, maxPeersHeight uint64) error {
 	canRunCycleInOneTransaction := s.MaxBlocksPerSyncCycle > 0 && s.MaxBlocksPerSyncCycle <= s.MaxMemSyncCycleSize
 	var tx kv.RwTx
 	if canRunCycleInOneTransaction {

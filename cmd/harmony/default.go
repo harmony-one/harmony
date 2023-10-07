@@ -232,7 +232,7 @@ var (
 		Downloader:           true,
 		StagedSync:           false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
-		Concurrency:          4,
+		Concurrency:          2,
 		MinPeers:             2,
 		InitStreams:          2,
 		MaxAdvertiseWaitTime: 2, //minutes

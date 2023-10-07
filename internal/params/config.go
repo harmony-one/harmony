@@ -75,6 +75,7 @@ var (
 		ValidatorCodeFixEpoch:                  big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                             EpochTBD,
 		NoNilDelegationsEpoch:        			EpochTBD,
+		BlockGas30MEpoch:                       EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -118,6 +119,7 @@ var (
 		ValidatorCodeFixEpoch:                  big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                             EpochTBD,
 		NoNilDelegationsEpoch:         			EpochTBD,
+		BlockGas30MEpoch:                       EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -161,6 +163,7 @@ var (
 		ValidatorCodeFixEpoch:                  EpochTBD,
 		HIP30Epoch:                             EpochTBD,
 		NoNilDelegationsEpoch:         EpochTBD,
+		BlockGas30MEpoch:                       big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -178,7 +181,7 @@ var (
 		QuickUnlockEpoch:                       big.NewInt(0),
 		FiveSecondsEpoch:                       big.NewInt(0),
 		TwoSecondsEpoch:                        big.NewInt(0),
-		SixtyPercentEpoch:                      big.NewInt(4),
+		SixtyPercentEpoch:                      EpochTBD,
 		RedelegationEpoch:                      big.NewInt(0),
 		NoEarlyUnlockEpoch:                     big.NewInt(0),
 		VRFEpoch:                               big.NewInt(0),
@@ -194,17 +197,18 @@ var (
 		ReceiptLogEpoch:                        big.NewInt(0),
 		SHA3Epoch:                              big.NewInt(0),
 		HIP6And8Epoch:                          big.NewInt(0),
-		StakingPrecompileEpoch:                 big.NewInt(2),
-		ChainIdFixEpoch:                        big.NewInt(0),
+		StakingPrecompileEpoch:                 big.NewInt(5),
+		ChainIdFixEpoch:                        big.NewInt(5),
 		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch:          big.NewInt(1),
+		CrossShardXferPrecompileEpoch:          big.NewInt(5),
 		AllowlistEpoch:                         EpochTBD,
 		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		FeeCollectEpoch:                        big.NewInt(848), // 2023-04-28 04:33:33+00:00
-		ValidatorCodeFixEpoch:                  big.NewInt(848),
-		HIP30Epoch:                             EpochTBD,
-		NoNilDelegationsEpoch:         EpochTBD,
+		FeeCollectEpoch:                        big.NewInt(5),
+		ValidatorCodeFixEpoch:                  big.NewInt(5),
+		HIP30Epoch:                             big.NewInt(7),
+		BlockGas30MEpoch:                       big.NewInt(7),
+		NoNilDelegationsEpoch:         			EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -248,7 +252,8 @@ var (
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		ValidatorCodeFixEpoch:                  EpochTBD,
 		HIP30Epoch:                             EpochTBD,
-		NoNilDelegationsEpoch:         big.NewInt(2),
+		NoNilDelegationsEpoch:					big.NewInt(2),
+		BlockGas30MEpoch:                       big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -291,7 +296,8 @@ var (
 		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  big.NewInt(2),
 		HIP30Epoch:                             EpochTBD,
-		NoNilDelegationsEpoch:         big.NewInt(2),
+		NoNilDelegationsEpoch:        			big.NewInt(2),
+		BlockGas30MEpoch:                       big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...

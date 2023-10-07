@@ -76,7 +76,6 @@ type StateTransition struct {
 	data       []byte
 	state      vm.StateDB
 	evm        *vm.EVM
-	bc         ChainContext
 }
 
 // Message represents a message sent to a contract.
@@ -131,7 +130,7 @@ func (result *ExecutionResult) Revert() []byte {
 }
 
 // NewStateTransition initialises and returns a new state transition object.
-func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) *StateTransition {
+func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
 	return &StateTransition{
 		gp:       gp,
 		evm:      evm,
@@ -140,7 +139,6 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) 
 		value:    msg.Value(),
 		data:     msg.Data(),
 		state:    evm.StateDB,
-		bc:       bc,
 	}
 }
 
@@ -152,12 +150,12 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) 
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (ExecutionResult, error) {
-	return NewStateTransition(evm, msg, gp, nil).TransitionDb()
+	return NewStateTransition(evm, msg, gp).TransitionDb()
 }
 
 // ApplyStakingMessage computes the new state for staking message
-func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) (uint64, error) {
-	return NewStateTransition(evm, msg, gp, bc).StakingTransitionDb()
+func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool) (uint64, error) {
+	return NewStateTransition(evm, msg, gp).StakingTransitionDb()
 }
 
 // to returns the recipient of the message.
