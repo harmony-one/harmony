@@ -806,6 +806,9 @@ func (c *ChainConfig) IsHIP30(epoch *big.Int) bool {
 // During this epoch, shards 2 and 3 will start sending
 // their balances over to shard 0 or 1.
 func (c *ChainConfig) IsOneEpochBeforeHIP30(epoch *big.Int) bool {
+	if epoch == nil {
+		return false
+	}
 	return epoch.Sub(c.HIP30Epoch, epoch).Cmp(common.Big1) == 0
 }
 
