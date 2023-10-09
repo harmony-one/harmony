@@ -149,6 +149,7 @@ var defaultCacheConfig = &CacheConfig{
 	TrieTimeLimit:  5 * time.Minute,
 	SnapshotLimit:  256,
 	SnapshotWait:   true,
+	Preimages:      true,
 }
 
 type BlockChainImpl struct {
@@ -236,7 +237,7 @@ func NewBlockChainWithOptions(
 
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum validator and
-// Processor.
+// Processor. As of Aug-23, this is only used by tests
 func NewBlockChain(
 	db ethdb.Database, stateCache state.Database, beaconChain BlockChain, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
@@ -364,6 +365,12 @@ func newBlockChainWithOptions(
 	err = bc.buildLeaderRotationMeta(curHeader)
 	if err != nil {
 		return nil, errors.WithMessage(err, "failed to build leader rotation meta")
+	}
+
+	if cacheConfig.Preimages {
+		if _, _, err := rawdb.WritePreImageStartEndBlock(bc.ChainDb(), curHeader.NumberU64()+1, 0); err != nil {
+			return nil, errors.WithMessage(err, "failed to write pre-image start end blocks")
+		}
 	}
 
 	// Take ownership of this particular state
@@ -1190,6 +1197,10 @@ func (bc *BlockChainImpl) Stop() {
 	// Flush the collected preimages to disk
 	if err := bc.stateCache.TrieDB().CommitPreimages(); err != nil {
 		utils.Logger().Error().Interface("err", err).Msg("Failed to commit trie preimages")
+	} else {
+		if _, _, err := rawdb.WritePreImageStartEndBlock(bc.ChainDb(), 0, bc.CurrentBlock().NumberU64()); err != nil {
+			utils.Logger().Error().Interface("err", err).Msg("Failed to mark preimages end block")
+		}
 	}
 	// Ensure all live cached entries be saved into disk, so that we can skip
 	// cache warmup when node restarts.
@@ -3674,6 +3685,18 @@ func (bc *BlockChainImpl) InitTiKV(conf *harmonyconfig.TiKVConfig) {
 
 	// start clean block tire data process
 	go bc.tikvCleanCache()
+}
+
+func (bc *BlockChainImpl) CommitPreimages() error {
+	return bc.stateCache.TrieDB().CommitPreimages()
+}
+
+func (bc *BlockChainImpl) GetStateCache() state.Database {
+	return bc.stateCache
+}
+
+func (bc *BlockChainImpl) GetSnapshotTrie() *snapshot.Tree {
+	return bc.snaps
 }
 
 var (

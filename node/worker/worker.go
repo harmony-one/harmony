@@ -178,6 +178,38 @@ func (w *Worker) CommitTransactions(
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
 
+	// if this is epoch for balance migration, no txs (or stxs)
+	// will be included in the block
+	// it is technically feasible for some to end up in the pool
+	// say, from the last epoch, but those will not be executed
+	// and no balance will be lost
+	// any cross-shard transfers destined to a shard being shut down
+	// will execute (since they are already spent on the source shard)
+	// but the balance will immediately be returned to shard 1
+	cx, err := core.MayBalanceMigration(
+		w.current.gasPool,
+		w.GetCurrentHeader(),
+		w.current.state,
+		w.chain,
+	)
+	if err != nil {
+		if errors.Is(err, core.ErrNoMigrationPossible) {
+			// means we do not accept transactions from the network
+			return nil
+		}
+		if !errors.Is(err, core.ErrNoMigrationRequired) {
+
+			// this shard not migrating => ErrNoMigrationRequired
+			// any other error means exit this block
+			return err
+		}
+	} else {
+		if cx != nil {
+			w.current.outcxs = append(w.current.outcxs, cx)
+			return nil
+		}
+	}
+
 	// HARMONY TXNS
 	normalTxns := types.NewTransactionsByPriceAndNonce(w.current.signer, w.current.ethSigner, pendingNormal)
 
@@ -252,9 +284,9 @@ func (w *Worker) commitStakingTransaction(
 	return nil
 }
 
-// ApplyTestnetShardReduction only used to reduce shards of Testnet
-func (w *Worker) ApplyTestnetShardReduction() {
-	core.MayTestnetShardReduction(w.chain, w.current.state, w.current.header)
+// ApplyShardReduction only used to reduce shards of Testnet
+func (w *Worker) ApplyShardReduction() {
+	core.MayShardReduction(w.chain, w.current.state, w.current.header)
 }
 
 var (
@@ -414,16 +446,6 @@ func GetNewEpoch(chain core.BlockChain) *big.Int {
 // GetCurrentReceipts get the receipts generated starting from the last state.
 func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 	return w.current.receipts
-}
-
-// OutgoingReceipts get the receipts generated starting from the last state.
-func (w *Worker) OutgoingReceipts() []*types.CXReceipt {
-	return w.current.outcxs
-}
-
-// IncomingReceipts get incoming receipts in destination shard that is received from source shard
-func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
-	return w.current.incxs
 }
 
 // CollectVerifiedSlashes sets w.current.slashes only to those that

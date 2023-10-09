@@ -17,6 +17,8 @@
 package core
 
 import (
+	"encoding/binary"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -27,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -38,6 +41,11 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
+)
+
+var (
+	ErrNoMigrationRequired = errors.New("No balance migration required")
+	ErrNoMigrationPossible = errors.New("No balance migration possible")
 )
 
 const (
@@ -125,43 +133,63 @@ func (p *StateProcessor) Process(
 		return nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
-	startTime := time.Now()
-	// Iterate over and process the individual transactions
-	for i, tx := range block.Transactions() {
-		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, cxReceipt, stakeMsgs, _, err := ApplyTransaction(
-			p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
-		)
-		if err != nil {
+	processTxsAndStxs := true
+	cxReceipt, err := MayBalanceMigration(gp, header, statedb, p.bc)
+	if err != nil {
+		if errors.Is(err, ErrNoMigrationPossible) {
+			// ran out of accounts
+			processTxsAndStxs = false
+		}
+		if !errors.Is(err, ErrNoMigrationRequired) && !errors.Is(err, ErrNoMigrationPossible) {
 			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
-		receipts = append(receipts, receipt)
+	} else {
 		if cxReceipt != nil {
 			outcxs = append(outcxs, cxReceipt)
+			// only 1 cx per block
+			processTxsAndStxs = false
 		}
-		if len(stakeMsgs) > 0 {
-			blockStakeMsgs = append(blockStakeMsgs, stakeMsgs...)
-		}
-		allLogs = append(allLogs, receipt.Logs...)
 	}
-	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Normal Txns")
 
-	startTime = time.Now()
-	// Iterate over and process the staking transactions
-	L := len(block.Transactions())
-	for i, tx := range block.StakingTransactions() {
-		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
-		receipt, _, err := ApplyStakingTransaction(
-			p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
-		)
-		if err != nil {
-			return nil, nil, nil, nil, 0, nil, statedb, err
+	if processTxsAndStxs {
+		startTime := time.Now()
+		// Iterate over and process the individual transactions
+		for i, tx := range block.Transactions() {
+			statedb.Prepare(tx.Hash(), block.Hash(), i)
+			receipt, cxReceipt, stakeMsgs, _, err := ApplyTransaction(
+				p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+			)
+			if err != nil {
+				return nil, nil, nil, nil, 0, nil, statedb, err
+			}
+			receipts = append(receipts, receipt)
+			if cxReceipt != nil {
+				outcxs = append(outcxs, cxReceipt)
+			}
+			if len(stakeMsgs) > 0 {
+				blockStakeMsgs = append(blockStakeMsgs, stakeMsgs...)
+			}
+
+			allLogs = append(allLogs, receipt.Logs...)
 		}
-		receipts = append(receipts, receipt)
-		allLogs = append(allLogs, receipt.Logs...)
-	}
-	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Staking Txns")
+		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Normal Txns")
 
+		startTime = time.Now()
+		// Iterate over and process the staking transactions
+		L := len(block.Transactions())
+		for i, tx := range block.StakingTransactions() {
+			statedb.Prepare(tx.Hash(), block.Hash(), i+L)
+			receipt, _, err := ApplyStakingTransaction(
+				p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+			)
+			if err != nil {
+				return nil, nil, nil, nil, 0, nil, statedb, err
+			}
+			receipts = append(receipts, receipt)
+			allLogs = append(allLogs, receipt.Logs...)
+		}
+		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Staking Txns")
+	}
 	// incomingReceipts should always be processed
 	// after transactions (to be consistent with the block proposal)
 	for _, cx := range block.IncomingReceipts() {
@@ -182,7 +210,7 @@ func (p *StateProcessor) Process(
 		}
 	}
 
-	if err := MayTestnetShardReduction(p.bc, statedb, header); err != nil {
+	if err := MayShardReduction(p.bc, statedb, header); err != nil {
 		return nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
@@ -282,7 +310,7 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
-		return nil, nil, nil, 0, err
+		return nil, nil, nil, 0, errors.Wrapf(err, "apply failed from='%s' to='%s' balance='%s'", msg.From().Hex(), msg.To().Hex(), statedb.GetBalance(msg.From()).String())
 	}
 	// Update the state with pending changes
 	var root []byte
@@ -440,13 +468,16 @@ func StakingToMessage(
 	return msg, nil
 }
 
-// MayTestnetShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
+// MayShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
 // This function does not handle all cases, only for ShardNum from 4 to 2.
-func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.Header) error {
+func MayShardReduction(bc ChainContext, statedb *state.DB, header *block.Header) error {
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isLastBlock := shard.Schedule.IsLastBlock(header.Number().Uint64())
-	isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
-	if !(isTestnet && isBeaconChain && isLastBlock) {
+	networkType := nodeconfig.GetDefaultConfig().GetNetworkType()
+	isTestnet := networkType == nodeconfig.Testnet
+	isMainnet := networkType == nodeconfig.Mainnet
+	isReducenet := isMainnet || isTestnet
+	if !(isReducenet && isBeaconChain && isLastBlock) {
 		return nil
 	}
 	curInstance := shard.Schedule.InstanceForEpoch(header.Epoch())
@@ -477,6 +508,15 @@ func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.
 		for _, pubKey := range validator.SlotPubKeys {
 			curShard := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(curNumShards))).Uint64()
 			nextShard := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(nextNumShards))).Uint64()
+			// background: any editValidator transactions take effect at next epoch.
+			// assumption: shard reduction happens at epoch X.
+			// validators who wish to continue validating after the shard reduction occurs
+			// must have a different node running with a key from shard 0 or 1.
+			// this key must be added to the validator during epoch X - 1
+			// and keys belonging to shards 2 and 3 removed at that point in time.
+			// the different node running will be unelected, but continue syncing in X - 1.
+			// if elected, it will start validating in epoch X.
+			// once epoch X begins, they can terminate servers from shards 2 and 3.
 			if curShard >= uint64(nextNumShards) || curShard != nextShard {
 				validator.Status = effective.Inactive
 				break
@@ -485,4 +525,164 @@ func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.
 	}
 	statedb.IntermediateRoot(bc.Config().IsS3(header.Epoch()))
 	return nil
+}
+
+func MayBalanceMigration(
+	gasPool *GasPool,
+	header *block.Header,
+	db *state.DB,
+	chain BlockChain,
+) (*types.CXReceipt, error) {
+	config := chain.Config()
+	isMainnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Mainnet
+	if isMainnet {
+		if config.IsOneEpochBeforeHIP30(header.Epoch()) {
+			nxtShards := shard.Schedule.InstanceForEpoch(
+				new(big.Int).Add(header.Epoch(), common.Big1),
+			).NumShards()
+			if myShard := chain.ShardID(); myShard >= nxtShards {
+				// i need to send my balances to the destination shard
+				// however, i do not know when the next epoch will begin
+				// because only shard 0 can govern that
+				// so i will just generate one cross shard transaction
+				// in each block of the epoch. this epoch is defined by
+				// nxtShards = 2 and curShards = 4
+				parentRoot := chain.GetBlockByHash(
+					header.ParentHash(),
+				).Root() // for examining MPT at this root, should exist
+				cx, err := generateOneMigrationMessage(
+					db, parentRoot,
+					header.NumberU64(),
+					myShard, uint32(1), // dstShard is always 1
+				)
+				if err != nil {
+					return nil, err
+				}
+				if cx != nil {
+					gasPool.SubGas(params.TxGasXShard)
+					return cx, nil
+				}
+				// both err and cx are nil, which means we
+				// ran out of eligible accounts in MPT
+				return nil, ErrNoMigrationPossible
+			}
+		}
+	}
+	// for testing balance migration on devnet
+	isDevnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Devnet
+	isLocalnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Localnet
+	if isDevnet || isLocalnet {
+		if config.IsOneEpochBeforeHIP30(header.Epoch()) {
+			if myShard := chain.ShardID(); myShard != shard.BeaconChainShardID {
+				parentRoot := chain.GetBlockByHash(
+					header.ParentHash(),
+				).Root() // for examining MPT at this root, should exist
+				// for examining MPT at this root, should exist
+				cx, err := generateOneMigrationMessage(
+					db, parentRoot,
+					header.NumberU64(),
+					myShard, shard.BeaconChainShardID, // dstShard
+				)
+				if err != nil {
+					return nil, errors.Wrap(err, "generateOneMigrationMessage")
+				}
+				if cx != nil {
+					gasPool.SubGas(params.TxGasXShard)
+					return cx, nil
+				}
+				//return nil, errors.Wrap(ErrNoMigrationPossible, "MayBalanceMigration: cx is nil")
+				return nil, nil
+			}
+		}
+	}
+
+	return nil, ErrNoMigrationRequired
+}
+
+func generateOneMigrationMessage(
+	statedb *state.DB,
+	parentRoot common.Hash,
+	number uint64,
+	myShard uint32,
+	dstShard uint32,
+) (*types.CXReceipt, error) {
+	// set up txHash prefix
+	txHash := make([]byte,
+		// 8 for uint64 block number
+		// 4 for uint32 shard id
+		8+4,
+	)
+	binary.LittleEndian.PutUint64(txHash[:8], number)
+	binary.LittleEndian.PutUint32(txHash[8:], myShard)
+	// open the trie, as of previous block.
+	// in this block we aren't processing transactions anyway.
+	trie, err := statedb.Database().OpenTrie(
+		parentRoot,
+	)
+	if err != nil {
+		return nil, err
+	}
+	// disk db, for use by rawdb
+	// this is same as blockchain.ChainDb
+	db := statedb.Database().DiskDB()
+	// start the iteration
+	accountIterator := trie.NodeIterator(nil)
+	// TODO: cache this iteration?
+	for accountIterator.Next(true) {
+		// leaf means leaf node of the MPT, which is an account
+		// the leaf key is the address
+		if accountIterator.Leaf() {
+			key := accountIterator.LeafKey()
+			preimage := rawdb.ReadPreimage(db, common.BytesToHash(key))
+			if len(preimage) == 0 {
+				return nil, errors.New(
+					fmt.Sprintf(
+						"cannot find preimage for %x", key,
+					),
+				)
+			}
+			address := common.BytesToAddress(preimage)
+			// skip blank address
+			if address == (common.Address{}) {
+				continue
+			}
+			// deserialize
+			var account state.Account
+			if err = rlp.DecodeBytes(accountIterator.LeafBlob(), &account); err != nil {
+				return nil, err
+			}
+			// skip contracts
+			if common.BytesToHash(account.CodeHash) != state.EmptyCodeHash {
+				continue
+			}
+			// skip anything with storage
+			if account.Root != state.EmptyRootHash {
+				continue
+			}
+			// skip no (or negative?) balance
+			if account.Balance.Cmp(common.Big0) <= 0 {
+				continue
+			}
+			// for safety, fetch the latest balance (again)
+			balance := statedb.GetBalance(address)
+			if balance.Cmp(common.Big0) <= 0 {
+				continue
+			}
+			// adds a journal entry (dirtied)
+			statedb.SubBalance(address, balance)
+			// create the receipt
+			res := &types.CXReceipt{
+				From:      address,
+				To:        &address,
+				ShardID:   myShard,
+				ToShardID: dstShard,
+				Amount:    balance,
+				TxHash:    common.BytesToHash(txHash),
+			}
+			// move from dirty to pending, same as b/w 2 txs
+			statedb.Finalise(true)
+			return res, nil
+		}
+	}
+	return nil, nil
 }

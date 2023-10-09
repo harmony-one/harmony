@@ -811,8 +811,8 @@ func (c *ChainConfig) IsHIP30(epoch *big.Int) bool {
 
 // During this epoch, shards 2 and 3 will start sending
 // their balances over to shard 0 or 1.
-func (c *ChainConfig) IsEpochBeforeHIP30(epoch *big.Int) bool {
-	return isForked(new(big.Int).Sub(c.HIP30Epoch, common.Big1), epoch)
+func (c *ChainConfig) IsOneEpochBeforeHIP30(epoch *big.Int) bool {
+	return epoch.Sub(c.HIP30Epoch, epoch).Cmp(common.Big1) == 0
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.

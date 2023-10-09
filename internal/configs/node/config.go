@@ -153,6 +153,7 @@ type RPCServerConfig struct {
 
 	DebugEnabled bool
 
+	PreimagesEnabled   bool
 	EthRPCsEnabled     bool
 	StakingRPCsEnabled bool
 	LegacyRPCsEnabled  bool

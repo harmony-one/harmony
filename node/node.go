@@ -255,20 +255,37 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 // Add new transactions to the pending transaction list.
 func addPendingTransactions(registry *registry.Registry, newTxs types.Transactions) []error {
 	var (
-		errs     []error
-		bc       = registry.GetBlockchain()
-		txPool   = registry.GetTxPool()
-		poolTxs  = types.PoolTransactions{}
-		acceptCx = bc.Config().AcceptsCrossTx(bc.CurrentHeader().Epoch())
+		errs          []error
+		bc            = registry.GetBlockchain()
+		txPool        = registry.GetTxPool()
+		poolTxs       = types.PoolTransactions{}
+		epoch         = bc.CurrentHeader().Epoch()
+		acceptCx      = bc.Config().AcceptsCrossTx(epoch)
+		isBeforeHIP30 = bc.Config().IsOneEpochBeforeHIP30(epoch)
+		nxtShards     = shard.Schedule.InstanceForEpoch(new(big.Int).Add(epoch, common.Big1)).NumShards()
 	)
 	for _, tx := range newTxs {
-		if tx.ShardID() != tx.ToShardID() && !acceptCx {
-			errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
-			continue
+		if tx.ShardID() != tx.ToShardID() {
+			if !acceptCx {
+				errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
+				continue
+			}
+			if isBeforeHIP30 {
+				if tx.ToShardID() >= nxtShards {
+					errs = append(errs, errors.New("shards 2 and 3 are shutting down in the next epoch"))
+					continue
+				}
+			}
 		}
 		if tx.IsEthCompatible() && !bc.Config().IsEthCompatible(bc.CurrentBlock().Epoch()) {
 			errs = append(errs, errors.WithMessage(errInvalidEpoch, "ethereum tx not accepted yet"))
 			continue
+		}
+		if isBeforeHIP30 {
+			if bc.ShardID() >= nxtShards {
+				errs = append(errs, errors.New("shards 2 and 3 are shutting down in the next epoch"))
+				continue
+			}
 		}
 		poolTxs = append(poolTxs, tx)
 	}
@@ -480,7 +497,8 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			if err := rlp.DecodeBytes(blocksPayload, &blocks); err != nil {
 				return nil, 0, errors.Wrap(err, "block decode error")
 			}
-			curBeaconHeight := node.Beaconchain().CurrentBlock().NumberU64()
+			curBeaconBlock := node.EpochChain().CurrentBlock()
+			curBeaconHeight := curBeaconBlock.NumberU64()
 			for _, block := range blocks {
 				// Ban blocks number that is smaller than tolerance
 				if block.NumberU64()+beaconBlockHeightTolerance <= curBeaconHeight {
@@ -490,7 +508,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 				} else if block.NumberU64()-beaconBlockHeightTolerance > curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
-					return nil, 0, errors.New("beacon block height too much higher than current height beyond tolerance")
+					return nil, 0, errors.Errorf("beacon block height too much higher than current height beyond tolerance, block %d, current %d, epoch %d , current %d", block.NumberU64(), curBeaconHeight, block.Epoch().Uint64(), curBeaconBlock.Epoch().Uint64())
 				} else if block.NumberU64() <= curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")

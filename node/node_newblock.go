@@ -159,7 +159,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
-	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+	// Execute all the time except for last block of epoch for shard 0
+	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) || node.Consensus.ShardID != 0 {
 		// Prepare normal and staking transactions retrieved from transaction pool
 		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
 
@@ -202,7 +203,13 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 	}
 
-	// Prepare cross shard transaction receipts
+	// Prepare incoming cross shard transaction receipts
+	// These are accepted even during the epoch before hip-30
+	// because the destination shard only receives them after
+	// balance is deducted on source shard. to prevent this from
+	// being a significant problem, the source shards will stop
+	// accepting txs destined to the shards which are shutting down
+	// one epoch prior the shut down
 	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {
 		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
@@ -251,7 +258,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 					len(crossLinksToPropose), len(allPending),
 				)
 		} else {
-			utils.Logger().Error().Err(err).Msgf(
+			utils.Logger().Warn().Err(err).Msgf(
 				"[ProposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
 				len(allPending),
 			)
@@ -267,7 +274,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
-	node.Worker.ApplyTestnetShardReduction()
+	node.Worker.ApplyShardReduction()
 	// Prepare shard state
 	var shardState *shard.State
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
@@ -287,7 +294,9 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed finalizing the new block")
 		return nil, err
 	}
+
 	utils.Logger().Info().Msg("[ProposeNewBlock] verifying the new block header")
+	// err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
 	err = core.NewBlockValidator(node.Blockchain()).ValidateHeader(finalizedBlock, true)
 
 	if err != nil {

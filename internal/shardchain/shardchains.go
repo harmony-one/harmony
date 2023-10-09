@@ -100,8 +100,12 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		}
 	}
 	var cacheConfig *core.CacheConfig
+	// archival node
 	if sc.disableCache[shardID] {
-		cacheConfig = &core.CacheConfig{Disabled: true}
+		cacheConfig = &core.CacheConfig{
+			Disabled:  true,
+			Preimages: true,
+		}
 		utils.Logger().Info().
 			Uint32("shardID", shardID).
 			Msg("disable cache, running in archival mode")
@@ -110,6 +114,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 			TrieNodeLimit: 256,
 			TrieTimeLimit: 2 * time.Minute,
 			TriesInMemory: 128,
+			Preimages:     true,
 		}
 		if sc.harmonyconfig != nil {
 			cacheConfig.TriesInMemory = uint64(sc.harmonyconfig.General.TriesInMemory)

@@ -76,6 +76,12 @@ func GetInt64FlagValue(cmd *cobra.Command, flag Int64Flag) int64 {
 	return getInt64FlagValue(cmd.Flags(), flag)
 }
 
+// GetInt64FlagValue get the int value for the given Int64Flag from the local flags of the
+// cobra command.
+func GetUint64FlagValue(cmd *cobra.Command, flag Uint64Flag) uint64 {
+	return getUint64FlagValue(cmd.Flags(), flag)
+}
+
 // GetIntPersistentFlagValue get the int value for the given IntFlag from the persistent
 // flags of the cobra command.
 func GetIntPersistentFlagValue(cmd *cobra.Command, flag IntFlag) int {
@@ -93,6 +99,15 @@ func getIntFlagValue(fs *pflag.FlagSet, flag IntFlag) int {
 
 func getInt64FlagValue(fs *pflag.FlagSet, flag Int64Flag) int64 {
 	val, err := fs.GetInt64(flag.Name)
+	if err != nil {
+		handleParseError(err)
+		return 0
+	}
+	return val
+}
+
+func getUint64FlagValue(fs *pflag.FlagSet, flag Uint64Flag) uint64 {
+	val, err := fs.GetUint64(flag.Name)
 	if err != nil {
 		handleParseError(err)
 		return 0

@@ -224,7 +224,9 @@ func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uin
 		}
 	} else {
 		// Mainnet (other nets):
-		if bc.Config().IsTwoSeconds(epoch) {
+		if bc.Config().IsHIP30(epoch) {
+			defaultReward = stakingReward.HIP30StakedBlocks
+		} else if bc.Config().IsTwoSeconds(epoch) {
 			defaultReward = stakingReward.TwoSecStakedBlocks
 		} else if bc.Config().IsFiveSeconds(epoch) {
 			defaultReward = stakingReward.FiveSecStakedBlocks
@@ -410,7 +412,8 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("After Chain Reward (AddReward)")
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("After Chain Reward")
 
-	return remainingReward, network.NewStakingEraRewardForRound(
+	// remainingReward needs to be multipled with the number of crosslinks across all shards
+	return remainingReward.MulInt(big.NewInt(int64(len(allCrossLinks)))), network.NewStakingEraRewardForRound(
 		newRewards, payouts,
 	), nil
 }

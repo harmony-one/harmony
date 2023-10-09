@@ -246,6 +246,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applySysFlags(cmd, config)
 	applyDevnetFlags(cmd, config)
 	applyRevertFlags(cmd, config)
+	applyPreimageFlags(cmd, config)
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
 	applyShardDataFlags(cmd, config)
@@ -375,6 +376,57 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		}
 	}
 
+	//// code to handle pre-image export, import and generation
+	if hc.Preimage != nil {
+		if hc.Preimage.ImportFrom != "" {
+			if err := core.ImportPreimages(
+				currentNode.Blockchain(),
+				hc.Preimage.ImportFrom,
+			); err != nil {
+				fmt.Println("Error importing", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		} else if exportPath := hc.Preimage.ExportTo; exportPath != "" {
+			if err := core.ExportPreimages(
+				currentNode.Blockchain(),
+				exportPath,
+			); err != nil {
+				fmt.Println("Error exporting", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+			// both must be set
+		} else if hc.Preimage.GenerateStart > 0 {
+			chain := currentNode.Blockchain()
+			end := hc.Preimage.GenerateEnd
+			current := chain.CurrentBlock().NumberU64()
+			if end > current {
+				fmt.Printf(
+					"Cropping generate endpoint from %d to %d\n",
+					end, current,
+				)
+				end = current
+			}
+
+			if end == 0 {
+				end = current
+			}
+
+			fmt.Println("Starting generation")
+			if err := core.GeneratePreimages(
+				chain,
+				hc.Preimage.GenerateStart, end,
+			); err != nil {
+				fmt.Println("Error generating", err)
+				os.Exit(1)
+			}
+			fmt.Println("Generation successful")
+			os.Exit(0)
+		}
+		os.Exit(0)
+	}
+
 	startMsg := "==== New Harmony Node ===="
 	if hc.General.NodeType == nodeTypeExplorer {
 		startMsg = "==== New Explorer Node ===="
@@ -451,6 +503,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			Err(err).
 			Msg("Start Rosetta failed")
 	}
+
+	go core.WritePreimagesMetricsIntoPrometheus(
+		currentNode.Blockchain(),
+		currentNode.Consensus.UpdatePreimageGenerationMetrics,
+	)
 
 	go listenOSSigAndShutDown(currentNode)
 
