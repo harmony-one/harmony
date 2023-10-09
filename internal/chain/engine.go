@@ -452,7 +452,7 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 	// unelected validators did not have their fee updated even
 	// when the protocol required them to do so. here we fix it,
 	// but only after the HIP-30 hard fork is effective.
-	if config.IsHIP30(newShardState.Epoch) {
+	if config.IsOneEpochBeforeHIP30(newShardState.Epoch) {
 		for _, addr := range chain.ValidatorCandidates() {
 			// skip elected validator
 			if _, ok := isElected[addr]; ok {
