@@ -568,10 +568,12 @@ func MayBalanceMigration(
 			}
 		}
 	}
+	// for testing balance migration on testnet
+	isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
 	// for testing balance migration on devnet
 	isDevnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Partner
 	isLocalnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Localnet
-	if isDevnet || isLocalnet {
+	if isDevnet || isLocalnet || isTestnet {
 		if config.IsOneEpochBeforeHIP30(header.Epoch()) {
 			if myShard := chain.ShardID(); myShard != shard.BeaconChainShardID {
 				parentRoot := chain.GetBlockByHash(
