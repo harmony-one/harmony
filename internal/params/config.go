@@ -73,8 +73,8 @@ var (
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(1535), // 2023-07-20 05:51:07+00:00
-		HIP30Epoch:                             EpochTBD,
-		BlockGas30MEpoch:                       EpochTBD,
+		HIP30Epoch:                             big.NewInt(1673), // 2023-11-02 17:30:00+00:00
+		BlockGas30MEpoch:                       big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
