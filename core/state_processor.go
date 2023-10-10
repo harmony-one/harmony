@@ -569,7 +569,7 @@ func MayBalanceMigration(
 		}
 	}
 	// for testing balance migration on devnet
-	isDevnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Devnet
+	isDevnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Partner
 	isLocalnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Localnet
 	if isDevnet || isLocalnet {
 		if config.IsOneEpochBeforeHIP30(header.Epoch()) {
