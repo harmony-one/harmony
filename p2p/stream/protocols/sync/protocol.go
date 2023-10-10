@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/go-version"
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 )
 
@@ -149,7 +150,7 @@ func (p *Protocol) IsBeaconNode() bool {
 }
 
 // Match checks the compatibility to the target protocol ID.
-func (p *Protocol) Match(targetID string) bool {
+func (p *Protocol) Match(targetID protocol.ID) bool {
 	target, err := sttypes.ProtoIDToProtoSpec(sttypes.ProtoID(targetID))
 	if err != nil {
 		return false

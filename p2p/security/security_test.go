@@ -145,6 +145,11 @@ func newPeer(port int) (host.Host, error) {
 
 type fakeConn struct{}
 
+func (conn *fakeConn) IsClosed() bool {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (conn *fakeConn) ID() string                                               { return "" }
 func (conn *fakeConn) NewStream(context.Context) (libp2p_network.Stream, error) { return nil, nil }
 func (conn *fakeConn) GetStreams() []libp2p_network.Stream                      { return nil }
