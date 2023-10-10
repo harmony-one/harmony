@@ -116,7 +116,7 @@ var (
 		LeaderRotationExternalBeaconLeaders:    EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(1296), // 2023-04-28 07:14:20+00:00
-		HIP30Epoch:                             big.NewInt(2176), // 2023-10-10 10:00:00+00:00
+		HIP30Epoch:                             big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 		BlockGas30MEpoch:                       EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
