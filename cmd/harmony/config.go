@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -221,7 +220,7 @@ func promptConfigUpdate() bool {
 }
 
 func loadHarmonyConfig(file string) (harmonyconfig.HarmonyConfig, string, error) {
-	b, err := ioutil.ReadFile(file)
+	b, err := os.ReadFile(file)
 	if err != nil {
 		return harmonyconfig.HarmonyConfig{}, "", err
 	}
@@ -234,12 +233,12 @@ func loadHarmonyConfig(file string) (harmonyconfig.HarmonyConfig, string, error)
 }
 
 func updateConfigFile(file string) error {
-	configBytes, err := ioutil.ReadFile(file)
+	configBytes, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
 	backup := fmt.Sprintf("%s.backup", file)
-	if err := ioutil.WriteFile(backup, configBytes, 0664); err != nil {
+	if err := os.WriteFile(backup, configBytes, 0664); err != nil {
 		return err
 	}
 	fmt.Printf("Original config backed up to %s\n", fmt.Sprintf("%s.backup", file))
@@ -259,5 +258,5 @@ func writeHarmonyConfigToFile(config harmonyconfig.HarmonyConfig, file string) e
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(file, b, 0644)
+	return os.WriteFile(file, b, 0644)
 }

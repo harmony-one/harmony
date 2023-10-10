@@ -3,8 +3,9 @@ package webhooks
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 
 	"gopkg.in/yaml.v2"
 )
@@ -63,7 +64,7 @@ func DoPost(url string, record interface{}) (*ReportResult, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	result, err := ioutil.ReadAll(resp.Body)
+	result, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +77,7 @@ func DoPost(url string, record interface{}) (*ReportResult, error) {
 
 // NewWebHooksFromPath ..
 func NewWebHooksFromPath(yamlPath string) (*Hooks, error) {
-	rawYAML, err := ioutil.ReadFile(yamlPath)
+	rawYAML, err := os.ReadFile(yamlPath)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -50,7 +49,7 @@ func WriteToFile(filename string, data string) error {
 
 // LoadBLSKeyWithPassPhrase loads bls key with passphrase.
 func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
-	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
+	encryptedPrivateKeyBytes, err := os.ReadFile(fileName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "attempted to load from %s", fileName)
 	}
@@ -72,7 +71,7 @@ func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 
 // LoadAwsCMKEncryptedBLSKey loads aws encrypted bls key.
 func LoadAwsCMKEncryptedBLSKey(fileName string, kmsClient *kms.KMS) (*ffi_bls.SecretKey, error) {
-	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
+	encryptedPrivateKeyBytes, err := os.ReadFile(fileName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail read at: %s", fileName)
 	}

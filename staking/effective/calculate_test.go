@@ -3,9 +3,9 @@ package effective
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"os"
 	"sort"
 	"testing"
 
@@ -35,7 +35,7 @@ type slotsData struct {
 }
 
 func init() {
-	input, err := ioutil.ReadFile(eposTestingFile)
+	input, err := os.ReadFile(eposTestingFile)
 	if err != nil {
 		panic(
 			fmt.Sprintf("cannot open genesisblock config file %v, err %v\n",
