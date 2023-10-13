@@ -9,6 +9,52 @@ import (
 )
 
 var (
+	preimageStartGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace:   "hmy",
+			Subsystem:   "blockchain",
+			Name:        "preimage_start",
+			Help:        "the first block for which pre-image generation ran locally",
+			ConstLabels: map[string]string{},
+		},
+		[]string{
+			"shard",
+		},
+	)
+	preimageEndGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "blockchain",
+			Name:      "preimage_end",
+			Help:      "the last block for which pre-image generation ran locally",
+		},
+		[]string{
+			"shard",
+		},
+	)
+	verifiedPreimagesGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "blockchain",
+			Name:      "verified_preimages",
+			Help:      "the number of verified preimages",
+		},
+		[]string{
+			"shard",
+		},
+	)
+	lastPreimageImportGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "blockchain",
+			Name:      "last_preimage_import",
+			Help:      "the last known block for which preimages were imported",
+		},
+		[]string{
+			"shard",
+		},
+	)
+
 	// consensusCounterVec is used to keep track of consensus reached
 	consensusCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -103,6 +149,26 @@ func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum flo
 	consensusCounterVec.With(prometheus.Labels{"consensus": "num_commits"}).Add(numCommits)
 	consensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(numCommits)
 }
+func (consensus *Consensus) UpdatePreimageGenerationMetrics(
+	preimageStart uint64,
+	preimageEnd uint64,
+	lastPreimageImport uint64,
+	verifiedAddresses uint64,
+	shard uint32,
+) {
+	if lastPreimageImport > 0 {
+		lastPreimageImportGauge.With(prometheus.Labels{"shard": fmt.Sprintf("%d", shard)}).Set(float64(lastPreimageImport))
+	}
+	if preimageStart > 0 {
+		preimageStartGauge.With(prometheus.Labels{"shard": fmt.Sprintf("%d", shard)}).Set(float64(preimageStart))
+	}
+	if preimageEnd > 0 {
+		preimageEndGauge.With(prometheus.Labels{"shard": fmt.Sprintf("%d", shard)}).Set(float64(preimageEnd))
+	}
+	if verifiedAddresses > 0 {
+		verifiedPreimagesGauge.With(prometheus.Labels{"shard": fmt.Sprintf("%d", shard)}).Set(float64(verifiedAddresses))
+	}
+}
 
 // AddPubkeyMetrics add the list of blskeys to prometheus metrics
 func (consensus *Consensus) AddPubkeyMetrics() {
@@ -122,6 +188,10 @@ func initMetrics() {
 			consensusGaugeVec,
 			consensusPubkeyVec,
 			consensusFinalityHistogram,
+			lastPreimageImportGauge,
+			preimageEndGauge,
+			preimageStartGauge,
+			verifiedPreimagesGauge,
 		)
 	})
 }

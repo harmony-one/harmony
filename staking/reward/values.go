@@ -31,6 +31,13 @@ var (
 	TwoSecStakedBlocks = numeric.NewDecFromBigInt(new(big.Int).Mul(
 		big.NewInt(7*denominations.Nano), big.NewInt(denominations.Nano),
 	))
+	// HIP30StakedBlocks is the reward received after HIP-30 goes into
+	// effect. It is simply double the TwoSecStakedBlocks reward, since
+	// the number of shards is being halved and we keep emission
+	// constant.
+	HIP30StakedBlocks = numeric.NewDecFromBigInt(new(big.Int).Mul(
+		big.NewInt(14*denominations.Nano), big.NewInt(denominations.Nano),
+	))
 
 	// TotalInitialTokens is the total amount of tokens (in ONE) at block 0 of the network.
 	// This should be set/change on the node's init according to the core.GenesisSpec.

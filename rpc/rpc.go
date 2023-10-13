@@ -42,7 +42,7 @@ const (
 
 var (
 	// HTTPModules ..
-	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", "trace", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "explorer"}
+	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", "trace", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "explorer", "preimages"}
 	// WSModules ..
 	WSModules = []string{"hmy", "hmyv2", "eth", "debug", "trace", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "web3"}
 
@@ -71,6 +71,9 @@ func (n Version) Namespace() string {
 func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig, rpcOpt harmony.RpcOptConfig) error {
 	apis = append(apis, getAPIs(hmy, config)...)
 	authApis := append(apis, getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
+	if rpcOpt.PreimagesEnabled {
+		authApis = append(authApis, NewPreimagesAPI(hmy, "preimages"))
+	}
 	// load method filter from file (if exist)
 	var rmf rpc.RpcMethodFilter
 	rpcFilterFilePath := strings.TrimSpace(rpcOpt.RpcFilterFile)

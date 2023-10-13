@@ -92,6 +92,7 @@ func TestHarmonyFlags(t *testing.T) {
 					RateLimterEnabled:  true,
 					RequestsPerSecond:  1000,
 					EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+					PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 				},
 				WS: harmonyconfig.WsConfig{
 					Enabled:  true,
@@ -752,6 +753,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -766,6 +768,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -780,6 +783,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -794,6 +798,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -808,6 +813,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -822,6 +828,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -836,6 +843,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  2000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -850,6 +858,7 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  false,
 				RequestsPerSecond:  2000,
 				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
 			},
 		},
 
@@ -864,6 +873,22 @@ func TestRPCOptFlags(t *testing.T) {
 				RateLimterEnabled:  true,
 				RequestsPerSecond:  1000,
 				EvmCallTimeout:     "10s",
+				PreimagesEnabled:   defaultConfig.RPCOpt.PreimagesEnabled,
+			},
+		},
+
+		{
+			args: []string{"--rpc.preimages"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./.hmy/rpc_filter.txt",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+				EvmCallTimeout:     defaultConfig.RPCOpt.EvmCallTimeout,
+				PreimagesEnabled:   true,
 			},
 		},
 	}
@@ -1504,6 +1529,70 @@ func TestRevertFlags(t *testing.T) {
 		}
 		if !reflect.DeepEqual(hc.Revert, test.expConfig) {
 			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Revert, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
+func TestPreimageFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig *harmonyconfig.PreimageConfig
+		expErr    error
+	}{
+		{
+			args:      []string{},
+			expConfig: nil,
+		},
+		{
+			args: []string{"--preimage.import", "/path/to/source.csv"},
+			expConfig: &harmonyconfig.PreimageConfig{
+				ImportFrom:    "/path/to/source.csv",
+				ExportTo:      defaultPreimageConfig.ExportTo,
+				GenerateStart: defaultPreimageConfig.GenerateStart,
+				GenerateEnd:   defaultPreimageConfig.GenerateEnd,
+			},
+		},
+		{
+			args: []string{"--preimage.export", "/path/to/destination.csv"},
+			expConfig: &harmonyconfig.PreimageConfig{
+				ImportFrom:    defaultPreimageConfig.ImportFrom,
+				ExportTo:      "/path/to/destination.csv",
+				GenerateStart: defaultPreimageConfig.GenerateStart,
+				GenerateEnd:   defaultPreimageConfig.GenerateEnd,
+			},
+		},
+		{
+			args: []string{"--preimage.start", "1"},
+			expConfig: &harmonyconfig.PreimageConfig{
+				ImportFrom:    defaultPreimageConfig.ImportFrom,
+				ExportTo:      defaultPreimageConfig.ExportTo,
+				GenerateStart: 1,
+				GenerateEnd:   defaultPreimageConfig.GenerateEnd,
+			},
+		},
+		{
+			args: []string{"--preimage.end", "2"},
+			expConfig: &harmonyconfig.PreimageConfig{
+				ImportFrom:    defaultPreimageConfig.ImportFrom,
+				ExportTo:      defaultPreimageConfig.ExportTo,
+				GenerateStart: defaultPreimageConfig.GenerateStart,
+				GenerateEnd:   2,
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, preimageFlags, applyPreimageFlags)
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		if !reflect.DeepEqual(hc.Preimage, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Preimage, test.expConfig)
 		}
 		ts.tearDown()
 	}
