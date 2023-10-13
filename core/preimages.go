@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // ImportPreimages is public so `main.go` can call it directly`
@@ -42,7 +43,9 @@ func ImportPreimages(chain BlockChain, path string) error {
 				// set this value in database, and prometheus, if needed
 				prev, err := rawdb.ReadPreimageImportBlock(dbReader)
 				if err != nil {
-					return fmt.Errorf("no prior value found, overwriting: %s", err)
+					if !errors.Is(err, leveldb.ErrNotFound) {
+						return fmt.Errorf("no prior value found, overwriting: %s", err)
+					}
 				}
 				if blockNumber > prev {
 					if rawdb.WritePreimageImportBlock(dbReader, blockNumber) != nil {
@@ -230,7 +233,7 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 
 		if stateAt != nil {
 			if root, err := endingState.Commit(false); err != nil {
-				return fmt.Errorf("unabe to commit state for block '%d': %w", i, err)
+				return fmt.Errorf("unable to commit state for block '%d': %w", i, err)
 			} else if root.Hex() != block.Root().Hex() {
 				return fmt.Errorf("block root hashes different after commit commitRoot='%s' blockRoot='%s'", root.Hex(), block.Root().Hex())
 			}
@@ -245,10 +248,11 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 	}
 	// force any pre-images in memory so far to go to disk, if they haven't already
 	fmt.Println("committing images")
-	if _, err := endingState.Commit(false); err != nil {
-		return fmt.Errorf("unabe to commit state for block: %w", err)
+	if endingState != nil {
+		if _, err := endingState.Commit(false); err != nil {
+			return fmt.Errorf("unable to commit state for block: %w", err)
+		}
 	}
-
 	if err := chain.CommitPreimages(); err != nil {
 		return fmt.Errorf("error committing preimages %s", err)
 	}
