@@ -143,7 +143,7 @@ func (p *StateProcessor) Process(
 			processTxsAndStxs = false
 		}
 		if !errors.Is(err, ErrNoMigrationRequired) && !errors.Is(err, ErrNoMigrationPossible) {
-			return nil, nil, nil, nil, 0, nil, statedb, err
+			return nil, nil, nil, nil, nil, 0, nil, statedb, err
 		}
 	} else {
 		if cxReceipt != nil {
@@ -162,7 +162,7 @@ func (p *StateProcessor) Process(
 				p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 			)
 			if err != nil {
-				return nil, nil, nil, nil, 0, nil, statedb, err
+				return nil, nil, nil, nil, nil, 0, nil, statedb, err
 			}
 			receipts = append(receipts, receipt)
 			if cxReceipt != nil {
@@ -185,7 +185,7 @@ func (p *StateProcessor) Process(
 				p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 			)
 			if err != nil {
-				return nil, nil, nil, nil, 0, nil, statedb, err
+				return nil, nil, nil, nil, nil, 0, nil, statedb, err
 			}
 			receipts = append(receipts, receipt)
 			allLogs = append(allLogs, receipt.Logs...)
@@ -209,10 +209,6 @@ func (p *StateProcessor) Process(
 			return nil, nil, nil, nil, nil, 0, nil, statedb, errors.Wrap(err,
 				"[Process] Cannot finalize block")
 		}
-	}
-
-	if err := MayTestnetShardReduction(p.bc, statedb, header); err != nil {
-		return nil, nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
 	if err := MayShardReduction(p.bc, statedb, header); err != nil {

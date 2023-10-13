@@ -287,7 +287,7 @@ func AccumulateRewardsAndCountSigs(
 	}
 
 	
-	reader, err := distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
+	_, reader, err := distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
 	return numeric.ZeroDec(), reader, err
 }
 
@@ -304,13 +304,17 @@ func waitForCommitSigs(sigsReady chan bool) error {
 	return nil
 }
 
-func distributeRewardAfterAggregateEpoch(
-	bc engine.ChainReader,
-	state *state.DB,
-	header *block.Header,
-	beaconChain engine.ChainReader,
-	defaultReward numeric.Dec,
-) (reward.Reader, error) {
+func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
+	rewardToDistribute numeric.Dec) (numeric.Dec, reward.Reader, error) {
+	epoch := header.Epoch()
+	defaultReward := rewardToDistribute
+	remainingReward := numeric.ZeroDec()
+	if bc.Config().IsHIP30(epoch) {
+		fractionToRecovery := shard.Schedule.InstanceForEpoch(epoch).HIP30EmissionFraction()
+		fractionToValidators := numeric.OneDec().Sub(fractionToRecovery)
+		defaultReward = rewardToDistribute.Mul(fractionToValidators)
+		remainingReward = rewardToDistribute.Mul(fractionToRecovery)
+	}
 	newRewards, payouts :=
 		big.NewInt(0), []reward.Payout{}
 
@@ -341,7 +345,7 @@ func distributeRewardAfterAggregateEpoch(
 		if cxLinks := curHeader.CrossLinks(); len(cxLinks) > 0 {
 			crossLinks := types.CrossLinks{}
 			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
-				return network.EmptyPayout, err
+				return numeric.ZeroDec(), network.EmptyPayout, err
 			}
 			allCrossLinks = append(allCrossLinks, crossLinks...)
 		}
@@ -356,7 +360,7 @@ func distributeRewardAfterAggregateEpoch(
 		payables, _, err := processOneCrossLink(bc, state, cxLink, defaultReward, i)
 
 		if err != nil {
-			return network.EmptyPayout, err
+			return numeric.ZeroDec(), network.EmptyPayout, err
 		}
 
 		allPayables = append(allPayables, payables...)
@@ -395,14 +399,14 @@ func distributeRewardAfterAggregateEpoch(
 	for _, addr := range allAddresses {
 		snapshot, err := bc.ReadValidatorSnapshot(addr)
 		if err != nil {
-			return network.EmptyPayout, err
+			return numeric.ZeroDec(), network.EmptyPayout, err
 		}
 		due := allValidatorPayable[addr]
 		newRewards.Add(newRewards, due)
 
 		shares, err := lookupDelegatorShares(snapshot)
 		if err != nil {
-			return network.EmptyPayout, err
+			return numeric.ZeroDec(), network.EmptyPayout, err
 		}
 		if err := state.AddReward(
 			snapshot.Validator,
@@ -415,7 +419,7 @@ func distributeRewardAfterAggregateEpoch(
 			// and delegations pruned afterwards
 			bc.Config().IsNoNilDelegations(header.Epoch()),
 		); err != nil {
-			return network.EmptyPayout, err
+			return numeric.ZeroDec(), network.EmptyPayout, err
 		}
 	}
 	
