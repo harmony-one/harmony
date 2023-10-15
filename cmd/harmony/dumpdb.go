@@ -156,6 +156,7 @@ func (db *KakashiDB) copyKV(key, value []byte) {
 	db.toDBBatch.Put(key, value)
 	snapdbInfo.DumpedSize += uint64(len(key) + len(value))
 	dumpPrint("copyKV", false)
+	db.flush()
 }
 
 func (db *KakashiDB) flush() {
