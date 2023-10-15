@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -120,7 +119,7 @@ Version = "1.0.4"
 	os.RemoveAll(testDir)
 	os.MkdirAll(testDir, 0777)
 	file := filepath.Join(testDir, "test.config")
-	err := ioutil.WriteFile(file, []byte(testConfig), 0644)
+	err := os.WriteFile(file, []byte(testConfig), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}

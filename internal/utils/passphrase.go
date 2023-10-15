@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -28,7 +27,7 @@ func AskForPassphrase(prompt string) string {
 
 // readAllAsString reads the entire file contents as a string.
 func readAllAsString(r io.Reader) (data string, err error) {
-	bytes, err := ioutil.ReadAll(r)
+	bytes, err := io.ReadAll(r)
 	return string(bytes), err
 }
 

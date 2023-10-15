@@ -3,7 +3,6 @@ package rpc
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -32,7 +31,7 @@ Deny = [ ... ]
 func (rmf *RpcMethodFilter) LoadRpcMethodFiltersFromFile(file string) error {
 	// check if file exist
 	if _, err := os.Stat(file); err == nil {
-		b, errRead := ioutil.ReadFile(file)
+		b, errRead := os.ReadFile(file)
 		if errRead != nil {
 			return fmt.Errorf("rpc filter file read error - %s", errRead.Error())
 		}

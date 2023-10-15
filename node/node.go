@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"runtime/pprof"
@@ -1434,7 +1433,7 @@ func (node *Node) syncFromTiKVWriter() {
 				if err != nil {
 					panic(err)
 				}
-				err = ioutil.WriteFile(fmt.Sprintf("/local/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
+				err = os.WriteFile(fmt.Sprintf("/local/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
 				if err != nil {
 					panic(err)
 				}

@@ -6,8 +6,8 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -50,7 +50,7 @@ func WriteToFile(filename string, data string) error {
 
 // LoadBLSKeyWithPassPhrase loads bls key with passphrase.
 func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
-	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
+	encryptedPrivateKeyBytes, err := os.ReadFile(fileName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "attempted to load from %s", fileName)
 	}
@@ -72,7 +72,7 @@ func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 
 // LoadAwsCMKEncryptedBLSKey loads aws encrypted bls key.
 func LoadAwsCMKEncryptedBLSKey(fileName string, kmsClient *kms.KMS) (*ffi_bls.SecretKey, error) {
-	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
+	encryptedPrivateKeyBytes, err := os.ReadFile(fileName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail read at: %s", fileName)
 	}
@@ -136,6 +136,9 @@ func decrypt(encrypted []byte, passphrase string) (decrypted []byte, err error) 
 }
 
 func decryptRaw(data []byte, passphrase string) ([]byte, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("unable to decrypt raw data with the provided passphrase; the data is empty")
+	}
 	var err error
 	key := []byte(createHash(passphrase))
 	block, err := aes.NewCipher(key)
@@ -147,6 +150,9 @@ func decryptRaw(data []byte, passphrase string) ([]byte, error) {
 		return nil, err
 	}
 	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return nil, fmt.Errorf("failed to decrypt raw data with the provided passphrase; the data size is invalid")
+	}
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	return plaintext, err

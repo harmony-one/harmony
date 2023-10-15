@@ -103,7 +103,7 @@ const (
 	STATEDB_CACHE_SIZE = 64 // size in MB
 	LEVELDB_CACHE_SIZE = 256
 	LEVELDB_HANDLES    = 1024
-	LRU_CACHE_SIZE     = 64 * 1024 * 1024
+	LRU_CACHE_SIZE     = 512
 )
 
 const (
