@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
 	_ "net/http/pprof"
@@ -1034,7 +1033,7 @@ func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struc
 	rosetta_common.InitRosettaFile(hc.TxPool.RosettaFixFile)
 
 	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", hc.TxPool.BlacklistFile)
-	dat, err := ioutil.ReadFile(hc.TxPool.BlacklistFile)
+	dat, err := os.ReadFile(hc.TxPool.BlacklistFile)
 	if err != nil {
 		return nil, err
 	}
@@ -1085,7 +1084,7 @@ func parseAllowedTxs(data []byte) (map[ethCommon.Address]core.AllowedTxData, err
 
 func setupAllowedTxs(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]core.AllowedTxData, error) {
 	utils.Logger().Debug().Msgf("Using AllowedTxs file at `%s`", hc.TxPool.AllowedTxsFile)
-	data, err := ioutil.ReadFile(hc.TxPool.AllowedTxsFile)
+	data, err := os.ReadFile(hc.TxPool.AllowedTxsFile)
 	if err != nil {
 		return nil, err
 	}
@@ -1097,7 +1096,7 @@ func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.
 	// check if file exist
 	var fileData string
 	if _, err := os.Stat(file); err == nil {
-		b, err := ioutil.ReadFile(file)
+		b, err := os.ReadFile(file)
 		if err != nil {
 			return nil, err
 		}
@@ -1113,22 +1112,23 @@ func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.
 	localAccounts := make(map[ethCommon.Address]struct{})
 	lines := strings.Split(fileData, "\n")
 	for _, line := range lines {
-		if len(line) != 0 { // the file may have trailing empty string line
-			trimmedLine := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmedLine, "#") { //check the line is not commented
-				continue
-			}
-			addr, err := common.Bech32ToAddress(trimmedLine)
-			if err != nil {
-				return nil, err
-			}
-			// skip the blacklisted addresses
-			if _, exists := blacklist[addr]; exists {
-				utils.Logger().Warn().Msgf("local account with address %s is blacklisted", addr.String())
-				continue
-			}
-			localAccounts[addr] = struct{}{}
+		if len(line) == 0 { // the file may have trailing empty string line
+			continue
 		}
+		addrPart := strings.TrimSpace(strings.Split(string(line), "#")[0])
+		if len(addrPart) == 0 { // if the line is commented by #
+			continue
+		}
+		addr, err := common.ParseAddr(addrPart)
+		if err != nil {
+			return nil, err
+		}
+		// skip the blacklisted addresses
+		if _, exists := blacklist[addr]; exists {
+			utils.Logger().Warn().Msgf("local account with address %s is blacklisted", addr.String())
+			continue
+		}
+		localAccounts[addr] = struct{}{}
 	}
 	uniqueAddresses := make([]ethCommon.Address, 0, len(localAccounts))
 	for addr := range localAccounts {

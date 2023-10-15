@@ -17,7 +17,6 @@
 package keystore
 
 import (
-	"io/ioutil"
 	"os"
 	"runtime"
 	"strings"
@@ -213,7 +212,7 @@ func TestSignRace(t *testing.T) {
 }
 
 func tmpKeyStore(t *testing.T, encrypted bool) (string, *KeyStore) {
-	d, err := ioutil.TempDir("", "eth-keystore-test")
+	d, err := os.MkdirTemp("", "eth-keystore-test")
 	if err != nil {
 		t.Fatal(err)
 	}
