@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -136,6 +137,9 @@ func decrypt(encrypted []byte, passphrase string) (decrypted []byte, err error) 
 }
 
 func decryptRaw(data []byte, passphrase string) ([]byte, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("unable to decrypt raw data with the provided passphrase; the data is empty")
+	}
 	var err error
 	key := []byte(createHash(passphrase))
 	block, err := aes.NewCipher(key)
@@ -147,6 +151,9 @@ func decryptRaw(data []byte, passphrase string) ([]byte, error) {
 		return nil, err
 	}
 	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return nil, fmt.Errorf("failed to decrypt raw data with the provided passphrase; the data size is invalid")
+	}
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	return plaintext, err
