@@ -93,7 +93,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 							Int("numTxs", newBlock.Transactions().Len()).
 							Int("numStakingTxs", newBlock.StakingTransactions().Len()).
 							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
-							Msg("=========Successfully Proposed New Block==========")
+							Msgf("=========Successfully Proposed New Block, shard: %d epoch: %d number: %d ==========", newBlock.ShardID(), newBlock.Epoch().Uint64(), newBlock.NumberU64())
 
 						// Send the new block to Consensus so it can be confirmed.
 						cs.BlockChannel(newBlock)

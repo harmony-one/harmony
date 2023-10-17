@@ -5,6 +5,8 @@ import (
 
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/registry"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -72,4 +74,19 @@ func TestSetViewID(t *testing.T) {
 	if consensus.GetCurBlockViewID() != height {
 		t.Errorf("Cannot set consensus ID. Got: %v, Expected: %v", consensus.GetCurBlockViewID(), height)
 	}
+}
+
+func TestErrors(t *testing.T) {
+	e1 := errors.New("e1")
+	require.True(t, errors.Is(e1, e1))
+
+	t.Run("wrap", func(t *testing.T) {
+		e2 := errors.Wrap(e1, "e2")
+		require.True(t, errors.Is(e2, e1))
+	})
+
+	t.Run("withMessage", func(t *testing.T) {
+		e2 := errors.WithMessage(e1, "e2")
+		require.True(t, errors.Is(e2, e1))
+	})
 }
