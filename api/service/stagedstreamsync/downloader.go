@@ -7,9 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/rs/zerolog"
-
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -17,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	"github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/rs/zerolog"
 )
 
 type (

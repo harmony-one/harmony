@@ -46,8 +46,6 @@ func CreateStagedSync(ctx context.Context,
 	protocol syncProtocol,
 	config Config,
 	logger zerolog.Logger,
-	logProgress bool,
-	c *consensus.Consensus,
 ) (*StagedStreamSync, error) {
 	logger.Info().
 		Uint32("shard", bc.ShardID()).
@@ -82,7 +80,7 @@ func CreateStagedSync(ctx context.Context,
 	}
 
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
-	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB, c)
+	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB, consensus)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
 	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
