@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv"
@@ -49,7 +48,6 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -104,8 +102,7 @@ type Node struct {
 	pendingCXReceipts  map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex     sync.Mutex
 	crosslinks         *crosslinks.Crosslinks // Memory storage for crosslink processing.
-	// Shard databases
-	shardChains      shardchain.Collection
+
 	SelfPeer         p2p.Peer
 	stateMutex       sync.Mutex // mutex for change node state
 	TxPool           *core.TxPool
@@ -193,7 +190,10 @@ func (node *Node) Beaconchain() core.BlockChain {
 }
 
 func (node *Node) chain(shardID uint32, options core.Options) core.BlockChain {
-	bc, err := node.shardChains.ShardChain(shardID, options)
+	if node.registry.GetShardChainCollection() == nil {
+		panic("shard chain collection is nil")
+	}
+	bc, err := node.registry.GetShardChainCollection().ShardChain(shardID, options)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
 	}
@@ -1026,12 +1026,9 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(
 	host p2p.Host,
 	consensusObj *consensus.Consensus,
-	engine engine.Engine,
-	collection *shardchain.CollectionImpl,
 	blacklist map[common.Address]struct{},
 	allowedTxs map[common.Address]core.AllowedTxData,
 	localAccounts []common.Address,
-	isArchival map[uint32]bool,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
 	registry *registry.Registry,
 ) *Node {
@@ -1058,7 +1055,6 @@ func New(
 	networkType := node.NodeConfig.GetNetworkType()
 	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
-	node.shardChains = collection
 	node.IsSynchronized = abool.NewBool(false)
 
 	if host != nil {
@@ -1081,9 +1077,9 @@ func New(
 				if b2 {
 					shardID := node.NodeConfig.ShardID
 					// HACK get the real error reason
-					_, err = node.shardChains.ShardChain(shardID)
+					_, err = node.registry.GetShardChainCollection().ShardChain(shardID)
 				} else {
-					_, err = node.shardChains.ShardChain(shard.BeaconChainShardID)
+					_, err = node.registry.GetShardChainCollection().ShardChain(shard.BeaconChainShardID)
 				}
 				fmt.Fprintf(os.Stderr, "Cannot initialize node: %v\n", err)
 				os.Exit(-1)

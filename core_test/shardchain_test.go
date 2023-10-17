@@ -48,7 +48,10 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot get blockchain")
 	}
-	reg := registry.New().SetBlockchain(blockchain)
+	reg := registry.New().
+		SetBlockchain(blockchain).
+		SetEngine(engine).
+		SetShardChainCollection(collection)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
@@ -57,7 +60,7 @@ func TestAddNewBlock(t *testing.T) {
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Testnet)
 	var block *types.Block
-	node := node.New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
+	node := node.New(host, consensus, nil, nil, nil, nil, reg)
 	commitSigs := make(chan []byte, 1)
 	commitSigs <- []byte{}
 	block, err = node.Worker.FinalizeNewBlock(

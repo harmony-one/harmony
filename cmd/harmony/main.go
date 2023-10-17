@@ -268,6 +268,29 @@ func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 	}
 }
 
+func revert(chain core.BlockChain, hc harmonyconfig.HarmonyConfig) {
+	curNum := chain.CurrentBlock().NumberU64()
+	if curNum < uint64(hc.Revert.RevertBefore) && curNum >= uint64(hc.Revert.RevertTo) {
+		// Remove invalid blocks
+		for chain.CurrentBlock().NumberU64() >= uint64(hc.Revert.RevertTo) {
+			curBlock := chain.CurrentBlock()
+			rollbacks := []ethCommon.Hash{curBlock.Hash()}
+			if err := chain.Rollback(rollbacks); err != nil {
+				fmt.Printf("Revert failed: %v\n", err)
+				os.Exit(1)
+			}
+			lastSig := curBlock.Header().LastCommitSignature()
+			sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
+			chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)
+		}
+		fmt.Printf("Revert finished. Current block: %v\n", chain.CurrentBlock().NumberU64())
+		utils.Logger().Warn().
+			Uint64("Current Block", chain.CurrentBlock().NumberU64()).
+			Msg("Revert finished.")
+		os.Exit(1)
+	}
+}
+
 func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	var err error
 
@@ -353,26 +376,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		if hc.Revert.RevertBeacon {
 			chain = currentNode.Beaconchain()
 		}
-		curNum := chain.CurrentBlock().NumberU64()
-		if curNum < uint64(hc.Revert.RevertBefore) && curNum >= uint64(hc.Revert.RevertTo) {
-			// Remove invalid blocks
-			for chain.CurrentBlock().NumberU64() >= uint64(hc.Revert.RevertTo) {
-				curBlock := chain.CurrentBlock()
-				rollbacks := []ethCommon.Hash{curBlock.Hash()}
-				if err := chain.Rollback(rollbacks); err != nil {
-					fmt.Printf("Revert failed: %v\n", err)
-					os.Exit(1)
-				}
-				lastSig := curBlock.Header().LastCommitSignature()
-				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
-				chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)
-			}
-			fmt.Printf("Revert finished. Current block: %v\n", chain.CurrentBlock().NumberU64())
-			utils.Logger().Warn().
-				Uint64("Current Block", chain.CurrentBlock().NumberU64()).
-				Msg("Revert finished.")
-			os.Exit(1)
-		}
+		revert(chain, hc)
 	}
 
 	//// code to handle pre-image export, import and generation
@@ -727,6 +731,62 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	return nodeConfig, nil
 }
 
+func setupChain(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType, registry *registry.Registry) *registry.Registry {
+
+	// Current node.
+	var chainDBFactory shardchain.DBFactory
+	if hc.General.RunElasticMode {
+		chainDBFactory = setupTiKV(hc)
+	} else if hc.ShardData.EnableShardData {
+		chainDBFactory = &shardchain.LDBShardFactory{
+			RootDir:    nodeConfig.DBDir,
+			DiskCount:  hc.ShardData.DiskCount,
+			ShardCount: hc.ShardData.ShardCount,
+			CacheTime:  hc.ShardData.CacheTime,
+			CacheSize:  hc.ShardData.CacheSize,
+		}
+	} else {
+		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	}
+
+	engine := chain.NewEngine()
+	registry.SetEngine(engine)
+
+	chainConfig := nodeConfig.GetNetworkType().ChainConfig()
+	collection := shardchain.NewCollection(
+		&hc, chainDBFactory, &core.GenesisInitializer{NetworkType: nodeConfig.GetNetworkType()}, engine, &chainConfig,
+	)
+	for shardID, archival := range nodeConfig.ArchiveModes() {
+		if archival {
+			collection.DisableCache(shardID)
+		}
+	}
+	registry.SetShardChainCollection(collection)
+
+	var blockchain core.BlockChain
+
+	// We are not beacon chain, make sure beacon already initialized.
+	if nodeConfig.ShardID != shard.BeaconChainShardID {
+		beacon, err := collection.ShardChain(shard.BeaconChainShardID, core.Options{EpochChain: true})
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+			os.Exit(1)
+		}
+		registry.SetBeaconchain(beacon)
+	}
+
+	blockchain, err := collection.ShardChain(nodeConfig.ShardID)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		os.Exit(1)
+	}
+	registry.SetBlockchain(blockchain)
+	if registry.GetBeaconchain() == nil {
+		registry.SetBeaconchain(registry.GetBlockchain())
+	}
+	return registry
+}
+
 func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType, registry *registry.Registry) *node.Node {
 	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
@@ -747,63 +807,16 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	if err != nil {
 		utils.Logger().Warn().Msgf("AllowedTxs setup error: %s", err.Error())
 	}
-
 	localAccounts, err := setupLocalAccounts(hc, blacklist)
 	if err != nil {
 		utils.Logger().Warn().Msgf("local accounts setup error: %s", err.Error())
 	}
 
-	// Current node.
-	var chainDBFactory shardchain.DBFactory
-	if hc.General.RunElasticMode {
-		chainDBFactory = setupTiKV(hc)
-	} else if hc.ShardData.EnableShardData {
-		chainDBFactory = &shardchain.LDBShardFactory{
-			RootDir:    nodeConfig.DBDir,
-			DiskCount:  hc.ShardData.DiskCount,
-			ShardCount: hc.ShardData.ShardCount,
-			CacheTime:  hc.ShardData.CacheTime,
-			CacheSize:  hc.ShardData.CacheSize,
-		}
-	} else {
-		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	registry = setupChain(hc, nodeConfig, registry)
+	if registry.GetShardChainCollection() == nil {
+		panic("shard chain collection is nil1111111")
 	}
-
-	engine := chain.NewEngine()
-
-	chainConfig := nodeConfig.GetNetworkType().ChainConfig()
-	collection := shardchain.NewCollection(
-		&hc, chainDBFactory, &core.GenesisInitializer{NetworkType: nodeConfig.GetNetworkType()}, engine, &chainConfig,
-	)
-	for shardID, archival := range nodeConfig.ArchiveModes() {
-		if archival {
-			collection.DisableCache(shardID)
-		}
-	}
-
-	var blockchain core.BlockChain
-
-	// We are not beacon chain, make sure beacon already initialized.
-	if nodeConfig.ShardID != shard.BeaconChainShardID {
-		beacon, err := collection.ShardChain(shard.BeaconChainShardID, core.Options{EpochChain: true})
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
-			os.Exit(1)
-		}
-		registry.SetBeaconchain(beacon)
-	}
-
-	blockchain, err = collection.ShardChain(nodeConfig.ShardID)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
-		os.Exit(1)
-	}
-	registry.SetBlockchain(blockchain)
 	registry.SetWebHooks(nodeConfig.WebHooks.Hooks)
-	if registry.GetBeaconchain() == nil {
-		registry.SetBeaconchain(registry.GetBlockchain())
-	}
-
 	cxPool := core.NewCxPool(core.CxPoolSize)
 	registry.SetCxPool(cxPool)
 
@@ -818,7 +831,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		os.Exit(1)
 	}
 
-	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc, registry)
+	currentNode := node.New(myHost, currentConsensus, blacklist, allowedTxs, localAccounts, &hc, registry)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
