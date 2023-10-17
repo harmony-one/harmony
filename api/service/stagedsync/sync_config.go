@@ -23,9 +23,8 @@ const (
 	downloadBlocksRetryLimit        = 3 // downloadBlocks service retry limit
 	RegistrationNumber              = 3
 	SyncingPortDifference           = 3000
-	inSyncThreshold                 = 0   // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
-	SyncLoopBatchSize        uint32 = 30  // maximum size for one query of block hashes
-	verifyHeaderBatchSize    uint64 = 100 // block chain header verification batch size (not used for now)
+	inSyncThreshold                 = 0  // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
+	SyncLoopBatchSize        uint32 = 30 // maximum size for one query of block hashes
 	LastMileBlocksSize              = 50
 
 	// after cutting off a number of connected peers, the result number of peers
@@ -51,14 +50,6 @@ type SyncPeerConfig struct {
 	newBlocks   []*types.Block // blocks after node doing sync
 	mux         sync.RWMutex
 	failedTimes uint64
-}
-
-// CreateTestSyncPeerConfig used for testing.
-func CreateTestSyncPeerConfig(client *downloader.Client, blockHashes [][]byte) *SyncPeerConfig {
-	return &SyncPeerConfig{
-		client:      client,
-		blockHashes: blockHashes,
-	}
 }
 
 // GetClient returns client pointer of downloader.Client
@@ -303,21 +294,21 @@ func (sc *SyncConfig) FindPeerByHash(peerHash []byte) *SyncPeerConfig {
 // getHowManyMaxConsensus returns max number of consensus nodes and the first ID of consensus group.
 // Assumption: all peers are sorted by CompareSyncPeerConfigByBlockHashes first.
 // Caller shall ensure mtx is locked for reading.
-func (sc *SyncConfig) getHowManyMaxConsensus() (int, int) {
+func getHowManyMaxConsensus(peers []*SyncPeerConfig) (int, int) {
 	// As all peers are sorted by their blockHashes, all equal blockHashes should come together and consecutively.
-	if len(sc.peers) == 0 {
+	if len(peers) == 0 {
 		return -1, 0
-	} else if len(sc.peers) == 1 {
+	} else if len(peers) == 1 {
 		return 0, 1
 	}
-	maxFirstID := len(sc.peers) - 1
+	maxFirstID := len(peers) - 1
 	for i := maxFirstID - 1; i >= 0; i-- {
-		if CompareSyncPeerConfigByblockHashes(sc.peers[maxFirstID], sc.peers[i]) != 0 {
+		if CompareSyncPeerConfigByblockHashes(peers[maxFirstID], peers[i]) != 0 {
 			break
 		}
 		maxFirstID = i
 	}
-	maxCount := len(sc.peers) - maxFirstID
+	maxCount := len(peers) - maxFirstID
 	return maxFirstID, maxCount
 }
 
@@ -386,7 +377,7 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp(bgMode bool) error {
 	sort.Slice(sc.peers, func(i, j int) bool {
 		return CompareSyncPeerConfigByblockHashes(sc.peers[i], sc.peers[j]) == -1
 	})
-	maxFirstID, maxCount := sc.getHowManyMaxConsensus()
+	maxFirstID, maxCount := getHowManyMaxConsensus(sc.peers)
 	if maxFirstID == -1 {
 		return errors.New("invalid peer index -1 for block hashes query")
 	}

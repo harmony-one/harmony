@@ -46,7 +46,11 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot get blockchain")
 	}
-	reg := registry.New().SetBlockchain(blockchain)
+	reg := registry.New().
+		SetBlockchain(blockchain).
+		SetEngine(engine).
+		SetShardChainCollection(collection)
+
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
@@ -54,7 +58,7 @@ func TestNewNode(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 
-	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
+	node := New(host, consensus, nil, nil, nil, nil, reg)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}
