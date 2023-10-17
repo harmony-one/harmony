@@ -163,6 +163,7 @@ func (conn *fakeConn) RemoteMultiaddr() ma.Multiaddr {
 }
 func (conn *fakeConn) Stat() libp2p_network.ConnStats  { return libp2p_network.ConnStats{} }
 func (conn *fakeConn) Scope() libp2p_network.ConnScope { return nil }
+func (conn *fakeConn) IsClosed() bool                  { return false }
 
 func TestGetRemoteIP(t *testing.T) {
 	ip, err := getRemoteIP(&fakeConn{})

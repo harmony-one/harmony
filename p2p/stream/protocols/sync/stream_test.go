@@ -292,6 +292,10 @@ func (st *testRemoteBaseStream) WriteBytes(b []byte) error {
 
 type fakeConn struct{}
 
+func (conn *fakeConn) IsClosed() bool {
+	return false
+}
+
 func (conn *fakeConn) ID() string                                               { return "" }
 func (conn *fakeConn) NewStream(context.Context) (libp2p_network.Stream, error) { return nil, nil }
 func (conn *fakeConn) GetStreams() []libp2p_network.Stream                      { return nil }
