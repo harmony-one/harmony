@@ -64,6 +64,11 @@ type SerializedPublicKey [PublicKeySizeInBytes]byte
 // SerializedSignature defines the bls signature
 type SerializedSignature [BLSSignatureSizeInBytes]byte
 
+// Bytes returns the byte array of bls signature
+func (pk SerializedPublicKey) Bytes() []byte {
+	return pk[:]
+}
+
 // Big ..
 func (pk SerializedPublicKey) Big() *big.Int {
 	return new(big.Int).SetBytes(pk[:])

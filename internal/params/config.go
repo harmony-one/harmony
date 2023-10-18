@@ -69,8 +69,8 @@ var (
 		SlotsLimitedEpoch:                      big.NewInt(999),  // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch:          big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
 		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
+		LeaderRotationInternalValidatorsEpoch:  EpochTBD,
+		LeaderRotationExternalValidatorsEpoch:  EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                             big.NewInt(1673), // 2023-11-02 17:30:00+00:00
@@ -113,8 +113,8 @@ var (
 		ChainIdFixEpoch:                        big.NewInt(0),
 		CrossShardXferPrecompileEpoch:          big.NewInt(2),
 		AllowlistEpoch:                         big.NewInt(2),
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
+		LeaderRotationInternalValidatorsEpoch:  EpochTBD,
+		LeaderRotationExternalValidatorsEpoch:  EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                  big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                             big.NewInt(2176), // 2023-10-12 10:00:00+00:00
@@ -158,12 +158,12 @@ var (
 		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch:          big.NewInt(1),
 		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
+		LeaderRotationInternalValidatorsEpoch:  EpochTBD,
+		LeaderRotationExternalValidatorsEpoch:  EpochTBD,
 		FeeCollectEpoch:                        EpochTBD,
 		ValidatorCodeFixEpoch:                  EpochTBD,
 		HIP30Epoch:                             EpochTBD,
-		NoNilDelegationsEpoch:         EpochTBD,
+		NoNilDelegationsEpoch:        			EpochTBD,
 		BlockGas30MEpoch:                       big.NewInt(0),
 	}
 
@@ -203,8 +203,8 @@ var (
 		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch:          big.NewInt(5),
 		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
+		LeaderRotationInternalValidatorsEpoch:  EpochTBD,
+		LeaderRotationExternalValidatorsEpoch:  EpochTBD,
 		FeeCollectEpoch:                        big.NewInt(5),
 		ValidatorCodeFixEpoch:                  big.NewInt(5),
 		HIP30Epoch:                             big.NewInt(7),
@@ -249,8 +249,8 @@ var (
 		CrossShardXferPrecompileEpoch:          big.NewInt(1),
 		AllowlistEpoch:                         EpochTBD,
 		FeeCollectEpoch:                        EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: EpochTBD,
+		LeaderRotationExternalValidatorsEpoch: EpochTBD,
 		ValidatorCodeFixEpoch:                  EpochTBD,
 		HIP30Epoch:                             EpochTBD,
 		NoNilDelegationsEpoch:					big.NewInt(2),
@@ -292,8 +292,8 @@ var (
 		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch:          big.NewInt(1),
 		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: big.NewInt(5),
-		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
+		LeaderRotationInternalValidatorsEpoch:  big.NewInt(5),
+		LeaderRotationExternalValidatorsEpoch:  big.NewInt(6),
 		FeeCollectEpoch:                        big.NewInt(2),
 		ValidatorCodeFixEpoch:                  big.NewInt(2),
 		HIP30Epoch:                             EpochTBD,
@@ -533,9 +533,9 @@ type ChainConfig struct {
 	// The first epoch at the end of which stale delegations are removed
 	NoNilDelegationsEpoch *big.Int `json:"no-nil-delegations-epoch,omitempty"`
 
-	LeaderRotationExternalNonBeaconLeaders *big.Int `json:"leader-rotation-external-non-beacon-leaders,omitempty"`
+	LeaderRotationInternalValidatorsEpoch *big.Int `json:"leader-rotation-internal-validators,omitempty"`
 
-	LeaderRotationExternalBeaconLeaders *big.Int `json:"leader-rotation-external-beacon-leaders,omitempty"`
+	LeaderRotationExternalValidatorsEpoch *big.Int `json:"leader-rotation-external-validators,omitempty"`
 
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
 	// It should >= StakingEpoch.
@@ -810,22 +810,16 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 	return isForked(c.AllowlistEpoch, epoch)
 }
 
-func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
-	return isForked(c.LeaderRotationExternalNonBeaconLeaders, epoch)
+func (c *ChainConfig) IsLeaderRotationInternalValidators(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationInternalValidatorsEpoch, epoch)
 }
 
 func (c *ChainConfig) IsBlockGas30M(epoch *big.Int) bool {
 	return isForked(c.BlockGas30MEpoch, epoch)
 }
 
-func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int, shardID uint32) bool {
-	if !c.IsLeaderRotation(epoch) {
-		return false
-	}
-	if shardID == 0 {
-		return isForked(c.LeaderRotationExternalBeaconLeaders, epoch)
-	}
-	return true
+func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationExternalValidatorsEpoch, epoch)
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.

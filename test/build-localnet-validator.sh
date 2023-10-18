@@ -19,13 +19,13 @@ hmy --node=http://127.0.0.1:9500 transfer     --from one1zksj3evekayy90xt4psrz8h
 
 #wait for epoch 2
 epoch=$(hmy blockchain latest-headers --node="http://localhost:9500" | jq -r '.["result"]["beacon-chain-header"]["epoch"]')
-while (( epoch < 2 )); do
-	echo "Not yet on epoch 2 .. waiting 30s"
+while (( epoch < 1 )); do
+	echo "Not yet on epoch 1 .. waiting 30s"
 	epoch=$(hmy blockchain latest-headers --node="http://localhost:9500" | jq -r '.["result"]["beacon-chain-header"]["epoch"]')
 	sleep 30
 done
 
-echo "Now in epoch 2, we'll create the external validators"
+echo "Now in epoch 1, we'll create the external validators"
 
 hmy --node="http://localhost:9500" staking create-validator \
     --validator-addr one17ughrllgnzx9sfa46p568k8rdmtz7qj85slc6t --amount 10000 \

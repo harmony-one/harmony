@@ -663,6 +663,12 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 func VerifyNewBlock(hooks *webhooks.Hooks, blockChain core.BlockChain, beaconChain core.BlockChain) func(*types.Block) error {
 	return func(newBlock *types.Block) error {
 		if err := blockChain.ValidateNewBlock(newBlock, beaconChain); err != nil {
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+				return nil
+			default:
+			}
+
 			if hooks := hooks; hooks != nil {
 				if p := hooks.ProtocolIssues; p != nil {
 					url := p.OnCannotCommit
@@ -680,7 +686,7 @@ func VerifyNewBlock(hooks *webhooks.Hooks, blockChain core.BlockChain, beaconCha
 				Int("numStakingTx", len(newBlock.StakingTransactions())).
 				Err(err).
 				Msgf("[VerifyNewBlock] Cannot Verify New Block!!!, blockHeight %d, myHeight %d", newBlock.NumberU64(), blockChain.CurrentHeader().NumberU64())
-			return errors.Errorf(
+			return errors.WithMessagef(err,
 				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
 				newBlock.Hash().Hex(),
 				len(newBlock.Transactions()),
