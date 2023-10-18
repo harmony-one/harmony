@@ -2,7 +2,6 @@ package testutils
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -13,7 +12,7 @@ import (
 // NewTempFile creates a new, empty temp file for testing.  Errors are fatal.
 func NewTempFile(t *testing.T) *os.File {
 	pattern := strings.ReplaceAll(t.Name(), string(os.PathSeparator), "_")
-	f, err := ioutil.TempFile("", pattern)
+	f, err := os.CreateTemp("", pattern)
 	if err != nil {
 		t.Fatal(errors.Wrap(err, "cannot create temp file"))
 	}

@@ -3,8 +3,8 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -29,7 +29,7 @@ func encodeGenesisConfig(ga []GenesisItem) string {
 }
 
 func parseGenesisConfigFile(fileName string) genesisConfig {
-	input, err := ioutil.ReadFile(fileName)
+	input, err := os.ReadFile(fileName)
 	if err != nil {
 		panic(fmt.Sprintf("cannot open genesisblock config file %v, err %v\n", fileName, err))
 	}

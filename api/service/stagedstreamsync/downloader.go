@@ -153,6 +153,17 @@ func (d *Downloader) SubscribeDownloadFinished(ch chan struct{}) event.Subscript
 // waitForBootFinish waits for stream manager to finish the initial discovery and have
 // enough peers to start downloader
 func (d *Downloader) waitForBootFinish() {
+	bootCompleted, numStreams := d.waitForEnoughStreams(d.config.InitStreams)
+	if bootCompleted {
+		fmt.Printf("boot completed for shard %d ( %d streams are connected )\n",
+			d.bc.ShardID(), numStreams)
+	}
+}
+
+func (d *Downloader) waitForEnoughStreams(requiredStreams int) (bool, int) {
+	d.logger.Info().Int("requiredStreams", requiredStreams).
+		Msg("waiting for enough stream connections to continue syncing")
+
 	evtCh := make(chan streammanager.EvtStreamAdded, 1)
 	sub := d.syncProtocol.SubscribeAddStreamEvent(evtCh)
 	defer sub.Unsubscribe()
@@ -177,12 +188,11 @@ func (d *Downloader) waitForBootFinish() {
 			trigger()
 
 		case <-checkCh:
-			if d.syncProtocol.NumStreams() >= d.config.InitStreams {
-				fmt.Printf("boot completed for shard %d ( %d streams are connected )\n", d.bc.ShardID(), d.syncProtocol.NumStreams())
-				return
+			if d.syncProtocol.NumStreams() >= requiredStreams {
+				return true, d.syncProtocol.NumStreams()
 			}
 		case <-d.closeC:
-			return
+			return false, d.syncProtocol.NumStreams()
 		}
 	}
 }
@@ -212,6 +222,9 @@ func (d *Downloader) loop() {
 		case <-d.downloadC:
 			bnBeforeSync := d.bc.CurrentBlock().NumberU64()
 			estimatedHeight, addedBN, err := d.stagedSyncInstance.doSync(d.ctx, initSync)
+			if err == ErrNotEnoughStreams {
+				d.waitForEnoughStreams(d.config.MinStreams)
+			}
 			if err != nil {
 				//TODO: if there is a bad block which can't be resolved
 				if d.stagedSyncInstance.invalidBlock.Active {

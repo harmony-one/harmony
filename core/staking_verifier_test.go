@@ -154,16 +154,6 @@ func TestCheckDuplicateFields(t *testing.T) {
 			expErr: nil,
 		},
 		{
-			// chain error
-			bc:        &fakeErrChainContext{},
-			sdb:       makeStateDBForStake(t),
-			validator: createValidatorAddr,
-			identity:  makeIdentityStr("new validator"),
-			pubs:      []bls.SerializedPublicKey{blsKeys[11].pub},
-
-			expErr: errors.New("error intended"),
-		},
-		{
 			// validators read from chain not in state
 			bc: func() *fakeChainContext {
 				chain := makeFakeChainContextForStake()
@@ -201,7 +191,11 @@ func TestCheckDuplicateFields(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		err := checkDuplicateFields(test.bc, test.sdb, test.validator, test.identity, test.pubs)
+		addrs, err := test.bc.ReadValidatorList()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = checkDuplicateFields(addrs, test.sdb, test.validator, test.identity, test.pubs)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
@@ -676,7 +670,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 				return msg
 			}(),
 
-			expErr: errCommissionRateChangeTooLow,
+			expErr: errCommissionRateChangeTooLowT,
 		},
 		{
 			// 15: Rate is ok within the promo period

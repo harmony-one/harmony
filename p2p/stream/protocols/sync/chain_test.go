@@ -53,11 +53,41 @@ func (tch *testChainHelper) getNodeData(hs []common.Hash) ([][]byte, error) {
 
 func (tch *testChainHelper) getReceipts(hs []common.Hash) ([]types.Receipts, error) {
 	testReceipts := makeTestReceipts(len(hs), 3)
-	receipts := make([]types.Receipts, len(hs)*3)
+	receipts := make([]types.Receipts, len(hs))
 	for i, _ := range hs {
 		receipts[i] = testReceipts
 	}
 	return receipts, nil
+}
+
+func checkGetReceiptsResult(b []byte, hs []common.Hash) error {
+	var msg = &syncpb.Message{}
+	if err := protobuf.Unmarshal(b, msg); err != nil {
+		return err
+	}
+	bhResp, err := msg.GetReceiptsResponse()
+	if err != nil {
+		return err
+	}
+	if len(hs) != len(bhResp.Receipts) {
+		return errors.New("unexpected size")
+	}
+	return nil
+}
+
+func checkGetNodeDataResult(b []byte, hs []common.Hash) error {
+	var msg = &syncpb.Message{}
+	if err := protobuf.Unmarshal(b, msg); err != nil {
+		return err
+	}
+	bhResp, err := msg.GetNodeDataResponse()
+	if err != nil {
+		return err
+	}
+	if len(hs) != len(bhResp.DataBytes) {
+		return errors.New("unexpected size")
+	}
+	return nil
 }
 
 func numberToHash(bn uint64) common.Hash {

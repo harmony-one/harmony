@@ -30,14 +30,9 @@ var (
 )
 
 func checkDuplicateFields(
-	bc ChainContext, state vm.StateDB,
+	addrs []common.Address, state vm.StateDB,
 	validator common.Address, identity string, blsKeys []bls.SerializedPublicKey,
 ) error {
-	addrs, err := bc.ReadValidatorList()
-	if err != nil {
-		return err
-	}
-
 	checkIdentity := identity != ""
 	checkBlsKeys := len(blsKeys) != 0
 
@@ -99,8 +94,12 @@ func VerifyAndCreateValidatorFromMsg(
 			errValidatorExist, common2.MustAddressToBech32(msg.ValidatorAddress),
 		)
 	}
+	addrs, err := chainContext.ReadValidatorList()
+	if err != nil {
+		return nil, err
+	}
 	if err := checkDuplicateFields(
-		chainContext, stateDB,
+		addrs, stateDB,
 		msg.ValidatorAddress,
 		msg.Identity,
 		msg.SlotPubKeys); err != nil {
@@ -151,8 +150,12 @@ func VerifyAndEditValidatorFromMsg(
 	if msg.SlotKeyToAdd != nil {
 		newBlsKeys = append(newBlsKeys, *msg.SlotKeyToAdd)
 	}
+	addrs, err := chainContext.ReadValidatorList()
+	if err != nil {
+		return nil, err
+	}
 	if err := checkDuplicateFields(
-		chainContext, stateDB,
+		addrs, stateDB,
 		msg.ValidatorAddress,
 		msg.Identity,
 		newBlsKeys); err != nil {
@@ -171,11 +174,20 @@ func VerifyAndEditValidatorFromMsg(
 		return nil, errCommissionRateChangeTooHigh
 	}
 
-	if chainContext.Config().IsMinCommissionRate(epoch) && newRate.LT(availability.MinCommissionRate) {
+	minRate := availability.MinCommissionRate(
+		chainContext.Config().IsMinCommissionRate(epoch),
+		chainContext.Config().IsHIP30(epoch),
+	)
+	if newRate.LT(minRate) {
 		firstEpoch := stateDB.GetValidatorFirstElectionEpoch(msg.ValidatorAddress)
 		promoPeriod := chainContext.Config().MinCommissionPromoPeriod.Int64()
 		if firstEpoch.Uint64() != 0 && big.NewInt(0).Sub(epoch, firstEpoch).Int64() >= promoPeriod {
-			return nil, errCommissionRateChangeTooLow
+			return nil,
+				errors.Errorf(
+					"%s %d%%",
+					errCommissionRateChangeTooLowT,
+					minRate.MulInt64(100).Int64(),
+				)
 		}
 	}
 

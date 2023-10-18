@@ -3,7 +3,9 @@ package registry
 import (
 	"sync"
 
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/webhooks"
 )
 
@@ -16,6 +18,8 @@ type Registry struct {
 	txPool      *core.TxPool
 	cxPool      *core.CxPool
 	isBackup    bool
+	engine      engine.Engine
+	collection  *shardchain.CollectionImpl
 }
 
 // New creates a new registry.
@@ -121,4 +125,38 @@ func (r *Registry) GetCxPool() *core.CxPool {
 	defer r.mu.Unlock()
 
 	return r.cxPool
+}
+
+// SetEngine sets the engine to registry.
+func (r *Registry) SetEngine(engine engine.Engine) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.engine = engine
+	return r
+}
+
+// GetEngine gets the engine from registry.
+func (r *Registry) GetEngine() engine.Engine {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.engine
+}
+
+// SetShardChainCollection sets the shard chain collection to registry.
+func (r *Registry) SetShardChainCollection(collection *shardchain.CollectionImpl) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.collection = collection
+	return r
+}
+
+// GetShardChainCollection gets the shard chain collection from registry.
+func (r *Registry) GetShardChainCollection() *shardchain.CollectionImpl {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.collection
 }

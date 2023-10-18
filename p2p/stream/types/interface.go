@@ -4,6 +4,7 @@ import (
 	p2ptypes "github.com/harmony-one/harmony/p2p/types"
 	"github.com/hashicorp/go-version"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // Protocol is the interface of protocol to be registered to libp2p.
@@ -15,7 +16,7 @@ type Protocol interface {
 	ProtoID() ProtoID
 	// ShardProtoID() ProtoID
 	IsBeaconNode() bool
-	Match(string) bool
+	Match(id protocol.ID) bool
 	HandleStream(st libp2p_network.Stream)
 }
 

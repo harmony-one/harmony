@@ -8,11 +8,12 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/discovery"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 func TestProtocol_Match(t *testing.T) {
 	tests := []struct {
-		targetID string
+		targetID protocol.ID
 		exp      bool
 	}{
 		{"harmony/sync/unitest/0/1.0.1/1", true},

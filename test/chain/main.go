@@ -93,7 +93,7 @@ func fundFaucetContract(chain core.BlockChain) {
 	fmt.Println("--------- Funding addresses for Faucet Contract Call ---------")
 	fmt.Println()
 
-	contractworker = pkgworker.New(params.TestChainConfig, chain, nil, chain.Engine())
+	contractworker = pkgworker.New(chain, nil)
 	nonce = contractworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
 	dataEnc = common.FromHex(FaucetContractBinary)
 	ftx, _ := types.SignTx(

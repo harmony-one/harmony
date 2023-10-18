@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -315,7 +314,7 @@ func TestPromptPassProvider_getPassphrase(t *testing.T) {
 				t.Errorf("Test %v: pass file exist %v", i, passFile)
 			}
 		} else {
-			b, err := ioutil.ReadFile(passFile)
+			b, err := os.ReadFile(passFile)
 			if err != nil {
 				t.Error(err)
 				continue

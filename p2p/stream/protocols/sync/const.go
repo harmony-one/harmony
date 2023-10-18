@@ -19,14 +19,18 @@ const (
 
 	// GetNodeDataCap is the cap of request of single GetNodeData request
 	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
-	GetNodeDataCap = 10
+	GetNodeDataCap = 256
 
 	// GetReceiptsCap is the cap of request of single GetReceipts request
 	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
-	GetReceiptsCap = 10
+	GetReceiptsCap = 128
 
 	// MaxStreamFailures is the maximum allowed failures before stream gets removed
-	MaxStreamFailures = 3
+	MaxStreamFailures = 5
+
+	// FaultRecoveryThreshold is the minimum duration before it resets the previous failures
+	// So, if stream hasn't had any issue for a certain amount of time since last failure, we can still trust it
+	FaultRecoveryThreshold = 30 * time.Minute
 
 	// minAdvertiseInterval is the minimum advertise interval
 	minAdvertiseInterval = 1 * time.Minute

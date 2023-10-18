@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/state/snapshot"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -55,8 +56,6 @@ type BlockChain interface {
 	// CurrentBlock retrieves the current head block of the canonical chain. The
 	// block is retrieved from the blockchain's internal cache.
 	CurrentBlock() *types.Block
-	// Validator returns the current validator.
-	Validator() Validator
 	// Processor returns the current processor.
 	Processor() Processor
 	// State returns a new mutable state based on the current HEAD block.
@@ -122,8 +121,8 @@ type BlockChain interface {
 	//
 	// After insertion is done, all accumulated events will be fired.
 	InsertChain(chain types.Blocks, verifyHeaders bool) (int, error)
-	// LeaderRotationMeta returns the number of continuous blocks by the leader.
-	LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts uint64, err error)
+	// LeaderRotationMeta returns info about leader rotation.
+	LeaderRotationMeta() LeaderRotationMeta
 	// BadBlocks returns a list of the last 'bad blocks' that
 	// the client has seen on the network.
 	BadBlocks() []BadBlock
@@ -346,6 +345,9 @@ type BlockChain interface {
 	) (status WriteStatus, err error)
 
 	GetLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error)
+	CommitPreimages() error
+	GetStateCache() state.Database
+	GetSnapshotTrie() *snapshot.Tree
 
 	// ========== Only For Tikv Start ==========
 

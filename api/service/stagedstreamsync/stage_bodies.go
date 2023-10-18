@@ -167,13 +167,22 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 				Msg(WrapStagedSyncMsg("downloadRawBlocks failed"))
 			err = errors.Wrap(err, "request error")
 			gbm.HandleRequestError(batch, err, stid)
-		} else if blockBytes == nil || len(blockBytes) == 0 {
+		} else if blockBytes == nil {
 			utils.Logger().Warn().
 				Str("stream", string(stid)).
 				Interface("block numbers", batch).
-				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received empty blockBytes"))
+				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received invalid (nil) blockBytes"))
+			err := errors.New("downloadRawBlocks received invalid (nil) blockBytes")
+			gbm.HandleRequestError(batch, err, stid)
+			b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
+		} else if len(blockBytes) == 0 {
+			utils.Logger().Warn().
+				Str("stream", string(stid)).
+				Interface("block numbers", batch).
+				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received empty blockBytes, remote peer is not fully synced"))
 			err := errors.New("downloadRawBlocks received empty blockBytes")
 			gbm.HandleRequestError(batch, err, stid)
+			b.configs.protocol.RemoveStream(stid)
 		} else {
 			if err = b.saveBlocks(ctx, gbm.tx, batch, blockBytes, sigBytes, loopID, stid); err != nil {
 				panic(ErrSaveBlocksToDbFailed)

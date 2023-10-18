@@ -45,13 +45,16 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot get blockchain")
 	}
-	reg := registry.New().SetBlockchain(blockchain)
+	reg := registry.New().
+		SetBlockchain(blockchain).
+		SetEngine(engine).
+		SetShardChainCollection(collection)
 	consensus, err := consensus.New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Testnet)
-	node := New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
+	node := New(host, consensus, nil, nil, nil, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -100,7 +103,11 @@ func TestVerifyNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot get blockchain")
 	}
-	reg := registry.New().SetBlockchain(blockchain)
+	reg := registry.New().
+		SetBlockchain(blockchain).
+		SetEngine(engine).
+		SetShardChainCollection(collection)
+
 	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
@@ -110,7 +117,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensusObj, engine, collection, nil, nil, nil, archiveMode, nil, reg)
+	node := New(host, consensusObj, nil, nil, nil, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -156,7 +163,10 @@ func TestVerifyVRF(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	reg := registry.New().SetBlockchain(blockchain)
+	reg := registry.New().
+		SetBlockchain(blockchain).
+		SetEngine(engine).
+		SetShardChainCollection(collection)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
@@ -166,7 +176,7 @@ func TestVerifyVRF(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, engine, collection, nil, nil, nil, archiveMode, nil, reg)
+	node := New(host, consensus, nil, nil, nil, nil, reg)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}

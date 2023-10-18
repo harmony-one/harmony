@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/go-version"
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 )
 
@@ -149,7 +150,7 @@ func (p *Protocol) IsBeaconNode() bool {
 }
 
 // Match checks the compatibility to the target protocol ID.
-func (p *Protocol) Match(targetID string) bool {
+func (p *Protocol) Match(targetID protocol.ID) bool {
 	target, err := sttypes.ProtoIDToProtoSpec(sttypes.ProtoID(targetID))
 	if err != nil {
 		return false
@@ -272,13 +273,16 @@ func (p *Protocol) RemoveStream(stID sttypes.StreamID) {
 		st.Close()
 		// stream manager removes this stream from the list and triggers discovery if number of streams are not enough
 		p.sm.RemoveStream(stID) //TODO: double check to see if this part is needed
+		p.logger.Info().
+			Str("stream ID", string(stID)).
+			Msg("stream removed")
 	}
 }
 
 func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
 	st, exist := p.sm.GetStreamByID(stID)
 	if exist && st != nil {
-		st.AddFailedTimes()
+		st.AddFailedTimes(FaultRecoveryThreshold)
 		p.logger.Info().
 			Str("stream ID", string(st.ID())).
 			Int("num failures", st.FailedTimes()).

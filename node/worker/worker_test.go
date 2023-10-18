@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -50,7 +51,7 @@ func TestNewWorker(t *testing.T) {
 		t.Error(err)
 	}
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, nil, engine)
+	worker := New(chain, nil)
 
 	if worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(testBankKey.PublicKey)).Cmp(testBankFunds) != 0 {
 		t.Error("Worker state is not setup correctly")
@@ -75,7 +76,7 @@ func TestCommitTransactions(t *testing.T) {
 	chain, _ := core.NewBlockChain(database, nil, nil, cacheConfig, gspec.Config, engine, vm.Config{})
 
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, nil, engine)
+	worker := New(chain, nil)
 
 	// Generate a test tx
 	baseNonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
@@ -99,4 +100,13 @@ func TestCommitTransactions(t *testing.T) {
 	if len(worker.current.txs) != 1 {
 		t.Error("Transaction is not committed")
 	}
+}
+
+func TestGasLimit(t *testing.T) {
+	w := newWorker(
+		&params.ChainConfig{
+			BlockGas30MEpoch: big.NewInt(10),
+		}, nil, nil)
+	require.EqualValues(t, 80_000_000, w.GasFloor(big.NewInt(3)))
+	require.EqualValues(t, 30_000_000, w.GasFloor(big.NewInt(10)))
 }

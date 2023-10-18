@@ -1,7 +1,6 @@
 package core_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -48,7 +47,10 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot get blockchain")
 	}
-	reg := registry.New().SetBlockchain(blockchain)
+	reg := registry.New().
+		SetBlockchain(blockchain).
+		SetEngine(engine).
+		SetShardChainCollection(collection)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
@@ -57,7 +59,7 @@ func TestAddNewBlock(t *testing.T) {
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Testnet)
 	var block *types.Block
-	node := node.New(host, consensus, engine, collection, nil, nil, nil, nil, nil, reg)
+	node := node.New(host, consensus, nil, nil, nil, nil, reg)
 	commitSigs := make(chan []byte, 1)
 	commitSigs <- []byte{}
 	block, err = node.Worker.FinalizeNewBlock(
@@ -73,8 +75,8 @@ func TestAddNewBlock(t *testing.T) {
 	_, err = blockchain.InsertChain([]*types.Block{block}, false)
 	require.NoError(t, err, "error when adding new block")
 
-	pk, epoch, count, shifts, err := blockchain.LeaderRotationMeta()
-	fmt.Println("pk", pk, "epoch", epoch, "count", count, "shifts", shifts, "err", err)
+	meta := blockchain.LeaderRotationMeta()
+	require.NotEmptyf(t, meta, "error when getting leader rotation meta")
 
 	t.Log("#", block.Header().NumberU64(), node.Blockchain().CurrentBlock().NumberU64(), block.Hash().Hex(), block.ParentHash())
 

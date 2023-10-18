@@ -40,10 +40,6 @@ type Validator interface {
 	// via the VerifySeal method.
 	ValidateHeader(block *types.Block, seal bool) error
 
-	// ValidateHeaders verifies a batch of blocks' headers concurrently. The method returns a quit channel
-	// to abort the operations and a results channel to retrieve the async verifications
-	ValidateHeaders(chain []*types.Block) (chan<- struct{}, <-chan error)
-
 	// ValidateCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
 	ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) error
 }

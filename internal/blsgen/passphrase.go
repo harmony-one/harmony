@@ -3,7 +3,7 @@ package blsgen
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -177,7 +177,7 @@ func (provider *promptPassProvider) persistPassphrase(keyFile string, passPhrase
 		return err
 	}
 
-	return ioutil.WriteFile(passFile, []byte(passPhrase), defWritePassFileMode)
+	return os.WriteFile(passFile, []byte(passPhrase), defWritePassFileMode)
 }
 
 // staticPassProvider provide the bls passphrase from a static .pass file
@@ -222,7 +222,7 @@ func readPassFromFile(file string) (string, error) {
 	}
 	defer f.Close()
 
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return "", err
 	}

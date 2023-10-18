@@ -36,250 +36,262 @@ var once sync.Once
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:                                MainnetChainID,
-		EthCompatibleChainID:                   EthMainnetShard0ChainID,
-		EthCompatibleShard0ChainID:             EthMainnetShard0ChainID,
-		EthCompatibleEpoch:                     big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
-		CrossTxEpoch:                           big.NewInt(28),
-		CrossLinkEpoch:                         big.NewInt(186),
-		AggregatedRewardEpoch:                  big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
-		StakingEpoch:                           big.NewInt(186),
-		PreStakingEpoch:                        big.NewInt(185),
-		QuickUnlockEpoch:                       big.NewInt(191),
-		FiveSecondsEpoch:                       big.NewInt(230),
-		TwoSecondsEpoch:                        big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
-		SixtyPercentEpoch:                      big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
-		RedelegationEpoch:                      big.NewInt(290),
-		NoEarlyUnlockEpoch:                     big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
-		VRFEpoch:                               big.NewInt(631), // Around Wed July 7th 2021
-		PrevVRFEpoch:                           big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
-		MinDelegation100Epoch:                  big.NewInt(631), // Around Wed July 7th 2021
-		MinCommissionRateEpoch:                 big.NewInt(631), // Around Wed July 7th 2021
-		MinCommissionPromoPeriod:               big.NewInt(100),
-		EPoSBound35Epoch:                       big.NewInt(631), // Around Wed July 7th 2021
-		EIP155Epoch:                            big.NewInt(28),
-		S3Epoch:                                big.NewInt(28),
-		DataCopyFixEpoch:                       big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
-		IstanbulEpoch:                          big.NewInt(314),
-		ReceiptLogEpoch:                        big.NewInt(101),
-		SHA3Epoch:                              big.NewInt(725),  // Around Mon Oct 11 2021, 19:00 UTC
-		HIP6And8Epoch:                          big.NewInt(725),  // Around Mon Oct 11 2021, 19:00 UTC
-		StakingPrecompileEpoch:                 big.NewInt(871),  // Around Tue Feb 11 2022
-		ChainIdFixEpoch:                        big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
-		SlotsLimitedEpoch:                      big.NewInt(999),  // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
-		CrossShardXferPrecompileEpoch:          big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
-		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		FeeCollectEpoch:                        big.NewInt(1535), // 2023-07-20 05:51:07+00:00
-		ValidatorCodeFixEpoch:                  big.NewInt(1535), // 2023-07-20 05:51:07+00:00
+		ChainID:                               MainnetChainID,
+		EthCompatibleChainID:                  EthMainnetShard0ChainID,
+		EthCompatibleShard0ChainID:            EthMainnetShard0ChainID,
+		EthCompatibleEpoch:                    big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
+		CrossTxEpoch:                          big.NewInt(28),
+		CrossLinkEpoch:                        big.NewInt(186),
+		AggregatedRewardEpoch:                 big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
+		StakingEpoch:                          big.NewInt(186),
+		PreStakingEpoch:                       big.NewInt(185),
+		QuickUnlockEpoch:                      big.NewInt(191),
+		FiveSecondsEpoch:                      big.NewInt(230),
+		TwoSecondsEpoch:                       big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
+		SixtyPercentEpoch:                     big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
+		RedelegationEpoch:                     big.NewInt(290),
+		NoEarlyUnlockEpoch:                    big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
+		VRFEpoch:                              big.NewInt(631), // Around Wed July 7th 2021
+		PrevVRFEpoch:                          big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
+		MinDelegation100Epoch:                 big.NewInt(631), // Around Wed July 7th 2021
+		MinCommissionRateEpoch:                big.NewInt(631), // Around Wed July 7th 2021
+		MinCommissionPromoPeriod:              big.NewInt(100),
+		EPoSBound35Epoch:                      big.NewInt(631), // Around Wed July 7th 2021
+		EIP155Epoch:                           big.NewInt(28),
+		S3Epoch:                               big.NewInt(28),
+		DataCopyFixEpoch:                      big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
+		IstanbulEpoch:                         big.NewInt(314),
+		ReceiptLogEpoch:                       big.NewInt(101),
+		SHA3Epoch:                             big.NewInt(725),  // Around Mon Oct 11 2021, 19:00 UTC
+		HIP6And8Epoch:                         big.NewInt(725),  // Around Mon Oct 11 2021, 19:00 UTC
+		StakingPrecompileEpoch:                big.NewInt(871),  // Around Tue Feb 11 2022
+		ChainIdFixEpoch:                       big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
+		SlotsLimitedEpoch:                     big.NewInt(999),  // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
+		CrossShardXferPrecompileEpoch:         big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
+		AllowlistEpoch:                        EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: EpochTBD,
+		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		FeeCollectEpoch:                       big.NewInt(1535), // 2023-07-20 05:51:07+00:00
+		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
+		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
+		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:                                TestnetChainID,
-		EthCompatibleChainID:                   EthTestnetShard0ChainID,
-		EthCompatibleShard0ChainID:             EthTestnetShard0ChainID,
-		EthCompatibleEpoch:                     big.NewInt(0),
-		CrossTxEpoch:                           big.NewInt(0),
-		CrossLinkEpoch:                         big.NewInt(2),
-		AggregatedRewardEpoch:                  big.NewInt(2),
-		StakingEpoch:                           big.NewInt(2),
-		PreStakingEpoch:                        big.NewInt(1),
-		QuickUnlockEpoch:                       big.NewInt(0),
-		FiveSecondsEpoch:                       big.NewInt(0),
-		TwoSecondsEpoch:                        big.NewInt(2),
-		SixtyPercentEpoch:                      big.NewInt(2),
-		RedelegationEpoch:                      big.NewInt(2),
-		NoEarlyUnlockEpoch:                     big.NewInt(2),
-		VRFEpoch:                               big.NewInt(2),
-		PrevVRFEpoch:                           big.NewInt(2),
-		MinDelegation100Epoch:                  big.NewInt(2),
-		MinCommissionRateEpoch:                 big.NewInt(2),
-		MinCommissionPromoPeriod:               big.NewInt(2),
-		EPoSBound35Epoch:                       big.NewInt(2),
-		EIP155Epoch:                            big.NewInt(0),
-		S3Epoch:                                big.NewInt(0),
-		DataCopyFixEpoch:                       big.NewInt(0),
-		IstanbulEpoch:                          big.NewInt(0),
-		ReceiptLogEpoch:                        big.NewInt(0),
-		SHA3Epoch:                              big.NewInt(0),
-		HIP6And8Epoch:                          big.NewInt(2),
-		StakingPrecompileEpoch:                 big.NewInt(2),
-		SlotsLimitedEpoch:                      big.NewInt(2),
-		ChainIdFixEpoch:                        big.NewInt(0),
-		CrossShardXferPrecompileEpoch:          big.NewInt(2),
-		AllowlistEpoch:                         big.NewInt(2),
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		FeeCollectEpoch:                        big.NewInt(1296), // 2023-04-28 07:14:20+00:00
-		ValidatorCodeFixEpoch:                  big.NewInt(1296), // 2023-04-28 07:14:20+00:00
+		ChainID:                               TestnetChainID,
+		EthCompatibleChainID:                  EthTestnetShard0ChainID,
+		EthCompatibleShard0ChainID:            EthTestnetShard0ChainID,
+		EthCompatibleEpoch:                    big.NewInt(0),
+		CrossTxEpoch:                          big.NewInt(0),
+		CrossLinkEpoch:                        big.NewInt(2),
+		AggregatedRewardEpoch:                 big.NewInt(2),
+		StakingEpoch:                          big.NewInt(2),
+		PreStakingEpoch:                       big.NewInt(1),
+		QuickUnlockEpoch:                      big.NewInt(0),
+		FiveSecondsEpoch:                      big.NewInt(0),
+		TwoSecondsEpoch:                       big.NewInt(2),
+		SixtyPercentEpoch:                     big.NewInt(2),
+		RedelegationEpoch:                     big.NewInt(2),
+		NoEarlyUnlockEpoch:                    big.NewInt(2),
+		VRFEpoch:                              big.NewInt(2),
+		PrevVRFEpoch:                          big.NewInt(2),
+		MinDelegation100Epoch:                 big.NewInt(2),
+		MinCommissionRateEpoch:                big.NewInt(2),
+		MinCommissionPromoPeriod:              big.NewInt(2),
+		EPoSBound35Epoch:                      big.NewInt(2),
+		EIP155Epoch:                           big.NewInt(0),
+		S3Epoch:                               big.NewInt(0),
+		DataCopyFixEpoch:                      big.NewInt(0),
+		IstanbulEpoch:                         big.NewInt(0),
+		ReceiptLogEpoch:                       big.NewInt(0),
+		SHA3Epoch:                             big.NewInt(0),
+		HIP6And8Epoch:                         big.NewInt(2),
+		StakingPrecompileEpoch:                big.NewInt(2),
+		SlotsLimitedEpoch:                     big.NewInt(2),
+		ChainIdFixEpoch:                       big.NewInt(0),
+		CrossShardXferPrecompileEpoch:         big.NewInt(2),
+		AllowlistEpoch:                        big.NewInt(2),
+		LeaderRotationInternalValidatorsEpoch: EpochTBD,
+		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		FeeCollectEpoch:                       big.NewInt(1296), // 2023-04-28 07:14:20+00:00
+		ValidatorCodeFixEpoch:                 big.NewInt(1296), // 2023-04-28 07:14:20+00:00
+		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
+		BlockGas30MEpoch:                      big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
-		ChainID:                                PangaeaChainID,
-		EthCompatibleChainID:                   EthPangaeaShard0ChainID,
-		EthCompatibleShard0ChainID:             EthPangaeaShard0ChainID,
-		EthCompatibleEpoch:                     big.NewInt(0),
-		CrossTxEpoch:                           big.NewInt(0),
-		CrossLinkEpoch:                         big.NewInt(2),
-		AggregatedRewardEpoch:                  big.NewInt(3),
-		StakingEpoch:                           big.NewInt(2),
-		PreStakingEpoch:                        big.NewInt(1),
-		QuickUnlockEpoch:                       big.NewInt(0),
-		FiveSecondsEpoch:                       big.NewInt(0),
-		TwoSecondsEpoch:                        big.NewInt(0),
-		SixtyPercentEpoch:                      big.NewInt(0),
-		RedelegationEpoch:                      big.NewInt(0),
-		NoEarlyUnlockEpoch:                     big.NewInt(0),
-		VRFEpoch:                               big.NewInt(0),
-		PrevVRFEpoch:                           big.NewInt(0),
-		MinDelegation100Epoch:                  big.NewInt(0),
-		MinCommissionRateEpoch:                 big.NewInt(0),
-		MinCommissionPromoPeriod:               big.NewInt(10),
-		EPoSBound35Epoch:                       big.NewInt(0),
-		EIP155Epoch:                            big.NewInt(0),
-		S3Epoch:                                big.NewInt(0),
-		DataCopyFixEpoch:                       big.NewInt(0),
-		IstanbulEpoch:                          big.NewInt(0),
-		ReceiptLogEpoch:                        big.NewInt(0),
-		SHA3Epoch:                              big.NewInt(0),
-		HIP6And8Epoch:                          big.NewInt(0),
-		StakingPrecompileEpoch:                 big.NewInt(2), // same as staking
-		ChainIdFixEpoch:                        big.NewInt(0),
-		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch:          big.NewInt(1),
-		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		FeeCollectEpoch:                        EpochTBD,
-		ValidatorCodeFixEpoch:                  EpochTBD,
+		ChainID:                               PangaeaChainID,
+		EthCompatibleChainID:                  EthPangaeaShard0ChainID,
+		EthCompatibleShard0ChainID:            EthPangaeaShard0ChainID,
+		EthCompatibleEpoch:                    big.NewInt(0),
+		CrossTxEpoch:                          big.NewInt(0),
+		CrossLinkEpoch:                        big.NewInt(2),
+		AggregatedRewardEpoch:                 big.NewInt(3),
+		StakingEpoch:                          big.NewInt(2),
+		PreStakingEpoch:                       big.NewInt(1),
+		QuickUnlockEpoch:                      big.NewInt(0),
+		FiveSecondsEpoch:                      big.NewInt(0),
+		TwoSecondsEpoch:                       big.NewInt(0),
+		SixtyPercentEpoch:                     big.NewInt(0),
+		RedelegationEpoch:                     big.NewInt(0),
+		NoEarlyUnlockEpoch:                    big.NewInt(0),
+		VRFEpoch:                              big.NewInt(0),
+		PrevVRFEpoch:                          big.NewInt(0),
+		MinDelegation100Epoch:                 big.NewInt(0),
+		MinCommissionRateEpoch:                big.NewInt(0),
+		MinCommissionPromoPeriod:              big.NewInt(10),
+		EPoSBound35Epoch:                      big.NewInt(0),
+		EIP155Epoch:                           big.NewInt(0),
+		S3Epoch:                               big.NewInt(0),
+		DataCopyFixEpoch:                      big.NewInt(0),
+		IstanbulEpoch:                         big.NewInt(0),
+		ReceiptLogEpoch:                       big.NewInt(0),
+		SHA3Epoch:                             big.NewInt(0),
+		HIP6And8Epoch:                         big.NewInt(0),
+		StakingPrecompileEpoch:                big.NewInt(2), // same as staking
+		ChainIdFixEpoch:                       big.NewInt(0),
+		SlotsLimitedEpoch:                     EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch:         big.NewInt(1),
+		AllowlistEpoch:                        EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: EpochTBD,
+		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		FeeCollectEpoch:                       EpochTBD,
+		ValidatorCodeFixEpoch:                 EpochTBD,
+		HIP30Epoch:                            EpochTBD,
+		BlockGas30MEpoch:                      big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
 	// This is the Devnet config
 	PartnerChainConfig = &ChainConfig{
-		ChainID:                                PartnerChainID,
-		EthCompatibleChainID:                   EthPartnerShard0ChainID,
-		EthCompatibleShard0ChainID:             EthPartnerShard0ChainID,
-		EthCompatibleEpoch:                     big.NewInt(0),
-		CrossTxEpoch:                           big.NewInt(0),
-		CrossLinkEpoch:                         big.NewInt(2),
-		AggregatedRewardEpoch:                  big.NewInt(3),
-		StakingEpoch:                           big.NewInt(2),
-		PreStakingEpoch:                        big.NewInt(1),
-		QuickUnlockEpoch:                       big.NewInt(0),
-		FiveSecondsEpoch:                       big.NewInt(0),
-		TwoSecondsEpoch:                        big.NewInt(0),
-		SixtyPercentEpoch:                      big.NewInt(4),
-		RedelegationEpoch:                      big.NewInt(0),
-		NoEarlyUnlockEpoch:                     big.NewInt(0),
-		VRFEpoch:                               big.NewInt(0),
-		PrevVRFEpoch:                           big.NewInt(0),
-		MinDelegation100Epoch:                  big.NewInt(0),
-		MinCommissionRateEpoch:                 big.NewInt(0),
-		MinCommissionPromoPeriod:               big.NewInt(10),
-		EPoSBound35Epoch:                       big.NewInt(0),
-		EIP155Epoch:                            big.NewInt(0),
-		S3Epoch:                                big.NewInt(0),
-		DataCopyFixEpoch:                       big.NewInt(0),
-		IstanbulEpoch:                          big.NewInt(0),
-		ReceiptLogEpoch:                        big.NewInt(0),
-		SHA3Epoch:                              big.NewInt(0),
-		HIP6And8Epoch:                          big.NewInt(0),
-		StakingPrecompileEpoch:                 big.NewInt(2),
-		ChainIdFixEpoch:                        big.NewInt(0),
-		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch:          big.NewInt(1),
-		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		FeeCollectEpoch:                        big.NewInt(848), // 2023-04-28 04:33:33+00:00
-		ValidatorCodeFixEpoch:                  big.NewInt(848),
+		ChainID:                               PartnerChainID,
+		EthCompatibleChainID:                  EthPartnerShard0ChainID,
+		EthCompatibleShard0ChainID:            EthPartnerShard0ChainID,
+		EthCompatibleEpoch:                    big.NewInt(0),
+		CrossTxEpoch:                          big.NewInt(0),
+		CrossLinkEpoch:                        big.NewInt(2),
+		AggregatedRewardEpoch:                 big.NewInt(3),
+		StakingEpoch:                          big.NewInt(2),
+		PreStakingEpoch:                       big.NewInt(1),
+		QuickUnlockEpoch:                      big.NewInt(0),
+		FiveSecondsEpoch:                      big.NewInt(0),
+		TwoSecondsEpoch:                       big.NewInt(0),
+		SixtyPercentEpoch:                     EpochTBD,
+		RedelegationEpoch:                     big.NewInt(0),
+		NoEarlyUnlockEpoch:                    big.NewInt(0),
+		VRFEpoch:                              big.NewInt(0),
+		PrevVRFEpoch:                          big.NewInt(0),
+		MinDelegation100Epoch:                 big.NewInt(0),
+		MinCommissionRateEpoch:                big.NewInt(0),
+		MinCommissionPromoPeriod:              big.NewInt(10),
+		EPoSBound35Epoch:                      big.NewInt(0),
+		EIP155Epoch:                           big.NewInt(0),
+		S3Epoch:                               big.NewInt(0),
+		DataCopyFixEpoch:                      big.NewInt(0),
+		IstanbulEpoch:                         big.NewInt(0),
+		ReceiptLogEpoch:                       big.NewInt(0),
+		SHA3Epoch:                             big.NewInt(0),
+		HIP6And8Epoch:                         big.NewInt(0),
+		StakingPrecompileEpoch:                big.NewInt(5),
+		ChainIdFixEpoch:                       big.NewInt(5),
+		SlotsLimitedEpoch:                     EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch:         big.NewInt(5),
+		AllowlistEpoch:                        EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: EpochTBD,
+		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		FeeCollectEpoch:                       big.NewInt(5),
+		ValidatorCodeFixEpoch:                 big.NewInt(5),
+		HIP30Epoch:                            big.NewInt(7),
+		BlockGas30MEpoch:                      big.NewInt(7),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
 	// All features except for CrossLink are enabled at launch.
 	StressnetChainConfig = &ChainConfig{
-		ChainID:                                StressnetChainID,
-		EthCompatibleChainID:                   EthStressnetShard0ChainID,
-		EthCompatibleShard0ChainID:             EthStressnetShard0ChainID,
-		EthCompatibleEpoch:                     big.NewInt(0),
-		CrossTxEpoch:                           big.NewInt(0),
-		CrossLinkEpoch:                         big.NewInt(2),
-		AggregatedRewardEpoch:                  big.NewInt(3),
-		StakingEpoch:                           big.NewInt(2),
-		PreStakingEpoch:                        big.NewInt(1),
-		QuickUnlockEpoch:                       big.NewInt(0),
-		FiveSecondsEpoch:                       big.NewInt(0),
-		TwoSecondsEpoch:                        big.NewInt(0),
-		SixtyPercentEpoch:                      big.NewInt(10),
-		RedelegationEpoch:                      big.NewInt(0),
-		NoEarlyUnlockEpoch:                     big.NewInt(0),
-		VRFEpoch:                               big.NewInt(0),
-		PrevVRFEpoch:                           big.NewInt(0),
-		MinDelegation100Epoch:                  big.NewInt(0),
-		MinCommissionRateEpoch:                 big.NewInt(0),
-		MinCommissionPromoPeriod:               big.NewInt(10),
-		EPoSBound35Epoch:                       big.NewInt(0),
-		EIP155Epoch:                            big.NewInt(0),
-		S3Epoch:                                big.NewInt(0),
-		DataCopyFixEpoch:                       big.NewInt(0),
-		IstanbulEpoch:                          big.NewInt(0),
-		ReceiptLogEpoch:                        big.NewInt(0),
-		SHA3Epoch:                              big.NewInt(0),
-		HIP6And8Epoch:                          big.NewInt(0),
-		StakingPrecompileEpoch:                 big.NewInt(2),
-		ChainIdFixEpoch:                        big.NewInt(0),
-		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch:          big.NewInt(1),
-		AllowlistEpoch:                         EpochTBD,
-		FeeCollectEpoch:                        EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		ValidatorCodeFixEpoch:                  EpochTBD,
+		ChainID:                               StressnetChainID,
+		EthCompatibleChainID:                  EthStressnetShard0ChainID,
+		EthCompatibleShard0ChainID:            EthStressnetShard0ChainID,
+		EthCompatibleEpoch:                    big.NewInt(0),
+		CrossTxEpoch:                          big.NewInt(0),
+		CrossLinkEpoch:                        big.NewInt(2),
+		AggregatedRewardEpoch:                 big.NewInt(3),
+		StakingEpoch:                          big.NewInt(2),
+		PreStakingEpoch:                       big.NewInt(1),
+		QuickUnlockEpoch:                      big.NewInt(0),
+		FiveSecondsEpoch:                      big.NewInt(0),
+		TwoSecondsEpoch:                       big.NewInt(0),
+		SixtyPercentEpoch:                     big.NewInt(10),
+		RedelegationEpoch:                     big.NewInt(0),
+		NoEarlyUnlockEpoch:                    big.NewInt(0),
+		VRFEpoch:                              big.NewInt(0),
+		PrevVRFEpoch:                          big.NewInt(0),
+		MinDelegation100Epoch:                 big.NewInt(0),
+		MinCommissionRateEpoch:                big.NewInt(0),
+		MinCommissionPromoPeriod:              big.NewInt(10),
+		EPoSBound35Epoch:                      big.NewInt(0),
+		EIP155Epoch:                           big.NewInt(0),
+		S3Epoch:                               big.NewInt(0),
+		DataCopyFixEpoch:                      big.NewInt(0),
+		IstanbulEpoch:                         big.NewInt(0),
+		ReceiptLogEpoch:                       big.NewInt(0),
+		SHA3Epoch:                             big.NewInt(0),
+		HIP6And8Epoch:                         big.NewInt(0),
+		StakingPrecompileEpoch:                big.NewInt(2),
+		ChainIdFixEpoch:                       big.NewInt(0),
+		SlotsLimitedEpoch:                     EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch:         big.NewInt(1),
+		AllowlistEpoch:                        EpochTBD,
+		FeeCollectEpoch:                       EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: EpochTBD,
+		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		ValidatorCodeFixEpoch:                 EpochTBD,
+		HIP30Epoch:                            EpochTBD,
+		BlockGas30MEpoch:                      big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
 	LocalnetChainConfig = &ChainConfig{
-		ChainID:                                TestnetChainID,
-		EthCompatibleChainID:                   EthTestnetShard0ChainID,
-		EthCompatibleShard0ChainID:             EthTestnetShard0ChainID,
-		EthCompatibleEpoch:                     big.NewInt(0),
-		CrossTxEpoch:                           big.NewInt(0),
-		CrossLinkEpoch:                         big.NewInt(2),
-		AggregatedRewardEpoch:                  big.NewInt(3),
-		StakingEpoch:                           big.NewInt(2),
-		PreStakingEpoch:                        big.NewInt(0),
-		QuickUnlockEpoch:                       big.NewInt(0),
-		FiveSecondsEpoch:                       big.NewInt(0),
-		TwoSecondsEpoch:                        big.NewInt(0),
-		SixtyPercentEpoch:                      EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		RedelegationEpoch:                      big.NewInt(0),
-		NoEarlyUnlockEpoch:                     big.NewInt(0),
-		VRFEpoch:                               big.NewInt(0),
-		PrevVRFEpoch:                           big.NewInt(0),
-		MinDelegation100Epoch:                  big.NewInt(0),
-		MinCommissionRateEpoch:                 big.NewInt(0),
-		MinCommissionPromoPeriod:               big.NewInt(10),
-		EPoSBound35Epoch:                       big.NewInt(0),
-		EIP155Epoch:                            big.NewInt(0),
-		S3Epoch:                                big.NewInt(0),
-		DataCopyFixEpoch:                       big.NewInt(0),
-		IstanbulEpoch:                          big.NewInt(0),
-		ReceiptLogEpoch:                        big.NewInt(0),
-		SHA3Epoch:                              big.NewInt(0),
-		HIP6And8Epoch:                          EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		StakingPrecompileEpoch:                 big.NewInt(2),
-		ChainIdFixEpoch:                        big.NewInt(0),
-		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch:          big.NewInt(1),
-		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: big.NewInt(5),
-		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
-		FeeCollectEpoch:                        big.NewInt(2),
-		ValidatorCodeFixEpoch:                  big.NewInt(2),
+		ChainID:                               TestnetChainID,
+		EthCompatibleChainID:                  EthTestnetShard0ChainID,
+		EthCompatibleShard0ChainID:            EthTestnetShard0ChainID,
+		EthCompatibleEpoch:                    big.NewInt(0),
+		CrossTxEpoch:                          big.NewInt(0),
+		CrossLinkEpoch:                        big.NewInt(2),
+		AggregatedRewardEpoch:                 big.NewInt(3),
+		StakingEpoch:                          big.NewInt(2),
+		PreStakingEpoch:                       big.NewInt(0),
+		QuickUnlockEpoch:                      big.NewInt(0),
+		FiveSecondsEpoch:                      big.NewInt(0),
+		TwoSecondsEpoch:                       big.NewInt(0),
+		SixtyPercentEpoch:                     EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		RedelegationEpoch:                     big.NewInt(0),
+		NoEarlyUnlockEpoch:                    big.NewInt(0),
+		VRFEpoch:                              big.NewInt(0),
+		PrevVRFEpoch:                          big.NewInt(0),
+		MinDelegation100Epoch:                 big.NewInt(0),
+		MinCommissionRateEpoch:                big.NewInt(0),
+		MinCommissionPromoPeriod:              big.NewInt(10),
+		EPoSBound35Epoch:                      big.NewInt(0),
+		EIP155Epoch:                           big.NewInt(0),
+		S3Epoch:                               big.NewInt(0),
+		DataCopyFixEpoch:                      big.NewInt(0),
+		IstanbulEpoch:                         big.NewInt(0),
+		ReceiptLogEpoch:                       big.NewInt(0),
+		SHA3Epoch:                             big.NewInt(0),
+		HIP6And8Epoch:                         EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		StakingPrecompileEpoch:                big.NewInt(2),
+		ChainIdFixEpoch:                       big.NewInt(0),
+		SlotsLimitedEpoch:                     EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch:         big.NewInt(1),
+		AllowlistEpoch:                        EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: big.NewInt(5),
+		LeaderRotationExternalValidatorsEpoch: big.NewInt(6),
+		FeeCollectEpoch:                       big.NewInt(2),
+		ValidatorCodeFixEpoch:                 big.NewInt(2),
+		HIP30Epoch:                            EpochTBD,
+		BlockGas30MEpoch:                      big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -323,6 +335,8 @@ var (
 		big.NewInt(1),                      // LeaderRotationExternalBeaconLeaders
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
+		big.NewInt(0),                      // BlockGas30M
+		big.NewInt(0),                      // HIP30Epoch
 	}
 
 	// TestChainConfig ...
@@ -366,6 +380,8 @@ var (
 		big.NewInt(1),        // LeaderRotationExternalBeaconLeaders
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
+		big.NewInt(0),        // HIP30Epoch
+		big.NewInt(0),        // BlockGas30M
 	}
 
 	// TestRules ...
@@ -505,9 +521,9 @@ type ChainConfig struct {
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
 
-	LeaderRotationExternalNonBeaconLeaders *big.Int `json:"leader-rotation-external-non-beacon-leaders,omitempty"`
+	LeaderRotationInternalValidatorsEpoch *big.Int `json:"leader-rotation-internal-validators,omitempty"`
 
-	LeaderRotationExternalBeaconLeaders *big.Int `json:"leader-rotation-external-beacon-leaders,omitempty"`
+	LeaderRotationExternalValidatorsEpoch *big.Int `json:"leader-rotation-external-validators,omitempty"`
 
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
 	// It should >= StakingEpoch.
@@ -522,6 +538,15 @@ type ChainConfig struct {
 	// Contracts can check the (presence of) validator code by calling the following:
 	// extcodesize, extcodecopy and extcodehash.
 	ValidatorCodeFixEpoch *big.Int `json:"validator-code-fix-epoch,omitempty"`
+
+	// The epoch at which HIP30 goes into effect.
+	// 1. Number of shards decrease from 4 to 2 (mainnet and localnet)
+	// 2. Split emission into 75% for staking rewards, and 25% for recovery (all nets)
+	// 3. Change from 250 to 200 nodes for remaining shards (mainnet and localnet)
+	// 4. Change the minimum validator commission from 5 to 7% (all nets)
+	HIP30Epoch *big.Int `json:"hip30-epoch,omitempty"`
+
+	BlockGas30MEpoch *big.Int `json:"block-gas-30m-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -548,6 +573,10 @@ func (c *ChainConfig) mustValid() {
 			panic(err)
 		}
 	}
+	// to ensure at least RewardFrequency blocks have passed
+	require(c.AggregatedRewardEpoch.Cmp(common.Big0) > 0,
+		"must satisfy: AggregatedRewardEpoch > 0",
+	)
 	// before staking epoch, fees were sent to coinbase
 	require(c.FeeCollectEpoch.Cmp(c.StakingEpoch) >= 0,
 		"must satisfy: FeeCollectEpoch >= StakingEpoch")
@@ -567,6 +596,22 @@ func (c *ChainConfig) mustValid() {
 	// we accept validator creation transactions starting at PreStakingEpoch
 	require(c.ValidatorCodeFixEpoch.Cmp(c.PreStakingEpoch) >= 0,
 		"must satisfy: ValidatorCodeFixEpoch >= PreStakingEpoch")
+	// staking epoch must pass for validator count reduction
+	require(c.HIP30Epoch.Cmp(c.StakingEpoch) > 0,
+		"must satisfy: HIP30Epoch > StakingEpoch")
+	// min commission increase 2.0 must happen on or after 1.0
+	require(c.HIP30Epoch.Cmp(c.MinCommissionRateEpoch) >= 0,
+		"must satisfy: HIP30Epoch > MinCommissionRateEpoch")
+	// the HIP30 split distribution of rewards is only implemented
+	// for the post aggregated epoch
+	require(c.HIP30Epoch.Cmp(c.AggregatedRewardEpoch) >= 0,
+		"must satisfy: HIP30Epoch >= MinCommissionRateEpoch")
+	// the migration of shard 2 and 3 balances assumes S3
+	require(c.HIP30Epoch.Cmp(c.S3Epoch) >= 0,
+		"must satisfy: HIP30Epoch >= S3Epoch")
+	// capabilities required to transfer balance across shards
+	require(c.HIP30Epoch.Cmp(c.CrossTxEpoch) > 0,
+		"must satisfy: HIP30Epoch > CrossTxEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -733,18 +778,16 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 	return isForked(c.AllowlistEpoch, epoch)
 }
 
-func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
-	return isForked(c.LeaderRotationExternalNonBeaconLeaders, epoch)
+func (c *ChainConfig) IsLeaderRotationInternalValidators(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationInternalValidatorsEpoch, epoch)
 }
 
-func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int, shardID uint32) bool {
-	if !c.IsLeaderRotation(epoch) {
-		return false
-	}
-	if shardID == 0 {
-		return isForked(c.LeaderRotationExternalBeaconLeaders, epoch)
-	}
-	return true
+func (c *ChainConfig) IsBlockGas30M(epoch *big.Int) bool {
+	return isForked(c.BlockGas30MEpoch, epoch)
+}
+
+func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationExternalValidatorsEpoch, epoch)
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.
@@ -754,6 +797,16 @@ func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsValidatorCodeFix(epoch *big.Int) bool {
 	return isForked(c.ValidatorCodeFixEpoch, epoch)
+}
+
+func (c *ChainConfig) IsHIP30(epoch *big.Int) bool {
+	return isForked(c.HIP30Epoch, epoch)
+}
+
+// During this epoch, shards 2 and 3 will start sending
+// their balances over to shard 0 or 1.
+func (c *ChainConfig) IsOneEpochBeforeHIP30(epoch *big.Int) bool {
+	return new(big.Int).Sub(c.HIP30Epoch, epoch).Cmp(common.Big1) == 0
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.

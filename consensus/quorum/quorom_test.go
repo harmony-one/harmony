@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -565,7 +566,7 @@ func TestNthNextHmyExt(test *testing.T) {
 	allLeaders := append(blsKeys[:numHmyNodes], allowlistLeaders...)
 
 	decider := NewDecider(SuperMajorityVote, shard.BeaconChainShardID)
-	fakeInstance := shardingconfig.MustNewInstance(2, 20, numHmyNodes, 0, numeric.OneDec(), nil, nil, allowlist, nil, nil, 0)
+	fakeInstance := shardingconfig.MustNewInstance(2, 20, numHmyNodes, 0, numeric.OneDec(), nil, nil, allowlist, nil, numeric.ZeroDec(), common.Address{}, nil, 0)
 
 	decider.UpdateParticipants(blsKeys, allowlistLeaders)
 	for i := 0; i < len(allLeaders); i++ {
@@ -592,4 +593,34 @@ func TestNthNextHmyExt(test *testing.T) {
 			}
 		}
 	}
+}
+
+func TestCIdentities_NthNextValidatorHmy(t *testing.T) {
+	address := []common.Address{
+		common.HexToAddress("0x1"),
+		common.HexToAddress("0x2"),
+		common.HexToAddress("0x3"),
+	}
+	slots := shard.SlotList{}
+	list := []harmony_bls.PublicKeyWrapper{}
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			blsKey := harmony_bls.RandPrivateKey()
+			wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+			wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+			slots = append(slots, shard.Slot{
+				EcdsaAddress:   address[i%3],
+				BLSPublicKey:   wrapper.Bytes,
+				EffectiveStake: nil,
+			})
+			list = append(list, wrapper)
+		}
+	}
+
+	c := newCIdentities()
+	c.UpdateParticipants(list, []bls.PublicKeyWrapper{})
+	found, key := c.NthNextValidator(slots, &list[0], 1)
+	require.Equal(t, true, found)
+	// because we skip 3 keys of current validator
+	require.Equal(t, 3, c.IndexOf(key.Bytes))
 }

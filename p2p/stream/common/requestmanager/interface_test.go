@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -118,7 +119,7 @@ func (st *testStream) FailedTimes() int {
 	return 0
 }
 
-func (st *testStream) AddFailedTimes() {
+func (st *testStream) AddFailedTimes(faultRecoveryThreshold time.Duration) {
 	return
 }
 

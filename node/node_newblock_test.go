@@ -46,7 +46,11 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	reg := registry.New().SetBlockchain(blockchain).SetBeaconchain(blockchain)
+	reg := registry.New().
+		SetBlockchain(blockchain).
+		SetBeaconchain(blockchain).
+		SetEngine(engine).
+		SetShardChainCollection(collection)
 	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
 	)
@@ -54,7 +58,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 
-	node := New(host, consensusObj, engine, collection, nil, nil, nil, nil, nil, registry.New().SetBlockchain(blockchain))
+	node := New(host, consensusObj, nil, nil, nil, nil, reg)
 
 	node.Worker.UpdateCurrent()
 

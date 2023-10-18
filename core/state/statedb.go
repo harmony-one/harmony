@@ -1222,9 +1222,9 @@ var (
 
 // ValidatorWrapper retrieves the existing validator in the cache, if sendOriginal
 // else it will return a copy of the wrapper - which needs to be explicitly committed
-// with UpdateValidatorWrapper
-// to conserve memory, the copy can optionally avoid deep copying delegations
-// Revert in UpdateValidatorWrapper does not work if sendOriginal == true
+// with UpdateValidatorWrapper.
+// To conserve memory, the copy can optionally avoid deep copying delegations.
+// Revert in UpdateValidatorWrapper does not work if sendOriginal == true.
 func (db *DB) ValidatorWrapper(
 	addr common.Address,
 	sendOriginal bool,
@@ -1362,7 +1362,11 @@ var (
 )
 
 // AddReward distributes the reward to all the delegators based on stake percentage.
-func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int, shareLookup map[common.Address]numeric.Dec) error {
+func (db *DB) AddReward(
+	snapshot *stk.ValidatorWrapper,
+	reward *big.Int,
+	shareLookup map[common.Address]numeric.Dec,
+) error {
 	if reward.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().RawJSON("validator", []byte(snapshot.String())).
 			Msg("0 given as reward")

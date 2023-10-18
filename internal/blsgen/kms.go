@@ -3,7 +3,7 @@ package blsgen
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
@@ -178,7 +178,7 @@ func newFileACProvider(file string) *fileACProvider {
 }
 
 func (provider *fileACProvider) getAwsConfig() (*AwsConfig, error) {
-	b, err := ioutil.ReadFile(provider.file)
+	b, err := os.ReadFile(provider.file)
 	if err != nil {
 		return nil, err
 	}

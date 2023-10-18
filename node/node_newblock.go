@@ -1,13 +1,14 @@
 package node
 
 import (
-	"errors"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/pkg/errors"
 
 	staking "github.com/harmony-one/harmony/staking/types"
 
@@ -92,7 +93,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 							Int("numTxs", newBlock.Transactions().Len()).
 							Int("numStakingTxs", newBlock.StakingTransactions().Len()).
 							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
-							Msg("=========Successfully Proposed New Block==========")
+							Msgf("=========Successfully Proposed New Block, shard: %d epoch: %d number: %d ==========", newBlock.ShardID(), newBlock.Epoch().Uint64(), newBlock.NumberU64())
 
 						// Send the new block to Consensus so it can be confirmed.
 						cs.BlockChannel(newBlock)
@@ -115,16 +116,18 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)
 	defer utils.AnalysisEnd("ProposeNewBlock", nowEpoch, blockNow)
 
-	node.Worker.UpdateCurrent()
-
-	header := node.Worker.GetCurrentHeader()
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
-	leaderKey := node.Consensus.GetLeaderPubKey()
+	env, err := node.Worker.UpdateCurrent()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update worker")
+	}
+
 	var (
+		header      = env.CurrentHeader()
+		leaderKey   = node.Consensus.GetLeaderPubKey()
 		coinbase    = node.GetAddressForBLSKey(leaderKey.Object, header.Epoch())
 		beneficiary = coinbase
-		err         error
 	)
 
 	// After staking, all coinbase will be the address of bls pub key
@@ -133,8 +136,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		coinbase.SetBytes(blsPubKeyBytes[:])
 	}
 
-	emptyAddr := common.Address{}
-	if coinbase == emptyAddr {
+	if coinbase == (common.Address{}) {
 		return nil, errors.New("[ProposeNewBlock] Failed setting coinbase")
 	}
 
@@ -157,7 +159,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
-	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+	// Execute all the time except for last block of epoch for shard 0
+	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) || node.Consensus.ShardID != 0 {
 		// Prepare normal and staking transactions retrieved from transaction pool
 		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
 
@@ -200,7 +203,13 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 	}
 
-	// Prepare cross shard transaction receipts
+	// Prepare incoming cross shard transaction receipts
+	// These are accepted even during the epoch before hip-30
+	// because the destination shard only receives them after
+	// balance is deducted on source shard. to prevent this from
+	// being a significant problem, the source shards will stop
+	// accepting txs destined to the shards which are shutting down
+	// one epoch prior the shut down
 	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {
 		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
@@ -249,7 +258,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 					len(crossLinksToPropose), len(allPending),
 				)
 		} else {
-			utils.Logger().Error().Err(err).Msgf(
+			utils.Logger().Warn().Err(err).Msgf(
 				"[ProposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
 				len(allPending),
 			)
@@ -265,7 +274,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
-	node.Worker.ApplyTestnetShardReduction()
+	node.Worker.ApplyShardReduction()
 	// Prepare shard state
 	var shardState *shard.State
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
@@ -285,8 +294,10 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed finalizing the new block")
 		return nil, err
 	}
+
 	utils.Logger().Info().Msg("[ProposeNewBlock] verifying the new block header")
-	err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
+	// err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
+	err = core.NewBlockValidator(node.Blockchain()).ValidateHeader(finalizedBlock, true)
 
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed verifying the new block header")
@@ -353,7 +364,7 @@ Loop:
 			}
 		}
 
-		if err := node.Blockchain().Validator().ValidateCXReceiptsProof(cxp); err != nil {
+		if err := core.NewBlockValidator(node.Blockchain()).ValidateCXReceiptsProof(cxp); err != nil {
 			if strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
 				pendingReceiptsList = append(pendingReceiptsList, cxp)
 			} else {

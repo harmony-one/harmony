@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
 	_ "net/http/pprof"
@@ -246,6 +245,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applySysFlags(cmd, config)
 	applyDevnetFlags(cmd, config)
 	applyRevertFlags(cmd, config)
+	applyPreimageFlags(cmd, config)
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
 	applyShardDataFlags(cmd, config)
@@ -265,6 +265,29 @@ func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 
 	if !config.Log.Console {
 		utils.AddLogFile(logPath, config.Log.RotateSize, config.Log.RotateCount, config.Log.RotateMaxAge)
+	}
+}
+
+func revert(chain core.BlockChain, hc harmonyconfig.HarmonyConfig) {
+	curNum := chain.CurrentBlock().NumberU64()
+	if curNum < uint64(hc.Revert.RevertBefore) && curNum >= uint64(hc.Revert.RevertTo) {
+		// Remove invalid blocks
+		for chain.CurrentBlock().NumberU64() >= uint64(hc.Revert.RevertTo) {
+			curBlock := chain.CurrentBlock()
+			rollbacks := []ethCommon.Hash{curBlock.Hash()}
+			if err := chain.Rollback(rollbacks); err != nil {
+				fmt.Printf("Revert failed: %v\n", err)
+				os.Exit(1)
+			}
+			lastSig := curBlock.Header().LastCommitSignature()
+			sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
+			chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)
+		}
+		fmt.Printf("Revert finished. Current block: %v\n", chain.CurrentBlock().NumberU64())
+		utils.Logger().Warn().
+			Uint64("Current Block", chain.CurrentBlock().NumberU64()).
+			Msg("Revert finished.")
+		os.Exit(1)
 	}
 }
 
@@ -353,26 +376,58 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		if hc.Revert.RevertBeacon {
 			chain = currentNode.Beaconchain()
 		}
-		curNum := chain.CurrentBlock().NumberU64()
-		if curNum < uint64(hc.Revert.RevertBefore) && curNum >= uint64(hc.Revert.RevertTo) {
-			// Remove invalid blocks
-			for chain.CurrentBlock().NumberU64() >= uint64(hc.Revert.RevertTo) {
-				curBlock := chain.CurrentBlock()
-				rollbacks := []ethCommon.Hash{curBlock.Hash()}
-				if err := chain.Rollback(rollbacks); err != nil {
-					fmt.Printf("Revert failed: %v\n", err)
-					os.Exit(1)
-				}
-				lastSig := curBlock.Header().LastCommitSignature()
-				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
-				chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)
+		revert(chain, hc)
+	}
+
+	//// code to handle pre-image export, import and generation
+	if hc.Preimage != nil {
+		if hc.Preimage.ImportFrom != "" {
+			if err := core.ImportPreimages(
+				currentNode.Blockchain(),
+				hc.Preimage.ImportFrom,
+			); err != nil {
+				fmt.Println("Error importing", err)
+				os.Exit(1)
 			}
-			fmt.Printf("Revert finished. Current block: %v\n", chain.CurrentBlock().NumberU64())
-			utils.Logger().Warn().
-				Uint64("Current Block", chain.CurrentBlock().NumberU64()).
-				Msg("Revert finished.")
-			os.Exit(1)
+			os.Exit(0)
+		} else if exportPath := hc.Preimage.ExportTo; exportPath != "" {
+			if err := core.ExportPreimages(
+				currentNode.Blockchain(),
+				exportPath,
+			); err != nil {
+				fmt.Println("Error exporting", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+			// both must be set
+		} else if hc.Preimage.GenerateStart > 0 {
+			chain := currentNode.Blockchain()
+			end := hc.Preimage.GenerateEnd
+			current := chain.CurrentBlock().NumberU64()
+			if end > current {
+				fmt.Printf(
+					"Cropping generate endpoint from %d to %d\n",
+					end, current,
+				)
+				end = current
+			}
+
+			if end == 0 {
+				end = current
+			}
+
+			fmt.Println("Starting generation")
+			if err := core.GeneratePreimages(
+				chain,
+				hc.Preimage.GenerateStart, end,
+			); err != nil {
+				fmt.Println("Error generating", err)
+				os.Exit(1)
+			}
+			fmt.Println("Generation successful")
+			os.Exit(0)
 		}
+		os.Exit(0)
 	}
 
 	startMsg := "==== New Harmony Node ===="
@@ -452,6 +507,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			Msg("Start Rosetta failed")
 	}
 
+	go core.WritePreimagesMetricsIntoPrometheus(
+		currentNode.Blockchain(),
+		currentNode.Consensus.UpdatePreimageGenerationMetrics,
+	)
+
 	go listenOSSigAndShutDown(currentNode)
 
 	if !hc.General.IsOffline {
@@ -500,7 +560,13 @@ func nodeconfigSetShardSchedule(config harmonyconfig.HarmonyConfig) {
 		}
 
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(dnConfig.NumShards), dnConfig.ShardSize, dnConfig.HmyNodeSize, dnConfig.SlotsLimit, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, shardingconfig.Allowlist{}, nil, nil, shardingconfig.VLBPE)
+			uint32(dnConfig.NumShards), dnConfig.ShardSize,
+			dnConfig.HmyNodeSize, dnConfig.SlotsLimit,
+			numeric.OneDec(), genesis.HarmonyAccounts,
+			genesis.FoundationalNodeAccounts, shardingconfig.Allowlist{},
+			nil, numeric.ZeroDec(), ethCommon.Address{},
+			nil, shardingconfig.VLBPE,
+		)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
@@ -665,6 +731,62 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	return nodeConfig, nil
 }
 
+func setupChain(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType, registry *registry.Registry) *registry.Registry {
+
+	// Current node.
+	var chainDBFactory shardchain.DBFactory
+	if hc.General.RunElasticMode {
+		chainDBFactory = setupTiKV(hc)
+	} else if hc.ShardData.EnableShardData {
+		chainDBFactory = &shardchain.LDBShardFactory{
+			RootDir:    nodeConfig.DBDir,
+			DiskCount:  hc.ShardData.DiskCount,
+			ShardCount: hc.ShardData.ShardCount,
+			CacheTime:  hc.ShardData.CacheTime,
+			CacheSize:  hc.ShardData.CacheSize,
+		}
+	} else {
+		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	}
+
+	engine := chain.NewEngine()
+	registry.SetEngine(engine)
+
+	chainConfig := nodeConfig.GetNetworkType().ChainConfig()
+	collection := shardchain.NewCollection(
+		&hc, chainDBFactory, &core.GenesisInitializer{NetworkType: nodeConfig.GetNetworkType()}, engine, &chainConfig,
+	)
+	for shardID, archival := range nodeConfig.ArchiveModes() {
+		if archival {
+			collection.DisableCache(shardID)
+		}
+	}
+	registry.SetShardChainCollection(collection)
+
+	var blockchain core.BlockChain
+
+	// We are not beacon chain, make sure beacon already initialized.
+	if nodeConfig.ShardID != shard.BeaconChainShardID {
+		beacon, err := collection.ShardChain(shard.BeaconChainShardID, core.Options{EpochChain: true})
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+			os.Exit(1)
+		}
+		registry.SetBeaconchain(beacon)
+	}
+
+	blockchain, err := collection.ShardChain(nodeConfig.ShardID)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		os.Exit(1)
+	}
+	registry.SetBlockchain(blockchain)
+	if registry.GetBeaconchain() == nil {
+		registry.SetBeaconchain(registry.GetBlockchain())
+	}
+	return registry
+}
+
 func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType, registry *registry.Registry) *node.Node {
 	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
@@ -685,63 +807,16 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	if err != nil {
 		utils.Logger().Warn().Msgf("AllowedTxs setup error: %s", err.Error())
 	}
-
 	localAccounts, err := setupLocalAccounts(hc, blacklist)
 	if err != nil {
 		utils.Logger().Warn().Msgf("local accounts setup error: %s", err.Error())
 	}
 
-	// Current node.
-	var chainDBFactory shardchain.DBFactory
-	if hc.General.RunElasticMode {
-		chainDBFactory = setupTiKV(hc)
-	} else if hc.ShardData.EnableShardData {
-		chainDBFactory = &shardchain.LDBShardFactory{
-			RootDir:    nodeConfig.DBDir,
-			DiskCount:  hc.ShardData.DiskCount,
-			ShardCount: hc.ShardData.ShardCount,
-			CacheTime:  hc.ShardData.CacheTime,
-			CacheSize:  hc.ShardData.CacheSize,
-		}
-	} else {
-		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	registry = setupChain(hc, nodeConfig, registry)
+	if registry.GetShardChainCollection() == nil {
+		panic("shard chain collection is nil1111111")
 	}
-
-	engine := chain.NewEngine()
-
-	chainConfig := nodeConfig.GetNetworkType().ChainConfig()
-	collection := shardchain.NewCollection(
-		&hc, chainDBFactory, &core.GenesisInitializer{NetworkType: nodeConfig.GetNetworkType()}, engine, &chainConfig,
-	)
-	for shardID, archival := range nodeConfig.ArchiveModes() {
-		if archival {
-			collection.DisableCache(shardID)
-		}
-	}
-
-	var blockchain core.BlockChain
-
-	// We are not beacon chain, make sure beacon already initialized.
-	if nodeConfig.ShardID != shard.BeaconChainShardID {
-		beacon, err := collection.ShardChain(shard.BeaconChainShardID, core.Options{EpochChain: true})
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
-			os.Exit(1)
-		}
-		registry.SetBeaconchain(beacon)
-	}
-
-	blockchain, err = collection.ShardChain(nodeConfig.ShardID)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
-		os.Exit(1)
-	}
-	registry.SetBlockchain(blockchain)
 	registry.SetWebHooks(nodeConfig.WebHooks.Hooks)
-	if registry.GetBeaconchain() == nil {
-		registry.SetBeaconchain(registry.GetBlockchain())
-	}
-
 	cxPool := core.NewCxPool(core.CxPoolSize)
 	registry.SetCxPool(cxPool)
 
@@ -756,7 +831,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		os.Exit(1)
 	}
 
-	currentNode := node.New(myHost, currentConsensus, engine, collection, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc, registry)
+	currentNode := node.New(myHost, currentConsensus, blacklist, allowedTxs, localAccounts, &hc, registry)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
@@ -971,7 +1046,7 @@ func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struc
 	rosetta_common.InitRosettaFile(hc.TxPool.RosettaFixFile)
 
 	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", hc.TxPool.BlacklistFile)
-	dat, err := ioutil.ReadFile(hc.TxPool.BlacklistFile)
+	dat, err := os.ReadFile(hc.TxPool.BlacklistFile)
 	if err != nil {
 		return nil, err
 	}
@@ -1022,7 +1097,7 @@ func parseAllowedTxs(data []byte) (map[ethCommon.Address]core.AllowedTxData, err
 
 func setupAllowedTxs(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]core.AllowedTxData, error) {
 	utils.Logger().Debug().Msgf("Using AllowedTxs file at `%s`", hc.TxPool.AllowedTxsFile)
-	data, err := ioutil.ReadFile(hc.TxPool.AllowedTxsFile)
+	data, err := os.ReadFile(hc.TxPool.AllowedTxsFile)
 	if err != nil {
 		return nil, err
 	}
@@ -1034,7 +1109,7 @@ func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.
 	// check if file exist
 	var fileData string
 	if _, err := os.Stat(file); err == nil {
-		b, err := ioutil.ReadFile(file)
+		b, err := os.ReadFile(file)
 		if err != nil {
 			return nil, err
 		}
@@ -1050,22 +1125,23 @@ func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.
 	localAccounts := make(map[ethCommon.Address]struct{})
 	lines := strings.Split(fileData, "\n")
 	for _, line := range lines {
-		if len(line) != 0 { // the file may have trailing empty string line
-			trimmedLine := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmedLine, "#") { //check the line is not commented
-				continue
-			}
-			addr, err := common.Bech32ToAddress(trimmedLine)
-			if err != nil {
-				return nil, err
-			}
-			// skip the blacklisted addresses
-			if _, exists := blacklist[addr]; exists {
-				utils.Logger().Warn().Msgf("local account with address %s is blacklisted", addr.String())
-				continue
-			}
-			localAccounts[addr] = struct{}{}
+		if len(line) == 0 { // the file may have trailing empty string line
+			continue
 		}
+		addrPart := strings.TrimSpace(strings.Split(string(line), "#")[0])
+		if len(addrPart) == 0 { // if the line is commented by #
+			continue
+		}
+		addr, err := common.ParseAddr(addrPart)
+		if err != nil {
+			return nil, err
+		}
+		// skip the blacklisted addresses
+		if _, exists := blacklist[addr]; exists {
+			utils.Logger().Warn().Msgf("local account with address %s is blacklisted", addr.String())
+			continue
+		}
+		localAccounts[addr] = struct{}{}
 	}
 	uniqueAddresses := make([]ethCommon.Address, 0, len(localAccounts))
 	for addr := range localAccounts {

@@ -18,10 +18,24 @@ import (
 var (
 	measure = numeric.NewDec(2).Quo(numeric.NewDec(3))
 
-	MinCommissionRate = numeric.MustNewDecFromStr("0.05")
+	minCommissionRateEra1 = numeric.MustNewDecFromStr("0.05")
+	minCommissionRateEra2 = numeric.MustNewDecFromStr("0.07")
 	// ErrDivByZero ..
 	ErrDivByZero = errors.New("toSign of availability cannot be 0, mistake in protocol")
 )
+
+// Returns the minimum commission rate between the two options.
+// The later rate supersedes the earlier rate.
+// If neither is applicable, returns 0.
+func MinCommissionRate(era1, era2 bool) numeric.Dec {
+	if era2 {
+		return minCommissionRateEra2
+	}
+	if era1 {
+		return minCommissionRateEra1
+	}
+	return numeric.ZeroDec()
+}
 
 // BlockSigners ..
 func BlockSigners(
@@ -217,33 +231,39 @@ func ComputeAndMutateEPOSStatus(
 	return nil
 }
 
-// UpdateMinimumCommissionFee update the validator commission fee to the minimum 5%
-// if the validator has a lower commission rate and 100 epochs have passed after
-// the validator was first elected.
+// UpdateMinimumCommissionFee update the validator commission fee to the minRate
+// if the validator has a lower commission rate and promoPeriod epochs have passed after
+// the validator was first elected. It returns true if the commission was updated
 func UpdateMinimumCommissionFee(
 	electionEpoch *big.Int,
 	state *state.DB,
 	addr common.Address,
-	promoPeriod int64,
-) error {
+	minRate numeric.Dec,
+	promoPeriod uint64,
+) (bool, error) {
 	utils.Logger().Info().Msg("begin update min commission fee")
 
 	wrapper, err := state.ValidatorWrapper(addr, true, false)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	firstElectionEpoch := state.GetValidatorFirstElectionEpoch(addr)
 
-	if firstElectionEpoch.Uint64() != 0 && big.NewInt(0).Sub(electionEpoch, firstElectionEpoch).Int64() >= int64(promoPeriod) {
-		if wrapper.Rate.LT(MinCommissionRate) {
+	// convert all to uint64 for easy maths
+	// this can take decades of time without overflowing
+	first := firstElectionEpoch.Uint64()
+	election := electionEpoch.Uint64()
+	if first != 0 && election-first >= promoPeriod && election >= first {
+		if wrapper.Rate.LT(minRate) {
 			utils.Logger().Info().
 				Str("addr", addr.Hex()).
 				Str("old rate", wrapper.Rate.String()).
 				Str("firstElectionEpoch", firstElectionEpoch.String()).
 				Msg("updating min commission rate")
-			wrapper.Rate.SetBytes(MinCommissionRate.Bytes())
+			wrapper.Rate.SetBytes(minRate.Bytes())
+			return true, nil
 		}
 	}
-	return nil
+	return false, nil
 }

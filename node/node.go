@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"runtime/pprof"
@@ -12,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"github.com/harmony-one/harmony/internal/tikv"
@@ -50,7 +48,6 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -89,7 +86,7 @@ type ISync interface {
 	AddLastMileBlock(block *types.Block)
 	GetActivePeerNumber() int
 	CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error
-	SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration)
+	SyncLoop(bc core.BlockChain, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration)
 	IsSynchronized() bool
 	IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool)
 	AddNewBlock(peerHash []byte, block *types.Block)
@@ -105,8 +102,7 @@ type Node struct {
 	pendingCXReceipts  map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex     sync.Mutex
 	crosslinks         *crosslinks.Crosslinks // Memory storage for crosslink processing.
-	// Shard databases
-	shardChains      shardchain.Collection
+
 	SelfPeer         p2p.Peer
 	stateMutex       sync.Mutex // mutex for change node state
 	TxPool           *core.TxPool
@@ -194,7 +190,10 @@ func (node *Node) Beaconchain() core.BlockChain {
 }
 
 func (node *Node) chain(shardID uint32, options core.Options) core.BlockChain {
-	bc, err := node.shardChains.ShardChain(shardID, options)
+	if node.registry.GetShardChainCollection() == nil {
+		panic("shard chain collection is nil")
+	}
+	bc, err := node.registry.GetShardChainCollection().ShardChain(shardID, options)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
 	}
@@ -255,20 +254,37 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 // Add new transactions to the pending transaction list.
 func addPendingTransactions(registry *registry.Registry, newTxs types.Transactions) []error {
 	var (
-		errs     []error
-		bc       = registry.GetBlockchain()
-		txPool   = registry.GetTxPool()
-		poolTxs  = types.PoolTransactions{}
-		acceptCx = bc.Config().AcceptsCrossTx(bc.CurrentHeader().Epoch())
+		errs          []error
+		bc            = registry.GetBlockchain()
+		txPool        = registry.GetTxPool()
+		poolTxs       = types.PoolTransactions{}
+		epoch         = bc.CurrentHeader().Epoch()
+		acceptCx      = bc.Config().AcceptsCrossTx(epoch)
+		isBeforeHIP30 = bc.Config().IsOneEpochBeforeHIP30(epoch)
+		nxtShards     = shard.Schedule.InstanceForEpoch(new(big.Int).Add(epoch, common.Big1)).NumShards()
 	)
 	for _, tx := range newTxs {
-		if tx.ShardID() != tx.ToShardID() && !acceptCx {
-			errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
-			continue
+		if tx.ShardID() != tx.ToShardID() {
+			if !acceptCx {
+				errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
+				continue
+			}
+			if isBeforeHIP30 {
+				if tx.ToShardID() >= nxtShards {
+					errs = append(errs, errors.New("shards 2 and 3 are shutting down in the next epoch"))
+					continue
+				}
+			}
 		}
 		if tx.IsEthCompatible() && !bc.Config().IsEthCompatible(bc.CurrentBlock().Epoch()) {
 			errs = append(errs, errors.WithMessage(errInvalidEpoch, "ethereum tx not accepted yet"))
 			continue
+		}
+		if isBeforeHIP30 {
+			if bc.ShardID() >= nxtShards {
+				errs = append(errs, errors.New("shards 2 and 3 are shutting down in the next epoch"))
+				continue
+			}
 		}
 		poolTxs = append(poolTxs, tx)
 	}
@@ -375,7 +391,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 	// Sanity checks
 
-	if err := node.Blockchain().Validator().ValidateCXReceiptsProof(receipts); err != nil {
+	if err := core.NewBlockValidator(node.Blockchain()).ValidateCXReceiptsProof(receipts); err != nil {
 		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
 			utils.Logger().Error().Err(err).Msg("[AddPendingReceipts] Invalid CXReceiptsProof")
 			return
@@ -480,7 +496,8 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			if err := rlp.DecodeBytes(blocksPayload, &blocks); err != nil {
 				return nil, 0, errors.Wrap(err, "block decode error")
 			}
-			curBeaconHeight := node.Beaconchain().CurrentBlock().NumberU64()
+			curBeaconBlock := node.EpochChain().CurrentBlock()
+			curBeaconHeight := curBeaconBlock.NumberU64()
 			for _, block := range blocks {
 				// Ban blocks number that is smaller than tolerance
 				if block.NumberU64()+beaconBlockHeightTolerance <= curBeaconHeight {
@@ -490,7 +507,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 				} else if block.NumberU64()-beaconBlockHeightTolerance > curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
-					return nil, 0, errors.New("beacon block height too much higher than current height beyond tolerance")
+					return nil, 0, errors.Errorf("beacon block height too much higher than current height beyond tolerance, block %d, current %d, epoch %d , current %d", block.NumberU64(), curBeaconHeight, block.Epoch().Uint64(), curBeaconBlock.Epoch().Uint64())
 				} else if block.NumberU64() <= curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")
@@ -1009,12 +1026,9 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(
 	host p2p.Host,
 	consensusObj *consensus.Consensus,
-	engine engine.Engine,
-	collection *shardchain.CollectionImpl,
 	blacklist map[common.Address]struct{},
 	allowedTxs map[common.Address]core.AllowedTxData,
 	localAccounts []common.Address,
-	isArchival map[uint32]bool,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
 	registry *registry.Registry,
 ) *Node {
@@ -1041,7 +1055,6 @@ func New(
 	networkType := node.NodeConfig.GetNetworkType()
 	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
-	node.shardChains = collection
 	node.IsSynchronized = abool.NewBool(false)
 
 	if host != nil {
@@ -1064,9 +1077,9 @@ func New(
 				if b2 {
 					shardID := node.NodeConfig.ShardID
 					// HACK get the real error reason
-					_, err = node.shardChains.ShardChain(shardID)
+					_, err = node.registry.GetShardChainCollection().ShardChain(shardID)
 				} else {
-					_, err = node.shardChains.ShardChain(shard.BeaconChainShardID)
+					_, err = node.registry.GetShardChainCollection().ShardChain(shard.BeaconChainShardID)
 				}
 				fmt.Fprintf(os.Stderr, "Cannot initialize node: %v\n", err)
 				os.Exit(-1)
@@ -1108,7 +1121,7 @@ func New(
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.registry.SetTxPool(node.TxPool)
 		node.CxPool = node.registry.GetCxPool()
-		node.Worker = worker.New(node.Blockchain().Config(), blockchain, beaconChain, engine)
+		node.Worker = worker.New(blockchain, beaconChain)
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
@@ -1416,7 +1429,7 @@ func (node *Node) syncFromTiKVWriter() {
 				if err != nil {
 					panic(err)
 				}
-				err = ioutil.WriteFile(fmt.Sprintf("/local/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
+				err = os.WriteFile(fmt.Sprintf("/local/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
 				if err != nil {
 					panic(err)
 				}

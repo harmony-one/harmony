@@ -103,7 +103,7 @@ const (
 	STATEDB_CACHE_SIZE = 64 // size in MB
 	LEVELDB_CACHE_SIZE = 256
 	LEVELDB_HANDLES    = 1024
-	LRU_CACHE_SIZE     = 64 * 1024 * 1024
+	LRU_CACHE_SIZE     = 512
 )
 
 const (
@@ -156,6 +156,7 @@ func (db *KakashiDB) copyKV(key, value []byte) {
 	db.toDBBatch.Put(key, value)
 	snapdbInfo.DumpedSize += uint64(len(key) + len(value))
 	dumpPrint("copyKV", false)
+	db.flush()
 }
 
 func (db *KakashiDB) flush() {

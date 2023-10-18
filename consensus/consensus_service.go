@@ -95,7 +95,7 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	if len(allKeys) != 0 {
 		consensus.LeaderPubKey = &allKeys[0]
 		consensus.getLogger().Info().
-			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
+			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("Setting leader as first validator, because provided new keys")
 	} else {
 		consensus.getLogger().Error().
 			Msg("[UpdatePublicKeys] Participants is empty")
@@ -663,6 +663,12 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 func VerifyNewBlock(hooks *webhooks.Hooks, blockChain core.BlockChain, beaconChain core.BlockChain) func(*types.Block) error {
 	return func(newBlock *types.Block) error {
 		if err := blockChain.ValidateNewBlock(newBlock, beaconChain); err != nil {
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+				return nil
+			default:
+			}
+
 			if hooks := hooks; hooks != nil {
 				if p := hooks.ProtocolIssues; p != nil {
 					url := p.OnCannotCommit
@@ -680,7 +686,7 @@ func VerifyNewBlock(hooks *webhooks.Hooks, blockChain core.BlockChain, beaconCha
 				Int("numStakingTx", len(newBlock.StakingTransactions())).
 				Err(err).
 				Msgf("[VerifyNewBlock] Cannot Verify New Block!!!, blockHeight %d, myHeight %d", newBlock.NumberU64(), blockChain.CurrentHeader().NumberU64())
-			return errors.Errorf(
+			return errors.WithMessagef(err,
 				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
 				newBlock.Hash().Hex(),
 				len(newBlock.Transactions()),
