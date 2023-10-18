@@ -39,7 +39,7 @@ func newDownloadHelper(c *Consensus, d downloader) *downloadHelper {
 	finishedCh := make(chan struct{}, 1)
 	finishedSub := d.SubscribeDownloadFinished(finishedCh)
 
-	return &downloadHelper{
+	out := &downloadHelper{
 		c:           c,
 		d:           d,
 		startedCh:   startedCh,
@@ -47,16 +47,12 @@ func newDownloadHelper(c *Consensus, d downloader) *downloadHelper {
 		startedSub:  startedSub,
 		finishedSub: finishedSub,
 	}
+	go out.downloadStartedLoop()
+	go out.downloadFinishedLoop()
+	return out
 }
 
 func (dh *downloadHelper) start() {
-	go dh.downloadStartedLoop()
-	go dh.downloadFinishedLoop()
-}
-
-func (dh *downloadHelper) close() {
-	dh.startedSub.Unsubscribe()
-	dh.finishedSub.Unsubscribe()
 }
 
 func (dh *downloadHelper) downloadStartedLoop() {
@@ -107,21 +103,10 @@ func (consensus *Consensus) AddConsensusLastMile() error {
 }
 
 func (consensus *Consensus) spinUpStateSync() {
-	if consensus.dHelper != nil {
-		consensus.dHelper.d.DownloadAsync()
-		consensus.current.SetMode(Syncing)
-		for _, v := range consensus.consensusTimeout {
-			v.Stop()
-		}
-	} else {
-		select {
-		case consensus.BlockNumLowChan <- struct{}{}:
-			consensus.current.SetMode(Syncing)
-			for _, v := range consensus.consensusTimeout {
-				v.Stop()
-			}
-		default:
-		}
+	consensus.dHelper.d.DownloadAsync()
+	consensus.current.SetMode(Syncing)
+	for _, v := range consensus.consensusTimeout {
+		v.Stop()
 	}
 }
 

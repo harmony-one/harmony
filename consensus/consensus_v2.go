@@ -323,9 +323,7 @@ func (consensus *Consensus) Start(
 		consensus.mutex.Unlock()
 	}()
 
-	if consensus.dHelper != nil {
-		consensus.dHelper.start()
-	}
+	consensus.dHelper.start()
 }
 
 func (consensus *Consensus) StartChannel() {
@@ -448,10 +446,6 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 			Msg("[ConsensusMainLoop] STARTING CONSENSUS")
 		consensus.announce(newBlock)
 	})
-
-	if consensus.dHelper != nil {
-		consensus.dHelper.start()
-	}
 }
 
 // LastMileBlockIter is the iterator to iterate over the last mile blocks in consensus cache.
