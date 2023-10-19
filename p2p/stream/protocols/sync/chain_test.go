@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 )
 
@@ -58,6 +60,26 @@ func (tch *testChainHelper) getReceipts(hs []common.Hash) ([]types.Receipts, err
 		receipts[i] = testReceipts
 	}
 	return receipts, nil
+}
+
+func (ch *testChainHelper) getAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, []common.Hash, error) {
+
+	return nil, nil, nil
+}
+
+func (ch *testChainHelper) getStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, []common.Hash, error) {
+
+	return nil, nil, nil
+}
+
+func (ch *testChainHelper) getByteCodesRequest(hs []common.Hash, bytes uint64) ([]common.Hash, error) {
+
+	return nil, nil
+}
+
+func (ch *testChainHelper) getTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([]common.Hash, error) {
+
+	return nil, nil
 }
 
 func checkGetReceiptsResult(b []byte, hs []common.Hash) error {
