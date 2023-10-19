@@ -262,9 +262,6 @@ func (ch *chainHelperImpl) getStorageRangesRequest(root common.Hash, accounts []
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit
 	}
-	// TODO(karalabe): Do we want to enforce > 0 accounts and 1 account if origin is set?
-	// TODO(karalabe):   - Logging locally is not ideal as remote faults annoy the local user
-	// TODO(karalabe):   - Dropping the remote peer is less flexible wrt client bugs (slow is better than non-functional)
 
 	// Calculate the hard limit at which to abort, even if mid storage trie
 	hardLimit := uint64(float64(bytes) * (1 + stateLookupSlack))

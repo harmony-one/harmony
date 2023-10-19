@@ -556,31 +556,26 @@ func (st *syncStream) computeGetReceipts(rid uint64, hs []common.Hash) (*syncpb.
 }
 
 func (st *syncStream) computeGetAccountRangeRequest(rid uint64, root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) (*syncpb.Message, error) {
-	// if len(accounts) > GetAccountRangeRequestCap {
-	// 	err := fmt.Errorf("GetAccountRangeRequest amount exceed cap: %v > %v", len(hs), GetAccountRangeRequestCap)
-	// 	return nil, err
-	// }
+	if bytes == 0 {
+		return nil, fmt.Errorf("zero account ranges bytes requested")
+	}
+	if bytes > softResponseLimit {
+		return nil, fmt.Errorf("requested bytes exceed limit")
+	}
 	accounts, proof, err := st.chain.getAccountRangeRequest(root, origin, limit, bytes)
 	if err != nil {
 		return nil, err
 	}
-	// var normalizedReceipts = make(map[uint64]*syncpb.Receipts, len(accounts))
-	// for i, blkReceipts := range accounts {
-	// 	normalizedReceipts[uint64(i)] = &syncpb.Receipts{
-	// 		ReceiptBytes: make([][]byte, 0),
-	// 	}
-	// 	for _, receipt := range blkReceipts {
-	// 		receiptBytes, err := rlp.EncodeToBytes(receipt)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		normalizedReceipts[uint64(i)].ReceiptBytes = append(normalizedReceipts[uint64(i)].ReceiptBytes, receiptBytes)
-	// 	}
-	// }
 	return syncpb.MakeGetAccountRangeResponseMessage(rid, accounts, proof), nil
 }
 
 func (st *syncStream) computeGetStorageRangesRequest(rid uint64, root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) (*syncpb.Message, error) {
+	if bytes == 0 {
+		return nil, fmt.Errorf("zero storage ranges bytes requested")
+	}
+	if bytes > softResponseLimit {
+		return nil, fmt.Errorf("requested bytes exceed limit")
+	}
 	if len(accounts) > GetStorageRangesRequestCap {
 		err := fmt.Errorf("GetStorageRangesRequest amount exceed cap: %v > %v", len(accounts), GetStorageRangesRequestCap)
 		return nil, err
@@ -589,23 +584,16 @@ func (st *syncStream) computeGetStorageRangesRequest(rid uint64, root common.Has
 	if err != nil {
 		return nil, err
 	}
-	// var normalizedReceipts = make(map[uint64]*syncpb.Receipts, len(slots))
-	// for i, blkReceipts := range slots {
-	// 	normalizedReceipts[uint64(i)] = &syncpb.Receipts{
-	// 		ReceiptBytes: make([][]byte, 0),
-	// 	}
-	// 	for _, receipt := range blkReceipts {
-	// 		receiptBytes, err := rlp.EncodeToBytes(receipt)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		normalizedReceipts[uint64(i)].ReceiptBytes = append(normalizedReceipts[uint64(i)].ReceiptBytes, receiptBytes)
-	// 	}
-	// }
 	return syncpb.MakeGetStorageRangesResponseMessage(rid, slots, proofs), nil
 }
 
 func (st *syncStream) computeGetByteCodesRequest(rid uint64, hs []common.Hash, bytes uint64) (*syncpb.Message, error) {
+	if bytes == 0 {
+		return nil, fmt.Errorf("zero byte code bytes requested")
+	}
+	if bytes > softResponseLimit {
+		return nil, fmt.Errorf("requested bytes exceed limit")
+	}
 	if len(hs) > GetByteCodesRequestCap {
 		err := fmt.Errorf("GetByteCodesRequest amount exceed cap: %v > %v", len(hs), GetByteCodesRequestCap)
 		return nil, err
@@ -614,23 +602,16 @@ func (st *syncStream) computeGetByteCodesRequest(rid uint64, hs []common.Hash, b
 	if err != nil {
 		return nil, err
 	}
-	// var normalizedReceipts = make(map[uint64]*syncpb.Receipts, len(codes))
-	// for i, blkReceipts := range codes {
-	// 	normalizedReceipts[uint64(i)] = &syncpb.Receipts{
-	// 		ReceiptBytes: make([][]byte, 0),
-	// 	}
-	// 	for _, receipt := range blkReceipts {
-	// 		receiptBytes, err := rlp.EncodeToBytes(receipt)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		normalizedReceipts[uint64(i)].ReceiptBytes = append(normalizedReceipts[uint64(i)].ReceiptBytes, receiptBytes)
-	// 	}
-	// }
 	return syncpb.MakeGetByteCodesResponseMessage(rid, codes), nil
 }
 
 func (st *syncStream) computeGetTrieNodesRequest(rid uint64, root common.Hash, paths []*message.TrieNodePathSet, bytes uint64) (*syncpb.Message, error) {
+	if bytes == 0 {
+		return nil, fmt.Errorf("zero trie node bytes requested")
+	}
+	if bytes > softResponseLimit {
+		return nil, fmt.Errorf("requested bytes exceed limit")
+	}
 	if len(paths) > GetTrieNodesRequestCap {
 		err := fmt.Errorf("GetTrieNodesRequest amount exceed cap: %v > %v", len(paths), GetTrieNodesRequestCap)
 		return nil, err
@@ -639,19 +620,6 @@ func (st *syncStream) computeGetTrieNodesRequest(rid uint64, root common.Hash, p
 	if err != nil {
 		return nil, err
 	}
-	// var normalizedReceipts = make(map[uint64]*syncpb.Receipts, len(codes))
-	// for i, blkReceipts := range codes {
-	// 	normalizedReceipts[uint64(i)] = &syncpb.Receipts{
-	// 		ReceiptBytes: make([][]byte, 0),
-	// 	}
-	// 	for _, receipt := range blkReceipts {
-	// 		receiptBytes, err := rlp.EncodeToBytes(receipt)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		normalizedReceipts[uint64(i)].ReceiptBytes = append(normalizedReceipts[uint64(i)].ReceiptBytes, receiptBytes)
-	// 	}
-	// }
 	return syncpb.MakeGetTrieNodesResponseMessage(rid, nodes), nil
 }
 
