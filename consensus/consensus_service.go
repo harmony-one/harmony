@@ -514,12 +514,14 @@ func (consensus *Consensus) setViewIDs(height uint64) {
 
 // SetCurBlockViewID set the current view ID
 func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
-	return consensus.current.SetCurBlockViewID(viewID)
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	return consensus.setCurBlockViewID(viewID)
 }
 
 // SetCurBlockViewID set the current view ID
-func (consensus *Consensus) setCurBlockViewID(viewID uint64) {
-	consensus.current.SetCurBlockViewID(viewID)
+func (consensus *Consensus) setCurBlockViewID(viewID uint64) uint64 {
+	return consensus.current.SetCurBlockViewID(viewID)
 }
 
 // SetViewChangingID set the current view change ID
