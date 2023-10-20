@@ -350,6 +350,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 				Int("numStakingTxns", len(newBlock.StakingTransactions())).
 				Uint32("numSignatures", numSignatures).
 				Msg("BINGO !!! Reached Consensus")
+			if node.Consensus.Mode() == consensus.Syncing {
+				node.Consensus.SetMode(node.Consensus.UpdateConsensusInformation())
+			}
 
 			node.Consensus.UpdateValidatorMetrics(float64(numSignatures), float64(newBlock.NumberU64()))
 
