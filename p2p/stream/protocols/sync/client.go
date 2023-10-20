@@ -182,9 +182,9 @@ func (p *Protocol) GetNodeData(ctx context.Context, hs []common.Hash, opts ...Op
 	return
 }
 
-// GetAccountRangeRequest do getAccountRange through sync stream protocol.
+// GetAccountRange do getAccountRange through sync stream protocol.
 // returns the accounts along with proofs as result, target stream id, and error
-func (p *Protocol) GetAccountRangeRequest(ctx context.Context, root common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (accounts []*message.AccountData, proof []common.Hash, stid sttypes.StreamID, err error) {
+func (p *Protocol) GetAccountRange(ctx context.Context, root common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (accounts []*message.AccountData, proof []common.Hash, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getAccountRange")
 	defer p.doMetricPostClientRequest("getAccountRange", err, timer)
 
@@ -205,9 +205,9 @@ func (p *Protocol) GetAccountRangeRequest(ctx context.Context, root common.Hash,
 	return
 }
 
-// GetStorageRangesRequest do getStorageRanges through sync stream protocol.
+// GetStorageRanges do getStorageRanges through sync stream protocol.
 // returns the slots along with proofs as result, target stream id, and error
-func (p *Protocol) GetStorageRangesRequest(ctx context.Context, root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (slots []*message.StorageData, proof []common.Hash, stid sttypes.StreamID, err error) {
+func (p *Protocol) GetStorageRanges(ctx context.Context, root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (slots []*message.StorageData, proof []common.Hash, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getStorageRanges")
 	defer p.doMetricPostClientRequest("getStorageRanges", err, timer)
 
@@ -242,14 +242,14 @@ func (p *Protocol) GetStorageRangesRequest(ctx context.Context, root common.Hash
 	return
 }
 
-// GetByteCodesRequest do getByteCodes through sync stream protocol.
+// GetByteCodes do getByteCodes through sync stream protocol.
 // returns the codes as result, target stream id, and error
-func (p *Protocol) GetByteCodesRequest(ctx context.Context, hs []common.Hash, bytes uint64, opts ...Option) (codes []common.Hash, stid sttypes.StreamID, err error) {
+func (p *Protocol) GetByteCodes(ctx context.Context, hs []common.Hash, bytes uint64, opts ...Option) (codes [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getByteCodes")
 	defer p.doMetricPostClientRequest("getByteCodes", err, timer)
 
 	if bytes == 0 {
-		err = fmt.Errorf("zero bytecodes bytes requested")
+		err = fmt.Errorf("zero bytecode bytes requested")
 		return
 	}
 	if bytes > softResponseLimit {
@@ -269,9 +269,9 @@ func (p *Protocol) GetByteCodesRequest(ctx context.Context, hs []common.Hash, by
 	return
 }
 
-// GetTrieNodesRequest do getTrieNodes through sync stream protocol.
+// GetTrieNodes do getTrieNodes through sync stream protocol.
 // returns the nodes as result, target stream id, and error
-func (p *Protocol) GetTrieNodesRequest(ctx context.Context, root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, opts ...Option) (nodes []common.Hash, stid sttypes.StreamID, err error) {
+func (p *Protocol) GetTrieNodes(ctx context.Context, root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, opts ...Option) (nodes [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getTrieNodes")
 	defer p.doMetricPostClientRequest("getTrieNodes", err, timer)
 
@@ -752,7 +752,7 @@ func (req *getAccountRangeRequest) parseGetAccountRangeResponse(resp *syncRespon
 	if grResp == nil {
 		return nil, nil, errors.New("response not GetAccountRange")
 	}
-	proofs := make([]common.Hash, len(grResp.Proof))
+	proofs := make([]common.Hash, 0)
 	for _, proofBytes := range grResp.Proof {
 		var proof common.Hash
 		if err := rlp.DecodeBytes(proofBytes, &proof); err != nil {
@@ -763,7 +763,6 @@ func (req *getAccountRangeRequest) parseGetAccountRangeResponse(resp *syncRespon
 	return grResp.Accounts, proofs, nil
 }
 
-// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // getStorageRangesRequest is the request for get storage ranges which implements
 // sttypes.Request interface
 type getStorageRangesRequest struct {
@@ -832,20 +831,19 @@ func (req *getStorageRangesRequest) parseGetStorageRangesResponse(resp *syncResp
 	}
 	grResp := resp.pb.GetGetStorageRangesResponse()
 	if grResp == nil {
-		return nil, nil, errors.New("response not GetAccountRange")
+		return nil, nil, errors.New("response not GetStorageRanges")
 	}
-	proofs := make([]common.Hash, len(grResp.Proof))
+	proofs := make([]common.Hash, 0)
 	for _, proofBytes := range grResp.Proof {
 		var proof common.Hash
 		if err := rlp.DecodeBytes(proofBytes, &proof); err != nil {
-			return nil, nil, errors.Wrap(err, "[GetAccountRangeResponse]")
+			return nil, nil, errors.Wrap(err, "[GetStorageRangesResponse]")
 		}
 		proofs = append(proofs, proof)
 	}
 	return grResp.Slots, proofs, nil
 }
 
-// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // getByteCodesRequest is the request for get code bytes which implements
 // sttypes.Request interface
 type getByteCodesRequest struct {
@@ -890,8 +888,7 @@ func (req *getByteCodesRequest) Encode() ([]byte, error) {
 	return protobuf.Marshal(msg)
 }
 
-// []*message.AccountData, []common.Hash
-func (req *getByteCodesRequest) getByteCodesFromResponse(resp sttypes.Response) ([]common.Hash, error) {
+func (req *getByteCodesRequest) getByteCodesFromResponse(resp sttypes.Response) ([][]byte, error) {
 	sResp, ok := resp.(*syncResponse)
 	if !ok || sResp == nil {
 		return nil, errors.New("not sync response")
@@ -899,7 +896,7 @@ func (req *getByteCodesRequest) getByteCodesFromResponse(resp sttypes.Response) 
 	return req.parseGetByteCodesResponse(sResp)
 }
 
-func (req *getByteCodesRequest) parseGetByteCodesResponse(resp *syncResponse) ([]common.Hash, error) {
+func (req *getByteCodesRequest) parseGetByteCodesResponse(resp *syncResponse) ([][]byte, error) {
 	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
 		return nil, errors.New(errResp.Error)
 	}
@@ -907,9 +904,9 @@ func (req *getByteCodesRequest) parseGetByteCodesResponse(resp *syncResponse) ([
 	if grResp == nil {
 		return nil, errors.New("response not GetByteCodes")
 	}
-	codes := make([]common.Hash, len(grResp.Codes))
+	codes := make([][]byte, 0)
 	for _, codeBytes := range grResp.Codes {
-		var code common.Hash
+		var code []byte
 		if err := rlp.DecodeBytes(codeBytes, &code); err != nil {
 			return nil, errors.Wrap(err, "[GetByteCodesResponse]")
 		}
@@ -918,7 +915,6 @@ func (req *getByteCodesRequest) parseGetByteCodesResponse(resp *syncResponse) ([
 	return codes, nil
 }
 
-// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // getTrieNodesRequest is the request for get trie nodes which implements
 // sttypes.Request interface
 type getTrieNodesRequest struct {
@@ -966,7 +962,7 @@ func (req *getTrieNodesRequest) Encode() ([]byte, error) {
 	return protobuf.Marshal(msg)
 }
 
-func (req *getTrieNodesRequest) getTrieNodesFromResponse(resp sttypes.Response) ([]common.Hash, error) {
+func (req *getTrieNodesRequest) getTrieNodesFromResponse(resp sttypes.Response) ([][]byte, error) {
 	sResp, ok := resp.(*syncResponse)
 	if !ok || sResp == nil {
 		return nil, errors.New("not sync response")
@@ -974,7 +970,7 @@ func (req *getTrieNodesRequest) getTrieNodesFromResponse(resp sttypes.Response) 
 	return req.parseGetTrieNodesResponse(sResp)
 }
 
-func (req *getTrieNodesRequest) parseGetTrieNodesResponse(resp *syncResponse) ([]common.Hash, error) {
+func (req *getTrieNodesRequest) parseGetTrieNodesResponse(resp *syncResponse) ([][]byte, error) {
 	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
 		return nil, errors.New(errResp.Error)
 	}
@@ -982,9 +978,9 @@ func (req *getTrieNodesRequest) parseGetTrieNodesResponse(resp *syncResponse) ([
 	if grResp == nil {
 		return nil, errors.New("response not GetTrieNodes")
 	}
-	nodes := make([]common.Hash, len(grResp.Nodes))
+	nodes := make([][]byte, 0)
 	for _, codeBytes := range grResp.Nodes {
-		var code common.Hash
+		var code []byte
 		if err := rlp.DecodeBytes(codeBytes, &code); err != nil {
 			return nil, errors.Wrap(err, "[GetTrieNodesResponse]")
 		}

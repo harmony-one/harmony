@@ -62,22 +62,22 @@ func (tch *testChainHelper) getReceipts(hs []common.Hash) ([]types.Receipts, err
 	return receipts, nil
 }
 
-func (ch *testChainHelper) getAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, []common.Hash, error) {
+func (ch *testChainHelper) getAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, [][]byte, error) {
 
 	return nil, nil, nil
 }
 
-func (ch *testChainHelper) getStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, []common.Hash, error) {
+func (ch *testChainHelper) getStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, [][]byte, error) {
 
 	return nil, nil, nil
 }
 
-func (ch *testChainHelper) getByteCodesRequest(hs []common.Hash, bytes uint64) ([]common.Hash, error) {
+func (ch *testChainHelper) getByteCodesRequest(hs []common.Hash, bytes uint64) ([][]byte, error) {
 
 	return nil, nil
 }
 
-func (ch *testChainHelper) getTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([]common.Hash, error) {
+func (ch *testChainHelper) getTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([][]byte, error) {
 
 	return nil, nil
 }

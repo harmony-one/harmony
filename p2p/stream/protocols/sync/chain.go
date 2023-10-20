@@ -27,10 +27,10 @@ type chainHelper interface {
 	getBlocksByHashes(hs []common.Hash) ([]*types.Block, error)
 	getNodeData(hs []common.Hash) ([][]byte, error)
 	getReceipts(hs []common.Hash) ([]types.Receipts, error)
-	getAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, []common.Hash, error)
-	getStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, []common.Hash, error)
-	getByteCodesRequest(hs []common.Hash, bytes uint64) ([]common.Hash, error)
-	getTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([]common.Hash, error)
+	getAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, [][]byte, error)
+	getStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, [][]byte, error)
+	getByteCodesRequest(hs []common.Hash, bytes uint64) ([][]byte, error)
+	getTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([][]byte, error)
 }
 
 type chainHelperImpl struct {
@@ -197,7 +197,7 @@ func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([]types.Receipts, erro
 }
 
 // getAccountRangeRequest
-func (ch *chainHelperImpl) getAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, []common.Hash, error) {
+func (ch *chainHelperImpl) getAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, [][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit
 	}
@@ -250,15 +250,15 @@ func (ch *chainHelperImpl) getAccountRangeRequest(root common.Hash, origin commo
 			return nil, nil, err
 		}
 	}
-	var proofs []common.Hash
+	var proofs [][]byte
 	for _, blob := range proof.NodeList() {
-		proofs = append(proofs, common.BytesToHash(blob))
+		proofs = append(proofs, blob)
 	}
 	return accounts, proofs, nil
 }
 
 // getStorageRangesRequest
-func (ch *chainHelperImpl) getStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, []common.Hash, error) {
+func (ch *chainHelperImpl) getStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, [][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit
 	}
@@ -269,7 +269,7 @@ func (ch *chainHelperImpl) getStorageRangesRequest(root common.Hash, accounts []
 	// Retrieve storage ranges until the packet limit is reached
 	var (
 		slots  []*message.StoragesData
-		proofs []common.Hash
+		proofs [][]byte
 		size   uint64
 	)
 	for _, account := range accounts {
@@ -352,7 +352,7 @@ func (ch *chainHelperImpl) getStorageRangesRequest(root common.Hash, accounts []
 				}
 			}
 			for _, blob := range proof.NodeList() {
-				proofs = append(proofs, common.BytesToHash(blob))
+				proofs = append(proofs, blob)
 			}
 			// Proof terminates the reply as proofs are only added if a node
 			// refuses to serve more data (exception when a contract fetch is
@@ -364,7 +364,7 @@ func (ch *chainHelperImpl) getStorageRangesRequest(root common.Hash, accounts []
 }
 
 // getByteCodesRequest
-func (ch *chainHelperImpl) getByteCodesRequest(hashes []common.Hash, bytes uint64) ([]common.Hash, error) {
+func (ch *chainHelperImpl) getByteCodesRequest(hashes []common.Hash, bytes uint64) ([][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit
 	}
@@ -373,16 +373,16 @@ func (ch *chainHelperImpl) getByteCodesRequest(hashes []common.Hash, bytes uint6
 	}
 	// Retrieve bytecodes until the packet size limit is reached
 	var (
-		codes      []common.Hash
+		codes      [][]byte
 		totalBytes uint64
 	)
 	for _, hash := range hashes {
 		if hash == state.EmptyCodeHash {
 			// Peers should not request the empty code, but if they do, at
 			// least sent them back a correct response without db lookups
-			codes = append(codes, common.Hash{})
+			codes = append(codes, []byte{})
 		} else if blob, err := ch.chain.ContractCode(hash); err == nil { // Double Check: ContractCodeWithPrefix
-			codes = append(codes, common.BytesToHash(blob))
+			codes = append(codes, blob)
 			totalBytes += uint64(len(blob))
 		}
 		if totalBytes > bytes {
@@ -393,7 +393,7 @@ func (ch *chainHelperImpl) getByteCodesRequest(hashes []common.Hash, bytes uint6
 }
 
 // getTrieNodesRequest
-func (ch *chainHelperImpl) getTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([]common.Hash, error) {
+func (ch *chainHelperImpl) getTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit
 	}
@@ -409,7 +409,7 @@ func (ch *chainHelperImpl) getTrieNodesRequest(root common.Hash, paths []*messag
 	snap := ch.chain.Snapshots().Snapshot(root)
 	// Retrieve trie nodes until the packet size limit is reached
 	var (
-		nodes      []common.Hash
+		nodes      [][]byte
 		TotalBytes uint64
 		loads      int // Trie hash expansions to count database reads
 	)
@@ -426,7 +426,7 @@ func (ch *chainHelperImpl) getTrieNodesRequest(root common.Hash, paths []*messag
 			if err != nil {
 				break
 			}
-			nodes = append(nodes, common.BytesToHash(blob))
+			nodes = append(nodes, blob)
 			TotalBytes += uint64(len(blob))
 
 		default:
@@ -461,7 +461,7 @@ func (ch *chainHelperImpl) getTrieNodesRequest(root common.Hash, paths []*messag
 				if err != nil {
 					break
 				}
-				nodes = append(nodes, common.BytesToHash(blob))
+				nodes = append(nodes, blob)
 				TotalBytes += uint64(len(blob))
 
 				// Sanity check limits to avoid DoS on the store trie loads

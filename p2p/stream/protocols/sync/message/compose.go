@@ -251,74 +251,74 @@ func MakeGetReceiptsResponse(rid uint64, receipts map[uint64]*Receipts) *Respons
 }
 
 // MakeGetAccountRangeResponseMessage makes the GetAccountRangeResponse of Message type
-func MakeGetAccountRangeResponseMessage(rid uint64, accounts []*AccountData, proof []common.Hash) *Message {
+func MakeGetAccountRangeResponseMessage(rid uint64, accounts []*AccountData, proof [][]byte) *Message {
 	resp := MakeGetAccountRangeResponse(rid, accounts, proof)
 	return makeMessageFromResponse(resp)
 }
 
 // MakeGetAccountRangeResponse make the GetAccountRangeResponse of Response type
-func MakeGetAccountRangeResponse(rid uint64, accounts []*AccountData, proof []common.Hash) *Response {
+func MakeGetAccountRangeResponse(rid uint64, accounts []*AccountData, proof [][]byte) *Response {
 	return &Response{
 		ReqId: rid,
 		Response: &Response_GetAccountRangeResponse{
 			GetAccountRangeResponse: &GetAccountRangeResponse{
 				Accounts: accounts,
-				Proof:    hashesToBytes(proof),
+				Proof:    proof,
 			},
 		},
 	}
 }
 
 // MakeGetStorageRangesResponseMessage makes the GetStorageRangesResponse of Message type
-func MakeGetStorageRangesResponseMessage(rid uint64, slots []*StoragesData, proof []common.Hash) *Message {
+func MakeGetStorageRangesResponseMessage(rid uint64, slots []*StoragesData, proof [][]byte) *Message {
 	resp := MakeGetStorageRangesResponse(rid, slots, proof)
 	return makeMessageFromResponse(resp)
 }
 
 // MakeGetStorageRangesResponse make the GetStorageRangesResponse of Response type
-func MakeGetStorageRangesResponse(rid uint64, slots []*StoragesData, proof []common.Hash) *Response {
+func MakeGetStorageRangesResponse(rid uint64, slots []*StoragesData, proof [][]byte) *Response {
 	return &Response{
 		ReqId: rid,
 		Response: &Response_GetStorageRangesResponse{
 			GetStorageRangesResponse: &GetStorageRangesResponse{
 				Slots: slots,
-				Proof: hashesToBytes(proof),
+				Proof: proof,
 			},
 		},
 	}
 }
 
 // MakeGetByteCodesResponseMessage makes the GetByteCodesResponse of Message type
-func MakeGetByteCodesResponseMessage(rid uint64, codes []common.Hash) *Message {
+func MakeGetByteCodesResponseMessage(rid uint64, codes [][]byte) *Message {
 	resp := MakeGetByteCodesResponse(rid, codes)
 	return makeMessageFromResponse(resp)
 }
 
 // MakeGetByteCodesResponse make the GetByteCodesResponse of Response type
-func MakeGetByteCodesResponse(rid uint64, codes []common.Hash) *Response {
+func MakeGetByteCodesResponse(rid uint64, codes [][]byte) *Response {
 	return &Response{
 		ReqId: rid,
 		Response: &Response_GetByteCodesResponse{
 			GetByteCodesResponse: &GetByteCodesResponse{
-				Codes: hashesToBytes(codes),
+				Codes: codes,
 			},
 		},
 	}
 }
 
 // MakeGetTrieNodesResponseMessage makes the GetTrieNodesResponse of Message type
-func MakeGetTrieNodesResponseMessage(rid uint64, nodes []common.Hash) *Message {
+func MakeGetTrieNodesResponseMessage(rid uint64, nodes [][]byte) *Message {
 	resp := MakeGetTrieNodesResponse(rid, nodes)
 	return makeMessageFromResponse(resp)
 }
 
 // MakeGetTrieNodesResponse make the GetTrieNodesResponse of Response type
-func MakeGetTrieNodesResponse(rid uint64, nodes []common.Hash) *Response {
+func MakeGetTrieNodesResponse(rid uint64, nodes [][]byte) *Response {
 	return &Response{
 		ReqId: rid,
 		Response: &Response_GetTrieNodesResponse{
 			GetTrieNodesResponse: &GetTrieNodesResponse{
-				Nodes: hashesToBytes(nodes),
+				Nodes: nodes,
 			},
 		},
 	}
