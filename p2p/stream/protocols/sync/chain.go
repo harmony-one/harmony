@@ -27,10 +27,10 @@ type chainHelper interface {
 	getBlocksByHashes(hs []common.Hash) ([]*types.Block, error)
 	getNodeData(hs []common.Hash) ([][]byte, error)
 	getReceipts(hs []common.Hash) ([]types.Receipts, error)
-	getAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, [][]byte, error)
-	getStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, [][]byte, error)
-	getByteCodesRequest(hs []common.Hash, bytes uint64) ([][]byte, error)
-	getTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([][]byte, error)
+	getAccountRange(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, [][]byte, error)
+	getStorageRanges(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, [][]byte, error)
+	getByteCodes(hs []common.Hash, bytes uint64) ([][]byte, error)
+	getTrieNodes(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([][]byte, error)
 }
 
 type chainHelperImpl struct {
@@ -197,7 +197,7 @@ func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([]types.Receipts, erro
 }
 
 // getAccountRangeRequest
-func (ch *chainHelperImpl) getAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, [][]byte, error) {
+func (ch *chainHelperImpl) getAccountRange(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, [][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit
 	}
@@ -258,7 +258,7 @@ func (ch *chainHelperImpl) getAccountRangeRequest(root common.Hash, origin commo
 }
 
 // getStorageRangesRequest
-func (ch *chainHelperImpl) getStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, [][]byte, error) {
+func (ch *chainHelperImpl) getStorageRanges(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.StoragesData, [][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit
 	}
@@ -364,7 +364,7 @@ func (ch *chainHelperImpl) getStorageRangesRequest(root common.Hash, accounts []
 }
 
 // getByteCodesRequest
-func (ch *chainHelperImpl) getByteCodesRequest(hashes []common.Hash, bytes uint64) ([][]byte, error) {
+func (ch *chainHelperImpl) getByteCodes(hashes []common.Hash, bytes uint64) ([][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit
 	}
@@ -393,7 +393,7 @@ func (ch *chainHelperImpl) getByteCodesRequest(hashes []common.Hash, bytes uint6
 }
 
 // getTrieNodesRequest
-func (ch *chainHelperImpl) getTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([][]byte, error) {
+func (ch *chainHelperImpl) getTrieNodes(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, start time.Time) ([][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit
 	}

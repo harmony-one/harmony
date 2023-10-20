@@ -562,7 +562,7 @@ func (st *syncStream) computeGetAccountRangeRequest(rid uint64, root common.Hash
 	if bytes > softResponseLimit {
 		return nil, fmt.Errorf("requested bytes exceed limit")
 	}
-	accounts, proof, err := st.chain.getAccountRangeRequest(root, origin, limit, bytes)
+	accounts, proof, err := st.chain.getAccountRange(root, origin, limit, bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -580,7 +580,7 @@ func (st *syncStream) computeGetStorageRangesRequest(rid uint64, root common.Has
 		err := fmt.Errorf("GetStorageRangesRequest amount exceed cap: %v > %v", len(accounts), GetStorageRangesRequestCap)
 		return nil, err
 	}
-	slots, proofs, err := st.chain.getStorageRangesRequest(root, accounts, origin, limit, bytes)
+	slots, proofs, err := st.chain.getStorageRanges(root, accounts, origin, limit, bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -598,7 +598,7 @@ func (st *syncStream) computeGetByteCodesRequest(rid uint64, hs []common.Hash, b
 		err := fmt.Errorf("GetByteCodesRequest amount exceed cap: %v > %v", len(hs), GetByteCodesRequestCap)
 		return nil, err
 	}
-	codes, err := st.chain.getByteCodesRequest(hs, bytes)
+	codes, err := st.chain.getByteCodes(hs, bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -616,7 +616,7 @@ func (st *syncStream) computeGetTrieNodesRequest(rid uint64, root common.Hash, p
 		err := fmt.Errorf("GetTrieNodesRequest amount exceed cap: %v > %v", len(paths), GetTrieNodesRequestCap)
 		return nil, err
 	}
-	nodes, err := st.chain.getTrieNodesRequest(root, paths, bytes, time.Now())
+	nodes, err := st.chain.getTrieNodes(root, paths, bytes, time.Now())
 	if err != nil {
 		return nil, err
 	}
