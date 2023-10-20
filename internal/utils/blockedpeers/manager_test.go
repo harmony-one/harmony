@@ -1,17 +1,18 @@
 package blockedpeers
 
 import (
-	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewManager(t *testing.T) {
 	var (
-		peer1 libp2p_peer.ID = "peer1"
-		now                  = time.Now()
-		m                    = NewManager(4)
+		peer1 peer.ID = "peer1"
+		now           = time.Now()
+		m             = NewManager(4)
 	)
 
 	t.Run("check_empty", func(t *testing.T) {
