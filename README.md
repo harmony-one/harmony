@@ -150,7 +150,7 @@ make debug-kill
 
 To keep things consistent, we have a docker image to run all tests. **These are the same tests ran on the pull request checks**.
 
-Note that all testing docker container binds a couple of ports to the host machine for your convince. The ports are:
+Note that all test Docker containers bind several ports to the host machine for your convenience. The ports are:
 * `9500` - Shard 0 RPC for a validator
 * `9501` - Shard 1 RPC for a validator
 * `9599` - Shard 0 RPC for an explorer
