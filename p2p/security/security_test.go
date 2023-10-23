@@ -3,10 +3,10 @@ package security
 import (
 	"context"
 	"fmt"
-	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
 	"testing"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
 	"github.com/libp2p/go-libp2p"
 	ic "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
