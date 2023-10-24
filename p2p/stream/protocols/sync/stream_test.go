@@ -60,6 +60,30 @@ var (
 	}
 	testGetNodeDataRequest    = syncpb.MakeGetNodeDataRequest(testGetNodeData)
 	testGetNodeDataRequestMsg = syncpb.MakeMessageFromRequest(testGetNodeDataRequest)
+
+	maxBytes = uint64(500)
+	root     = numberToHash(1)
+	origin   = numberToHash(2)
+	limit    = numberToHash(3)
+
+	testHashes = []common.Hash{
+		numberToHash(1),
+		numberToHash(2),
+	}
+
+	testAccounts = []common.Hash{account1, account2}
+
+	testGetAccountRangesRequest    = syncpb.MakeGetAccountRangeRequest(root, origin, limit, maxBytes)
+	testGetAccountRangesRequestMsg = syncpb.MakeMessageFromRequest(testGetAccountRangesRequest)
+
+	testGetStorageRangesRequest    = syncpb.MakeGetStorageRangesRequest(root, testAccounts, origin, limit, maxBytes)
+	testGetStorageRangesRequestMsg = syncpb.MakeMessageFromRequest(testGetStorageRangesRequest)
+
+	testGetByteCodesRequest    = syncpb.MakeGetByteCodesRequest(testHashes, maxBytes)
+	testGetByteCodesRequestMsg = syncpb.MakeMessageFromRequest(testGetByteCodesRequest)
+
+	testGetTrieNodesRequest    = syncpb.MakeGetTrieNodesRequest(root, testPaths, maxBytes)
+	testGetTrieNodesRequestMsg = syncpb.MakeMessageFromRequest(testGetTrieNodesRequest)
 )
 
 func TestSyncStream_HandleGetBlocksByRequest(t *testing.T) {
@@ -184,6 +208,90 @@ func TestSyncStream_HandleGetNodeData(t *testing.T) {
 	receivedBytes, _ := remoteSt.ReadBytes()
 
 	if err := checkGetNodeDataResult(receivedBytes, testGetNodeData); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSyncStream_HandleGetAccountRanges(t *testing.T) {
+	st, remoteSt := makeTestSyncStream()
+
+	go st.run()
+	defer close(st.closeC)
+
+	req := testGetAccountRangesRequestMsg
+	b, _ := protobuf.Marshal(req)
+	err := remoteSt.WriteBytes(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	receivedBytes, _ := remoteSt.ReadBytes()
+
+	if err := checkAccountRangeResult(maxBytes, receivedBytes); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSyncStream_HandleGetStorageRanges(t *testing.T) {
+	st, remoteSt := makeTestSyncStream()
+
+	go st.run()
+	defer close(st.closeC)
+
+	req := testGetStorageRangesRequestMsg
+	b, _ := protobuf.Marshal(req)
+	err := remoteSt.WriteBytes(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	receivedBytes, _ := remoteSt.ReadBytes()
+
+	if err := checkStorageRangesResult(testAccounts, maxBytes, receivedBytes); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSyncStream_HandleGetByteCodesResult(t *testing.T) {
+	st, remoteSt := makeTestSyncStream()
+
+	go st.run()
+	defer close(st.closeC)
+
+	req := testGetByteCodesRequestMsg
+	b, _ := protobuf.Marshal(req)
+	err := remoteSt.WriteBytes(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	receivedBytes, _ := remoteSt.ReadBytes()
+
+	if err := checkByteCodesResult(testHashes, maxBytes, receivedBytes); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSyncStream_HandleGetTrieNodes(t *testing.T) {
+	st, remoteSt := makeTestSyncStream()
+
+	go st.run()
+	defer close(st.closeC)
+
+	req := testGetTrieNodesRequestMsg
+	b, _ := protobuf.Marshal(req)
+	err := remoteSt.WriteBytes(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	receivedBytes, _ := remoteSt.ReadBytes()
+
+	if err := checkTrieNodesResult(testHashes, maxBytes, receivedBytes); err != nil {
 		t.Fatal(err)
 	}
 }
