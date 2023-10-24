@@ -1,6 +1,7 @@
 package stagedstreamsync
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -118,11 +119,14 @@ func (gbm *blockDownloadManager) SetDownloadDetails(bns []uint64, loopID int, st
 }
 
 // GetDownloadDetails returns the download details for a block
-func (gbm *blockDownloadManager) GetDownloadDetails(blockNumber uint64) (loopID int, streamID sttypes.StreamID) {
+func (gbm *blockDownloadManager) GetDownloadDetails(blockNumber uint64) (loopID int, streamID sttypes.StreamID, err error) {
 	gbm.lock.Lock()
 	defer gbm.lock.Unlock()
 
-	return gbm.bdd[blockNumber].loopID, gbm.bdd[blockNumber].streamID
+	if dm, exist := gbm.bdd[blockNumber]; exist {
+		return dm.loopID, dm.streamID, nil
+	}
+	return 0, sttypes.StreamID(0), fmt.Errorf("there is no download details for the block number: %d", blockNumber)
 }
 
 // SetRootHash sets the root hash for a specific block

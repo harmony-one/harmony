@@ -237,20 +237,14 @@ func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint6
 	}
 
 	pivotBlockNumber := uint64(0)
-	if curPivot := rawdb.ReadLastPivotNumber(s.bc.ChainDb()); curPivot != nil {
+	var curPivot *uint64
+	if curPivot = rawdb.ReadLastPivotNumber(s.bc.ChainDb()); curPivot != nil {
 		// if head is behind pivot, that means it is still on fast/snap sync mode
 		if head := s.CurrentBlockNumber(); head < *curPivot {
 			pivotBlockNumber = *curPivot
 			// pivot could be moved forward if it is far from head
 			if pivotBlockNumber < estimatedHeight-MaxPivotDistanceToHead {
 				pivotBlockNumber = estimatedHeight - MinPivotDistanceToHead
-				if err := rawdb.WriteLastPivotNumber(s.bc.ChainDb(), pivotBlockNumber); err != nil {
-					s.logger.Warn().Err(err).
-						Uint64("current pivot number", *curPivot).
-						Uint64("new pivot number", pivotBlockNumber).
-						Msg(WrapStagedSyncMsg("update pivot number failed"))
-					pivotBlockNumber = *curPivot
-				}
 			}
 		}
 	} else {
@@ -270,6 +264,14 @@ func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint6
 				Msg(WrapStagedSyncMsg("query peers for pivot block failed"))
 			return block, FastSync, err
 		} else {
+			if curPivot == nil || pivotBlockNumber != *curPivot {
+				if err := rawdb.WriteLastPivotNumber(s.bc.ChainDb(), pivotBlockNumber); err != nil {
+					s.logger.Warn().Err(err).
+						Uint64("new pivot number", pivotBlockNumber).
+						Msg(WrapStagedSyncMsg("update pivot number failed"))
+					return block, FastSync, err
+				}
+			}
 			s.status.pivotBlock = block
 			s.logger.Info().
 				Uint64("estimatedHeight", estimatedHeight).

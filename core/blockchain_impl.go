@@ -852,6 +852,20 @@ func (bc *BlockChainImpl) writeHeadBlock(block *types.Block) error {
 	if err := rawdb.WriteHeadBlockHash(batch, block.Hash()); err != nil {
 		return err
 	}
+	if err := rawdb.WriteHeadHeaderHash(batch, block.Hash()); err != nil {
+		return err
+	}
+
+	isNewEpoch := block.IsLastBlockInEpoch()
+	if isNewEpoch {
+		epoch := block.Header().Epoch()
+		nextEpoch := epoch.Add(epoch, common.Big1)
+		if err := rawdb.WriteShardStateBytes(batch, nextEpoch, block.Header().ShardState()); err != nil {
+			utils.Logger().Error().Err(err).Msg("failed to store shard state")
+			return err
+		}
+	}
+
 	if err := batch.Write(); err != nil {
 		return err
 	}
@@ -1326,6 +1340,17 @@ func (bc *BlockChainImpl) InsertReceiptChain(blockChain types.Blocks, receiptCha
 		}
 		if err := rawdb.WriteBlockStxLookUpEntries(batch, block); err != nil {
 			return 0, err
+		}
+
+		isNewEpoch := block.IsLastBlockInEpoch()
+		if isNewEpoch {
+			epoch := block.Header().Epoch()
+			nextEpoch := epoch.Add(epoch, common.Big1)
+			err := rawdb.WriteShardStateBytes(batch, nextEpoch, block.Header().ShardState())
+			if err != nil {
+				utils.Logger().Error().Err(err).Msg("failed to store shard state")
+				return 0, err
+			}
 		}
 
 		stats.processed++

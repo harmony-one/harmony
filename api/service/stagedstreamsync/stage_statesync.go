@@ -55,36 +55,37 @@ func NewStageStateSyncCfg(bc core.BlockChain,
 // Exec progresses States stage in the forward direction
 func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
-	// only execute this stage in fast/snap sync mode and once we reach to pivot
-	if s.state.status.pivotBlock == nil || s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64() {
-		return nil
-	}
-
 	// for short range sync, skip this step
 	if !s.state.initSync {
 		return nil
-	}
-
-	maxHeight := s.state.status.targetBN
-	currentHead := s.state.CurrentBlockNumber()
-	if currentHead >= maxHeight {
+	}	// only execute this stage in fast/snap sync mode and once we reach to pivot
+	
+	if s.state.status.pivotBlock == nil ||
+		s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64() ||
+		s.state.status.statesSynced {
 		return nil
 	}
-	currProgress := s.state.CurrentBlockNumber()
-	targetHeight := s.state.currentCycle.TargetHeight
 
-	if errV := CreateView(ctx, sss.configs.db, tx, func(etx kv.Tx) error {
-		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
-			return err
-		}
-		return nil
-	}); errV != nil {
-		return errV
-	}
+	// maxHeight := s.state.status.targetBN
+	// currentHead := s.state.CurrentBlockNumber()
+	// if currentHead >= maxHeight {
+	// 	return nil
+	// }
+	// currProgress := s.state.CurrentBlockNumber()
+	// targetHeight := s.state.currentCycle.TargetHeight
 
-	if currProgress >= targetHeight {
-		return nil
-	}
+	// if errV := CreateView(ctx, sss.configs.db, tx, func(etx kv.Tx) error {
+	// 	if currProgress, err = s.CurrentStageProgress(etx); err != nil {
+	// 		return err
+	// 	}
+	// 	return nil
+	// }); errV != nil {
+	// 	return errV
+	// }
+
+	// if currProgress >= targetHeight {
+	// 	return nil
+	// }
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
@@ -104,8 +105,9 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 
 	// Fetch states from neighbors
 	pivotRootHash := s.state.status.pivotBlock.Root()
+	currentBlockRootHash := s.state.bc.CurrentFastBlock().Root()
 	sdm := newStateDownloadManager(tx, sss.configs.bc, sss.configs.concurrency, s.state.logger)
-	sdm.setRootHash(pivotRootHash)
+	sdm.setRootHash(currentBlockRootHash)
 	var wg sync.WaitGroup
 	for i := 0; i < s.state.config.Concurrency; i++ {
 		wg.Add(1)

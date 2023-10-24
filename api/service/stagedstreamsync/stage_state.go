@@ -69,11 +69,11 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	}
 
 	maxHeight := s.state.status.targetBN
-	currentHead := stg.configs.bc.CurrentBlock().NumberU64()
+	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
-	currProgress := stg.configs.bc.CurrentBlock().NumberU64()
+	currProgress := currentHead
 	targetHeight := s.state.currentCycle.TargetHeight
 	if currProgress >= targetHeight {
 		return nil
@@ -115,7 +115,10 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 
 	for i := currProgress + 1; i <= targetHeight; i++ {
 		blkKey := marshalData(i)
-		loopID, streamID := gbm.GetDownloadDetails(i)
+		loopID, streamID, errBDD := gbm.GetDownloadDetails(i)
+		if errBDD != nil {
+			return errBDD
+		}
 
 		blockBytes, err := txs[loopID].GetOne(BlocksBucket, blkKey)
 		if err != nil {

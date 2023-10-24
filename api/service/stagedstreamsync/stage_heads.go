@@ -91,8 +91,7 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 
 	// check pivot: if chain hasn't reached to pivot yet
 	if s.state.status.cycleSyncMode != FullSync && s.state.status.pivotBlock != nil {
-		// set target height on the block before pivot
-		// pivot block would be downloaded by StateSync stage
+		// set target height on the pivot block
 		if !s.state.status.statesSynced && targetHeight > s.state.status.pivotBlock.NumberU64() {
 			targetHeight = s.state.status.pivotBlock.NumberU64()
 		}

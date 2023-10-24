@@ -238,7 +238,14 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 
 		for _, bn := range batch {
 			blkKey := marshalData(bn)
-			loopID, _ := gbm.GetDownloadDetails(bn)
+			loopID, _, errBDD := gbm.GetDownloadDetails(bn)
+			if errBDD != nil {
+				utils.Logger().Warn().
+					Err(errBDD).
+					Interface("block numbers", bn).
+					Msg(WrapStagedSyncMsg("get block download details failed"))
+				return
+			}
 			blockBytes, err := txs[loopID].GetOne(BlocksBucket, blkKey)
 			if err != nil {
 				return

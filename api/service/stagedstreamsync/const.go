@@ -40,7 +40,7 @@ const (
 	ShortRangeTimeout time.Duration = 1 * time.Minute
 
 	// pivot block distance ranges
-	MinPivotDistanceToHead uint64 = 1028
+	MinPivotDistanceToHead uint64 = 1024
 	MaxPivotDistanceToHead uint64 = 2048
 )
 
