@@ -1122,6 +1122,11 @@ func (bc *BlockChainImpl) GetUnclesInChain(b *types.Block, length int) []*block.
 	return uncles
 }
 
+// TrieDB returns trie database
+func (bc *BlockChainImpl) TrieDB() *trie.Database {
+	return bc.stateCache.TrieDB()
+}
+
 // TrieNode retrieves a blob of data associated with a trie node (or code hash)
 // either from ephemeral in-memory cache, or from persistent storage.
 func (bc *BlockChainImpl) TrieNode(hash common.Hash) ([]byte, error) {

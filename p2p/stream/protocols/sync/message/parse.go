@@ -111,3 +111,67 @@ func (msg *Message) GetNodeDataResponse() (*GetNodeDataResponse, error) {
 	}
 	return gnResp, nil
 }
+
+// GetAccountRangesResponse parse the message to GetAccountRangesResponse
+func (msg *Message) GetAccountRangesResponse() (*GetAccountRangeResponse, error) {
+	resp := msg.GetResp()
+	if resp == nil {
+		return nil, errors.New("not response message")
+	}
+	if errResp := resp.GetErrorResponse(); errResp != nil {
+		return nil, &ResponseError{errResp.Error}
+	}
+	gnResp := resp.GetGetAccountRangeResponse()
+	if gnResp == nil {
+		return nil, errors.New("not GetGetAccountRangeResponse")
+	}
+	return gnResp, nil
+}
+
+// GetStorageRangesResponse parse the message to GetStorageRangesResponse
+func (msg *Message) GetStorageRangesResponse() (*GetStorageRangesResponse, error) {
+	resp := msg.GetResp()
+	if resp == nil {
+		return nil, errors.New("not response message")
+	}
+	if errResp := resp.GetErrorResponse(); errResp != nil {
+		return nil, &ResponseError{errResp.Error}
+	}
+	gnResp := resp.GetGetStorageRangesResponse()
+	if gnResp == nil {
+		return nil, errors.New("not GetGetStorageRangesResponse")
+	}
+	return gnResp, nil
+}
+
+// GetByteCodesResponse parse the message to GetByteCodesResponse
+func (msg *Message) GetByteCodesResponse() (*GetByteCodesResponse, error) {
+	resp := msg.GetResp()
+	if resp == nil {
+		return nil, errors.New("not response message")
+	}
+	if errResp := resp.GetErrorResponse(); errResp != nil {
+		return nil, &ResponseError{errResp.Error}
+	}
+	gnResp := resp.GetGetByteCodesResponse()
+	if gnResp == nil {
+		return nil, errors.New("not GetByteCodesResponse")
+	}
+	return gnResp, nil
+}
+
+// GetTrieNodesResponse parse the message to GetTrieNodesResponse
+func (msg *Message) GetTrieNodesResponse() (*GetTrieNodesResponse, error) {
+	resp := msg.GetResp()
+	if resp == nil {
+		return nil, errors.New("not response message")
+	}
+	if errResp := resp.GetErrorResponse(); errResp != nil {
+		return nil, &ResponseError{errResp.Error}
+	}
+	gnResp := resp.GetGetTrieNodesResponse()
+	if gnResp == nil {
+		return nil, errors.New("not GetTrieNodesResponse")
+	}
+	return gnResp, nil
+}
