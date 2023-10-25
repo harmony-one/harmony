@@ -3,9 +3,7 @@ package stagedstreamsync
 import (
 	"context"
 
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/harmony-one/harmony/shard"
@@ -20,7 +18,6 @@ type StageShortRange struct {
 type StageShortRangeCfg struct {
 	bc core.BlockChain
 	db kv.RwDB
-	c  *consensus.Consensus
 }
 
 func NewStageShortRange(cfg StageShortRangeCfg) *StageShortRange {
@@ -29,11 +26,10 @@ func NewStageShortRange(cfg StageShortRangeCfg) *StageShortRange {
 	}
 }
 
-func NewStageShortRangeCfg(bc core.BlockChain, db kv.RwDB, c *consensus.Consensus) StageShortRangeCfg {
+func NewStageShortRangeCfg(bc core.BlockChain, db kv.RwDB) StageShortRangeCfg {
 	return StageShortRangeCfg{
 		bc: bc,
 		db: db,
-		c:  c,
 	}
 }
 
@@ -108,12 +104,9 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 			return 0, errors.Wrap(err, "prerequisite")
 		}
 	}
-	var (
-		bc                        = sr.configs.bc
-		curBN                     = bc.CurrentHeader().NumberU64()
-		blkNums                   = sh.prepareBlockHashNumbers(curBN)
-		hashChain, whitelist, err = sh.getHashChain(ctx, blkNums)
-	)
+	curBN := sr.configs.bc.CurrentBlock().NumberU64()
+	blkNums := sh.prepareBlockHashNumbers(curBN)
+	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, nil
@@ -162,25 +155,6 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 		}
 		return 0, err
 	}
-
-	numInserted := 0
-	err = sr.configs.c.GetLastMileBlockIter(sr.configs.bc.CurrentHeader().NumberU64()+1, func(blockIter *consensus.LastMileBlockIter) error {
-		for {
-			block := blockIter.Next()
-			if block == nil {
-				break
-			}
-			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
-				return errors.Wrap(err, "failed to InsertChain")
-			}
-			numInserted++
-		}
-		return nil
-	})
-	if err != nil {
-		return 0, errors.WithMessage(err, "failed to InsertChain for last mile blocks")
-	}
-	utils.Logger().Info().Int("last mile blocks inserted", numInserted).Msg("Insert last mile blocks success")
 
 	return n, nil
 }

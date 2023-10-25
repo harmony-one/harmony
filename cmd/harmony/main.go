@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -522,7 +521,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				Msg("Start p2p host failed")
 		}
 
-		if err := node.BootstrapConsensus(context.TODO(), currentNode.Consensus, currentNode.Host()); err != nil {
+		if err := currentNode.BootstrapConsensus(); err != nil {
 			fmt.Fprint(os.Stderr, "could not bootstrap consensus", err.Error())
 			if !currentNode.NodeConfig.IsOffline {
 				os.Exit(-1)
@@ -1033,7 +1032,7 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 		}
 	}
 	//Setup stream sync service
-	s := stagedstreamsync.NewService(host, blockchains, node.Consensus, sConfig, hc.General.DataDir, node.Consensus)
+	s := stagedstreamsync.NewService(host, blockchains, node.Consensus, sConfig, hc.General.DataDir)
 
 	node.RegisterService(service.StagedStreamSync, s)
 

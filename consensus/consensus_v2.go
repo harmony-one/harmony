@@ -8,14 +8,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
-
 	"github.com/ethereum/go-ethereum/common"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -395,12 +394,11 @@ func (consensus *Consensus) tick() {
 			// the bootstrap timer will be stopped once consensus is reached or view change
 			// is succeeded
 			if k != timeoutBootstrap {
-				if v.Stop() { // prevent useless logs
-					consensus.getLogger().Debug().
-						Str("k", k.String()).
-						Str("Mode", consensus.current.Mode().String()).
-						Msg("[ConsensusMainLoop] consensusTimeout stopped!!!")
-				}
+				consensus.getLogger().Debug().
+					Str("k", k.String()).
+					Str("Mode", consensus.current.Mode().String()).
+					Msg("[ConsensusMainLoop] consensusTimeout stopped!!!")
+				v.Stop()
 				continue
 			}
 		}
@@ -456,6 +454,7 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 type LastMileBlockIter struct {
 	blockCandidates []*types.Block
 	fbftLog         *FBFTLog
+	verify          func(*types.Block) error
 	curIndex        int
 	logger          *zerolog.Logger
 }
@@ -470,6 +469,9 @@ func (consensus *Consensus) GetLastMileBlockIter(bnStart uint64, cb func(iter *L
 
 // GetLastMileBlockIter get the iterator of the last mile blocks starting from number bnStart
 func (consensus *Consensus) getLastMileBlockIter(bnStart uint64, cb func(iter *LastMileBlockIter) error) error {
+	if consensus.BlockVerifier == nil {
+		return errors.New("consensus haven't initialized yet")
+	}
 	blocks, _, err := consensus.getLastMileBlocksAndMsg(bnStart)
 	if err != nil {
 		return err
@@ -477,6 +479,7 @@ func (consensus *Consensus) getLastMileBlockIter(bnStart uint64, cb func(iter *L
 	return cb(&LastMileBlockIter{
 		blockCandidates: blocks,
 		fbftLog:         consensus.fBFTLog,
+		verify:          consensus.BlockVerifier,
 		curIndex:        0,
 		logger:          consensus.getLogger(),
 	})
@@ -491,7 +494,7 @@ func (iter *LastMileBlockIter) Next() *types.Block {
 	iter.curIndex++
 
 	if !iter.fbftLog.IsBlockVerified(block.Hash()) {
-		if err := iter.fbftLog.BlockVerify(block); err != nil {
+		if err := iter.verify(block); err != nil {
 			iter.logger.Debug().Err(err).Msg("block verification failed in consensus last mile block")
 			return nil
 		}
@@ -618,6 +621,9 @@ func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types
 // tryCatchup add the last mile block in PBFT log memory cache to blockchain.
 func (consensus *Consensus) tryCatchup() error {
 	// TODO: change this to a more systematic symbol
+	if consensus.BlockVerifier == nil {
+		return errors.New("consensus haven't finished initialization")
+	}
 	initBN := consensus.getBlockNum()
 	defer consensus.postCatchup(initBN)
 
@@ -632,7 +638,7 @@ func (consensus *Consensus) tryCatchup() error {
 		}
 		blk.SetCurrentCommitSig(msg.Payload)
 
-		if err := consensus.fBFTLog.verifyBlock(blk); err != nil {
+		if err := consensus.verifyBlock(blk); err != nil {
 			consensus.getLogger().Err(err).Msg("[TryCatchup] failed block verifier")
 			return err
 		}

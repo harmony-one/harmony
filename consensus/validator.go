@@ -63,11 +63,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		go func() {
 			// Best effort check, no need to error out.
 			_, err := consensus.ValidateNewBlock(recvMsg)
-			if err != nil {
-				// maybe ban sender
-				consensus.getLogger().Error().
-					Err(err).Msgf("[Announce] Failed to validate block")
-			}
 			if err == nil {
 				consensus.GetLogger().Info().
 					Msg("[Announce] Block verified")
@@ -81,7 +76,6 @@ func (consensus *Consensus) ValidateNewBlock(recvMsg *FBFTMessage) (*types.Block
 	defer consensus.mutex.Unlock()
 	return consensus.validateNewBlock(recvMsg)
 }
-
 func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block, error) {
 	if consensus.fBFTLog.IsBlockVerified(recvMsg.BlockHash) {
 		var blockObj *types.Block
@@ -131,7 +125,12 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 		Hex("blockHash", recvMsg.BlockHash[:]).
 		Msg("[validateNewBlock] Prepared message and block added")
 
-	if err := consensus.fBFTLog.verifyBlock(&blockObj); err != nil {
+	if consensus.BlockVerifier == nil {
+		consensus.getLogger().Debug().Msg("[validateNewBlock] consensus received message before init. Ignoring")
+		return nil, errors.New("nil block verifier")
+	}
+
+	if err := consensus.verifyBlock(&blockObj); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[validateNewBlock] Block verification failed")
 		return nil, errors.Errorf("Block verification failed: %s", err.Error())
 	}

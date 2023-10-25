@@ -124,6 +124,10 @@ func (a Stub) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error
 	return errors.Errorf("method WriteBlockWithoutState not implemented for %s", a.Name)
 }
 
+func (a Stub) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, stakeMsgs []staking.StakeMsg, paid reward.Reader, state *state.DB) (status WriteStatus, err error) {
+	return 0, errors.Errorf("method WriteBlockWithState not implemented for %s", a.Name)
+}
+
 func (a Stub) GetMaxGarbageCollectedBlockNumber() int64 {
 	return 0
 }

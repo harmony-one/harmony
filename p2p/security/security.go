@@ -7,14 +7,14 @@ import (
 
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
-	libp2pnetwork "github.com/libp2p/go-libp2p/core/network"
+	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 )
 
 type Security interface {
-	OnConnectCheck(net libp2pnetwork.Network, conn libp2pnetwork.Conn) error
-	OnDisconnectCheck(conn libp2pnetwork.Conn) error
+	OnConnectCheck(net libp2p_network.Network, conn libp2p_network.Conn) error
+	OnDisconnectCheck(conn libp2p_network.Conn) error
 }
 
 type peerMap struct {
@@ -87,7 +87,7 @@ func (m *Manager) RangePeers(f func(key string, value []string) bool) {
 	m.peers.Range(f)
 }
 
-func (m *Manager) OnConnectCheck(net libp2pnetwork.Network, conn libp2pnetwork.Conn) error {
+func (m *Manager) OnConnectCheck(net libp2p_network.Network, conn libp2p_network.Conn) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -133,7 +133,7 @@ func (m *Manager) OnConnectCheck(net libp2pnetwork.Network, conn libp2pnetwork.C
 	return nil
 }
 
-func (m *Manager) OnDisconnectCheck(conn libp2pnetwork.Conn) error {
+func (m *Manager) OnDisconnectCheck(conn libp2p_network.Conn) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -171,7 +171,7 @@ func find(slice []string, val string) (int, bool) {
 	return -1, false
 }
 
-func getRemoteIP(conn libp2pnetwork.Conn) (string, error) {
+func getRemoteIP(conn libp2p_network.Conn) (string, error) {
 	for _, protocol := range conn.RemoteMultiaddr().Protocols() {
 		switch protocol.Code {
 		case ma.P_IP4:

@@ -34,11 +34,9 @@ func (timeout *Timeout) Start() {
 }
 
 // Stop stops the timeout clock
-func (timeout *Timeout) Stop() (stopped bool) {
-	stopped = timeout.state != Inactive
+func (timeout *Timeout) Stop() {
 	timeout.state = Inactive
 	timeout.start = time.Now()
-	return stopped
 }
 
 // Expired checks whether the timeout is reached/expired

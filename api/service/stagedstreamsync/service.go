@@ -12,9 +12,9 @@ type StagedStreamSyncService struct {
 }
 
 // NewService creates a new downloader service
-func NewService(host p2p.Host, bcs []core.BlockChain, consensus *consensus.Consensus, config Config, dbDir string, c *consensus.Consensus) *StagedStreamSyncService {
+func NewService(host p2p.Host, bcs []core.BlockChain, consensus *consensus.Consensus, config Config, dbDir string) *StagedStreamSyncService {
 	return &StagedStreamSyncService{
-		Downloaders: NewDownloaders(host, bcs, consensus, dbDir, config, c),
+		Downloaders: NewDownloaders(host, bcs, consensus, dbDir, config),
 	}
 }
 

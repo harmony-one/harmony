@@ -47,6 +47,7 @@ func CreateStagedSync(ctx context.Context,
 	config Config,
 	logger zerolog.Logger,
 ) (*StagedStreamSync, error) {
+
 	logger.Info().
 		Uint32("shard", bc.ShardID()).
 		Bool("beaconNode", isBeaconNode).
@@ -55,6 +56,7 @@ func CreateStagedSync(ctx context.Context,
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
 		Msg(WrapStagedSyncMsg("creating staged sync"))
+
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
 	if config.UseMemDB {
@@ -80,7 +82,7 @@ func CreateStagedSync(ctx context.Context,
 	}
 
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
-	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB, consensus)
+	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
 	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
@@ -225,9 +227,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		return 0, 0, err
 	}
 
-	s.startSyncing()
-	defer s.finishSyncing()
-
 	var estimatedHeight uint64
 	if initSync {
 		if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
@@ -244,20 +243,13 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		}
 	}
 
-	i := 0
+	s.startSyncing()
+	defer s.finishSyncing()
+
 	for {
-		i++
 		ctx, cancel := context.WithCancel(downloaderContext)
-		started := s.bc.CurrentHeader().NumberU64()
+
 		n, err := s.doSyncCycle(ctx, initSync)
-		finished := s.bc.CurrentHeader().NumberU64()
-		utils.Logger().Info().
-			Uint64("from", started).
-			Int("returned", n).
-			Uint64("to", finished).
-			Bool("initSync", initSync).
-			Int("cycle", i).
-			Msg(WrapStagedSyncMsg("synced blocks"))
 		if err != nil {
 			utils.Logger().Error().
 				Err(err).
@@ -377,9 +369,6 @@ func (s *StagedStreamSync) finishSyncing() {
 	if s.evtDownloadFinishedSubscribed {
 		s.evtDownloadFinished.Send(struct{}{})
 	}
-	utils.Logger().Info().
-		Bool("evtDownloadFinishedSubscribed", s.evtDownloadFinishedSubscribed).
-		Msg(WrapStagedSyncMsg("finished syncing"))
 }
 
 func (s *StagedStreamSync) checkPrerequisites() error {

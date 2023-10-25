@@ -113,16 +113,14 @@ type FBFTLog struct {
 	blocks         map[common.Hash]*types.Block // store blocks received in FBFT
 	verifiedBlocks map[common.Hash]struct{}     // store block hashes for blocks that has already been verified
 	messages       map[fbftMsgID]*FBFTMessage   // store messages received in FBFT
-	verifyNewBlock func(*types.Block) error     // block verification function
 }
 
 // NewFBFTLog returns new instance of FBFTLog
-func NewFBFTLog(verifyNewBlock func(*types.Block) error) *FBFTLog {
+func NewFBFTLog() *FBFTLog {
 	pbftLog := FBFTLog{
 		blocks:         make(map[common.Hash]*types.Block),
 		messages:       make(map[fbftMsgID]*FBFTMessage),
 		verifiedBlocks: make(map[common.Hash]struct{}),
-		verifyNewBlock: verifyNewBlock,
 	}
 	return &pbftLog
 }
@@ -130,10 +128,6 @@ func NewFBFTLog(verifyNewBlock func(*types.Block) error) *FBFTLog {
 // AddBlock add a new block into the log
 func (log *FBFTLog) AddBlock(block *types.Block) {
 	log.blocks[block.Hash()] = block
-}
-
-func (log *FBFTLog) BlockVerify(block *types.Block) error {
-	return log.verifyNewBlock(block)
 }
 
 // MarkBlockVerified marks the block as verified
