@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type ConnectCallback func(net libp2p_network.Network, conn libp2p_network.Conn) error
@@ -53,7 +54,7 @@ func (mh *fakeHost) SetDisconnectCallback(callback DisconnectCallback) {
 
 func TestManager_OnConnectCheck(t *testing.T) {
 	h1, err := newPeer(50550)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	defer h1.Close()
 
 	fakeHost := &fakeHost{}
@@ -65,10 +66,9 @@ func TestManager_OnConnectCheck(t *testing.T) {
 	assert.Nil(t, err)
 	defer h2.Close()
 	err = h2.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
-	security.peers.Range(func(k, v interface{}) bool {
-		peers := v.([]string)
+	security.RangePeers(func(k string, peers []string) bool {
 		assert.Equal(t, 1, len(peers))
 		return true
 	})
@@ -78,9 +78,8 @@ func TestManager_OnConnectCheck(t *testing.T) {
 	defer h3.Close()
 	err = h3.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
 	assert.Nil(t, err)
-	security.peers.Range(func(k, v interface{}) bool {
-		peers := v.([]string)
-		assert.Equal(t, 2, len(peers))
+	security.RangePeers(func(k string, peers []string) bool {
+		require.Equal(t, 2, len(peers))
 		return true
 	})
 
@@ -89,9 +88,8 @@ func TestManager_OnConnectCheck(t *testing.T) {
 	defer h4.Close()
 	err = h4.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
 	assert.Nil(t, err)
-	security.peers.Range(func(k, v interface{}) bool {
-		peers := v.([]string)
-		assert.Equal(t, 2, len(peers))
+	security.RangePeers(func(k string, peers []string) bool {
+		require.Equal(t, 2, len(peers))
 		return true
 	})
 }
@@ -112,8 +110,7 @@ func TestManager_OnDisconnectCheck(t *testing.T) {
 	err = h2.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
 	assert.Nil(t, err)
 
-	security.peers.Range(func(k, v interface{}) bool {
-		peers := v.([]string)
+	security.RangePeers(func(k string, peers []string) bool {
 		assert.Equal(t, 1, len(peers))
 		return true
 	})
@@ -121,8 +118,7 @@ func TestManager_OnDisconnectCheck(t *testing.T) {
 	err = h2.Network().ClosePeer(h1.ID())
 	assert.Nil(t, err)
 	time.Sleep(200 * time.Millisecond)
-	security.peers.Range(func(k, v interface{}) bool {
-		peers := v.([]string)
+	security.RangePeers(func(k string, peers []string) bool {
 		assert.Equal(t, 0, len(peers))
 		return true
 	})
