@@ -254,7 +254,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	self.PeerID = p2pHost.ID()
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 
-	security := security.NewManager(cfg.MaxConnPerIP, cfg.MaxPeers)
+	security := security.NewManager(cfg.MaxConnPerIP, int(cfg.MaxPeers))
 	// has to save the private key for host
 	h := &HostV2{
 		h:             p2pHost,

@@ -3,7 +3,6 @@ package security
 import (
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/harmony-one/harmony/internal/utils"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -18,56 +17,53 @@ type Security interface {
 
 type Manager struct {
 	maxConnPerIP int
-	maxPeers     int64
+	maxPeers     int
 
 	mutex sync.Mutex
-	peers peerMap // All the connected nodes, key is the Peer's IP, value is the peer's ID array
+	peers *peerMap // All the connected nodes, key is the Peer's IP, value is the peer's ID array
 }
 
 type peerMap struct {
-	count int64
-	peers sync.Map
+	peers map[string][]string
 }
 
-func (peerMap *peerMap) Len() int64 {
-	return atomic.LoadInt64(&peerMap.count)
-}
-
-func (peerMap *peerMap) Store(key, value interface{}) {
-	// only increment if you didn't have this key
-	hasKey := peerMap.HasKey(key)
-	peerMap.peers.Store(key, value)
-	if !hasKey {
-		atomic.AddInt64(&peerMap.count, 1)
+func newPeersMap() *peerMap {
+	return &peerMap{
+		peers: make(map[string][]string),
 	}
 }
 
-func (peerMap *peerMap) HasKey(key interface{}) bool {
-	hasKey := false
-	peerMap.peers.Range(func(k, v interface{}) bool {
-		if k == key {
-			hasKey = true
-			return false
+func (peerMap *peerMap) Len() int {
+	return len(peerMap.peers)
+}
+
+func (peerMap *peerMap) Store(key string, value []string) {
+	peerMap.peers[key] = value
+}
+
+func (peerMap *peerMap) HasKey(key string) bool {
+	_, ok := peerMap.peers[key]
+	return ok
+}
+
+func (peerMap *peerMap) Delete(key string) {
+	delete(peerMap.peers, key)
+}
+
+func (peerMap *peerMap) Load(key string) (value []string, ok bool) {
+	value, ok = peerMap.peers[key]
+	return value, ok
+}
+
+func (peerMap *peerMap) Range(f func(key string, value []string) bool) {
+	for key, value := range peerMap.peers {
+		if !f(key, value) {
+			break
 		}
-		return true
-	})
-	return hasKey
+	}
 }
 
-func (peerMap *peerMap) Delete(key interface{}) {
-	peerMap.peers.Delete(key)
-	atomic.AddInt64(&peerMap.count, -1)
-}
-
-func (peerMap *peerMap) Load(key interface{}) (value interface{}, ok bool) {
-	return peerMap.peers.Load(key)
-}
-
-func (peerMap *peerMap) Range(f func(key, value any) bool) {
-	peerMap.peers.Range(f)
-}
-
-func NewManager(maxConnPerIP int, maxPeers int64) *Manager {
+func NewManager(maxConnPerIP int, maxPeers int) *Manager {
 	if maxConnPerIP < 0 {
 		panic("maximum connections per IP must not be negative")
 	}
@@ -77,7 +73,14 @@ func NewManager(maxConnPerIP int, maxPeers int64) *Manager {
 	return &Manager{
 		maxConnPerIP: maxConnPerIP,
 		maxPeers:     maxPeers,
+		peers:        newPeersMap(),
 	}
+}
+
+func (m *Manager) RangePeers(f func(key string, value []string) bool) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.peers.Range(f)
 }
 
 func (m *Manager) OnConnectCheck(net libp2p_network.Network, conn libp2p_network.Conn) error {
@@ -89,19 +92,11 @@ func (m *Manager) OnConnectCheck(net libp2p_network.Network, conn libp2p_network
 		return errors.Wrap(err, "failed on get remote ip")
 	}
 
-	value, ok := m.peers.Load(remoteIp)
-	if !ok {
-		value = []string{}
-	}
-
-	peers, ok := value.([]string)
-	if !ok {
-		return errors.New("peers info type err")
-	}
+	peers, _ := m.peers.Load(remoteIp)
 
 	// avoid add repeatedly
 	peerID := conn.RemotePeer().String()
-	_, ok = find(peers, peerID)
+	_, ok := find(peers, peerID)
 	if !ok {
 		peers = append(peers, peerID)
 	}
@@ -118,7 +113,7 @@ func (m *Manager) OnConnectCheck(net libp2p_network.Network, conn libp2p_network
 	// only limit addition if it's a new peer and not an existing peer with new connection
 	if m.maxPeers > 0 && currentPeerCount >= m.maxPeers && !m.peers.HasKey(remoteIp) {
 		utils.Logger().Warn().
-			Int64("connected peers", currentPeerCount).
+			Int("connected peers", currentPeerCount).
 			Str("new peer", remoteIp).
 			Msg("too many peers, closing")
 		return net.ClosePeer(conn.RemotePeer())
@@ -136,14 +131,9 @@ func (m *Manager) OnDisconnectCheck(conn libp2p_network.Conn) error {
 		return errors.Wrap(err, "failed on get ip")
 	}
 
-	value, ok := m.peers.Load(ip)
+	peers, ok := m.peers.Load(ip)
 	if !ok {
 		return nil
-	}
-
-	peers, ok := value.([]string)
-	if !ok {
-		return errors.New("peers info type err")
 	}
 
 	peerID := conn.RemotePeer().String()

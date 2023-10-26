@@ -1091,13 +1091,16 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 	}
 
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
-	if err != nil {
+	switch {
+	case errors.Is(err, core.ErrKnownBlock):
+	case err != nil:
 		utils.Logger().Error().
 			Err(err).
 			Uint64("block number", block.NumberU64()).
 			Uint32("shard", block.ShardID()).
 			Msgf("[STAGED_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain")
 		return err
+	default:
 	}
 	utils.Logger().Info().
 		Uint64("blockHeight", block.NumberU64()).
@@ -1218,7 +1221,7 @@ func (ss *StagedSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Con
 			if block == nil {
 				break
 			}
-			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil && !errors.Is(err, core.ErrKnownBlock) {
 				return errors.Wrap(err, "failed to InsertChain")
 			}
 		}
