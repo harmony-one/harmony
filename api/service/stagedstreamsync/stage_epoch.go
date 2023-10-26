@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/harmony-one/harmony/shard"
@@ -129,13 +130,20 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		return 0, nil
 	}
 
-	n, err := s.state.bc.InsertChain(blocks, true)
-	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
-	if err != nil {
-		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
-		sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
-		return n, err
+	n := 0
+	for _, block := range blocks {
+		_, err := s.state.bc.InsertChain([]*types.Block{block}, true)
+		switch {
+		case errors.Is(err, core.ErrKnownBlock):
+		case err != nil:
+			utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
+			sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
+			return n, err
+		default:
+		}
+		n++
 	}
+	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	return n, nil
 }
 

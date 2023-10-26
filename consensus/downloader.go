@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/pkg/errors"
 )
@@ -93,7 +94,7 @@ func (consensus *Consensus) AddConsensusLastMile() error {
 			if block == nil {
 				break
 			}
-			if _, err := consensus.Blockchain().InsertChain(types.Blocks{block}, true); err != nil {
+			if _, err := consensus.Blockchain().InsertChain(types.Blocks{block}, true); err != nil && !errors.Is(err, core.ErrKnownBlock) {
 				return errors.Wrap(err, "failed to InsertChain")
 			}
 		}
