@@ -104,7 +104,7 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 	}
 
 	// Fetch states from neighbors
-	pivotRootHash := s.state.status.pivotBlock.Root()
+	// pivotRootHash := s.state.status.pivotBlock.Root()
 	currentBlockRootHash := s.state.bc.CurrentFastBlock().Root()
 	sdm := newStateDownloadManager(tx, sss.configs.bc, sss.configs.concurrency, s.state.logger)
 	sdm.setRootHash(currentBlockRootHash)

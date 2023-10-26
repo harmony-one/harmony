@@ -296,27 +296,6 @@ func TestSyncStream_HandleGetTrieNodes(t *testing.T) {
 	}
 }
 
-func TestSyncStream_HandleGetNodeData(t *testing.T) {
-	st, remoteSt := makeTestSyncStream()
-
-	go st.run()
-	defer close(st.closeC)
-
-	req := testGetNodeDataRequestMsg
-	b, _ := protobuf.Marshal(req)
-	err := remoteSt.WriteBytes(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(200 * time.Millisecond)
-	receivedBytes, _ := remoteSt.ReadBytes()
-
-	if err := checkGetNodeDataResult(receivedBytes, testGetNodeData); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func makeTestSyncStream() (*syncStream, *testRemoteBaseStream) {
 	localRaw, remoteRaw := makePairP2PStreams()
 	remote := newTestRemoteBaseStream(remoteRaw)

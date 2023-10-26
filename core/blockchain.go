@@ -130,7 +130,7 @@ type BlockChain interface {
 	// transaction and receipt data.
 	InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error)
 	// LeaderRotationMeta returns the number of continuous blocks by the leader.
-	LeaderRotationMeta() (publicKeyBytes []byte, epoch, count, shifts uint64, err error)
+	LeaderRotationMeta() LeaderRotationMeta
 	// BadBlocks returns a list of the last 'bad blocks' that
 	// the client has seen on the network.
 	BadBlocks() []BadBlock

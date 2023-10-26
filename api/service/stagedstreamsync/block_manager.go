@@ -126,7 +126,7 @@ func (gbm *blockDownloadManager) GetDownloadDetails(blockNumber uint64) (loopID 
 	if dm, exist := gbm.bdd[blockNumber]; exist {
 		return dm.loopID, dm.streamID, nil
 	}
-	return 0, sttypes.StreamID(0), fmt.Errorf("there is no download details for the block number: %d", blockNumber)
+	return 0, sttypes.StreamID(fmt.Sprint(0)), fmt.Errorf("there is no download details for the block number: %d", blockNumber)
 }
 
 // SetRootHash sets the root hash for a specific block
