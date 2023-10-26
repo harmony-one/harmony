@@ -59,14 +59,14 @@ func (peerMap *peerMap) Range(f func(key string, value []string) bool) {
 
 type Manager struct {
 	maxConnPerIP int
-	maxPeers     int64
+	maxPeers     int
 
 	mutex  sync.Mutex
-	peers  peerMap // All the connected nodes, key is the Peer's IP, value is the peer's ID array
+	peers  *peerMap // All the connected nodes, key is the Peer's IP, value is the peer's ID array
 	banned *blockedpeers.Manager
 }
 
-func NewManager(maxConnPerIP int, maxPeers int64, banned *blockedpeers.Manager) *Manager {
+func NewManager(maxConnPerIP int, maxPeers int, banned *blockedpeers.Manager) *Manager {
 	if maxConnPerIP < 0 {
 		panic("maximum connections per IP must not be negative")
 	}

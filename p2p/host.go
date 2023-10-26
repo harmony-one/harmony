@@ -11,6 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
+	"github.com/harmony-one/harmony/p2p/discovery"
+	"github.com/harmony-one/harmony/p2p/security"
+	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -247,7 +254,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 
 	banned := blockedpeers.NewManager(1024)
-	security := security.NewManager(cfg.MaxConnPerIP, int(cfg.MaxPeers, banned))
+	security := security.NewManager(cfg.MaxConnPerIP, int(cfg.MaxPeers), banned)
 	// has to save the private key for host
 	h := &HostV2{
 		h:             p2pHost,
