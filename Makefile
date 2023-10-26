@@ -180,3 +180,6 @@ debug_external: clean
 
 build_localnet_validator:
 	bash test/build-localnet-validator.sh
+
+tt:
+	go test -v -test.run OnDisconnectCheck ./p2p/security

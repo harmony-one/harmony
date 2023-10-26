@@ -1682,6 +1682,8 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 	if len(chain) == 0 {
 		return 0, nil, nil, ErrEmptyChain
 	}
+	first := chain[0]
+	fmt.Println("insertChain", utils.GetPort(), first.ShardID(), first.Epoch().Uint64(), first.NumberU64())
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
 		if chain[i].NumberU64() != chain[i-1].NumberU64()+1 || chain[i].ParentHash() != chain[i-1].Hash() {

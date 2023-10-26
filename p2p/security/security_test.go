@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
 	"github.com/libp2p/go-libp2p"
 	ic "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -58,7 +59,7 @@ func TestManager_OnConnectCheck(t *testing.T) {
 	defer h1.Close()
 
 	fakeHost := &fakeHost{}
-	security := NewManager(2, 1)
+	security := NewManager(2, 1, blockedpeers.NewManager(4))
 	h1.Network().Notify(fakeHost)
 	fakeHost.SetConnectCallback(security.OnConnectCheck)
 	fakeHost.SetDisconnectCallback(security.OnDisconnectCheck)
@@ -100,7 +101,7 @@ func TestManager_OnDisconnectCheck(t *testing.T) {
 	defer h1.Close()
 
 	fakeHost := &fakeHost{}
-	security := NewManager(2, 0)
+	security := NewManager(2, 0, blockedpeers.NewManager(4))
 	h1.Network().Notify(fakeHost)
 	fakeHost.SetConnectCallback(security.OnConnectCheck)
 	fakeHost.SetDisconnectCallback(security.OnDisconnectCheck)

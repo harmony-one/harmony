@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -55,7 +56,7 @@ func (consensus *Consensus) isViewChangingMode() bool {
 }
 
 // HandleMessageUpdate will update the consensus state according to received message
-func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message, senderKey *bls.SerializedPublicKey) error {
+func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message, senderKey *bls.SerializedPublicKey) error {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog

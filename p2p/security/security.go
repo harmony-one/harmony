@@ -3,8 +3,10 @@ package security
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -13,14 +15,6 @@ import (
 type Security interface {
 	OnConnectCheck(net libp2p_network.Network, conn libp2p_network.Conn) error
 	OnDisconnectCheck(conn libp2p_network.Conn) error
-}
-
-type Manager struct {
-	maxConnPerIP int
-	maxPeers     int
-
-	mutex sync.Mutex
-	peers *peerMap // All the connected nodes, key is the Peer's IP, value is the peer's ID array
 }
 
 type peerMap struct {
@@ -63,7 +57,16 @@ func (peerMap *peerMap) Range(f func(key string, value []string) bool) {
 	}
 }
 
-func NewManager(maxConnPerIP int, maxPeers int) *Manager {
+type Manager struct {
+	maxConnPerIP int
+	maxPeers     int
+
+	mutex  sync.Mutex
+	peers  *peerMap // All the connected nodes, key is the Peer's IP, value is the peer's ID array
+	banned *blockedpeers.Manager
+}
+
+func NewManager(maxConnPerIP int, maxPeers int, banned *blockedpeers.Manager) *Manager {
 	if maxConnPerIP < 0 {
 		panic("maximum connections per IP must not be negative")
 	}
@@ -74,6 +77,7 @@ func NewManager(maxConnPerIP int, maxPeers int) *Manager {
 		maxConnPerIP: maxConnPerIP,
 		maxPeers:     maxPeers,
 		peers:        newPeersMap(),
+		banned:       banned,
 	}
 }
 
@@ -118,6 +122,13 @@ func (m *Manager) OnConnectCheck(net libp2p_network.Network, conn libp2p_network
 			Msg("too many peers, closing")
 		return net.ClosePeer(conn.RemotePeer())
 	}
+	if m.banned.IsBanned(conn.RemotePeer(), time.Now()) {
+		utils.Logger().Warn().
+			Str("new peer", remoteIp).
+			Msg("peer is banned, closing")
+		return net.ClosePeer(conn.RemotePeer())
+	}
+
 	m.peers.Store(remoteIp, peers)
 	return nil
 }
