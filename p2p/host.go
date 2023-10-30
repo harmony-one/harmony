@@ -11,6 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
+	"github.com/harmony-one/harmony/p2p/discovery"
+	"github.com/harmony-one/harmony/p2p/security"
+	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -24,19 +31,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
-
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-
-	"github.com/harmony-one/bls/ffi/go/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p/discovery"
-	"github.com/harmony-one/harmony/p2p/security"
-	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 )
 
 type ConnectCallback func(net libp2p_network.Network, conn libp2p_network.Conn) error
@@ -254,7 +253,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 	self.PeerID = p2pHost.ID()
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 
-	security := security.NewManager(cfg.MaxConnPerIP, cfg.MaxPeers)
+	banned := blockedpeers.NewManager(1024)
+	security := security.NewManager(cfg.MaxConnPerIP, int(cfg.MaxPeers), banned)
 	// has to save the private key for host
 	h := &HostV2{
 		h:             p2pHost,
@@ -269,6 +269,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		logger:        &subLogger,
 		ctx:           ctx,
 		cancel:        cancel,
+		banned:        banned,
 	}
 
 	utils.Logger().Info().
@@ -323,6 +324,7 @@ type HostV2 struct {
 	onDisconnects DisconnectCallbacks
 	ctx           context.Context
 	cancel        func()
+	banned        *blockedpeers.Manager
 }
 
 // PubSub ..
@@ -492,9 +494,7 @@ func (host *HostV2) ListPeer(topic string) []libp2p_peer.ID {
 
 // ListBlockedPeer returns list of blocked peer
 func (host *HostV2) ListBlockedPeer() []libp2p_peer.ID {
-	// TODO: this is a place holder for now
-	peers := make([]libp2p_peer.ID, 0)
-	return peers
+	return host.banned.Keys()
 }
 
 // GetPeerCount ...

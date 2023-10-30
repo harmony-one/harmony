@@ -25,19 +25,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ValidatorListProvider ..
-type ValidatorListProvider interface {
-	Compute(
-		epoch *big.Int, reader DataProvider,
-	) (*shard.State, error)
-	ReadFromDB(epoch *big.Int, reader DataProvider) (*shard.State, error)
-}
-
-// Reader is committee.Reader and it is the API that committee membership assignment needs
-type Reader interface {
-	ValidatorListProvider
-}
-
 // StakingCandidatesReader ..
 type StakingCandidatesReader interface {
 	CurrentBlock() *types.Block
@@ -272,7 +259,7 @@ type partialStakingEnabled struct{}
 
 var (
 	// WithStakingEnabled ..
-	WithStakingEnabled Reader = partialStakingEnabled{}
+	WithStakingEnabled = partialStakingEnabled{}
 	// ErrComputeForEpochInPast ..
 	ErrComputeForEpochInPast = errors.New("cannot compute for epoch in past")
 )

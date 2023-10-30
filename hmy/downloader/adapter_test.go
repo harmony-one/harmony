@@ -8,11 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/trie"
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/state/snapshot"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/params"
@@ -88,7 +90,9 @@ func (bc *testBlockChain) changeBlockNumber(val uint64) {
 
 func (bc *testBlockChain) ShardID() uint32                                          { return 0 }
 func (bc *testBlockChain) ReadShardState(epoch *big.Int) (*shard.State, error)      { return nil, nil }
+func (bc *testBlockChain) Snapshots() *snapshot.Tree                                { return nil }
 func (bc *testBlockChain) TrieNode(hash common.Hash) ([]byte, error)                { return []byte{}, nil }
+func (bc *testBlockChain) TrieDB() *trie.Database                                   { return nil }
 func (bc *testBlockChain) Config() *params.ChainConfig                              { return nil }
 func (bc *testBlockChain) WriteCommitSig(blockNum uint64, lastCommits []byte) error { return nil }
 func (bc *testBlockChain) GetHeader(hash common.Hash, number uint64) *block.Header  { return nil }

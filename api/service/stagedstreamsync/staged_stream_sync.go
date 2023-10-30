@@ -636,7 +636,8 @@ func (ss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consens
 			if block == nil {
 				break
 			}
-			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+			_, err := bc.InsertChain(types.Blocks{block}, true)
+			if err != nil && !errors.Is(err, core.ErrKnownBlock) {
 				return errors.Wrap(err, "failed to InsertChain")
 			}
 			hashes = append(hashes, block.Header().Hash())
@@ -704,13 +705,16 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 	}
 
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
-	if err != nil {
+	switch {
+	case errors.Is(err, core.ErrKnownBlock):
+	case err != nil:
 		utils.Logger().Error().
 			Err(err).
 			Uint64("block number", block.NumberU64()).
 			Uint32("shard", block.ShardID()).
 			Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain")
 		return err
+	default:
 	}
 	utils.Logger().Info().
 		Uint64("blockHeight", block.NumberU64()).
