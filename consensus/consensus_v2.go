@@ -686,13 +686,6 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	return nil
 }
 
-type stored struct {
-	pub    []byte
-	epoch  uint64
-	count  uint64
-	shifts uint64 // count how much changes validator per epoch
-}
-
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
@@ -727,22 +720,23 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		utils.Logger().Error().Msg("[Rotating leader] slots count is 0")
 		return
 	}
-	var (
-		s                           stored
-		minimumBlocksForLeaderInRow uint64 = 3 // mine no less than N blocks in a row
-		rest                               = blocksPerEpoch % uint64(slotsCount)
-		numBlocksToProduceByLeader         = utils.Max(blocksPerEpoch/uint64(slotsCount), minimumBlocksForLeaderInRow)
-	)
-	s.pub, s.epoch, s.count, s.shifts, _ = bc.LeaderRotationMeta()
-	if !bytes.Equal(leader.Bytes[:], s.pub) {
+	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
+	rest := blocksPerEpoch % uint64(slotsCount)
+	const minimumBlocksForLeaderInRow = 3
+	if numBlocksProducedByLeader < minimumBlocksForLeaderInRow {
+		// mine no less than 3 blocks in a row
+		numBlocksProducedByLeader = minimumBlocksForLeaderInRow
+	}
+	s := bc.LeaderRotationMeta()
+	if !bytes.Equal(leader.Bytes[:], s.Pub) {
 		// Another leader.
 		return
 	}
 	// If it is the first validator producing blocks, it should also produce the remaining 'rest' of the blocks.
 	if s.Shifts == 0 {
-		numBlocksToProduceByLeader += rest
+		numBlocksProducedByLeader += rest
 	}
-	if s.Count < numBlocksToProduceByLeader {
+	if s.Count < numBlocksProducedByLeader {
 		// Not enough blocks produced by the leader, continue producing by the same leader.
 		return
 	}
