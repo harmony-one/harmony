@@ -690,10 +690,15 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	var (
-		bc     = consensus.Blockchain()
-		prev   = consensus.getLeaderPubKey()
-		leader = consensus.getLeaderPubKey()
+		bc        = consensus.Blockchain()
+		prev      = consensus.getLeaderPubKey()
+		leader    = consensus.getLeaderPubKey()
+		curBlock  = bc.CurrentBlock()
+		curNumber = curBlock.NumberU64()
+		curEpoch  = curBlock.Epoch().Uint64()
 	)
+	const blocksCountAliveness = 10
+
 	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
@@ -741,18 +746,59 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	var (
 		wasFound bool
 		next     *bls.PublicKeyWrapper
+		offset   = 1
 	)
-	if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
-		wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, 1)
-	} else {
-		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
-	}
-	if !wasFound {
-		utils.Logger().Error().Msg("Failed to get next leader")
-		return
-	} else {
+
+	for {
+		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
+			wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, offset)
+		} else {
+			wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
+		}
+		if !wasFound {
+			utils.Logger().Error().Msg("Failed to get next leader")
+			// Seems like nothing we can do here.
+			return
+		}
+		members := consensus.Decider.Participants()
+		mask := bls.NewMask(members)
+		skipped := 0
+		for i := 0; i < blocksCountAliveness; i++ {
+			header := bc.GetHeaderByNumber(curNumber - uint64(i))
+			if header == nil {
+				utils.Logger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(i))
+				return
+			}
+			// if epoch is different, we should not check this block.
+			if header.Epoch().Uint64() != curEpoch {
+				break
+			}
+			// Populate the mask with the bitmap.
+			err = mask.SetMask(header.LastCommitBitmap())
+			if err != nil {
+				utils.Logger().Err(err).Msg("Failed to set mask")
+				return
+			}
+			ok, err := mask.KeyEnabled(next.Bytes)
+			if err != nil {
+				utils.Logger().Err(err).Msg("Failed to get key enabled")
+				return
+			}
+			if !ok {
+				skipped++
+			}
+		}
+
+		// no signature from the next leader at all, we should skip it.
+		if skipped >= blocksCountAliveness {
+			// Next leader is not signing blocks, we should skip it.
+			offset++
+			continue
+		}
 		consensus.setLeaderPubKey(next)
+		break
 	}
+
 	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 		// leader changed
 		go func() {
