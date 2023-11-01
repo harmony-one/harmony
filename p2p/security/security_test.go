@@ -3,6 +3,7 @@ package security
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -53,8 +54,26 @@ func (mh *fakeHost) SetDisconnectCallback(callback DisconnectCallback) {
 	mh.onDisconnects = append(mh.onDisconnects, callback)
 }
 
+func GetFreePort(t *testing.T) int {
+	t.Helper()
+	a, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+		return 0
+	} else {
+		l, err := net.ListenTCP("tcp", a)
+		if err != nil {
+			t.Fatal(err)
+			return 0
+		} else {
+			defer l.Close()
+			return l.Addr().(*net.TCPAddr).Port
+		}
+	}
+}
+
 func TestManager_OnConnectCheck(t *testing.T) {
-	h1, err := newPeer(50550)
+	h1, err := newPeer(GetFreePort(t))
 	require.NoError(t, err)
 	defer h1.Close()
 
@@ -63,7 +82,7 @@ func TestManager_OnConnectCheck(t *testing.T) {
 	h1.Network().Notify(fakeHost)
 	fakeHost.SetConnectCallback(security.OnConnectCheck)
 	fakeHost.SetDisconnectCallback(security.OnDisconnectCheck)
-	h2, err := newPeer(50551)
+	h2, err := newPeer(GetFreePort(t))
 	assert.Nil(t, err)
 	defer h2.Close()
 	err = h2.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
@@ -74,7 +93,7 @@ func TestManager_OnConnectCheck(t *testing.T) {
 		return true
 	})
 
-	h3, err := newPeer(50552)
+	h3, err := newPeer(GetFreePort(t))
 	assert.Nil(t, err)
 	defer h3.Close()
 	err = h3.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
@@ -84,7 +103,7 @@ func TestManager_OnConnectCheck(t *testing.T) {
 		return true
 	})
 
-	h4, err := newPeer(50553)
+	h4, err := newPeer(GetFreePort(t))
 	assert.Nil(t, err)
 	defer h4.Close()
 	err = h4.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
@@ -96,7 +115,7 @@ func TestManager_OnConnectCheck(t *testing.T) {
 }
 
 func TestManager_OnDisconnectCheck(t *testing.T) {
-	h1, err := newPeer(50550)
+	h1, err := newPeer(GetFreePort(t))
 	assert.Nil(t, err)
 	defer h1.Close()
 
@@ -105,7 +124,7 @@ func TestManager_OnDisconnectCheck(t *testing.T) {
 	h1.Network().Notify(fakeHost)
 	fakeHost.SetConnectCallback(security.OnConnectCheck)
 	fakeHost.SetDisconnectCallback(security.OnDisconnectCheck)
-	h2, err := newPeer(50551)
+	h2, err := newPeer(GetFreePort(t))
 	assert.Nil(t, err)
 	defer h2.Close()
 	err = h2.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
