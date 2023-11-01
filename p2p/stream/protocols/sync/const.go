@@ -25,6 +25,39 @@ const (
 	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
 	GetReceiptsCap = 128
 
+	// GetStorageRangesRequestCap is the cap of request of single GetStorageRanges request
+	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
+	GetStorageRangesRequestCap = 256
+
+	// GetByteCodesRequestCap is the cap of request of single GetByteCodes request
+	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
+	GetByteCodesRequestCap = 128
+
+	// GetTrieNodesRequestCap is the cap of request of single GetTrieNodes request
+	// This number has an effect on maxMsgBytes as 20MB defined in github.com/harmony-one/harmony/p2p/stream/types.
+	GetTrieNodesRequestCap = 128
+
+	// stateLookupSlack defines the ratio by how much a state response can exceed
+	// the requested limit in order to try and avoid breaking up contracts into
+	// multiple packages and proving them.
+	stateLookupSlack = 0.1
+
+	// softResponseLimit is the target maximum size of replies to data retrievals.
+	softResponseLimit = 2 * 1024 * 1024
+
+	// maxCodeLookups is the maximum number of bytecodes to serve. This number is
+	// there to limit the number of disk lookups.
+	maxCodeLookups = 1024
+
+	// maxTrieNodeLookups is the maximum number of state trie nodes to serve. This
+	// number is there to limit the number of disk lookups.
+	maxTrieNodeLookups = 1024
+
+	// maxTrieNodeTimeSpent is the maximum time we should spend on looking up trie nodes.
+	// If we spend too much time, then it's a fairly high chance of timing out
+	// at the remote side, which means all the work is in vain.
+	maxTrieNodeTimeSpent = 5 * time.Second
+
 	// MaxStreamFailures is the maximum allowed failures before stream gets removed
 	MaxStreamFailures = 5
 

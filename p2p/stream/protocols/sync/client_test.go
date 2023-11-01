@@ -25,6 +25,8 @@ var (
 	_ sttypes.Request  = &getBlockNumberRequest{}
 	_ sttypes.Request  = &getReceiptsRequest{}
 	_ sttypes.Response = &syncResponse{&syncpb.Response{}}
+	// MaxHash represents the maximum possible hash value.
+	MaxHash = common.HexToHash("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 )
 
 var (
@@ -66,6 +68,69 @@ var (
 	testReceiptResponse = syncpb.MakeGetReceiptsResponse(0, testReceipsMap)
 
 	testNodeDataResponse = syncpb.MakeGetNodeDataResponse(0, [][]byte{testNodeDataBytes})
+
+	account1    = common.HexToHash("0xf493f79c43bd747129a226ad42529885a4b108aba6046b2d12071695a6627844")
+	account2    = common.HexToHash("0xf493f79c43bd747129a226ad42529885a4b108aba6046b2d12071695a6627844")
+	resAccounts = []common.Hash{account1, account2}
+
+	accountsData = []*message.AccountData{
+		&syncpb.AccountData{
+			Hash: account1[:],
+			Body: common.HexToHash("0x00bf100000000000000000000000000000000000000000000000000000000000").Bytes(),
+		},
+		&syncpb.AccountData{
+			Hash: account2[:],
+			Body: common.HexToHash("0x00bf100000000000000000000000000000000000000000000000000000000000").Bytes(),
+		},
+	}
+
+	slots = []*syncpb.StoragesData{
+		&syncpb.StoragesData{
+			Data: []*syncpb.StorageData{
+				&syncpb.StorageData{
+					Hash: account1[:],
+					Body: common.HexToHash("0x00bf100000000000000000000000000000000000000000000000000000000000").Bytes(),
+				},
+			},
+		},
+		&syncpb.StoragesData{
+			Data: []*syncpb.StorageData{
+				&syncpb.StorageData{
+					Hash: account2[:],
+					Body: common.HexToHash("0x00bf100000000000000000000000000000000000000000000000000000000000").Bytes(),
+				},
+			},
+		},
+	}
+
+	proofBytes1, _ = rlp.EncodeToBytes(account1)
+	proofBytes2, _ = rlp.EncodeToBytes(account2)
+	proof          = [][]byte{proofBytes1, proofBytes2}
+
+	codeBytes1, _     = rlp.EncodeToBytes(account1)
+	codeBytes2, _     = rlp.EncodeToBytes(account2)
+	testByteCodes     = [][]byte{codeBytes1, codeBytes2}
+	dataNodeBytes1, _ = rlp.EncodeToBytes(numberToHash(1).Bytes())
+	dataNodeBytes2, _ = rlp.EncodeToBytes(numberToHash(2).Bytes())
+	testTrieNodes     = [][]byte{dataNodeBytes1, dataNodeBytes2}
+	testPathSet       = [][]byte{numberToHash(19850928).Bytes(), numberToHash(13640607).Bytes()}
+
+	testPaths = []*syncpb.TrieNodePathSet{
+		&syncpb.TrieNodePathSet{
+			Pathset: testPathSet,
+		},
+		&syncpb.TrieNodePathSet{
+			Pathset: testPathSet,
+		},
+	}
+
+	testAccountRangeResponse = syncpb.MakeGetAccountRangeResponse(0, accountsData, proof)
+
+	testStorageRangesResponse = syncpb.MakeGetStorageRangesResponse(0, slots, proof)
+
+	testByteCodesResponse = syncpb.MakeGetByteCodesResponse(0, testByteCodes)
+
+	testTrieNodesResponse = syncpb.MakeGetTrieNodesResponse(0, testTrieNodes)
 
 	testErrorResponse = syncpb.MakeErrorResponse(0, errors.New("test error"))
 )
@@ -423,6 +488,267 @@ func TestProtocol_GetNodeData(t *testing.T) {
 		if test.expErr == nil {
 			if len(receipts) != 1 {
 				t.Errorf("Test %v: size not 1", i)
+			}
+		}
+	}
+}
+
+func TestProtocol_GetAccountRange(t *testing.T) {
+	var (
+		root   = numberToHash(1985082913640607)
+		ffHash = MaxHash
+		zero   = common.Hash{}
+	)
+
+	tests := []struct {
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
+	}{
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testAccountRangeResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testBlockResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("response not GetAccountRange"),
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testErrorResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
+		},
+	}
+
+	for i, test := range tests {
+		protocol := makeTestProtocol(test.getResponse)
+		accounts, proof, stid, err := protocol.GetAccountRange(context.Background(), root, zero, ffHash, uint64(100))
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
+		}
+		if stid != test.expStID {
+			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
+		}
+		if test.expErr == nil {
+			if len(accounts) != len(proof) {
+				t.Errorf("accounts:  %v", test.getResponse)
+				t.Errorf("accounts:  %v", accounts)
+				t.Errorf("proof: %v", proof)
+				t.Errorf("Test %v: accounts size (%d) not equal to proof size (%d)", i, len(accounts), len(proof))
+			}
+		}
+	}
+}
+
+func TestProtocol_GetStorageRanges(t *testing.T) {
+	var (
+		root         = numberToHash(1985082913640607)
+		firstKey     = common.HexToHash("0x00bf49f440a1cd0527e4d06e2765654c0f56452257516d793a9b8d604dcfdf2a")
+		secondKey    = common.HexToHash("0x09e47cd5056a689e708f22fe1f932709a320518e444f5f7d8d46a3da523d6606")
+		testAccounts = []common.Hash{secondKey, firstKey}
+		ffHash       = MaxHash
+		zero         = common.Hash{}
+	)
+
+	tests := []struct {
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
+	}{
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testStorageRangesResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testBlockResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("response not GetStorageRanges"),
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testErrorResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
+		},
+	}
+
+	for i, test := range tests {
+		protocol := makeTestProtocol(test.getResponse)
+		slots, proof, stid, err := protocol.GetStorageRanges(context.Background(), root, testAccounts, zero, ffHash, uint64(100))
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
+		}
+		if stid != test.expStID {
+			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
+		}
+		if test.expErr == nil {
+			if len(slots) != len(testAccounts) {
+				t.Errorf("Test %v: slots size not equal to accounts size", i)
+			}
+			if len(slots) != len(proof) {
+				t.Errorf("Test %v: account size not equal to proof", i)
+			}
+		}
+	}
+}
+
+func TestProtocol_GetByteCodes(t *testing.T) {
+	tests := []struct {
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
+	}{
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testByteCodesResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testBlockResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("response not GetByteCodes"),
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testErrorResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
+		},
+	}
+
+	for i, test := range tests {
+		protocol := makeTestProtocol(test.getResponse)
+		codes, stid, err := protocol.GetByteCodes(context.Background(), []common.Hash{numberToHash(19850829)}, uint64(500))
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
+		}
+		if stid != test.expStID {
+			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
+		}
+		if test.expErr == nil {
+			if len(codes) != 2 {
+				t.Errorf("Test %v: size not 2", i)
+			}
+		}
+	}
+}
+
+func TestProtocol_GetTrieNodes(t *testing.T) {
+	var (
+		root = numberToHash(1985082913640607)
+	)
+
+	tests := []struct {
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
+	}{
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testTrieNodesResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testBlockResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("response not GetTrieNodes"),
+			expStID: makeTestStreamID(0),
+		},
+		{
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
+		},
+		{
+			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
+				return &syncResponse{
+					pb: testErrorResponse,
+				}, makeTestStreamID(0)
+			},
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
+		},
+	}
+
+	for i, test := range tests {
+		protocol := makeTestProtocol(test.getResponse)
+		nodes, stid, err := protocol.GetTrieNodes(context.Background(), root, testPaths, uint64(500))
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
+		}
+		if stid != test.expStID {
+			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
+		}
+		if test.expErr == nil {
+			if len(nodes) != 2 {
+				t.Errorf("Test %v: size not 2", i)
 			}
 		}
 	}

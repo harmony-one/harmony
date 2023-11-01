@@ -6,8 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/trie"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
@@ -19,7 +20,14 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
-	staketest "github.com/harmony-one/harmony/staking/types/test"
+	types2 "github.com/harmony-one/harmony/staking/types"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/state/snapshot"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 type fakeReader struct {
@@ -98,113 +106,95 @@ func sampleWrapper(address common.Address) *staking.ValidatorWrapper {
 		Description:    defaultDesc,
 		CreationHeight: big.NewInt(100),
 	}
-	// ds := staking.Delegations{
-	//   staking.NewDelegation(address, big.NewInt(0)),
-	// }
-	w := &staking.ValidatorWrapper{
-		Validator:   v,
-		BlockReward: big.NewInt(0),
-	}
-	w.Counters.NumBlocksSigned = common.Big0
-	w.Counters.NumBlocksToSign = common.Big0
-	return w
 }
 
-func TestPruneStaleStakingData(t *testing.T) {
-	blockFactory := blockfactory.ForTest
-	header := blockFactory.NewHeader(common.Big0) // epoch
-	chain := fakeReader{core.FakeChainReader{InternalConfig: params.LocalnetChainConfig}}
-	db := getDatabase()
-	// now make the two wrappers and store them
-	wrapper := sampleWrapper(validator1)
-	wrapper.Status = effective.Inactive
-	wrapper.Delegations = staking.Delegations{
-		staking.NewDelegation(wrapper.Address, big.NewInt(0)),
-		staking.NewDelegation(delegator1, big.NewInt(0)),
-		staking.NewDelegation(delegator2, big.NewInt(0)),
-		staking.NewDelegation(delegator3, new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))),
-	}
-	if err := wrapper.Delegations[3].Undelegate(
-		big.NewInt(2), new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100)), nil,
-	); err != nil {
-		t.Fatalf("Got error %v", err)
-	}
-	if wrapper.Delegations[3].Amount.Cmp(common.Big0) != 0 {
-		t.Fatalf("Expected 0 delegation but got %v", wrapper.Delegations[3].Amount)
-	}
-	if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
-		t.Fatalf("Got error %v", err)
-	}
-	wrapper = sampleWrapper(validator2)
-	wrapper.Status = effective.Active
-	wrapper.Delegations = staking.Delegations{
-		staking.NewDelegation(wrapper.Address, new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(10000))),
-		staking.NewDelegation(delegator1, new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))),
-		staking.NewDelegation(delegator2, big.NewInt(0)),
-		staking.NewDelegation(delegator3, big.NewInt(0)),
-		staking.NewDelegation(validator1, big.NewInt(0)),
-	}
-	wrapper.Delegations[3].Reward = common.Big257
-	if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
-		t.Fatalf("Got error %v", err)
-	}
-	// we expect
-	// (1) validator1 to show up with validator2 only (and not validator1 where the delegation is 0)
-	// (2) delegator1 to show up with validator1 only (validator2 has amount)
-	// (3) delegator2 to show up with both validator1 and validator2
-	// (4) delegator3 to show up with neither validator1 (undelegation) nor validator2 (reward)
-	delegationsToRemove := make(map[common.Address][]common.Address, 0)
-	if err := pruneStaleStakingData(&chain, header, db, delegationsToRemove); err != nil {
-		t.Fatalf("Got error %v", err)
-	}
-	if toRemove, ok := delegationsToRemove[validator1]; ok {
-		if len(toRemove) != 1 {
-			t.Errorf("Unexpected # of removals for validator1 %d", len(toRemove))
-		}
-		if len(toRemove) > 0 {
-			for _, validatorAddress := range toRemove {
-				if bytes.Equal(validatorAddress.Bytes(), validator1.Bytes()) {
-					t.Errorf("Found validator1 being removed from validator1's delegations")
-				}
-			}
-		}
-	}
-	if toRemove, ok := delegationsToRemove[delegator1]; ok {
-		if len(toRemove) != 1 {
-			t.Errorf("Unexpected # of removals for delegator1 %d", len(toRemove))
-		}
-		if len(toRemove) > 0 {
-			for _, validatorAddress := range toRemove {
-				if !bytes.Equal(validatorAddress.Bytes(), validator1.Bytes()) {
-					t.Errorf("Unexpected removal for delegator1; validator1 %s, validator2 %s, validatorAddress %s",
-						validator1.Hex(),
-						validator2.Hex(),
-						validatorAddress.Hex(),
-					)
-				}
-			}
-		}
-	}
-	if toRemove, ok := delegationsToRemove[delegator2]; ok {
-		if len(toRemove) != 2 {
-			t.Errorf("Unexpected # of removals for delegator2 %d", len(toRemove))
-		}
-		if len(toRemove) > 0 {
-			for _, validatorAddress := range toRemove {
-				if !(bytes.Equal(validatorAddress.Bytes(), validator1.Bytes()) ||
-					bytes.Equal(validatorAddress.Bytes(), validator2.Bytes())) {
-					t.Errorf("Unexpected removal for delegator2; validator1 %s, validator2 %s, validatorAddress %s",
-						validator1.Hex(),
-						validator2.Hex(),
-						validatorAddress.Hex(),
-					)
-				}
-			}
-		}
-	}
-	if toRemove, ok := delegationsToRemove[delegator3]; ok {
-		if len(toRemove) != 0 {
-			t.Errorf("Unexpected # of removals for delegator3 %d", len(toRemove))
-		}
+func makeBlockForTest(epoch int64, index int) *types.Block {
+	h := blockfactory.NewTestHeader()
+
+	h.SetEpoch(big.NewInt(epoch))
+	h.SetNumber(big.NewInt(doubleSignBlockNumber))
+	h.SetViewID(big.NewInt(doubleSignViewID))
+	h.SetRoot(common.BigToHash(big.NewInt(int64(index))))
+
+	return types.NewBlockWithHeader(h)
+}
+
+func (bc *fakeBlockChain) CurrentBlock() *types.Block {
+	return &bc.currentBlock
+}
+func (bc *fakeBlockChain) CurrentHeader() *block.Header {
+	return bc.currentBlock.Header()
+}
+func (bc *fakeBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block    { return nil }
+func (bc *fakeBlockChain) GetHeader(hash common.Hash, number uint64) *block.Header  { return nil }
+func (bc *fakeBlockChain) GetHeaderByHash(hash common.Hash) *block.Header           { return nil }
+func (bc *fakeBlockChain) GetReceiptsByHash(hash common.Hash) types.Receipts        { return nil }
+func (bc *fakeBlockChain) ContractCode(hash common.Hash) ([]byte, error)            { return []byte{}, nil }
+func (bc *fakeBlockChain) ValidatorCode(hash common.Hash) ([]byte, error)           { return []byte{}, nil }
+func (bc *fakeBlockChain) ShardID() uint32                                          { return 0 }
+func (bc *fakeBlockChain) ReadShardState(epoch *big.Int) (*shard.State, error)      { return nil, nil }
+func (bc *fakeBlockChain) TrieDB() *trie.Database                                   { return nil }
+func (bc *fakeBlockChain) TrieNode(hash common.Hash) ([]byte, error)                { return []byte{}, nil }
+func (bc *fakeBlockChain) WriteCommitSig(blockNum uint64, lastCommits []byte) error { return nil }
+func (bc *fakeBlockChain) GetHeaderByNumber(number uint64) *block.Header            { return nil }
+func (bc *fakeBlockChain) ReadValidatorList() ([]common.Address, error)             { return nil, nil }
+func (bc *fakeBlockChain) ReadCommitSig(blockNum uint64) ([]byte, error)            { return nil, nil }
+func (bc *fakeBlockChain) ReadBlockRewardAccumulator(uint64) (*big.Int, error)      { return nil, nil }
+func (bc *fakeBlockChain) ValidatorCandidates() []common.Address                    { return nil }
+func (cr *fakeBlockChain) ReadValidatorInformationAtState(addr common.Address, state *state.DB) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+func (bc *fakeBlockChain) ReadValidatorSnapshotAtEpoch(epoch *big.Int, offender common.Address) (*types2.ValidatorSnapshot, error) {
+	return &types2.ValidatorSnapshot{
+		Validator: makeDefaultValidatorWrapper(),
+		Epoch:     epoch,
+	}, nil
+}
+func (bc *fakeBlockChain) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+func (bc *fakeBlockChain) Config() *params.ChainConfig {
+	return params.LocalnetChainConfig
+}
+func (cr *fakeBlockChain) StateAt(root common.Hash) (*state.DB, error) {
+	return nil, nil
+}
+func (cr *fakeBlockChain) Snapshots() *snapshot.Tree {
+	return nil
+}
+func (bc *fakeBlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error) {
+	return nil, nil
+}
+func (bc *fakeBlockChain) ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error) {
+	return nil, nil
+}
+func (bc *fakeBlockChain) SuperCommitteeForNextEpoch(beacon engine.ChainReader, header *block.Header, isVerify bool) (*shard.State, error) {
+	return nil, nil
+}
+
+//
+// Fake header for testing
+//
+
+func makeFakeHeader() *block.Header {
+	h := blockfactory.NewTestHeader()
+	h.SetCoinbase(leaderAddr)
+	return h
+}
+
+//
+// Utilities for testing
+//
+
+func makeTestAddress(item interface{}) common.Address {
+	s := fmt.Sprintf("harmony.one.%v", item)
+	return common.BytesToAddress([]byte(s))
+}
+
+func makeVoteData(kp blsKeyPair, block *types.Block) slash.Vote {
+	return slash.Vote{
+		SignerPubKeys:   []bls.SerializedPublicKey{kp.Pub()},
+		BlockHeaderHash: block.Hash(),
+		Signature:       kp.Sign(block),
 	}
 }

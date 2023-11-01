@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -62,6 +63,10 @@ type BlockChain interface {
 	State() (*state.DB, error)
 	// StateAt returns a new mutable state based on a particular point in time.
 	StateAt(root common.Hash) (*state.DB, error)
+	// Snapshots returns the blockchain snapshot tree.
+	Snapshots() *snapshot.Tree
+	// TrieDB returns trie database
+	TrieDB() *trie.Database
 	// HasBlock checks if a block is fully present in the database or not.
 	HasBlock(hash common.Hash, number uint64) bool
 	// HasState checks if state trie is fully present in the database or not.

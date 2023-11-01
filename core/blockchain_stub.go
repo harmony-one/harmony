@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -62,6 +63,14 @@ func (a Stub) State() (*state.DB, error) {
 
 func (a Stub) StateAt(common.Hash) (*state.DB, error) {
 	return nil, errors.Errorf("method StateAt not implemented for %s", a.Name)
+}
+
+func (a Stub) Snapshots() *snapshot.Tree {
+	return nil
+}
+
+func (a Stub) TrieDB() *trie.Database {
+	return nil
 }
 
 func (a Stub) TrieNode(hash common.Hash) ([]byte, error) {
