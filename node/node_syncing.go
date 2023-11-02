@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/multiformats/go-multiaddr"
 
@@ -279,20 +280,16 @@ func (node *Node) DoSyncing(bc core.BlockChain, willJoinConsensus bool) {
 	for {
 		select {
 		case <-ticker.C:
-			node.doSync(bc, willJoinConsensus)
-		case <-node.Consensus.BlockNumLowChan:
-			node.doSync(bc, willJoinConsensus)
+			node.doSync(node.SyncInstance(), node.SyncingPeerProvider, bc, node.Consensus, willJoinConsensus)
 		}
 	}
 }
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
-func (node *Node) doSync(bc core.BlockChain, willJoinConsensus bool) {
-
-	syncInstance := node.SyncInstance()
+func (node *Node) doSync(syncInstance ISync, syncingPeerProvider SyncingPeerProvider, bc core.BlockChain, consensus *consensus.Consensus, willJoinConsensus bool) {
 	if syncInstance.GetActivePeerNumber() < legacysync.NumPeersLowBound {
 		shardID := bc.ShardID()
-		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
+		peers, err := syncingPeerProvider.SyncingPeers(shardID)
 		if err != nil {
 			utils.Logger().Warn().
 				Err(err).
@@ -313,13 +310,13 @@ func (node *Node) doSync(bc core.BlockChain, willJoinConsensus bool) {
 	if isSynchronized, _, _ := syncInstance.GetParsedSyncStatusDoubleChecked(); !isSynchronized {
 		node.IsSynchronized.UnSet()
 		if willJoinConsensus {
-			node.Consensus.BlocksNotSynchronized()
+			consensus.BlocksNotSynchronized()
 		}
 		isBeacon := bc.ShardID() == shard.BeaconChainShardID
-		syncInstance.SyncLoop(bc, isBeacon, node.Consensus, legacysync.LoopMinTime)
+		syncInstance.SyncLoop(bc, isBeacon, consensus, legacysync.LoopMinTime)
 		if willJoinConsensus {
 			node.IsSynchronized.Set()
-			node.Consensus.BlocksSynchronized()
+			consensus.BlocksSynchronized()
 		}
 	}
 	node.IsSynchronized.Set()
@@ -415,7 +412,7 @@ func (node *Node) SendNewBlockToUnsync() {
 			utils.Logger().Warn().Msg("[SYNC] unable to encode block to hashes")
 			continue
 		}
-		blockWithSigBytes, err := node.getEncodedBlockWithSigFromBlock(block)
+		blockWithSigBytes, err := getEncodedBlockWithSigFromBlock(block)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("[SYNC] rlp encode BlockWithSig")
 			continue
@@ -747,7 +744,7 @@ func (node *Node) getEncodedBlockWithSigByHeight(height uint64) ([]byte, error) 
 	return b, nil
 }
 
-func (node *Node) getEncodedBlockWithSigFromBlock(block *types.Block) ([]byte, error) {
+func getEncodedBlockWithSigFromBlock(block *types.Block) ([]byte, error) {
 	bwh := legacysync.BlockWithSig{
 		Block:              block,
 		CommitSigAndBitmap: block.GetCurrentCommitSig(),
