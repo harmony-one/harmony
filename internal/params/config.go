@@ -343,7 +343,7 @@ var (
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // BlockGas30M
-		big.NewInt(0),                      // HIP30Epoch
+		big.NewInt(0),                      // MaxRateEpoch
 	}
 
 	// TestChainConfig ...
@@ -388,8 +388,8 @@ var (
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 		big.NewInt(0),        // HIP30Epoch
-		big.NewInt(0),        // HIP30Epoch
 		big.NewInt(0),        // BlockGas30M
+		big.NewInt(0),        // MaxRateEpoch
 	}
 
 	// TestRules ...
