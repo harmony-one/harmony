@@ -466,6 +466,14 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 			}
 		}
 	}
+
+	if config.IsMaxRate(newShardState.Epoch) {
+		for _, addr := range chain.ValidatorCandidates() {
+			if _, err := availability.UpdateMaxCommissionFee(state, addr, minRate); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
