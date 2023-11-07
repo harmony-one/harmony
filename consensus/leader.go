@@ -7,6 +7,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils/rclient"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -16,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
+// announce fires leader
 func (consensus *Consensus) announce(block *types.Block) {
 	blockHash := block.Hash()
 
@@ -92,6 +94,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
+// this method is called for each validator sent their vote message
 func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
 	if !consensus.fBFTLog.HasMatchingViewAnnounce(
@@ -189,6 +192,7 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	//// Read - End
 }
 
+// this method is called by leader
 func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	//// Read - Start
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
