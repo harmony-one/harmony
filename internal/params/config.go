@@ -295,9 +295,9 @@ var (
 		LeaderRotationExternalValidatorsEpoch: big.NewInt(6),
 		FeeCollectEpoch:                       big.NewInt(2),
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
-		HIP30Epoch:                            EpochTBD,
+		HIP30Epoch:                            big.NewInt(3),
 		BlockGas30MEpoch:                      big.NewInt(0),
-		MaxRateEpoch:                          EpochTBD,
+		MaxRateEpoch:                          big.NewInt(3),
 	}
 
 	// AllProtocolChanges ...
