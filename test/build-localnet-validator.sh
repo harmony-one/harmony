@@ -40,7 +40,7 @@ hmy --node="http://localhost:9500" staking create-validator \
     --bls-pubkeys b0917378b179a519a5055259c4f8980cce37d58af300b00dd98b07076d3d9a3b16c4a55f84522f553872225a7b1efc0c \
     --name "s0-localnet-validator2" --identity "validator2" --details "validator2" \
     --security-contact "localnet" --website "localnet.one" \
-    --max-change-rate 0.1 --max-rate 0.05 --rate 0.05 \
+    --max-change-rate 0.1 --max-rate 0.1 --rate 0.05 \
     --max-total-delegation 100000000 --min-self-delegation 10000 --bls-pubkeys-dir .hmy/extbls/
 	
 hmy --node="http://localhost:9500" staking create-validator \
