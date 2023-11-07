@@ -20,7 +20,6 @@ import (
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/internal/utils/rclient"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
@@ -812,9 +811,6 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	}
 	if consensus.Blockchain().Config().IsLeaderRotationInternalValidators(epoch) {
 		if next := consensus.rotateLeader(epoch); next != nil {
-			if consensus.ShardID == 0 {
-				rclient.Send("*")
-			}
 			prev := consensus.getLeaderPubKey()
 			consensus.setLeaderPubKey(next)
 			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
