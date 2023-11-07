@@ -297,7 +297,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            big.NewInt(3),
 		BlockGas30MEpoch:                      big.NewInt(0),
-		MaxRateEpoch:                          big.NewInt(3),
+		MaxRateEpoch:                          big.NewInt(4),
 	}
 
 	// AllProtocolChanges ...
