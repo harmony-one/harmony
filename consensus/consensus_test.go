@@ -33,7 +33,6 @@ func TestConsensusInitialization(t *testing.T) {
 	assert.Equal(t, decider, consensus.Decider)
 	assert.Equal(t, host, consensus.host)
 	assert.Equal(t, messageSender, consensus.msgSender)
-	assert.IsType(t, make(chan struct{}), consensus.BlockNumLowChan)
 
 	// FBFTLog
 	assert.NotNil(t, consensus.FBFTLog())

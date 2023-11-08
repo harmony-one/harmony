@@ -110,14 +110,3 @@ func (consensus *Consensus) spinUpStateSync() {
 		v.Stop()
 	}
 }
-
-func (consensus *Consensus) spinLegacyStateSync() {
-	select {
-	case consensus.BlockNumLowChan <- struct{}{}:
-		consensus.current.SetMode(Syncing)
-		for _, v := range consensus.consensusTimeout {
-			v.Stop()
-		}
-	default:
-	}
-}
