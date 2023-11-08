@@ -469,9 +469,6 @@ func (consensus *Consensus) GetLastMileBlockIter(bnStart uint64, cb func(iter *L
 
 // GetLastMileBlockIter get the iterator of the last mile blocks starting from number bnStart
 func (consensus *Consensus) getLastMileBlockIter(bnStart uint64, cb func(iter *LastMileBlockIter) error) error {
-	if consensus.BlockVerifier == nil {
-		return errors.New("consensus haven't initialized yet")
-	}
 	blocks, _, err := consensus.getLastMileBlocksAndMsg(bnStart)
 	if err != nil {
 		return err
@@ -620,10 +617,6 @@ func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types
 
 // tryCatchup add the last mile block in PBFT log memory cache to blockchain.
 func (consensus *Consensus) tryCatchup() error {
-	// TODO: change this to a more systematic symbol
-	if consensus.BlockVerifier == nil {
-		return errors.New("consensus haven't finished initialization")
-	}
 	initBN := consensus.getBlockNum()
 	defer consensus.postCatchup(initBN)
 

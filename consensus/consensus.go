@@ -39,9 +39,6 @@ const (
 	AsyncProposal
 )
 
-// VerifyBlockFunc is a function used to verify the block and keep trace of verified blocks
-type VerifyBlockFunc func(*types.Block) error
-
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	Decider quorum.Decider
@@ -94,8 +91,6 @@ type Consensus struct {
 	// The post-consensus job func passed from Node object
 	// Called when consensus on a new block is done
 	PostConsensusJob func(*types.Block) error
-	// The verifier func passed from Node object
-	BlockVerifier VerifyBlockFunc
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// will trigger state syncing when blockNum is low
@@ -170,7 +165,7 @@ func (consensus *Consensus) Beaconchain() core.BlockChain {
 	return consensus.registry.GetBeaconchain()
 }
 
-// VerifyBlock is a function used to verify the block and keep trace of verified blocks.
+// verifyBlock is a function used to verify the block and keep trace of verified blocks.
 func (consensus *Consensus) verifyBlock(block *types.Block) error {
 	if !consensus.fBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
@@ -305,11 +300,6 @@ func New(
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	// Make Sure Verifier is not null
 	consensus.vc = newViewChange()
-	// TODO: reference to blockchain/beaconchain should be removed.
-	verifier := VerifyNewBlock(registry.GetWebHooks(), consensus.Blockchain(), consensus.Beaconchain())
-	consensus.BlockVerifier = verifier
-	consensus.vc.verifyBlock = consensus.verifyBlock
-
 	// init prometheus metrics
 	initMetrics()
 	consensus.AddPubkeyMetrics()

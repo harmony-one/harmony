@@ -125,11 +125,6 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 		Hex("blockHash", recvMsg.BlockHash[:]).
 		Msg("[validateNewBlock] Prepared message and block added")
 
-	if consensus.BlockVerifier == nil {
-		consensus.getLogger().Debug().Msg("[validateNewBlock] consensus received message before init. Ignoring")
-		return nil, errors.New("nil block verifier")
-	}
-
 	if err := consensus.verifyBlock(&blockObj); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[validateNewBlock] Block verification failed")
 		return nil, errors.Errorf("Block verification failed: %s", err.Error())
