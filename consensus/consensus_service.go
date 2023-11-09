@@ -627,14 +627,18 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 // NumSignaturesIncludedInBlock returns the number of signatures included in the block
 func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uint32 {
 	count := uint32(0)
+	consensus.mutex.Lock()
 	members := consensus.Decider.Participants()
+	pubKeys := consensus.getPublicKeys()
+	consensus.mutex.Unlock()
+
 	// TODO(audit): do not reconstruct the Mask
 	mask := bls.NewMask(members)
 	err := mask.SetMask(block.Header().LastCommitBitmap())
 	if err != nil {
 		return count
 	}
-	for _, key := range consensus.GetPublicKeys() {
+	for _, key := range pubKeys {
 		if ok, err := mask.KeyEnabled(key.Bytes); err == nil && ok {
 			count++
 		}
