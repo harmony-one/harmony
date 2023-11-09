@@ -158,10 +158,6 @@ func (node *Node) SyncInstance() ISync {
 	return node.GetOrCreateSyncInstance(true)
 }
 
-func (node *Node) CurrentSyncInstance() bool {
-	return node.GetOrCreateSyncInstance(false) != nil
-}
-
 // GetOrCreateSyncInstance returns an instance of state sync, either legacy or staged
 // if initiate sets to true, it generates a new instance
 func (node *Node) GetOrCreateSyncInstance(initiate bool) ISync {
