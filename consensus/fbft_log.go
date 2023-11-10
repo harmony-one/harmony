@@ -3,6 +3,8 @@ package consensus
 import (
 	"encoding/binary"
 	"fmt"
+	"hash/crc32"
+	"strconv"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -34,6 +36,19 @@ type FBFTMessage struct {
 	M3AggSig           *bls_core.Sign
 	M3Bitmap           *bls_cosi.Mask
 	Verified           bool
+}
+
+func (m *FBFTMessage) Hash() []byte {
+	// Hash returns hash of the struct
+
+	c := crc32.NewIEEE()
+	c.Write([]byte(strconv.FormatUint(uint64(m.MessageType), 10)))
+	c.Write([]byte(strconv.FormatUint(m.ViewID, 10)))
+	c.Write([]byte(strconv.FormatUint(m.BlockNum, 10)))
+	c.Write(m.BlockHash[:])
+	c.Write(m.Block[:])
+	c.Write(m.Payload[:])
+	return c.Sum(nil)
 }
 
 // String ..

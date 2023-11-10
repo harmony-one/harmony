@@ -10,24 +10,23 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/core"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
-	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/rs/zerolog"
-
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -681,37 +680,36 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
-func (consensus *Consensus) rotateLeader(epoch *big.Int) {
+func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
 	var (
 		bc        = consensus.Blockchain()
-		prev      = consensus.getLeaderPubKey()
 		leader    = consensus.getLeaderPubKey()
 		curBlock  = bc.CurrentBlock()
 		curNumber = curBlock.NumberU64()
 		curEpoch  = curBlock.Epoch().Uint64()
 	)
-	const blocksCountAliveness = 10
+	const blocksCountAliveness = 4
 
 	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
-		return
+		return nil
 	}
 	committee, err := ss.FindCommitteeByID(consensus.ShardID)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to find committee")
-		return
+		return nil
 	}
 	slotsCount := len(committee.Slots)
 	blocksPerEpoch := shard.Schedule.InstanceForEpoch(epoch).BlocksPerEpoch()
 	if blocksPerEpoch == 0 {
 		utils.Logger().Error().Msg("[Rotating leader] blocks per epoch is 0")
-		return
+		return nil
 	}
 	if slotsCount == 0 {
 		utils.Logger().Error().Msg("[Rotating leader] slots count is 0")
-		return
+		return nil
 	}
 	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
 	rest := blocksPerEpoch % uint64(slotsCount)
@@ -723,7 +721,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	s := bc.LeaderRotationMeta()
 	if !bytes.Equal(leader.Bytes[:], s.Pub) {
 		// Another leader.
-		return
+		return nil
 	}
 	// If it is the first validator producing blocks, it should also produce the remaining 'rest' of the blocks.
 	if s.Shifts == 0 {
@@ -731,7 +729,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	}
 	if s.Count < numBlocksProducedByLeader {
 		// Not enough blocks produced by the leader, continue producing by the same leader.
-		return
+		return nil
 	}
 	// Passed all checks, we can change leader.
 	// NthNext will move the leader to the next leader in the committee.
@@ -742,7 +740,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		offset   = 1
 	)
 
-	for {
+	for i := 0; i < len(committee.Slots); i++ {
 		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
 			wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, offset)
 		} else {
@@ -751,7 +749,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		if !wasFound {
 			utils.Logger().Error().Msg("Failed to get next leader")
 			// Seems like nothing we can do here.
-			return
+			return nil
 		}
 		members := consensus.Decider.Participants()
 		mask := bls.NewMask(members)
@@ -760,7 +758,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 			header := bc.GetHeaderByNumber(curNumber - uint64(i))
 			if header == nil {
 				utils.Logger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(i))
-				return
+				return nil
 			}
 			// if epoch is different, we should not check this block.
 			if header.Epoch().Uint64() != curEpoch {
@@ -770,12 +768,12 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 			err = mask.SetMask(header.LastCommitBitmap())
 			if err != nil {
 				utils.Logger().Err(err).Msg("Failed to set mask")
-				return
+				return nil
 			}
 			ok, err := mask.KeyEnabled(next.Bytes)
 			if err != nil {
 				utils.Logger().Err(err).Msg("Failed to get key enabled")
-				return
+				return nil
 			}
 			if !ok {
 				skipped++
@@ -788,16 +786,9 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 			offset++
 			continue
 		}
-		consensus.setLeaderPubKey(next)
-		break
+		return next
 	}
-
-	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
-		// leader changed
-		go func() {
-			consensus.ReadySignal(SyncProposal)
-		}()
-	}
+	return nil
 }
 
 // SetupForNewConsensus sets the state for new consensus
@@ -812,7 +803,18 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 		epoch = blk.Epoch()
 	}
 	if consensus.Blockchain().Config().IsLeaderRotationInternalValidators(epoch) {
-		consensus.rotateLeader(epoch)
+		if next := consensus.rotateLeader(epoch); next != nil {
+			prev := consensus.getLeaderPubKey()
+			consensus.setLeaderPubKey(next)
+			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
+				// leader changed
+				blockPeriod := consensus.BlockPeriod
+				go func() {
+					<-time.After(blockPeriod)
+					consensus.ReadySignal(SyncProposal)
+				}()
+			}
+		}
 	}
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow

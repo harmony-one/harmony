@@ -68,10 +68,12 @@ require (
 
 require (
 	github.com/c2h5oh/datasize v0.0.0-20220606134207-859f65c6625b
+	github.com/grafana/pyroscope-go v1.0.4
 	github.com/holiman/bloomfilter/v2 v2.0.3
 	github.com/ledgerwatch/erigon-lib v0.0.0-20230607152933-42c9c28cac68
 	github.com/ledgerwatch/log/v3 v3.8.0
 	github.com/olekukonko/tablewriter v0.0.5
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 )
 
 require (
@@ -146,6 +148,7 @@ require (
 	github.com/google/pprof v0.0.0-20230405160723-4a4c7d95572b // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gostaticanalysis/analysisutil v0.0.0-20190318220348-4088753ea4d3 // indirect
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.4 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -262,7 +265,6 @@ require (
 	go.uber.org/dig v1.16.1 // indirect
 	go.uber.org/fx v1.19.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
