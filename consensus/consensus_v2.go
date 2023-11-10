@@ -572,19 +572,19 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog().IsBlockVerified(blk.Hash())); err != nil {
 			switch {
 			case errors.Is(err, core.ErrKnownBlock):
-				consensus.getLogger().Info().Msg("[preCommitAndPropose] Block already known")
+				consensus.GetLogger().Info().Msg("[preCommitAndPropose] Block already known")
 			default:
-				consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+				consensus.GetLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
 				return
 			}
 		}
-
+		consensus.mutex.Lock()
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 
 		// Send signal to Node to propose the new block for consensus
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
-
+		consensus.mutex.Unlock()
 		consensus.ReadySignal(AsyncProposal)
 	}()
 

@@ -1646,6 +1646,8 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 	}
 
 	prevHash := bc.CurrentBlock().Hash()
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
 	if err == nil {
@@ -1698,9 +1700,6 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 				chain[i-1].Hash().Bytes()[:4], i, chain[i].NumberU64(), chain[i].Hash().Bytes()[:4], chain[i].ParentHash().Bytes()[:4])
 		}
 	}
-
-	bc.chainmu.Lock()
-	defer bc.chainmu.Unlock()
 
 	// A queued approach to delivering events. This is generally
 	// faster than direct delivery and requires much less mutex
@@ -1801,9 +1800,7 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			// Prune in case non-empty winner chain
 			if len(winner) > 0 {
 				// Import all the pruned blocks to make the state available
-				bc.chainmu.Unlock()
 				_, evs, logs, err := bc.insertChain(winner, true /* verifyHeaders */)
-				bc.chainmu.Lock()
 				events, coalescedLogs = evs, logs
 
 				if err != nil {
