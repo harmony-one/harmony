@@ -19,12 +19,13 @@ type downloader interface {
 // Set downloader set the downloader of the shard to consensus
 // TODO: It will be better to move this to consensus.New and register consensus as a service
 func (consensus *Consensus) SetDownloader(d downloader) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.dHelper = newDownloadHelper(consensus, d)
 }
 
 type downloadHelper struct {
 	d downloader
-	c *Consensus
 
 	startedCh  chan struct{}
 	finishedCh chan struct{}
@@ -41,46 +42,42 @@ func newDownloadHelper(c *Consensus, d downloader) *downloadHelper {
 	finishedSub := d.SubscribeDownloadFinished(finishedCh)
 
 	out := &downloadHelper{
-		c:           c,
 		d:           d,
 		startedCh:   startedCh,
 		finishedCh:  finishedCh,
 		startedSub:  startedSub,
 		finishedSub: finishedSub,
 	}
-	go out.downloadStartedLoop()
-	go out.downloadFinishedLoop()
+	go out.downloadStartedLoop(c)
+	go out.downloadFinishedLoop(c)
 	return out
 }
 
-func (dh *downloadHelper) start() {
+func (dh *downloadHelper) DownloadAsync() {
+	dh.d.DownloadAsync()
 }
 
-func (dh *downloadHelper) downloadStartedLoop() {
+func (dh *downloadHelper) downloadStartedLoop(c *Consensus) {
 	for {
 		select {
 		case <-dh.startedCh:
-			dh.c.BlocksNotSynchronized()
+			c.BlocksNotSynchronized()
 
 		case err := <-dh.startedSub.Err():
-			dh.c.getLogger().Info().Err(err).Msg("consensus download finished loop closed")
+			c.GetLogger().Info().Err(err).Msg("consensus download finished loop closed")
 			return
 		}
 	}
 }
 
-func (dh *downloadHelper) downloadFinishedLoop() {
+func (dh *downloadHelper) downloadFinishedLoop(c *Consensus) {
 	for {
 		select {
 		case <-dh.finishedCh:
-			err := dh.c.AddConsensusLastMile()
-			if err != nil {
-				dh.c.getLogger().Error().Err(err).Msg("add last mile failed")
-			}
-			dh.c.BlocksSynchronized()
+			c.BlocksSynchronized()
 
 		case err := <-dh.finishedSub.Err():
-			dh.c.getLogger().Info().Err(err).Msg("consensus download finished loop closed")
+			c.GetLogger().Info().Err(err).Msg("consensus download finished loop closed")
 			return
 		}
 	}
@@ -104,7 +101,7 @@ func (consensus *Consensus) AddConsensusLastMile() error {
 }
 
 func (consensus *Consensus) spinUpStateSync() {
-	consensus.dHelper.d.DownloadAsync()
+	consensus.dHelper.DownloadAsync()
 	consensus.current.SetMode(Syncing)
 	for _, v := range consensus.consensusTimeout {
 		v.Stop()
