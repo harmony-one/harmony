@@ -290,7 +290,9 @@ func (consensus *Consensus) startViewChange() {
 		nextViewID,
 		consensus.getBlockNum(),
 		consensus.priKey,
-		members); err != nil {
+		members,
+		consensus.verifyBlock,
+	); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[startViewChange] Init Payload Error")
 	}
 
@@ -406,16 +408,19 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	consensus.vc.AddViewIDKeyIfNotExist(recvMsg.ViewID, members)
 
 	// do it once only per viewID/Leader
-	if err := consensus.vc.InitPayload(consensus.fBFTLog,
+	if err := consensus.vc.InitPayload(
+		consensus.fBFTLog,
 		recvMsg.ViewID,
 		recvMsg.BlockNum,
 		consensus.priKey,
-		members); err != nil {
+		members,
+		consensus.verifyBlock,
+	); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[onViewChange] Init Payload Error")
 		return
 	}
 
-	err = consensus.vc.ProcessViewChangeMsg(consensus.fBFTLog, consensus.Decider, recvMsg)
+	err = consensus.vc.ProcessViewChangeMsg(consensus.fBFTLog, consensus.Decider, recvMsg, consensus.verifyBlock)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Uint64("viewID", recvMsg.ViewID).
@@ -483,7 +488,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		return
 	}
 
-	preparedBlock, err := consensus.vc.VerifyNewViewMsg(recvMsg)
+	preparedBlock, err := consensus.vc.VerifyNewViewMsg(recvMsg, consensus.verifyBlock)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[onNewView] Verify New View Msg Failed")
 		return

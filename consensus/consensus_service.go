@@ -627,14 +627,18 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 // NumSignaturesIncludedInBlock returns the number of signatures included in the block
 func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uint32 {
 	count := uint32(0)
+	consensus.mutex.Lock()
 	members := consensus.Decider.Participants()
+	pubKeys := consensus.getPublicKeys()
+	consensus.mutex.Unlock()
+
 	// TODO(audit): do not reconstruct the Mask
 	mask := bls.NewMask(members)
 	err := mask.SetMask(block.Header().LastCommitBitmap())
 	if err != nil {
 		return count
 	}
-	for _, key := range consensus.GetPublicKeys() {
+	for _, key := range pubKeys {
 		if ok, err := mask.KeyEnabled(key.Bytes); err == nil && ok {
 			count++
 		}
@@ -660,40 +664,38 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 	return &logger
 }
 
-// VerifyNewBlock is called by consensus participants to verify the block (account model) they are
+// BlockVerifier is called by consensus participants to verify the block (account model) they are
 // running consensus on.
-func VerifyNewBlock(hooks *webhooks.Hooks, blockChain core.BlockChain, beaconChain core.BlockChain) func(*types.Block) error {
-	return func(newBlock *types.Block) error {
-		if err := blockChain.ValidateNewBlock(newBlock, beaconChain); err != nil {
-			switch {
-			case errors.Is(err, core.ErrKnownBlock):
-				return nil
-			default:
-			}
-
-			if hooks := hooks; hooks != nil {
-				if p := hooks.ProtocolIssues; p != nil {
-					url := p.OnCannotCommit
-					go func() {
-						webhooks.DoPost(url, map[string]interface{}{
-							"bad-header": newBlock.Header(),
-							"reason":     err.Error(),
-						})
-					}()
-				}
-			}
-			utils.Logger().Error().
-				Str("blockHash", newBlock.Hash().Hex()).
-				Int("numTx", len(newBlock.Transactions())).
-				Int("numStakingTx", len(newBlock.StakingTransactions())).
-				Err(err).
-				Msgf("[VerifyNewBlock] Cannot Verify New Block!!!, blockHeight %d, myHeight %d", newBlock.NumberU64(), blockChain.CurrentHeader().NumberU64())
-			return errors.WithMessagef(err,
-				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
-				newBlock.Hash().Hex(),
-				len(newBlock.Transactions()),
-			)
+func (consensus *Consensus) BlockVerifier(newBlock *types.Block) error {
+	if err := consensus.Blockchain().ValidateNewBlock(newBlock, consensus.Beaconchain()); err != nil {
+		switch {
+		case errors.Is(err, core.ErrKnownBlock):
+			return nil
+		default:
 		}
-		return nil
+
+		if hooks := consensus.registry.GetWebHooks(); hooks != nil {
+			if p := hooks.ProtocolIssues; p != nil {
+				url := p.OnCannotCommit
+				go func() {
+					webhooks.DoPost(url, map[string]interface{}{
+						"bad-header": newBlock.Header(),
+						"reason":     err.Error(),
+					})
+				}()
+			}
+		}
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Int("numTx", len(newBlock.Transactions())).
+			Int("numStakingTx", len(newBlock.StakingTransactions())).
+			Err(err).
+			Msgf("[VerifyNewBlock] Cannot Verify New Block!!!, blockHeight %d, myHeight %d", newBlock.NumberU64(), consensus.Blockchain().CurrentHeader().NumberU64())
+		return errors.WithMessagef(err,
+			"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
+			newBlock.Hash().Hex(),
+			len(newBlock.Transactions()),
+		)
 	}
+	return nil
 }

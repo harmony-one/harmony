@@ -134,7 +134,7 @@ func TestVerifyNewBlock(t *testing.T) {
 
 	// work around vrf verification as it's tested in another test.
 	node.Blockchain().Config().VRFEpoch = big.NewInt(2)
-	if err := consensus.VerifyNewBlock(nil, node.Blockchain(), node.Beaconchain())(block); err != nil {
+	if err := node.Blockchain().ValidateNewBlock(block, node.Beaconchain()); err != nil {
 		t.Error("New block is not verified successfully:", err)
 	}
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
 	"github.com/libp2p/go-libp2p"
@@ -119,14 +119,30 @@ func TestManager_OnDisconnectCheck(t *testing.T) {
 	assert.Nil(t, err)
 	defer h1.Close()
 
-	fakeHost := &fakeHost{}
-	security := NewManager(2, 0, blockedpeers.NewManager(4))
-	h1.Network().Notify(fakeHost)
-	fakeHost.SetConnectCallback(security.OnConnectCheck)
-	fakeHost.SetDisconnectCallback(security.OnDisconnectCheck)
 	h2, err := newPeer(GetFreePort(t))
 	assert.Nil(t, err)
 	defer h2.Close()
+
+	fakeHost := &fakeHost{}
+	security := NewManager(2, 0, blockedpeers.NewManager(4))
+	h1.Network().Notify(fakeHost)
+	var wrap = func() (
+		func(net libp2p_network.Network, conn libp2p_network.Conn) error,
+		func(conn libp2p_network.Conn) error,
+		*sync.WaitGroup) {
+		wg := &sync.WaitGroup{}
+		return func(net libp2p_network.Network, conn libp2p_network.Conn) error {
+				wg.Add(1)
+				return security.OnConnectCheck(net, conn)
+			}, func(conn libp2p_network.Conn) error {
+				defer wg.Done()
+				return security.OnDisconnectCheck(conn)
+			}, wg
+	}
+	OnConnectCheck, OnDisconnectCheck, wg := wrap()
+	fakeHost.SetConnectCallback(OnConnectCheck)
+	fakeHost.SetDisconnectCallback(OnDisconnectCheck)
+
 	err = h2.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
 	assert.Nil(t, err)
 
@@ -137,7 +153,7 @@ func TestManager_OnDisconnectCheck(t *testing.T) {
 
 	err = h2.Network().ClosePeer(h1.ID())
 	assert.Nil(t, err)
-	time.Sleep(200 * time.Millisecond)
+	wg.Wait()
 	security.RangePeers(func(k string, peers []string) bool {
 		assert.Equal(t, 0, len(peers))
 		return true

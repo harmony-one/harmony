@@ -139,8 +139,8 @@ func (sm *streamManager) loop() {
 				discCancel() // cancel last discovery
 			}
 			discCtx, discCancel = context.WithCancel(sm.ctx)
-			go func() {
-				discovered, err := sm.discoverAndSetupStream(discCtx)
+			go func(ctx context.Context) {
+				discovered, err := sm.discoverAndSetupStream(ctx)
 				if err != nil {
 					sm.logger.Err(err)
 				}
@@ -152,7 +152,7 @@ func (sm *streamManager) loop() {
 						sm.coolDown.UnSet()
 					}()
 				}
-			}()
+			}(discCtx)
 
 		case addStream := <-sm.addStreamCh:
 			err := sm.handleAddStream(addStream.st)
