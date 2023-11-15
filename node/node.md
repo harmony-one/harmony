@@ -3,7 +3,7 @@
 ### Services
 
 In Harmony network, a node can be treated as one of the roles: validator, leader, beacon validator,
-beacon leader depending on its context. With each role, a node can run a certian set of services.
+beacon leader depending on its context. With each role, a node can run a certain set of services.
 
 For example, a leader needs to run explorer support service, syncing support
 service etc.. while a normal validator does not run such many.
@@ -13,8 +13,8 @@ service etc.. while a normal validator does not run such many.
 To support such behavior, we architecture Node logic with service manager which can wait for actions
 which each triggers its management operation such as starting some service, stopping some service.
 
-Each service needs to implement minimal interace behavior like Start, Stop so that the service
-manager can handle those operation.
+Each service needs to implement minimal interface behavior like Start, Stop so that the service
+manager can handle those operations.
 
 ```go
 // ServiceInterface is the collection of functions any service needs to implement.
@@ -26,7 +26,7 @@ type ServiceInterface interface {
 
 ### Creating a service.
 
-To create a service, you need to have an struct which implements above interface function
+To create a service, you need to have a struct which implements above interface function
 `StartService`, `StopService`.
 
 Since different services may have different ways to be created you may need to have a method

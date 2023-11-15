@@ -11,7 +11,7 @@
 This [github document](https://help.github.com/articles/creating-a-pull-request/) provides some guidance on how to create a pull request in github.
 
 ## PR requirement
-To pursue engineering excellence, we have insisted on the highest stardard on the quality of each PR.
+To pursue engineering excellence, we have insisted on the highest standard for the quality of each PR.
 
 * For each PR, please run [golint](https://github.com/golang/lint), [goimports](https://godoc.org/golang.org/x/tools/cmd/goimports), to fix the basic issues/warnings.
 * Make sure you understand [How to Write a Git Commit Message](https://chris.beams.io/posts/git-commit/).
@@ -21,7 +21,7 @@ To pursue engineering excellence, we have insisted on the highest stardard on th
 The best practice is to reorder and squash your local commits before the PR submission to create an atomic and self-contained PR.
 This [book chapter](https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History) provides detailed explanation and guidance on how to rewrite the local git history.
 
-For exampple, a typical workflow is like the following.
+For example, a typical workflow is like the following.
 ```bash
 # assuming you are working on a fix of bug1, and use a local branch called "fixes_of_bug1".
 
