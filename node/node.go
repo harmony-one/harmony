@@ -52,7 +52,6 @@ import (
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/reward"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -1194,72 +1193,6 @@ func (node *Node) updateInitialRewardValues() {
 		initTotal = new(big.Int).Add(core.GetInitialFunds(i), initTotal)
 	}
 	reward.SetTotalInitialTokens(initTotal)
-}
-
-// InitConsensusWithValidators initialize shard state
-// from latest epoch and update committee pub
-// keys for consensus
-func (node *Node) InitConsensusWithValidators() (err error) {
-	if node.Consensus == nil {
-		utils.Logger().Error().
-			Msg("[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID")
-		return errors.New(
-			"[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID",
-		)
-	}
-	shardID := node.Consensus.ShardID
-	currentBlock := node.Blockchain().CurrentBlock()
-	blockNum := currentBlock.NumberU64()
-	node.Consensus.SetMode(consensus.Listening)
-	epoch := currentBlock.Epoch()
-	utils.Logger().Info().
-		Uint64("blockNum", blockNum).
-		Uint32("shardID", shardID).
-		Uint64("epoch", epoch.Uint64()).
-		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
-	shardState, err := committee.WithStakingEnabled.Compute(
-		epoch, node.Consensus.Blockchain(),
-	)
-	if err != nil {
-		utils.Logger().Err(err).
-			Uint64("blockNum", blockNum).
-			Uint32("shardID", shardID).
-			Uint64("epoch", epoch.Uint64()).
-			Msg("[InitConsensusWithValidators] Failed getting shard state")
-		return err
-	}
-	subComm, err := shardState.FindCommitteeByID(shardID)
-	if err != nil {
-		utils.Logger().Err(err).
-			Interface("shardState", shardState).
-			Msg("[InitConsensusWithValidators] Find CommitteeByID")
-		return err
-	}
-	pubKeys, err := subComm.BLSPublicKeys()
-	if err != nil {
-		utils.Logger().Error().
-			Uint32("shardID", shardID).
-			Uint64("blockNum", blockNum).
-			Msg("[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys")
-		return errors.Wrapf(
-			err,
-			"[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys",
-		)
-	}
-
-	for _, key := range pubKeys {
-		if node.Consensus.GetPublicKeys().Contains(key.Object) {
-			utils.Logger().Info().
-				Uint64("blockNum", blockNum).
-				Int("numPubKeys", len(pubKeys)).
-				Str("mode", node.Consensus.Mode().String()).
-				Msg("[InitConsensusWithValidators] Successfully updated public keys")
-			node.Consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
-			node.Consensus.SetMode(consensus.Normal)
-			return nil
-		}
-	}
-	return nil
 }
 
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {

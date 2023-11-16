@@ -6,19 +6,20 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/registry"
-
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
@@ -121,7 +122,9 @@ type Consensus struct {
 	// finalityCounter keep tracks of the finality time
 	finalityCounter atomic.Value //int64
 
-	dHelper *downloadHelper
+	dHelper interface {
+		DownloadAsync()
+	}
 
 	// Both flags only for initialization state.
 	start           bool
@@ -177,6 +180,10 @@ func (consensus *Consensus) verifyBlock(block *types.Block) error {
 // BlocksSynchronized lets the main loop know that block synchronization finished
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
+	err := consensus.AddConsensusLastMile()
+	if err != nil {
+		consensus.GetLogger().Error().Err(err).Msg("add last mile failed")
+	}
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	consensus.syncReadyChan()
@@ -274,6 +281,7 @@ func New(
 		msgSender:    NewMessageSender(host),
 		// FBFT timeout
 		consensusTimeout: createTimeout(),
+		dHelper:          downloadAsync{},
 	}
 
 	if multiBLSPriKey != nil {
@@ -310,4 +318,69 @@ func (consensus *Consensus) GetHost() p2p.Host {
 
 func (consensus *Consensus) Registry() *registry.Registry {
 	return consensus.registry
+}
+
+// InitConsensusWithValidators initialize shard state
+// from latest epoch and update committee pub
+// keys for consensus
+func (consensus *Consensus) InitConsensusWithValidators() (err error) {
+	shardID := consensus.ShardID
+	currentBlock := consensus.Blockchain().CurrentBlock()
+	blockNum := currentBlock.NumberU64()
+	consensus.SetMode(Listening)
+	epoch := currentBlock.Epoch()
+	utils.Logger().Info().
+		Uint64("blockNum", blockNum).
+		Uint32("shardID", shardID).
+		Uint64("epoch", epoch.Uint64()).
+		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
+	shardState, err := committee.WithStakingEnabled.Compute(
+		epoch, consensus.Blockchain(),
+	)
+	if err != nil {
+		utils.Logger().Err(err).
+			Uint64("blockNum", blockNum).
+			Uint32("shardID", shardID).
+			Uint64("epoch", epoch.Uint64()).
+			Msg("[InitConsensusWithValidators] Failed getting shard state")
+		return err
+	}
+	subComm, err := shardState.FindCommitteeByID(shardID)
+	if err != nil {
+		utils.Logger().Err(err).
+			Interface("shardState", shardState).
+			Msg("[InitConsensusWithValidators] Find CommitteeByID")
+		return err
+	}
+	pubKeys, err := subComm.BLSPublicKeys()
+	if err != nil {
+		utils.Logger().Error().
+			Uint32("shardID", shardID).
+			Uint64("blockNum", blockNum).
+			Msg("[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys")
+		return errors.Wrapf(
+			err,
+			"[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys",
+		)
+	}
+
+	for _, key := range pubKeys {
+		if consensus.GetPublicKeys().Contains(key.Object) {
+			utils.Logger().Info().
+				Uint64("blockNum", blockNum).
+				Int("numPubKeys", len(pubKeys)).
+				Str("mode", consensus.Mode().String()).
+				Msg("[InitConsensusWithValidators] Successfully updated public keys")
+			consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
+			consensus.SetMode(Normal)
+			return nil
+		}
+	}
+	return nil
+}
+
+type downloadAsync struct {
+}
+
+func (a downloadAsync) DownloadAsync() {
 }

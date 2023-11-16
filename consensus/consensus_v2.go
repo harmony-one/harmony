@@ -277,6 +277,8 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 		return nil, nil
 	}
 	lastCommits, err := consensus.Blockchain().ReadCommitSig(blockNum)
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	if err != nil ||
 		len(lastCommits) < bls.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog().GetMessagesByTypeSeq(
@@ -300,30 +302,26 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 func (consensus *Consensus) Start(
 	stopChan chan struct{},
 ) {
+	consensus.GetLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 	go func() {
-		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
-		go func() {
-			ticker := time.NewTicker(250 * time.Millisecond)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-stopChan:
-					return
-				case <-ticker.C:
-					consensus.Tick()
-				}
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopChan:
+				return
+			case <-ticker.C:
+				consensus.Tick()
 			}
-		}()
-
-		consensus.mutex.Lock()
-		consensus.consensusTimeout[timeoutBootstrap].Start()
-		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
-		// Set up next block due time.
-		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-		consensus.mutex.Unlock()
+		}
 	}()
 
-	consensus.dHelper.start()
+	consensus.mutex.Lock()
+	consensus.consensusTimeout[timeoutBootstrap].Start()
+	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
+	// Set up next block due time.
+	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
+	consensus.mutex.Unlock()
 }
 
 func (consensus *Consensus) StartChannel() {
