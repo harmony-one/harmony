@@ -904,7 +904,16 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 	}
 
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
-	if err != nil {
+	switch {
+	case errors.Is(err, core.ErrKnownBlock):
+		utils.Logger().Info().
+			Uint64("blockHeight", block.NumberU64()).
+			Uint64("blockEpoch", block.Epoch().Uint64()).
+			Str("blockHex", block.Hash().Hex()).
+			Uint32("ShardID", block.ShardID()).
+			Msg("[SYNC] UpdateBlockAndStatus: Block exists")
+		return nil
+	case err != nil:
 		utils.Logger().Error().
 			Err(err).
 			Msgf(
@@ -913,6 +922,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 				block.ShardID(),
 			)
 		return err
+	default:
 	}
 	utils.Logger().Info().
 		Uint64("blockHeight", block.NumberU64()).
