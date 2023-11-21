@@ -1045,6 +1045,10 @@ func (bc *BlockChainImpl) GetBlock(hash common.Hash, number uint64) *types.Block
 	return block
 }
 
+func (bc *BlockChainImpl) deleteBlock(hash common.Hash, number uint64) error {
+	return rawdb.DeleteBlock(bc.db, hash, number)
+}
+
 func (bc *BlockChainImpl) GetBlockByHash(hash common.Hash) *types.Block {
 	number := bc.hc.GetBlockNumber(hash)
 	if number == nil {
@@ -1244,8 +1248,8 @@ const (
 )
 
 func (bc *BlockChainImpl) Rollback(chain []common.Hash) error {
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 
 	valsToRemove := map[common.Address]struct{}{}
 	for i := len(chain) - 1; i >= 0; i-- {
@@ -1284,6 +1288,15 @@ func (bc *BlockChainImpl) Rollback(chain []common.Hash) error {
 						}
 					}
 				}
+			}
+		}
+	}
+	num := bc.CurrentBlock().NumberU64()
+	for i := uint64(1); i < 100; i++ {
+		blk := bc.GetBlockByNumber(num + i)
+		if blk != nil {
+			if err := bc.deleteBlock(blk.Hash(), blk.NumberU64()); err != nil {
+				return err
 			}
 		}
 	}
@@ -1749,15 +1762,10 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			err = NewBlockValidator(bc).ValidateBody(block)
 		}
 		switch {
-		case err == ErrKnownBlock:
-			// Block and state both already known. However if the current block is below
-			// this number we did a rollback and we should reimport it nonetheless.
-			if bc.CurrentBlock().NumberU64() >= block.NumberU64() {
-				stats.ignored++
-				continue
-			}
+		case errors.Is(err, ErrKnownBlock):
+			return i, events, coalescedLogs, err
 
-		case err == consensus_engine.ErrFutureBlock:
+		case errors.Is(err, consensus_engine.ErrFutureBlock):
 			// Allow up to MaxFuture second in the future blocks. If this limit is exceeded
 			// the chain is discarded and processed at a later time if given.
 			max := big.NewInt(time.Now().Unix() + maxTimeFutureBlocks)
@@ -1768,12 +1776,12 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			stats.queued++
 			continue
 
-		case err == consensus_engine.ErrUnknownAncestor && bc.futureBlocks.Contains(block.ParentHash()):
+		case errors.Is(err, consensus_engine.ErrUnknownAncestor) && bc.futureBlocks.Contains(block.ParentHash()):
 			bc.futureBlocks.Add(block.Hash(), block)
 			stats.queued++
 			continue
 
-		case err == consensus_engine.ErrPrunedAncestor:
+		case errors.Is(err, consensus_engine.ErrPrunedAncestor):
 			// TODO: add fork choice mechanism
 			// Block competing with the canonical chain, store in the db, but don't process
 			// until the competitor TD goes above the canonical TD
