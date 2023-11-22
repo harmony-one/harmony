@@ -265,7 +265,7 @@ func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 
 func revert(chain core.BlockChain, hc harmonyconfig.HarmonyConfig) {
 	curNum := chain.CurrentBlock().NumberU64()
-	fmt.Println("curNum < uint64(hc.Revert.RevertBefore) && curNum >= uint64(hc.Revert.RevertTo)", curNum < uint64(hc.Revert.RevertBefore) && curNum >= uint64(hc.Revert.RevertTo))
+	fmt.Println("curNum < uint64(hc.Revert.RevertBefore) && curNum >= uint64(hc.Revert.RevertTo)", curNum < uint64(hc.Revert.RevertBefore) && curNum >= uint64(hc.Revert.RevertTo), curNum < uint64(hc.Revert.RevertBefore), curNum >= uint64(hc.Revert.RevertTo), hc.Revert.RevertBefore, hc.Revert.RevertTo, curNum)
 	if curNum < uint64(hc.Revert.RevertBefore) && curNum >= uint64(hc.Revert.RevertTo) {
 		// Remove invalid blocks
 		fmt.Printf("removing invalid blocks, current block %d\n", curNum)
