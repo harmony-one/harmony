@@ -1095,7 +1095,6 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, isBeacon bool, consensus *cons
 	for {
 		start := time.Now()
 		currentHeight := bc.CurrentBlock().NumberU64()
-		panic(currentHeight)
 		otherHeight, errMaxHeight := getMaxPeerHeight(ss.syncConfig)
 		if errMaxHeight != nil {
 			utils.Logger().Error().

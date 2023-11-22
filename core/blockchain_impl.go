@@ -340,6 +340,12 @@ func newBlockChainWithOptions(
 	bc.validator = NewBlockValidator(bc)
 	bc.processor = NewStateProcessor(bc, beaconChain)
 
+	fmt.Println(1531935, bc.GetBlockByNumber(1531935))
+	fmt.Println(1531936, bc.GetBlockByNumber(1531936))
+	fmt.Println(1531937, bc.GetBlockByNumber(1531937))
+	fmt.Println(bc.CurrentBlock().NumberU64())
+	panic(bc.CurrentHeader().NumberU64())
+
 	// Load any existing snapshot, regenerating it if loading failed
 	if bc.cacheConfig.SnapshotLimit > 0 {
 		// If the chain was rewound past the snapshot persistent layer (causing
