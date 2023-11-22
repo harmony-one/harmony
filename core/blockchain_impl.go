@@ -103,8 +103,6 @@ const (
 	bodyCacheLimit                     = 128
 	blockCacheLimit                    = 128
 	receiptsCacheLimit                 = 32
-	maxFutureBlocks                    = 16
-	maxTimeFutureBlocks                = 30
 	badBlockLimit                      = 10
 	triesInRedis                       = 1000
 	shardCacheLimit                    = 10
@@ -198,7 +196,6 @@ type BlockChainImpl struct {
 	bodyRLPCache                  *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
 	receiptsCache                 *lru.Cache     // Cache for the most recent receipts per block
 	blockCache                    *lru.Cache     // Cache for the most recent entire blocks
-	futureBlocks                  *lru.Cache     // future blocks are blocks added for later processing
 	shardStateCache               *lru.Cache
 	lastCommitsCache              *lru.Cache
 	epochCache                    *lru.Cache        // Cache epoch number → first block number
@@ -270,7 +267,6 @@ func newBlockChainWithOptions(
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	receiptsCache, _ := lru.New(receiptsCacheLimit)
 	blockCache, _ := lru.New(blockCacheLimit)
-	futureBlocks, _ := lru.New(maxFutureBlocks)
 	badBlocks, _ := lru.New(badBlockLimit)
 	shardCache, _ := lru.New(shardCacheLimit)
 	commitsCache, _ := lru.New(commitsCacheLimit)
@@ -296,7 +292,6 @@ func newBlockChainWithOptions(
 		bodyRLPCache:                  bodyRLPCache,
 		receiptsCache:                 receiptsCache,
 		blockCache:                    blockCache,
-		futureBlocks:                  futureBlocks,
 		shardStateCache:               shardCache,
 		lastCommitsCache:              commitsCache,
 		epochCache:                    epochCache,
@@ -373,9 +368,6 @@ func newBlockChainWithOptions(
 			return nil, errors.WithMessage(err, "failed to write pre-image start end blocks")
 		}
 	}
-
-	// Take ownership of this particular state
-	go bc.update()
 	return bc, nil
 }
 
@@ -684,7 +676,6 @@ func (bc *BlockChainImpl) SetHead(head uint64) error {
 	bc.bodyRLPCache.Purge()
 	bc.receiptsCache.Purge()
 	bc.blockCache.Purge()
-	bc.futureBlocks.Purge()
 	bc.shardStateCache.Purge()
 
 	// Rewind the block chain, ensuring we don't end up with a stateless head block
@@ -1216,23 +1207,6 @@ func (bc *BlockChainImpl) Stop() {
 	utils.Logger().Info().Msg("Blockchain manager stopped")
 }
 
-func (bc *BlockChainImpl) procFutureBlocks() {
-	blocks := make([]*types.Block, 0, bc.futureBlocks.Len())
-	for _, hash := range bc.futureBlocks.Keys() {
-		if block, exist := bc.futureBlocks.Peek(hash); exist {
-			blocks = append(blocks, block.(*types.Block))
-		}
-	}
-	if len(blocks) > 0 {
-		types.BlockBy(types.Number).Sort(blocks)
-
-		// Insert one by one as chain insertion needs contiguous ancestry between blocks
-		for i := range blocks {
-			bc.InsertChain(blocks[i:i+1], true /* verifyHeaders */)
-		}
-	}
-}
-
 // WriteStatus status of write
 type WriteStatus byte
 
@@ -1624,7 +1598,6 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 		return NonStatTy, errors.Wrap(err, "writeHeadBlock")
 	}
 
-	bc.futureBlocks.Remove(block.Hash())
 	return CanonStatTy, nil
 }
 
@@ -1758,20 +1731,10 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			}
 
 		case err == consensus_engine.ErrFutureBlock:
-			// Allow up to MaxFuture second in the future blocks. If this limit is exceeded
-			// the chain is discarded and processed at a later time if given.
-			max := big.NewInt(time.Now().Unix() + maxTimeFutureBlocks)
-			if block.Time().Cmp(max) > 0 {
-				return i, events, coalescedLogs, fmt.Errorf("future block: %v > %v", block.Time(), max)
-			}
-			bc.futureBlocks.Add(block.Hash(), block)
-			stats.queued++
-			continue
+			return i, events, coalescedLogs, err
 
-		case err == consensus_engine.ErrUnknownAncestor && bc.futureBlocks.Contains(block.ParentHash()):
-			bc.futureBlocks.Add(block.Hash(), block)
-			stats.queued++
-			continue
+		case err == consensus_engine.ErrUnknownAncestor:
+			return i, events, coalescedLogs, err
 
 		case err == consensus_engine.ErrPrunedAncestor:
 			// TODO: add fork choice mechanism
@@ -2016,19 +1979,6 @@ func (bc *BlockChainImpl) PostChainEvents(events []interface{}, logs []*types.Lo
 
 		case TraceEvent:
 			bc.traceFeed.Send(ev)
-		}
-	}
-}
-
-func (bc *BlockChainImpl) update() {
-	futureTimer := time.NewTicker(5 * time.Second)
-	defer futureTimer.Stop()
-	for {
-		select {
-		case <-futureTimer.C:
-			bc.procFutureBlocks()
-		case <-bc.quit:
-			return
 		}
 	}
 }
