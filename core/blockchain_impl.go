@@ -344,7 +344,7 @@ func newBlockChainWithOptions(
 	fmt.Println(1531936, bc.GetBlockByNumber(1531936))
 	fmt.Println(1531937, bc.GetBlockByNumber(1531937))
 	fmt.Println(bc.CurrentBlock().NumberU64())
-	panic(bc.CurrentHeader().NumberU64())
+	//panic(bc.CurrentHeader().NumberU64())
 
 	// Load any existing snapshot, regenerating it if loading failed
 	if bc.cacheConfig.SnapshotLimit > 0 {
