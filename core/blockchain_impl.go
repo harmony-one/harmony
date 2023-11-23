@@ -34,7 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -181,9 +180,7 @@ type BlockChainImpl struct {
 	scope         event.SubscriptionScope
 	genesisBlock  *types.Block
 
-	mu                          sync.RWMutex // global mutex for locking chain operations
 	chainmu                     sync.RWMutex // blockchain insertion lock
-	procmu                      sync.RWMutex // block processor lock
 	pendingCrossLinksMutex      sync.RWMutex // pending crosslinks lock
 	pendingSlashingCandidatesMU sync.RWMutex // pending slashing candidates
 
@@ -576,14 +573,14 @@ func (bc *BlockChainImpl) loadLastState() error {
 	if head == (common.Hash{}) {
 		// Corrupt or empty database, init from scratch
 		utils.Logger().Warn().Msg("Empty database, resetting chain")
-		return bc.Reset()
+		return bc.reset()
 	}
 	// Make sure the entire head block is available
 	currentBlock := bc.GetBlockByHash(head)
 	if currentBlock == nil {
 		// Corrupt or empty database, init from scratch
 		utils.Logger().Warn().Str("hash", head.Hex()).Msg("Head block missing, resetting chain")
-		return bc.Reset()
+		return bc.reset()
 	}
 	// Make sure the state associated with the block is available
 	if _, err := state.New(currentBlock.Root(), bc.stateCache, bc.snaps); err != nil {
@@ -633,11 +630,8 @@ func (bc *BlockChainImpl) loadLastState() error {
 	return nil
 }
 
-func (bc *BlockChainImpl) SetHead(head uint64) error {
+func (bc *BlockChainImpl) setHead(head uint64) error {
 	utils.Logger().Warn().Uint64("target", head).Msg("Rewinding blockchain")
-
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
 
 	// Rewind the header chain, deleting all block bodies until then
 	delFn := func(db rawdb.DatabaseDeleter, hash common.Hash, num uint64) error {
@@ -691,8 +685,6 @@ func (bc *BlockChainImpl) CurrentBlock() *types.Block {
 }
 
 func (bc *BlockChainImpl) Processor() Processor {
-	bc.procmu.RLock()
-	defer bc.procmu.RUnlock()
 	return bc.processor
 }
 
@@ -709,17 +701,15 @@ func (bc *BlockChainImpl) Snapshots() *snapshot.Tree {
 	return bc.snaps
 }
 
-func (bc *BlockChainImpl) Reset() error {
-	return bc.ResetWithGenesisBlock(bc.genesisBlock)
+func (bc *BlockChainImpl) reset() error {
+	return bc.resetWithGenesisBlock(bc.genesisBlock)
 }
 
-func (bc *BlockChainImpl) ResetWithGenesisBlock(genesis *types.Block) error {
+func (bc *BlockChainImpl) resetWithGenesisBlock(genesis *types.Block) error {
 	// Dump the entire block chain and purge the caches
-	if err := bc.SetHead(0); err != nil {
+	if err := bc.setHead(0); err != nil {
 		return err
 	}
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
 
 	// Prepare the genesis block and reinitialise the chain
 	if err := rawdb.WriteBlock(bc.db, genesis); err != nil {
@@ -808,8 +798,8 @@ func (bc *BlockChainImpl) Export(w io.Writer) error {
 
 // ExportN writes a subset of the active chain to the given writer.
 func (bc *BlockChainImpl) ExportN(w io.Writer, first uint64, last uint64) error {
-	bc.mu.RLock()
-	defer bc.mu.RUnlock()
+	bc.chainmu.RLock()
+	defer bc.chainmu.RUnlock()
 
 	if first > last {
 		return fmt.Errorf("export failed: first (%d) is greater than last (%d)", first, last)
@@ -835,10 +825,6 @@ func (bc *BlockChainImpl) ExportN(w io.Writer, first uint64, last uint64) error 
 	}
 
 	return nil
-}
-
-func (bc *BlockChainImpl) WriteHeadBlock(block *types.Block) error {
-	return bc.writeHeadBlock(block)
 }
 
 // writeHeadBlock writes a new head block
@@ -1167,8 +1153,8 @@ const (
 )
 
 func (bc *BlockChainImpl) Rollback(chain []common.Hash) error {
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 
 	valsToRemove := map[common.Address]struct{}{}
 	for i := len(chain) - 1; i >= 0; i-- {
@@ -1205,95 +1191,15 @@ func (bc *BlockChainImpl) Rollback(chain []common.Hash) error {
 	return bc.removeInValidatorList(valsToRemove)
 }
 
-// SetReceiptsData computes all the non-consensus fields of the receipts
-func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) error {
-	signer := types.MakeSigner(config, block.Epoch())
-	ethSigner := types.NewEIP155Signer(config.EthCompatibleChainID)
-
-	transactions, stakingTransactions, logIndex := block.Transactions(), block.StakingTransactions(), uint(0)
-	if len(transactions)+len(stakingTransactions) != len(receipts) {
-		return errors.New("transaction+stakingTransactions and receipt count mismatch")
-	}
-
-	// The used gas can be calculated based on previous receipts
-	if len(receipts) > 0 && len(transactions) > 0 {
-		receipts[0].GasUsed = receipts[0].CumulativeGasUsed
-	}
-	for j := 1; j < len(transactions); j++ {
-		// The transaction hash can be retrieved from the transaction itself
-		receipts[j].TxHash = transactions[j].Hash()
-		receipts[j].GasUsed = receipts[j].CumulativeGasUsed - receipts[j-1].CumulativeGasUsed
-		// The contract address can be derived from the transaction itself
-		if transactions[j].To() == nil {
-			// Deriving the signer is expensive, only do if it's actually needed
-			var from common.Address
-			if transactions[j].IsEthCompatible() {
-				from, _ = types.Sender(ethSigner, transactions[j])
-			} else {
-				from, _ = types.Sender(signer, transactions[j])
-			}
-			receipts[j].ContractAddress = crypto.CreateAddress(from, transactions[j].Nonce())
-		}
-		// The derived log fields can simply be set from the block and transaction
-		for k := 0; k < len(receipts[j].Logs); k++ {
-			receipts[j].Logs[k].BlockNumber = block.NumberU64()
-			receipts[j].Logs[k].BlockHash = block.Hash()
-			receipts[j].Logs[k].TxHash = receipts[j].TxHash
-			receipts[j].Logs[k].TxIndex = uint(j)
-			receipts[j].Logs[k].Index = logIndex
-			logIndex++
-		}
-	}
-
-	// The used gas can be calculated based on previous receipts
-	if len(receipts) > len(transactions) && len(stakingTransactions) > 0 {
-		receipts[len(transactions)].GasUsed = receipts[len(transactions)].CumulativeGasUsed
-	}
-	// in a block, txns are processed before staking txns
-	for j := len(transactions) + 1; j < len(transactions)+len(stakingTransactions); j++ {
-		// The transaction hash can be retrieved from the staking transaction itself
-		receipts[j].TxHash = stakingTransactions[j].Hash()
-		receipts[j].GasUsed = receipts[j].CumulativeGasUsed - receipts[j-1].CumulativeGasUsed
-		// The derived log fields can simply be set from the block and transaction
-		for k := 0; k < len(receipts[j].Logs); k++ {
-			receipts[j].Logs[k].BlockNumber = block.NumberU64()
-			receipts[j].Logs[k].BlockHash = block.Hash()
-			receipts[j].Logs[k].TxHash = receipts[j].TxHash
-			receipts[j].Logs[k].TxIndex = uint(j) + uint(len(transactions))
-			receipts[j].Logs[k].Index = logIndex
-			logIndex++
-		}
-	}
-	return nil
-}
-
 var lastWrite uint64
 
-func (bc *BlockChainImpl) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
-	bc.chainmu.Lock()
-	defer bc.chainmu.Unlock()
-
-	if err := bc.hc.WriteTd(block.Hash(), block.NumberU64(), td); err != nil {
-		return err
-	}
-	if err := rawdb.WriteBlock(bc.db, block); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (bc *BlockChainImpl) WriteBlockWithState(
+func (bc *BlockChainImpl) writeBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
 	stakeMsgs []staking.StakeMsg,
 	paid reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
-	// Make sure no inconsistent state is leaked during insertion
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
-
 	currentBlock := bc.CurrentBlock()
 	if currentBlock == nil {
 		return NonStatTy, errors.New("Current block is nil")
@@ -1676,7 +1582,7 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 
 		// Write the block to the chain and get the status.
 		substart = time.Now()
-		status, err := bc.WriteBlockWithState(
+		status, err := bc.writeBlockWithState(
 			block, receipts, cxReceipts, stakeMsgs, payout, state,
 		)
 		if err != nil {
@@ -1886,35 +1792,6 @@ Error: %v
 		utils.Logger().Error().
 			Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
 	}
-}
-
-// InsertHeaderChain attempts to insert the given header chain in to the local
-// chain, possibly creating a reorg. If an error is returned, it will return the
-// index number of the failing header as well an error describing what went wrong.
-//
-// The verify parameter can be used to fine tune whether nonce verification
-// should be done or not. The reason behind the optional check is because some
-// of the header retrieval mechanisms already need to verify nonces, as well as
-// because nonces can be verified sparsely, not needing to check each.
-func (bc *BlockChainImpl) InsertHeaderChain(chain []*block.Header, checkFreq int) (int, error) {
-	start := time.Now()
-	if i, err := bc.hc.ValidateHeaderChain(chain, checkFreq); err != nil {
-		return i, err
-	}
-
-	// Make sure only one thread manipulates the chain at once
-	bc.chainmu.Lock()
-	defer bc.chainmu.Unlock()
-
-	whFunc := func(header *block.Header) error {
-		bc.mu.Lock()
-		defer bc.mu.Unlock()
-
-		_, err := bc.hc.WriteHeader(header)
-		return err
-	}
-
-	return bc.hc.InsertHeaderChain(chain, whFunc, start)
 }
 
 func (bc *BlockChainImpl) CurrentHeader() *block.Header {
