@@ -1221,7 +1221,11 @@ func (ss *StagedSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Con
 			if block == nil {
 				break
 			}
-			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil && !errors.Is(err, core.ErrKnownBlock) {
+			_, err := bc.InsertChain(types.Blocks{block}, true)
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+			case errors.Is(err, core.ErrNotLastBlockInEpoch):
+			case err != nil:
 				return errors.Wrap(err, "failed to InsertChain")
 			}
 		}

@@ -88,8 +88,9 @@ var (
 	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
 
 	// ErrNoGenesis is the error when there is no genesis.
-	ErrNoGenesis  = errors.New("Genesis not found in chain")
-	ErrEmptyChain = errors.New("empty chain")
+	ErrNoGenesis           = errors.New("Genesis not found in chain")
+	ErrEmptyChain          = errors.New("empty chain")
+	ErrNotLastBlockInEpoch = errors.New("not last block in epoch")
 	// errExceedMaxPendingSlashes ..
 	errExceedMaxPendingSlashes = errors.New("exceeed max pending slashes")
 	errNilEpoch                = errors.New("nil epoch for voting power computation")
