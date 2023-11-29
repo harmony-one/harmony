@@ -1,33 +1,29 @@
 package chain
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
-	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/trie"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
-	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/state/snapshot"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/staking/effective"
+	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	types2 "github.com/harmony-one/harmony/staking/types"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/rawdb"
-	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/state/snapshot"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/params"
+	staketest "github.com/harmony-one/harmony/staking/types/test"
 )
 
 type fakeReader struct {

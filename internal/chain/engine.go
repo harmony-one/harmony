@@ -377,7 +377,6 @@ func (e *engineImpl) Finalize(
 			Msg("pruneStaleStakingData")
 	}
 
-
 	// Finalize the state root
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), delegationsToRemove, payout, nil

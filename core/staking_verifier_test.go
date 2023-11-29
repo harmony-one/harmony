@@ -1416,8 +1416,6 @@ func TestVerifyAndUndelegateFromMsg(t *testing.T) {
 			}(t),
 			noNilDelegationsEpoch: big.NewInt(defaultEpoch),
 		},
-
-
 	}
 	for i, test := range tests {
 		config := &params.ChainConfig{}

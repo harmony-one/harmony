@@ -64,13 +64,13 @@ type StateProcessor struct {
 
 // this structure is cached, and each individual element is returned
 type ProcessorResult struct {
-	Receipts   types.Receipts
-	CxReceipts types.CXReceipts
-	StakeMsgs  []staking.StakeMsg
-	Logs       []*types.Log
-	UsedGas    uint64
-	Reward     reward.Reader
-	State      *state.DB
+	Receipts            types.Receipts
+	CxReceipts          types.CXReceipts
+	StakeMsgs           []staking.StakeMsg
+	Logs                []*types.Log
+	UsedGas             uint64
+	Reward              reward.Reader
+	State               *state.DB
 	DelegationsToRemove map[common.Address][]common.Address
 }
 
@@ -232,13 +232,13 @@ func (p *StateProcessor) Process(
 	}
 
 	result := &ProcessorResult{
-		Receipts:   receipts,
-		CxReceipts: outcxs,
-		StakeMsgs:  blockStakeMsgs,
-		Logs:       allLogs,
-		UsedGas:    *usedGas,
-		Reward:     payout,
-		State:      statedb,
+		Receipts:            receipts,
+		CxReceipts:          outcxs,
+		StakeMsgs:           blockStakeMsgs,
+		Logs:                allLogs,
+		UsedGas:             *usedGas,
+		Reward:              payout,
+		State:               statedb,
 		DelegationsToRemove: delegationsToRemove,
 	}
 	p.resultCache.Add(cacheKey, result)

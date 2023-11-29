@@ -161,7 +161,7 @@ func (e *dummyEngine) Finalize(
 	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
 	doubleSigners slash.Records, sigsReady chan bool, viewID func() uint64,
 ) (*types.Block, map[common.Address][]common.Address, reward.Reader, error) {
-		return nil, nil, nil, nil
+	return nil, nil, nil, nil
 }
 
 type testInsertHelper struct {
