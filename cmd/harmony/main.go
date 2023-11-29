@@ -862,7 +862,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
 
 	// This needs to be executed after consensus setup
-	if err := currentNode.InitConsensusWithValidators(); err != nil {
+	if err := currentConsensus.InitConsensusWithValidators(); err != nil {
 		utils.Logger().Warn().
 			Int("shardID", hc.General.ShardID).
 			Err(err).
