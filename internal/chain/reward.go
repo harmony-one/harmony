@@ -271,7 +271,7 @@ func AccumulateRewardsAndCountSigs(
 	// Handle rewards on pre-aggregated rewards era.
 	if !bc.Config().IsAggregatedRewardEpoch(header.Epoch()) {
 		reader, err := distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
-		return numeric.ZeroDec(), reader, err; 
+		return numeric.ZeroDec(), reader, err
 	}
 
 	// Aggregated Rewards Era: Rewards are aggregated every 64 blocks.
@@ -286,7 +286,6 @@ func AccumulateRewardsAndCountSigs(
 		return numeric.ZeroDec(), network.EmptyPayout, nil
 	}
 
-	
 	_, reader, err := distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
 	return numeric.ZeroDec(), reader, err
 }
@@ -422,12 +421,12 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 			return numeric.ZeroDec(), network.EmptyPayout, err
 		}
 	}
-	
+
 	utils.Logger().Debug().Int64("elapsed time", time.Since(startTimeLocal).Milliseconds()).Msg("After Chain Reward (AddReward)")
 	utils.Logger().Debug().Int64("elapsed time", time.Since(startTime).Milliseconds()).Msg("After Chain Reward")
 
 	// remainingReward needs to be multipled with the number of crosslinks across all shards
-	
+
 	return remainingReward.MulInt(big.NewInt(int64(len(allCrossLinks)))), network.NewStakingEraRewardForRound(
 		newRewards, payouts,
 	), nil
