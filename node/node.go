@@ -499,10 +499,6 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
 					return nil, 0, errors.New("beacon block height smaller than current height beyond tolerance")
-				} else if block.NumberU64()-beaconBlockHeightTolerance > curBeaconHeight {
-					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
-						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
-					return nil, 0, errors.Errorf("beacon block height too much higher than current height beyond tolerance, block %d, current %d, epoch %d , current %d", block.NumberU64(), curBeaconHeight, block.Epoch().Uint64(), curBeaconBlock.Epoch().Uint64())
 				} else if block.NumberU64() <= curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")
