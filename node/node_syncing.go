@@ -231,7 +231,16 @@ func (node *Node) doBeaconSyncing() {
 		// If Downloader is not working, we need also deal with blocks from beaconBlockChannel
 		go func(node *Node) {
 			// TODO ek – infinite loop; add shutdown/cleanup logic
-			for _ = range node.BeaconBlockChannel {
+			for b := range node.BeaconBlockChannel {
+				if b != nil && b.IsLastBlockInEpoch() {
+					_, err := node.EpochChain().InsertChain(types.Blocks{b}, true)
+					if err != nil {
+						utils.Logger().Error().Err(err).Msgf("[SYNC] InsertChain failed shard: %d epoch:%d number:%d", b.Header().ShardID(), b.Epoch().Uint64(), b.NumberU64())
+					} else {
+						utils.Logger().Info().
+							Msgf("Beacon block being handled by block channel: epoch: %d, number: %d", b.Epoch().Uint64(), b.NumberU64())
+					}
+				}
 			}
 		}(node)
 	}

@@ -76,8 +76,6 @@ func (node *Node) HandleNodeMessage(
 				if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 					for _, block := range blocks {
 						if block.ShardID() == 0 {
-							utils.Logger().Info().
-								Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
 							if block.IsLastBlockInEpoch() {
 								go func(blk *types.Block) {
 									node.BeaconBlockChannel <- blk
