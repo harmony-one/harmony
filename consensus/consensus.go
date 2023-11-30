@@ -40,10 +40,6 @@ const (
 	AsyncProposal
 )
 
-type DownloadAsync interface {
-	DownloadAsync()
-}
-
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	Decider quorum.Decider
@@ -126,7 +122,9 @@ type Consensus struct {
 	// finalityCounter keep tracks of the finality time
 	finalityCounter atomic.Value //int64
 
-	dHelper DownloadAsync
+	dHelper interface {
+		DownloadAsync()
+	}
 
 	// Both flags only for initialization state.
 	start           bool
@@ -192,10 +190,10 @@ func (consensus *Consensus) BlocksSynchronized() {
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
-func (consensus *Consensus) BlocksNotSynchronized(reason string) {
+func (consensus *Consensus) BlocksNotSynchronized() {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.syncNotReadyChan(reason)
+	consensus.syncNotReadyChan()
 }
 
 // VdfSeedSize returns the number of VRFs for VDF computation

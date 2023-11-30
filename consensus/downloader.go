@@ -61,7 +61,7 @@ func (dh *downloadHelper) downloadStartedLoop(c *Consensus) {
 	for {
 		select {
 		case <-dh.startedCh:
-			c.BlocksNotSynchronized("downloadStartedLoop")
+			c.BlocksNotSynchronized()
 
 		case err := <-dh.startedSub.Err():
 			c.GetLogger().Info().Err(err).Msg("consensus download finished loop closed")

@@ -316,7 +316,7 @@ func (node *Node) doSync(syncInstance ISync, syncingPeerProvider SyncingPeerProv
 	if isSynchronized, _, _ := syncInstance.GetParsedSyncStatusDoubleChecked(); !isSynchronized {
 		node.IsSynchronized.UnSet()
 		if willJoinConsensus {
-			consensus.BlocksNotSynchronized("node.doSync")
+			consensus.BlocksNotSynchronized()
 		}
 		isBeacon := bc.ShardID() == shard.BeaconChainShardID
 		syncInstance.SyncLoop(bc, isBeacon, consensus, legacysync.LoopMinTime)
