@@ -65,7 +65,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			_, err := consensus.ValidateNewBlock(recvMsg)
 			if err == nil {
 				consensus.GetLogger().Info().
-					Msg("[Announce] Block verified")
+					Msgf("[Announce] Block verified %d", recvMsg.BlockNum)
 			}
 		}()
 	}

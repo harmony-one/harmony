@@ -359,11 +359,12 @@ func (consensus *Consensus) syncReadyChan() {
 	}
 }
 
-func (consensus *Consensus) syncNotReadyChan() {
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
+func (consensus *Consensus) syncNotReadyChan(reason string) {
+	mode := consensus.current.Mode()
 	consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
 	consensus.current.SetMode(Syncing)
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
+	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] syncNotReadyChan, prev %s, reason %s", mode.String(), reason)
+	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] Node is OUT OF SYNC, reason: %s", reason)
 	consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
 }
 
