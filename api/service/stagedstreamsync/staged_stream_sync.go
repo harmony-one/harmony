@@ -642,9 +642,8 @@ func (ss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consens
 			case errors.Is(err, core.ErrNotLastBlockInEpoch):
 			case err != nil:
 				return errors.Wrap(err, "failed to InsertChain")
-			default:
-				hashes = append(hashes, block.Header().Hash())
 			}
+			hashes = append(hashes, block.Header().Hash())
 		}
 		return nil
 	})
