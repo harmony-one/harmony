@@ -236,7 +236,7 @@ func (s *PublicTransactionService) newRPCTransaction(tx *types.Transaction, bloc
 		}
 		return NewStructuredResponse(tx)
 	case Eth:
-		tx, err := eth.NewTransaction(tx.ConvertToEth(), blockHash, blockNumber, timestamp, index)
+		tx, err := eth.NewTransactionFromTransaction(tx, blockHash, blockNumber, timestamp, index)
 		if err != nil {
 			DoMetricRPCQueryInfo(GetTransactionByHash, FailedNumber)
 			return nil, err
