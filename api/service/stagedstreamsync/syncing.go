@@ -219,6 +219,8 @@ func (s *StagedStreamSync) Debug(source string, msg interface{}) {
 // For each iteration, estimate the current block number, then fetch block & insert to blockchain
 func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bool) (uint64, int, error) {
 
+	startedNumber := s.bc.CurrentBlock().NumberU64()
+
 	var totalInserted int
 
 	s.initSync = initSync
@@ -249,7 +251,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	for {
 		ctx, cancel := context.WithCancel(downloaderContext)
 
-		n, err := s.doSyncCycle(ctx, initSync)
+		n, err := s.doSyncCycle(ctx)
 		if err != nil {
 			utils.Logger().Error().
 				Err(err).
@@ -281,6 +283,8 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			Bool("isBeacon", s.isBeacon).
 			Uint32("shard", s.bc.ShardID()).
 			Int("blocks", totalInserted).
+			Uint64("startedNumber", startedNumber).
+			Uint64("currentNumber", s.bc.CurrentBlock().NumberU64()).
 			Msg(WrapStagedSyncMsg("sync cycle blocks inserted successfully"))
 	}
 
@@ -304,7 +308,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	return estimatedHeight, totalInserted, nil
 }
 
-func (s *StagedStreamSync) doSyncCycle(ctx context.Context, initSync bool) (int, error) {
+func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 
 	// TODO: initSync=true means currentCycleNumber==0, so we can remove initSync
 
