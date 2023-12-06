@@ -199,7 +199,7 @@ var (
 		SlotsLimitedEpoch:                     EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch:         big.NewInt(5),
 		AllowlistEpoch:                        EpochTBD,
-		LeaderRotationInternalValidatorsEpoch: EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: big.NewInt(2379),
 		LeaderRotationExternalValidatorsEpoch: EpochTBD,
 		FeeCollectEpoch:                       big.NewInt(5),
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
