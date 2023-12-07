@@ -367,7 +367,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	}
 
 	// add consensus last mile blocks
-	if s.consensus != nil {
+	if s.consensus != nil && s.isBeaconNode {
 		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
