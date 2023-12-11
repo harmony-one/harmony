@@ -105,6 +105,8 @@ type BlockChain interface {
 	// Rollback is designed to remove a chain of links from the database that aren't
 	// certain enough to be valid.
 	Rollback(chain []common.Hash) error
+	// writeHeadBlock writes a new head block
+	WriteHeadBlock(block *types.Block) error
 	// WriteBlockWithoutState writes only the block and its metadata to the database,
 	// but does not write any state. This is used to construct competing side forks
 	// up to the point where they exceed the canonical total difficulty.

@@ -58,8 +58,8 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 	// for short range sync, skip this step
 	if !s.state.initSync {
 		return nil
-	}	// only execute this stage in fast/snap sync mode and once we reach to pivot
-	
+	} // only execute this stage in fast/snap sync mode and once we reach to pivot
+
 	if s.state.status.pivotBlock == nil ||
 		s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64() ||
 		s.state.status.statesSynced {
