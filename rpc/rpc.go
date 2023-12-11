@@ -207,7 +207,7 @@ func getAPIs(hmy *hmy.Harmony, config nodeconfig.RPCServerConfig) []rpc.API {
 		NewPrivateDebugAPI(hmy, V2),
 	}
 
-	if config.DebugEnabled {
+	if config.DebugEnabled || true {
 		apis := append(publicAPIs, publicDebugAPIs...)
 		return append(apis, privateAPIs...)
 	}

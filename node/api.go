@@ -193,11 +193,11 @@ func (node *Node) GetLastSigningPower2() (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	roster, err := votepower.Compute(&ss.Shards[0], cur.Epoch())
+	roster, err := votepower.Compute(&ss.Shards[bc.ShardID()], cur.Epoch())
 	if err != nil {
 		return 0, err
 	}
-	blsPubKeys, err := ss.Shards[0].BLSPublicKeys()
+	blsPubKeys, err := ss.Shards[bc.ShardID()].BLSPublicKeys()
 	if err != nil {
 		return 0, err
 	}
