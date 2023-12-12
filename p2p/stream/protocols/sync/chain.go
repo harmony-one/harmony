@@ -199,7 +199,7 @@ func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([]types.Receipts, erro
 	return receipts, nil
 }
 
-// getAccountRange 
+// getAccountRange
 func (ch *chainHelperImpl) getAccountRange(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, [][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit

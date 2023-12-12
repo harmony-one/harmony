@@ -206,84 +206,92 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 			cap := maxRequestSize
 			retAccounts, proof, stid, err := sss.configs.protocol.GetAccountRange(ctx, root, origin, limit, uint64(cap))
 			if err != nil {
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					sss.configs.protocol.StreamFailed(stid, "GetAccountRange failed")
+				}
+				utils.Logger().Error().
+					Err(err).
+					Str("stream", string(stid)).
+					Msg(WrapStagedSyncMsg("GetAccountRange failed"))
+				err = errors.Wrap(err, "request error")
+				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
+				return
+			} else if retAccounts == nil || len(retAccounts) == 0 {
+				s.state.Debug("runStateWorkerLoop/GetAccountRange/data", "nil array")
+				utils.Logger().Warn().
+					Str("stream", string(stid)).
+					Msg(WrapStagedSyncMsg("GetAccountRange failed, received empty accounts"))
+				err := errors.New("GetAccountRange received empty slots")
+				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 				return
 			}
 			if err := sdm.HandleAccountRequestResult(task, retAccounts, proof, origin[:], limit[:], loopID, stid); err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Str("stream", string(stid)).
+					Msg(WrapStagedSyncMsg("GetAccountRange handle result failed"))
+				err = errors.Wrap(err, "handle result error")
+				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 				return
 			}
 
-		} else if len(codes)+len(storages.accounts) > 0 {
+		} else if len(codes) > 0 {
 
-			if len(codes) > 0 {
-				stid, err := sss.downloadByteCodes(ctx, sdm, codes, loopID)
-				if err != nil {
-					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-						sss.configs.protocol.StreamFailed(stid, "downloadByteCodes failed")
-					}
-					utils.Logger().Error().
-						Err(err).
-						Str("stream", string(stid)).
-						Msg(WrapStagedSyncMsg("downloadByteCodes failed"))
-					err = errors.Wrap(err, "request error")
-					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
-					return
+			stid, err := sss.downloadByteCodes(ctx, sdm, codes, loopID)
+			if err != nil {
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					sss.configs.protocol.StreamFailed(stid, "downloadByteCodes failed")
 				}
+				utils.Logger().Error().
+					Err(err).
+					Str("stream", string(stid)).
+					Msg(WrapStagedSyncMsg("downloadByteCodes failed"))
+				err = errors.Wrap(err, "request error")
+				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
+				return
 			}
 
-			if len(storages.accounts) > 0 {
-				root := sdm.root
-				roots := storages.roots
-				accounts := storages.accounts
-				cap := maxRequestSize
-				origin := storages.origin
-				limit := storages.limit
-				mainTask := storages.mainTask
-				subTask := storages.subtask
+		} else if len(storages.accounts) > 0 {
 
-				slots, proof, stid, err := sss.configs.protocol.GetStorageRanges(ctx, root, accounts, origin, limit, uint64(cap))
-				if err != nil {
-					return
+			root := sdm.root
+			roots := storages.roots
+			accounts := storages.accounts
+			cap := maxRequestSize
+			origin := storages.origin
+			limit := storages.limit
+			mainTask := storages.mainTask
+			subTask := storages.subtask
+
+			slots, proof, stid, err := sss.configs.protocol.GetStorageRanges(ctx, root, accounts, origin, limit, uint64(cap))
+			if err != nil {
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					sss.configs.protocol.StreamFailed(stid, "GetStorageRanges failed")
 				}
-				if err := sdm.HandleStorageRequestResult(mainTask, subTask, accounts, roots, origin, limit, slots, proof, loopID, stid); err != nil {
-					return
-				}
+				utils.Logger().Error().
+					Err(err).
+					Str("stream", string(stid)).
+					Msg(WrapStagedSyncMsg("GetStorageRanges failed"))
+				err = errors.Wrap(err, "request error")
+				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
+				return
+			} else if slots == nil || len(slots) == 0 {
+				s.state.Debug("runStateWorkerLoop/GetStorageRanges/data", "nil array")
+				utils.Logger().Warn().
+					Str("stream", string(stid)).
+					Msg(WrapStagedSyncMsg("GetStorageRanges failed, received empty slots"))
+				err := errors.New("GetStorageRanges received empty slots")
+				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
+				return
 			}
-
-			// data, stid, err := sss.downloadStates(ctx, accounts, codes, storages)
-			// if err != nil {
-			// 	s.state.Debug("runStateWorkerLoop/downloadStates/error", err)
-			// 	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			// 		sss.configs.protocol.StreamFailed(stid, "downloadStates failed")
-			// 	}
-			// 	utils.Logger().Error().
-			// 		Err(err).
-			// 		Str("stream", string(stid)).
-			// 		Msg(WrapStagedSyncMsg("downloadStates failed"))
-			// 	err = errors.Wrap(err, "request error")
-			// 	sdm.HandleRequestError(codes, paths, stid, err)
-			// } else if data == nil || len(data) == 0 {
-			// 	s.state.Debug("runStateWorkerLoop/downloadStates/data", "nil array")
-			// 	utils.Logger().Warn().
-			// 		Str("stream", string(stid)).
-			// 		Msg(WrapStagedSyncMsg("downloadStates failed, received empty data bytes"))
-			// 	err := errors.New("downloadStates received empty data bytes")
-			// 	sdm.HandleRequestError(codes, paths, stid, err)
-			// } else {
-			// 	s.state.Debug("runStateWorkerLoop/downloadStates/data/len", len(data))
-			// 	sdm.HandleRequestResult(nodes, paths, data, loopID, stid)
-			// 	if sss.configs.logProgress {
-			// 		//calculating block download speed
-			// 		dt := time.Now().Sub(startTime).Seconds()
-			// 		speed := float64(0)
-			// 		if dt > 0 {
-			// 			speed = float64(len(data)) / dt
-			// 		}
-			// 		stateDownloadSpeed := fmt.Sprintf("%.2f", speed)
-
-			// 		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-			// 		fmt.Println("state download speed:", stateDownloadSpeed, "states/s")
-			// 	}
-			// }
+			if err := sdm.HandleStorageRequestResult(mainTask, subTask, accounts, roots, origin, limit, slots, proof, loopID, stid); err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Str("stream", string(stid)).
+					Msg(WrapStagedSyncMsg("GetStorageRanges handle result failed"))
+				err = errors.Wrap(err, "handle result error")
+				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
+				return
+			}
 
 		} else {
 			// assign trie node Heal Tasks
@@ -296,9 +304,32 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 
 				nodes, stid, err := sss.configs.protocol.GetTrieNodes(ctx, root, pathsets, maxRequestSize)
 				if err != nil {
+					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+						sss.configs.protocol.StreamFailed(stid, "GetTrieNodes failed")
+					}
+					utils.Logger().Error().
+						Err(err).
+						Str("stream", string(stid)).
+						Msg(WrapStagedSyncMsg("GetTrieNodes failed"))
+					err = errors.Wrap(err, "request error")
+					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
+					return
+				} else if nodes == nil || len(nodes) == 0 {
+					s.state.Debug("runStateWorkerLoop/GetTrieNodes/data", "nil array")
+					utils.Logger().Warn().
+						Str("stream", string(stid)).
+						Msg(WrapStagedSyncMsg("GetTrieNodes failed, received empty nodes"))
+					err := errors.New("GetTrieNodes received empty nodes")
+					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 					return
 				}
 				if err := sdm.HandleTrieNodeHealRequestResult(task, paths, hashes, nodes, loopID, stid); err != nil {
+					utils.Logger().Error().
+						Err(err).
+						Str("stream", string(stid)).
+						Msg(WrapStagedSyncMsg("GetTrieNodes handle result failed"))
+					err = errors.Wrap(err, "handle result error")
+					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 					return
 				}
 			}
@@ -306,11 +337,34 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 			if len(codetask.hashes) > 0 {
 				task := codetask.task
 				hashes := codetask.hashes
-				codes, stid, err := sss.configs.protocol.GetByteCodes(ctx, hashes, maxRequestSize)
+				retCodes, stid, err := sss.configs.protocol.GetByteCodes(ctx, hashes, maxRequestSize)
 				if err != nil {
+					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+						sss.configs.protocol.StreamFailed(stid, "GetByteCodes failed")
+					}
+					utils.Logger().Error().
+						Err(err).
+						Str("stream", string(stid)).
+						Msg(WrapStagedSyncMsg("GetByteCodes failed"))
+					err = errors.Wrap(err, "request error")
+					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
+					return
+				} else if retCodes == nil || len(retCodes) == 0 {
+					s.state.Debug("runStateWorkerLoop/GetByteCodes/data", "nil array")
+					utils.Logger().Warn().
+						Str("stream", string(stid)).
+						Msg(WrapStagedSyncMsg("GetByteCodes failed, received empty codes"))
+					err := errors.New("GetByteCodes received empty codes")
+					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 					return
 				}
-				if err := sdm.HandleBytecodeRequestResult(task, hashes, codes, loopID, stid); err != nil {
+				if err := sdm.HandleBytecodeRequestResult(task, hashes, retCodes, loopID, stid); err != nil {
+					utils.Logger().Error().
+						Err(err).
+						Str("stream", string(stid)).
+						Msg(WrapStagedSyncMsg("GetByteCodes handle result failed"))
+					err = errors.Wrap(err, "handle result error")
+					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 					return
 				}
 			}
@@ -326,20 +380,8 @@ func (sss *StageFullStateSync) downloadByteCodes(ctx context.Context, sdm *FullS
 		if err != nil {
 			return stid, err
 		}
-		if err = sdm.HandleBytecodeRequestResult(codeTask.task, codeTask.hashes, retCodes, loopID, stid); err != nil {
-			return stid, err
-		}
-	}
-	return
-}
-
-func (sss *StageFullStateSync) downloadStorages(ctx context.Context, sdm *FullStateDownloadManager, codeTasks []*byteCodeTasksBundle, loopID int) (stid sttypes.StreamID, err error) {
-	for _, codeTask := range codeTasks {
-		// try to get byte codes from remote peer
-		// if any of them failed, the stid will be the id of failed stream
-		retCodes, stid, err := sss.configs.protocol.GetByteCodes(ctx, codeTask.hashes, maxRequestSize)
-		if err != nil {
-			return stid, err
+		if len(retCodes) == 0 {
+			return stid, errors.New("empty codes array")
 		}
 		if err = sdm.HandleBytecodeRequestResult(codeTask.task, codeTask.hashes, retCodes, loopID, stid); err != nil {
 			return stid, err

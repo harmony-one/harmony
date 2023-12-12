@@ -571,13 +571,10 @@ func (s *FullStateDownloadManager) GetNextBatch() (accounts []*accountTask,
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	cap := StatesPerRequest
-
-	accounts, codes, storages, healtask, codetask = s.getBatchFromRetries(cap)
+	accounts, codes, storages, healtask, codetask = s.getBatchFromRetries()
 	nItems := len(accounts) + len(codes) + len(storages.roots) + len(healtask.hashes) + len(codetask.hashes)
-	cap -= nItems
 
-	if cap == 0 {
+	if nItems > 0 {
 		return
 	}
 
@@ -593,7 +590,7 @@ func (s *FullStateDownloadManager) GetNextBatch() (accounts []*accountTask,
 	if healtask != nil || codetask != nil {
 		withHealTasks = false
 	}
-	newAccounts, newCodes, newStorageTaskBundle, newHealTask, newCodeTask := s.getBatchFromUnprocessed(cap, withHealTasks)
+	newAccounts, newCodes, newStorageTaskBundle, newHealTask, newCodeTask := s.getBatchFromUnprocessed(withHealTasks)
 	accounts = append(accounts, newAccounts...)
 	codes = append(codes, newCodes...)
 	storages = newStorageTaskBundle
@@ -924,7 +921,7 @@ func (s *FullStateDownloadManager) updateStats(written, duplicate, unexpected in
 
 // getBatchFromUnprocessed returns objects with a maximum of n unprocessed state download
 // tasks to send to the remote peer.
-func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks bool) (
+func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 	accounts []*accountTask,
 	codes []*byteCodeTasksBundle,
 	storages *storageTaskBundle,
@@ -932,31 +929,43 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 	codetask *healTask) {
 
 	// over trie nodes as those can be written to disk and forgotten about.
-	codes = make([]*byteCodeTasksBundle, 0, n)
-	accounts = make([]*accountTask, 0, n)
+	codes = make([]*byteCodeTasksBundle, 0)
+	accounts = make([]*accountTask, 0)
 
 	for i, task := range s.tasks.accountTasks {
 		// Stop when we've gathered enough requests
-		if len(accounts) == n {
-			return
-		}
+		// if len(accounts) == n {
+		// 	return
+		// }
+
 		// if already requested
 		if task.requested {
 			continue
 		}
-		if task.id == 0 {
-			continue
+
+		// create a unique id for healer task
+		var taskID uint64
+		for {
+			taskID = uint64(rand.Int63())
+			if taskID == 0 {
+				continue
+			}
+			if _, ok := s.tasks.accountTasks[taskID]; ok {
+				continue
+			}
+			break
 		}
+
 		s.tasks.accountTasks[i].requested = true
 		accounts = append(accounts, task)
 		s.requesting.addAccountTask(task.id, task)
-		// s.tasks.deleteAccountTask(task)
+		s.tasks.addAccountTask(task.id, task)
 
 		// one task account is enough for an stream
 		return
 	}
 
-	cap := n // - len(accounts)
+	totalHashes := int(0)
 
 	for _, task := range s.tasks.accountTasks {
 		// Skip tasks that are already retrieving (or done with) all codes
@@ -969,6 +978,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 			delete(task.codeTasks, hash)
 			hashes = append(hashes, hash)
 		}
+		totalHashes += len(hashes)
 
 		// create a unique id for task bundle
 		var taskID uint64
@@ -991,15 +1001,18 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 		codes = append(codes, bytecodeTask)
 
 		s.requesting.addCodeTask(taskID, bytecodeTask)
-		//s.tasks.deleteCodeTask(taskID)
+		s.tasks.addCodeTask(taskID, bytecodeTask)
 
 		// Stop when we've gathered enough requests
-		if len(codes) >= cap {
+		if totalHashes >= maxCodeRequestCount {
 			return
 		}
 	}
 
-	cap = n - len(codes) // - len(accounts)
+	// if we found some codes, can assign it to node
+	if totalHashes > 0 {
+		return
+	}
 
 	for accTaskID, task := range s.tasks.accountTasks {
 		// Skip tasks that are already retrieving (or done with) all small states
@@ -1008,13 +1021,13 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 		}
 
 		// TODO: check cap calculations (shouldn't give us big chunk)
-		if cap > maxRequestSize {
-			cap = maxRequestSize
-		}
-		if cap < minRequestSize { // Don't bother with peers below a bare minimum performance
-			cap = minRequestSize
-		}
-		storageSets := cap / 1024
+		// if cap > maxRequestSize {
+		// 	cap = maxRequestSize
+		// }
+		// if cap < minRequestSize { // Don't bother with peers below a bare minimum performance
+		// 	cap = minRequestSize
+		// }
+		storageSets := maxRequestSize / 1024
 
 		storages = &storageTaskBundle{
 			accounts: make([]common.Hash, 0, storageSets),
@@ -1079,14 +1092,10 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 		s.tasks.addStorageTaskBundle(taskID, storages)
 		s.requesting.addStorageTaskBundle(taskID, storages)
 
-		cap -= len(storages.accounts)
-
-		if cap <= 0 {
-			break
-		}
+		return
 	}
 
-	if len(accounts)+len(codes)+len(storages.accounts) > 0 {
+	if len(storages.accounts) > 0 {
 		return
 	}
 
@@ -1095,7 +1104,6 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 	}
 
 	// Sync phase done, run heal phase
-	cap = n
 
 	// Iterate over pending tasks and try to find a peer to retrieve with
 	for (len(s.tasks.healer) > 0 && len(s.tasks.healer[0].hashes) > 0) || s.scheduler.Pending() > 0 {
@@ -1111,7 +1119,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 			}
 		}
 
-		mPaths, mHashes, mCodes := s.scheduler.Missing(n)
+		mPaths, mHashes, mCodes := s.scheduler.Missing(maxTrieRequestCount)
 		for i, path := range mPaths {
 			s.tasks.healer[0].trieTasks[path] = mHashes[i]
 		}
@@ -1124,10 +1132,10 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 			return
 		}
 		// Generate the network query and send it to the peer
-		if cap > maxTrieRequestCount {
-			cap = maxTrieRequestCount
-		}
-		cap = int(float64(cap) / s.trienodeHealThrottle)
+		// if cap > maxTrieRequestCount {
+		// 	cap = maxTrieRequestCount
+		// }
+		cap := int(float64(maxTrieRequestCount) / s.trienodeHealThrottle)
 		if cap <= 0 {
 			cap = 1
 		}
@@ -1175,7 +1183,9 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 		s.tasks.healer[taskID] = healtask
 		s.requesting.addHealerTask(taskID, healtask)
 
-		cap = n - len(hashes)
+		if len(hashes) > 0 {
+			return
+		}
 	}
 
 	// trying to get bytecodes
@@ -1185,7 +1195,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 		// queue from the state sync scheduler. The trie synced schedules these
 		// together with trie nodes, so we need to queue them combined.
 
-		mPaths, mHashes, mCodes := s.scheduler.Missing(cap)
+		mPaths, mHashes, mCodes := s.scheduler.Missing(maxTrieRequestCount)
 		for i, path := range mPaths {
 			s.tasks.healer[0].trieTasks[path] = mHashes[i]
 		}
@@ -1202,9 +1212,10 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(n int, withHealTasks 
 		// Abort the entire assignment mechanism.
 
 		// Generate the network query and send it to the peer
-		if cap > maxCodeRequestCount {
-			cap = maxCodeRequestCount
-		}
+		// if cap > maxCodeRequestCount {
+		// 	cap = maxCodeRequestCount
+		// }
+		cap := maxCodeRequestCount
 		hashes := make([]common.Hash, 0, cap)
 		for hash := range s.tasks.healer[0].codeTasks {
 			delete(s.tasks.healer[0].codeTasks, hash)
@@ -1256,7 +1267,7 @@ func sortByAccountPath(paths []string, hashes []common.Hash) ([]string, []common
 }
 
 // getBatchFromRetries get the block number batch to be requested from retries.
-func (s *FullStateDownloadManager) getBatchFromRetries(n int) (
+func (s *FullStateDownloadManager) getBatchFromRetries() (
 	accounts []*accountTask,
 	codes []*byteCodeTasksBundle,
 	storages *storageTaskBundle,
@@ -1269,27 +1280,29 @@ func (s *FullStateDownloadManager) getBatchFromRetries(n int) (
 
 	for _, task := range s.retries.accountTasks {
 		// Stop when we've gathered enough requests
-		if len(accounts) == n {
-			return
-		}
+		// if len(accounts) == n {
+		// 	return
+		// }
 		accounts = append(accounts, task)
 		s.requesting.addAccountTask(task.id, task)
 		s.retries.deleteAccountTask(task.id)
+		return
 	}
 
-	cap := n - len(accounts)
+	if len(accounts) > 0 {
+		return
+	}
 
 	for _, code := range s.retries.codeTasks {
-		// Stop when we've gathered enough requests
-		if len(codes) >= cap {
-			return
-		}
 		codes = append(codes, code)
 		s.requesting.addCodeTask(code.id, code)
 		s.retries.deleteCodeTask(code.id)
+		return
 	}
 
-	cap = n - len(accounts) - len(codes)
+	if len(codes) > 0 {
+		return
+	}
 
 	if s.retries.storageTasks != nil && len(s.retries.storageTasks) > 0 {
 		storages = &storageTaskBundle{
@@ -1303,20 +1316,17 @@ func (s *FullStateDownloadManager) getBatchFromRetries(n int) (
 		}
 		s.requesting.addStorageTaskBundle(storages.id, storages)
 		s.retries.deleteStorageTaskBundle(storages.id)
-	}
-
-	if len(accounts)+len(codes)+len(storages.accounts) > 0 {
 		return
 	}
 
-	cap = n
+	if len(storages.accounts) > 0 {
+		return
+	}
 
 	if s.retries.healer != nil && len(s.retries.healer) > 0 {
-		foundHealTask := false
-		foundByteCodeTask := false
 
 		for id, task := range s.retries.healer {
-			if !foundHealTask && !task.byteCodeReq {
+			if !task.byteCodeReq {
 				healtask = &healTask{
 					id:          id,
 					hashes:      task.hashes,
@@ -1328,9 +1338,9 @@ func (s *FullStateDownloadManager) getBatchFromRetries(n int) (
 				}
 				s.requesting.addHealerTask(id, task)
 				s.retries.deleteHealerTask(id)
-				foundHealTask = true
+				return
 			}
-			if !foundByteCodeTask && task.byteCodeReq {
+			if task.byteCodeReq {
 				codetask = &healTask{
 					id:          id,
 					hashes:      task.hashes,
@@ -1342,10 +1352,7 @@ func (s *FullStateDownloadManager) getBatchFromRetries(n int) (
 				}
 				s.requesting.addHealerTask(id, task)
 				s.retries.deleteHealerTask(id)
-				foundByteCodeTask = true
-			}
-			if foundHealTask && foundByteCodeTask {
-				break
+				return
 			}
 		}
 	}
