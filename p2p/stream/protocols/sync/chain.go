@@ -171,7 +171,10 @@ func (ch *chainHelperImpl) getNodeData(hs []common.Hash) ([][]byte, error) {
 				entry, err = ch.chain.ValidatorCode(hash)
 			}
 		}
-		if err == nil && len(entry) > 0 {
+		if err != nil {
+			return nil, err
+		}
+		if len(entry) > 0 {
 			nodes = append(nodes, entry)
 			bytes += len(entry)
 		}
@@ -196,7 +199,7 @@ func (ch *chainHelperImpl) getReceipts(hs []common.Hash) ([]types.Receipts, erro
 	return receipts, nil
 }
 
-// getAccountRangeRequest
+// getAccountRange
 func (ch *chainHelperImpl) getAccountRange(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) ([]*message.AccountData, [][]byte, error) {
 	if bytes > softResponseLimit {
 		bytes = softResponseLimit

@@ -192,6 +192,7 @@ var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
 var (
 	defaultMainnetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              false,
+		SyncMode:             0,
 		Downloader:           false,
 		StagedSync:           false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
@@ -207,6 +208,7 @@ var (
 
 	defaultTestNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
+		SyncMode:             0,
 		Downloader:           false,
 		StagedSync:           false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
@@ -222,6 +224,7 @@ var (
 
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
+		SyncMode:             0,
 		Downloader:           true,
 		StagedSync:           true,
 		StagedSyncCfg:        defaultStagedSyncConfig,
@@ -237,6 +240,7 @@ var (
 
 	defaultPartnerSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
+		SyncMode:             0,
 		Downloader:           true,
 		StagedSync:           false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
@@ -252,6 +256,7 @@ var (
 
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
+		SyncMode:             0,
 		Downloader:           true,
 		StagedSync:           false,
 		StagedSyncCfg:        defaultStagedSyncConfig,

@@ -59,23 +59,22 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 }
 
 type StagedStreamSync struct {
-	bc             core.BlockChain
-	consensus      *consensus.Consensus
-	isBeacon       bool
-	isExplorer     bool
-	db             kv.RwDB
-	protocol       syncProtocol
-	isBeaconNode   bool
-	gbm            *blockDownloadManager // initialized when finished get block number
-	lastMileBlocks []*types.Block        // last mile blocks to catch up with the consensus
-	lastMileMux    sync.Mutex
-	inserted       int
-	config         Config
-	logger         zerolog.Logger
-	status         *status //TODO: merge this with currentSyncCycle
-	initSync       bool    // if sets to true, node start long range syncing
-	UseMemDB       bool
-
+	bc              core.BlockChain
+	consensus       *consensus.Consensus
+	isBeacon        bool
+	isExplorer      bool
+	db              kv.RwDB
+	protocol        syncProtocol
+	isBeaconNode    bool
+	gbm             *blockDownloadManager // initialized when finished get block number
+	lastMileBlocks  []*types.Block        // last mile blocks to catch up with the consensus
+	lastMileMux     sync.Mutex
+	inserted        int
+	config          Config
+	logger          zerolog.Logger
+	status          *status //TODO: merge this with currentSyncCycle
+	initSync        bool    // if sets to true, node start long range syncing
+	UseMemDB        bool
 	revertPoint     *uint64 // used to run stages
 	prevRevertPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
 	invalidBlock    InvalidBlock
@@ -267,8 +266,18 @@ func New(
 	logger zerolog.Logger,
 ) *StagedStreamSync {
 
-	revertStages := make([]*Stage, len(stagesList))
-	for i, stageIndex := range DefaultRevertOrder {
+	forwardStages := make([]*Stage, len(StagesForwardOrder))
+	for i, stageIndex := range StagesForwardOrder {
+		for _, s := range stagesList {
+			if s.ID == stageIndex {
+				forwardStages[i] = s
+				break
+			}
+		}
+	}
+
+	revertStages := make([]*Stage, len(StagesRevertOrder))
+	for i, stageIndex := range StagesRevertOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
 				revertStages[i] = s
@@ -276,8 +285,9 @@ func New(
 			}
 		}
 	}
-	pruneStages := make([]*Stage, len(stagesList))
-	for i, stageIndex := range DefaultCleanUpOrder {
+
+	pruneStages := make([]*Stage, len(StagesCleanUpOrder))
+	for i, stageIndex := range StagesCleanUpOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
 				pruneStages[i] = s
@@ -306,7 +316,7 @@ func New(
 		inserted:       0,
 		config:         config,
 		logger:         logger,
-		stages:         stagesList,
+		stages:         forwardStages,
 		currentStage:   0,
 		revertOrder:    revertStages,
 		pruningOrder:   pruneStages,
@@ -325,6 +335,18 @@ func (s *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint6
 		return 0, stid, err
 	}
 	return bn, stid, nil
+}
+
+// doGetBlockByNumberRequest returns block by its number and corresponding stream
+func (s *StagedStreamSync) doGetBlockByNumberRequest(ctx context.Context, bn uint64) (*types.Block, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	blocks, stid, err := s.protocol.GetBlocksByNumber(ctx, []uint64{bn}, syncproto.WithHighPriority())
+	if err != nil || len(blocks) != 1 {
+		return nil, stid, err
+	}
+	return blocks[0], stid, nil
 }
 
 // promLabels returns a prometheus labels for current shard id
@@ -472,7 +494,6 @@ func (s *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.RwD
 	if err != nil {
 		return err
 	}
-
 	if err = stage.Handler.Exec(ctx, firstCycle, invalidBlockRevert, stageState, s, tx); err != nil {
 		utils.Logger().Error().
 			Err(err).

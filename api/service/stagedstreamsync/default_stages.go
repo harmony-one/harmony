@@ -8,35 +8,91 @@ type ForwardOrder []SyncStageID
 type RevertOrder []SyncStageID
 type CleanUpOrder []SyncStageID
 
-var DefaultForwardOrder = ForwardOrder{
-	Heads,
-	SyncEpoch,
-	ShortRange,
-	BlockBodies,
-	// Stages below don't use Internet
-	States,
-	LastMile,
-	Finish,
+var (
+	StagesForwardOrder ForwardOrder
+	StagesRevertOrder  RevertOrder
+	StagesCleanUpOrder CleanUpOrder
+)
+
+func initStagesOrder(syncMode SyncMode) {
+	switch syncMode {
+	case FullSync:
+		initFullSyncStagesOrder()
+	case FastSync:
+		initFastSyncStagesOrder()
+	default:
+		panic("not supported sync mode")
+	}
 }
 
-var DefaultRevertOrder = RevertOrder{
-	Finish,
-	LastMile,
-	States,
-	BlockBodies,
-	ShortRange,
-	SyncEpoch,
-	Heads,
+func initFullSyncStagesOrder() {
+	StagesForwardOrder = ForwardOrder{
+		Heads,
+		SyncEpoch,
+		ShortRange,
+		BlockBodies,
+		States,
+		LastMile,
+		Finish,
+	}
+
+	StagesRevertOrder = RevertOrder{
+		Finish,
+		LastMile,
+		States,
+		BlockBodies,
+		ShortRange,
+		SyncEpoch,
+		Heads,
+	}
+
+	StagesCleanUpOrder = CleanUpOrder{
+		Finish,
+		LastMile,
+		States,
+		BlockBodies,
+		ShortRange,
+		SyncEpoch,
+		Heads,
+	}
 }
 
-var DefaultCleanUpOrder = CleanUpOrder{
-	Finish,
-	LastMile,
-	States,
-	BlockBodies,
-	ShortRange,
-	SyncEpoch,
-	Heads,
+func initFastSyncStagesOrder() {
+	StagesForwardOrder = ForwardOrder{
+		Heads,
+		SyncEpoch,
+		ShortRange,
+		BlockBodies,
+		Receipts,
+		StateSync,
+		States,
+		LastMile,
+		Finish,
+	}
+
+	StagesRevertOrder = RevertOrder{
+		Finish,
+		LastMile,
+		States,
+		StateSync,
+		Receipts,
+		BlockBodies,
+		ShortRange,
+		SyncEpoch,
+		Heads,
+	}
+
+	StagesCleanUpOrder = CleanUpOrder{
+		Finish,
+		LastMile,
+		States,
+		StateSync,
+		Receipts,
+		BlockBodies,
+		ShortRange,
+		SyncEpoch,
+		Heads,
+	}
 }
 
 func DefaultStages(ctx context.Context,
@@ -44,7 +100,9 @@ func DefaultStages(ctx context.Context,
 	seCfg StageEpochCfg,
 	srCfg StageShortRangeCfg,
 	bodiesCfg StageBodiesCfg,
+	stateSyncCfg StageStateSyncCfg,
 	statesCfg StageStatesCfg,
+	receiptsCfg StageReceiptsCfg,
 	lastMileCfg StageLastMileCfg,
 	finishCfg StageFinishCfg,
 ) []*Stage {
@@ -54,6 +112,8 @@ func DefaultStages(ctx context.Context,
 	handlerStageEpochSync := NewStageEpoch(seCfg)
 	handlerStageBodies := NewStageBodies(bodiesCfg)
 	handlerStageStates := NewStageStates(statesCfg)
+	handlerStageStateSync := NewStageStateSync(stateSyncCfg)
+	handlerStageReceipts := NewStageReceipts(receiptsCfg)
 	handlerStageLastMile := NewStageLastMile(lastMileCfg)
 	handlerStageFinish := NewStageFinish(finishCfg)
 
@@ -82,6 +142,16 @@ func DefaultStages(ctx context.Context,
 			ID:          States,
 			Description: "Update Blockchain State",
 			Handler:     handlerStageStates,
+		},
+		{
+			ID:          StateSync,
+			Description: "Retrieve States",
+			Handler:     handlerStageStateSync,
+		},
+		{
+			ID:          Receipts,
+			Description: "Retrieve Receipts",
+			Handler:     handlerStageReceipts,
 		},
 		{
 			ID:          LastMile,

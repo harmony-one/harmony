@@ -597,14 +597,17 @@ func ReadLastPivotNumber(db ethdb.KeyValueReader) *uint64 {
 }
 
 // WriteLastPivotNumber stores the number of the last pivot block.
-func WriteLastPivotNumber(db ethdb.KeyValueWriter, pivot uint64) {
+func WriteLastPivotNumber(db ethdb.KeyValueWriter, pivot uint64) error {
 	enc, err := rlp.EncodeToBytes(pivot)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to encode pivot block number")
+		return err
 	}
 	if err := db.Put(lastPivotKey, enc); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to store pivot block number")
+		return err
 	}
+	return nil
 }
 
 // ReadTxIndexTail retrieves the number of oldest indexed block

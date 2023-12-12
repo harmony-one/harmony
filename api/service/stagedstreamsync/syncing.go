@@ -11,6 +11,8 @@ import (
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
@@ -81,20 +83,28 @@ func CreateStagedSync(ctx context.Context,
 		return nil, errInitDB
 	}
 
+	extractReceiptHashes := config.SyncMode == FastSync || config.SyncMode == SnapSync
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
 	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
-	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
+	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, extractReceiptHashes, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
+	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
+	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)
 	stageFinishCfg := NewStageFinishCfg(mainDB)
 
-	stages := DefaultStages(ctx,
+	// init stages order based on sync mode
+	initStagesOrder(config.SyncMode)
+
+	defaultStages := DefaultStages(ctx,
 		stageHeadsCfg,
 		stageSyncEpochCfg,
 		stageShortRangeCfg,
 		stageBodiesCfg,
+		stageStateSyncCfg,
 		stageStatesCfg,
+		stageReceiptsCfg,
 		lastMileCfg,
 		stageFinishCfg,
 	)
@@ -112,7 +122,7 @@ func CreateStagedSync(ctx context.Context,
 		bc,
 		consensus,
 		mainDB,
-		stages,
+		defaultStages,
 		isBeaconNode,
 		protocol,
 		isBeaconNode,
@@ -214,6 +224,65 @@ func (s *StagedStreamSync) Debug(source string, msg interface{}) {
 	}
 }
 
+// checkPivot checks pivot block and returns pivot block and cycle Sync mode
+func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint64, initSync bool) (*types.Block, SyncMode, error) {
+
+	if s.config.SyncMode == FullSync {
+		return nil, FullSync, nil
+	}
+
+	// do full sync if chain is at early stage
+	if initSync && estimatedHeight < MaxPivotDistanceToHead {
+		return nil, FullSync, nil
+	}
+
+	pivotBlockNumber := uint64(0)
+	var curPivot *uint64
+	if curPivot = rawdb.ReadLastPivotNumber(s.bc.ChainDb()); curPivot != nil {
+		// if head is behind pivot, that means it is still on fast/snap sync mode
+		if head := s.CurrentBlockNumber(); head < *curPivot {
+			pivotBlockNumber = *curPivot
+			// pivot could be moved forward if it is far from head
+			if pivotBlockNumber < estimatedHeight-MaxPivotDistanceToHead {
+				pivotBlockNumber = estimatedHeight - MinPivotDistanceToHead
+			}
+		}
+	} else {
+		if head := s.CurrentBlockNumber(); s.config.SyncMode == FastSync && head <= 1 {
+			pivotBlockNumber = estimatedHeight - MinPivotDistanceToHead
+			if err := rawdb.WriteLastPivotNumber(s.bc.ChainDb(), pivotBlockNumber); err != nil {
+				s.logger.Warn().Err(err).
+					Uint64("new pivot number", pivotBlockNumber).
+					Msg(WrapStagedSyncMsg("update pivot number failed"))
+			}
+		}
+	}
+	if pivotBlockNumber > 0 {
+		if block, err := s.queryAllPeersForBlockByNumber(ctx, pivotBlockNumber); err != nil {
+			s.logger.Error().Err(err).
+				Uint64("pivot", pivotBlockNumber).
+				Msg(WrapStagedSyncMsg("query peers for pivot block failed"))
+			return block, FastSync, err
+		} else {
+			if curPivot == nil || pivotBlockNumber != *curPivot {
+				if err := rawdb.WriteLastPivotNumber(s.bc.ChainDb(), pivotBlockNumber); err != nil {
+					s.logger.Warn().Err(err).
+						Uint64("new pivot number", pivotBlockNumber).
+						Msg(WrapStagedSyncMsg("update pivot number failed"))
+					return block, FastSync, err
+				}
+			}
+			s.status.pivotBlock = block
+			s.logger.Info().
+				Uint64("estimatedHeight", estimatedHeight).
+				Uint64("pivot number", pivotBlockNumber).
+				Msg(WrapStagedSyncMsg("fast/snap sync mode, pivot is set successfully"))
+			return block, FastSync, nil
+		}
+	}
+	return nil, FullSync, nil
+}
+
 // doSync does the long range sync.
 // One LongRangeSync consists of several iterations.
 // For each iteration, estimate the current block number, then fetch block & insert to blockchain
@@ -224,7 +293,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	var totalInserted int
 
 	s.initSync = initSync
-
 	if err := s.checkPrerequisites(); err != nil {
 		return 0, 0, err
 	}
@@ -238,11 +306,21 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			//TODO: use directly currentCycle var
 			s.status.setTargetBN(estimatedHeight)
 		}
-		if curBN := s.bc.CurrentBlock().NumberU64(); estimatedHeight <= curBN {
+		if curBN := s.CurrentBlockNumber(); estimatedHeight <= curBN {
 			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
 				Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
 			return estimatedHeight, 0, nil
 		}
+	}
+
+	// We are probably in full sync, but we might have rewound to before the
+	// fast/snap sync pivot, check if we should reenable
+	if pivotBlock, cycleSyncMode, err := s.checkPivot(downloaderContext, estimatedHeight, initSync); err != nil {
+		s.logger.Error().Err(err).Msg(WrapStagedSyncMsg("check pivot failed"))
+		return 0, 0, err
+	} else {
+		s.status.cycleSyncMode = cycleSyncMode
+		s.status.pivotBlock = pivotBlock
 	}
 
 	s.startSyncing()
@@ -289,7 +367,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	}
 
 	// add consensus last mile blocks
-	if s.consensus != nil {
+	if s.consensus != nil && s.isBeaconNode {
 		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
@@ -315,7 +393,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 	var totalInserted int
 
 	s.inserted = 0
-	startHead := s.bc.CurrentBlock().NumberU64()
+	startHead := s.CurrentBlockNumber()
 	canRunCycleInOneTransaction := false
 
 	var tx kv.RwTx
@@ -379,6 +457,36 @@ func (s *StagedStreamSync) checkPrerequisites() error {
 	return s.checkHaveEnoughStreams()
 }
 
+func (s *StagedStreamSync) CurrentBlockNumber() uint64 {
+	// if current head is ahead of pivot block, return chain head regardless of sync mode
+	if s.status.pivotBlock != nil && s.bc.CurrentBlock().NumberU64() >= s.status.pivotBlock.NumberU64() {
+		return s.bc.CurrentBlock().NumberU64()
+	}
+
+	current := uint64(0)
+	switch s.config.SyncMode {
+	case FullSync:
+		current = s.bc.CurrentBlock().NumberU64()
+	case FastSync:
+		current = s.bc.CurrentFastBlock().NumberU64()
+	case SnapSync:
+		current = s.bc.CurrentHeader().Number().Uint64()
+	}
+	return current
+}
+
+func (s *StagedStreamSync) stateSyncStage() bool {
+	switch s.config.SyncMode {
+	case FullSync:
+		return false
+	case FastSync:
+		return s.status.pivotBlock != nil && s.bc.CurrentFastBlock().NumberU64() == s.status.pivotBlock.NumberU64()-1
+	case SnapSync:
+		return false
+	}
+	return false
+}
+
 // estimateCurrentNumber roughly estimates the current block number.
 // The block number does not need to be exact, but just a temporary target of the iteration
 func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, error) {
@@ -417,4 +525,46 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 	}
 	bn := computeBlockNumberByMaxVote(cnResults)
 	return bn, nil
+}
+
+// queryAllPeersForBlockByNumber queries all connected streams for a block by its number.
+func (s *StagedStreamSync) queryAllPeersForBlockByNumber(ctx context.Context, bn uint64) (*types.Block, error) {
+	var (
+		blkResults []*types.Block
+		lock       sync.Mutex
+		wg         sync.WaitGroup
+	)
+	wg.Add(s.config.Concurrency)
+	for i := 0; i != s.config.Concurrency; i++ {
+		go func() {
+			defer wg.Done()
+			block, stid, err := s.doGetBlockByNumberRequest(ctx, bn)
+			if err != nil {
+				s.logger.Err(err).Str("streamID", string(stid)).
+					Msg(WrapStagedSyncMsg("getBlockByNumber request failed"))
+				if !errors.Is(err, context.Canceled) {
+					s.protocol.StreamFailed(stid, "getBlockByNumber request failed")
+				}
+				return
+			}
+			lock.Lock()
+			blkResults = append(blkResults, block)
+			lock.Unlock()
+		}()
+	}
+	wg.Wait()
+
+	if len(blkResults) == 0 {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+		return nil, ErrZeroBlockResponse
+	}
+	block, err := getBlockByMaxVote(blkResults)
+	if err != nil {
+		return nil, err
+	}
+	return block, nil
 }

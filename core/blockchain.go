@@ -52,6 +52,11 @@ type BlockChain interface {
 	// CurrentBlock retrieves the current head block of the canonical chain. The
 	// block is retrieved from the blockchain's internal cache.
 	CurrentBlock() *types.Block
+	// CurrentFastBlock retrieves the current fast-sync head block of the canonical
+	// block is retrieved from the blockchain's internal cache.
+	CurrentFastBlock() *types.Block
+	// Validator returns the current validator.
+	Validator() Validator
 	// Processor returns the current processor.
 	Processor() Processor
 	// State returns a new mutable state based on the current HEAD block.
@@ -100,6 +105,20 @@ type BlockChain interface {
 	// Rollback is designed to remove a chain of links from the database that aren't
 	// certain enough to be valid.
 	Rollback(chain []common.Hash) error
+	// writeHeadBlock writes a new head block
+	WriteHeadBlock(block *types.Block) error
+	// WriteBlockWithoutState writes only the block and its metadata to the database,
+	// but does not write any state. This is used to construct competing side forks
+	// up to the point where they exceed the canonical total difficulty.
+	WriteBlockWithoutState(block *types.Block) (err error)
+	// WriteBlockWithState writes the block and all associated state to the database.
+	WriteBlockWithState(
+		block *types.Block, receipts []*types.Receipt,
+		cxReceipts []*types.CXReceipt,
+		stakeMsgs []types2.StakeMsg,
+		paid reward.Reader,
+		state *state.DB,
+	) (status WriteStatus, err error)
 	// GetMaxGarbageCollectedBlockNumber ..
 	GetMaxGarbageCollectedBlockNumber() int64
 	// InsertChain attempts to insert the given batch of blocks in to the canonical
@@ -109,7 +128,10 @@ type BlockChain interface {
 	//
 	// After insertion is done, all accumulated events will be fired.
 	InsertChain(chain types.Blocks, verifyHeaders bool) (int, error)
-	// LeaderRotationMeta returns info about leader rotation.
+	// InsertReceiptChain attempts to complete an already existing header chain with
+	// transaction and receipt data.
+	InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error)
+	// LeaderRotationMeta returns the number of continuous blocks by the leader.
 	LeaderRotationMeta() LeaderRotationMeta
 	// BadBlocks returns a list of the last 'bad blocks' that
 	// the client has seen on the network.
