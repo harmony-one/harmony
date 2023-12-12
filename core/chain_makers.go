@@ -14,16 +14,17 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package chain
+package core
 
 import (
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -32,7 +33,7 @@ import (
 	"github.com/harmony-one/harmony/core/state/snapshot"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -104,7 +105,7 @@ func (b *BlockGen) AddTxWithChain(bc core.BlockChain, tx *types.Transaction) {
 	b.statedb.Prepare(tx.Hash(), common.Hash{}, len(b.txs))
 	coinbase := b.header.Coinbase()
 	gasUsed := b.header.GasUsed()
-	receipt, _, _, _, err := core.ApplyTransaction(bc, &coinbase, b.gasPool, b.statedb, b.header, tx, &gasUsed, vm.Config{})
+	receipt, _, _, _, err := ApplyTransaction(bc, &coinbase, b.gasPool, b.statedb, b.header, tx, &gasUsed, vm.Config{})
 	b.header.SetGasUsed(gasUsed)
 	b.header.SetCoinbase(coinbase)
 	if err != nil {
@@ -229,7 +230,7 @@ func makeHeader(chain consensus_engine.ChainReader, parent *block.Header, state 
 		Root(state.IntermediateRoot(chain.Config().IsS3(parent.Epoch()))).
 		ParentHash(parent.Hash()).
 		Coinbase(parent.Coinbase()).
-		GasLimit(core.CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit())).
+		GasLimit(core.CalcGasLimit(parent.GasLimit(), parent.GasLimit())).
 		Number(new(big.Int).Add(parent.Number(), common.Big1)).
 		Time(time).
 		Header()
