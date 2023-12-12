@@ -267,3 +267,27 @@ func UpdateMinimumCommissionFee(
 	}
 	return false, nil
 }
+
+// UpdateMaxCommissionFee makes sure the max-rate is at least higher than the rate + max-rate-change.
+func UpdateMaxCommissionFee(state *state.DB, addr common.Address, minRate numeric.Dec) (bool, error) {
+	utils.Logger().Info().Msg("begin update max commission fee")
+
+	wrapper, err := state.ValidatorWrapper(addr, true, false)
+	if err != nil {
+		return false, err
+	}
+
+	minMaxRate := minRate.Add(wrapper.MaxChangeRate)
+
+	if wrapper.MaxRate.LT(minMaxRate) {
+		utils.Logger().Info().
+			Str("addr", addr.Hex()).
+			Str("old max-rate", wrapper.MaxRate.String()).
+			Str("new max-rate", minMaxRate.String()).
+			Msg("updating max commission rate")
+		wrapper.MaxRate.SetBytes(minMaxRate.Bytes())
+		return true, nil
+	}
+
+	return false, nil
+}

@@ -166,7 +166,8 @@ func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
 		se1()
 		se2()
 		utils.Logger().Info().
-			Msgf("[EPOCHSYNC] Added block %d %s", block.NumberU64(), block.Hash().Hex())
+			Msgf("[EPOCHSYNC] Added block %d, epoch %d, %s", block.NumberU64(), block.Epoch().Uint64(), block.Hash().Hex())
+
 	}
 	return 0, nil
 }

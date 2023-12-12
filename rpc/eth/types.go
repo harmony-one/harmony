@@ -110,6 +110,37 @@ func NewTransaction(
 	}
 	return result, nil
 }
+func NewTransactionFromTransaction(
+	tx *types.Transaction, blockHash common.Hash,
+	blockNumber uint64, timestamp uint64, index uint64,
+) (*Transaction, error) {
+	from, err := tx.SenderAddress()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get sender address: %w", err)
+	}
+	v, r, s := tx.RawSignatureValues()
+
+	result := &Transaction{
+		From:      from,
+		Gas:       hexutil.Uint64(tx.GasLimit()),
+		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
+		Hash:      tx.Hash(),
+		Input:     hexutil.Bytes(tx.Data()),
+		Nonce:     hexutil.Uint64(tx.Nonce()),
+		To:        tx.To(),
+		Value:     (*hexutil.Big)(tx.Value()),
+		Timestamp: hexutil.Uint64(timestamp),
+		V:         (*hexutil.Big)(v),
+		R:         (*hexutil.Big)(r),
+		S:         (*hexutil.Big)(s),
+	}
+	if blockHash != (common.Hash{}) {
+		result.BlockHash = &blockHash
+		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
+		result.TransactionIndex = (*hexutil.Uint64)(&index)
+	}
+	return result, nil
+}
 
 // NewReceipt returns the RPC data for a new receipt
 func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
