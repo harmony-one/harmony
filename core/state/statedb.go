@@ -894,7 +894,9 @@ func (db *DB) Finalise(deleteEmptyObjects bool) {
 	// Commit validator changes in cache to stateObjects
 	// TODO: remove validator cache after commit
 	for addr, wrapper := range db.stateValidators {
-		db.UpdateValidatorWrapper(addr, wrapper)
+		if err := db.UpdateValidatorWrapper(addr, wrapper); err != nil {
+			utils.Logger().Warn().Err(err).Interface("address", addr).Msg("Unable to update the validator wrapper in finalize process")
+		}
 	}
 	addressesToPrefetch := make([][]byte, 0, len(db.journal.dirties))
 	for addr := range db.journal.dirties {
@@ -1238,6 +1240,7 @@ func (db *DB) ValidatorWrapper(
 	// Read cache first
 	cached, ok := db.stateValidators[addr]
 	if ok {
+		utils.Logger().Info().Interface("address", addr).Msg("wrapper loaded from cache")
 		return copyValidatorWrapperIfNeeded(cached, sendOriginal, copyDelegations), nil
 	}
 
@@ -1283,6 +1286,7 @@ func (db *DB) UpdateValidatorWrapper(
 	addr common.Address, val *stk.ValidatorWrapper,
 ) error {
 	if err := val.SanityCheck(); err != nil {
+		utils.Logger().Error().Err(err).Interface("address", addr).Msg("UpdateValidatorWrapper SanityCheck failed")
 		return err
 	}
 	by, err := rlp.EncodeToBytes(val)
@@ -1302,15 +1306,18 @@ func (db *DB) UpdateValidatorWrapperWithRevert(
 	addr common.Address, val *stk.ValidatorWrapper,
 ) error {
 	if err := val.SanityCheck(); err != nil {
+		utils.Logger().Error().Err(err).Interface("address", addr).Msg("UpdateValidatorWrapperWithRevert SanityCheck failed")
 		return err
 	}
 	// a copy of the existing store can be used for revert
 	// since we are replacing the existing with the new anyway
 	prev, err := db.ValidatorWrapper(addr, true, false)
 	if err != nil && err != ErrAddressNotPresent {
+		utils.Logger().Error().Err(err).Interface("address", addr).Msg("UpdateValidatorWrapperWithRevert ValidatorWrapper prev failed")
 		return err
 	}
 	if err := db.UpdateValidatorWrapper(addr, val); err != nil {
+		utils.Logger().Error().Err(err).Interface("address", addr).Msg("UpdateValidatorWrapperWithRevert UpdateValidatorWrapper failed")
 		return err
 	}
 	// this will save the ValidatorWrapper as prev in validatorWrapperChange object

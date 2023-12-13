@@ -393,12 +393,30 @@ func VerifyAndUndelegateFromMsg(
 		delegation := &wrapper.Delegations[i]
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
 			if err := delegation.Undelegate(epoch, msg.Amount); err != nil {
+				utils.Logger().Error().Err(err).
+					Uint64("epoch", epoch.Uint64()).
+					Interface("address", wrapper.Address.String()).
+					Interface("DelegatorAddress", delegation.DelegatorAddress.String()).
+					Uint64("amount", msg.Amount.Uint64()).
+					Msg("Undelegate failed")
 				return nil, err
 			}
 			if err := wrapper.SanityCheck(); err != nil {
 				// allow self delegation to go below min self delegation
 				// but set the status to inactive
+				utils.Logger().Error().Err(err).
+					Uint64("epoch", epoch.Uint64()).
+					Interface("address", wrapper.Address.String()).
+					Interface("DelegatorAddress", delegation.DelegatorAddress.String()).
+					Uint64("amount", msg.Amount.Uint64()).
+					Msg("Undelegate SanityCheck failed")
 				if errors.Cause(err) == staking.ErrInvalidSelfDelegation {
+					utils.Logger().Error().Err(err).
+						Uint64("epoch", epoch.Uint64()).
+						Interface("address", wrapper.Address.String()).
+						Interface("DelegatorAddress", delegation.DelegatorAddress.String()).
+						Uint64("amount", msg.Amount.Uint64()).
+						Msg("Undelegate SanityCheck failed, wrapper deactivated")
 					wrapper.Status = effective.Inactive
 				} else {
 					return nil, err

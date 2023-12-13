@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 var (
@@ -132,6 +133,12 @@ func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 	exist := false
 	for _, entry := range d.Undelegations {
 		if entry.Epoch.Cmp(epoch) == 0 {
+			utils.Logger().Info().
+				Uint64("epoch", epoch.Uint64()).
+				Interface("DelegatorAddress", d.DelegatorAddress.String()).
+				Uint64("Amount", entry.Amount.Uint64()).
+				Uint64("amt", amt.Uint64()).
+				Msg("undelegations entry found")
 			exist = true
 			entry.Amount.Add(entry.Amount, amt)
 			return nil
@@ -139,6 +146,12 @@ func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 	}
 
 	if !exist {
+		utils.Logger().Info().
+			Uint64("epoch", epoch.Uint64()).
+			Interface("DelegatorAddress", d.DelegatorAddress.String()).
+			Uint64("amt", amt.Uint64()).
+			Msg("undelegations entry not found, so it adds a new undelegation entry")
+
 		item := Undelegation{amt, epoch}
 		d.Undelegations = append(d.Undelegations, item)
 
@@ -182,10 +195,32 @@ func (d *Delegation) RemoveUnlockedUndelegations(
 ) *big.Int {
 	totalWithdraw := big.NewInt(0)
 	count := 0
+
+	utils.Logger().Info().
+		Uint64("curEpoch", curEpoch.Uint64()).
+		Uint64("lastEpochInCommittee", lastEpochInCommittee.Uint64()).
+		Int("lockPeriod", lockPeriod).
+		Bool("noEarlyUnlock", noEarlyUnlock).
+		Interface("DelegatorAddress", d.DelegatorAddress.String()).
+		Uint64("amount", d.Amount.Uint64()).
+		Interface("Undelegations", d.Undelegations).
+		Msg("Remove Unlocked Undelegations")
+
 	for j := range d.Undelegations {
 		if big.NewInt(0).Sub(curEpoch, d.Undelegations[j].Epoch).Int64() >= int64(lockPeriod) ||
 			(!noEarlyUnlock && big.NewInt(0).Sub(curEpoch, lastEpochInCommittee).Int64() >= int64(lockPeriod)) {
 			// need to wait at least 7 epochs to withdraw; or the validator has been out of committee for 7 epochs
+			utils.Logger().Info().
+				Uint64("curEpoch", curEpoch.Uint64()).
+				Uint64("epoch", d.Undelegations[j].Epoch.Uint64()).
+				Uint64("lastEpochInCommittee", lastEpochInCommittee.Uint64()).
+				Int("lockPeriod", lockPeriod).
+				Bool("noEarlyUnlock", noEarlyUnlock).
+				Interface("DelegatorAddress", d.DelegatorAddress.String()).
+				Uint64("amount", d.Amount.Uint64()).
+				Uint64("withdraw", d.Undelegations[j].Amount.Uint64()).
+				Msg("Undelegation record found")
+
 			totalWithdraw.Add(totalWithdraw, d.Undelegations[j].Amount)
 			count++
 		} else {
@@ -194,5 +229,16 @@ func (d *Delegation) RemoveUnlockedUndelegations(
 
 	}
 	d.Undelegations = d.Undelegations[count:]
+	utils.Logger().Info().
+		Uint64("curEpoch", curEpoch.Uint64()).
+		Uint64("lastEpochInCommittee", lastEpochInCommittee.Uint64()).
+		Int("lockPeriod", lockPeriod).
+		Bool("noEarlyUnlock", noEarlyUnlock).
+		Interface("DelegatorAddress", d.DelegatorAddress.String()).
+		Int("count", count).
+		Uint64("totalWithdraw", totalWithdraw.Uint64()).
+		Interface("Undelegations", d.Undelegations).
+		Msg("Undelegation record found")
+
 	return totalWithdraw
 }
