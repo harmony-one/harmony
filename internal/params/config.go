@@ -47,7 +47,7 @@ var (
 		PreStakingEpoch:                       big.NewInt(185),
 		QuickUnlockEpoch:                      big.NewInt(191),
 		FiveSecondsEpoch:                      big.NewInt(230),
-		TwoSecondsEpoch:                       big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
+		oneSecondsEpoch:                       big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
 		SixtyPercentEpoch:                     big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		RedelegationEpoch:                     big.NewInt(290),
 		NoEarlyUnlockEpoch:                    big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
@@ -90,7 +90,7 @@ var (
 		PreStakingEpoch:                       big.NewInt(1),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
-		TwoSecondsEpoch:                       big.NewInt(2),
+		oneSecondsEpoch:                       big.NewInt(2),
 		SixtyPercentEpoch:                     big.NewInt(2),
 		RedelegationEpoch:                     big.NewInt(2),
 		NoEarlyUnlockEpoch:                    big.NewInt(2),
@@ -133,7 +133,7 @@ var (
 		PreStakingEpoch:                       big.NewInt(1),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
-		TwoSecondsEpoch:                       big.NewInt(0),
+		oneSecondsEpoch:                       big.NewInt(0),
 		SixtyPercentEpoch:                     big.NewInt(0),
 		RedelegationEpoch:                     big.NewInt(0),
 		NoEarlyUnlockEpoch:                    big.NewInt(0),
@@ -177,7 +177,7 @@ var (
 		PreStakingEpoch:                       big.NewInt(1),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
-		TwoSecondsEpoch:                       big.NewInt(0),
+		oneSecondsEpoch:                       big.NewInt(0),
 		SixtyPercentEpoch:                     EpochTBD,
 		RedelegationEpoch:                     big.NewInt(0),
 		NoEarlyUnlockEpoch:                    big.NewInt(0),
@@ -221,7 +221,7 @@ var (
 		PreStakingEpoch:                       big.NewInt(1),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
-		TwoSecondsEpoch:                       big.NewInt(0),
+		oneSecondsEpoch:                       big.NewInt(0),
 		SixtyPercentEpoch:                     big.NewInt(10),
 		RedelegationEpoch:                     big.NewInt(0),
 		NoEarlyUnlockEpoch:                    big.NewInt(0),
@@ -264,7 +264,7 @@ var (
 		PreStakingEpoch:                       big.NewInt(0),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
-		TwoSecondsEpoch:                       big.NewInt(0),
+		oneSecondsEpoch:                       big.NewInt(0),
 		SixtyPercentEpoch:                     EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		RedelegationEpoch:                     big.NewInt(0),
 		NoEarlyUnlockEpoch:                    big.NewInt(0),
@@ -309,7 +309,7 @@ var (
 		big.NewInt(0),                      // PreStakingEpoch
 		big.NewInt(0),                      // QuickUnlockEpoch
 		big.NewInt(0),                      // FiveSecondsEpoch
-		big.NewInt(0),                      // TwoSecondsEpoch
+		big.NewInt(0),                      // oneSecondsEpoch
 		big.NewInt(0),                      // SixtyPercentEpoch
 		big.NewInt(0),                      // RedelegationEpoch
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
@@ -354,7 +354,7 @@ var (
 		big.NewInt(0),        // PreStakingEpoch
 		big.NewInt(0),        // QuickUnlockEpoch
 		big.NewInt(0),        // FiveSecondsEpoch
-		big.NewInt(0),        // TwoSecondsEpoch
+		big.NewInt(0),        // oneSecondsEpoch
 		big.NewInt(0),        // SixtyPercentEpoch
 		big.NewInt(0),        // RedelegationEpoch
 		big.NewInt(0),        // NoEarlyUnlockEpoch
@@ -452,9 +452,9 @@ type ChainConfig struct {
 	// and block rewards adjusted to 17.5 ONE/block
 	FiveSecondsEpoch *big.Int `json:"five-seconds-epoch,omitempty"`
 
-	// TwoSecondsEpoch is the epoch when block time is reduced to 2 seconds
+	// oneSecondsEpoch is the epoch when block time is reduced to 2 seconds
 	// and block rewards adjusted to 7 ONE/block
-	TwoSecondsEpoch *big.Int `json:"two-seconds-epoch,omitempty"`
+	oneSecondsEpoch *big.Int `json:"two-seconds-epoch,omitempty"`
 
 	// SixtyPercentEpoch is the epoch when internal voting power reduced from 68% to 60%
 	SixtyPercentEpoch *big.Int `json:"sixty-percent-epoch,omitempty"`
@@ -664,9 +664,9 @@ func (c *ChainConfig) IsFiveSeconds(epoch *big.Int) bool {
 	return isForked(c.FiveSecondsEpoch, epoch)
 }
 
-// IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
-func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
-	return isForked(c.TwoSecondsEpoch, epoch)
+// IsOneSecond determines whether it is the epoch to change to 3 seconds block time
+func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
+	return isForked(c.oneSecondsEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%

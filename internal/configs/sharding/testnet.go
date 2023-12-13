@@ -67,10 +67,10 @@ func (ts testnetSchedule) BlocksPerEpoch() uint64 {
 
 func (ts testnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 
-	firstBlock2s := params.TestnetChainConfig.TwoSecondsEpoch.Uint64() * ts.BlocksPerEpochOld()
+	firstBlock2s := params.TestnetChainConfig.oneSecondsEpoch.Uint64() * ts.BlocksPerEpochOld()
 	switch {
 	case blockNum >= firstBlock2s:
-		return big.NewInt(int64((blockNum-firstBlock2s)/ts.BlocksPerEpoch() + params.TestnetChainConfig.TwoSecondsEpoch.Uint64()))
+		return big.NewInt(int64((blockNum-firstBlock2s)/ts.BlocksPerEpoch() + params.TestnetChainConfig.oneSecondsEpoch.Uint64()))
 	default: // genesis
 		oldEpoch := blockNum / ts.BlocksPerEpochOld()
 		return big.NewInt(int64(oldEpoch))
@@ -79,7 +79,7 @@ func (ts testnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 }
 
 func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
-	firstBlock2s := params.TestnetChainConfig.TwoSecondsEpoch.Uint64() * ts.BlocksPerEpochOld()
+	firstBlock2s := params.TestnetChainConfig.oneSecondsEpoch.Uint64() * ts.BlocksPerEpochOld()
 
 	switch {
 	case blockNum >= firstBlock2s:
@@ -90,11 +90,11 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 }
 
 func (ts testnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
-	firstBlock2s := params.TestnetChainConfig.TwoSecondsEpoch.Uint64() * ts.BlocksPerEpochOld()
+	firstBlock2s := params.TestnetChainConfig.oneSecondsEpoch.Uint64() * ts.BlocksPerEpochOld()
 
 	switch {
-	case params.TestnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
-		return firstBlock2s - 1 + ts.BlocksPerEpoch()*(epochNum-params.TestnetChainConfig.TwoSecondsEpoch.Uint64()+1)
+	case params.TestnetChainConfig.IsOneSecond(big.NewInt(int64(epochNum))):
+		return firstBlock2s - 1 + ts.BlocksPerEpoch()*(epochNum-params.TestnetChainConfig.oneSecondsEpoch.Uint64()+1)
 	default: // genesis
 		return ts.BlocksPerEpochOld()*(epochNum+1) - 1
 	}
@@ -122,7 +122,7 @@ func (ts testnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 var testnetReshardingEpoch = []*big.Int{
 	big.NewInt(0),
 	params.TestnetChainConfig.StakingEpoch,
-	params.TestnetChainConfig.TwoSecondsEpoch,
+	params.TestnetChainConfig.oneSecondsEpoch,
 }
 
 var (

@@ -326,9 +326,9 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 
 	consensus.BlockPeriod = 5 * time.Second
 
-	// Enable 2s block time at the twoSecondsEpoch
-	if consensus.Blockchain().Config().IsTwoSeconds(nextEpoch) {
-		consensus.BlockPeriod = 2 * time.Second
+	// Enable 1s block time at the oneSecondsEpoch
+	if consensus.Blockchain().Config().IsOneSecond(nextEpoch) {
+		consensus.BlockPeriod = 1 * time.Second
 	}
 
 	isFirstTimeStaking := consensus.Blockchain().Config().IsStaking(nextEpoch) &&
