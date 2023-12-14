@@ -479,7 +479,7 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 	// for all validators which have MaxRate < minRate + maxChangeRate
 	// set their MaxRate equal to the minRate + MaxChangeRate
 	// this will allow the wrapper.SanityCheck to pass if Rate is set to a value
-	// higher than the the MaxRate in the prior blocks
+	// higher than the the MaxRate by UpdateMinimumCommissionFee above
 	if config.IsMaxRate(newShardState.Epoch) && minRateNotZero {
 		for _, addr := range chain.ValidatorCandidates() {
 			if _, err := availability.UpdateMaxCommissionFee(state, addr, minRate); err != nil {
