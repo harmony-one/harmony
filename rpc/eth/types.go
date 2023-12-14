@@ -111,7 +111,7 @@ func NewTransaction(
 	return result, nil
 }
 
-// NewReceipt returns the RPC data for a new receipt
+// NewReceipt returns the RPC data for a new receipt. It is unused at the moment.
 func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
 	senderAddr, err := tx.SenderAddress()
 	if err != nil {
