@@ -184,9 +184,9 @@ func (d *Delegation) RemoveUnlockedUndelegations(
 	count := 0
 	for j := range d.Undelegations {
 		epochsSinceUndelegation := big.NewInt(0).Sub(curEpoch, d.Undelegations[j].Epoch).Int64()
-		// 7 epochs have passed since undelegation, or
+		// >=7 epochs have passed since undelegation, or
 		lockPeriodApplies := epochsSinceUndelegation >= int64(lockPeriod)
-		// 7 epochs have passed since unelection during the noEarlyUnlock configuration
+		// >=7 epochs have passed since unelection during the noEarlyUnlock configuration
 		earlyUnlockPeriodApplies := big.NewInt(0).Sub(curEpoch, lastEpochInCommittee).Int64() >= int64(lockPeriod) && !noEarlyUnlock
 		maxRateApplies := isMaxRate && epochsSinceUndelegation > int64(lockPeriod)
 		if lockPeriodApplies || earlyUnlockPeriodApplies {
