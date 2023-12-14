@@ -99,10 +99,9 @@ type Object struct {
 	// Cache flags.
 	// When an object is marked suicided it will be delete from the trie
 	// during the "update" phase of the state transition.
-	validatorWrapper bool // true if the code belongs to validator wrapper
-	dirtyCode        bool // true if the code was updated
-	suicided         bool
-	deleted          bool
+	dirtyCode bool // true if the code was updated
+	suicided  bool
+	deleted   bool
 }
 
 // empty returns whether the account is considered empty.
@@ -514,24 +513,23 @@ func (s *Object) Code(db Database) []byte {
 	}
 	var err error
 	code := []byte{}
-	// if it's not set for validator wrapper, then it may be either contract code or validator wrapper (old version of db
-	// don't have any prefix to differentiate between them)
-	// so, if it's not set for validator wrapper, we need to check contract code as well
-	if !s.validatorWrapper {
+
+	isValidatorWrapper := s.IsValidator(db)
+	if !isValidatorWrapper {
 		code, err = db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
-	}
-	// if it couldn't load contract code or it is set to validator wrapper, then it tries to fetch validator wrapper code
-	if s.validatorWrapper || err != nil {
-		vCode, errVCode := db.ValidatorCode(s.addrHash, common.BytesToHash(s.CodeHash()))
-		if errVCode == nil && vCode != nil {
-			s.code = vCode
-			return vCode
+		if err != nil {
+			s.setError(fmt.Errorf("can't load contract code hash %x for account address hash %x : contract code error: %v",
+				s.CodeHash(), s.addrHash, err))
 		}
-		if s.validatorWrapper {
-			s.setError(fmt.Errorf("can't load validator code hash %x for account address hash %x : %v", s.CodeHash(), s.addrHash, err))
-		} else {
-			s.setError(fmt.Errorf("can't load contract/validator code hash %x for account address hash %x : contract code error: %v, validator code error: %v",
-				s.CodeHash(), s.addrHash, err, errVCode))
+	} else {
+		code, err = db.ValidatorCode(s.addrHash, common.BytesToHash(s.CodeHash()))
+		if err != nil {
+			// old version of db don't have any prefix to differentiate between them
+			// so, if it's not set for validator wrapper, we need to check contract code as well
+			code, err = db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
+			if err != nil {
+				s.setError(fmt.Errorf("can't load validator/contract code hash %x for account address hash %x : %v", s.CodeHash(), s.addrHash, err))
+			}
 		}
 	}
 	s.code = code
@@ -551,44 +549,42 @@ func (s *Object) CodeSize(db Database) int {
 	var err error
 	size := int(0)
 
-	// if it's not set for validator wrapper, then it may be either contract code or validator wrapper (old version of db
-	// don't have any prefix to differentiate between them)
-	// so, if it's not set for validator wrapper, we need to check contract code as well
-	if !s.validatorWrapper {
+	isValidatorWrapper := s.IsValidator(db)
+	if !isValidatorWrapper {
 		size, err = db.ContractCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
-	}
-	// if it couldn't get contract code or it is set to validator wrapper, then it tries to retrieve validator wrapper code
-	if s.validatorWrapper || err != nil {
-		vcSize, errVCSize := db.ValidatorCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
-		if errVCSize == nil && vcSize > 0 {
-			return vcSize
+		if err != nil {
+			s.setError(fmt.Errorf("can't load contract code size %x for account address hash %x : contract code size error: %v",
+				s.CodeHash(), s.addrHash, err))
 		}
-		if s.validatorWrapper {
-			s.setError(fmt.Errorf("can't load validator code size %x for account address hash %x : %v", s.CodeHash(), s.addrHash, err))
-		} else {
-			s.setError(fmt.Errorf("can't load contract/validator code size %x for account address hash %x : contract code size error: %v, validator code size error: %v",
-				s.CodeHash(), s.addrHash, err, errVCSize))
+	} else {
+		size, err = db.ValidatorCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
+		if err != nil {
+			// old version of db don't have any prefix to differentiate between them
+			// so, if it's not set for validator wrapper, we need to check contract code as well
+			size, err = db.ContractCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
+			if err != nil {
+				s.setError(fmt.Errorf("can't load validator/contract code size %x for account address hash %x : code error: %v", s.CodeHash(), s.addrHash, err))
+			}
 		}
-		s.setError(fmt.Errorf("can't load code size %x (validator wrapper: %t): %v", s.CodeHash(), s.validatorWrapper, err))
 	}
+
 	return size
 }
 
-func (s *Object) SetCode(codeHash common.Hash, code []byte, isValidatorCode bool) {
+func (s *Object) SetCode(codeHash common.Hash, code []byte) {
 	prevcode := s.Code(s.db.db)
 	s.db.journal.append(codeChange{
 		account:  &s.address,
 		prevhash: s.CodeHash(),
 		prevcode: prevcode,
 	})
-	s.setCode(codeHash, code, isValidatorCode)
+	s.setCode(codeHash, code)
 }
 
-func (s *Object) setCode(codeHash common.Hash, code []byte, isValidatorCode bool) {
+func (s *Object) setCode(codeHash common.Hash, code []byte) {
 	s.code = code
 	s.data.CodeHash = codeHash[:]
 	s.dirtyCode = true
-	s.validatorWrapper = isValidatorCode
 }
 
 func (s *Object) SetNonce(nonce uint64) {

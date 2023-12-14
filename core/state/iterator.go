@@ -120,14 +120,14 @@ func (it *NodeIterator) step() error {
 	if !bytes.Equal(account.CodeHash, types.EmptyCodeHash.Bytes()) {
 		it.codeHash = common.BytesToHash(account.CodeHash)
 		addrHash := common.BytesToHash(it.stateIt.LeafKey())
-		it.code, err = it.state.db.ContractCode(addrHash, common.BytesToHash(account.CodeHash))
-		if err != nil {
-			return fmt.Errorf("code %x: %v", account.CodeHash, err)
-		}
-		if it.code == nil || len(it.code) == 0 {
-			it.code, err = it.state.db.ValidatorCode(addrHash, common.BytesToHash(account.CodeHash))
-			if err != nil {
-				return fmt.Errorf("code %x: %v", account.CodeHash, err)
+
+		if code, errCC := it.state.db.ContractCode(addrHash, common.BytesToHash(account.CodeHash)); code != nil && len(code) > 0 && errCC == nil {
+			it.code = code
+		} else {
+			if code, errVC := it.state.db.ValidatorCode(addrHash, common.BytesToHash(account.CodeHash)); code != nil && len(code) > 0 && errVC == nil {
+				it.code = code
+			} else {
+				return fmt.Errorf("code %x: contract code error: %v, validator code error: %v", account.CodeHash, errCC, errVC)
 			}
 		}
 	}
