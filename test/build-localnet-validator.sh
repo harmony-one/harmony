@@ -32,7 +32,7 @@ hmy --node="http://localhost:9500" staking create-validator \
     --bls-pubkeys 4f41a37a3a8d0695dd6edcc58142c6b7d98e74da5c90e79b587b3b960b6a4f5e048e6d8b8a000d77a478d44cd640270c,7dcc035a943e29e17959dabe636efad7303d2c6f273ace457ba9dcc2fd19d3f37e70ba1cd8d082cf8ff7be2f861db48c \
     --name "s0-localnet-validator1" --identity "validator1" --details "validator1" \
     --security-contact "localnet" --website "localnet.one" \
-    --max-change-rate 0.1 --max-rate 0.1 --rate 0.1 \
+    --max-change-rate 0.01 --max-rate 0.01 --rate 0.01 \
     --max-total-delegation 100000000 --min-self-delegation 10000 --bls-pubkeys-dir .hmy/extbls/
 	
 hmy --node="http://localhost:9500" staking create-validator \
@@ -40,7 +40,7 @@ hmy --node="http://localhost:9500" staking create-validator \
     --bls-pubkeys b0917378b179a519a5055259c4f8980cce37d58af300b00dd98b07076d3d9a3b16c4a55f84522f553872225a7b1efc0c \
     --name "s0-localnet-validator2" --identity "validator2" --details "validator2" \
     --security-contact "localnet" --website "localnet.one" \
-    --max-change-rate 0.1 --max-rate 0.1 --rate 0.1 \
+    --max-change-rate 0.1 --max-rate 0.1 --rate 0.05 \
     --max-total-delegation 100000000 --min-self-delegation 10000 --bls-pubkeys-dir .hmy/extbls/
 	
 hmy --node="http://localhost:9500" staking create-validator \

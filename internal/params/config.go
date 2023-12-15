@@ -75,6 +75,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
+		MaxRateEpoch:                          big.NewInt(1733), // 2023-12-17 12:20:15+00:00
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -118,6 +119,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(2176), // 2023-10-12 10:00:00+00:00
+		MaxRateEpoch:                          big.NewInt(2520), // 2023-12-16 12:17:14+00:00
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -161,6 +163,7 @@ var (
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
+		MaxRateEpoch:                          EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -205,6 +208,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
 		HIP30Epoch:                            big.NewInt(7),
 		BlockGas30MEpoch:                      big.NewInt(7),
+		MaxRateEpoch:                          EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -249,6 +253,7 @@ var (
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
+		MaxRateEpoch:                          EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -292,6 +297,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
+		MaxRateEpoch:                          EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -336,7 +342,8 @@ var (
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 		big.NewInt(0),                      // BlockGas30M
-		big.NewInt(0),                      // HIP30Epoch
+		big.NewInt(0),                      // BlockGas30M
+		big.NewInt(0),                      // MaxRateEpoch
 	}
 
 	// TestChainConfig ...
@@ -382,6 +389,7 @@ var (
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 		big.NewInt(0),        // HIP30Epoch
 		big.NewInt(0),        // BlockGas30M
+		big.NewInt(0),        // MaxRateEpoch
 	}
 
 	// TestRules ...
@@ -547,6 +555,9 @@ type ChainConfig struct {
 	HIP30Epoch *big.Int `json:"hip30-epoch,omitempty"`
 
 	BlockGas30MEpoch *big.Int `json:"block-gas-30m-epoch,omitempty"`
+
+	// MaxRateEpoch will make sure the validator max-rate is at least equal to the minRate + the validator max-rate-increase
+	MaxRateEpoch *big.Int `json:"max-rate-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -612,6 +623,9 @@ func (c *ChainConfig) mustValid() {
 	// capabilities required to transfer balance across shards
 	require(c.HIP30Epoch.Cmp(c.CrossTxEpoch) > 0,
 		"must satisfy: HIP30Epoch > CrossTxEpoch")
+	// max rate (7%) fix is applied on or after hip30
+	require(c.MaxRateEpoch.Cmp(c.HIP30Epoch) >= 0,
+		"must satisfy: MaxRateEpoch >= HIP30Epoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -801,6 +815,10 @@ func (c *ChainConfig) IsValidatorCodeFix(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsHIP30(epoch *big.Int) bool {
 	return isForked(c.HIP30Epoch, epoch)
+}
+
+func (c *ChainConfig) IsMaxRate(epoch *big.Int) bool {
+	return isForked(c.MaxRateEpoch, epoch)
 }
 
 // During this epoch, shards 2 and 3 will start sending

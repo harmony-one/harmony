@@ -143,6 +143,11 @@ func (hmy *Harmony) IsNoEarlyUnlockEpoch(epoch *big.Int) bool {
 	return hmy.BlockChain.Config().IsNoEarlyUnlock(epoch)
 }
 
+// IsMaxRate ...
+func (hmy *Harmony) IsMaxRate(epoch *big.Int) bool {
+	return hmy.BlockChain.Config().IsMaxRate(epoch)
+}
+
 // IsCommitteeSelectionBlock checks if the given block is the committee selection block
 func (hmy *Harmony) IsCommitteeSelectionBlock(header *block.Header) bool {
 	return chain.IsCommitteeSelectionBlock(hmy.BlockChain, header)
@@ -592,6 +597,7 @@ func (hmy *Harmony) GetUndelegationPayouts(
 		return undelegationPayouts, nil
 	}
 
+	isMaxRate := hmy.IsMaxRate(epoch)
 	lockingPeriod := hmy.GetDelegationLockingPeriodInEpoch(undelegationPayoutBlock.Epoch())
 	for _, validator := range hmy.GetAllValidatorAddresses() {
 		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validator, undelegationPayoutBlock.Root())
@@ -600,7 +606,7 @@ func (hmy *Harmony) GetUndelegationPayouts(
 		}
 		noEarlyUnlock := hmy.IsNoEarlyUnlockEpoch(epoch)
 		for _, delegation := range wrapper.Delegations {
-			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod, noEarlyUnlock)
+			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod, noEarlyUnlock, isMaxRate)
 			if withdraw.Cmp(bigZero) == 1 {
 				undelegationPayouts.SetPayoutByDelegatorAddrAndValidatorAddr(validator, delegation.DelegatorAddress, withdraw)
 			}

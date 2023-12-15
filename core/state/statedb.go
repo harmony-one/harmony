@@ -894,7 +894,9 @@ func (db *DB) Finalise(deleteEmptyObjects bool) {
 	// Commit validator changes in cache to stateObjects
 	// TODO: remove validator cache after commit
 	for addr, wrapper := range db.stateValidators {
-		db.UpdateValidatorWrapper(addr, wrapper)
+		if err := db.UpdateValidatorWrapper(addr, wrapper); err != nil {
+			utils.Logger().Warn().Err(err).Msg("Unable to update the validator wrapper on the finalize")
+		}
 	}
 	addressesToPrefetch := make([][]byte, 0, len(db.journal.dirties))
 	for addr := range db.journal.dirties {

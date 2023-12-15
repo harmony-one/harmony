@@ -461,10 +461,10 @@ func (s *PublicBlockchainService) GetBlockReceipts(
 		case V1:
 			r, err = v1.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()])
 		case V2:
-			r, err = v2.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+			r, err = v2.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()], false)
 		case Eth:
 			if tx, ok := tx.(*types.Transaction); ok {
-				r, err = eth.NewReceipt(tx.ConvertToEth(), blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+				r, err = v2.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()], true)
 			}
 		default:
 			return nil, ErrUnknownRPCVersion

@@ -751,19 +751,11 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 			return nil, err
 		}
 		return NewStructuredResponse(RPCReceipt)
-	case V2:
+	case V2, Eth:
 		if tx == nil {
-			RPCReceipt, err = v2.NewReceipt(stx, blockHash, blockNumber, index, receipt)
+			RPCReceipt, err = v2.NewReceipt(stx, blockHash, blockNumber, index, receipt, false)
 		} else {
-			RPCReceipt, err = v2.NewReceipt(tx, blockHash, blockNumber, index, receipt)
-		}
-		if err != nil {
-			return nil, err
-		}
-		return NewStructuredResponse(RPCReceipt)
-	case Eth:
-		if tx != nil {
-			RPCReceipt, err = eth.NewReceipt(tx.ConvertToEth(), blockHash, blockNumber, index, receipt)
+			RPCReceipt, err = v2.NewReceipt(tx, blockHash, blockNumber, index, receipt, s.version == Eth)
 		}
 		if err != nil {
 			return nil, err

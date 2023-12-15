@@ -370,9 +370,15 @@ func payoutUndelegations(
 		const msg = "[Finalize] failed to read all validators"
 		return errors.New(msg)
 	}
-	// Payout undelegated/unlocked tokens
+	// Payout undelegated/unlocked tokens at the end of each epoch
 	lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
 	noEarlyUnlock := chain.Config().IsNoEarlyUnlock(header.Epoch())
+	newShardState, err := header.GetShardState()
+	if err != nil {
+		const msg = "[Finalize] failed to read shard state"
+		return errors.New(msg)
+	}
+	isMaxRate := chain.Config().IsMaxRate(newShardState.Epoch)
 	for _, validator := range validators {
 		wrapper, err := state.ValidatorWrapper(validator, true, false)
 		if err != nil {
@@ -383,7 +389,7 @@ func payoutUndelegations(
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
-				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock,
+				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock, isMaxRate,
 			)
 			if totalWithdraw.Sign() != 0 {
 				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
@@ -426,6 +432,7 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 		map[common.Address]struct{},
 		len(newShardState.StakedValidators().Addrs),
 	)
+	// this loop is for elected validators only
 	for _, addr := range newShardState.StakedValidators().Addrs {
 		wrapper, err := state.ValidatorWrapper(addr, true, false)
 		if err != nil {
@@ -448,11 +455,13 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 		}
 		isElected[addr] = struct{}{}
 	}
+
 	// due to a bug in the old implementation of the minimum fee,
 	// unelected validators did not have their fee updated even
 	// when the protocol required them to do so. here we fix it,
-	// but only after the HIP-30 hard fork is effective.
-	if config.IsHIP30(newShardState.Epoch) {
+	// but only after the HIP-30 hard fork is effective
+	// this loop applies to all validators, but excludes the ones in isElected
+	if config.IsHIP30(newShardState.Epoch) && minRateNotZero {
 		for _, addr := range chain.ValidatorCandidates() {
 			// skip elected validator
 			if _, ok := isElected[addr]; ok {
@@ -466,6 +475,19 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 			}
 		}
 	}
+
+	// for all validators which have MaxRate < minRate + maxChangeRate
+	// set their MaxRate equal to the minRate + MaxChangeRate
+	// this will allow the wrapper.SanityCheck to pass if Rate is set to a value
+	// higher than the the MaxRate by UpdateMinimumCommissionFee above
+	if config.IsMaxRate(newShardState.Epoch) && minRateNotZero {
+		for _, addr := range chain.ValidatorCandidates() {
+			if _, err := availability.UpdateMaxCommissionFee(state, addr, minRate); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
