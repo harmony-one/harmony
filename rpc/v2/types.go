@@ -334,11 +334,11 @@ func NewTransaction(
 
 // NewReceipt returns a transaction OR staking transaction that will serialize to the RPC representation
 func NewReceipt(
-	tx interface{}, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt, eth bool,
+	tx interface{}, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
 ) (interface{}, error) {
 	plainTx, ok := tx.(*types.Transaction)
 	if ok {
-		return NewTxReceipt(plainTx, blockHash, blockNumber, blockIndex, receipt, eth)
+		return NewTxReceipt(plainTx, blockHash, blockNumber, blockIndex, receipt)
 	}
 	stakingTx, ok := tx.(*staking.StakingTransaction)
 	if ok {
@@ -349,7 +349,7 @@ func NewReceipt(
 
 // NewTxReceipt returns a plain transaction receipt that will serialize to the RPC representation
 func NewTxReceipt(
-	tx *types.Transaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt, eth bool,
+	tx *types.Transaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
 ) (*TxReceipt, error) {
 	// Set correct to & from address
 	senderAddr, err := tx.SenderAddress()
@@ -362,19 +362,13 @@ func NewTxReceipt(
 		sender = senderAddr.String()
 		receiver = ""
 	} else {
-		// Handle response type for regular transaction
-		if eth {
-			sender = senderAddr.String()
-			receiver = tx.To().String()
-		} else {
-			sender, err = internal_common.AddressToBech32(senderAddr)
-			if err != nil {
-				return nil, err
-			}
-			receiver, err = internal_common.AddressToBech32(*tx.To())
-			if err != nil {
-				return nil, err
-			}
+		sender, err = internal_common.AddressToBech32(senderAddr)
+		if err != nil {
+			return nil, err
+		}
+		receiver, err = internal_common.AddressToBech32(*tx.To())
+		if err != nil {
+			return nil, err
 		}
 	}
 
