@@ -155,6 +155,50 @@ func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, bl
 	return fields, nil
 }
 
+// NewReceiptFromTransaction returns the RPC data for a new receipt. It is unused at the moment.
+func NewReceiptFromTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
+	senderAddr, err := tx.SenderAddress()
+	if err != nil {
+		return nil, err
+	}
+
+	ethTxHash := tx.Hash()
+	for i, _ := range receipt.Logs {
+		// Override log txHash with receipt's
+		receipt.Logs[i].TxHash = ethTxHash
+	}
+
+	fields := map[string]interface{}{
+		"blockHash":         blockHash,
+		"blockNumber":       hexutil.Uint64(blockNumber),
+		"transactionHash":   ethTxHash,
+		"transactionIndex":  hexutil.Uint64(blockIndex),
+		"from":              senderAddr,
+		"to":                tx.To(),
+		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
+		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
+		"contractAddress":   nil,
+		"logs":              receipt.Logs,
+		"logsBloom":         receipt.Bloom,
+	}
+
+	// Assign receipt status or post state.
+	if len(receipt.PostState) > 0 {
+		fields["root"] = hexutil.Bytes(receipt.PostState)
+	} else {
+		fields["status"] = hexutil.Uint(receipt.Status)
+	}
+	if receipt.Logs == nil {
+		fields["logs"] = [][]*types.Log{}
+	}
+	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
+	if receipt.ContractAddress != (common.Address{}) {
+		fields["contractAddress"] = receipt.ContractAddress
+	}
+
+	return fields, nil
+}
+
 func newBlock(b *types.Block) *Block {
 	head := b.Header()
 
