@@ -204,20 +204,20 @@ type UndelegateMsg struct {
 
 // TxReceipt represents a transaction receipt that will serialize to the RPC representation.
 type TxReceipt struct {
-	BlockHash         common.Hash     `json:"blockHash"`
-	TransactionHash   common.Hash     `json:"transactionHash"`
-	BlockNumber       uint64          `json:"blockNumber"`
-	TransactionIndex  uint64          `json:"transactionIndex"`
-	GasUsed           uint64          `json:"gasUsed"`
-	CumulativeGasUsed uint64          `json:"cumulativeGasUsed"`
-	ContractAddress   *common.Address `json:"contractAddress"`
-	Logs              []*types.Log    `json:"logs"`
-	LogsBloom         ethtypes.Bloom  `json:"logsBloom"`
-	ShardID           uint32          `json:"shardID"`
-	From              string          `json:"from"`
-	To                string          `json:"to"`
-	Root              hexutil.Bytes   `json:"root"`
-	Status            uint            `json:"status"`
+	BlockHash         common.Hash    `json:"blockHash"`
+	TransactionHash   common.Hash    `json:"transactionHash"`
+	BlockNumber       uint64         `json:"blockNumber"`
+	TransactionIndex  uint64         `json:"transactionIndex"`
+	GasUsed           uint64         `json:"gasUsed"`
+	CumulativeGasUsed uint64         `json:"cumulativeGasUsed"`
+	ContractAddress   common.Address `json:"contractAddress"`
+	Logs              []*types.Log   `json:"logs"`
+	LogsBloom         ethtypes.Bloom `json:"logsBloom"`
+	ShardID           uint32         `json:"shardID"`
+	From              string         `json:"from"`
+	To                string         `json:"to"`
+	Root              hexutil.Bytes  `json:"root"`
+	Status            uint           `json:"status"`
 }
 
 // StakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
@@ -362,6 +362,7 @@ func NewTxReceipt(
 		sender = senderAddr.String()
 		receiver = ""
 	} else {
+		// Handle response type for regular transaction
 		sender, err = internal_common.AddressToBech32(senderAddr)
 		if err != nil {
 			return nil, err
@@ -403,7 +404,7 @@ func NewTxReceipt(
 
 	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
 	if receipt.ContractAddress != (common.Address{}) {
-		txReceipt.ContractAddress = &receipt.ContractAddress
+		txReceipt.ContractAddress = receipt.ContractAddress
 	}
 	return txReceipt, nil
 }
