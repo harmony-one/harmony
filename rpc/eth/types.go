@@ -74,19 +74,9 @@ type Transaction struct {
 // representation, with the given location metadata set (if available).
 // Note that all txs on Harmony are replay protected (post EIP155 epoch).
 func NewTransaction(
-	tx *types.EthTransaction, blockHash common.Hash,
+	from common.Address, tx *types.EthTransaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
 ) (*Transaction, error) {
-	from := common.Address{}
-	var err error
-	if tx.IsEthCompatible() {
-		from, err = tx.SenderAddress()
-	} else {
-		from, err = tx.ConvertToHmy().SenderAddress()
-	}
-	if err != nil {
-		return nil, err
-	}
 	v, r, s := tx.RawSignatureValues()
 
 	result := &Transaction{
@@ -111,59 +101,10 @@ func NewTransaction(
 	return result, nil
 }
 
-// NewReceipt returns the RPC data for a new receipt. It is unused at the moment.
-func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
-	senderAddr, err := tx.SenderAddress()
-	if err != nil {
-		return nil, err
-	}
-
+// NewReceipt returns the RPC data for a new receipt
+func NewReceipt(senderAddr common.Address, tx *types.EthTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
 	ethTxHash := tx.Hash()
-	for i, _ := range receipt.Logs {
-		// Override log txHash with receipt's
-		receipt.Logs[i].TxHash = ethTxHash
-	}
-
-	fields := map[string]interface{}{
-		"blockHash":         blockHash,
-		"blockNumber":       hexutil.Uint64(blockNumber),
-		"transactionHash":   ethTxHash,
-		"transactionIndex":  hexutil.Uint64(blockIndex),
-		"from":              senderAddr,
-		"to":                tx.To(),
-		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
-		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
-		"contractAddress":   nil,
-		"logs":              receipt.Logs,
-		"logsBloom":         receipt.Bloom,
-	}
-
-	// Assign receipt status or post state.
-	if len(receipt.PostState) > 0 {
-		fields["root"] = hexutil.Bytes(receipt.PostState)
-	} else {
-		fields["status"] = hexutil.Uint(receipt.Status)
-	}
-	if receipt.Logs == nil {
-		fields["logs"] = [][]*types.Log{}
-	}
-	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
-	if receipt.ContractAddress != (common.Address{}) {
-		fields["contractAddress"] = receipt.ContractAddress
-	}
-
-	return fields, nil
-}
-
-// NewReceiptFromTransaction returns the RPC data for a new receipt. It is unused at the moment.
-func NewReceiptFromTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
-	senderAddr, err := tx.SenderAddress()
-	if err != nil {
-		return nil, err
-	}
-
-	ethTxHash := tx.Hash()
-	for i, _ := range receipt.Logs {
+	for i := range receipt.Logs {
 		// Override log txHash with receipt's
 		receipt.Logs[i].TxHash = ethTxHash
 	}
@@ -253,7 +194,11 @@ func blockWithFullTxFromBlock(b *types.Block) (*BlockWithFullTx, error) {
 	}
 
 	for idx, tx := range b.Transactions() {
-		fmtTx, err := NewTransaction(tx.ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), uint64(idx))
+		from, err := tx.SenderAddress()
+		if err != nil {
+			return nil, err
+		}
+		fmtTx, err := NewTransaction(from, tx.ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), uint64(idx))
 		if err != nil {
 			return nil, err
 		}
@@ -270,5 +215,10 @@ func NewTransactionFromBlockIndex(b *types.Block, index uint64) (*Transaction, e
 			"tx index %v greater than or equal to number of transactions on block %v", index, b.Hash().String(),
 		)
 	}
-	return NewTransaction(txs[index].ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
+	tx := txs[index].ConvertToEth()
+	from, err := tx.SenderAddress()
+	if err != nil {
+		return nil, err
+	}
+	return NewTransaction(from, tx, b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
 }

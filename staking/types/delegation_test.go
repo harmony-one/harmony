@@ -166,3 +166,123 @@ func TestNoEarlyUnlock(t *testing.T) {
 		t.Errorf("should not allow early unlock")
 	}
 }
+
+func TestMaxRateAtLess(t *testing.T) {
+	// recreate it so that all tests can run
+	delegation := NewDelegation(delegatorAddr, delegationAmt)
+	lastEpochInCommittee := big.NewInt(1)
+	curEpoch := big.NewInt(27)
+	epoch := big.NewInt(21)
+	amount := big.NewInt(4000)
+	delegation.Undelegate(epoch, amount)
+	initialLength := len(delegation.Undelegations)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, true)
+	if result.Cmp(big.NewInt(0)) != 0 {
+		t.Errorf("should not allow unlock before 7")
+	}
+	finalLength := len(delegation.Undelegations)
+	if initialLength != finalLength {
+		t.Errorf("should not remove undelegations before 7")
+	}
+}
+
+func TestMaxRateAtEqual(t *testing.T) {
+	// recreate it so that all tests can run
+	delegation := NewDelegation(delegatorAddr, delegationAmt)
+	lastEpochInCommittee := big.NewInt(1)
+	curEpoch := big.NewInt(28)
+	epoch := big.NewInt(21)
+	amount := big.NewInt(4000)
+	delegation.Undelegate(epoch, amount)
+	initialLength := len(delegation.Undelegations)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, true)
+	if result.Cmp(big.NewInt(4000)) != 0 {
+		t.Errorf("should withdraw at 7")
+	}
+	finalLength := len(delegation.Undelegations)
+	if initialLength == finalLength {
+		t.Errorf("should remove undelegations at 7")
+	}
+}
+
+func TestMaxRateAtExcess(t *testing.T) {
+	// recreate it so that all tests can run
+	delegation := NewDelegation(delegatorAddr, delegationAmt)
+	lastEpochInCommittee := big.NewInt(1)
+	curEpoch := big.NewInt(29)
+	epoch := big.NewInt(21)
+	amount := big.NewInt(4000)
+	delegation.Undelegate(epoch, amount)
+	initialLength := len(delegation.Undelegations)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, true)
+	if result.Cmp(big.NewInt(0)) != 0 {
+		t.Errorf("should not withdraw at 8")
+	}
+	finalLength := len(delegation.Undelegations)
+	if initialLength == finalLength {
+		t.Errorf("should remove undelegations at 8")
+	}
+}
+
+func TestNoMaxRateAtLess(t *testing.T) {
+	// recreate it so that all tests can run
+	delegation := NewDelegation(delegatorAddr, delegationAmt)
+	lastEpochInCommittee := big.NewInt(1)
+	curEpoch := big.NewInt(27)
+	epoch := big.NewInt(21)
+	amount := big.NewInt(4000)
+	delegation.Undelegate(epoch, amount)
+	initialLength := len(delegation.Undelegations)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false)
+	if result.Cmp(big.NewInt(0)) != 0 {
+		t.Errorf("should not allow unlock before 7")
+	}
+	finalLength := len(delegation.Undelegations)
+	if initialLength != finalLength {
+		t.Errorf("should not remove undelegations before 7")
+	}
+}
+
+func TestNoMaxRateAtEqual(t *testing.T) {
+	// recreate it so that all tests can run
+	delegation := NewDelegation(delegatorAddr, delegationAmt)
+	lastEpochInCommittee := big.NewInt(1)
+	curEpoch := big.NewInt(28)
+	epoch := big.NewInt(21)
+	amount := big.NewInt(4000)
+	delegation.Undelegate(epoch, amount)
+	initialLength := len(delegation.Undelegations)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false)
+	if result.Cmp(big.NewInt(4000)) != 0 {
+		t.Errorf("should withdraw at 7")
+	}
+	finalLength := len(delegation.Undelegations)
+	if initialLength == finalLength {
+		t.Errorf("should remove undelegations at 7")
+	}
+}
+
+func TestNoMaxRateAtExcess(t *testing.T) {
+	// recreate it so that all tests can run
+	delegation := NewDelegation(delegatorAddr, delegationAmt)
+	lastEpochInCommittee := big.NewInt(1)
+	curEpoch := big.NewInt(29)
+	epoch := big.NewInt(21)
+	amount := big.NewInt(4000)
+	delegation.Undelegate(epoch, amount)
+	initialLength := len(delegation.Undelegations)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false)
+	if result.Cmp(big.NewInt(4000)) != 0 {
+		t.Errorf("should withdraw at 8")
+	}
+	finalLength := len(delegation.Undelegations)
+	if initialLength == finalLength {
+		t.Errorf("should remove undelegations at 8")
+	}
+}
