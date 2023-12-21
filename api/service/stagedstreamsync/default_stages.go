@@ -64,7 +64,7 @@ func initFastSyncStagesOrder() {
 		ShortRange,
 		BlockBodies,
 		Receipts,
-		StateSync,
+		FullStateSync,
 		States,
 		LastMile,
 		Finish,
@@ -74,7 +74,7 @@ func initFastSyncStagesOrder() {
 		Finish,
 		LastMile,
 		States,
-		StateSync,
+		FullStateSync,
 		Receipts,
 		BlockBodies,
 		ShortRange,
@@ -86,7 +86,7 @@ func initFastSyncStagesOrder() {
 		Finish,
 		LastMile,
 		States,
-		StateSync,
+		FullStateSync,
 		Receipts,
 		BlockBodies,
 		ShortRange,
@@ -101,6 +101,7 @@ func DefaultStages(ctx context.Context,
 	srCfg StageShortRangeCfg,
 	bodiesCfg StageBodiesCfg,
 	stateSyncCfg StageStateSyncCfg,
+	fullStateSyncCfg StageFullStateSyncCfg,
 	statesCfg StageStatesCfg,
 	receiptsCfg StageReceiptsCfg,
 	lastMileCfg StageLastMileCfg,
@@ -113,6 +114,7 @@ func DefaultStages(ctx context.Context,
 	handlerStageBodies := NewStageBodies(bodiesCfg)
 	handlerStageStates := NewStageStates(statesCfg)
 	handlerStageStateSync := NewStageStateSync(stateSyncCfg)
+	handlerStageFullStateSync := NewStageFullStateSync(fullStateSyncCfg)
 	handlerStageReceipts := NewStageReceipts(receiptsCfg)
 	handlerStageLastMile := NewStageLastMile(lastMileCfg)
 	handlerStageFinish := NewStageFinish(finishCfg)
@@ -147,6 +149,11 @@ func DefaultStages(ctx context.Context,
 			ID:          StateSync,
 			Description: "Retrieve States",
 			Handler:     handlerStageStateSync,
+		},
+		{
+			ID:          FullStateSync,
+			Description: "Retrieve Full States",
+			Handler:     handlerStageFullStateSync,
 		},
 		{
 			ID:          Receipts,
