@@ -108,6 +108,11 @@ var (
 type accountTask struct {
 	id uint64 //unique id for account task
 
+	root   common.Hash
+	origin common.Hash
+	limit  common.Hash
+	cap    int
+
 	// These fields get serialized to leveldb on shutdown
 	Next     common.Hash                    // Next account to sync in this interval
 	Last     common.Hash                    // Last account to sync in this interval
@@ -229,16 +234,19 @@ type byteCodeTasksBundle struct {
 	id     uint64 //unique id for bytecode task bundle
 	task   *accountTask
 	hashes []common.Hash
+	cap    int
 }
 
 type storageTaskBundle struct {
 	id       uint64 //unique id for storage task bundle
+	root     common.Hash
 	accounts []common.Hash
 	roots    []common.Hash
 	mainTask *accountTask
 	subtask  *storageTask
 	origin   common.Hash
 	limit    common.Hash
+	cap      int
 }
 
 // healTask represents the sync task for healing the snap-synced chunk boundaries.
@@ -251,6 +259,7 @@ type healTask struct {
 	pathsets    []*message.TrieNodePathSet
 	task        *healTask
 	root        common.Hash
+	bytes       int
 	byteCodeReq bool
 }
 
@@ -259,7 +268,6 @@ type tasks struct {
 	storageTasks map[uint64]*storageTaskBundle   // Set of trie node tasks currently queued for retrieval, indexed by path
 	codeTasks    map[uint64]*byteCodeTasksBundle // Set of byte code tasks currently queued for retrieval, indexed by hash
 	healer       map[uint64]*healTask
-	snapped      bool // Flag to signal that snap phase is done
 }
 
 func newTasks() *tasks {
@@ -268,7 +276,6 @@ func newTasks() *tasks {
 		storageTasks: make(map[uint64]*storageTaskBundle, 0),
 		codeTasks:    make(map[uint64]*byteCodeTasksBundle),
 		healer:       make(map[uint64]*healTask, 0),
-		snapped:      false,
 	}
 }
 
@@ -399,8 +406,6 @@ type FullStateDownloadManager struct {
 	storageSynced  uint64             // Number of storage slots downloaded
 	storageBytes   common.StorageSize // Number of storage trie bytes persisted to disk
 
-	pend sync.WaitGroup // Tracks network request goroutines for graceful shutdown
-
 	stateWriter        ethdb.Batch        // Shared batch writer used for persisting raw states
 	accountHealed      uint64             // Number of accounts downloaded during the healing stage
 	accountHealedBytes common.StorageSize // Number of raw account bytes persisted to disk during the healing stage
@@ -420,6 +425,9 @@ type FullStateDownloadManager struct {
 	bytecodeHealBytes  common.StorageSize // Number of bytecodes persisted to disk
 	bytecodeHealDups   uint64             // Number of bytecodes already processed
 	bytecodeHealNops   uint64             // Number of bytecodes not requested
+
+	startTime time.Time // Time instance when snapshot sync started
+	logTime   time.Time // Time instance when status was last reported
 }
 
 func newFullStateDownloadManager(db ethdb.KeyValueStore,
@@ -430,18 +438,19 @@ func newFullStateDownloadManager(db ethdb.KeyValueStore,
 	logger zerolog.Logger) *FullStateDownloadManager {
 
 	return &FullStateDownloadManager{
-		db:          db,
-		scheme:      scheme,
-		bc:          bc,
-		stateWriter: db.NewBatch(),
-		tx:          tx,
-		keccak:      sha3.NewLegacyKeccak256().(crypto.KeccakState),
-		concurrency: concurrency,
-		logger:      logger,
-		tasks:       newTasks(),
-		requesting:  newTasks(),
-		processing:  newTasks(),
-		retries:     newTasks(),
+		db:                   db,
+		scheme:               scheme,
+		bc:                   bc,
+		stateWriter:          db.NewBatch(),
+		tx:                   tx,
+		keccak:               sha3.NewLegacyKeccak256().(crypto.KeccakState),
+		concurrency:          concurrency,
+		logger:               logger,
+		tasks:                newTasks(),
+		requesting:           newTasks(),
+		processing:           newTasks(),
+		retries:              newTasks(),
+		trienodeHealThrottle: maxTrienodeHealThrottle, // Tune downward instead of insta-filling with junk
 	}
 }
 
@@ -531,6 +540,12 @@ func (s *FullStateDownloadManager) commitHealer(force bool) {
 	utils.Logger().Debug().Str("type", "trienodes").Interface("bytes", common.StorageSize(batch.ValueSize())).Msg("Persisted set of healing data")
 }
 
+func (s *FullStateDownloadManager) SyncStarted() {
+	if s.startTime == (time.Time{}) {
+		s.startTime = time.Now()
+	}
+}
+
 func (s *FullStateDownloadManager) SyncCompleted() {
 	defer func() { // Persist any progress, independent of failure
 		for _, task := range s.tasks.accountTasks {
@@ -556,7 +571,8 @@ func (s *FullStateDownloadManager) SyncCompleted() {
 		utils.Logger().Debug().Interface("root", s.root).Msg("Terminating snapshot sync cycle")
 	}()
 
-	utils.Logger().Debug().Msg("Snapshot sync already completed")
+	elapsed := time.Since(s.startTime)
+	utils.Logger().Debug().Interface("elapsed", elapsed).Msg("Snapshot sync already completed")
 }
 
 // getNextBatch returns objects with a maximum of n state download
@@ -956,6 +972,11 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 			break
 		}
 
+		task.root = s.root
+		task.origin = task.Next
+		task.limit = task.Last
+		task.cap = maxRequestSize
+		task.requested = true
 		s.tasks.accountTasks[i].requested = true
 		accounts = append(accounts, task)
 		s.requesting.addAccountTask(task.id, task)
@@ -997,6 +1018,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 			id:     taskID,
 			hashes: hashes,
 			task:   task,
+			cap:    maxRequestSize,
 		}
 		codes = append(codes, bytecodeTask)
 
@@ -1020,14 +1042,8 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 			continue
 		}
 
-		// TODO: check cap calculations (shouldn't give us big chunk)
-		// if cap > maxRequestSize {
-		// 	cap = maxRequestSize
-		// }
-		// if cap < minRequestSize { // Don't bother with peers below a bare minimum performance
-		// 	cap = minRequestSize
-		// }
-		storageSets := maxRequestSize / 1024
+		cap := maxRequestSize
+		storageSets := cap / 1024
 
 		storages = &storageTaskBundle{
 			accounts: make([]common.Hash, 0, storageSets),
@@ -1089,6 +1105,8 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 			storages.origin = storages.subtask.Next
 			storages.limit = storages.subtask.Last
 		}
+		storages.root = s.root
+		storages.cap = cap
 		s.tasks.addStorageTaskBundle(taskID, storages)
 		s.requesting.addStorageTaskBundle(taskID, storages)
 
@@ -1099,11 +1117,10 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 		return
 	}
 
+	// Sync phase done, run heal phase (if requested for heal tasks)
 	if !withHealTasks {
 		return
 	}
-
-	// Sync phase done, run heal phase
 
 	// Iterate over pending tasks and try to find a peer to retrieve with
 	for (len(s.tasks.healer) > 0 && len(s.tasks.healer[0].hashes) > 0) || s.scheduler.Pending() > 0 {
@@ -1177,6 +1194,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 			pathsets:    pathsets,
 			root:        s.root,
 			task:        s.tasks.healer[0],
+			bytes:       maxRequestSize,
 			byteCodeReq: false,
 		}
 
@@ -1243,6 +1261,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 			id:          taskID,
 			hashes:      hashes,
 			task:        s.tasks.healer[0],
+			bytes:       maxRequestSize,
 			byteCodeReq: true,
 		}
 

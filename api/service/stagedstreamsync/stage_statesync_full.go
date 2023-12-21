@@ -59,8 +59,14 @@ func (sss *StageFullStateSync) Exec(ctx context.Context, bool, invalidBlockRever
 	// for short range sync, skip this step
 	if !s.state.initSync {
 		return nil
-	} // only execute this stage in fast/snap sync mode and once we reach to pivot
+	}
 
+	// if states are already synced, don't execute this stage
+	if s.state.status.statesSynced {
+		return
+	}
+
+	// only execute this stage in fast/snap sync mode and once we reach to pivot
 	if s.state.status.pivotBlock == nil ||
 		s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64() ||
 		s.state.status.statesSynced {
@@ -72,21 +78,21 @@ func (sss *StageFullStateSync) Exec(ctx context.Context, bool, invalidBlockRever
 	// if currentHead >= maxHeight {
 	// 	return nil
 	// }
-	// currProgress := s.state.CurrentBlockNumber()
 	// targetHeight := s.state.currentCycle.TargetHeight
 
-	// if errV := CreateView(ctx, sss.configs.db, tx, func(etx kv.Tx) error {
-	// 	if currProgress, err = s.CurrentStageProgress(etx); err != nil {
-	// 		return err
-	// 	}
-	// 	return nil
-	// }); errV != nil {
-	// 	return errV
-	// }
+	currProgress := uint64(0)
+	if errV := CreateView(ctx, sss.configs.db, tx, func(etx kv.Tx) error {
+		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
+			return err
+		}
+		return nil
+	}); errV != nil {
+		return errV
+	}
+	if currProgress >= s.state.status.pivotBlock.NumberU64() {
+		return nil
+	}
 
-	// if currProgress >= targetHeight {
-	// 	return nil
-	// }
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
@@ -109,6 +115,8 @@ func (sss *StageFullStateSync) Exec(ctx context.Context, bool, invalidBlockRever
 	scheme := sss.configs.bc.TrieDB().Scheme()
 	sdm := newFullStateDownloadManager(sss.configs.bc.ChainDb(), scheme, tx, sss.configs.bc, sss.configs.concurrency, s.state.logger)
 	sdm.setRootHash(currentBlockRootHash)
+
+	sdm.SyncStarted()
 	var wg sync.WaitGroup
 	for i := 0; i < s.state.config.Concurrency; i++ {
 		wg.Add(1)
@@ -127,6 +135,12 @@ func (sss *StageFullStateSync) Exec(ctx context.Context, bool, invalidBlockRever
 
 	// states should be fully synced in this stage
 	s.state.status.statesSynced = true
+
+	if err := sss.saveProgress(s, tx); err != nil {
+		sss.configs.logger.Warn().Err(err).
+			Uint64("pivot block number", s.state.status.pivotBlock.NumberU64()).
+			Msg(WrapStagedSyncMsg("save progress for statesync stage failed"))
+	}
 
 	/*
 		gbm := s.state.gbm
@@ -184,8 +198,8 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 			task := accountTasks[0]
 			origin := task.Next
 			limit := task.Last
-			root := sdm.root
-			cap := maxRequestSize
+			root := task.root
+			cap := task.cap
 			retAccounts, proof, stid, err := sss.configs.protocol.GetAccountRange(ctx, root, origin, limit, uint64(cap))
 			if err != nil {
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
@@ -234,10 +248,10 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 
 		} else if len(storages.accounts) > 0 {
 
-			root := sdm.root
+			root := storages.root
 			roots := storages.roots
 			accounts := storages.accounts
-			cap := maxRequestSize
+			cap := storages.cap
 			origin := storages.origin
 			limit := storages.limit
 			mainTask := storages.mainTask
@@ -276,13 +290,14 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 		} else {
 			// assign trie node Heal Tasks
 			if len(healtask.hashes) > 0 {
-				root := sdm.root
+				root := healtask.root
 				task := healtask.task
 				hashes := healtask.hashes
 				pathsets := healtask.pathsets
 				paths := healtask.paths
+				bytes := healtask.bytes
 
-				nodes, stid, err := sss.configs.protocol.GetTrieNodes(ctx, root, pathsets, maxRequestSize)
+				nodes, stid, err := sss.configs.protocol.GetTrieNodes(ctx, root, pathsets, uint64(bytes))
 				if err != nil {
 					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 						sss.configs.protocol.StreamFailed(stid, "GetTrieNodes failed")
@@ -316,7 +331,8 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 			if len(codetask.hashes) > 0 {
 				task := codetask.task
 				hashes := codetask.hashes
-				retCodes, stid, err := sss.configs.protocol.GetByteCodes(ctx, hashes, maxRequestSize)
+				bytes := codetask.bytes
+				retCodes, stid, err := sss.configs.protocol.GetByteCodes(ctx, hashes, uint64(bytes))
 				if err != nil {
 					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 						sss.configs.protocol.StreamFailed(stid, "GetByteCodes failed")
@@ -354,7 +370,7 @@ func (sss *StageFullStateSync) downloadByteCodes(ctx context.Context, sdm *FullS
 	for _, codeTask := range codeTasks {
 		// try to get byte codes from remote peer
 		// if any of them failed, the stid will be the id of the failed stream
-		retCodes, stid, err := sss.configs.protocol.GetByteCodes(ctx, codeTask.hashes, maxRequestSize)
+		retCodes, stid, err := sss.configs.protocol.GetByteCodes(ctx, codeTask.hashes, uint64(codeTask.cap))
 		if err != nil {
 			return stid, err
 		}
@@ -413,7 +429,7 @@ func (stg *StageFullStateSync) saveProgress(s *StageState, tx kv.RwTx) (err erro
 	}
 
 	// save progress
-	if err = s.Update(tx, s.state.CurrentBlockNumber()); err != nil {
+	if err = s.Update(tx, s.state.status.pivotBlock.NumberU64()); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msgf("[STAGED_SYNC] saving progress for block States stage failed")
