@@ -81,7 +81,7 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = stg.configs.db.BeginRw(ctx)
+		tx, err = stg.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}
@@ -231,7 +231,7 @@ func (stg *StageStates) saveProgress(ctx context.Context, s *StageState, tx kv.R
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = stg.configs.db.BeginRw(ctx)
+		tx, err = stg.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}

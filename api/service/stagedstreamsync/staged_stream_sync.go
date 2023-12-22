@@ -127,7 +127,7 @@ func (s *StagedStreamSync) CleanUpStageState(ctx context.Context, id SyncStageID
 	var pruneProgress uint64
 	var err error
 
-	if errV := CreateView(ctx, db, tx, func(tx kv.Tx) error {
+	if errV := CreateView(context.Background(), db, tx, func(tx kv.Tx) error {
 		pruneProgress, err = GetStageCleanUpProgress(tx, id, s.isBeacon)
 		if err != nil {
 			return err
@@ -223,7 +223,7 @@ func (s *StagedStreamSync) SetCurrentStage(id SyncStageID) error {
 func (s *StagedStreamSync) StageState(ctx context.Context, stage SyncStageID, tx kv.Tx, db kv.RwDB) (*StageState, error) {
 	var blockNum uint64
 	var err error
-	if errV := CreateView(ctx, db, tx, func(rtx kv.Tx) error {
+	if errV := CreateView(context.Background(), db, tx, func(rtx kv.Tx) error {
 		blockNum, err = GetStageProgress(rtx, stage, s.isBeacon)
 		if err != nil {
 			return err
@@ -436,7 +436,7 @@ func CreateView(ctx context.Context, db kv.RwDB, tx kv.Tx, f func(tx kv.Tx) erro
 	if tx != nil {
 		return f(tx)
 	}
-	return db.View(ctx, func(etx kv.Tx) error {
+	return db.View(context.Background(), func(etx kv.Tx) error {
 		return f(etx)
 	})
 }

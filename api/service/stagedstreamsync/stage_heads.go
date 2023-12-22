@@ -118,7 +118,7 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 func (heads *StageHeads) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = heads.configs.db.BeginRw(ctx)
+		tx, err = heads.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}
@@ -140,7 +140,7 @@ func (heads *StageHeads) Revert(ctx context.Context, firstCycle bool, u *RevertS
 func (heads *StageHeads) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
-		tx, err = heads.configs.db.BeginRw(ctx)
+		tx, err = heads.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}

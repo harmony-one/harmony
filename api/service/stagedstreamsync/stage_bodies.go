@@ -106,7 +106,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 
 	if useInternalTx {
 		var err error
-		tx, err = b.configs.db.BeginRw(ctx)
+		tx, err = b.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}
@@ -265,7 +265,7 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 			continue
 		}
 		s.state.gbm.SetDownloadDetails(batch, 0, stid)
-		if errU := b.configs.blockDBs[0].Update(ctx, func(tx kv.RwTx) error {
+		if errU := b.configs.blockDBs[0].Update(context.Background(), func(tx kv.RwTx) error {
 			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, 0, stid); err != nil {
 				return errors.Errorf("[STAGED_STREAM_SYNC] saving re-downloaded bad block to db failed.")
 			}
@@ -314,7 +314,7 @@ func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 // saveBlocks saves the blocks into db
 func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, stid sttypes.StreamID) error {
 
-	tx, err := b.configs.blockDBs[loopID].BeginRw(ctx)
+	tx, err := b.configs.blockDBs[loopID].BeginRw(context.Background())
 	if err != nil {
 		return err
 	}
@@ -357,7 +357,7 @@ func (b *StageBodies) saveProgress(ctx context.Context, s *StageState, progress 
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = b.configs.db.BeginRw(ctx)
+		tx, err = b.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
 		}
