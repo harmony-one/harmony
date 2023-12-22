@@ -203,7 +203,7 @@ var (
 		CrossShardXferPrecompileEpoch:         big.NewInt(5),
 		AllowlistEpoch:                        EpochTBD,
 		LeaderRotationInternalValidatorsEpoch: big.NewInt(2379),
-		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		LeaderRotationExternalValidatorsEpoch: big.NewInt(3153),
 		FeeCollectEpoch:                       big.NewInt(5),
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
 		HIP30Epoch:                            big.NewInt(7),
