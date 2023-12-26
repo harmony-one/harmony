@@ -17,8 +17,11 @@
 package vm
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	//Needed for SHA3-256 FIPS202
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -32,10 +35,13 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"golang.org/x/crypto/ripemd160"
 
-	//Needed for SHA3-256 FIPS202
-	"encoding/hex"
-
 	"golang.org/x/crypto/sha3"
+
+	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	gnark "github.com/consensys/gnark/backend/groth16"
+	"github.com/consensys/gnark/backend/witness"
+	//gnarkLog "github.com/consensys/gnark/logger"
 )
 
 // PrecompiledContract is the basic interface for native Go contracts. The implementation
@@ -135,6 +141,91 @@ var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{253}): &sha3fip{},
 	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
 	common.BytesToAddress([]byte{255}): &vrf{},
+}
+
+var PrecompiledContractsGroth16 = map[common.Address]PrecompiledContract{
+	common.BytesToAddress([]byte{1}): &ecrecover{},
+	common.BytesToAddress([]byte{2}): &sha256hash{},
+	common.BytesToAddress([]byte{3}): &ripemd160hash{},
+	common.BytesToAddress([]byte{4}): &dataCopy{},
+	common.BytesToAddress([]byte{5}): &bigModExp{},
+	common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
+	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
+	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
+	common.BytesToAddress([]byte{9}): &blake2F{},
+
+	common.BytesToAddress([]byte{250}): &groth16Verify{},
+	common.BytesToAddress([]byte{251}): &epoch{},
+	// marked nil to ensure no overwrite
+	common.BytesToAddress([]byte{252}): nil, // used by WriteCapablePrecompiledContractsStaking
+	common.BytesToAddress([]byte{253}): &sha3fip{},
+	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
+	common.BytesToAddress([]byte{255}): &vrf{},
+}
+
+type groth16Verify struct{}
+
+func (g groth16Verify) RequiredGas(input []byte) uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (g groth16Verify) Run(input []byte) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func Groth16Verify(vkBytes []byte, proofBytes []byte, inputsBytes []byte, curve ecc.ID) (bool, error) {
+
+	var vk gnark.VerifyingKey
+	var proof gnark.Proof
+
+	switch curve {
+	case ecc.BN254:
+		bn256vk, err := FromBytesToVerifyingKey(vkBytes)
+		if err != nil {
+			return false, err
+		}
+		vk = bn256vk
+
+		bn256proof, err := bn256.FromBytesToProof(proofBytes)
+		if err != nil {
+			return false, err
+		}
+		proof = bn256proof
+	default:
+		return false, errors.Errorf("unknown eliptic curve")
+	}
+
+	var buf bytes.Buffer
+	buf.Grow(8 + 4 + len(inputsBytes))
+	// Add 8 bytes for correct reading
+	// Gnark witness has two addition number in the start
+	// These numbers aren't used for verification
+	buf.Write(make([]byte, 8))
+	err := binary.Write(&buf, binary.BigEndian, uint32(len(inputsBytes)/(fr.Limbs*sizeUint64)))
+	if err != nil {
+		return false, err
+	}
+	buf.Write(inputsBytes)
+	wit, err := witness.New(curve.ScalarField())
+	if err != nil {
+		return false, err
+	}
+	err = wit.UnmarshalBinary(buf.Bytes())
+	if err != nil {
+		return false, err
+	}
+	err = gnark.Verify(proof, vk, wit)
+	if err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+func FromBytesToVerifyingKey(vkBytes []byte) (gnark.VerifyingKey, error) {
+	var vk gnark.VerifyingKey
+	return vk, nil
 }
 
 func init() {
