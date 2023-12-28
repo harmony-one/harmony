@@ -54,7 +54,7 @@ func verifyBlock(bc blockChain, block *types.Block, nextBlocks ...*types.Block) 
 	if err := bc.Engine().VerifyHeader(bc, block.Header(), true); err != nil {
 		return errors.Wrap(err, "[VerifyHeader]")
 	}
-	
+
 	return nil
 }
 
