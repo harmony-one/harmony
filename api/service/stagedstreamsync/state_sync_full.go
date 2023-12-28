@@ -582,38 +582,30 @@ func (s *FullStateDownloadManager) GetNextBatch() (accounts []*accountTask,
 	storages *storageTaskBundle,
 	healtask *healTask,
 	codetask *healTask,
+	nItems int,
 	err error) {
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	accounts, codes, storages, healtask, codetask = s.getBatchFromRetries()
-	nItems := len(accounts) + len(codes) + len(storages.roots) + len(healtask.hashes) + len(codetask.hashes)
+	accounts, codes, storages, healtask, codetask, nItems = s.getBatchFromRetries()
 
 	if nItems > 0 {
 		return
 	}
 
 	if len(s.tasks.accountTasks) == 0 && s.scheduler.Pending() == 0 {
-		if nItems == 0 {
-			s.SyncCompleted()
-		}
+		s.SyncCompleted()
 		return
 	}
 
 	// Refill available tasks from the scheduler.
-	withHealTasks := true
-	if healtask != nil || codetask != nil {
-		withHealTasks = false
-	}
-	newAccounts, newCodes, newStorageTaskBundle, newHealTask, newCodeTask := s.getBatchFromUnprocessed(withHealTasks)
+	newAccounts, newCodes, newStorageTaskBundle, newHealTask, newCodeTask, nItems := s.getBatchFromUnprocessed()
 	accounts = append(accounts, newAccounts...)
 	codes = append(codes, newCodes...)
 	storages = newStorageTaskBundle
-	if withHealTasks {
-		healtask = newHealTask
-		codetask = newCodeTask
-	}
+	healtask = newHealTask
+	codetask = newCodeTask
 
 	return
 }
@@ -730,7 +722,7 @@ func (s *FullStateDownloadManager) loadSyncStatus() {
 	// Either we've failed to decode the previous state, or there was none.
 	// Start a fresh sync by chunking up the account range and scheduling
 	// them for retrieval.
-	s.tasks.accountTasks = nil
+	s.tasks = newTasks()
 	s.accountSynced, s.accountBytes = 0, 0
 	s.bytecodeSynced, s.bytecodeBytes = 0, 0
 	s.storageSynced, s.storageBytes = 0, 0
@@ -937,16 +929,18 @@ func (s *FullStateDownloadManager) updateStats(written, duplicate, unexpected in
 
 // getBatchFromUnprocessed returns objects with a maximum of n unprocessed state download
 // tasks to send to the remote peer.
-func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
+func (s *FullStateDownloadManager) getBatchFromUnprocessed() (
 	accounts []*accountTask,
 	codes []*byteCodeTasksBundle,
 	storages *storageTaskBundle,
 	healtask *healTask,
-	codetask *healTask) {
+	codetask *healTask,
+	count int) {
 
 	// over trie nodes as those can be written to disk and forgotten about.
 	codes = make([]*byteCodeTasksBundle, 0)
 	accounts = make([]*accountTask, 0)
+	count = 0
 
 	for i, task := range s.tasks.accountTasks {
 		// Stop when we've gathered enough requests
@@ -983,6 +977,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 		s.tasks.addAccountTask(task.id, task)
 
 		// one task account is enough for an stream
+		count = len(accounts)
 		return
 	}
 
@@ -1027,12 +1022,14 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 
 		// Stop when we've gathered enough requests
 		if totalHashes >= maxCodeRequestCount {
+			count = totalHashes
 			return
 		}
 	}
 
 	// if we found some codes, can assign it to node
 	if totalHashes > 0 {
+		count = totalHashes
 		return
 	}
 
@@ -1109,20 +1106,17 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 		storages.cap = cap
 		s.tasks.addStorageTaskBundle(taskID, storages)
 		s.requesting.addStorageTaskBundle(taskID, storages)
-
+		count = len(storages.accounts)
 		return
 	}
 
 	if len(storages.accounts) > 0 {
+		count = len(storages.accounts)
 		return
 	}
 
-	// Sync phase done, run heal phase (if requested for heal tasks)
-	if !withHealTasks {
-		return
-	}
-
-	// Iterate over pending tasks and try to find a peer to retrieve with
+	// Sync phase done, run heal phase
+	// Iterate over pending tasks
 	for (len(s.tasks.healer) > 0 && len(s.tasks.healer[0].hashes) > 0) || s.scheduler.Pending() > 0 {
 		// If there are not enough trie tasks queued to fully assign, fill the
 		// queue from the state sync scheduler. The trie synced schedules these
@@ -1146,7 +1140,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 
 		// If all the heal tasks are bytecodes or already downloading, bail
 		if len(s.tasks.healer[0].trieTasks) == 0 {
-			return
+			break
 		}
 		// Generate the network query and send it to the peer
 		// if cap > maxTrieRequestCount {
@@ -1202,6 +1196,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 		s.requesting.addHealerTask(taskID, healtask)
 
 		if len(hashes) > 0 {
+			count = len(hashes)
 			return
 		}
 	}
@@ -1223,7 +1218,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 
 		// If all the heal tasks are trienodes or already downloading, bail
 		if len(s.tasks.healer[0].codeTasks) == 0 {
-			return
+			break
 		}
 		// Task pending retrieval, try to find an idle peer. If no such peer
 		// exists, we probably assigned tasks for all (or they are stateless).
@@ -1264,7 +1259,7 @@ func (s *FullStateDownloadManager) getBatchFromUnprocessed(withHealTasks bool) (
 			bytes:       maxRequestSize,
 			byteCodeReq: true,
 		}
-
+		count = len(hashes)
 		s.tasks.healer[taskID] = codetask
 		s.requesting.addHealerTask(taskID, healtask)
 	}
@@ -1291,7 +1286,8 @@ func (s *FullStateDownloadManager) getBatchFromRetries() (
 	codes []*byteCodeTasksBundle,
 	storages *storageTaskBundle,
 	healtask *healTask,
-	codetask *healTask) {
+	codetask *healTask,
+	count int) {
 
 	// over trie nodes as those can be written to disk and forgotten about.
 	accounts = make([]*accountTask, 0)
@@ -1309,6 +1305,7 @@ func (s *FullStateDownloadManager) getBatchFromRetries() (
 	}
 
 	if len(accounts) > 0 {
+		count = len(accounts)
 		return
 	}
 
@@ -1320,6 +1317,7 @@ func (s *FullStateDownloadManager) getBatchFromRetries() (
 	}
 
 	if len(codes) > 0 {
+		count = len(codes)
 		return
 	}
 
@@ -1335,10 +1333,7 @@ func (s *FullStateDownloadManager) getBatchFromRetries() (
 		}
 		s.requesting.addStorageTaskBundle(storages.id, storages)
 		s.retries.deleteStorageTaskBundle(storages.id)
-		return
-	}
-
-	if len(storages.accounts) > 0 {
+		count = len(storages.accounts)
 		return
 	}
 
@@ -1357,6 +1352,7 @@ func (s *FullStateDownloadManager) getBatchFromRetries() (
 				}
 				s.requesting.addHealerTask(id, task)
 				s.retries.deleteHealerTask(id)
+				count = len(task.hashes)
 				return
 			}
 			if task.byteCodeReq {
@@ -1371,11 +1367,13 @@ func (s *FullStateDownloadManager) getBatchFromRetries() (
 				}
 				s.requesting.addHealerTask(id, task)
 				s.retries.deleteHealerTask(id)
+				count = len(task.hashes)
 				return
 			}
 		}
 	}
 
+	count = 0
 	return
 }
 

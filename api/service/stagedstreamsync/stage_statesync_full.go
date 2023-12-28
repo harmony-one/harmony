@@ -189,8 +189,8 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 			return
 		default:
 		}
-		accountTasks, codes, storages, healtask, codetask, err := sdm.GetNextBatch()
-		if len(accountTasks)+len(codes)+len(storages.accounts)+len(healtask.hashes)+len(codetask.hashes) == 0 || err != nil {
+		accountTasks, codes, storages, healtask, codetask, nTasks, err := sdm.GetNextBatch()
+		if nTasks == 0 || err != nil {
 			select {
 			case <-ctx.Done():
 				return
