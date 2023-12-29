@@ -712,7 +712,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
 	}
 	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
 	rest := blocksPerEpoch % uint64(slotsCount)
-	const minimumBlocksForLeaderInRow = 3
+	const minimumBlocksForLeaderInRow = blocksCountAliveness
 	if numBlocksProducedByLeader < minimumBlocksForLeaderInRow {
 		// mine no less than 3 blocks in a row
 		numBlocksProducedByLeader = minimumBlocksForLeaderInRow

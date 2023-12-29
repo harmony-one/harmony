@@ -238,6 +238,7 @@ var (
 
 	syncFlags = []cli.Flag{
 		syncStreamEnabledFlag,
+		syncModeFlag,
 		syncDownloaderFlag,
 		syncStagedSyncFlag,
 		syncConcurrencyFlag,
@@ -1876,6 +1877,13 @@ var (
 		Usage:    "Enable the stream sync protocol (experimental feature)",
 		DefValue: false,
 	}
+
+	syncModeFlag = cli.IntFlag{
+		Name:     "sync.mode",
+		Usage:    "synchronization mode of the downloader (0=FullSync, 1=FastSync, 2=SnapSync)",
+		DefValue: 0,
+	}
+
 	// TODO: Deprecate this flag, and always set to true after stream sync is fully up.
 	syncDownloaderFlag = cli.BoolFlag{
 		Name:     "sync.downloader",
@@ -1935,6 +1943,10 @@ var (
 func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, syncStreamEnabledFlag) {
 		config.Sync.Enabled = cli.GetBoolFlagValue(cmd, syncStreamEnabledFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncModeFlag) {
+		config.Sync.SyncMode = uint32(cli.GetIntFlagValue(cmd, syncModeFlag))
 	}
 
 	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {

@@ -65,3 +65,10 @@ func (s *PrivateDebugService) GetLastSigningPower(
 ) (float64, error) {
 	return s.hmy.NodeAPI.GetLastSigningPower()
 }
+
+// GetLastSigningPower2 get last signed power
+func (s *PrivateDebugService) GetLastSigningPower2(
+	ctx context.Context,
+) (float64, error) {
+	return s.hmy.NodeAPI.GetLastSigningPower2()
+}

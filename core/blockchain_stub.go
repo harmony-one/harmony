@@ -49,6 +49,10 @@ func (a Stub) CurrentBlock() *types.Block {
 	return nil
 }
 
+func (a Stub) CurrentFastBlock() *types.Block {
+	return nil
+}
+
 func (a Stub) Validator() Validator {
 	return nil
 }
@@ -120,7 +124,7 @@ func (a Stub) Rollback(chain []common.Hash) error {
 	return errors.Errorf("method Rollback not implemented for %s", a.Name)
 }
 
-func (a Stub) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
+func (a Stub) WriteBlockWithoutState(block *types.Block) (err error) {
 	return errors.Errorf("method WriteBlockWithoutState not implemented for %s", a.Name)
 }
 
@@ -134,6 +138,10 @@ func (a Stub) GetMaxGarbageCollectedBlockNumber() int64 {
 
 func (a Stub) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	return 0, errors.Errorf("method InsertChain not implemented for %s", a.Name)
+}
+
+func (a Stub) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
+	return 0, errors.Errorf("method InsertReceiptChain not implemented for %s", a.Name)
 }
 
 func (a Stub) BadBlocks() []BadBlock {

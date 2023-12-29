@@ -136,6 +136,8 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 		sh.streamsFailed(whitelist, "remote nodes cannot provide blocks with target hashes")
 	}
 
+	utils.Logger().Info().Int("num blocks", len(blocks)).Msg("getBlockByHashes result")
+
 	n, err := verifyAndInsertBlocks(sr.configs.bc, blocks)
 	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	if err != nil {

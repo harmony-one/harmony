@@ -98,19 +98,19 @@ func (v *stakedVoteWeight) AddNewVote(
 		additionalVotePower = additionalVotePower.Add(votingPower)
 	}
 
-	tallyQuorum := func() *tallyAndQuorum {
-		switch p {
-		case Prepare:
-			return v.voteTally.Prepare
-		case Commit:
-			return v.voteTally.Commit
-		case ViewChange:
-			return v.voteTally.ViewChange
-		default:
-			// Should not happen
-			return nil
-		}
-	}()
+	var tallyQuorum *tallyAndQuorum
+	switch p {
+	case Prepare:
+		tallyQuorum = v.voteTally.Prepare
+	case Commit:
+		tallyQuorum = v.voteTally.Commit
+	case ViewChange:
+		tallyQuorum = v.voteTally.ViewChange
+	default:
+		// Should not happen
+		return nil, errors.New("stakedVoteWeight not cache this phase")
+	}
+
 	tallyQuorum.tally = tallyQuorum.tally.Add(additionalVotePower)
 
 	t := v.QuorumThreshold()
@@ -161,20 +161,6 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	utils.Logger().Debug().
 		Msgf(msg, threshold, currentTotalPower)
 	return (*currentTotalPower).GT(threshold)
-}
-
-func (v *stakedVoteWeight) currentTotalPower(p Phase) (*numeric.Dec, error) {
-	switch p {
-	case Prepare:
-		return &v.voteTally.Prepare.tally, nil
-	case Commit:
-		return &v.voteTally.Commit.tally, nil
-	case ViewChange:
-		return &v.voteTally.ViewChange.tally, nil
-	default:
-		// Should not happen
-		return nil, errors.New("wrong phase is provided")
-	}
 }
 
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask

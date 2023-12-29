@@ -184,7 +184,7 @@ func (p *Protocol) GetNodeData(ctx context.Context, hs []common.Hash, opts ...Op
 
 // GetAccountRange do getAccountRange through sync stream protocol.
 // returns the accounts along with proofs as result, target stream id, and error
-func (p *Protocol) GetAccountRange(ctx context.Context, root common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (accounts []*message.AccountData, proof []common.Hash, stid sttypes.StreamID, err error) {
+func (p *Protocol) GetAccountRange(ctx context.Context, root common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (accounts []*message.AccountData, proof [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getAccountRange")
 	defer p.doMetricPostClientRequest("getAccountRange", err, timer)
 
@@ -207,7 +207,7 @@ func (p *Protocol) GetAccountRange(ctx context.Context, root common.Hash, origin
 
 // GetStorageRanges do getStorageRanges through sync stream protocol.
 // returns the slots along with proofs as result, target stream id, and error
-func (p *Protocol) GetStorageRanges(ctx context.Context, root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (slots []*message.StorageData, proof []common.Hash, stid sttypes.StreamID, err error) {
+func (p *Protocol) GetStorageRanges(ctx context.Context, root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (slots [][]*message.StorageData, proof [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getStorageRanges")
 	defer p.doMetricPostClientRequest("getStorageRanges", err, timer)
 
@@ -233,11 +233,9 @@ func (p *Protocol) GetStorageRanges(ctx context.Context, root common.Hash, accou
 	if err != nil {
 		return
 	}
-	slots = make([]*message.StorageData, 0)
+	slots = make([][]*message.StorageData, 0)
 	for _, storage := range storages {
-		for _, data := range storage.Data {
-			slots = append(slots, data)
-		}
+		slots = append(slots, storage.Data)
 	}
 	return
 }
@@ -735,8 +733,7 @@ func (req *getAccountRangeRequest) Encode() ([]byte, error) {
 	return protobuf.Marshal(msg)
 }
 
-// []*message.AccountData, []common.Hash
-func (req *getAccountRangeRequest) getAccountRangeFromResponse(resp sttypes.Response) ([]*message.AccountData, []common.Hash, error) {
+func (req *getAccountRangeRequest) getAccountRangeFromResponse(resp sttypes.Response) ([]*message.AccountData, [][]byte, error) {
 	sResp, ok := resp.(*syncResponse)
 	if !ok || sResp == nil {
 		return nil, nil, errors.New("not sync response")
@@ -744,7 +741,7 @@ func (req *getAccountRangeRequest) getAccountRangeFromResponse(resp sttypes.Resp
 	return req.parseGetAccountRangeResponse(sResp)
 }
 
-func (req *getAccountRangeRequest) parseGetAccountRangeResponse(resp *syncResponse) ([]*message.AccountData, []common.Hash, error) {
+func (req *getAccountRangeRequest) parseGetAccountRangeResponse(resp *syncResponse) ([]*message.AccountData, [][]byte, error) {
 	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
 		return nil, nil, errors.New(errResp.Error)
 	}
@@ -752,9 +749,9 @@ func (req *getAccountRangeRequest) parseGetAccountRangeResponse(resp *syncRespon
 	if grResp == nil {
 		return nil, nil, errors.New("response not GetAccountRange")
 	}
-	proofs := make([]common.Hash, 0)
+	proofs := make([][]byte, 0)
 	for _, proofBytes := range grResp.Proof {
-		var proof common.Hash
+		var proof []byte
 		if err := rlp.DecodeBytes(proofBytes, &proof); err != nil {
 			return nil, nil, errors.Wrap(err, "[GetAccountRangeResponse]")
 		}
@@ -817,7 +814,7 @@ func (req *getStorageRangesRequest) Encode() ([]byte, error) {
 }
 
 // []*message.AccountData, []common.Hash
-func (req *getStorageRangesRequest) getStorageRangesFromResponse(resp sttypes.Response) ([]*message.StoragesData, []common.Hash, error) {
+func (req *getStorageRangesRequest) getStorageRangesFromResponse(resp sttypes.Response) ([]*message.StoragesData, [][]byte, error) {
 	sResp, ok := resp.(*syncResponse)
 	if !ok || sResp == nil {
 		return nil, nil, errors.New("not sync response")
@@ -825,7 +822,7 @@ func (req *getStorageRangesRequest) getStorageRangesFromResponse(resp sttypes.Re
 	return req.parseGetStorageRangesResponse(sResp)
 }
 
-func (req *getStorageRangesRequest) parseGetStorageRangesResponse(resp *syncResponse) ([]*message.StoragesData, []common.Hash, error) {
+func (req *getStorageRangesRequest) parseGetStorageRangesResponse(resp *syncResponse) ([]*message.StoragesData, [][]byte, error) {
 	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
 		return nil, nil, errors.New(errResp.Error)
 	}
@@ -833,9 +830,9 @@ func (req *getStorageRangesRequest) parseGetStorageRangesResponse(resp *syncResp
 	if grResp == nil {
 		return nil, nil, errors.New("response not GetStorageRanges")
 	}
-	proofs := make([]common.Hash, 0)
+	proofs := make([][]byte, 0)
 	for _, proofBytes := range grResp.Proof {
-		var proof common.Hash
+		var proof []byte
 		if err := rlp.DecodeBytes(proofBytes, &proof); err != nil {
 			return nil, nil, errors.Wrap(err, "[GetStorageRangesResponse]")
 		}
