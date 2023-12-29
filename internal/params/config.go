@@ -75,7 +75,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
-		MaxRateEpoch:                          EpochTBD,
+		MaxRateEpoch:                          big.NewInt(1733), // 2023-12-17 12:20:15+00:00
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -119,7 +119,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(2176), // 2023-10-12 10:00:00+00:00
-		MaxRateEpoch:                          EpochTBD,
+		MaxRateEpoch:                          big.NewInt(2520), // 2023-12-16 12:17:14+00:00
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -623,6 +623,9 @@ func (c *ChainConfig) mustValid() {
 	// capabilities required to transfer balance across shards
 	require(c.HIP30Epoch.Cmp(c.CrossTxEpoch) > 0,
 		"must satisfy: HIP30Epoch > CrossTxEpoch")
+	// max rate (7%) fix is applied on or after hip30
+	require(c.MaxRateEpoch.Cmp(c.HIP30Epoch) >= 0,
+		"must satisfy: MaxRateEpoch >= HIP30Epoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
