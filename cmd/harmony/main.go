@@ -586,6 +586,7 @@ func setupLegacyNodeAccount(hc harmonyconfig.HarmonyConfig) error {
 	multiBLSPubKey := setupConsensusKeys(hc, nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
+	fmt.Println("len(reshardingEpoch) > 0", len(reshardingEpoch) > 0, reshardingEpoch)
 	if len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
@@ -624,6 +625,9 @@ func setupStakingNodeAccount(hc harmonyconfig.HarmonyConfig) error {
 	); err != nil {
 		return err
 	}
+
+	fmt.Println("pubKeys", shardID, len(pubKeys))
+
 	for _, blsKey := range pubKeys {
 		initialAccount := &genesis.DeployAccount{}
 		initialAccount.ShardID = shardID

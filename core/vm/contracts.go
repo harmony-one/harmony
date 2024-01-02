@@ -175,14 +175,14 @@ func (g groth16Verify) Run(input []byte) ([]byte, error) {
 	panic("implement me")
 }
 
-func Groth16Verify(vkBytes []byte, proofBytes []byte, inputsBytes []byte, curve ecc.ID) (bool, error) {
+func Groth16Verify(verifyingKey []byte, proofBytes []byte, inputsBytes []byte, curve ecc.ID) (bool, error) {
 
 	var vk gnark.VerifyingKey
 	var proof gnark.Proof
 
 	switch curve {
 	case ecc.BN254:
-		bn256vk, err := FromBytesToVerifyingKey(vkBytes)
+		bn256vk, err := FromBytesToVerifyingKey(verifyingKey)
 		if err != nil {
 			return false, err
 		}
@@ -223,9 +223,29 @@ func Groth16Verify(vkBytes []byte, proofBytes []byte, inputsBytes []byte, curve 
 	return true, nil
 }
 
-func FromBytesToVerifyingKey(vkBytes []byte) (gnark.VerifyingKey, error) {
-	var vk gnark.VerifyingKey
-	return vk, nil
+func FromBytesToProof(proofBytes []byte) (gnark.Proof, error) {
+	var bproof BellmanProofBn256
+	proofBytes, err := changeFlagsInProofToGnarkType(proofBytes)
+	if err != nil {
+		return nil, err
+	}
+	_, err = bproof.ReadFrom(bytes.NewReader(proofBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var b bytes.Buffer
+	_, err = bproof.WriteTo(&b)
+	if err != nil {
+		return nil, err
+	}
+
+	proof := gnark.NewProof(ecc.BN254)
+	_, err = proof.ReadFrom(bytes.NewReader(b.Bytes()))
+	if err != nil {
+		return nil, err
+	}
+	return proof, nil
 }
 
 func init() {
