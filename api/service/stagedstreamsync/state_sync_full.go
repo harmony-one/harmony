@@ -1388,14 +1388,18 @@ func (s *FullStateDownloadManager) HandleRequestError(accounts []*accountTask,
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	for _, task := range accounts {
-		s.requesting.deleteAccountTask(task.id)
-		s.retries.addAccountTask(task.id, task)
+	if accounts != nil && len(accounts) > 0 {
+		for _, task := range accounts {
+			s.requesting.deleteAccountTask(task.id)
+			s.retries.addAccountTask(task.id, task)
+		}
 	}
 
-	for _, code := range codes {
-		s.requesting.deleteCodeTask(code.id)
-		s.retries.addCodeTask(code.id, code)
+	if codes != nil && len(codes) > 0 {
+		for _, code := range codes {
+			s.requesting.deleteCodeTask(code.id)
+			s.retries.addCodeTask(code.id, code)
+		}
 	}
 
 	if storages != nil {
