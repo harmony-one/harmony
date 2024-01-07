@@ -860,11 +860,12 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Debug().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
 	}
+	verifyAllSig := true
 
 	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
 	// Verify block signatures
@@ -954,8 +955,8 @@ func (ss *StateSync) generateNewState(bc core.BlockChain) error {
 			break
 		}
 		// Enforce sig check for the last block in a batch
-		enforceSigCheck := !commonIter.HasNext()
-		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck)
+		_ = !commonIter.HasNext()
+		err = ss.UpdateBlockAndStatus(block, bc)
 		if err != nil {
 			break
 		}
@@ -972,7 +973,7 @@ func (ss *StateSync) generateNewState(bc core.BlockChain) error {
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, true)
+		err = ss.UpdateBlockAndStatus(block, bc)
 		if err != nil {
 			break
 		}
@@ -993,7 +994,7 @@ func (ss *StateSync) generateNewState(bc core.BlockChain) error {
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, false)
+		err = ss.UpdateBlockAndStatus(block, bc)
 		if err != nil {
 			break
 		}

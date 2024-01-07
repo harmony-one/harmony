@@ -81,7 +81,7 @@ type syncConfig struct {
 }
 
 type ISync interface {
-	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error
+	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain) error
 	AddLastMileBlock(block *types.Block)
 	GetActivePeerNumber() int
 	CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error
