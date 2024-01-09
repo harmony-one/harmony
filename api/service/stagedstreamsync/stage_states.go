@@ -165,6 +165,10 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			return ErrInvalidBlockNumber
 		}
 
+		if stg.configs.bc.HasBlock(block.Hash(), block.NumberU64()) {
+			continue
+		}
+
 		if err := verifyAndInsertBlock(stg.configs.bc, block); err != nil {
 			stg.configs.logger.Warn().Err(err).Uint64("cycle target block", targetHeight).
 				Uint64("block number", block.NumberU64()).

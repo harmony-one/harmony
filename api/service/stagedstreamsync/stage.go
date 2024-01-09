@@ -30,6 +30,25 @@ type StageHandler interface {
 	CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) error
 }
 
+type RangeExecution uint32
+
+const (
+	LongRangeAndShortRange RangeExecution = iota // Both short range and long range
+	OnlyShortRange                               // only short range
+	OnlyLongRange                                // only long range
+	//OnlyEpochSync                                // only epoch sync
+)
+
+type ChainExecution uint32
+
+const (
+	AllChains                 ChainExecution = iota // Can execute for any shard
+	AllChainsExceptEpochChain                       // Can execute for any shard except epoch chain
+	OnlyBeaconNode                                  // only for beacon node
+	OnlyEpochChain                                  // only for epoch chain
+	OnlyShardChain                                  // only for shard node (exclude beacon node and epoch chain)
+)
+
 // Stage is a single sync stage in staged sync.
 type Stage struct {
 	// ID of the sync stage. Should not be empty and should be unique. It is recommended to prefix it with reverse domain to avoid clashes (`com.example.my-stage`).
@@ -42,6 +61,10 @@ type Stage struct {
 	DisabledDescription string
 	// Disabled defines if the stage is disabled. It sets up when the stage is build by its `StageBuilder`.
 	Disabled bool
+	// Range defines whether stage has to be executed for either long range or short range
+	RangeMode RangeExecution
+	// ShardExecution defines this stage has to be executed for which shards
+	ChainExecutionMode ChainExecution
 }
 
 // StageState is the state of the stage.

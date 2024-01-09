@@ -285,4 +285,5 @@ func (d *Downloader) loop() {
 			return
 		}
 	}
+
 }
