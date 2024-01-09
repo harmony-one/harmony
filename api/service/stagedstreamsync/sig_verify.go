@@ -54,14 +54,7 @@ func verifyBlock(bc blockChain, block *types.Block, nextBlocks ...*types.Block) 
 	if err := bc.Engine().VerifyHeader(bc, block.Header(), true); err != nil {
 		return errors.Wrap(err, "[VerifyHeader]")
 	}
-	_, err = bc.InsertChain(types.Blocks{block}, false)
-	switch {
-	case errors.Is(err, core.ErrKnownBlock):
-		return nil
-	case err != nil:
-		return errors.Wrap(err, "[InsertChain]")
-	default:
-	}
+
 	return nil
 }
 
@@ -72,6 +65,9 @@ func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*type
 	}
 	// insert block
 	if _, err := bc.InsertChain(types.Blocks{block}, false); err != nil {
+		if errors.Is(err, core.ErrKnownBlock) {
+			return nil
+		}
 		return errors.Wrap(err, "[InsertChain]")
 	}
 	return nil

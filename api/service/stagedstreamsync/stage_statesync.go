@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,8 +59,14 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 	// for short range sync, skip this step
 	if !s.state.initSync {
 		return nil
-	} // only execute this stage in fast/snap sync mode and once we reach to pivot
+	}
 
+	// shouldn't execute for epoch chain
+	if sss.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+		return nil
+	}
+
+	// only execute this stage in fast/snap sync mode and once we reach to pivot
 	if s.state.status.pivotBlock == nil ||
 		s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64() ||
 		s.state.status.statesSynced {
