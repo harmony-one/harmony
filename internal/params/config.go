@@ -76,6 +76,7 @@ var (
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		MaxRateEpoch:                          EpochTBD,
+		DevnetExternalEpoch:                   EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -120,6 +121,7 @@ var (
 		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 		MaxRateEpoch:                          EpochTBD,
+		DevnetExternalEpoch:                   EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -164,6 +166,7 @@ var (
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
 		MaxRateEpoch:                          EpochTBD,
+		DevnetExternalEpoch:                   EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -209,6 +212,7 @@ var (
 		HIP30Epoch:                            big.NewInt(7),
 		BlockGas30MEpoch:                      big.NewInt(7),
 		MaxRateEpoch:                          EpochTBD,
+		DevnetExternalEpoch:                   EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -254,6 +258,7 @@ var (
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
 		MaxRateEpoch:                          EpochTBD,
+		DevnetExternalEpoch:                   EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -298,6 +303,7 @@ var (
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
 		MaxRateEpoch:                          EpochTBD,
+		DevnetExternalEpoch:                   EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -344,6 +350,7 @@ var (
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // MaxRateEpoch
+		big.NewInt(0),
 	}
 
 	// TestChainConfig ...
@@ -390,6 +397,7 @@ var (
 		big.NewInt(0),        // HIP30Epoch
 		big.NewInt(0),        // BlockGas30M
 		big.NewInt(0),        // MaxRateEpoch
+		big.NewInt(0),
 	}
 
 	// TestRules ...
@@ -553,6 +561,8 @@ type ChainConfig struct {
 	// 3. Change from 250 to 200 nodes for remaining shards (mainnet and localnet)
 	// 4. Change the minimum validator commission from 5 to 7% (all nets)
 	HIP30Epoch *big.Int `json:"hip30-epoch,omitempty"`
+
+	DevnetExternalEpoch *big.Int `json:"devnet-external-epoch,omitempty"`
 
 	BlockGas30MEpoch *big.Int `json:"block-gas-30m-epoch,omitempty"`
 
@@ -812,6 +822,10 @@ func (c *ChainConfig) IsValidatorCodeFix(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsHIP30(epoch *big.Int) bool {
 	return isForked(c.HIP30Epoch, epoch)
+}
+
+func (c *ChainConfig) IsDevnetExternalEpoch(epoch *big.Int) bool {
+	return isForked(c.DevnetExternalEpoch, epoch)
 }
 
 func (c *ChainConfig) IsMaxRate(epoch *big.Int) bool {
