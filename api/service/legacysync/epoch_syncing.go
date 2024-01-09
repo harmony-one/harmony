@@ -138,6 +138,9 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 
 		err := ProcessStateSync(syncConfig, heights, bc)
 		if err != nil {
+			if errors.Is(err, core.ErrKnownBlock) {
+				return 10
+			}
 			utils.Logger().Error().Err(err).
 				Msgf("[EPOCHSYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d)",
 					isBeacon, bc.ShardID(), otherEpoch, curEpoch)
