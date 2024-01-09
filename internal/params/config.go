@@ -633,6 +633,9 @@ func (c *ChainConfig) mustValid() {
 	// capabilities required to transfer balance across shards
 	require(c.HIP30Epoch.Cmp(c.CrossTxEpoch) > 0,
 		"must satisfy: HIP30Epoch > CrossTxEpoch")
+	// max rate (7%) fix is applied on or after hip30
+	require(c.MaxRateEpoch.Cmp(c.HIP30Epoch) >= 0,
+		"must satisfy: MaxRateEpoch >= HIP30Epoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.

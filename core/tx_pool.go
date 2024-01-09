@@ -850,15 +850,11 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		}
 		currentBlockNumber := pool.chain.CurrentBlock().Number()
 		pendingBlockNumber := new(big.Int).Add(currentBlockNumber, big.NewInt(1))
-		pendingEpoch := pool.chain.CurrentBlock().Epoch()
-		if shard.Schedule.IsLastBlock(currentBlockNumber.Uint64()) {
-			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
-		}
 		chainContext, ok := pool.chain.(ChainContext)
 		if !ok {
 			chainContext = nil // might use testing blockchain, set to nil for verifier to handle.
 		}
-		_, err = VerifyAndCreateValidatorFromMsg(pool.currentState, chainContext, pendingEpoch, pendingBlockNumber, stkMsg)
+		_, err = VerifyAndCreateValidatorFromMsg(pool.currentState, chainContext, pool.pendingEpoch(), pendingBlockNumber, stkMsg)
 		return err
 	case staking.DirectiveEditValidator:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveEditValidator)
@@ -932,7 +928,6 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.DelegatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
-
 		_, err = VerifyAndUndelegateFromMsg(pool.currentState, pool.pendingEpoch(), stkMsg)
 		return err
 	case staking.DirectiveCollectRewards:
@@ -964,11 +959,12 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 	}
 }
 
+// pendingEpoch refers to the epoch of the pending block
 func (pool *TxPool) pendingEpoch() *big.Int {
 	currentBlock := pool.chain.CurrentBlock()
 	pendingEpoch := currentBlock.Epoch()
 	if shard.Schedule.IsLastBlock(currentBlock.Number().Uint64()) {
-		pendingEpoch.Add(pendingEpoch, big.NewInt(1))
+		pendingEpoch = new(big.Int).Add(pendingEpoch, common.Big1)
 	}
 	return pendingEpoch
 }

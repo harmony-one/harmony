@@ -178,15 +178,21 @@ func (d *Delegation) DeleteEntry(epoch *big.Int) {
 // RemoveUnlockedUndelegations removes all fully unlocked
 // undelegations and returns the total sum
 func (d *Delegation) RemoveUnlockedUndelegations(
-	curEpoch, lastEpochInCommittee *big.Int, lockPeriod int, noEarlyUnlock bool,
+	curEpoch, lastEpochInCommittee *big.Int, lockPeriod int, noEarlyUnlock bool, isMaxRate bool,
 ) *big.Int {
 	totalWithdraw := big.NewInt(0)
 	count := 0
 	for j := range d.Undelegations {
-		if big.NewInt(0).Sub(curEpoch, d.Undelegations[j].Epoch).Int64() >= int64(lockPeriod) ||
-			(!noEarlyUnlock && big.NewInt(0).Sub(curEpoch, lastEpochInCommittee).Int64() >= int64(lockPeriod)) {
-			// need to wait at least 7 epochs to withdraw; or the validator has been out of committee for 7 epochs
-			totalWithdraw.Add(totalWithdraw, d.Undelegations[j].Amount)
+		epochsSinceUndelegation := big.NewInt(0).Sub(curEpoch, d.Undelegations[j].Epoch).Int64()
+		// >=7 epochs have passed since undelegation, or
+		lockPeriodApplies := epochsSinceUndelegation >= int64(lockPeriod)
+		// >=7 epochs have passed since unelection during the noEarlyUnlock configuration
+		earlyUnlockPeriodApplies := big.NewInt(0).Sub(curEpoch, lastEpochInCommittee).Int64() >= int64(lockPeriod) && !noEarlyUnlock
+		maxRateApplies := isMaxRate && epochsSinceUndelegation > int64(lockPeriod)
+		if lockPeriodApplies || earlyUnlockPeriodApplies {
+			if !maxRateApplies {
+				totalWithdraw.Add(totalWithdraw, d.Undelegations[j].Amount)
+			}
 			count++
 		} else {
 			break

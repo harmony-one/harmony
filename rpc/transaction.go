@@ -236,7 +236,13 @@ func (s *PublicTransactionService) newRPCTransaction(tx *types.Transaction, bloc
 		}
 		return NewStructuredResponse(tx)
 	case Eth:
-		tx, err := eth.NewTransactionFromTransaction(tx, blockHash, blockNumber, timestamp, index)
+		// calculate SenderAddress before ConvertToEth
+		senderAddr, err := tx.SenderAddress()
+		if err != nil {
+			DoMetricRPCQueryInfo(GetTransactionByHash, FailedNumber)
+			return nil, err
+		}
+		tx, err := eth.NewTransaction(senderAddr, tx.ConvertToEth(), blockHash, blockNumber, timestamp, index)
 		if err != nil {
 			DoMetricRPCQueryInfo(GetTransactionByHash, FailedNumber)
 			return nil, err
@@ -751,11 +757,24 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 			return nil, err
 		}
 		return NewStructuredResponse(RPCReceipt)
-	case V2, Eth:
+	case V2:
 		if tx == nil {
 			RPCReceipt, err = v2.NewReceipt(stx, blockHash, blockNumber, index, receipt)
 		} else {
 			RPCReceipt, err = v2.NewReceipt(tx, blockHash, blockNumber, index, receipt)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(RPCReceipt)
+	case Eth:
+		if tx != nil {
+			// calculate SenderAddress before ConvertToEth
+			senderAddr, err := tx.SenderAddress()
+			if err != nil {
+				return nil, err
+			}
+			RPCReceipt, err = eth.NewReceipt(senderAddr, tx.ConvertToEth(), blockHash, blockNumber, index, receipt)
 		}
 		if err != nil {
 			return nil, err
