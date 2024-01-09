@@ -90,6 +90,7 @@ func CreateStagedSync(ctx context.Context,
 	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, extractReceiptHashes, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
 	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
+	stageFullStateSyncCfg := NewStageFullStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)
 	stageFinishCfg := NewStageFinishCfg(mainDB)
@@ -103,6 +104,7 @@ func CreateStagedSync(ctx context.Context,
 		stageShortRangeCfg,
 		stageBodiesCfg,
 		stageStateSyncCfg,
+		stageFullStateSyncCfg,
 		stageStatesCfg,
 		stageReceiptsCfg,
 		lastMileCfg,

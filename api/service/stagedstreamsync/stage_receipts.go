@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 )
@@ -53,6 +54,11 @@ func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 
 	// only execute this stage in fast/snap sync mode
 	if s.state.status.cycleSyncMode == FullSync {
+		return nil
+	}
+
+	// shouldn't execute for epoch chain
+	if r.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
 		return nil
 	}
 

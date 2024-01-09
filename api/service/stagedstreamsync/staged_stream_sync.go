@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	syncproto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -405,6 +406,11 @@ func (s *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firs
 			continue
 		}
 
+		// TODO: enable this part after make sure all works well
+		// if !s.canExecute(stage) {
+		// 	continue
+		// }
+
 		if err := s.runStage(ctx, stage, db, tx, firstCycle, s.invalidBlock.Active); err != nil {
 			utils.Logger().Error().
 				Err(err).
@@ -429,6 +435,55 @@ func (s *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firs
 	}
 	s.currentStage = 0
 	return nil
+}
+
+func (s *StagedStreamSync) canExecute(stage *Stage) bool {
+	// check range mode
+	if stage.RangeMode != LongRangeAndShortRange {
+		isLongRange := s.initSync
+		switch stage.RangeMode {
+		case OnlyLongRange:
+			if !isLongRange {
+				return false
+			}
+		case OnlyShortRange:
+			if isLongRange {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	// check chain execution
+	if stage.ChainExecutionMode != AllChains {
+		shardID := s.bc.ShardID()
+		isBeaconNode := s.isBeaconNode
+		isShardChain := shardID != shard.BeaconChainShardID
+		isEpochChain := shardID == shard.BeaconChainShardID && !isBeaconNode
+		switch stage.ChainExecutionMode {
+		case AllChainsExceptEpochChain:
+			if isEpochChain {
+				return false
+			}
+		case OnlyBeaconNode:
+			if !isBeaconNode {
+				return false
+			}
+		case OnlyShardChain:
+			if !isShardChain {
+				return false
+			}
+		case OnlyEpochChain:
+			if !isEpochChain {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	return true
 }
 
 // CreateView creates a view for a given db

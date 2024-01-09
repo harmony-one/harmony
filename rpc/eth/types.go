@@ -74,19 +74,9 @@ type Transaction struct {
 // representation, with the given location metadata set (if available).
 // Note that all txs on Harmony are replay protected (post EIP155 epoch).
 func NewTransaction(
-	tx *types.EthTransaction, blockHash common.Hash,
+	from common.Address, tx *types.EthTransaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
 ) (*Transaction, error) {
-	from := common.Address{}
-	var err error
-	if tx.IsEthCompatible() {
-		from, err = tx.SenderAddress()
-	} else {
-		from, err = tx.ConvertToHmy().SenderAddress()
-	}
-	if err != nil {
-		return nil, err
-	}
 	v, r, s := tx.RawSignatureValues()
 
 	result := &Transaction{
@@ -143,14 +133,9 @@ func NewTransactionFromTransaction(
 }
 
 // NewReceipt returns the RPC data for a new receipt
-func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
-	senderAddr, err := tx.SenderAddress()
-	if err != nil {
-		return nil, err
-	}
-
+func NewReceipt(senderAddr common.Address, tx *types.EthTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
 	ethTxHash := tx.Hash()
-	for i, _ := range receipt.Logs {
+	for i := range receipt.Logs {
 		// Override log txHash with receipt's
 		receipt.Logs[i].TxHash = ethTxHash
 	}
@@ -240,7 +225,11 @@ func blockWithFullTxFromBlock(b *types.Block) (*BlockWithFullTx, error) {
 	}
 
 	for idx, tx := range b.Transactions() {
-		fmtTx, err := NewTransaction(tx.ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), uint64(idx))
+		from, err := tx.SenderAddress()
+		if err != nil {
+			return nil, err
+		}
+		fmtTx, err := NewTransaction(from, tx.ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), uint64(idx))
 		if err != nil {
 			return nil, err
 		}
@@ -257,5 +246,10 @@ func NewTransactionFromBlockIndex(b *types.Block, index uint64) (*Transaction, e
 			"tx index %v greater than or equal to number of transactions on block %v", index, b.Hash().String(),
 		)
 	}
-	return NewTransaction(txs[index].ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
+	tx := txs[index].ConvertToEth()
+	from, err := tx.SenderAddress()
+	if err != nil {
+		return nil, err
+	}
+	return NewTransaction(from, tx, b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
 }
