@@ -139,7 +139,7 @@ func main() {
 	fmt.Printf("Time required to calc percentage %d delegations: %f seconds\n", len(validator.Delegations), endTime.Sub(startTime).Seconds())
 
 	startTime = time.Now()
-	statedb.AddReward(validator, big.NewInt(1000), shares)
+	statedb.AddReward(validator, big.NewInt(1000), shares, false)
 	endTime = time.Now()
 	fmt.Printf("Time required to reward a validator with %d delegations: %f seconds\n", len(validator.Delegations), endTime.Sub(startTime).Seconds())
 
