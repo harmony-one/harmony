@@ -1035,7 +1035,7 @@ func (ss *StagedSync) getBlockFromLastMileBlocksByParentHash(parentHash common.H
 }
 
 // UpdateBlockAndStatus updates block and its status in db
-func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
+func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Debug().
 			Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).
@@ -1043,6 +1043,7 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 			Msg("[STAGED_SYNC] Inappropriate block number, ignore!")
 		return nil
 	}
+	verifyAllSig := true
 
 	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
 	// Verify block signatures
