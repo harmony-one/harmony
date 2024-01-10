@@ -209,7 +209,7 @@ require (
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d // indirect
-	github.com/onsi/ginkgo/v2 v2.9.2 // indirect
+	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
@@ -225,9 +225,8 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/quic-go/qtls-go1-19 v0.3.3 // indirect
-	github.com/quic-go/qtls-go1-20 v0.2.3 // indirect
-	github.com/quic-go/quic-go v0.33.1 // indirect
+	github.com/quic-go/qtls-go1-20 v0.3.1 // indirect
+	github.com/quic-go/quic-go v0.37.7 // indirect
 	github.com/quic-go/webtransport-go v0.5.2 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
