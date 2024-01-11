@@ -99,7 +99,7 @@ var partnerV0 = MustNewInstance(
 	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
 )
 var partnerV1 = MustNewInstance(
-	2, 5, 4, 0,
+	2, 15, 4, 0,
 	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
 	genesis.TNFoundationalAccounts, emptyAllowlist, nil,
 	numeric.ZeroDec(), ethCommon.Address{},
