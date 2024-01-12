@@ -115,6 +115,13 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 				Msg("Failed to deserialize transaction list")
 			return
 		}
+		// log the transactions
+		for _, tx := range txs {
+			utils.Logger().Info().
+				Str("tx_hash", tx.Hash().Hex()).
+				Msg("Received a new transaction, adding to pending transactions")
+		}
+		// add txs to pending list
 		addPendingTransactions(node.registry, txs)
 	}
 }
@@ -132,6 +139,13 @@ func (node *Node) stakingMessageHandler(msgPayload []byte) {
 				Msg("Failed to deserialize staking transaction list")
 			return
 		}
+		// log the transactions
+		for _, tx := range txs {
+			utils.Logger().Info().
+				Str("tx_hash", tx.Hash().Hex()).
+				Msg("Received a new staking transaction, adding to pending staking transactions")
+		}
+		// add txs to pending list
 		node.addPendingStakingTransactions(txs)
 	}
 }

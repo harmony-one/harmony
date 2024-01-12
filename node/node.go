@@ -221,12 +221,12 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 
 	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(tx.ShardID()))
-	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
+	utils.Logger().Info().Str("tx_hash", tx.Hash().Hex()).Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
 		err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID}, p2p.ConstructMessage(msg))
 		if err != nil {
-			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
+			utils.Logger().Error().Str("tx_hash", tx.Hash().Hex()).Int("attempt", attempt).Msg("Error when trying to broadcast tx")
 		} else {
 			break
 		}
@@ -239,12 +239,12 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 	shardGroupID := nodeconfig.NewGroupIDByShardID(
 		nodeconfig.ShardID(shard.BeaconChainShardID),
 	) // broadcast to beacon chain
-	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcastStaking")
+	utils.Logger().Info().Str("tx_hash", stakingTx.Hash().Hex()).Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcastStaking")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
 		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
 			p2p.ConstructMessage(msg)); err != nil {
-			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
+			utils.Logger().Error().Str("tx_hash", stakingTx.Hash().Hex()).Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
 		} else {
 			break
 		}
