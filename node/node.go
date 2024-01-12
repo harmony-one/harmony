@@ -286,6 +286,9 @@ func addPendingTransactions(registry *registry.Registry, newTxs types.Transactio
 				continue
 			}
 		}
+		utils.Logger().Debug().
+			Str("tx_hash", tx.Hash().Hex()).
+			Msg("[addPendingTransactions] tx is added to the txs pool array")
 		poolTxs = append(poolTxs, tx)
 	}
 	errs = append(errs, registry.GetTxPool().AddRemotes(poolTxs)...)
@@ -305,6 +308,9 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 		if node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
 			poolTxs := types.PoolTransactions{}
 			for _, tx := range newStakingTxs {
+				utils.Logger().Debug().
+					Str("tx_hash", tx.Hash().Hex()).
+					Msg("[addPendingStakingTransactions] tx is added to the txs pool array")
 				poolTxs = append(poolTxs, tx)
 			}
 			errs := node.TxPool.AddRemotes(poolTxs)

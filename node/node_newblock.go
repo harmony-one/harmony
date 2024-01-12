@@ -175,14 +175,17 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 			plainTxsPerAcc := types.Transactions{}
 			for _, tx := range poolTxs {
 				if plainTx, ok := tx.(*types.Transaction); ok {
+					utils.Logger().Info().Str("tx_hash", tx.Hash().Hex()).Msg("add transaction to proposing block")
 					plainTxsPerAcc = append(plainTxsPerAcc, plainTx)
 				} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
 					// Only process staking transactions after pre-staking epoch happened.
 					if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
+						utils.Logger().Info().Str("tx_hash", tx.Hash().Hex()).Msg("add staking transaction to proposing block")
 						pendingStakingTxs = append(pendingStakingTxs, stakingTx)
 					}
 				} else {
 					utils.Logger().Err(types.ErrUnknownPoolTxType).
+						Str("tx_hash", tx.Hash().Hex()).
 						Msg("Failed to parse pending transactions")
 					return nil, types.ErrUnknownPoolTxType
 				}
