@@ -267,22 +267,34 @@ func addPendingTransactions(registry *registry.Registry, newTxs types.Transactio
 		if tx.ShardID() != tx.ToShardID() {
 			if !acceptCx {
 				errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
+				utils.Logger().Debug().Err(errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet")).
+					Str("tx_hash", tx.Hash().Hex()).
+					Msg("[addPendingTransactions] tx is not added to pending pool")
 				continue
 			}
 			if isBeforeHIP30 {
 				if tx.ToShardID() >= nxtShards {
 					errs = append(errs, errors.New("shards 2 and 3 are shutting down in the next epoch"))
+					utils.Logger().Debug().Err(errors.WithMessage(errInvalidEpoch, "shards 2 and 3 are shutting down in the next epoch")).
+						Str("tx_hash", tx.Hash().Hex()).
+						Msg("[addPendingTransactions] tx is not added to pending pool")
 					continue
 				}
 			}
 		}
 		if tx.IsEthCompatible() && !bc.Config().IsEthCompatible(bc.CurrentBlock().Epoch()) {
 			errs = append(errs, errors.WithMessage(errInvalidEpoch, "ethereum tx not accepted yet"))
+			utils.Logger().Debug().Err(errors.WithMessage(errInvalidEpoch, "ethereum tx not accepted yet")).
+				Str("tx_hash", tx.Hash().Hex()).
+				Msg("[addPendingTransactions] tx is not added to pending pool")
 			continue
 		}
 		if isBeforeHIP30 {
 			if bc.ShardID() >= nxtShards {
 				errs = append(errs, errors.New("shards 2 and 3 are shutting down in the next epoch"))
+				utils.Logger().Debug().Err(errors.WithMessage(errInvalidEpoch, "shards 2 and 3 are shutting down in the next epoch")).
+					Str("tx_hash", tx.Hash().Hex()).
+					Msg("[addPendingTransactions] tx is not added to pending pool")
 				continue
 			}
 		}
@@ -314,6 +326,13 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 				poolTxs = append(poolTxs, tx)
 			}
 			errs := node.TxPool.AddRemotes(poolTxs)
+			if len(errs) > 0 {
+				for _, err := range errs {
+					utils.Logger().Debug().
+						Err(err).
+						Msg("[addPendingStakingTransactions] AddRemotes failed")
+				}
+			}
 			pendingCount, queueCount := node.TxPool.Stats()
 			utils.Logger().Info().
 				Int("length of newStakingTxs", len(poolTxs)).
@@ -366,7 +385,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 		var err error
 		for i := range errs {
 			if errs[i] != nil {
-				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingTransaction] Failed adding new transaction")
+				// utils.Logger().Info().Err(errs[i]).Msg("[AddPendingTransaction] Failed adding new transaction")
 				err = errs[i]
 				break
 			}
