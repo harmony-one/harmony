@@ -91,7 +91,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	case t == msg_pb.MessageType_VIEWCHANGE:
 		fbftMsg, err = ParseViewChangeMessage(msg)
 	case t == msg_pb.MessageType_NEWVIEW:
-		members := consensus.Decider.Participants()
+		members := consensus.decider.Participants()
 		fbftMsg, err = ParseNewViewMessage(msg, members)
 	default:
 		fbftMsg, err = consensus.parseFBFTMessage(msg)
@@ -138,7 +138,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 }
 
 func (consensus *Consensus) finalCommit() {
-	numCommits := consensus.Decider.SignersCount(quorum.Commit)
+	numCommits := consensus.decider.SignersCount(quorum.Commit)
 
 	consensus.getLogger().Info().
 		Int64("NumCommits", numCommits).
@@ -441,7 +441,7 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 			Int("numTxs", len(newBlock.Transactions())).
 			Int("numStakingTxs", len(newBlock.StakingTransactions())).
 			Time("startTime", startTime).
-			Int64("publicKeys", consensus.Decider.ParticipantsCount()).
+			Int64("publicKeys", consensus.decider.ParticipantsCount()).
 			Msg("[ConsensusMainLoop] STARTING CONSENSUS")
 		consensus.announce(newBlock)
 	})
@@ -741,16 +741,16 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
 
 	for i := 0; i < len(committee.Slots); i++ {
 		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
-			wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, offset)
+			wasFound, next = consensus.decider.NthNextValidator(committee.Slots, leader, offset)
 		} else {
-			wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
+			wasFound, next = consensus.decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
 		}
 		if !wasFound {
 			utils.Logger().Error().Msg("Failed to get next leader")
 			// Seems like nothing we can do here.
 			return nil
 		}
-		members := consensus.Decider.Participants()
+		members := consensus.decider.Participants()
 		mask := bls.NewMask(members)
 		skipped := 0
 		for i := 0; i < blocksCountAliveness; i++ {

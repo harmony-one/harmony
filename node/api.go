@@ -177,7 +177,7 @@ func (node *Node) GetConfig() rpc_common.Config {
 
 // GetLastSigningPower get last signed power
 func (node *Node) GetLastSigningPower() (float64, error) {
-	power, err := node.Consensus.Decider.CurrentTotalPower(quorum.Commit)
+	power, err := node.Consensus.Decider().CurrentTotalPower(quorum.Commit)
 	if err != nil {
 		return 0, err
 	}

@@ -53,7 +53,7 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			return err
 		}
 
-		if !node.Consensus.Decider.IsQuorumAchievedByMask(mask) {
+		if !node.Consensus.Decider().IsQuorumAchievedByMask(mask) {
 			utils.Logger().Error().Msg("[Explorer] not have enough signature power")
 			return nil
 		}

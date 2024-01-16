@@ -46,7 +46,7 @@ type DownloadAsync interface {
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	Decider quorum.Decider
+	decider quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	fBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -200,7 +200,9 @@ func (consensus *Consensus) BlocksNotSynchronized(reason string) {
 
 // VdfSeedSize returns the number of VRFs for VDF computation
 func (consensus *Consensus) VdfSeedSize() int {
-	return int(consensus.Decider.ParticipantsCount()) * 2 / 3
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return int(consensus.decider.ParticipantsCount()) * 2 / 3
 }
 
 // GetPublicKeys returns the public keys
@@ -275,7 +277,7 @@ func New(
 		fBFTLog:      NewFBFTLog(),
 		phase:        FBFTAnnounce,
 		current:      State{mode: Normal},
-		Decider:      Decider,
+		decider:      Decider,
 		registry:     registry,
 		MinPeers:     minPeers,
 		AggregateSig: aggregateSig,
@@ -320,6 +322,10 @@ func (consensus *Consensus) GetHost() p2p.Host {
 
 func (consensus *Consensus) Registry() *registry.Registry {
 	return consensus.registry
+}
+
+func (consensus *Consensus) Decider() quorum.Decider {
+	return quorum.NewThreadSafeDecider(consensus.decider, consensus.mutex)
 }
 
 // InitConsensusWithValidators initialize shard state
