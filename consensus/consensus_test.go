@@ -18,7 +18,7 @@ import (
 )
 
 func TestConsensusInitialization(t *testing.T) {
-	host, multiBLSPrivateKey, consensus, decider, err := GenerateConsensusForTesting()
+	host, multiBLSPrivateKey, consensus, _, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)
 
 	messageSender := &MessageSender{host: host, retryTimes: int(phaseDuration.Seconds()) / RetryIntervalInSec}
@@ -30,7 +30,6 @@ func TestConsensusInitialization(t *testing.T) {
 	expectedTimeouts[timeoutViewChange] = viewChangeDuration
 	expectedTimeouts[timeoutBootstrap] = bootstrapDuration
 
-	assert.Equal(t, decider, consensus.Decider)
 	assert.Equal(t, host, consensus.host)
 	assert.Equal(t, messageSender, consensus.msgSender)
 

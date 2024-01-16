@@ -94,7 +94,7 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 	_, _, consensus, _, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)
 
-	assert.Equal(t, int64(0), consensus.Decider.ParticipantsCount())
+	assert.Equal(t, int64(0), consensus.Decider().ParticipantsCount())
 
 	blsKeys := []*bls_core.PublicKey{}
 	wrappedBLSKeys := []bls.PublicKeyWrapper{}
@@ -111,8 +111,8 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 		wrappedBLSKeys = append(wrappedBLSKeys, wrapped)
 	}
 
-	consensus.Decider.UpdateParticipants(wrappedBLSKeys, []bls.PublicKeyWrapper{})
-	assert.Equal(t, keyCount, consensus.Decider.ParticipantsCount())
+	consensus.Decider().UpdateParticipants(wrappedBLSKeys, []bls.PublicKeyWrapper{})
+	assert.Equal(t, keyCount, consensus.Decider().ParticipantsCount())
 
 	consensus.LeaderPubKey = &wrappedBLSKeys[0]
 	nextKey := consensus.getNextLeaderKey(uint64(1), nil)
