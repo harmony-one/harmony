@@ -189,20 +189,6 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	return (*currentTotalPower).GT(threshold)
 }
 
-func (v *stakedVoteWeight) currentTotalPower(p Phase) (*numeric.Dec, error) {
-	switch p {
-	case Prepare:
-		return &v.VoteTally().Prepare.tally, nil
-	case Commit:
-		return &v.VoteTally().Commit.tally, nil
-	case ViewChange:
-		return &v.VoteTally().ViewChange.tally, nil
-	default:
-		// Should not happen
-		return nil, errors.New("wrong phase is provided")
-	}
-}
-
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	currentTotal := numeric.ZeroDec()
