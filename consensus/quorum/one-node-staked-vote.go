@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"math/big"
+	"sync"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -47,11 +48,36 @@ type stakedVoteWeight struct {
 	roster    votepower.Roster
 	voteTally VoteTally
 	lastPower map[Phase]numeric.Dec
+	mux       sync.RWMutex
 }
 
 // Policy ..
 func (v *stakedVoteWeight) Policy() Policy {
 	return SuperMajorityStake
+}
+
+// Roster ..
+func (v *stakedVoteWeight) Roster() votepower.Roster {
+	v.mux.RLock()
+	defer v.mux.RUnlock()
+
+	return v.roster
+}
+
+// SetRoster ..
+func (v *stakedVoteWeight) SetRoster(r votepower.Roster) {
+	v.mux.Lock()
+	defer v.mux.Unlock()
+
+	v.roster = r
+}
+
+// VoteTally ..
+func (v *stakedVoteWeight) VoteTally() VoteTally {
+	v.mux.RLock()
+	defer v.mux.RUnlock()
+
+	return v.voteTally
 }
 
 // AddNewVote ..
@@ -63,7 +89,7 @@ func (v *stakedVoteWeight) AddNewVote(
 	pubKeysBytes := make([]bls.SerializedPublicKey, len(pubKeys))
 	signerAddr := common.Address{}
 	for i, pubKey := range pubKeys {
-		voter, ok := v.roster.Voters[pubKey.Bytes]
+		voter, ok := v.Roster().Voters[pubKey.Bytes]
 		if !ok {
 			return nil, errors.Errorf("Signer not in committee: %x", pubKey.Bytes)
 		}
@@ -90,7 +116,7 @@ func (v *stakedVoteWeight) AddNewVote(
 	additionalVotePower := numeric.NewDec(0)
 
 	for _, pubKeyBytes := range pubKeysBytes {
-		votingPower := v.roster.Voters[pubKeyBytes].OverallPercent
+		votingPower := v.Roster().Voters[pubKeyBytes].OverallPercent
 		utils.Logger().Debug().
 			Str("signer", pubKeyBytes.Hex()).
 			Str("votingPower", votingPower.String()).
@@ -101,11 +127,11 @@ func (v *stakedVoteWeight) AddNewVote(
 	var tallyQuorum *tallyAndQuorum
 	switch p {
 	case Prepare:
-		tallyQuorum = v.voteTally.Prepare
+		tallyQuorum = v.VoteTally().Prepare
 	case Commit:
-		tallyQuorum = v.voteTally.Commit
+		tallyQuorum = v.VoteTally().Commit
 	case ViewChange:
-		tallyQuorum = v.voteTally.ViewChange
+		tallyQuorum = v.VoteTally().ViewChange
 	default:
 		// Should not happen
 		return nil, errors.New("stakedVoteWeight not cache this phase")
@@ -136,11 +162,11 @@ func (v *stakedVoteWeight) AddNewVote(
 func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 	switch p {
 	case Prepare:
-		return v.voteTally.Prepare.quorumAchieved
+		return v.VoteTally().Prepare.quorumAchieved
 	case Commit:
-		return v.voteTally.Commit.quorumAchieved
+		return v.VoteTally().Commit.quorumAchieved
 	case ViewChange:
-		return v.voteTally.ViewChange.quorumAchieved
+		return v.VoteTally().ViewChange.quorumAchieved
 	default:
 		// Should not happen
 		return false
@@ -163,13 +189,27 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	return (*currentTotalPower).GT(threshold)
 }
 
+func (v *stakedVoteWeight) currentTotalPower(p Phase) (*numeric.Dec, error) {
+	switch p {
+	case Prepare:
+		return &v.VoteTally().Prepare.tally, nil
+	case Commit:
+		return &v.VoteTally().Commit.tally, nil
+	case ViewChange:
+		return &v.VoteTally().ViewChange.tally, nil
+	default:
+		// Should not happen
+		return nil, errors.New("wrong phase is provided")
+	}
+}
+
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	currentTotal := numeric.ZeroDec()
 
 	for key, i := range mask.PublicsIndex {
 		if enabled, err := mask.IndexEnabled(i); err == nil && enabled {
-			if voter, ok := v.roster.Voters[key]; ok {
+			if voter, ok := v.Roster().Voters[key]; ok {
 				currentTotal = currentTotal.Add(
 					voter.OverallPercent,
 				)
@@ -186,7 +226,7 @@ func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 
 // IsAllSigsCollected ..
 func (v *stakedVoteWeight) IsAllSigsCollected() bool {
-	return v.voteTally.Commit.tally.Equal(numeric.NewDec(1))
+	return v.VoteTally().Commit.tally.Equal(numeric.NewDec(1))
 }
 
 func (v *stakedVoteWeight) SetVoters(
@@ -200,7 +240,7 @@ func (v *stakedVoteWeight) SetVoters(
 		return nil, err
 	}
 	// Hold onto this calculation
-	v.roster = *roster
+	v.SetRoster(*roster)
 
 	utils.Logger().Debug().
 		Uint64("curEpoch", epoch.Uint64()).
@@ -214,13 +254,15 @@ func (v *stakedVoteWeight) SetVoters(
 }
 
 func (v *stakedVoteWeight) String() string {
+	v.mux.RLock()
+	defer v.mux.RUnlock()
 	s, _ := json.Marshal(v)
 	return string(s)
 }
 
 // HACK later remove - unify votepower in UI (aka MarshalJSON)
 func (v *stakedVoteWeight) SetRawStake(key bls.SerializedPublicKey, d numeric.Dec) {
-	if voter, ok := v.roster.Voters[key]; ok {
+	if voter, ok := v.Roster().Voters[key]; ok {
 		voter.RawStake = d
 	}
 }
@@ -228,7 +270,7 @@ func (v *stakedVoteWeight) SetRawStake(key bls.SerializedPublicKey, d numeric.De
 // TODO remove this large method, use roster's own Marshal, mix it
 // specific logic here
 func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
-	voterCount := len(v.roster.Voters)
+	voterCount := len(v.Roster().Voters)
 	type u struct {
 		IsHarmony      bool   `json:"is-harmony-slot"`
 		EarningAccount string `json:"earning-account"`
@@ -254,9 +296,9 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	i, externalCount := 0, 0
 
 	totalRaw := numeric.ZeroDec()
-	for _, slot := range v.roster.OrderedSlots {
+	for _, slot := range v.Roster().OrderedSlots {
 		identity := slot
-		voter := v.roster.Voters[slot]
+		voter := v.Roster().Voters[slot]
 		member := u{
 			voter.IsHarmonyNode,
 			common2.MustAddressToBech32(voter.EarningAccount),
@@ -297,6 +339,9 @@ func newVoteTally() VoteTally {
 }
 
 func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
+	v.mux.Lock()
+	defer v.mux.Unlock()
+
 	v.lastPower[Prepare] = v.voteTally.Prepare.tally
 	v.lastPower[Commit] = v.voteTally.Commit.tally
 
@@ -306,6 +351,9 @@ func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
 }
 
 func (v *stakedVoteWeight) ResetViewChangeVotes() {
+	v.mux.Lock()
+	defer v.mux.Unlock()
+
 	v.lastPower[ViewChange] = v.voteTally.ViewChange.tally
 
 	v.reset([]Phase{ViewChange})
@@ -313,6 +361,8 @@ func (v *stakedVoteWeight) ResetViewChangeVotes() {
 }
 
 func (v *stakedVoteWeight) CurrentTotalPower(p Phase) (*numeric.Dec, error) {
+	v.mux.RLock()
+	defer v.mux.RUnlock()
 	if power, ok := v.lastPower[p]; ok {
 		return &power, nil
 	} else {
