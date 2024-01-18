@@ -782,6 +782,20 @@ func (bc *BlockChainImpl) resetWithGenesisBlock(genesis *types.Block) error {
 	return nil
 }
 
+func (bc *BlockChainImpl) repairRecreateStateTries(head **types.Block) error {
+	for {
+		blk := bc.GetBlockByNumber((*head).NumberU64() + 1)
+		if blk != nil {
+			_, _, _, err := bc.insertChain([]*types.Block{blk}, true)
+			if err != nil {
+				return err
+			}
+			*head = blk
+			continue
+		}
+	}
+}
+
 // repair tries to repair the current blockchain by rolling back the current block
 // until one with associated state is found. This is needed to fix incomplete db
 // writes caused either by crashes/power outages, or simply non-committed tries.
@@ -789,6 +803,16 @@ func (bc *BlockChainImpl) resetWithGenesisBlock(genesis *types.Block) error {
 // This method only rolls back the current block. The current header and current
 // fast block are left intact.
 func (bc *BlockChainImpl) repair(head **types.Block) error {
+	if err := bc.repairValidatorsAndCommitSigs(head); err != nil {
+		return errors.WithMessage(err, "failed to repair validators and commit sigs")
+	}
+	if err := bc.repairRecreateStateTries(head); err != nil {
+		return errors.WithMessage(err, "failed to recreate state tries")
+	}
+	return nil
+}
+
+func (bc *BlockChainImpl) repairValidatorsAndCommitSigs(head **types.Block) error {
 	valsToRemove := map[common.Address]struct{}{}
 	for {
 		// Abort if we've rewound to a head block that does have associated state

@@ -912,6 +912,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 			Uint64("blockEpoch", block.Epoch().Uint64()).
 			Str("blockHex", block.Hash().Hex()).
 			Uint32("ShardID", block.ShardID()).
+			Err(err).
 			Msg("[SYNC] UpdateBlockAndStatus: Block exists")
 		return nil
 	case err != nil:
