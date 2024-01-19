@@ -924,6 +924,9 @@ func (bc *BlockChainImpl) writeHeadBlock(block *types.Block) error {
 	if err := rawdb.WriteHeadHeaderHash(batch, block.Hash()); err != nil {
 		return err
 	}
+	if err := rawdb.WriteHeaderNumber(batch, block.Hash(), block.NumberU64()); err != nil {
+		return err
+	}
 
 	isNewEpoch := block.IsLastBlockInEpoch()
 	if isNewEpoch {
