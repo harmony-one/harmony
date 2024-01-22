@@ -828,6 +828,11 @@ func (bc *BlockChainImpl) repairValidatorsAndCommitSigs(head **types.Block) erro
 		sigAndBitMap := append(lastSig[:], (*head).Header().LastCommitBitmap()...)
 		bc.WriteCommitSig((*head).NumberU64()-1, sigAndBitMap)
 
+		err := rawdb.DeleteBlock(bc.db, (*head).Hash(), (*head).NumberU64())
+		if err != nil {
+			return errors.WithMessagef(err, "failed to delete block %d", (*head).NumberU64())
+		}
+
 		// Otherwise rewind one block and recheck state availability there
 		for _, stkTxn := range (*head).StakingTransactions() {
 			if stkTxn.StakingType() == staking.DirectiveCreateValidator {
