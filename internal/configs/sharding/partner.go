@@ -106,7 +106,7 @@ var partnerV1 = MustNewInstance(
 	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
 )
 var partnerV2 = MustNewInstance(
-	2, 5, 4, 0,
+	2, 20, 4, 0,
 	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
 	genesis.TNFoundationalAccounts, emptyAllowlist,
 	feeCollectorsDevnet[1], numeric.MustNewDecFromStr("0.25"),
@@ -114,8 +114,8 @@ var partnerV2 = MustNewInstance(
 	PartnerSchedule.BlocksPerEpoch(),
 )
 var partnerV3 = MustNewInstance(
-	2, 5, 1, 0,
-	numeric.MustNewDecFromStr("0.1"), genesis.TNHarmonyAccounts,
+	2, 20, 1, 0,
+	numeric.MustNewDecFromStr("0.0"), genesis.TNHarmonyAccounts,
 	genesis.TNFoundationalAccounts, emptyAllowlist,
 	feeCollectorsDevnet[1], numeric.MustNewDecFromStr("0.25"),
 	hip30CollectionAddressTestnet, partnerReshardingEpoch,
