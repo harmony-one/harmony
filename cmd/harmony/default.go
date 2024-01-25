@@ -178,7 +178,7 @@ var defaultPrometheusConfig = harmonyconfig.PrometheusConfig{
 }
 
 var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
-	TurboMode:              false,
+	TurboMode:              true,
 	DoubleCheckBlockHashes: false,
 	MaxBlocksPerSyncCycle:  512,   // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
 	MaxBackgroundBlocks:    512,   // max blocks to be downloaded at background process in turbo mode
@@ -230,14 +230,14 @@ var (
 		Downloader:           true,
 		StagedSync:           true,
 		StagedSyncCfg:        defaultStagedSyncConfig,
-		Concurrency:          2,
-		MinPeers:             2,
-		InitStreams:          2,
-		MaxAdvertiseWaitTime: 1, //minutes
-		DiscSoftLowCap:       2,
-		DiscHardLowCap:       2,
+		Concurrency:          4,
+		MinPeers:             4,
+		InitStreams:          4,
+		MaxAdvertiseWaitTime: 5, //minutes
+		DiscSoftLowCap:       4,
+		DiscHardLowCap:       4,
 		DiscHighCap:          1024,
-		DiscBatch:            3,
+		DiscBatch:            8,
 	}
 
 	defaultPartnerSyncConfig = harmonyconfig.SyncConfig{
