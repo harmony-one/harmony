@@ -245,6 +245,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applySyncFlags(cmd, config)
 	applyShardDataFlags(cmd, config)
 	applyGPOFlags(cmd, config)
+	applyCacheFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {

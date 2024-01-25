@@ -1,13 +1,15 @@
 package main
 
 import (
+	"time"
+
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/hmy"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.6.0"
+const tomlConfigVersion = "2.6.1"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -24,7 +26,6 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IsOffline:        false,
 		DataDir:          "./",
 		TraceEnable:      false,
-		TriesInMemory:    128,
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
@@ -131,6 +132,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		LowUsageThreshold: hmy.DefaultGPOConfig.LowUsageThreshold,
 		BlockGasLimit:     hmy.DefaultGPOConfig.BlockGasLimit,
 	},
+	Cache: getDefaultCacheConfig(defNetworkType),
 }
 
 var defaultSysConfig = harmonyconfig.SysConfig{
@@ -176,7 +178,7 @@ var defaultPrometheusConfig = harmonyconfig.PrometheusConfig{
 }
 
 var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
-	TurboMode:              true,
+	TurboMode:              false,
 	DoubleCheckBlockHashes: false,
 	MaxBlocksPerSyncCycle:  512,   // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
 	MaxBackgroundBlocks:    512,   // max blocks to be downloaded at background process in turbo mode
@@ -228,14 +230,14 @@ var (
 		Downloader:           true,
 		StagedSync:           true,
 		StagedSyncCfg:        defaultStagedSyncConfig,
-		Concurrency:          4,
-		MinPeers:             4,
-		InitStreams:          4,
-		MaxAdvertiseWaitTime: 5, //minutes
-		DiscSoftLowCap:       4,
-		DiscHardLowCap:       4,
+		Concurrency:          2,
+		MinPeers:             2,
+		InitStreams:          2,
+		MaxAdvertiseWaitTime: 1, //minutes
+		DiscSoftLowCap:       2,
+		DiscHardLowCap:       2,
 		DiscHighCap:          1024,
-		DiscBatch:            8,
+		DiscBatch:            3,
 	}
 
 	defaultPartnerSyncConfig = harmonyconfig.SyncConfig{
@@ -271,6 +273,17 @@ var (
 	}
 )
 
+var defaultCacheConfig = harmonyconfig.CacheConfig{
+	Disabled:        false,
+	TrieNodeLimit:   256,
+	TriesInMemory:   128,
+	TrieTimeLimit:   2 * time.Minute,
+	SnapshotLimit:   256,
+	SnapshotWait:    true,
+	Preimages:       true,
+	SnapshotNoBuild: false,
+}
+
 const (
 	defaultBroadcastInvalidTx = false
 )
@@ -285,6 +298,7 @@ func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyconfig.HarmonyCon
 	}
 	config.Sync = getDefaultSyncConfig(nt)
 	config.DNSSync = getDefaultDNSSyncConfig(nt)
+	config.Cache = getDefaultCacheConfig(nt)
 
 	return config
 }
@@ -321,6 +335,11 @@ func getDefaultConsensusConfigCopy() harmonyconfig.ConsensusConfig {
 
 func getDefaultPrometheusConfigCopy() harmonyconfig.PrometheusConfig {
 	config := defaultPrometheusConfig
+	return config
+}
+
+func getDefaultCacheConfigCopy() harmonyconfig.CacheConfig {
+	config := defaultCacheConfig
 	return config
 }
 

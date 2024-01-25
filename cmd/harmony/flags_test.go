@@ -37,12 +37,11 @@ func TestHarmonyFlags(t *testing.T) {
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
-					NodeType:      "validator",
-					NoStaking:     false,
-					ShardID:       -1,
-					IsArchival:    false,
-					DataDir:       "./",
-					TriesInMemory: 128,
+					NodeType:   "validator",
+					NoStaking:  false,
+					ShardID:    -1,
+					IsArchival: false,
+					DataDir:    "./",
 				},
 				Network: harmonyconfig.NetworkConfig{
 					NetworkType: "mainnet",
@@ -183,6 +182,16 @@ func TestHarmonyFlags(t *testing.T) {
 					LowUsageThreshold: defaultConfig.GPO.LowUsageThreshold,
 					BlockGasLimit:     defaultConfig.GPO.BlockGasLimit,
 				},
+				Cache: harmonyconfig.CacheConfig{
+					Disabled:        defaultConfig.Cache.Disabled,
+					TrieNodeLimit:   defaultCacheConfig.TrieNodeLimit,
+					TriesInMemory:   defaultConfig.Cache.TriesInMemory,
+					TrieTimeLimit:   defaultConfig.Cache.TrieTimeLimit,
+					SnapshotLimit:   defaultConfig.Cache.SnapshotLimit,
+					SnapshotWait:    defaultConfig.Cache.SnapshotWait,
+					Preimages:       defaultConfig.Cache.Preimages,
+					SnapshotNoBuild: defaultConfig.Cache.SnapshotNoBuild,
+				},
 			},
 		},
 	}
@@ -208,80 +217,63 @@ func TestGeneralFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:      "validator",
-				NoStaking:     false,
-				ShardID:       -1,
-				IsArchival:    false,
-				DataDir:       "./",
-				TriesInMemory: 128,
+				NodeType:   "validator",
+				NoStaking:  false,
+				ShardID:    -1,
+				IsArchival: false,
+				DataDir:    "./",
 			},
 		},
 		{
 			args: []string{"--run", "explorer", "--run.legacy", "--run.shard=0",
 				"--run.archive=true", "--datadir=./.hmy"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:      "explorer",
-				NoStaking:     true,
-				ShardID:       0,
-				IsArchival:    true,
-				DataDir:       "./.hmy",
-				TriesInMemory: 128,
+				NodeType:   "explorer",
+				NoStaking:  true,
+				ShardID:    0,
+				IsArchival: true,
+				DataDir:    "./.hmy",
 			},
 		},
 		{
 			args: []string{"--node_type", "explorer", "--staking", "--shard_id", "0",
 				"--is_archival", "--db_dir", "./"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:      "explorer",
-				NoStaking:     false,
-				ShardID:       0,
-				IsArchival:    true,
-				DataDir:       "./",
-				TriesInMemory: 128,
+				NodeType:   "explorer",
+				NoStaking:  false,
+				ShardID:    0,
+				IsArchival: true,
+				DataDir:    "./",
 			},
 		},
 		{
 			args: []string{"--staking=false", "--is_archival=false"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:      "validator",
-				NoStaking:     true,
-				ShardID:       -1,
-				IsArchival:    false,
-				DataDir:       "./",
-				TriesInMemory: 128,
+				NodeType:   "validator",
+				NoStaking:  true,
+				ShardID:    -1,
+				IsArchival: false,
+				DataDir:    "./",
 			},
 		},
 		{
 			args: []string{"--run", "explorer", "--run.shard", "0"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:      "explorer",
-				NoStaking:     false,
-				ShardID:       0,
-				IsArchival:    false,
-				DataDir:       "./",
-				TriesInMemory: 128,
+				NodeType:   "explorer",
+				NoStaking:  false,
+				ShardID:    0,
+				IsArchival: false,
+				DataDir:    "./",
 			},
 		},
 		{
 			args: []string{"--run", "explorer", "--run.shard", "0", "--run.archive=false"},
 			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:      "explorer",
-				NoStaking:     false,
-				ShardID:       0,
-				IsArchival:    false,
-				DataDir:       "./",
-				TriesInMemory: 128,
-			},
-		},
-		{
-			args: []string{"--blockchain.tries_in_memory", "64"},
-			expConfig: harmonyconfig.GeneralConfig{
-				NodeType:      "validator",
-				NoStaking:     false,
-				ShardID:       -1,
-				IsArchival:    false,
-				DataDir:       "./",
-				TriesInMemory: 64,
+				NodeType:   "explorer",
+				NoStaking:  false,
+				ShardID:    0,
+				IsArchival: false,
+				DataDir:    "./",
 			},
 		},
 	}
@@ -1430,6 +1422,58 @@ func TestGPOFlags(t *testing.T) {
 
 		if !reflect.DeepEqual(hc.GPO, test.expConfig) {
 			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.GPO, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
+func TestCacheFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig harmonyconfig.CacheConfig
+		expErr    error
+	}{
+		{
+			args: []string{},
+			expConfig: harmonyconfig.CacheConfig{
+				Disabled:        true, // based on network type
+				TrieNodeLimit:   defaultCacheConfig.TrieNodeLimit,
+				TriesInMemory:   defaultCacheConfig.TriesInMemory,
+				TrieTimeLimit:   defaultCacheConfig.TrieTimeLimit,
+				SnapshotLimit:   defaultCacheConfig.SnapshotLimit,
+				SnapshotWait:    defaultCacheConfig.SnapshotWait,
+				Preimages:       defaultCacheConfig.Preimages, // based on network type
+				SnapshotNoBuild: defaultCacheConfig.SnapshotNoBuild,
+			},
+		},
+		{
+			args: []string{"--cache.disabled=true", "--cache.trie_node_limit", "512", "--cache.tries_in_memory", "256", "--cache.preimages=false", "--cache.snapshot_limit", "512", "--cache.snapshot_no_build=true", "--cache.snapshot_wait=false"},
+			expConfig: harmonyconfig.CacheConfig{
+				Disabled:        true,
+				TrieNodeLimit:   512,
+				TriesInMemory:   256,
+				TrieTimeLimit:   2 * time.Minute,
+				SnapshotLimit:   512,
+				SnapshotWait:    false,
+				Preimages:       false,
+				SnapshotNoBuild: true,
+			},
+		},
+	}
+
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, cacheConfigFlags, applyCacheFlags)
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+
+		if !reflect.DeepEqual(hc.Cache, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Cache, test.expConfig)
 		}
 		ts.tearDown()
 	}
