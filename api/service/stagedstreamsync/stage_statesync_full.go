@@ -191,6 +191,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 		}
 		accountTasks, codes, storages, healtask, codetask, nTasks, err := sdm.GetNextBatch()
 		if nTasks == 0 {
+			utils.Logger().Debug().Msg("the state worker loop received no more tasks")
 			return
 		}
 		if err != nil {
