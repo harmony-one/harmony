@@ -821,12 +821,23 @@ func (bc *BlockChainImpl) repairValidatorsAndCommitSigs(head **types.Block) erro
 				Str("number", (*head).Number().String()).
 				Str("hash", (*head).Hash().Hex()).
 				Msg("Rewound blockchain to past state")
+			if err := rawdb.WriteHeadBlockHash(bc.db, (*head).Hash()); err != nil {
+				return errors.WithMessagef(err, "failed to write head block hash number %d", (*head).NumberU64())
+			}
 			return bc.removeInValidatorList(valsToRemove)
 		}
 		// Repair last commit sigs
 		lastSig := (*head).Header().LastCommitSignature()
 		sigAndBitMap := append(lastSig[:], (*head).Header().LastCommitBitmap()...)
 		bc.WriteCommitSig((*head).NumberU64()-1, sigAndBitMap)
+
+		err := rawdb.DeleteBlock(bc.db, (*head).Hash(), (*head).NumberU64())
+		if err != nil {
+			return errors.WithMessagef(err, "failed to delete block %d", (*head).NumberU64())
+		}
+		if err := rawdb.WriteHeadBlockHash(bc.db, (*head).ParentHash()); err != nil {
+			return errors.WithMessagef(err, "failed to write head block hash number %d", (*head).NumberU64()-1)
+		}
 
 		// Otherwise rewind one block and recheck state availability there
 		for _, stkTxn := range (*head).StakingTransactions() {
