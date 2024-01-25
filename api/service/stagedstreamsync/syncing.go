@@ -465,6 +465,10 @@ func (s *StagedStreamSync) CurrentBlockNumber() uint64 {
 		return s.bc.CurrentBlock().NumberU64()
 	}
 
+	if s.status.pivotBlock != nil && s.bc.CurrentFastBlock().NumberU64() >= s.status.pivotBlock.NumberU64() {
+		return s.bc.CurrentFastBlock().NumberU64()
+	}
+
 	current := uint64(0)
 	switch s.config.SyncMode {
 	case FullSync:

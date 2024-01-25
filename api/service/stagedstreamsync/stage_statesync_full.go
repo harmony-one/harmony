@@ -190,7 +190,11 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 		default:
 		}
 		accountTasks, codes, storages, healtask, codetask, nTasks, err := sdm.GetNextBatch()
-		if nTasks == 0 || err != nil {
+		if nTasks == 0 {
+			utils.Logger().Debug().Msg("the state worker loop received no more tasks")
+			return
+		}
+		if err != nil {
 			select {
 			case <-ctx.Done():
 				return
@@ -199,7 +203,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 			}
 		}
 
-		if len(accountTasks) > 0 {
+		if accountTasks != nil && len(accountTasks) > 0 {
 
 			task := accountTasks[0]
 			origin := task.Next
@@ -222,8 +226,8 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 				utils.Logger().Warn().
 					Str("stream", string(stid)).
 					Msg(WrapStagedSyncMsg("GetAccountRange failed, received empty accounts"))
-				err := errors.New("GetAccountRange received empty slots")
-				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
+				//err := errors.New("GetAccountRange received empty slots")
+				//sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 				return
 			}
 			if err := sdm.HandleAccountRequestResult(task, retAccounts, proof, origin[:], limit[:], loopID, stid); err != nil {
@@ -236,7 +240,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 				return
 			}
 
-		} else if len(codes) > 0 {
+		} else if codes != nil && len(codes) > 0 {
 
 			stid, err := sss.downloadByteCodes(ctx, sdm, codes, loopID)
 			if err != nil {
@@ -252,7 +256,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 				return
 			}
 
-		} else if len(storages.accounts) > 0 {
+		} else if storages != nil && len(storages.accounts) > 0 {
 
 			root := storages.root
 			roots := storages.roots
@@ -295,7 +299,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 
 		} else {
 			// assign trie node Heal Tasks
-			if len(healtask.hashes) > 0 {
+			if healtask != nil && len(healtask.hashes) > 0 {
 				root := healtask.root
 				task := healtask.task
 				hashes := healtask.hashes
@@ -334,7 +338,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 				}
 			}
 
-			if len(codetask.hashes) > 0 {
+			if codetask != nil && len(codetask.hashes) > 0 {
 				task := codetask.task
 				hashes := codetask.hashes
 				bytes := codetask.bytes

@@ -209,7 +209,11 @@ func (ch *chainHelperImpl) getAccountRange(root common.Hash, origin common.Hash,
 	if err != nil {
 		return nil, nil, err
 	}
-	it, err := ch.chain.Snapshots().AccountIterator(root, origin)
+	snapshots := ch.chain.Snapshots()
+	if snapshots == nil {
+		return nil, nil, errors.Errorf("failed to retrieve snapshots")
+	}
+	it, err := snapshots.AccountIterator(root, origin)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -275,6 +279,10 @@ func (ch *chainHelperImpl) getStorageRanges(root common.Hash, accounts []common.
 		proofs [][]byte
 		size   uint64
 	)
+	snapshots := ch.chain.Snapshots()
+	if snapshots == nil {
+		return nil, nil, errors.Errorf("failed to retrieve snapshots")
+	}
 	for _, account := range accounts {
 		// If we've exceeded the requested data limit, abort without opening
 		// a new storage range (that we'd need to prove due to exceeded size)
@@ -284,7 +292,7 @@ func (ch *chainHelperImpl) getStorageRanges(root common.Hash, accounts []common.
 		// The first account might start from a different origin and end sooner
 		// origin==nil or limit ==nil
 		// Retrieve the requested state and bail out if non existent
-		it, err := ch.chain.Snapshots().StorageIterator(root, account, origin)
+		it, err := snapshots.StorageIterator(root, account, origin)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -409,7 +417,11 @@ func (ch *chainHelperImpl) getTrieNodes(root common.Hash, paths []*message.TrieN
 		return nil, nil
 	}
 	// The 'snap' might be nil, in which case we cannot serve storage slots.
-	snap := ch.chain.Snapshots().Snapshot(root)
+	snapshots := ch.chain.Snapshots()
+	if snapshots == nil {
+		return nil, errors.Errorf("failed to retrieve snapshots")
+	}
+	snap := snapshots.Snapshot(root)
 	// Retrieve trie nodes until the packet size limit is reached
 	var (
 		nodes      [][]byte
