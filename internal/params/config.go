@@ -212,7 +212,7 @@ var (
 		HIP30Epoch:                            big.NewInt(7),
 		BlockGas30MEpoch:                      big.NewInt(7),
 		MaxRateEpoch:                          EpochTBD,
-		DevnetExternalEpoch:                   EpochTBD,
+		DevnetExternalEpoch:                   big.NewInt(135),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.

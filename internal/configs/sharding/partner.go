@@ -114,7 +114,7 @@ var partnerV2 = MustNewInstance(
 	PartnerSchedule.BlocksPerEpoch(),
 )
 var partnerV3 = MustNewInstance(
-	2, 20, 1, 0,
+	2, 20, 0, 0,
 	numeric.MustNewDecFromStr("0.0"), genesis.TNHarmonyAccounts,
 	genesis.TNFoundationalAccounts, emptyAllowlist,
 	feeCollectorsDevnet[1], numeric.MustNewDecFromStr("0.25"),
