@@ -354,7 +354,8 @@ func newBlockChainWithOptions(
 			NoBuild:    bc.cacheConfig.SnapshotNoBuild,
 			AsyncBuild: !bc.cacheConfig.SnapshotWait,
 		}
-		bc.snaps, _ = snapshot.New(snapconfig, bc.db, bc.triedb, head.Hash())
+		fmt.Println("loading/generating snapshot...")
+		bc.snaps, _ = snapshot.New(snapconfig, bc.db, bc.triedb, head.Root())
 	}
 
 	curHeader := bc.CurrentBlock().Header()
