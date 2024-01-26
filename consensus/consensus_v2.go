@@ -801,6 +801,11 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 		if next := consensus.rotateLeader(epoch, committedMsg.SenderPubkeys[0]); next != nil {
 			prev := consensus.getLeaderPubKey()
 			consensus.setLeaderPubKey(next)
+			if consensus.isLeader() {
+				utils.Logger().Info().Msgf("We are block %d, I am the new leader %s", blk.NumberU64(), next.Bytes.Hex())
+			} else {
+				utils.Logger().Info().Msgf("We are block %d, the leader is %s", blk.NumberU64(), next.Bytes.Hex())
+			}
 			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 				// leader changed
 				blockPeriod := consensus.BlockPeriod
