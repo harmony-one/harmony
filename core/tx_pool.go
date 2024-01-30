@@ -760,7 +760,7 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 		if to != nil {
 			toAddr = *to
 			for _, allowedTx := range allowedTxs {
-				if to != nil && *to == allowedTx.To && bytes.Equal(tx.Data(), allowedTx.Data) {
+				if toAddr == allowedTx.To && bytes.Equal(tx.Data(), allowedTx.Data) {
 					txIsAllowed = true
 					break
 				}
