@@ -1022,7 +1022,7 @@ func New(
 	host p2p.Host,
 	consensusObj *consensus.Consensus,
 	blacklist map[common.Address]struct{},
-	allowedTxs map[common.Address]core.AllowedTxData,
+	allowedTxs map[common.Address][]core.AllowedTxData,
 	localAccounts []common.Address,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
 	registry *registry.Registry,
