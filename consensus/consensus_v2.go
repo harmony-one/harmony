@@ -679,7 +679,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
-func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
+func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicKeyWrapper) *bls.PublicKeyWrapper {
 	var (
 		bc        = consensus.Blockchain()
 		leader    = consensus.getLeaderPubKey()
@@ -687,31 +687,32 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
 		curNumber = curBlock.NumberU64()
 		curEpoch  = curBlock.Epoch().Uint64()
 	)
+	if epoch.Uint64() != curEpoch {
+		return defaultKey
+	}
 	const blocksCountAliveness = 4
-
 	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
-		return nil
+		return defaultKey
 	}
 	committee, err := ss.FindCommitteeByID(consensus.ShardID)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to find committee")
-		return nil
+		return defaultKey
 	}
 	slotsCount := len(committee.Slots)
 	blocksPerEpoch := shard.Schedule.InstanceForEpoch(epoch).BlocksPerEpoch()
 	if blocksPerEpoch == 0 {
 		utils.Logger().Error().Msg("[Rotating leader] blocks per epoch is 0")
-		return nil
+		return defaultKey
 	}
 	if slotsCount == 0 {
 		utils.Logger().Error().Msg("[Rotating leader] slots count is 0")
-		return nil
+		return defaultKey
 	}
 	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
-	rest := blocksPerEpoch % uint64(slotsCount)
 	const minimumBlocksForLeaderInRow = blocksCountAliveness
 	if numBlocksProducedByLeader < minimumBlocksForLeaderInRow {
 		// mine no less than 3 blocks in a row
@@ -720,15 +721,11 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
 	s := bc.LeaderRotationMeta()
 	if !bytes.Equal(leader.Bytes[:], s.Pub) {
 		// Another leader.
-		return nil
-	}
-	// If it is the first validator producing blocks, it should also produce the remaining 'rest' of the blocks.
-	if s.Shifts == 0 {
-		numBlocksProducedByLeader += rest
+		return defaultKey
 	}
 	if s.Count < numBlocksProducedByLeader {
 		// Not enough blocks produced by the leader, continue producing by the same leader.
-		return nil
+		return defaultKey
 	}
 	// Passed all checks, we can change leader.
 	// NthNext will move the leader to the next leader in the committee.
@@ -748,7 +745,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
 		if !wasFound {
 			utils.Logger().Error().Msg("Failed to get next leader")
 			// Seems like nothing we can do here.
-			return nil
+			return defaultKey
 		}
 		members := consensus.decider.Participants()
 		mask := bls.NewMask(members)
@@ -757,7 +754,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
 			header := bc.GetHeaderByNumber(curNumber - uint64(i))
 			if header == nil {
 				utils.Logger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(i))
-				return nil
+				return defaultKey
 			}
 			// if epoch is different, we should not check this block.
 			if header.Epoch().Uint64() != curEpoch {
@@ -767,12 +764,12 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
 			err = mask.SetMask(header.LastCommitBitmap())
 			if err != nil {
 				utils.Logger().Err(err).Msg("Failed to set mask")
-				return nil
+				return defaultKey
 			}
 			ok, err := mask.KeyEnabled(next.Bytes)
 			if err != nil {
 				utils.Logger().Err(err).Msg("Failed to get key enabled")
-				return nil
+				return defaultKey
 			}
 			if !ok {
 				skipped++
@@ -787,14 +784,13 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) *bls.PublicKeyWrapper {
 		}
 		return next
 	}
-	return nil
+	return defaultKey
 }
 
 // SetupForNewConsensus sets the state for new consensus
 func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
 	consensus.setCurBlockViewID(committedMsg.ViewID + 1)
-	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 	var epoch *big.Int
 	if blk.IsLastBlockInEpoch() {
 		epoch = new(big.Int).Add(blk.Epoch(), common.Big1)
@@ -802,9 +798,14 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 		epoch = blk.Epoch()
 	}
 	if consensus.Blockchain().Config().IsLeaderRotationInternalValidators(epoch) {
-		if next := consensus.rotateLeader(epoch); next != nil {
+		if next := consensus.rotateLeader(epoch, committedMsg.SenderPubkeys[0]); next != nil {
 			prev := consensus.getLeaderPubKey()
 			consensus.setLeaderPubKey(next)
+			if consensus.isLeader() {
+				utils.Logger().Info().Msgf("We are block %d, I am the new leader %s", blk.NumberU64(), next.Bytes.Hex())
+			} else {
+				utils.Logger().Info().Msgf("We are block %d, the leader is %s", blk.NumberU64(), next.Bytes.Hex())
+			}
 			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 				// leader changed
 				blockPeriod := consensus.BlockPeriod
