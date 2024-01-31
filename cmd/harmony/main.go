@@ -1064,8 +1064,8 @@ func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struc
 	return addrMap, nil
 }
 
-func parseAllowedTxs(data []byte) (map[ethCommon.Address]core.AllowedTxData, error) {
-	allowedTxs := make(map[ethCommon.Address]core.AllowedTxData)
+func parseAllowedTxs(data []byte) (map[ethCommon.Address][]core.AllowedTxData, error) {
+	allowedTxs := make(map[ethCommon.Address][]core.AllowedTxData)
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if len(line) != 0 { // AllowedTxs file may have trailing empty string line
@@ -1086,16 +1086,16 @@ func parseAllowedTxs(data []byte) (map[ethCommon.Address]core.AllowedTxData, err
 			if err != nil {
 				return nil, err
 			}
-			allowedTxs[from] = core.AllowedTxData{
+			allowedTxs[from] = append(allowedTxs[from], core.AllowedTxData{
 				To:   to,
 				Data: data,
-			}
+			})
 		}
 	}
 	return allowedTxs, nil
 }
 
-func setupAllowedTxs(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]core.AllowedTxData, error) {
+func setupAllowedTxs(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address][]core.AllowedTxData, error) {
 	utils.Logger().Debug().Msgf("Using AllowedTxs file at `%s`", hc.TxPool.AllowedTxsFile)
 	data, err := os.ReadFile(hc.TxPool.AllowedTxsFile)
 	if err != nil {
