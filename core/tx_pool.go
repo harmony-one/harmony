@@ -172,8 +172,8 @@ type TxPoolConfig struct {
 
 	AddEvent func(tx types.PoolTransaction, local bool) // Fire add event
 
-	Blacklist  map[common.Address]struct{}      // Set of accounts that cannot be a part of any transaction
-	AllowedTxs map[common.Address]AllowedTxData // Set of allowed transactions can break the blocklist
+	Blacklist  map[common.Address]struct{}        // Set of accounts that cannot be a part of any transaction
+	AllowedTxs map[common.Address][]AllowedTxData // Set of allowed transactions can break the blocklist
 }
 
 // DefaultTxPoolConfig contains the default configurations for the transaction
@@ -193,7 +193,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	Lifetime: 30 * time.Minute, // --txpool.lifetime
 
 	Blacklist:  map[common.Address]struct{}{},
-	AllowedTxs: map[common.Address]AllowedTxData{},
+	AllowedTxs: map[common.Address][]AllowedTxData{},
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -753,12 +753,20 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	}
 
 	// do whitelist check first, if tx not in whitelist, do blacklist check
-	if allowedTx, exists := pool.config.AllowedTxs[from]; exists {
-		if to := tx.To(); to == nil || *to != allowedTx.To || !bytes.Equal(tx.Data(), allowedTx.Data) {
-			toAddr := common.Address{}
-			if to != nil {
-				toAddr = *to
+	if allowedTxs, exists := pool.config.AllowedTxs[from]; exists {
+		txIsAllowed := false
+		to := tx.To()
+		toAddr := common.Address{}
+		if to != nil {
+			toAddr = *to
+			for _, allowedTx := range allowedTxs {
+				if toAddr == allowedTx.To && bytes.Equal(tx.Data(), allowedTx.Data) {
+					txIsAllowed = true
+					break
+				}
 			}
+		}
+		if !txIsAllowed {
 			return errors.WithMessagef(ErrAllowedTxs, "transaction sender: %x, receiver: %x, input: %x", tx.From(), toAddr, tx.Data())
 		}
 	} else {
