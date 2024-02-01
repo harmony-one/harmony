@@ -178,7 +178,10 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
-	consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
+
+	if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+	}
 
 	// Send committed message before block insertion.
 	// if leader successfully finalizes the block, send committed message to validators
