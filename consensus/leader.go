@@ -296,7 +296,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	quorumIsMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
 	//// Read - End
 
-	if (!quorumWasMet && quorumIsMet) || consensus.decider.IsAllSigsCollected() {
+	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
