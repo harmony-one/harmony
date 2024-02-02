@@ -285,14 +285,6 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	//// Read - Start
 	viewID := consensus.getCurBlockViewID()
 
-	if consensus.decider.IsAllSigsCollected() {
-		logger.Info().Msg("[OnCommit] 100% Enough commits received")
-		consensus.finalCommit()
-
-		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
-		return
-	}
-
 	quorumIsMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
 	//// Read - End
 
