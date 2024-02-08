@@ -166,7 +166,7 @@ func newPeer(port int) (host.Host, error) {
 		return nil, err
 	}
 
-	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)
+	listenAddr := fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port)
 	host, err := libp2p.New(libp2p.ListenAddrStrings(listenAddr), libp2p.DisableRelay(), libp2p.Identity(priv), libp2p.NoSecurity)
 	if err != nil {
 		return nil, err
