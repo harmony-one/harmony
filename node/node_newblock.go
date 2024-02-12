@@ -236,15 +236,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 			for _, pending := range allPending {
 				// if pending crosslink is older than 10 epochs, delete it and continue
 				if pending.EpochF.Cmp(crossLinkEpochThreshold) <= 0 {
-					if n, err := node.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete); err != nil {
-						utils.Logger().Error().
-							Err(err).
-							Msg("[ProposeNewBlock] deleting old pending cross links failed")
-					} else if n > 0 {
-						utils.Logger().Info().
-							Int("left-pending", n).
-							Msg("[ProposeNewBlock] deleted old pending cross links")
-					}
+					// this also runs on node
+					invalidToDelete = append(invalidToDelete, pending)
 					continue
 				}
 				// ReadCrossLink beacon chain usage.
@@ -279,7 +272,16 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				len(allPending),
 			)
 		}
-		node.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete)
+		if n, err := node.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete); err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Msg("[ProposeNewBlock] invalid pending cross links failed")
+		} else if n > 0 {
+			utils.Logger().Info().
+				Int("left-pending", n).
+				Int("deleted", len(invalidToDelete).
+				Msg("[ProposeNewBlock] deleted invalid pending cross links")
+		}
 	}
 	utils.AnalysisEnd("proposeNewBlockVerifyCrossLinks")
 
