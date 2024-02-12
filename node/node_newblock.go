@@ -1,6 +1,7 @@
 package node
 
 import (
+	"math/big"
 	"sort"
 	"strings"
 	"time"
@@ -226,12 +227,15 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	utils.AnalysisStart("proposeNewBlockVerifyCrossLinks")
 	// Prepare cross links and slashing messages
 	var crossLinksToPropose types.CrossLinks
+	ten := big.NewInt(10)
+	crossLinkEpochThreshold := new(big.Int).Sub(currentHeader.Epoch(), ten)
 	if isBeaconchainInCrossLinkEra {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
 		invalidToDelete := []types.CrossLink{}
 		if err == nil {
 			for _, pending := range allPending {
-				if pending.EpochF.Int64() < currentHeader.Epoch().Int64()-3 {
+				// if pending crosslink is older than 10 epochs, ignore it
+				if pending.EpochF.Cmp(crossLinkEpochThreshold) <= 0 {
 					continue
 				}
 				// ReadCrossLink beacon chain usage.
