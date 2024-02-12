@@ -1,6 +1,7 @@
 package node
 
 import (
+	"math/big"
 	"sort"
 	"strings"
 	"time"
@@ -226,11 +227,35 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	utils.AnalysisStart("proposeNewBlockVerifyCrossLinks")
 	// Prepare cross links and slashing messages
 	var crossLinksToPropose types.CrossLinks
+	ten := big.NewInt(10)
+	// map of shard id to last processed crosslink
+	var lastCrossLinkEpoch map[uint32]*big.Int
 	if isBeaconchainInCrossLinkEra {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
 		invalidToDelete := []types.CrossLink{}
 		if err == nil {
 			for _, pending := range allPending {
+				// trying to retrieve last cross link of the shard
+				var crossLinkEpochThreshold *big.Int
+				if epoch, exist := lastCrossLinkEpoch[pending.ShardID()]; exist {
+					crossLinkEpochThreshold = epoch
+				} else {
+					if lscl, errC := node.Blockchain().ReadShardLastCrossLink(pending.ShardID()); errC == nil && lscl != nil {
+						lastCrossLinkEpoch[pending.ShardID()] = lscl.EpochF
+						crossLinkEpochThreshold = lscl.EpochF
+					} else {
+						lastCrossLinkEpoch[pending.ShardID()] = new(big.Int).Sub(currentHeader.Epoch(), ten)
+						crossLinkEpochThreshold = new(big.Int).Sub(currentHeader.Epoch(), ten)
+					}
+					utils.Logger().Debug().
+						Uint32("shard", pending.ShardID()).
+						Int64("crossLinkEpochThreshold", crossLinkEpochThreshold.Int64()).
+						Msg("calculating epoch for the last cross link of the shard")
+				}
+				// if pending crosslink is older than last shard cross link or it is older than 10 epochs, ignore it
+				if pending.EpochF.Cmp(crossLinkEpochThreshold) <= 0 {
+					continue
+				}
 				// ReadCrossLink beacon chain usage.
 				exist, err := node.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
 				if err == nil || exist != nil {
@@ -247,8 +272,16 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 						AnErr("[ProposeNewBlock] pending crosslink that's before crosslink epoch", err)
 					continue
 				}
-
 				crossLinksToPropose = append(crossLinksToPropose, pending)
+				utils.Logger().Debug().
+					Int64("crossLinkEpochThreshold", crossLinkEpochThreshold.Int64()).
+					Uint32("shard", pending.ShardID()).
+					Int64("epoch", pending.Epoch().Int64()).
+					Uint64("blockNum", pending.BlockNum()).
+					Int64("viewID", pending.ViewID().Int64()).
+					Interface("hash", pending.Hash()).
+					Msg("add cross link to proposing block")
+
 				if len(crossLinksToPropose) > 15 {
 					break
 				}
