@@ -1184,17 +1184,25 @@ func New(
 	node.serviceManager = service.NewManager()
 
 	// log all pending crosslinks
+	invalidToDelete := []types.CrossLink{}
 	allPending, err := node.Blockchain().ReadPendingCrossLinks()
 	if err == nil {
 		for _, pending := range allPending {
-			utils.Logger().Info().
-				Uint32("shard", pending.ShardID()).
-				Int64("epoch", pending.Epoch().Int64()).
-				Uint64("blockNum", pending.BlockNum()).
-				Int64("viewID", pending.ViewID().Int64()).
-				Interface("hash", pending.Hash()).
-				Msg("[PendingCrossLinksOnInit] pending cross links")
+			if pending.EpochF.Int64() < 1100 {
+				utils.Logger().Info().
+					Uint32("shard", pending.ShardID()).
+					Int64("epoch", pending.Epoch().Int64()).
+					Uint64("blockNum", pending.BlockNum()).
+					Int64("viewID", pending.ViewID().Int64()).
+					Interface("hash", pending.Hash()).
+					Msg("[PendingCrossLinksOnInit] delete pending cross links")
+
+				invalidToDelete = append(invalidToDelete, pending)
+			}
 		}
+
+		node.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete)
+
 	} else {
 		utils.Logger().Error().
 			Err(err).
