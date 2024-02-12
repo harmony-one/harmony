@@ -464,7 +464,7 @@ func (vc *viewChange) InitPayload(
 	if !inited {
 		viewIDBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(viewIDBytes, viewID)
-		vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M3 (ViewID) type messaage")
+		vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M3 (ViewID) type message")
 		for _, key := range privKeys {
 			if _, ok := vc.viewIDBitmap[viewID]; !ok {
 				viewIDBitmap := bls_cosi.NewMask(members)
