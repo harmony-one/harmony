@@ -1183,6 +1183,24 @@ func New(
 
 	node.serviceManager = service.NewManager()
 
+	// log all pending crosslinks
+	allPending, err := node.Blockchain().ReadPendingCrossLinks()
+	if err == nil {
+		for _, pending := range allPending {
+			utils.Logger().Info().
+				Uint32("shard", pending.ShardID()).
+				Int64("epoch", pending.Epoch().Int64()).
+				Uint64("blockNum", pending.BlockNum()).
+				Int64("viewID", pending.ViewID().Int64()).
+				Interface("hash", pending.Hash()).
+				Msg("[PendingCrossLinksOnInit] pending cross links")
+		}
+	} else {
+		utils.Logger().Error().
+			Err(err).
+			Msg("read pending cross links failed")
+	}
+
 	return &node
 }
 
