@@ -1187,13 +1187,13 @@ func New(
 	allPending, err := node.Blockchain().ReadPendingCrossLinks()
 	if err == nil {
 		for _, pending := range allPending {
-			utils.Logger().Debug().
+			utils.Logger().Info().
 				Uint32("shard", pending.ShardID()).
 				Int64("epoch", pending.Epoch().Int64()).
 				Uint64("blockNum", pending.BlockNum()).
 				Int64("viewID", pending.ViewID().Int64()).
 				Interface("hash", pending.Hash()).
-				Msg("pending cross link")
+				Msg("[PendingCrossLinksOnInit] pending cross links")
 		}
 	} else {
 		utils.Logger().Debug().
