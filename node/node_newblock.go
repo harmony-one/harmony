@@ -234,9 +234,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		invalidToDelete := []types.CrossLink{}
 		if err == nil {
 			for _, pending := range allPending {
-				// if pending crosslink is older than 10 epochs, delete it and continue
+				// if pending crosslink is older than 10 epochs, delete it and continue. this logic is also applied when the node starts
 				if pending.EpochF.Cmp(crossLinkEpochThreshold) <= 0 {
-					// this logic is also applied when the node starts
 					invalidToDelete = append(invalidToDelete, pending)
 					continue
 				}
@@ -278,8 +277,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				Msg("[ProposeNewBlock] invalid pending cross links failed")
 		} else if n > 0 {
 			utils.Logger().Info().
-				Int("left-pending", n).
-				Int("deleted", len(invalidToDelete).
+				Int("not-deleted", n).
+				Int("deleted", len(invalidToDelete)).
 				Msg("[ProposeNewBlock] deleted invalid pending cross links")
 		}
 	}
