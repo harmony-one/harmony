@@ -33,7 +33,9 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 	}
 
 	preparedMsgs := consensus.fBFTLog.GetMessagesByTypeSeq(
-		msg_pb.MessageType_PREPARED, consensus.getBlockNum(),
+		msg_pb.MessageType_PREPARED, consensus.getBlockNum(), func(message *FBFTMessage, log *FBFTLog) bool {
+			return log.IsBlockVerified(message.BlockHash)
+		},
 	)
 	preparedMsg := consensus.fBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
