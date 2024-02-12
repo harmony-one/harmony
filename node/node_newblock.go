@@ -275,7 +275,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 			utils.Logger().Error().
 				Err(err).
 				Msg("[ProposeNewBlock] invalid pending cross links failed")
-		} else if n > 0 {
+		} else {
 			utils.Logger().Info().
 				Int("not-deleted", n).
 				Int("deleted", len(invalidToDelete)).
