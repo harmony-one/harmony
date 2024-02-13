@@ -1209,7 +1209,7 @@ func New(
 				utils.Logger().Error().
 					Err(err).
 					Msg("[PendingCrossLinksOnInit] deleting old pending cross links failed")
-			} else if n > 0 {
+			} else if len(invalidToDelete) > 0 {
 				utils.Logger().Info().
 					Int("left-pending", n).
 					Msg("[PendingCrossLinksOnInit] deleted old pending cross links")
