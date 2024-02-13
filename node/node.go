@@ -1183,6 +1183,45 @@ func New(
 
 	node.serviceManager = service.NewManager()
 
+	// delete old pending crosslinks
+	if node.Blockchain().ShardID() == shard.BeaconChainShardID {
+		ten := big.NewInt(10)
+		crossLinkEpochThreshold := new(big.Int).Sub(node.Blockchain().CurrentHeader().Epoch(), ten)
+
+		invalidToDelete := make([]types.CrossLink, 0, 1000)
+		allPending, err := node.Blockchain().ReadPendingCrossLinks()
+		if err == nil {
+			for _, pending := range allPending {
+				// if pending crosslink is older than 10 epochs, delete it
+				if pending.EpochF.Cmp(crossLinkEpochThreshold) <= 0 {
+					invalidToDelete = append(invalidToDelete, pending)
+					utils.Logger().Info().
+						Uint32("shard", pending.ShardID()).
+						Int64("epoch", pending.Epoch().Int64()).
+						Uint64("blockNum", pending.BlockNum()).
+						Int64("viewID", pending.ViewID().Int64()).
+						Interface("hash", pending.Hash()).
+						Msg("[PendingCrossLinksOnInit] delete old pending cross links")
+				}
+			}
+
+			if n, err := node.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete); err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Msg("[PendingCrossLinksOnInit] deleting old pending cross links failed")
+			} else if len(invalidToDelete) > 0 {
+				utils.Logger().Info().
+					Int("not-deleted", n).
+					Int("deleted", len(invalidToDelete)).
+					Msg("[PendingCrossLinksOnInit] deleted old pending cross links")
+			}
+		} else {
+			utils.Logger().Error().
+				Err(err).
+				Msg("[PendingCrossLinksOnInit] read pending cross links failed")
+		}
+	}
+
 	return &node
 }
 
