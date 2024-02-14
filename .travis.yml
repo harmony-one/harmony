@@ -2,7 +2,7 @@ os: linux
 dist: jammy
 language: go
 go:
-  - 1.19.5
+  - 1.20
 go_import_path: github.com/harmony-one/harmony
 cache:
   directories:

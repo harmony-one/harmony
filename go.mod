@@ -1,6 +1,6 @@
 module github.com/harmony-one/harmony
 
-go 1.19
+go 1.20
 
 require (
 	github.com/RoaringBitmap/roaring v1.2.3
