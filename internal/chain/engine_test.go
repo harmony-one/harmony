@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/trie"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -21,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/state/snapshot"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
 )
@@ -328,6 +330,7 @@ func (bc *fakeBlockChain) ContractCode(hash common.Hash) ([]byte, error)        
 func (bc *fakeBlockChain) ValidatorCode(hash common.Hash) ([]byte, error)           { return []byte{}, nil }
 func (bc *fakeBlockChain) ShardID() uint32                                          { return 0 }
 func (bc *fakeBlockChain) ReadShardState(epoch *big.Int) (*shard.State, error)      { return nil, nil }
+func (bc *fakeBlockChain) TrieDB() *trie.Database                                   { return nil }
 func (bc *fakeBlockChain) TrieNode(hash common.Hash) ([]byte, error)                { return []byte{}, nil }
 func (bc *fakeBlockChain) WriteCommitSig(blockNum uint64, lastCommits []byte) error { return nil }
 func (bc *fakeBlockChain) GetHeaderByNumber(number uint64) *block.Header            { return nil }
@@ -352,6 +355,9 @@ func (bc *fakeBlockChain) Config() *params.ChainConfig {
 }
 func (cr *fakeBlockChain) StateAt(root common.Hash) (*state.DB, error) {
 	return nil, nil
+}
+func (cr *fakeBlockChain) Snapshots() *snapshot.Tree {
+	return nil
 }
 func (bc *fakeBlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error) {
 	return nil, nil

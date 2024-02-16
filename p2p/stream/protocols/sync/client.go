@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
@@ -178,6 +179,118 @@ func (p *Protocol) GetNodeData(ctx context.Context, hs []common.Hash, opts ...Op
 		return
 	}
 	data, err = req.getNodeDataFromResponse(resp)
+	return
+}
+
+// GetAccountRange do getAccountRange through sync stream protocol.
+// returns the accounts along with proofs as result, target stream id, and error
+func (p *Protocol) GetAccountRange(ctx context.Context, root common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (accounts []*message.AccountData, proof [][]byte, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getAccountRange")
+	defer p.doMetricPostClientRequest("getAccountRange", err, timer)
+
+	if bytes == 0 {
+		err = fmt.Errorf("zero account ranges bytes requested")
+		return
+	}
+	if bytes > softResponseLimit {
+		err = fmt.Errorf("requested bytes exceed limit")
+		return
+	}
+	req := newGetAccountRangeRequest(root, origin, limit, bytes)
+	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
+	if err != nil {
+		return
+	}
+	accounts, proof, err = req.getAccountRangeFromResponse(resp)
+	return
+}
+
+// GetStorageRanges do getStorageRanges through sync stream protocol.
+// returns the slots along with proofs as result, target stream id, and error
+func (p *Protocol) GetStorageRanges(ctx context.Context, root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (slots [][]*message.StorageData, proof [][]byte, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getStorageRanges")
+	defer p.doMetricPostClientRequest("getStorageRanges", err, timer)
+
+	if bytes == 0 {
+		err = fmt.Errorf("zero storage ranges bytes requested")
+		return
+	}
+	if bytes > softResponseLimit {
+		err = fmt.Errorf("requested bytes exceed limit")
+		return
+	}
+	if len(accounts) > GetStorageRangesRequestCap {
+		err = fmt.Errorf("number of requested accounts exceed limit")
+		return
+	}
+	req := newGetStorageRangesRequest(root, accounts, origin, limit, bytes)
+	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
+	if err != nil {
+		return
+	}
+	var storages []*message.StoragesData
+	storages, proof, err = req.getStorageRangesFromResponse(resp)
+	if err != nil {
+		return
+	}
+	slots = make([][]*message.StorageData, 0)
+	for _, storage := range storages {
+		slots = append(slots, storage.Data)
+	}
+	return
+}
+
+// GetByteCodes do getByteCodes through sync stream protocol.
+// returns the codes as result, target stream id, and error
+func (p *Protocol) GetByteCodes(ctx context.Context, hs []common.Hash, bytes uint64, opts ...Option) (codes [][]byte, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getByteCodes")
+	defer p.doMetricPostClientRequest("getByteCodes", err, timer)
+
+	if bytes == 0 {
+		err = fmt.Errorf("zero bytecode bytes requested")
+		return
+	}
+	if bytes > softResponseLimit {
+		err = fmt.Errorf("requested bytes exceed limit")
+		return
+	}
+	if len(hs) > GetByteCodesRequestCap {
+		err = fmt.Errorf("number of requested hashes exceed limit")
+		return
+	}
+	req := newGetByteCodesRequest(hs, bytes)
+	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
+	if err != nil {
+		return
+	}
+	codes, err = req.getByteCodesFromResponse(resp)
+	return
+}
+
+// GetTrieNodes do getTrieNodes through sync stream protocol.
+// returns the nodes as result, target stream id, and error
+func (p *Protocol) GetTrieNodes(ctx context.Context, root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, opts ...Option) (nodes [][]byte, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getTrieNodes")
+	defer p.doMetricPostClientRequest("getTrieNodes", err, timer)
+
+	if bytes == 0 {
+		err = fmt.Errorf("zero trie nodes bytes requested")
+		return
+	}
+	if bytes > softResponseLimit {
+		err = fmt.Errorf("requested bytes exceed limit")
+		return
+	}
+	if len(paths) > GetTrieNodesRequestCap {
+		err = fmt.Errorf("number of requested paths exceed limit")
+		return
+	}
+	req := newGetTrieNodesRequest(root, paths, bytes)
+	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
+	if err != nil {
+		return
+	}
+	nodes, err = req.getTrieNodesFromResponse(resp)
 	return
 }
 
@@ -570,4 +683,305 @@ func (req *getReceiptsRequest) parseGetReceiptsBytes(resp *syncResponse) ([]type
 		}
 	}
 	return receipts, nil
+}
+
+// getAccountRangeRequest is the request for get account ranges which implements
+// sttypes.Request interface
+type getAccountRangeRequest struct {
+	root   common.Hash
+	origin common.Hash
+	limit  common.Hash
+	bytes  uint64
+	pbReq  *syncpb.Request
+}
+
+func newGetAccountRangeRequest(root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) *getAccountRangeRequest {
+	pbReq := syncpb.MakeGetAccountRangeRequest(root, origin, limit, bytes)
+	return &getAccountRangeRequest{
+		root:   root,
+		origin: origin,
+		limit:  limit,
+		bytes:  bytes,
+		pbReq:  pbReq,
+	}
+}
+
+func (req *getAccountRangeRequest) ReqID() uint64 {
+	return req.pbReq.GetReqId()
+}
+
+func (req *getAccountRangeRequest) SetReqID(val uint64) {
+	req.pbReq.ReqId = val
+}
+
+func (req *getAccountRangeRequest) String() string {
+	ss := make([]string, 0, 4)
+	ss = append(ss, req.root.String())
+	ss = append(ss, req.origin.String())
+	ss = append(ss, req.limit.String())
+	ss = append(ss, fmt.Sprint(req.bytes))
+	rqStr := strings.Join(ss, ",")
+	return fmt.Sprintf("REQUEST [GetAccountRange: %s]", rqStr)
+}
+
+func (req *getAccountRangeRequest) IsSupportedByProto(target sttypes.ProtoSpec) bool {
+	return target.Version.GreaterThanOrEqual(MinVersion)
+}
+
+func (req *getAccountRangeRequest) Encode() ([]byte, error) {
+	msg := syncpb.MakeMessageFromRequest(req.pbReq)
+	return protobuf.Marshal(msg)
+}
+
+func (req *getAccountRangeRequest) getAccountRangeFromResponse(resp sttypes.Response) ([]*message.AccountData, [][]byte, error) {
+	sResp, ok := resp.(*syncResponse)
+	if !ok || sResp == nil {
+		return nil, nil, errors.New("not sync response")
+	}
+	return req.parseGetAccountRangeResponse(sResp)
+}
+
+func (req *getAccountRangeRequest) parseGetAccountRangeResponse(resp *syncResponse) ([]*message.AccountData, [][]byte, error) {
+	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
+		return nil, nil, errors.New(errResp.Error)
+	}
+	grResp := resp.pb.GetGetAccountRangeResponse()
+	if grResp == nil {
+		return nil, nil, errors.New("response not GetAccountRange")
+	}
+	proofs := make([][]byte, 0)
+	for _, proofBytes := range grResp.Proof {
+		var proof []byte
+		if err := rlp.DecodeBytes(proofBytes, &proof); err != nil {
+			return nil, nil, errors.Wrap(err, "[GetAccountRangeResponse]")
+		}
+		proofs = append(proofs, proof)
+	}
+	return grResp.Accounts, proofs, nil
+}
+
+// getStorageRangesRequest is the request for get storage ranges which implements
+// sttypes.Request interface
+type getStorageRangesRequest struct {
+	root     common.Hash
+	accounts []common.Hash
+	origin   common.Hash
+	limit    common.Hash
+	bytes    uint64
+	pbReq    *syncpb.Request
+}
+
+func newGetStorageRangesRequest(root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) *getStorageRangesRequest {
+	pbReq := syncpb.MakeGetStorageRangesRequest(root, accounts, origin, limit, bytes)
+	return &getStorageRangesRequest{
+		root:     root,
+		accounts: accounts,
+		origin:   origin,
+		limit:    limit,
+		bytes:    bytes,
+		pbReq:    pbReq,
+	}
+}
+
+func (req *getStorageRangesRequest) ReqID() uint64 {
+	return req.pbReq.GetReqId()
+}
+
+func (req *getStorageRangesRequest) SetReqID(val uint64) {
+	req.pbReq.ReqId = val
+}
+
+func (req *getStorageRangesRequest) String() string {
+	ss := make([]string, 0, 4)
+	ss = append(ss, req.root.String())
+	for _, acc := range req.accounts {
+		ss = append(ss, acc.String())
+	}
+	ss = append(ss, req.origin.String())
+	ss = append(ss, req.limit.String())
+	ss = append(ss, fmt.Sprint(req.bytes))
+	rqStr := strings.Join(ss, ",")
+	return fmt.Sprintf("REQUEST [GetStorageRanges: %s]", rqStr)
+}
+
+func (req *getStorageRangesRequest) IsSupportedByProto(target sttypes.ProtoSpec) bool {
+	return target.Version.GreaterThanOrEqual(MinVersion)
+}
+
+func (req *getStorageRangesRequest) Encode() ([]byte, error) {
+	msg := syncpb.MakeMessageFromRequest(req.pbReq)
+	return protobuf.Marshal(msg)
+}
+
+// []*message.AccountData, []common.Hash
+func (req *getStorageRangesRequest) getStorageRangesFromResponse(resp sttypes.Response) ([]*message.StoragesData, [][]byte, error) {
+	sResp, ok := resp.(*syncResponse)
+	if !ok || sResp == nil {
+		return nil, nil, errors.New("not sync response")
+	}
+	return req.parseGetStorageRangesResponse(sResp)
+}
+
+func (req *getStorageRangesRequest) parseGetStorageRangesResponse(resp *syncResponse) ([]*message.StoragesData, [][]byte, error) {
+	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
+		return nil, nil, errors.New(errResp.Error)
+	}
+	grResp := resp.pb.GetGetStorageRangesResponse()
+	if grResp == nil {
+		return nil, nil, errors.New("response not GetStorageRanges")
+	}
+	proofs := make([][]byte, 0)
+	for _, proofBytes := range grResp.Proof {
+		var proof []byte
+		if err := rlp.DecodeBytes(proofBytes, &proof); err != nil {
+			return nil, nil, errors.Wrap(err, "[GetStorageRangesResponse]")
+		}
+		proofs = append(proofs, proof)
+	}
+	return grResp.Slots, proofs, nil
+}
+
+// getByteCodesRequest is the request for get code bytes which implements
+// sttypes.Request interface
+type getByteCodesRequest struct {
+	hashes []common.Hash
+	bytes  uint64
+	pbReq  *syncpb.Request
+}
+
+func newGetByteCodesRequest(hashes []common.Hash, bytes uint64) *getByteCodesRequest {
+	pbReq := syncpb.MakeGetByteCodesRequest(hashes, bytes)
+	return &getByteCodesRequest{
+		hashes: hashes,
+		bytes:  bytes,
+		pbReq:  pbReq,
+	}
+}
+
+func (req *getByteCodesRequest) ReqID() uint64 {
+	return req.pbReq.GetReqId()
+}
+
+func (req *getByteCodesRequest) SetReqID(val uint64) {
+	req.pbReq.ReqId = val
+}
+
+func (req *getByteCodesRequest) String() string {
+	ss := make([]string, 0, 4)
+	for _, h := range req.hashes {
+		ss = append(ss, h.String())
+	}
+	ss = append(ss, fmt.Sprint(req.bytes))
+	rqStr := strings.Join(ss, ",")
+	return fmt.Sprintf("REQUEST [GetByteCodes: %s]", rqStr)
+}
+
+func (req *getByteCodesRequest) IsSupportedByProto(target sttypes.ProtoSpec) bool {
+	return target.Version.GreaterThanOrEqual(MinVersion)
+}
+
+func (req *getByteCodesRequest) Encode() ([]byte, error) {
+	msg := syncpb.MakeMessageFromRequest(req.pbReq)
+	return protobuf.Marshal(msg)
+}
+
+func (req *getByteCodesRequest) getByteCodesFromResponse(resp sttypes.Response) ([][]byte, error) {
+	sResp, ok := resp.(*syncResponse)
+	if !ok || sResp == nil {
+		return nil, errors.New("not sync response")
+	}
+	return req.parseGetByteCodesResponse(sResp)
+}
+
+func (req *getByteCodesRequest) parseGetByteCodesResponse(resp *syncResponse) ([][]byte, error) {
+	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
+		return nil, errors.New(errResp.Error)
+	}
+	grResp := resp.pb.GetGetByteCodesResponse()
+	if grResp == nil {
+		return nil, errors.New("response not GetByteCodes")
+	}
+	codes := make([][]byte, 0)
+	for _, codeBytes := range grResp.Codes {
+		var code []byte
+		if err := rlp.DecodeBytes(codeBytes, &code); err != nil {
+			return nil, errors.Wrap(err, "[GetByteCodesResponse]")
+		}
+		codes = append(codes, code)
+	}
+	return codes, nil
+}
+
+// getTrieNodesRequest is the request for get trie nodes which implements
+// sttypes.Request interface
+type getTrieNodesRequest struct {
+	root  common.Hash
+	paths []*message.TrieNodePathSet
+	bytes uint64
+	pbReq *syncpb.Request
+}
+
+func newGetTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, bytes uint64) *getTrieNodesRequest {
+	pbReq := syncpb.MakeGetTrieNodesRequest(root, paths, bytes)
+	return &getTrieNodesRequest{
+		root:  root,
+		paths: paths,
+		bytes: bytes,
+		pbReq: pbReq,
+	}
+}
+
+func (req *getTrieNodesRequest) ReqID() uint64 {
+	return req.pbReq.GetReqId()
+}
+
+func (req *getTrieNodesRequest) SetReqID(val uint64) {
+	req.pbReq.ReqId = val
+}
+
+func (req *getTrieNodesRequest) String() string {
+	ss := make([]string, 0, 4)
+	ss = append(ss, req.root.String())
+	for _, p := range req.paths {
+		ss = append(ss, p.String())
+	}
+	ss = append(ss, fmt.Sprint(req.bytes))
+	rqStr := strings.Join(ss, ",")
+	return fmt.Sprintf("REQUEST [GetTrieNodes: %s]", rqStr)
+}
+
+func (req *getTrieNodesRequest) IsSupportedByProto(target sttypes.ProtoSpec) bool {
+	return target.Version.GreaterThanOrEqual(MinVersion)
+}
+
+func (req *getTrieNodesRequest) Encode() ([]byte, error) {
+	msg := syncpb.MakeMessageFromRequest(req.pbReq)
+	return protobuf.Marshal(msg)
+}
+
+func (req *getTrieNodesRequest) getTrieNodesFromResponse(resp sttypes.Response) ([][]byte, error) {
+	sResp, ok := resp.(*syncResponse)
+	if !ok || sResp == nil {
+		return nil, errors.New("not sync response")
+	}
+	return req.parseGetTrieNodesResponse(sResp)
+}
+
+func (req *getTrieNodesRequest) parseGetTrieNodesResponse(resp *syncResponse) ([][]byte, error) {
+	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
+		return nil, errors.New(errResp.Error)
+	}
+	grResp := resp.pb.GetGetTrieNodesResponse()
+	if grResp == nil {
+		return nil, errors.New("response not GetTrieNodes")
+	}
+	nodes := make([][]byte, 0)
+	for _, codeBytes := range grResp.Nodes {
+		var code []byte
+		if err := rlp.DecodeBytes(codeBytes, &code); err != nil {
+			return nil, errors.Wrap(err, "[GetTrieNodesResponse]")
+		}
+		nodes = append(nodes, code)
+	}
+	return nodes, nil
 }

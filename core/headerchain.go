@@ -18,13 +18,11 @@ package core
 
 import (
 	crand "crypto/rand"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
 	mrand "math/rand"
 	"sync/atomic"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -256,55 +254,6 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*block.Header, checkFreq int)
 	//		return i, err
 	//	}
 	//}
-
-	return 0, nil
-}
-
-// InsertHeaderChain attempts to insert the given header chain in to the local
-// chain, possibly creating a reorg. If an error is returned, it will return the
-// index number of the failing header as well an error describing what went wrong.
-//
-// The verify parameter can be used to fine tune whether nonce verification
-// should be done or not. The reason behind the optional check is because some
-// of the header retrieval mechanisms already need to verfy nonces, as well as
-// because nonces can be verified sparsely, not needing to check each.
-func (hc *HeaderChain) InsertHeaderChain(chain []*block.Header, writeHeader WhCallback, start time.Time) (int, error) {
-	// Collect some import statistics to report on
-	stats := struct{ processed, ignored int }{}
-	// All headers passed verification, import them into the database
-	for i, header := range chain {
-		// Short circuit insertion if shutting down
-		if hc.procInterrupt() {
-			utils.Logger().Debug().Msg("Premature abort during headers import")
-			return i, errors.New("aborted")
-		}
-		// If the header's already known, skip it, otherwise store
-		if hc.HasHeader(header.Hash(), header.Number().Uint64()) {
-			stats.ignored++
-			continue
-		}
-		if err := writeHeader(header); err != nil {
-			return i, err
-		}
-		stats.processed++
-	}
-	// Report some public statistics so the user has a clue what's going on
-	last := chain[len(chain)-1]
-
-	context := utils.Logger().With().
-		Int("count", stats.processed).
-		Str("elapsed", common.PrettyDuration(time.Since(start)).String()).
-		Str("number", last.Number().String()).
-		Str("hash", last.Hash().Hex())
-
-	if timestamp := time.Unix(last.Time().Int64(), 0); time.Since(timestamp) > time.Minute {
-		context = context.Str("age", common.PrettyAge(timestamp).String())
-	}
-	if stats.ignored > 0 {
-		context = context.Int("ignored", stats.ignored)
-	}
-	logger := context.Logger()
-	logger.Info().Msg("Imported new block headers")
 
 	return 0, nil
 }

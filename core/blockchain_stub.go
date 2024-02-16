@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -48,6 +49,10 @@ func (a Stub) CurrentBlock() *types.Block {
 	return nil
 }
 
+func (a Stub) CurrentFastBlock() *types.Block {
+	return nil
+}
+
 func (a Stub) Validator() Validator {
 	return nil
 }
@@ -62,6 +67,14 @@ func (a Stub) State() (*state.DB, error) {
 
 func (a Stub) StateAt(common.Hash) (*state.DB, error) {
 	return nil, errors.Errorf("method StateAt not implemented for %s", a.Name)
+}
+
+func (a Stub) Snapshots() *snapshot.Tree {
+	return nil
+}
+
+func (a Stub) TrieDB() *trie.Database {
+	return nil
 }
 
 func (a Stub) TrieNode(hash common.Hash) ([]byte, error) {
@@ -111,7 +124,7 @@ func (a Stub) Rollback(chain []common.Hash) error {
 	return errors.Errorf("method Rollback not implemented for %s", a.Name)
 }
 
-func (a Stub) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
+func (a Stub) WriteBlockWithoutState(block *types.Block) (err error) {
 	return errors.Errorf("method WriteBlockWithoutState not implemented for %s", a.Name)
 }
 
@@ -125,6 +138,10 @@ func (a Stub) GetMaxGarbageCollectedBlockNumber() int64 {
 
 func (a Stub) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	return 0, errors.Errorf("method InsertChain not implemented for %s", a.Name)
+}
+
+func (a Stub) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
+	return 0, errors.Errorf("method InsertReceiptChain not implemented for %s", a.Name)
 }
 
 func (a Stub) BadBlocks() []BadBlock {

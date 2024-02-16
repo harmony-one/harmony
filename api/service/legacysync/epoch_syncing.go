@@ -138,6 +138,9 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 
 		err := ProcessStateSync(syncConfig, heights, bc)
 		if err != nil {
+			if errors.Is(err, core.ErrKnownBlock) {
+				return 10
+			}
 			utils.Logger().Error().Err(err).
 				Msgf("[EPOCHSYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d)",
 					isBeacon, bc.ShardID(), otherEpoch, curEpoch)
@@ -199,8 +202,18 @@ func processWithPayload(payload [][]byte, bc core.BlockChain) error {
 		decoded = append(decoded, block)
 	}
 
-	_, err := bc.InsertChain(decoded, true)
-	return err
+	for _, block := range decoded {
+		_, err := bc.InsertChain([]*types.Block{block}, true)
+		switch {
+		case errors.Is(err, core.ErrKnownBlock):
+			continue
+		case err != nil:
+			return err
+		default:
+		}
+	}
+
+	return nil
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.

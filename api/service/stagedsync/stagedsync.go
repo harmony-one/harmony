@@ -1035,7 +1035,7 @@ func (ss *StagedSync) getBlockFromLastMileBlocksByParentHash(parentHash common.H
 }
 
 // UpdateBlockAndStatus updates block and its status in db
-func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
+func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Debug().
 			Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).
@@ -1043,6 +1043,7 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 			Msg("[STAGED_SYNC] Inappropriate block number, ignore!")
 		return nil
 	}
+	verifyAllSig := true
 
 	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
 	// Verify block signatures
@@ -1091,13 +1092,16 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 	}
 
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
-	if err != nil {
+	switch {
+	case errors.Is(err, core.ErrKnownBlock):
+	case err != nil:
 		utils.Logger().Error().
 			Err(err).
 			Uint64("block number", block.NumberU64()).
 			Uint32("shard", block.ShardID()).
 			Msgf("[STAGED_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain")
 		return err
+	default:
 	}
 	utils.Logger().Info().
 		Uint64("blockHeight", block.NumberU64()).
@@ -1218,7 +1222,11 @@ func (ss *StagedSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Con
 			if block == nil {
 				break
 			}
-			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+			_, err := bc.InsertChain(types.Blocks{block}, true)
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+			case errors.Is(err, core.ErrNotLastBlockInEpoch):
+			case err != nil:
 				return errors.Wrap(err, "failed to InsertChain")
 			}
 		}

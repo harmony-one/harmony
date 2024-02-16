@@ -271,8 +271,6 @@ func (p *Protocol) RemoveStream(stID sttypes.StreamID) {
 	if exist && st != nil {
 		//TODO: log this incident with reason
 		st.Close()
-		// stream manager removes this stream from the list and triggers discovery if number of streams are not enough
-		p.sm.RemoveStream(stID) //TODO: double check to see if this part is needed
 		p.logger.Info().
 			Str("stream ID", string(stID)).
 			Msg("stream removed")
@@ -290,8 +288,6 @@ func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
 			Msg("stream failed")
 		if st.FailedTimes() >= MaxStreamFailures {
 			st.Close()
-			// stream manager removes this stream from the list and triggers discovery if number of streams are not enough
-			p.sm.RemoveStream(stID) //TODO: double check to see if this part is needed
 			p.logger.Warn().
 				Str("stream ID", string(st.ID())).
 				Msg("stream removed")

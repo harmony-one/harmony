@@ -860,11 +860,12 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Debug().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
 	}
+	verifyAllSig := true
 
 	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
 	// Verify block signatures
@@ -904,7 +905,17 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 	}
 
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
-	if err != nil {
+	switch {
+	case errors.Is(err, core.ErrKnownBlock):
+		utils.Logger().Info().
+			Uint64("blockHeight", block.NumberU64()).
+			Uint64("blockEpoch", block.Epoch().Uint64()).
+			Str("blockHex", block.Hash().Hex()).
+			Uint32("ShardID", block.ShardID()).
+			Err(err).
+			Msg("[SYNC] UpdateBlockAndStatus: Block exists")
+		return nil
+	case err != nil:
 		utils.Logger().Error().
 			Err(err).
 			Msgf(
@@ -913,6 +924,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 				block.ShardID(),
 			)
 		return err
+	default:
 	}
 	utils.Logger().Info().
 		Uint64("blockHeight", block.NumberU64()).
@@ -944,8 +956,8 @@ func (ss *StateSync) generateNewState(bc core.BlockChain) error {
 			break
 		}
 		// Enforce sig check for the last block in a batch
-		enforceSigCheck := !commonIter.HasNext()
-		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck)
+		_ = !commonIter.HasNext()
+		err = ss.UpdateBlockAndStatus(block, bc)
 		if err != nil {
 			break
 		}
@@ -962,7 +974,7 @@ func (ss *StateSync) generateNewState(bc core.BlockChain) error {
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, true)
+		err = ss.UpdateBlockAndStatus(block, bc)
 		if err != nil {
 			break
 		}
@@ -983,7 +995,7 @@ func (ss *StateSync) generateNewState(bc core.BlockChain) error {
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, false)
+		err = ss.UpdateBlockAndStatus(block, bc)
 		if err != nil {
 			break
 		}
@@ -1111,6 +1123,9 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, isBeacon bool, consensus *cons
 		}
 		err := ss.ProcessStateSync(startHash[:], size, bc)
 		if err != nil {
+			if errors.Is(err, core.ErrKnownBlock) {
+				continue
+			}
 			utils.Logger().Error().Err(err).
 				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
@@ -1148,7 +1163,11 @@ func (ss *StateSync) addConsensusLastMile(bc core.BlockChain, consensus *consens
 			if block == nil {
 				break
 			}
-			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+			_, err := bc.InsertChain(types.Blocks{block}, true)
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+			case errors.Is(err, core.ErrNotLastBlockInEpoch):
+			case err != nil:
 				return errors.Wrap(err, "failed to InsertChain")
 			}
 		}

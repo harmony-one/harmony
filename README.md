@@ -150,7 +150,7 @@ make debug-kill
 
 To keep things consistent, we have a docker image to run all tests. **These are the same tests ran on the pull request checks**.
 
-Note that all testing docker container binds a couple of ports to the host machine for your convince. The ports are:
+Note that all test Docker containers bind several ports to the host machine for your convenience. The ports are:
 * `9500` - Shard 0 RPC for a validator
 * `9501` - Shard 1 RPC for a validator
 * `9599` - Shard 0 RPC for an explorer
@@ -174,7 +174,7 @@ To run this test, do:
 make test-rpc
 ```
 This test starts a localnet (within the Docker container), **ensures it reaches a consensus**, and runs a series of tests to ensure correct RPC behavior.
-This test also acts as a preliminary integration test (more through tests are done on the testnets).
+This test also acts as a preliminary integration test (more thorough tests are done on the testnets).
 > The tests ran by this command can be found [here](https://github.com/harmony-one/harmony-test/tree/master/localnet).
 
 If you wish to debug further with the localnet after the tests are done, open a new shell and run:
@@ -194,7 +194,7 @@ To run this test, do:
 make test-rosetta
 ```
 This test starts a localnet (within the Docker container), **ensures it reaches a consensus**, and runs the Construction & Data API checks using the [rosetta-cli](https://github.com/coinbase/rosetta-cli).
-This test also acts as a preliminary integration test (more through tests are done on the testnets).
+This test also acts as a preliminary integration test (more thorough tests are done on the testnets).
 > The config for this test can be found [here](https://github.com/harmony-one/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s0.json) & [here](https://github.com/harmony-one/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s1.json)
 
 Similar to the RPC tests, if you wish to debug further with the localnet after the tests are done, open a new shell and run:

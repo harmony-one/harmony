@@ -22,12 +22,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/state/snapshot"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
@@ -252,6 +254,7 @@ func (cr *fakeChainReader) GetReceiptsByHash(hash common.Hash) types.Receipts   
 func (cr *fakeChainReader) ContractCode(hash common.Hash) ([]byte, error)           { return []byte{}, nil }
 func (cr *fakeChainReader) ValidatorCode(hash common.Hash) ([]byte, error)          { return []byte{}, nil }
 func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (*shard.State, error)     { return nil, nil }
+func (cr *fakeChainReader) TrieDB() *trie.Database                                  { return nil }
 func (cr *fakeChainReader) TrieNode(hash common.Hash) ([]byte, error)               { return []byte{}, nil }
 func (cr *fakeChainReader) ReadValidatorList() ([]common.Address, error)            { return nil, nil }
 func (cr *fakeChainReader) ValidatorCandidates() []common.Address                   { return nil }
@@ -272,6 +275,9 @@ func (cr *fakeChainReader) ReadValidatorInformationAtState(
 }
 func (cr *fakeChainReader) StateAt(root common.Hash) (*state.DB, error) {
 	return nil, nil
+}
+func (cr *fakeChainReader) Snapshots() *snapshot.Tree {
+	return nil
 }
 func (cr *fakeChainReader) ReadValidatorSnapshot(
 	addr common.Address,

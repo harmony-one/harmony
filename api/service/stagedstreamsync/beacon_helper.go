@@ -1,8 +1,10 @@
 package stagedstreamsync
 
 import (
+	"errors"
 	"time"
 
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/rs/zerolog"
@@ -126,7 +128,8 @@ func (bh *beaconHelper) insertLastMileBlocks() (inserted int, bn uint64, err err
 		}
 		// TODO: Instruct the beacon helper to verify signatures. This may require some forks
 		//       in pub-sub message (add commit sigs in node.block.sync messages)
-		if _, err = bh.bc.InsertChain(types.Blocks{b}, true); err != nil {
+		_, err = bh.bc.InsertChain(types.Blocks{b}, true)
+		if err != nil && !errors.Is(err, core.ErrKnownBlock) {
 			bn--
 			return
 		}

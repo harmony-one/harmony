@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -46,22 +47,26 @@ type Options struct {
 type BlockChain interface {
 	// ValidateNewBlock validates new block.
 	ValidateNewBlock(block *types.Block, beaconChain BlockChain) error
-	// SetHead rewinds the local chain to a new head. In the case of headers, everything
-	// above the new head will be deleted and the new one set. In the case of blocks
-	// though, the head may be further rewound if block bodies are missing (non-archive
-	// nodes after a fast sync).
-	SetHead(head uint64) error
 	// ShardID returns the shard Id of the blockchain.
 	ShardID() uint32
 	// CurrentBlock retrieves the current head block of the canonical chain. The
 	// block is retrieved from the blockchain's internal cache.
 	CurrentBlock() *types.Block
+	// CurrentFastBlock retrieves the current fast-sync head block of the canonical
+	// block is retrieved from the blockchain's internal cache.
+	CurrentFastBlock() *types.Block
+	// Validator returns the current validator.
+	Validator() Validator
 	// Processor returns the current processor.
 	Processor() Processor
 	// State returns a new mutable state based on the current HEAD block.
 	State() (*state.DB, error)
 	// StateAt returns a new mutable state based on a particular point in time.
 	StateAt(root common.Hash) (*state.DB, error)
+	// Snapshots returns the blockchain snapshot tree.
+	Snapshots() *snapshot.Tree
+	// TrieDB returns trie database
+	TrieDB() *trie.Database
 	// HasBlock checks if a block is fully present in the database or not.
 	HasBlock(hash common.Hash, number uint64) bool
 	// HasState checks if state trie is fully present in the database or not.
@@ -100,10 +105,12 @@ type BlockChain interface {
 	// Rollback is designed to remove a chain of links from the database that aren't
 	// certain enough to be valid.
 	Rollback(chain []common.Hash) error
+	// writeHeadBlock writes a new head block
+	WriteHeadBlock(block *types.Block) error
 	// WriteBlockWithoutState writes only the block and its metadata to the database,
 	// but does not write any state. This is used to construct competing side forks
 	// up to the point where they exceed the canonical total difficulty.
-	WriteBlockWithoutState(block *types.Block, td *big.Int) (err error)
+	WriteBlockWithoutState(block *types.Block) (err error)
 	// WriteBlockWithState writes the block and all associated state to the database.
 	WriteBlockWithState(
 		block *types.Block, receipts []*types.Receipt,
@@ -121,7 +128,10 @@ type BlockChain interface {
 	//
 	// After insertion is done, all accumulated events will be fired.
 	InsertChain(chain types.Blocks, verifyHeaders bool) (int, error)
-	// LeaderRotationMeta returns info about leader rotation.
+	// InsertReceiptChain attempts to complete an already existing header chain with
+	// transaction and receipt data.
+	InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error)
+	// LeaderRotationMeta returns the number of continuous blocks by the leader.
 	LeaderRotationMeta() LeaderRotationMeta
 	// BadBlocks returns a list of the last 'bad blocks' that
 	// the client has seen on the network.
@@ -162,8 +172,6 @@ type BlockChain interface {
 	WriteShardStateBytes(db rawdb.DatabaseWriter,
 		epoch *big.Int, shardState []byte,
 	) (*shard.State, error)
-	// WriteHeadBlock writes head block.
-	WriteHeadBlock(block *types.Block) error
 	// ReadCommitSig retrieves the commit signature on a block.
 	ReadCommitSig(blockNum uint64) ([]byte, error)
 	// WriteCommitSig saves the commits signatures signed on a block.
@@ -174,20 +182,8 @@ type BlockChain interface {
 	GetVrfByNumber(number uint64) []byte
 	// ChainDb returns the database.
 	ChainDb() ethdb.Database
-	// GetEpochBlockNumber returns the first block number of the given epoch.
-	GetEpochBlockNumber(epoch *big.Int) (*big.Int, error)
-	// StoreEpochBlockNumber stores the given epoch-first block number.
-	StoreEpochBlockNumber(
-		epoch *big.Int, blockNum *big.Int,
-	) error
 	// ReadEpochVrfBlockNums retrieves block numbers with valid VRF for the specified epoch.
 	ReadEpochVrfBlockNums(epoch *big.Int) ([]uint64, error)
-	// WriteEpochVrfBlockNums saves block numbers with valid VRF for the specified epoch.
-	WriteEpochVrfBlockNums(epoch *big.Int, vrfNumbers []uint64) error
-	// ReadEpochVdfBlockNum retrieves block number with valid VDF for the specified epoch.
-	ReadEpochVdfBlockNum(epoch *big.Int) (*big.Int, error)
-	// WriteEpochVdfBlockNum saves block number with valid VDF for the specified epoch.
-	WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) error
 	// WriteCrossLinks saves the hashes of crosslinks by shardID and blockNum combination key.
 	WriteCrossLinks(batch rawdb.DatabaseWriter, cls []types.CrossLink) error
 	// DeleteCrossLinks removes the hashes of crosslinks by shardID and blockNum combination key.

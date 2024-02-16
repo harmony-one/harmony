@@ -32,7 +32,6 @@ var (
 		legacyDataDirFlag,
 
 		taraceFlag,
-		triesInMemoryFlag,
 	}
 
 	dnsSyncFlags = []cli.Flag{
@@ -238,6 +237,7 @@ var (
 
 	syncFlags = []cli.Flag{
 		syncStreamEnabledFlag,
+		syncModeFlag,
 		syncDownloaderFlag,
 		syncStagedSyncFlag,
 		syncConcurrencyFlag,
@@ -265,6 +265,16 @@ var (
 		gpoMaxPriceFlag,
 		gpoLowUsageThresholdFlag,
 		gpoBlockGasLimitFlag,
+	}
+
+	cacheConfigFlags = []cli.Flag{
+		cacheDisabled,
+		cacheTrieNodeLimit,
+		cacheTriesInMemory,
+		cachePreimages,
+		cacheSnapshotLimit,
+		cacheSnapshotNoBuild,
+		cacheSnapshotWait,
 	}
 
 	metricsFlags = []cli.Flag{
@@ -351,11 +361,6 @@ var (
 		Usage:    "indicates if full transaction tracing should be enabled",
 		DefValue: defaultConfig.General.TraceEnable,
 	}
-	triesInMemoryFlag = cli.IntFlag{
-		Name:     "blockchain.tries_in_memory",
-		Usage:    "number of blocks from header stored in disk before exiting",
-		DefValue: defaultConfig.General.TriesInMemory,
-	}
 )
 
 func getRootFlags() []cli.Flag {
@@ -434,14 +439,6 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, isBackupFlag) {
 		config.General.IsBackup = cli.GetBoolFlagValue(cmd, isBackupFlag)
-	}
-
-	if cli.IsFlagChanged(cmd, triesInMemoryFlag) {
-		value := cli.GetIntFlagValue(cmd, triesInMemoryFlag)
-		if value <= 2 {
-			panic("Must provide number greater than 2 for General.TriesInMemory")
-		}
-		config.General.TriesInMemory = value
 	}
 }
 
@@ -1876,6 +1873,13 @@ var (
 		Usage:    "Enable the stream sync protocol (experimental feature)",
 		DefValue: false,
 	}
+
+	syncModeFlag = cli.IntFlag{
+		Name:     "sync.mode",
+		Usage:    "synchronization mode of the downloader (0=FullSync, 1=FastSync, 2=SnapSync)",
+		DefValue: 0,
+	}
+
 	// TODO: Deprecate this flag, and always set to true after stream sync is fully up.
 	syncDownloaderFlag = cli.BoolFlag{
 		Name:     "sync.downloader",
@@ -1935,6 +1939,10 @@ var (
 func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, syncStreamEnabledFlag) {
 		config.Sync.Enabled = cli.GetBoolFlagValue(cmd, syncStreamEnabledFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncModeFlag) {
+		config.Sync.SyncMode = uint32(cli.GetIntFlagValue(cmd, syncModeFlag))
 	}
 
 	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
@@ -2101,5 +2109,72 @@ func applyGPOFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, gpoBlockGasLimitFlag) {
 		cfg.GPO.BlockGasLimit = cli.GetIntFlagValue(cmd, gpoBlockGasLimitFlag)
+	}
+}
+
+// cache config flags
+var (
+	cacheDisabled = cli.BoolFlag{
+		Name:     "cache.disabled",
+		Usage:    "Whether to disable trie write caching (archive node)",
+		DefValue: defaultCacheConfig.Disabled,
+	}
+	cacheTrieNodeLimit = cli.IntFlag{
+		Name:     "cache.trie_node_limit",
+		Usage:    " Memory limit (MB) at which to flush the current in-memory trie to disk",
+		DefValue: defaultCacheConfig.TrieNodeLimit,
+	}
+	cacheTriesInMemory = cli.Uint64Flag{
+		Name:     "cache.tries_in_memory",
+		Usage:    "Block number from the head stored in disk before exiting",
+		DefValue: defaultCacheConfig.TriesInMemory,
+	}
+	cachePreimages = cli.BoolFlag{
+		Name:     "cache.preimages",
+		Usage:    "Whether to store preimage of trie key to the disk",
+		DefValue: defaultCacheConfig.Preimages,
+	}
+	cacheSnapshotLimit = cli.IntFlag{
+		Name:     "cache.snapshot_limit",
+		Usage:    "Memory allowance (MB) to use for caching snapshot entries in memory",
+		DefValue: defaultCacheConfig.SnapshotLimit,
+	}
+	cacheSnapshotNoBuild = cli.BoolFlag{
+		Name:     "cache.snapshot_no_build",
+		Usage:    "Whether the background generation is allowed",
+		DefValue: defaultCacheConfig.SnapshotNoBuild,
+	}
+	cacheSnapshotWait = cli.BoolFlag{
+		Name:     "cache.snapshot_wait",
+		Usage:    "Wait for snapshot construction on startup",
+		DefValue: defaultCacheConfig.SnapshotWait,
+	}
+)
+
+func applyCacheFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, cacheDisabled) {
+		cfg.Cache.Disabled = cli.GetBoolFlagValue(cmd, cacheDisabled)
+	}
+	if cli.IsFlagChanged(cmd, cacheTrieNodeLimit) {
+		cfg.Cache.TrieNodeLimit = cli.GetIntFlagValue(cmd, cacheTrieNodeLimit)
+	}
+	if cli.IsFlagChanged(cmd, cacheTriesInMemory) {
+		value := cli.GetUint64FlagValue(cmd, cacheTriesInMemory)
+		if value <= 2 {
+			panic("Must provide number greater than 2 for Cache.TriesInMemory")
+		}
+		cfg.Cache.TriesInMemory = value
+	}
+	if cli.IsFlagChanged(cmd, cachePreimages) {
+		cfg.Cache.Preimages = cli.GetBoolFlagValue(cmd, cachePreimages)
+	}
+	if cli.IsFlagChanged(cmd, cacheSnapshotLimit) {
+		cfg.Cache.SnapshotLimit = cli.GetIntFlagValue(cmd, cacheSnapshotLimit)
+	}
+	if cli.IsFlagChanged(cmd, cacheSnapshotNoBuild) {
+		cfg.Cache.SnapshotNoBuild = cli.GetBoolFlagValue(cmd, cacheSnapshotNoBuild)
+	}
+	if cli.IsFlagChanged(cmd, cacheSnapshotWait) {
+		cfg.Cache.SnapshotWait = cli.GetBoolFlagValue(cmd, cacheSnapshotWait)
 	}
 }

@@ -82,7 +82,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 }
 
 func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
-	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
+	consensus.decider.UpdateParticipants(pubKeys, allowlist)
 	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
 		consensus.getLogger().Info().
@@ -91,7 +91,7 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 			Msg("Member")
 	}
 
-	allKeys := consensus.Decider.Participants()
+	allKeys := consensus.decider.Participants()
 	if len(allKeys) != 0 {
 		consensus.LeaderPubKey = &allKeys[0]
 		consensus.getLogger().Info().
@@ -115,7 +115,7 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	if !consensus.isViewChangingMode() {
 		consensus.resetViewChangeState()
 	}
-	return consensus.Decider.ParticipantsCount()
+	return consensus.decider.ParticipantsCount()
 }
 
 // Sign on the hash of the message
@@ -144,7 +144,7 @@ func (consensus *Consensus) updateBitmaps() {
 	consensus.getLogger().Debug().
 		Str("MessageType", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
-	members := consensus.Decider.Participants()
+	members := consensus.decider.Participants()
 	prepareBitmap := bls_cosi.NewMask(members)
 	commitBitmap := bls_cosi.NewMask(members)
 	multiSigBitmap := bls_cosi.NewMask(members)
@@ -160,7 +160,7 @@ func (consensus *Consensus) resetState() {
 
 	consensus.blockHash = [32]byte{}
 	consensus.block = []byte{}
-	consensus.Decider.ResetPrepareAndCommitVotes()
+	consensus.decider.ResetPrepareAndCommitVotes()
 	if consensus.prepareBitmap != nil {
 		consensus.prepareBitmap.Clear()
 	}
@@ -179,7 +179,7 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 }
 
 func (consensus *Consensus) isValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
-	return consensus.Decider.IndexOf(pubKey) != -1
+	return consensus.decider.IndexOf(pubKey) != -1
 }
 
 // SetMode sets the mode of consensus
@@ -271,7 +271,7 @@ func (consensus *Consensus) setBlockNum(blockNum uint64) {
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
 func (consensus *Consensus) ReadSignatureBitmapPayload(recvPayload []byte, offset int) (*bls_core.Sign, *bls_cosi.Mask, error) {
 	consensus.mutex.RLock()
-	members := consensus.Decider.Participants()
+	members := consensus.decider.Participants()
 	consensus.mutex.RUnlock()
 	return consensus.readSignatureBitmapPayload(recvPayload, offset, members)
 }
@@ -334,12 +334,12 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	isFirstTimeStaking := consensus.Blockchain().Config().IsStaking(nextEpoch) &&
 		curHeader.IsLastBlockInEpoch() && !consensus.Blockchain().Config().IsStaking(curEpoch)
 	haventUpdatedDecider := consensus.Blockchain().Config().IsStaking(curEpoch) &&
-		consensus.Decider.Policy() != quorum.SuperMajorityStake
+		consensus.decider.Policy() != quorum.SuperMajorityStake
 
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
-		consensus.Decider = decider
+		consensus.decider = decider
 	}
 
 	var committeeToSet *shard.Committee
@@ -412,7 +412,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	consensus.updatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(nextEpoch).ExternalAllowlist())
 
 	// Update voters in the committee
-	if _, err := consensus.Decider.SetVoters(
+	if _, err := consensus.decider.SetVoters(
 		committeeToSet, epochToSet,
 	); err != nil {
 		consensus.getLogger().Error().
@@ -514,12 +514,14 @@ func (consensus *Consensus) setViewIDs(height uint64) {
 
 // SetCurBlockViewID set the current view ID
 func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
-	return consensus.current.SetCurBlockViewID(viewID)
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	return consensus.setCurBlockViewID(viewID)
 }
 
 // SetCurBlockViewID set the current view ID
-func (consensus *Consensus) setCurBlockViewID(viewID uint64) {
-	consensus.current.SetCurBlockViewID(viewID)
+func (consensus *Consensus) setCurBlockViewID(viewID uint64) uint64 {
+	return consensus.current.SetCurBlockViewID(viewID)
 }
 
 // SetViewChangingID set the current view change ID
@@ -580,7 +582,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 		return errGetPreparedBlock
 	}
 
-	aggSig, mask, err := consensus.readSignatureBitmapPayload(payload, 32, consensus.Decider.Participants())
+	aggSig, mask, err := consensus.readSignatureBitmapPayload(payload, 32, consensus.decider.Participants())
 	if err != nil {
 		return errReadBitmapPayload
 	}
@@ -604,7 +606,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 			continue
 		}
 
-		if _, err := consensus.Decider.AddNewVote(
+		if _, err := consensus.decider.AddNewVote(
 			quorum.Commit,
 			[]*bls_cosi.PublicKeyWrapper{key.Pub},
 			key.Pri.SignHash(commitPayload),
@@ -625,14 +627,18 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 // NumSignaturesIncludedInBlock returns the number of signatures included in the block
 func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uint32 {
 	count := uint32(0)
-	members := consensus.Decider.Participants()
+	consensus.mutex.Lock()
+	members := consensus.decider.Participants()
+	pubKeys := consensus.getPublicKeys()
+	consensus.mutex.Unlock()
+
 	// TODO(audit): do not reconstruct the Mask
 	mask := bls.NewMask(members)
 	err := mask.SetMask(block.Header().LastCommitBitmap())
 	if err != nil {
 		return count
 	}
-	for _, key := range consensus.GetPublicKeys() {
+	for _, key := range pubKeys {
 		if ok, err := mask.KeyEnabled(key.Bytes); err == nil && ok {
 			count++
 		}
@@ -658,40 +664,38 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 	return &logger
 }
 
-// VerifyNewBlock is called by consensus participants to verify the block (account model) they are
+// BlockVerifier is called by consensus participants to verify the block (account model) they are
 // running consensus on.
-func VerifyNewBlock(hooks *webhooks.Hooks, blockChain core.BlockChain, beaconChain core.BlockChain) func(*types.Block) error {
-	return func(newBlock *types.Block) error {
-		if err := blockChain.ValidateNewBlock(newBlock, beaconChain); err != nil {
-			switch {
-			case errors.Is(err, core.ErrKnownBlock):
-				return nil
-			default:
-			}
-
-			if hooks := hooks; hooks != nil {
-				if p := hooks.ProtocolIssues; p != nil {
-					url := p.OnCannotCommit
-					go func() {
-						webhooks.DoPost(url, map[string]interface{}{
-							"bad-header": newBlock.Header(),
-							"reason":     err.Error(),
-						})
-					}()
-				}
-			}
-			utils.Logger().Error().
-				Str("blockHash", newBlock.Hash().Hex()).
-				Int("numTx", len(newBlock.Transactions())).
-				Int("numStakingTx", len(newBlock.StakingTransactions())).
-				Err(err).
-				Msgf("[VerifyNewBlock] Cannot Verify New Block!!!, blockHeight %d, myHeight %d", newBlock.NumberU64(), blockChain.CurrentHeader().NumberU64())
-			return errors.WithMessagef(err,
-				"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
-				newBlock.Hash().Hex(),
-				len(newBlock.Transactions()),
-			)
+func (consensus *Consensus) BlockVerifier(newBlock *types.Block) error {
+	if err := consensus.Blockchain().ValidateNewBlock(newBlock, consensus.Beaconchain()); err != nil {
+		switch {
+		case errors.Is(err, core.ErrKnownBlock):
+			return nil
+		default:
 		}
-		return nil
+
+		if hooks := consensus.registry.GetWebHooks(); hooks != nil {
+			if p := hooks.ProtocolIssues; p != nil {
+				url := p.OnCannotCommit
+				go func() {
+					webhooks.DoPost(url, map[string]interface{}{
+						"bad-header": newBlock.Header(),
+						"reason":     err.Error(),
+					})
+				}()
+			}
+		}
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Int("numTx", len(newBlock.Transactions())).
+			Int("numStakingTx", len(newBlock.StakingTransactions())).
+			Err(err).
+			Msgf("[VerifyNewBlock] Cannot Verify New Block!!!, blockHeight %d, myHeight %d", newBlock.NumberU64(), consensus.Blockchain().CurrentHeader().NumberU64())
+		return errors.WithMessagef(err,
+			"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
+			newBlock.Hash().Hex(),
+			len(newBlock.Transactions()),
+		)
 	}
+	return nil
 }

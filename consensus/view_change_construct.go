@@ -46,7 +46,6 @@ type viewChange struct {
 
 	m1Payload []byte // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 
-	verifyBlock        VerifyBlockFunc
 	viewChangeDuration time.Duration
 }
 
@@ -152,7 +151,7 @@ func (vc *viewChange) GetM3Bitmap(viewID uint64) ([]byte, []byte) {
 }
 
 // VerifyNewViewMsg returns true if the new view message is valid
-func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, error) {
+func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage, verifyBlock func(block *types.Block) error) (*types.Block, error) {
 	if recvMsg.M3AggSig == nil || recvMsg.M3Bitmap == nil {
 		return nil, errors.New("[VerifyNewViewMsg] M3AggSig or M3Bitmap is nil")
 	}
@@ -215,7 +214,7 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 		if !bytes.Equal(preparedBlockHash[:], blockHash) {
 			return nil, errors.New("[VerifyNewViewMsg] Prepared block hash doesn't match msg block hash")
 		}
-		if err := vc.verifyBlock(preparedBlock); err != nil {
+		if err := verifyBlock(preparedBlock); err != nil {
 			return nil, err
 		}
 		return preparedBlock, nil
@@ -239,6 +238,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 	fbftlog *FBFTLog,
 	decider quorum.Decider,
 	recvMsg *FBFTMessage,
+	verifyBlock func(block *types.Block) error,
 ) error {
 	preparedBlock := &types.Block{}
 	if !recvMsg.HasSingleSender() {
@@ -256,7 +256,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
 			return err
 		}
-		if err := vc.verifyBlock(preparedBlock); err != nil {
+		if err := verifyBlock(preparedBlock); err != nil {
 			return err
 		}
 		_, ok := vc.bhpSigs[recvMsg.ViewID][senderKeyStr]
@@ -381,6 +381,7 @@ func (vc *viewChange) InitPayload(
 	blockNum uint64,
 	privKeys multibls.PrivateKeys,
 	members multibls.PublicKeys,
+	verifyBlock func(block *types.Block) error,
 ) error {
 	// m1 or m2 init once per viewID/key.
 	// m1 and m2 are mutually exclusive.
@@ -405,7 +406,7 @@ func (vc *viewChange) InitPayload(
 		hasBlock := false
 		if preparedMsg != nil {
 			if preparedBlock := fbftlog.GetBlockByHash(preparedMsg.BlockHash); preparedBlock != nil {
-				if err := vc.verifyBlock(preparedBlock); err == nil {
+				if err := verifyBlock(preparedBlock); err == nil {
 					vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Int("size", binary.Size(preparedBlock)).Msg("[InitPayload] add my M1 (prepared) type messaage")
 					msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 					for _, key := range privKeys {

@@ -53,6 +53,11 @@ func NewStageStatesCfg(
 
 // Exec progresses States stage in the forward direction
 func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
+	// only execute this stage in full sync mode
+	if s.state.status.cycleSyncMode != FullSync {
+		return nil
+	}
+
 	// for short range sync, skip this step
 	if !s.state.initSync {
 		return nil
@@ -64,11 +69,11 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	}
 
 	maxHeight := s.state.status.targetBN
-	currentHead := stg.configs.bc.CurrentBlock().NumberU64()
+	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
-	currProgress := stg.configs.bc.CurrentBlock().NumberU64()
+	currProgress := currentHead
 	targetHeight := s.state.currentCycle.TargetHeight
 	if currProgress >= targetHeight {
 		return nil
@@ -110,7 +115,10 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 
 	for i := currProgress + 1; i <= targetHeight; i++ {
 		blkKey := marshalData(i)
-		loopID, streamID := gbm.GetDownloadDetails(i)
+		loopID, streamID, errBDD := gbm.GetDownloadDetails(i)
+		if errBDD != nil {
+			return errBDD
+		}
 
 		blockBytes, err := txs[loopID].GetOne(BlocksBucket, blkKey)
 		if err != nil {
@@ -155,6 +163,10 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 				reverter.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), i, invalidBlockHash, streamID)
 			}
 			return ErrInvalidBlockNumber
+		}
+
+		if stg.configs.bc.HasBlock(block.Hash(), block.NumberU64()) {
+			continue
 		}
 
 		if err := verifyAndInsertBlock(stg.configs.bc, block); err != nil {

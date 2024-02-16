@@ -40,6 +40,8 @@ const (
 
 func (ps partnerSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.PartnerChainConfig.IsDevnetExternalEpoch(epoch):
+		return partnerV3
 	case params.PartnerChainConfig.IsHIP30(epoch):
 		return partnerV2
 	case epoch.Cmp(params.PartnerChainConfig.StakingEpoch) >= 0:
@@ -97,15 +99,23 @@ var partnerV0 = MustNewInstance(
 	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
 )
 var partnerV1 = MustNewInstance(
-	2, 5, 4, 0,
+	2, 15, 4, 0,
 	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
 	genesis.TNFoundationalAccounts, emptyAllowlist, nil,
 	numeric.ZeroDec(), ethCommon.Address{},
 	partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(),
 )
 var partnerV2 = MustNewInstance(
-	2, 5, 4, 0,
+	2, 20, 4, 0,
 	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
+	genesis.TNFoundationalAccounts, emptyAllowlist,
+	feeCollectorsDevnet[1], numeric.MustNewDecFromStr("0.25"),
+	hip30CollectionAddressTestnet, partnerReshardingEpoch,
+	PartnerSchedule.BlocksPerEpoch(),
+)
+var partnerV3 = MustNewInstance(
+	2, 20, 0, 0,
+	numeric.MustNewDecFromStr("0.0"), genesis.TNHarmonyAccounts,
 	genesis.TNFoundationalAccounts, emptyAllowlist,
 	feeCollectorsDevnet[1], numeric.MustNewDecFromStr("0.25"),
 	hip30CollectionAddressTestnet, partnerReshardingEpoch,

@@ -124,7 +124,7 @@ func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
 	}()
 	for i, block := range blocks {
 		if !block.IsLastBlockInEpoch() {
-			return i, errors.New("block is not last block in epoch")
+			return i, ErrNotLastBlockInEpoch
 		}
 		sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
 		if err != nil {
@@ -166,7 +166,8 @@ func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
 		se1()
 		se2()
 		utils.Logger().Info().
-			Msgf("[EPOCHSYNC] Added block %d %s", block.NumberU64(), block.Hash().Hex())
+			Msgf("[EPOCHSYNC] Added block %d, epoch %d, %s", block.NumberU64(), block.Epoch().Uint64(), block.Hash().Hex())
+
 	}
 	return 0, nil
 }

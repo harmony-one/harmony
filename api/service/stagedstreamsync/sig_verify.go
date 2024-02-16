@@ -3,6 +3,7 @@ package stagedstreamsync
 import (
 	"fmt"
 
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -28,7 +29,7 @@ func verifyAndInsertBlocks(bc blockChain, blocks types.Blocks) (int, error) {
 	return len(blocks), nil
 }
 
-func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*types.Block) error {
+func verifyBlock(bc blockChain, block *types.Block, nextBlocks ...*types.Block) error {
 	var (
 		sigBytes bls.SerializedSignature
 		bitmap   []byte
@@ -53,7 +54,20 @@ func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*type
 	if err := bc.Engine().VerifyHeader(bc, block.Header(), true); err != nil {
 		return errors.Wrap(err, "[VerifyHeader]")
 	}
+
+	return nil
+}
+
+func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*types.Block) error {
+	//verify block
+	if err := verifyBlock(bc, block, nextBlocks...); err != nil {
+		return err
+	}
+	// insert block
 	if _, err := bc.InsertChain(types.Blocks{block}, false); err != nil {
+		if errors.Is(err, core.ErrKnownBlock) {
+			return nil
+		}
 		return errors.Wrap(err, "[InsertChain]")
 	}
 	return nil

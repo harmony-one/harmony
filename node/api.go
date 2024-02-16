@@ -2,7 +2,9 @@ package node
 
 import (
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/tikv"
@@ -175,11 +177,37 @@ func (node *Node) GetConfig() rpc_common.Config {
 
 // GetLastSigningPower get last signed power
 func (node *Node) GetLastSigningPower() (float64, error) {
-	power, err := node.Consensus.Decider.CurrentTotalPower(quorum.Commit)
+	power, err := node.Consensus.Decider().CurrentTotalPower(quorum.Commit)
 	if err != nil {
 		return 0, err
 	}
 
+	round := float64(power.MulInt64(10000).RoundInt64()) / 10000
+	return round, nil
+}
+
+func (node *Node) GetLastSigningPower2() (float64, error) {
+	bc := node.Consensus.Blockchain()
+	cur := bc.CurrentBlock()
+	ss, err := bc.ReadShardState(cur.Epoch())
+	if err != nil {
+		return 0, err
+	}
+	roster, err := votepower.Compute(&ss.Shards[bc.ShardID()], cur.Epoch())
+	if err != nil {
+		return 0, err
+	}
+	blsPubKeys, err := ss.Shards[bc.ShardID()].BLSPublicKeys()
+	if err != nil {
+		return 0, err
+	}
+
+	mask := bls.NewMask(blsPubKeys)
+	err = mask.SetMask(cur.Header().LastCommitBitmap())
+	if err != nil {
+		return 0, err
+	}
+	power := roster.VotePowerByMask(mask)
 	round := float64(power.MulInt64(10000).RoundInt64()) / 10000
 	return round, nil
 }

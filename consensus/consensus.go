@@ -6,19 +6,20 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/registry"
-
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
@@ -39,12 +40,13 @@ const (
 	AsyncProposal
 )
 
-// VerifyBlockFunc is a function used to verify the block and keep trace of verified blocks
-type VerifyBlockFunc func(*types.Block) error
+type DownloadAsync interface {
+	DownloadAsync()
+}
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	Decider quorum.Decider
+	decider quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	fBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -94,12 +96,8 @@ type Consensus struct {
 	// The post-consensus job func passed from Node object
 	// Called when consensus on a new block is done
 	PostConsensusJob func(*types.Block) error
-	// The verifier func passed from Node object
-	BlockVerifier VerifyBlockFunc
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
-	// will trigger state syncing when blockNum is low
-	BlockNumLowChan chan struct{}
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
 	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -128,7 +126,7 @@ type Consensus struct {
 	// finalityCounter keep tracks of the finality time
 	finalityCounter atomic.Value //int64
 
-	dHelper *downloadHelper
+	dHelper DownloadAsync
 
 	// Both flags only for initialization state.
 	start           bool
@@ -170,7 +168,7 @@ func (consensus *Consensus) Beaconchain() core.BlockChain {
 	return consensus.registry.GetBeaconchain()
 }
 
-// VerifyBlock is a function used to verify the block and keep trace of verified blocks.
+// verifyBlock is a function used to verify the block and keep trace of verified blocks.
 func (consensus *Consensus) verifyBlock(block *types.Block) error {
 	if !consensus.fBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
@@ -184,21 +182,27 @@ func (consensus *Consensus) verifyBlock(block *types.Block) error {
 // BlocksSynchronized lets the main loop know that block synchronization finished
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
+	err := consensus.AddConsensusLastMile()
+	if err != nil {
+		consensus.GetLogger().Error().Err(err).Msg("add last mile failed")
+	}
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	consensus.syncReadyChan()
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
-func (consensus *Consensus) BlocksNotSynchronized() {
+func (consensus *Consensus) BlocksNotSynchronized(reason string) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.syncNotReadyChan()
+	consensus.syncNotReadyChan(reason)
 }
 
 // VdfSeedSize returns the number of VRFs for VDF computation
 func (consensus *Consensus) VdfSeedSize() int {
-	return int(consensus.Decider.ParticipantsCount()) * 2 / 3
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return int(consensus.decider.ParticipantsCount()) * 2 / 3
 }
 
 // GetPublicKeys returns the public keys
@@ -268,20 +272,20 @@ func New(
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
 	consensus := Consensus{
-		mutex:           &sync.RWMutex{},
-		ShardID:         shard,
-		fBFTLog:         NewFBFTLog(),
-		phase:           FBFTAnnounce,
-		current:         State{mode: Normal},
-		Decider:         Decider,
-		registry:        registry,
-		MinPeers:        minPeers,
-		AggregateSig:    aggregateSig,
-		host:            host,
-		msgSender:       NewMessageSender(host),
-		BlockNumLowChan: make(chan struct{}, 1),
+		mutex:        &sync.RWMutex{},
+		ShardID:      shard,
+		fBFTLog:      NewFBFTLog(),
+		phase:        FBFTAnnounce,
+		current:      State{mode: Normal},
+		decider:      Decider,
+		registry:     registry,
+		MinPeers:     minPeers,
+		AggregateSig: aggregateSig,
+		host:         host,
+		msgSender:    NewMessageSender(host),
 		// FBFT timeout
 		consensusTimeout: createTimeout(),
+		dHelper:          downloadAsync{},
 	}
 
 	if multiBLSPriKey != nil {
@@ -296,7 +300,7 @@ func New(
 	// viewID has to be initialized as the height of
 	// the blockchain during initialization as it was
 	// displayed on explorer as Height right now
-	consensus.SetCurBlockViewID(0)
+	consensus.setCurBlockViewID(0)
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.readySignal = make(chan ProposalType)
 	consensus.commitSigChannel = make(chan []byte)
@@ -305,11 +309,6 @@ func New(
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	// Make Sure Verifier is not null
 	consensus.vc = newViewChange()
-	// TODO: reference to blockchain/beaconchain should be removed.
-	verifier := VerifyNewBlock(registry.GetWebHooks(), consensus.Blockchain(), consensus.Beaconchain())
-	consensus.BlockVerifier = verifier
-	consensus.vc.verifyBlock = consensus.verifyBlock
-
 	// init prometheus metrics
 	initMetrics()
 	consensus.AddPubkeyMetrics()
@@ -323,4 +322,73 @@ func (consensus *Consensus) GetHost() p2p.Host {
 
 func (consensus *Consensus) Registry() *registry.Registry {
 	return consensus.registry
+}
+
+func (consensus *Consensus) Decider() quorum.Decider {
+	return quorum.NewThreadSafeDecider(consensus.decider, consensus.mutex)
+}
+
+// InitConsensusWithValidators initialize shard state
+// from latest epoch and update committee pub
+// keys for consensus
+func (consensus *Consensus) InitConsensusWithValidators() (err error) {
+	shardID := consensus.ShardID
+	currentBlock := consensus.Blockchain().CurrentBlock()
+	blockNum := currentBlock.NumberU64()
+	consensus.SetMode(Listening)
+	epoch := currentBlock.Epoch()
+	utils.Logger().Info().
+		Uint64("blockNum", blockNum).
+		Uint32("shardID", shardID).
+		Uint64("epoch", epoch.Uint64()).
+		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
+	shardState, err := committee.WithStakingEnabled.Compute(
+		epoch, consensus.Blockchain(),
+	)
+	if err != nil {
+		utils.Logger().Err(err).
+			Uint64("blockNum", blockNum).
+			Uint32("shardID", shardID).
+			Uint64("epoch", epoch.Uint64()).
+			Msg("[InitConsensusWithValidators] Failed getting shard state")
+		return err
+	}
+	subComm, err := shardState.FindCommitteeByID(shardID)
+	if err != nil {
+		utils.Logger().Err(err).
+			Interface("shardState", shardState).
+			Msg("[InitConsensusWithValidators] Find CommitteeByID")
+		return err
+	}
+	pubKeys, err := subComm.BLSPublicKeys()
+	if err != nil {
+		utils.Logger().Error().
+			Uint32("shardID", shardID).
+			Uint64("blockNum", blockNum).
+			Msg("[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys")
+		return errors.Wrapf(
+			err,
+			"[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys",
+		)
+	}
+
+	for _, key := range pubKeys {
+		if consensus.GetPublicKeys().Contains(key.Object) {
+			utils.Logger().Info().
+				Uint64("blockNum", blockNum).
+				Int("numPubKeys", len(pubKeys)).
+				Str("mode", consensus.Mode().String()).
+				Msg("[InitConsensusWithValidators] Successfully updated public keys")
+			consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
+			consensus.SetMode(Normal)
+			return nil
+		}
+	}
+	return nil
+}
+
+type downloadAsync struct {
+}
+
+func (a downloadAsync) DownloadAsync() {
 }

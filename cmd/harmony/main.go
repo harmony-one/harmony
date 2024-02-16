@@ -14,28 +14,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/internal/chain"
-	"github.com/harmony-one/harmony/internal/registry"
-	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
-	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
-	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
-
-	"github.com/harmony-one/harmony/api/service/crosslink_sending"
-	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
-
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
-	rpc_common "github.com/harmony-one/harmony/rpc/common"
-
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/api/service/crosslink_sending"
 	"github.com/harmony-one/harmony/api/service/pprof"
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/stagedstreamsync"
@@ -43,22 +27,33 @@ import (
 	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/common/ntp"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/hmy/downloader"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/internal/common"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/shardchain"
+	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
+	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
+	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
+	rpc_common "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 // Host
@@ -250,6 +245,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applySyncFlags(cmd, config)
 	applyShardDataFlags(cmd, config)
 	applyGPOFlags(cmd, config)
+	applyCacheFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
@@ -788,6 +784,8 @@ func setupChain(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigTyp
 }
 
 func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType, registry *registry.Registry) *node.Node {
+	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(hc.General.ShardID))
+
 	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
 	var aggregateSig bool
@@ -821,7 +819,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	registry.SetCxPool(cxPool)
 
 	// Consensus object.
-	decider := quorum.NewDecider(quorum.SuperMajorityVote, nodeConfig.ShardID)
 	registry.SetIsBackup(isBackup(hc))
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, registry, decider, minPeers, aggregateSig)
@@ -866,7 +863,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
 
 	// This needs to be executed after consensus setup
-	if err := currentNode.InitConsensusWithValidators(); err != nil {
+	if err := currentConsensus.InitConsensusWithValidators(); err != nil {
 		utils.Logger().Warn().
 			Int("shardID", hc.General.ShardID).
 			Err(err).
@@ -1009,6 +1006,7 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 
 	sConfig := stagedstreamsync.Config{
 		ServerOnly:           !hc.Sync.Downloader,
+		SyncMode:             stagedstreamsync.SyncMode(hc.Sync.SyncMode),
 		Network:              nodeconfig.NetworkType(hc.Network.NetworkType),
 		Concurrency:          hc.Sync.Concurrency,
 		MinStreams:           hc.Sync.MinPeers,
@@ -1020,7 +1018,7 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 		SmDiscBatch:          hc.Sync.DiscBatch,
 		UseMemDB:             hc.Sync.StagedSyncCfg.UseMemDB,
 		LogProgress:          hc.Sync.StagedSyncCfg.LogProgress,
-		DebugMode:            hc.Sync.StagedSyncCfg.DebugMode,
+		DebugMode:            true, // hc.Sync.StagedSyncCfg.DebugMode,
 	}
 
 	// If we are running side chain, we will need to do some extra works for beacon

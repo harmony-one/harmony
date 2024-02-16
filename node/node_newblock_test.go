@@ -74,7 +74,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
 	)
 
-	if err := consensus.VerifyNewBlock(nil, blockchain, nil)(block); err != nil {
+	if err := blockchain.ValidateNewBlock(block, blockchain); err != nil {
 		t.Error("New block is not verified successfully:", err)
 	}
 

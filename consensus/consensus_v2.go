@@ -10,23 +10,23 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/core"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/rs/zerolog"
-
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -55,7 +55,7 @@ func (consensus *Consensus) isViewChangingMode() bool {
 }
 
 // HandleMessageUpdate will update the consensus state according to received message
-func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message, senderKey *bls.SerializedPublicKey) error {
+func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message, senderKey *bls.SerializedPublicKey) error {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
@@ -91,7 +91,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 	case t == msg_pb.MessageType_VIEWCHANGE:
 		fbftMsg, err = ParseViewChangeMessage(msg)
 	case t == msg_pb.MessageType_NEWVIEW:
-		members := consensus.Decider.Participants()
+		members := consensus.decider.Participants()
 		fbftMsg, err = ParseNewViewMessage(msg, members)
 	default:
 		fbftMsg, err = consensus.parseFBFTMessage(msg)
@@ -138,7 +138,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 }
 
 func (consensus *Consensus) finalCommit() {
-	numCommits := consensus.Decider.SignersCount(quorum.Commit)
+	numCommits := consensus.decider.SignersCount(quorum.Commit)
 
 	consensus.getLogger().Info().
 		Int64("NumCommits", numCommits).
@@ -178,7 +178,10 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
-	consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
+
+	if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+	}
 
 	// Send committed message before block insertion.
 	// if leader successfully finalizes the block, send committed message to validators
@@ -277,6 +280,8 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 		return nil, nil
 	}
 	lastCommits, err := consensus.Blockchain().ReadCommitSig(blockNum)
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	if err != nil ||
 		len(lastCommits) < bls.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog().GetMessagesByTypeSeq(
@@ -300,32 +305,26 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 func (consensus *Consensus) Start(
 	stopChan chan struct{},
 ) {
+	consensus.GetLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 	go func() {
-		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
-		go func() {
-			ticker := time.NewTicker(250 * time.Millisecond)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-stopChan:
-					return
-				case <-ticker.C:
-					consensus.Tick()
-				}
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopChan:
+				return
+			case <-ticker.C:
+				consensus.Tick()
 			}
-		}()
-
-		consensus.mutex.Lock()
-		consensus.consensusTimeout[timeoutBootstrap].Start()
-		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
-		// Set up next block due time.
-		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-		consensus.mutex.Unlock()
+		}
 	}()
 
-	if consensus.dHelper != nil {
-		consensus.dHelper.start()
-	}
+	consensus.mutex.Lock()
+	consensus.consensusTimeout[timeoutBootstrap].Start()
+	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
+	// Set up next block due time.
+	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
+	consensus.mutex.Unlock()
 }
 
 func (consensus *Consensus) StartChannel() {
@@ -363,11 +362,12 @@ func (consensus *Consensus) syncReadyChan() {
 	}
 }
 
-func (consensus *Consensus) syncNotReadyChan() {
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
+func (consensus *Consensus) syncNotReadyChan(reason string) {
+	mode := consensus.current.Mode()
 	consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
 	consensus.current.SetMode(Syncing)
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
+	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] syncNotReadyChan, prev %s, reason %s", mode.String(), reason)
+	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] Node is OUT OF SYNC, reason: %s", reason)
 	consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
 }
 
@@ -444,14 +444,10 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 			Int("numTxs", len(newBlock.Transactions())).
 			Int("numStakingTxs", len(newBlock.StakingTransactions())).
 			Time("startTime", startTime).
-			Int64("publicKeys", consensus.Decider.ParticipantsCount()).
+			Int64("publicKeys", consensus.decider.ParticipantsCount()).
 			Msg("[ConsensusMainLoop] STARTING CONSENSUS")
 		consensus.announce(newBlock)
 	})
-
-	if consensus.dHelper != nil {
-		consensus.dHelper.start()
-	}
 }
 
 // LastMileBlockIter is the iterator to iterate over the last mile blocks in consensus cache.
@@ -474,9 +470,6 @@ func (consensus *Consensus) GetLastMileBlockIter(bnStart uint64, cb func(iter *L
 
 // GetLastMileBlockIter get the iterator of the last mile blocks starting from number bnStart
 func (consensus *Consensus) getLastMileBlockIter(bnStart uint64, cb func(iter *LastMileBlockIter) error) error {
-	if consensus.BlockVerifier == nil {
-		return errors.New("consensus haven't initialized yet")
-	}
 	blocks, _, err := consensus.getLastMileBlocksAndMsg(bnStart)
 	if err != nil {
 		return err
@@ -580,19 +573,19 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog().IsBlockVerified(blk.Hash())); err != nil {
 			switch {
 			case errors.Is(err, core.ErrKnownBlock):
-				consensus.getLogger().Info().Msg("[preCommitAndPropose] Block already known")
+				consensus.GetLogger().Info().Msg("[preCommitAndPropose] Block already known")
 			default:
-				consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+				consensus.GetLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
 				return
 			}
 		}
-
+		consensus.mutex.Lock()
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 
 		// Send signal to Node to propose the new block for consensus
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
-
+		consensus.mutex.Unlock()
 		consensus.ReadySignal(AsyncProposal)
 	}()
 
@@ -625,10 +618,6 @@ func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types
 
 // tryCatchup add the last mile block in PBFT log memory cache to blockchain.
 func (consensus *Consensus) tryCatchup() error {
-	// TODO: change this to a more systematic symbol
-	if consensus.BlockVerifier == nil {
-		return errors.New("consensus haven't finished initialization")
-	}
 	initBN := consensus.getBlockNum()
 	defer consensus.postCatchup(initBN)
 
@@ -667,7 +656,8 @@ func (consensus *Consensus) tryCatchup() error {
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
 	if consensus.Blockchain().CurrentBlock().NumberU64() < blk.NumberU64() {
-		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.fBFTLog.IsBlockVerified(blk.Hash())); err != nil {
+		_, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.fBFTLog.IsBlockVerified(blk.Hash()))
+		if err != nil && !errors.Is(err, core.ErrKnownBlock) {
 			consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
 			return err
 		}
@@ -692,36 +682,41 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
-func (consensus *Consensus) rotateLeader(epoch *big.Int) {
+func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicKeyWrapper) *bls.PublicKeyWrapper {
 	var (
-		bc     = consensus.Blockchain()
-		prev   = consensus.getLeaderPubKey()
-		leader = consensus.getLeaderPubKey()
+		bc        = consensus.Blockchain()
+		leader    = consensus.getLeaderPubKey()
+		curBlock  = bc.CurrentBlock()
+		curNumber = curBlock.NumberU64()
+		curEpoch  = curBlock.Epoch().Uint64()
 	)
+	if epoch.Uint64() != curEpoch {
+		return defaultKey
+	}
+	const blocksCountAliveness = 4
 	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
-		return
+		return defaultKey
 	}
 	committee, err := ss.FindCommitteeByID(consensus.ShardID)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to find committee")
-		return
+		return defaultKey
 	}
 	slotsCount := len(committee.Slots)
 	blocksPerEpoch := shard.Schedule.InstanceForEpoch(epoch).BlocksPerEpoch()
 	if blocksPerEpoch == 0 {
 		utils.Logger().Error().Msg("[Rotating leader] blocks per epoch is 0")
-		return
+		return defaultKey
 	}
 	if slotsCount == 0 {
 		utils.Logger().Error().Msg("[Rotating leader] slots count is 0")
-		return
+		return defaultKey
 	}
 	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
-	rest := blocksPerEpoch % uint64(slotsCount)
-	const minimumBlocksForLeaderInRow = 3
+	const minimumBlocksForLeaderInRow = blocksCountAliveness
 	if numBlocksProducedByLeader < minimumBlocksForLeaderInRow {
 		// mine no less than 3 blocks in a row
 		numBlocksProducedByLeader = minimumBlocksForLeaderInRow
@@ -729,15 +724,11 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	s := bc.LeaderRotationMeta()
 	if !bytes.Equal(leader.Bytes[:], s.Pub) {
 		// Another leader.
-		return
-	}
-	// If it is the first validator producing blocks, it should also produce the remaining 'rest' of the blocks.
-	if s.Shifts == 0 {
-		numBlocksProducedByLeader += rest
+		return defaultKey
 	}
 	if s.Count < numBlocksProducedByLeader {
 		// Not enough blocks produced by the leader, continue producing by the same leader.
-		return
+		return defaultKey
 	}
 	// Passed all checks, we can change leader.
 	// NthNext will move the leader to the next leader in the committee.
@@ -745,31 +736,64 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	var (
 		wasFound bool
 		next     *bls.PublicKeyWrapper
+		offset   = 1
 	)
-	if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
-		wasFound, next = consensus.Decider.NthNextValidator(committee.Slots, leader, 1)
-	} else {
-		wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
+
+	for i := 0; i < len(committee.Slots); i++ {
+		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
+			wasFound, next = consensus.decider.NthNextValidator(committee.Slots, leader, offset)
+		} else {
+			wasFound, next = consensus.decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
+		}
+		if !wasFound {
+			utils.Logger().Error().Msg("Failed to get next leader")
+			// Seems like nothing we can do here.
+			return defaultKey
+		}
+		members := consensus.decider.Participants()
+		mask := bls.NewMask(members)
+		skipped := 0
+		for i := 0; i < blocksCountAliveness; i++ {
+			header := bc.GetHeaderByNumber(curNumber - uint64(i))
+			if header == nil {
+				utils.Logger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(i))
+				return defaultKey
+			}
+			// if epoch is different, we should not check this block.
+			if header.Epoch().Uint64() != curEpoch {
+				break
+			}
+			// Populate the mask with the bitmap.
+			err = mask.SetMask(header.LastCommitBitmap())
+			if err != nil {
+				utils.Logger().Err(err).Msg("Failed to set mask")
+				return defaultKey
+			}
+			ok, err := mask.KeyEnabled(next.Bytes)
+			if err != nil {
+				utils.Logger().Err(err).Msg("Failed to get key enabled")
+				return defaultKey
+			}
+			if !ok {
+				skipped++
+			}
+		}
+
+		// no signature from the next leader at all, we should skip it.
+		if skipped >= blocksCountAliveness {
+			// Next leader is not signing blocks, we should skip it.
+			offset++
+			continue
+		}
+		return next
 	}
-	if !wasFound {
-		utils.Logger().Error().Msg("Failed to get next leader")
-		return
-	} else {
-		consensus.setLeaderPubKey(next)
-	}
-	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
-		// leader changed
-		go func() {
-			consensus.ReadySignal(SyncProposal)
-		}()
-	}
+	return defaultKey
 }
 
 // SetupForNewConsensus sets the state for new consensus
 func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
 	consensus.setCurBlockViewID(committedMsg.ViewID + 1)
-	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 	var epoch *big.Int
 	if blk.IsLastBlockInEpoch() {
 		epoch = new(big.Int).Add(blk.Epoch(), common.Big1)
@@ -777,7 +801,23 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 		epoch = blk.Epoch()
 	}
 	if consensus.Blockchain().Config().IsLeaderRotationInternalValidators(epoch) {
-		consensus.rotateLeader(epoch)
+		if next := consensus.rotateLeader(epoch, committedMsg.SenderPubkeys[0]); next != nil {
+			prev := consensus.getLeaderPubKey()
+			consensus.setLeaderPubKey(next)
+			if consensus.isLeader() {
+				utils.Logger().Info().Msgf("We are block %d, I am the new leader %s", blk.NumberU64(), next.Bytes.Hex())
+			} else {
+				utils.Logger().Info().Msgf("We are block %d, the leader is %s", blk.NumberU64(), next.Bytes.Hex())
+			}
+			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
+				// leader changed
+				blockPeriod := consensus.BlockPeriod
+				go func() {
+					<-time.After(blockPeriod)
+					consensus.ReadySignal(SyncProposal)
+				}()
+			}
+		}
 	}
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow

@@ -37,6 +37,7 @@ type HarmonyConfig struct {
 	ShardData  ShardDataConfig
 	GPO        GasPriceOracleConfig
 	Preimage   *PreimageConfig
+	Cache      CacheConfig
 }
 
 func (hc HarmonyConfig) ToRPCServerConfig() nodeconfig.RPCServerConfig {
@@ -138,7 +139,6 @@ type GeneralConfig struct {
 	TraceEnable            bool
 	EnablePruneBeaconChain bool
 	RunElasticMode         bool
-	TriesInMemory          int
 }
 
 type TiKVConfig struct {
@@ -306,6 +306,17 @@ type RevertConfig struct {
 	RevertBefore int
 }
 
+type CacheConfig struct {
+	Disabled        bool          // Whether to disable trie write caching (archive node)
+	TrieNodeLimit   int           // Memory limit (MB) at which to flush the current in-memory trie to disk
+	TrieTimeLimit   time.Duration // Time limit after which to flush the current in-memory trie to disk
+	TriesInMemory   uint64        // Block number from the head stored in disk before exiting
+	Preimages       bool          // Whether to store preimage of trie key to the disk
+	SnapshotLimit   int           // Memory allowance (MB) to use for caching snapshot entries in memory
+	SnapshotNoBuild bool          // Whether the background generation is allowed
+	SnapshotWait    bool          // Wait for snapshot construction on startup
+}
+
 type PreimageConfig struct {
 	ImportFrom    string
 	ExportTo      string
@@ -329,6 +340,7 @@ type PrometheusConfig struct {
 type SyncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
 	Enabled              bool             // enable the stream sync protocol
+	SyncMode             uint32           // sync mode (default:Full sync, 1: Fast Sync, 2: Snap Sync(not implemented yet))
 	Downloader           bool             // start the sync downloader client
 	StagedSync           bool             // use staged sync
 	StagedSyncCfg        StagedSyncConfig // staged sync configurations

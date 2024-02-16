@@ -39,6 +39,11 @@ func (finish *StageFinish) Exec(ctx context.Context, firstCycle bool, invalidBlo
 
 	// TODO: prepare indices (useful for RPC) and finalize
 
+	// switch to Full Sync Mode if the states are synced
+	if s.state.status.statesSynced {
+		s.state.status.cycleSyncMode = FullSync
+	}
+
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err

@@ -22,7 +22,7 @@ func ReadShardState(
 	data, err := db.Get(shardStateKey(epoch))
 	if err != nil {
 		return nil, errors.Errorf(
-			MsgNoShardStateFromDB, "epoch: %d", epoch,
+			MsgNoShardStateFromDB, "epoch: %d", epoch.Uint64(),
 		)
 	}
 	ss, err2 := shard.DecodeWrapper(data)
@@ -43,7 +43,7 @@ func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) error 
 	}
 	utils.Logger().Info().
 		Str("epoch", epoch.String()).
-		Int("size", len(data)).Msg("wrote sharding state")
+		Int("size", len(data)).Msgf("wrote sharding state, epoch %d", epoch.Uint64())
 	return nil
 }
 

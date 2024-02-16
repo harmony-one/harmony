@@ -53,7 +53,7 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			return err
 		}
 
-		if !node.Consensus.Decider.IsQuorumAchievedByMask(mask) {
+		if !node.Consensus.Decider().IsQuorumAchievedByMask(mask) {
 			utils.Logger().Error().Msg("[Explorer] not have enough signature power")
 			return nil
 		}
@@ -154,7 +154,7 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 
 	utils.Logger().Info().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
 
-	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, false); err == nil {
+	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, false); err == nil || errors.Is(err, core.ErrKnownBlock) {
 		if block.IsLastBlockInEpoch() {
 			node.Consensus.UpdateConsensusInformation()
 		}
