@@ -205,14 +205,14 @@ var (
 		SlotsLimitedEpoch:                     EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch:         big.NewInt(5),
 		AllowlistEpoch:                        EpochTBD,
-		LeaderRotationInternalValidatorsEpoch: big.NewInt(12),
-		LeaderRotationExternalValidatorsEpoch: big.NewInt(12),
+		LeaderRotationInternalValidatorsEpoch: big.NewInt(144),
+		LeaderRotationExternalValidatorsEpoch: big.NewInt(144),
 		FeeCollectEpoch:                       big.NewInt(5),
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
 		HIP30Epoch:                            big.NewInt(7),
 		BlockGas30MEpoch:                      big.NewInt(7),
 		MaxRateEpoch:                          EpochTBD,
-		DevnetExternalEpoch:                   big.NewInt(142),
+		DevnetExternalEpoch:                   big.NewInt(144),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
