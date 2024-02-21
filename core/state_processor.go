@@ -318,7 +318,6 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 			balance = a.String()
 		}
 		return nil, nil, nil, 0, errors.Wrapf(err, "apply failed from='%s' to='%s' balance='%s'", msg.From().Hex(), to, balance)
-
 	}
 	// Update the state with pending changes
 	var root []byte
