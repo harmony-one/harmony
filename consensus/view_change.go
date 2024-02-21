@@ -4,7 +4,9 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/internal/chain"
+	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -53,25 +55,46 @@ func (pm *State) SetMode(s Mode) {
 
 // GetCurBlockViewID return the current view id
 func (pm *State) GetCurBlockViewID() uint64 {
+	return pm.getCurBlockViewID()
+}
+
+// GetCurBlockViewID return the current view id
+func (pm *State) getCurBlockViewID() uint64 {
+	return pm.blockViewID
+}
+
+// SetCurBlockViewID set the current view ID
+func (pm *State) setCurBlockViewID(viewID uint64) uint64 {
+	pm.blockViewID = viewID
 	return pm.blockViewID
 }
 
 // SetCurBlockViewID sets the current view id
 func (pm *State) SetCurBlockViewID(viewID uint64) uint64 {
-	pm.blockViewID = viewID
-	return pm.blockViewID
+	return pm.setCurBlockViewID(viewID)
 }
 
 // GetViewChangingID return the current view changing id
 // It is meaningful during view change mode
 func (pm *State) GetViewChangingID() uint64 {
+	return pm.getViewChangingID()
+}
+
+// getViewChangingID return the current view changing id
+// It is meaningful during view change mode
+func (pm *State) getViewChangingID() uint64 {
 	return pm.viewChangingID
+}
+
+// SetViewChangingID set the current view change ID
+func (consensus *State) setViewChangingID(viewID uint64) {
+	consensus.viewChangingID = viewID
 }
 
 // SetViewChangingID set the current view changing id
 // It is meaningful during view change mode
 func (pm *State) SetViewChangingID(id uint64) {
-	pm.viewChangingID = id
+	pm.setViewChangingID(id)
 }
 
 // GetViewChangeDuraion return the duration of the current view change
@@ -87,12 +110,12 @@ func (pm *State) SetIsBackup(isBackup bool) {
 
 // fallbackNextViewID return the next view ID and duration when there is an exception
 // to calculate the time-based viewId
-func (consensus *Consensus) fallbackNextViewID() (uint64, time.Duration) {
+func (consensus *State) fallbackNextViewID(logger *zerolog.Logger) (uint64, time.Duration) {
 	diff := int64(consensus.getViewChangingID() + 1 - consensus.getCurBlockViewID())
 	if diff <= 0 {
 		diff = int64(1)
 	}
-	consensus.getLogger().Error().
+	logger.Error().
 		Int64("diff", diff).
 		Msg("[fallbackNextViewID] use legacy viewID algorithm")
 	return consensus.getViewChangingID() + 1, time.Duration(diff * diff * int64(viewChangeDuration))
@@ -108,14 +131,9 @@ func (consensus *Consensus) fallbackNextViewID() (uint64, time.Duration) {
 // The view change duration is a fixed duration now to avoid stuck into offline nodes during
 // the view change.
 // viewID is only used as the fallback mechansim to determine the nextViewID
-func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
-	// handle corner case at first
-	if consensus.Blockchain() == nil {
-		return consensus.fallbackNextViewID()
-	}
-	curHeader := consensus.Blockchain().CurrentHeader()
+func (consensus *State) getNextViewID(curHeader *block.Header, logger *zerolog.Logger) (uint64, time.Duration) {
 	if curHeader == nil {
-		return consensus.fallbackNextViewID()
+		return consensus.fallbackNextViewID(logger)
 	}
 	blockTimestamp := curHeader.Time().Int64()
 	stuckBlockViewID := curHeader.ViewID().Uint64() + 1
@@ -123,18 +141,18 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 
 	// timestamp messed up in current validator node
 	if curTimestamp <= blockTimestamp {
-		consensus.getLogger().Error().
+		logger.Error().
 			Int64("curTimestamp", curTimestamp).
 			Int64("blockTimestamp", blockTimestamp).
 			Msg("[getNextViewID] timestamp of block too high")
-		return consensus.fallbackNextViewID()
+		return consensus.fallbackNextViewID(logger)
 	}
 	// diff only increases, since view change timeout is shorter than
 	// view change slot now, we want to make sure diff is always greater than 0
 	diff := uint64((curTimestamp-blockTimestamp)/viewChangeSlot + 1)
 	nextViewID := diff + stuckBlockViewID
 
-	consensus.getLogger().Info().
+	logger.Info().
 		Int64("curTimestamp", curTimestamp).
 		Int64("blockTimestamp", blockTimestamp).
 		Uint64("nextViewID", nextViewID).
@@ -248,10 +266,12 @@ func (consensus *Consensus) startViewChange() {
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
-	nextViewID, duration := consensus.getNextViewID()
-	consensus.setViewChangingID(nextViewID)
-	epoch := consensus.Blockchain().CurrentHeader().Epoch()
-	ss, err := consensus.Blockchain().ReadShardState(epoch)
+	// handle corner case at first
+	bc := consensus.Blockchain()
+	nextViewID, duration := consensus.current.getNextViewID(bc.CurrentHeader(), consensus.getLogger())
+	consensus.current.setViewChangingID(nextViewID)
+	epoch := bc.CurrentHeader().Epoch()
+	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
 		return

@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -301,11 +302,10 @@ func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offse
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	return consensus.updateConsensusInformation()
+	return consensus.updateConsensusInformation(consensus.Blockchain().CurrentHeader())
 }
 
-func (consensus *Consensus) updateConsensusInformation() Mode {
-	curHeader := consensus.Blockchain().CurrentHeader()
+func (consensus *Consensus) updateConsensusInformation(curHeader *block.Header) Mode {
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
 
@@ -508,30 +508,8 @@ func (consensus *Consensus) SetViewIDs(height uint64) {
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) setViewIDs(height uint64) {
-	consensus.setCurBlockViewID(height)
-	consensus.setViewChangingID(height)
-}
-
-// SetCurBlockViewID set the current view ID
-func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	return consensus.setCurBlockViewID(viewID)
-}
-
-// SetCurBlockViewID set the current view ID
-func (consensus *Consensus) setCurBlockViewID(viewID uint64) uint64 {
-	return consensus.current.SetCurBlockViewID(viewID)
-}
-
-// SetViewChangingID set the current view change ID
-func (consensus *Consensus) SetViewChangingID(viewID uint64) {
-	consensus.current.SetViewChangingID(viewID)
-}
-
-// SetViewChangingID set the current view change ID
-func (consensus *Consensus) setViewChangingID(viewID uint64) {
-	consensus.current.SetViewChangingID(viewID)
+	consensus.current.setCurBlockViewID(height)
+	consensus.current.setViewChangingID(height)
 }
 
 // StartFinalityCount set the finality counter to current time

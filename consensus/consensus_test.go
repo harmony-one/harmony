@@ -17,6 +17,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// SetCurBlockViewID set the current view ID
+func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	return consensus.current.setCurBlockViewID(viewID)
+}
+
 func TestConsensusInitialization(t *testing.T) {
 	host, multiBLSPrivateKey, consensus, _, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)

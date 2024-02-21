@@ -342,10 +342,11 @@ func (consensus *Consensus) StartChannel() {
 
 func (consensus *Consensus) syncReadyChan() {
 	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
-	if consensus.getBlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
-		consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
-		consensus.setViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
-		mode := consensus.updateConsensusInformation()
+	h := consensus.Blockchain().CurrentHeader()
+	if consensus.getBlockNum() < h.Number().Uint64()+1 {
+		consensus.setBlockNum(h.Number().Uint64() + 1)
+		consensus.setViewIDs(h.ViewID().Uint64() + 1)
+		mode := consensus.updateConsensusInformation(h)
 		consensus.current.SetMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -354,7 +355,7 @@ func (consensus *Consensus) syncReadyChan() {
 	} else if consensus.mode() == Syncing {
 		// Corner case where sync is triggered before `onCommitted` and there is a race
 		// for block insertion between consensus and downloader.
-		mode := consensus.updateConsensusInformation()
+		mode := consensus.updateConsensusInformation(consensus.Blockchain().CurrentHeader())
 		consensus.setMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -793,7 +794,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 // SetupForNewConsensus sets the state for new consensus
 func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
-	consensus.setCurBlockViewID(committedMsg.ViewID + 1)
+	consensus.current.setCurBlockViewID(committedMsg.ViewID + 1)
 	var epoch *big.Int
 	if blk.IsLastBlockInEpoch() {
 		epoch = new(big.Int).Add(blk.Epoch(), common.Big1)
@@ -822,7 +823,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if blk.IsLastBlockInEpoch() {
-		consensus.setMode(consensus.updateConsensusInformation())
+		consensus.setMode(consensus.updateConsensusInformation(consensus.Blockchain().CurrentHeader()))
 	}
 	consensus.fBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.resetState()

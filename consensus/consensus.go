@@ -300,7 +300,7 @@ func New(
 	// viewID has to be initialized as the height of
 	// the blockchain during initialization as it was
 	// displayed on explorer as Height right now
-	consensus.setCurBlockViewID(0)
+	consensus.current.setCurBlockViewID(0)
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.readySignal = make(chan ProposalType)
 	consensus.commitSigChannel = make(chan []byte)

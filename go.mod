@@ -70,6 +70,7 @@ require (
 	github.com/c2h5oh/datasize v0.0.0-20220606134207-859f65c6625b
 	github.com/grafana/pyroscope-go v1.0.4
 	github.com/holiman/bloomfilter/v2 v2.0.3
+	github.com/holiman/uint256 v1.2.3
 	github.com/ledgerwatch/erigon-lib v0.0.0-20230607152933-42c9c28cac68
 	github.com/ledgerwatch/log/v3 v3.8.0
 	github.com/olekukonko/tablewriter v0.0.5
@@ -155,7 +156,6 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/big v0.0.0-20221017200358-a027dc42d04e // indirect
-	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
