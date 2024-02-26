@@ -222,20 +222,11 @@ func (log *FBFTLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, blockNu
 	return found
 }
 
-func (log *FBFTLog) all(filters []func(*FBFTMessage, *FBFTLog) bool, value *FBFTMessage) bool {
-	for _, filter := range filters {
-		if !filter(value, log) {
-			return false
-		}
-	}
-	return true
-}
-
 // GetMessagesByTypeSeq returns pbft messages with matching type, blockNum
-func (log *FBFTLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64, filters ...func(message *FBFTMessage, log *FBFTLog) bool) []*FBFTMessage {
+func (log *FBFTLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64) []*FBFTMessage {
 	var found []*FBFTMessage
 	for _, msg := range log.messages {
-		if msg.MessageType == typ && msg.BlockNum == blockNum && msg.Verified && log.all(filters, msg) {
+		if msg.MessageType == typ && msg.BlockNum == blockNum && msg.Verified {
 			found = append(found, msg)
 		}
 	}
