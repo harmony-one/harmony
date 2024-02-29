@@ -812,7 +812,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 
 	registry = setupChain(hc, nodeConfig, registry)
 	if registry.GetShardChainCollection() == nil {
-		panic("shard chain collection is nil1111111")
+		panic("shard chain collection is nil")
 	}
 	registry.SetWebHooks(nodeConfig.WebHooks.Hooks)
 	cxPool := core.NewCxPool(core.CxPoolSize)
@@ -861,14 +861,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 	currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
-
-	// This needs to be executed after consensus setup
-	if err := currentConsensus.InitConsensusWithValidators(); err != nil {
-		utils.Logger().Warn().
-			Int("shardID", hc.General.ShardID).
-			Err(err).
-			Msg("InitConsensusWithMembers failed")
-	}
 
 	// Set the consensus ID to be the current block number
 	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()

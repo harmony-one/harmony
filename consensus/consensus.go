@@ -313,6 +313,11 @@ func New(
 	initMetrics()
 	consensus.AddPubkeyMetrics()
 
+	err := consensus.InitConsensusWithValidators()
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to init consensus with validators")
+	}
+
 	return &consensus, nil
 }
 
