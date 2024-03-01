@@ -133,7 +133,7 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 }
 
 func (consensus *Consensus) prepare() {
-	if consensus.IsBackup() {
+	if consensus.isBackup {
 		return
 	}
 
@@ -152,7 +152,7 @@ func (consensus *Consensus) prepare() {
 
 // sendCommitMessages send out commit messages to leader
 func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
-	if consensus.IsBackup() || blockObj == nil {
+	if consensus.isBackup || blockObj == nil {
 		return
 	}
 
