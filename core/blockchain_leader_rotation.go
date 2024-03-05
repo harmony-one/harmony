@@ -14,10 +14,9 @@ import (
 
 // LeaderRotationMeta contains information about leader rotation
 type LeaderRotationMeta struct {
-	Pub    []byte // bls public key of previous block miner
-	Epoch  uint64 // epoch number of previously inserted block
-	Count  uint64 // quantity of continuous blocks inserted by the same leader
-	Shifts uint64 // number of leader shifts, shift happens when leader changes
+	Pub   []byte // bls public key of previous block miner
+	Epoch uint64 // epoch number of previously inserted block
+	Count uint64 // quantity of continuous blocks inserted by the same leader
 }
 
 // ShortString returns string representation of the struct
@@ -28,8 +27,6 @@ func (a LeaderRotationMeta) ShortString() string {
 	s.WriteString(strconv.FormatUint(a.Epoch, 10))
 	s.WriteString(" ")
 	s.WriteString(strconv.FormatUint(a.Count, 10))
-	s.WriteString(" ")
-	s.WriteString(strconv.FormatUint(a.Shifts, 10))
 	return s.String()
 }
 
@@ -39,17 +36,15 @@ func (a LeaderRotationMeta) Hash() []byte {
 	c.Write(a.Pub)
 	c.Write([]byte(strconv.FormatUint(a.Epoch, 10)))
 	c.Write([]byte(strconv.FormatUint(a.Count, 10)))
-	c.Write([]byte(strconv.FormatUint(a.Shifts, 10)))
 	return c.Sum(nil)
 }
 
 // Clone returns a copy of the struct
 func (a LeaderRotationMeta) Clone() LeaderRotationMeta {
 	return LeaderRotationMeta{
-		Pub:    append([]byte{}, a.Pub...),
-		Epoch:  a.Epoch,
-		Count:  a.Count,
-		Shifts: a.Shifts,
+		Pub:   append([]byte{}, a.Pub...),
+		Epoch: a.Epoch,
+		Count: a.Count,
 	}
 }
 
@@ -109,19 +104,10 @@ func processRotationMeta(epoch uint64, blockPubKey bls.SerializedPublicKey, s Le
 	} else {
 		s.Count = 1
 	}
-	// we should increase shifts if the leader has changed.
-	if !bytes.Equal(s.Pub, blockPubKey[:]) {
-		s.Shifts++
-	}
-	// but set to zero if new
-	if s.Epoch != epoch {
-		s.Shifts = 0
-	}
 	s.Epoch = epoch
 	return LeaderRotationMeta{
-		Pub:    blockPubKey[:],
-		Epoch:  s.Epoch,
-		Count:  s.Count,
-		Shifts: s.Shifts,
+		Pub:   blockPubKey[:],
+		Epoch: s.Epoch,
+		Count: s.Count,
 	}
 }

@@ -73,6 +73,27 @@ func checkGetBlockByHashesResult(blocks []*types.Block, hashes []common.Hash) er
 	return nil
 }
 
+func getBlockByMaxVote(blocks []*types.Block) (*types.Block, error) {
+	hashesVote := make(map[common.Hash]int)
+	maxVote := int(-1)
+	maxVotedBlockIndex := int(0)
+
+	for i, block := range blocks {
+		if block == nil {
+			continue
+		}
+		hashesVote[block.Header().Hash()]++
+		if hashesVote[block.Header().Hash()] > maxVote {
+			maxVote = hashesVote[block.Header().Hash()]
+			maxVotedBlockIndex = i
+		}
+	}
+	if maxVote < 0 {
+		return nil, ErrInvalidBlockBytes
+	}
+	return blocks[maxVotedBlockIndex], nil
+}
+
 func countHashMaxVote(m map[sttypes.StreamID]common.Hash, whitelist map[sttypes.StreamID]struct{}) (common.Hash, map[sttypes.StreamID]struct{}) {
 	var (
 		voteM  = make(map[common.Hash]int)

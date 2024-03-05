@@ -145,6 +145,35 @@ func getDefaultSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.SyncConfig {
 	}
 }
 
+func getDefaultCacheConfig(nt nodeconfig.NetworkType) harmonyconfig.CacheConfig {
+	cacheConfig := harmonyconfig.CacheConfig{
+		Disabled:        defaultCacheConfig.Disabled,
+		TrieNodeLimit:   defaultCacheConfig.TrieNodeLimit,
+		TriesInMemory:   defaultCacheConfig.TriesInMemory,
+		TrieTimeLimit:   defaultCacheConfig.TrieTimeLimit,
+		SnapshotLimit:   defaultCacheConfig.SnapshotLimit,
+		SnapshotWait:    defaultCacheConfig.SnapshotWait,
+		Preimages:       defaultCacheConfig.Preimages,
+		SnapshotNoBuild: defaultCacheConfig.SnapshotNoBuild,
+	}
+
+	switch nt {
+	case nodeconfig.Mainnet:
+		cacheConfig.Disabled = true
+		cacheConfig.Preimages = true
+	case nodeconfig.Testnet:
+		cacheConfig.Disabled = false
+		cacheConfig.Preimages = true
+	case nodeconfig.Localnet:
+		cacheConfig.Disabled = false
+		cacheConfig.Preimages = false
+	default:
+		cacheConfig.Disabled = false
+		cacheConfig.Preimages = true
+	}
+	return cacheConfig
+}
+
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "dump or update config",

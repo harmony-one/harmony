@@ -7,30 +7,28 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/tikv"
-	"github.com/multiformats/go-multiaddr"
-
-	prom "github.com/harmony-one/harmony/api/service/prometheus"
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/pkg/errors"
-
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	legdownloader "github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
+	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/stagedstreamsync"
 	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/api/service/synchronize"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Constants related to doing syncing.
@@ -233,7 +231,16 @@ func (node *Node) doBeaconSyncing() {
 		// If Downloader is not working, we need also deal with blocks from beaconBlockChannel
 		go func(node *Node) {
 			// TODO ek – infinite loop; add shutdown/cleanup logic
-			for _ = range node.BeaconBlockChannel {
+			for b := range node.BeaconBlockChannel {
+				if b != nil && b.IsLastBlockInEpoch() {
+					_, err := node.EpochChain().InsertChain(types.Blocks{b}, true)
+					if err != nil {
+						utils.Logger().Error().Err(err).Msgf("[SYNC] InsertChain failed shard: %d epoch:%d number:%d", b.Header().ShardID(), b.Epoch().Uint64(), b.NumberU64())
+					} else {
+						utils.Logger().Info().
+							Msgf("Beacon block being handled by block channel: epoch: %d, number: %d", b.Epoch().Uint64(), b.NumberU64())
+					}
+				}
 			}
 		}(node)
 	}
@@ -279,20 +286,16 @@ func (node *Node) DoSyncing(bc core.BlockChain, willJoinConsensus bool) {
 	for {
 		select {
 		case <-ticker.C:
-			node.doSync(bc, willJoinConsensus)
-		case <-node.Consensus.BlockNumLowChan:
-			node.doSync(bc, willJoinConsensus)
+			node.doSync(node.SyncInstance(), node.SyncingPeerProvider, bc, node.Consensus, willJoinConsensus)
 		}
 	}
 }
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
-func (node *Node) doSync(bc core.BlockChain, willJoinConsensus bool) {
-
-	syncInstance := node.SyncInstance()
+func (node *Node) doSync(syncInstance ISync, syncingPeerProvider SyncingPeerProvider, bc core.BlockChain, consensus *consensus.Consensus, willJoinConsensus bool) {
 	if syncInstance.GetActivePeerNumber() < legacysync.NumPeersLowBound {
 		shardID := bc.ShardID()
-		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
+		peers, err := syncingPeerProvider.SyncingPeers(shardID)
 		if err != nil {
 			utils.Logger().Warn().
 				Err(err).
@@ -313,13 +316,13 @@ func (node *Node) doSync(bc core.BlockChain, willJoinConsensus bool) {
 	if isSynchronized, _, _ := syncInstance.GetParsedSyncStatusDoubleChecked(); !isSynchronized {
 		node.IsSynchronized.UnSet()
 		if willJoinConsensus {
-			node.Consensus.BlocksNotSynchronized()
+			consensus.BlocksNotSynchronized("node.doSync")
 		}
 		isBeacon := bc.ShardID() == shard.BeaconChainShardID
-		syncInstance.SyncLoop(bc, isBeacon, node.Consensus, legacysync.LoopMinTime)
+		syncInstance.SyncLoop(bc, isBeacon, consensus, legacysync.LoopMinTime)
 		if willJoinConsensus {
 			node.IsSynchronized.Set()
-			node.Consensus.BlocksSynchronized()
+			consensus.BlocksSynchronized()
 		}
 	}
 	node.IsSynchronized.Set()
@@ -415,7 +418,7 @@ func (node *Node) SendNewBlockToUnsync() {
 			utils.Logger().Warn().Msg("[SYNC] unable to encode block to hashes")
 			continue
 		}
-		blockWithSigBytes, err := node.getEncodedBlockWithSigFromBlock(block)
+		blockWithSigBytes, err := getEncodedBlockWithSigFromBlock(block)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("[SYNC] rlp encode BlockWithSig")
 			continue
@@ -747,7 +750,7 @@ func (node *Node) getEncodedBlockWithSigByHeight(height uint64) ([]byte, error) 
 	return b, nil
 }
 
-func (node *Node) getEncodedBlockWithSigFromBlock(block *types.Block) ([]byte, error) {
+func getEncodedBlockWithSigFromBlock(block *types.Block) ([]byte, error) {
 	bwh := legacysync.BlockWithSig{
 		Block:              block,
 		CommitSigAndBitmap: block.GetCurrentCommitSig(),

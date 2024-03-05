@@ -76,8 +76,6 @@ func (node *Node) HandleNodeMessage(
 				if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 					for _, block := range blocks {
 						if block.ShardID() == 0 {
-							utils.Logger().Info().
-								Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
 							if block.IsLastBlockInEpoch() {
 								go func(blk *types.Block) {
 									node.BeaconBlockChannel <- blk
@@ -339,7 +337,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 		}
 		BroadcastCXReceipts(newBlock, node.Consensus)
 	} else {
-		if node.Consensus.Mode() != consensus.Listening {
+		if mode := node.Consensus.Mode(); mode != consensus.Listening {
 			numSignatures := node.Consensus.NumSignaturesIncludedInBlock(newBlock)
 			utils.Logger().Info().
 				Uint64("blockNum", newBlock.NumberU64()).
@@ -349,7 +347,13 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 				Int("numTxns", len(newBlock.Transactions())).
 				Int("numStakingTxns", len(newBlock.StakingTransactions())).
 				Uint32("numSignatures", numSignatures).
+				Str("mode", mode.String()).
 				Msg("BINGO !!! Reached Consensus")
+			if node.Consensus.Mode() == consensus.Syncing {
+				mode = node.Consensus.UpdateConsensusInformation()
+				utils.Logger().Info().Msgf("Switching to mode %s", mode)
+				node.Consensus.SetMode(mode)
+			}
 
 			node.Consensus.UpdateValidatorMetrics(float64(numSignatures), float64(newBlock.NumberU64()))
 

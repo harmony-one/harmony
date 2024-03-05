@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -188,6 +189,18 @@ func (st *syncStream) handleReq(req *syncpb.Request) error {
 	if rReq := req.GetGetReceiptsRequest(); rReq != nil {
 		return st.handleGetReceiptsRequest(req.ReqId, rReq)
 	}
+	if ndReq := req.GetGetAccountRangeRequest(); ndReq != nil {
+		return st.handleGetAccountRangeRequest(req.ReqId, ndReq)
+	}
+	if ndReq := req.GetGetStorageRangesRequest(); ndReq != nil {
+		return st.handleGetStorageRangesRequest(req.ReqId, ndReq)
+	}
+	if ndReq := req.GetGetByteCodesRequest(); ndReq != nil {
+		return st.handleGetByteCodesRequest(req.ReqId, ndReq)
+	}
+	if ndReq := req.GetGetTrieNodesRequest(); ndReq != nil {
+		return st.handleGetTrieNodesRequest(req.ReqId, ndReq)
+	}
 	// unsupported request type
 	return st.handleUnknownRequest(req.ReqId)
 }
@@ -306,6 +319,95 @@ func (st *syncStream) handleGetReceiptsRequest(rid uint64, req *syncpb.GetReceip
 		}
 	}
 	return errors.Wrap(err, "[GetReceipts]")
+}
+
+func (st *syncStream) handleGetAccountRangeRequest(rid uint64, req *syncpb.GetAccountRangeRequest) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getAccountRangeRequest",
+	}).Inc()
+
+	root := common.BytesToHash(req.Root)
+	origin := common.BytesToHash(req.Origin)
+	limit := common.BytesToHash(req.Limit)
+	resp, err := st.computeGetAccountRangeRequest(rid, root, origin, limit, req.Bytes)
+	if resp == nil && err != nil {
+		resp = syncpb.MakeErrorResponseMessage(rid, err)
+	}
+	if writeErr := st.writeMsg(resp); writeErr != nil {
+		if err == nil {
+			err = writeErr
+		} else {
+			err = fmt.Errorf("%v; [writeMsg] %v", err.Error(), writeErr)
+		}
+	}
+	return errors.Wrap(err, "[GetAccountRange]")
+}
+
+func (st *syncStream) handleGetStorageRangesRequest(rid uint64, req *syncpb.GetStorageRangesRequest) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getStorageRangesRequest",
+	}).Inc()
+
+	root := common.BytesToHash(req.Root)
+	accounts := bytesToHashes(req.Accounts)
+	origin := common.BytesToHash(req.Origin)
+	limit := common.BytesToHash(req.Limit)
+	resp, err := st.computeGetStorageRangesRequest(rid, root, accounts, origin, limit, req.Bytes)
+	if resp == nil && err != nil {
+		resp = syncpb.MakeErrorResponseMessage(rid, err)
+	}
+	if writeErr := st.writeMsg(resp); writeErr != nil {
+		if err == nil {
+			err = writeErr
+		} else {
+			err = fmt.Errorf("%v; [writeMsg] %v", err.Error(), writeErr)
+		}
+	}
+	return errors.Wrap(err, "[GetStorageRanges]")
+}
+
+func (st *syncStream) handleGetByteCodesRequest(rid uint64, req *syncpb.GetByteCodesRequest) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getByteCodesRequest",
+	}).Inc()
+
+	hashes := bytesToHashes(req.Hashes)
+	resp, err := st.computeGetByteCodesRequest(rid, hashes, req.Bytes)
+	if resp == nil && err != nil {
+		resp = syncpb.MakeErrorResponseMessage(rid, err)
+	}
+	if writeErr := st.writeMsg(resp); writeErr != nil {
+		if err == nil {
+			err = writeErr
+		} else {
+			err = fmt.Errorf("%v; [writeMsg] %v", err.Error(), writeErr)
+		}
+	}
+	return errors.Wrap(err, "[GetByteCodes]")
+}
+
+func (st *syncStream) handleGetTrieNodesRequest(rid uint64, req *syncpb.GetTrieNodesRequest) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getTrieNodesRequest",
+	}).Inc()
+
+	root := common.BytesToHash(req.Root)
+	resp, err := st.computeGetTrieNodesRequest(rid, root, req.Paths, req.Bytes)
+	if resp == nil && err != nil {
+		resp = syncpb.MakeErrorResponseMessage(rid, err)
+	}
+	if writeErr := st.writeMsg(resp); writeErr != nil {
+		if err == nil {
+			err = writeErr
+		} else {
+			err = fmt.Errorf("%v; [writeMsg] %v", err.Error(), writeErr)
+		}
+	}
+	return errors.Wrap(err, "[GetTrieNodes]")
 }
 
 func (st *syncStream) handleUnknownRequest(rid uint64) error {
@@ -451,6 +553,74 @@ func (st *syncStream) computeGetReceipts(rid uint64, hs []common.Hash) (*syncpb.
 		}
 	}
 	return syncpb.MakeGetReceiptsResponseMessage(rid, normalizedReceipts), nil
+}
+
+func (st *syncStream) computeGetAccountRangeRequest(rid uint64, root common.Hash, origin common.Hash, limit common.Hash, bytes uint64) (*syncpb.Message, error) {
+	if bytes == 0 {
+		return nil, fmt.Errorf("zero account ranges bytes requested")
+	}
+	if bytes > softResponseLimit {
+		return nil, fmt.Errorf("requested bytes exceed limit")
+	}
+	accounts, proof, err := st.chain.getAccountRange(root, origin, limit, bytes)
+	if err != nil {
+		return nil, err
+	}
+	return syncpb.MakeGetAccountRangeResponseMessage(rid, accounts, proof), nil
+}
+
+func (st *syncStream) computeGetStorageRangesRequest(rid uint64, root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64) (*syncpb.Message, error) {
+	if bytes == 0 {
+		return nil, fmt.Errorf("zero storage ranges bytes requested")
+	}
+	if bytes > softResponseLimit {
+		return nil, fmt.Errorf("requested bytes exceed limit")
+	}
+	if len(accounts) > GetStorageRangesRequestCap {
+		err := fmt.Errorf("GetStorageRangesRequest amount exceed cap: %v > %v", len(accounts), GetStorageRangesRequestCap)
+		return nil, err
+	}
+	slots, proofs, err := st.chain.getStorageRanges(root, accounts, origin, limit, bytes)
+	if err != nil {
+		return nil, err
+	}
+	return syncpb.MakeGetStorageRangesResponseMessage(rid, slots, proofs), nil
+}
+
+func (st *syncStream) computeGetByteCodesRequest(rid uint64, hs []common.Hash, bytes uint64) (*syncpb.Message, error) {
+	if bytes == 0 {
+		return nil, fmt.Errorf("zero byte code bytes requested")
+	}
+	if bytes > softResponseLimit {
+		return nil, fmt.Errorf("requested bytes exceed limit")
+	}
+	if len(hs) > GetByteCodesRequestCap {
+		err := fmt.Errorf("GetByteCodesRequest amount exceed cap: %v > %v", len(hs), GetByteCodesRequestCap)
+		return nil, err
+	}
+	codes, err := st.chain.getByteCodes(hs, bytes)
+	if err != nil {
+		return nil, err
+	}
+	return syncpb.MakeGetByteCodesResponseMessage(rid, codes), nil
+}
+
+func (st *syncStream) computeGetTrieNodesRequest(rid uint64, root common.Hash, paths []*message.TrieNodePathSet, bytes uint64) (*syncpb.Message, error) {
+	if bytes == 0 {
+		return nil, fmt.Errorf("zero trie node bytes requested")
+	}
+	if bytes > softResponseLimit {
+		return nil, fmt.Errorf("requested bytes exceed limit")
+	}
+	if len(paths) > GetTrieNodesRequestCap {
+		err := fmt.Errorf("GetTrieNodesRequest amount exceed cap: %v > %v", len(paths), GetTrieNodesRequestCap)
+		return nil, err
+	}
+	nodes, err := st.chain.getTrieNodes(root, paths, bytes, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	return syncpb.MakeGetTrieNodesResponseMessage(rid, nodes), nil
 }
 
 func bytesToHashes(bs [][]byte) []common.Hash {

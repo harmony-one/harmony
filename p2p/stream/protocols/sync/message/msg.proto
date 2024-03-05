@@ -19,6 +19,10 @@ message Request {
     GetBlocksByHashesRequest get_blocks_by_hashes_request = 5;
     GetNodeDataRequest get_node_data_request = 6;
     GetReceiptsRequest get_receipts_request = 7;
+    GetAccountRangeRequest get_account_range_request = 8;
+    GetStorageRangesRequest get_storage_ranges_request = 9;
+    GetByteCodesRequest get_byte_codes_request = 10;
+    GetTrieNodesRequest get_trie_nodes_request = 11;
   }
 }
 
@@ -44,6 +48,36 @@ message GetReceiptsRequest {
   repeated bytes block_hashes = 1;
 }
 
+message GetAccountRangeRequest {
+  bytes root = 1;
+  bytes origin = 2;
+  bytes limit = 3;
+  uint64 bytes = 4; 
+}
+
+message GetStorageRangesRequest {
+  bytes root = 1;
+  repeated bytes accounts = 2;
+  bytes origin = 3;
+  bytes limit = 4;
+  uint64 bytes = 5;
+}
+
+message GetByteCodesRequest {
+  repeated bytes hashes = 1;
+  uint64 bytes = 2; 
+}
+
+message TrieNodePathSet {
+  repeated bytes pathset = 1;
+}
+
+message GetTrieNodesRequest {
+  bytes root = 1;
+  repeated TrieNodePathSet paths = 2;
+  uint64 bytes = 3;
+}
+
 message Response {
   uint64 req_id = 1;
   oneof response {
@@ -54,6 +88,10 @@ message Response {
     GetBlocksByHashesResponse get_blocks_by_hashes_response = 6;
     GetNodeDataResponse get_node_data_response = 7;
     GetReceiptsResponse get_receipts_response = 8;
+    GetAccountRangeResponse get_account_range_response = 9;
+    GetStorageRangesResponse get_storage_ranges_response = 10;
+    GetByteCodesResponse get_byte_codes_response = 11;
+    GetTrieNodesResponse get_trie_nodes_response = 12;
   }
 }
 
@@ -89,4 +127,36 @@ message Receipts {
 
 message GetReceiptsResponse {
   map<uint64, Receipts> receipts = 1;
+}
+
+message AccountData {
+  bytes hash = 1;
+  bytes body = 2;
+}
+
+message GetAccountRangeResponse {
+  repeated AccountData accounts = 1;
+  repeated bytes proof = 2;
+}
+
+message StorageData {
+  bytes hash = 1;
+  bytes body = 2;
+}
+
+message StoragesData {
+  repeated StorageData data = 1;
+}
+
+message GetStorageRangesResponse {
+  repeated StoragesData slots = 1;
+  repeated bytes proof = 2;
+}
+
+message GetByteCodesResponse {
+  repeated bytes codes = 1;
+}
+
+message GetTrieNodesResponse {
+  repeated bytes nodes = 1;
 }

@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/pkg/errors"
 )
@@ -18,12 +19,13 @@ type downloader interface {
 // Set downloader set the downloader of the shard to consensus
 // TODO: It will be better to move this to consensus.New and register consensus as a service
 func (consensus *Consensus) SetDownloader(d downloader) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.dHelper = newDownloadHelper(consensus, d)
 }
 
 type downloadHelper struct {
 	d downloader
-	c *Consensus
 
 	startedCh  chan struct{}
 	finishedCh chan struct{}
@@ -39,51 +41,43 @@ func newDownloadHelper(c *Consensus, d downloader) *downloadHelper {
 	finishedCh := make(chan struct{}, 1)
 	finishedSub := d.SubscribeDownloadFinished(finishedCh)
 
-	return &downloadHelper{
-		c:           c,
+	out := &downloadHelper{
 		d:           d,
 		startedCh:   startedCh,
 		finishedCh:  finishedCh,
 		startedSub:  startedSub,
 		finishedSub: finishedSub,
 	}
+	go out.downloadStartedLoop(c)
+	go out.downloadFinishedLoop(c)
+	return out
 }
 
-func (dh *downloadHelper) start() {
-	go dh.downloadStartedLoop()
-	go dh.downloadFinishedLoop()
+func (dh *downloadHelper) DownloadAsync() {
+	dh.d.DownloadAsync()
 }
 
-func (dh *downloadHelper) close() {
-	dh.startedSub.Unsubscribe()
-	dh.finishedSub.Unsubscribe()
-}
-
-func (dh *downloadHelper) downloadStartedLoop() {
+func (dh *downloadHelper) downloadStartedLoop(c *Consensus) {
 	for {
 		select {
 		case <-dh.startedCh:
-			dh.c.BlocksNotSynchronized()
+			c.BlocksNotSynchronized("downloadStartedLoop")
 
 		case err := <-dh.startedSub.Err():
-			dh.c.getLogger().Info().Err(err).Msg("consensus download finished loop closed")
+			c.GetLogger().Info().Err(err).Msg("consensus download finished loop closed")
 			return
 		}
 	}
 }
 
-func (dh *downloadHelper) downloadFinishedLoop() {
+func (dh *downloadHelper) downloadFinishedLoop(c *Consensus) {
 	for {
 		select {
 		case <-dh.finishedCh:
-			err := dh.c.AddConsensusLastMile()
-			if err != nil {
-				dh.c.getLogger().Error().Err(err).Msg("add last mile failed")
-			}
-			dh.c.BlocksSynchronized()
+			c.BlocksSynchronized()
 
 		case err := <-dh.finishedSub.Err():
-			dh.c.getLogger().Info().Err(err).Msg("consensus download finished loop closed")
+			c.GetLogger().Info().Err(err).Msg("consensus download finished loop closed")
 			return
 		}
 	}
@@ -97,7 +91,11 @@ func (consensus *Consensus) AddConsensusLastMile() error {
 			if block == nil {
 				break
 			}
-			if _, err := consensus.Blockchain().InsertChain(types.Blocks{block}, true); err != nil {
+			_, err := consensus.Blockchain().InsertChain(types.Blocks{block}, true)
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+			case errors.Is(err, core.ErrNotLastBlockInEpoch):
+			case err != nil:
 				return errors.Wrap(err, "failed to InsertChain")
 			}
 		}
@@ -107,31 +105,9 @@ func (consensus *Consensus) AddConsensusLastMile() error {
 }
 
 func (consensus *Consensus) spinUpStateSync() {
-	if consensus.dHelper != nil {
-		consensus.dHelper.d.DownloadAsync()
-		consensus.current.SetMode(Syncing)
-		for _, v := range consensus.consensusTimeout {
-			v.Stop()
-		}
-	} else {
-		select {
-		case consensus.BlockNumLowChan <- struct{}{}:
-			consensus.current.SetMode(Syncing)
-			for _, v := range consensus.consensusTimeout {
-				v.Stop()
-			}
-		default:
-		}
-	}
-}
-
-func (consensus *Consensus) spinLegacyStateSync() {
-	select {
-	case consensus.BlockNumLowChan <- struct{}{}:
-		consensus.current.SetMode(Syncing)
-		for _, v := range consensus.consensusTimeout {
-			v.Stop()
-		}
-	default:
+	consensus.dHelper.DownloadAsync()
+	consensus.current.SetMode(Syncing)
+	for _, v := range consensus.consensusTimeout {
+		v.Stop()
 	}
 }

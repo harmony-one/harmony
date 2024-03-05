@@ -22,8 +22,6 @@ import (
 	"math/big"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -40,6 +38,7 @@ import (
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )
 
@@ -310,17 +309,15 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
-		if err != nil {
-			to := ""
-			if m := msg.To(); m != nil {
-				to = m.Hex()
-			}
-			balance := ""
-			if a := statedb.GetBalance(msg.From()); a != nil {
-				balance = a.String()
-			}
-			return nil, nil, nil, 0, errors.Wrapf(err, "apply failed from='%s' to='%s' balance='%s'", msg.From().Hex(), to, balance)
+		to := ""
+		if m := msg.To(); m != nil {
+			to = m.Hex()
 		}
+		balance := ""
+		if a := statedb.GetBalance(msg.From()); a != nil {
+			balance = a.String()
+		}
+		return nil, nil, nil, 0, errors.Wrapf(err, "apply failed from='%s' to='%s' balance='%s'", msg.From().Hex(), to, balance)
 	}
 	// Update the state with pending changes
 	var root []byte

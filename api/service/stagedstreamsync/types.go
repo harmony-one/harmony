@@ -14,9 +14,12 @@ var (
 )
 
 type status struct {
-	isSyncing bool
-	targetBN  uint64
-	lock      sync.Mutex
+	isSyncing     bool
+	targetBN      uint64
+	pivotBlock    *types.Block
+	cycleSyncMode SyncMode
+	statesSynced  bool
+	lock          sync.Mutex
 }
 
 func newStatus() status {

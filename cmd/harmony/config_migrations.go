@@ -334,7 +334,7 @@ func init() {
 
 	migrations["2.5.11"] = func(confTree *toml.Tree) *toml.Tree {
 		if confTree.Get("General.TriesInMemory") == nil {
-			confTree.Set("General.TriesInMemory", defaultConfig.General.TriesInMemory)
+			confTree.Set("General.TriesInMemory", defaultConfig.Cache.TriesInMemory)
 		}
 		confTree.Set("Version", "2.5.12")
 		return confTree
@@ -402,6 +402,17 @@ func init() {
 		}
 		// upgrade minor version because of `GPO` section introduction
 		confTree.Set("Version", "2.6.0")
+		return confTree
+	}
+
+	migrations["2.6.0"] = func(confTree *toml.Tree) *toml.Tree {
+		confTree.Delete("General.TriesInMemory")
+
+		if confTree.Get("Cache") == nil {
+			confTree.Set("Cache", defaultConfig.Cache)
+		}
+		// upgrade minor version because of `Cache` section introduction
+		confTree.Set("Version", "2.6.1")
 		return confTree
 	}
 

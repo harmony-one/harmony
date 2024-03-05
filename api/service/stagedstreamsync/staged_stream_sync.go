@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	syncproto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,23 +60,22 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 }
 
 type StagedStreamSync struct {
-	bc             core.BlockChain
-	consensus      *consensus.Consensus
-	isBeacon       bool
-	isExplorer     bool
-	db             kv.RwDB
-	protocol       syncProtocol
-	isBeaconNode   bool
-	gbm            *blockDownloadManager // initialized when finished get block number
-	lastMileBlocks []*types.Block        // last mile blocks to catch up with the consensus
-	lastMileMux    sync.Mutex
-	inserted       int
-	config         Config
-	logger         zerolog.Logger
-	status         *status //TODO: merge this with currentSyncCycle
-	initSync       bool    // if sets to true, node start long range syncing
-	UseMemDB       bool
-
+	bc              core.BlockChain
+	consensus       *consensus.Consensus
+	isBeacon        bool
+	isExplorer      bool
+	db              kv.RwDB
+	protocol        syncProtocol
+	isBeaconNode    bool
+	gbm             *blockDownloadManager // initialized when finished get block number
+	lastMileBlocks  []*types.Block        // last mile blocks to catch up with the consensus
+	lastMileMux     sync.Mutex
+	inserted        int
+	config          Config
+	logger          zerolog.Logger
+	status          *status //TODO: merge this with currentSyncCycle
+	initSync        bool    // if sets to true, node start long range syncing
+	UseMemDB        bool
 	revertPoint     *uint64 // used to run stages
 	prevRevertPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
 	invalidBlock    InvalidBlock
@@ -267,8 +267,18 @@ func New(
 	logger zerolog.Logger,
 ) *StagedStreamSync {
 
-	revertStages := make([]*Stage, len(stagesList))
-	for i, stageIndex := range DefaultRevertOrder {
+	forwardStages := make([]*Stage, len(StagesForwardOrder))
+	for i, stageIndex := range StagesForwardOrder {
+		for _, s := range stagesList {
+			if s.ID == stageIndex {
+				forwardStages[i] = s
+				break
+			}
+		}
+	}
+
+	revertStages := make([]*Stage, len(StagesRevertOrder))
+	for i, stageIndex := range StagesRevertOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
 				revertStages[i] = s
@@ -276,8 +286,9 @@ func New(
 			}
 		}
 	}
-	pruneStages := make([]*Stage, len(stagesList))
-	for i, stageIndex := range DefaultCleanUpOrder {
+
+	pruneStages := make([]*Stage, len(StagesCleanUpOrder))
+	for i, stageIndex := range StagesCleanUpOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
 				pruneStages[i] = s
@@ -306,7 +317,7 @@ func New(
 		inserted:       0,
 		config:         config,
 		logger:         logger,
-		stages:         stagesList,
+		stages:         forwardStages,
 		currentStage:   0,
 		revertOrder:    revertStages,
 		pruningOrder:   pruneStages,
@@ -325,6 +336,18 @@ func (s *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint6
 		return 0, stid, err
 	}
 	return bn, stid, nil
+}
+
+// doGetBlockByNumberRequest returns block by its number and corresponding stream
+func (s *StagedStreamSync) doGetBlockByNumberRequest(ctx context.Context, bn uint64) (*types.Block, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	blocks, stid, err := s.protocol.GetBlocksByNumber(ctx, []uint64{bn}, syncproto.WithHighPriority())
+	if err != nil || len(blocks) != 1 {
+		return nil, stid, err
+	}
+	return blocks[0], stid, nil
 }
 
 // promLabels returns a prometheus labels for current shard id
@@ -383,6 +406,11 @@ func (s *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firs
 			continue
 		}
 
+		// TODO: enable this part after make sure all works well
+		// if !s.canExecute(stage) {
+		// 	continue
+		// }
+
 		if err := s.runStage(ctx, stage, db, tx, firstCycle, s.invalidBlock.Active); err != nil {
 			utils.Logger().Error().
 				Err(err).
@@ -407,6 +435,55 @@ func (s *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firs
 	}
 	s.currentStage = 0
 	return nil
+}
+
+func (s *StagedStreamSync) canExecute(stage *Stage) bool {
+	// check range mode
+	if stage.RangeMode != LongRangeAndShortRange {
+		isLongRange := s.initSync
+		switch stage.RangeMode {
+		case OnlyLongRange:
+			if !isLongRange {
+				return false
+			}
+		case OnlyShortRange:
+			if isLongRange {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	// check chain execution
+	if stage.ChainExecutionMode != AllChains {
+		shardID := s.bc.ShardID()
+		isBeaconNode := s.isBeaconNode
+		isShardChain := shardID != shard.BeaconChainShardID
+		isEpochChain := shardID == shard.BeaconChainShardID && !isBeaconNode
+		switch stage.ChainExecutionMode {
+		case AllChainsExceptEpochChain:
+			if isEpochChain {
+				return false
+			}
+		case OnlyBeaconNode:
+			if !isBeaconNode {
+				return false
+			}
+		case OnlyShardChain:
+			if !isShardChain {
+				return false
+			}
+		case OnlyEpochChain:
+			if !isEpochChain {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	return true
 }
 
 // CreateView creates a view for a given db
@@ -472,7 +549,6 @@ func (s *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.RwD
 	if err != nil {
 		return err
 	}
-
 	if err = stage.Handler.Exec(ctx, firstCycle, invalidBlockRevert, stageState, s, tx); err != nil {
 		utils.Logger().Error().
 			Err(err).
@@ -636,10 +712,15 @@ func (ss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consens
 			if block == nil {
 				break
 			}
-			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+			_, err := bc.InsertChain(types.Blocks{block}, true)
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+			case errors.Is(err, core.ErrNotLastBlockInEpoch):
+			case err != nil:
 				return errors.Wrap(err, "failed to InsertChain")
+			default:
+				hashes = append(hashes, block.Header().Hash())
 			}
-			hashes = append(hashes, block.Header().Hash())
 		}
 		return nil
 	})
@@ -704,13 +785,16 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 	}
 
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
-	if err != nil {
+	switch {
+	case errors.Is(err, core.ErrKnownBlock):
+	case err != nil:
 		utils.Logger().Error().
 			Err(err).
 			Uint64("block number", block.NumberU64()).
 			Uint32("shard", block.ShardID()).
 			Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain")
 		return err
+	default:
 	}
 	utils.Logger().Info().
 		Uint64("blockHeight", block.NumberU64()).

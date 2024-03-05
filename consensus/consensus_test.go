@@ -18,7 +18,7 @@ import (
 )
 
 func TestConsensusInitialization(t *testing.T) {
-	host, multiBLSPrivateKey, consensus, decider, err := GenerateConsensusForTesting()
+	host, multiBLSPrivateKey, consensus, _, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)
 
 	messageSender := &MessageSender{host: host, retryTimes: int(phaseDuration.Seconds()) / RetryIntervalInSec}
@@ -30,10 +30,8 @@ func TestConsensusInitialization(t *testing.T) {
 	expectedTimeouts[timeoutViewChange] = viewChangeDuration
 	expectedTimeouts[timeoutBootstrap] = bootstrapDuration
 
-	assert.Equal(t, decider, consensus.Decider)
 	assert.Equal(t, host, consensus.host)
 	assert.Equal(t, messageSender, consensus.msgSender)
-	assert.IsType(t, make(chan struct{}), consensus.BlockNumLowChan)
 
 	// FBFTLog
 	assert.NotNil(t, consensus.FBFTLog())
@@ -64,9 +62,6 @@ func TestConsensusInitialization(t *testing.T) {
 
 	assert.IsType(t, make(chan slash.Record), consensus.SlashChan)
 	assert.NotNil(t, consensus.SlashChan)
-
-	assert.IsType(t, make(chan ProposalType), consensus.GetReadySignal())
-	assert.NotNil(t, consensus.GetReadySignal())
 
 	assert.IsType(t, make(chan [vdfAndSeedSize]byte), consensus.RndChannel)
 	assert.NotNil(t, consensus.RndChannel)

@@ -52,7 +52,6 @@ import (
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/reward"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -82,7 +81,7 @@ type syncConfig struct {
 }
 
 type ISync interface {
-	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error
+	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain) error
 	AddLastMileBlock(block *types.Block)
 	GetActivePeerNumber() int
 	CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error
@@ -156,10 +155,6 @@ func (node *Node) Blockchain() core.BlockChain {
 
 func (node *Node) SyncInstance() ISync {
 	return node.GetOrCreateSyncInstance(true)
-}
-
-func (node *Node) CurrentSyncInstance() bool {
-	return node.GetOrCreateSyncInstance(false) != nil
 }
 
 // GetOrCreateSyncInstance returns an instance of state sync, either legacy or staged
@@ -504,10 +499,6 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
 					return nil, 0, errors.New("beacon block height smaller than current height beyond tolerance")
-				} else if block.NumberU64()-beaconBlockHeightTolerance > curBeaconHeight {
-					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
-						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
-					return nil, 0, errors.Errorf("beacon block height too much higher than current height beyond tolerance, block %d, current %d, epoch %d , current %d", block.NumberU64(), curBeaconHeight, block.Epoch().Uint64(), curBeaconBlock.Epoch().Uint64())
 				} else if block.NumberU64() <= curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")
@@ -555,7 +546,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 // validate shardID
 // validate public key size
 // verify message signature
-func validateShardBoundMessage(consensus *consensus.Consensus, nodeConfig *nodeconfig.ConfigType, payload []byte,
+func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.ID, nodeConfig *nodeconfig.ConfigType, payload []byte,
 ) (*msg_pb.Message, *bls.SerializedPublicKey, bool, error) {
 	var (
 		m msg_pb.Message
@@ -664,7 +655,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, nodeConfig *nodec
 			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 		}
 	} else {
-		count := consensus.Decider.ParticipantsCount()
+		count := consensus.Decider().ParticipantsCount()
 		if (count+7)>>3 != int64(len(senderBitmap)) {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_participant_count"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongSizeOfBitmap)
@@ -736,6 +727,7 @@ func (node *Node) StartPubSub() error {
 	// p2p consensus message handler function
 	type p2pHandlerConsensus func(
 		ctx context.Context,
+		peer libp2p_peer.ID,
 		msg *msg_pb.Message,
 		key *bls.SerializedPublicKey,
 	) error
@@ -749,6 +741,7 @@ func (node *Node) StartPubSub() error {
 
 	// interface pass to p2p message validator
 	type validated struct {
+		peerID         libp2p_peer.ID
 		consensusBound bool
 		handleC        p2pHandlerConsensus
 		handleCArg     *msg_pb.Message
@@ -806,7 +799,7 @@ func (node *Node) StartPubSub() error {
 
 					// validate consensus message
 					validMsg, senderPubKey, ignore, err := validateShardBoundMessage(
-						node.Consensus, node.NodeConfig, openBox[proto.MessageCategoryBytes:],
+						node.Consensus, peer, node.NodeConfig, openBox[proto.MessageCategoryBytes:],
 					)
 
 					if err != nil {
@@ -820,6 +813,7 @@ func (node *Node) StartPubSub() error {
 					}
 
 					msg.ValidatorData = validated{
+						peerID:         peer,
 						consensusBound: true,
 						handleC:        node.Consensus.HandleMessageUpdate,
 						handleCArg:     validMsg,
@@ -850,6 +844,7 @@ func (node *Node) StartPubSub() error {
 						}
 					}
 					msg.ValidatorData = validated{
+						peerID:         peer,
 						consensusBound: false,
 						handleE:        node.HandleNodeMessage,
 						handleEArg:     validMsg,
@@ -901,7 +896,7 @@ func (node *Node) StartPubSub() error {
 									errChan <- withError{err, nil}
 								}
 							} else {
-								if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
+								if err := msg.handleC(ctx, msg.peerID, msg.handleCArg, msg.senderPubKey); err != nil {
 									errChan <- withError{err, msg.senderPubKey}
 								}
 							}
@@ -1233,72 +1228,6 @@ func (node *Node) updateInitialRewardValues() {
 		initTotal = new(big.Int).Add(core.GetInitialFunds(i), initTotal)
 	}
 	reward.SetTotalInitialTokens(initTotal)
-}
-
-// InitConsensusWithValidators initialize shard state
-// from latest epoch and update committee pub
-// keys for consensus
-func (node *Node) InitConsensusWithValidators() (err error) {
-	if node.Consensus == nil {
-		utils.Logger().Error().
-			Msg("[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID")
-		return errors.New(
-			"[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID",
-		)
-	}
-	shardID := node.Consensus.ShardID
-	currentBlock := node.Blockchain().CurrentBlock()
-	blockNum := currentBlock.NumberU64()
-	node.Consensus.SetMode(consensus.Listening)
-	epoch := currentBlock.Epoch()
-	utils.Logger().Info().
-		Uint64("blockNum", blockNum).
-		Uint32("shardID", shardID).
-		Uint64("epoch", epoch.Uint64()).
-		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
-	shardState, err := committee.WithStakingEnabled.Compute(
-		epoch, node.Consensus.Blockchain(),
-	)
-	if err != nil {
-		utils.Logger().Err(err).
-			Uint64("blockNum", blockNum).
-			Uint32("shardID", shardID).
-			Uint64("epoch", epoch.Uint64()).
-			Msg("[InitConsensusWithValidators] Failed getting shard state")
-		return err
-	}
-	subComm, err := shardState.FindCommitteeByID(shardID)
-	if err != nil {
-		utils.Logger().Err(err).
-			Interface("shardState", shardState).
-			Msg("[InitConsensusWithValidators] Find CommitteeByID")
-		return err
-	}
-	pubKeys, err := subComm.BLSPublicKeys()
-	if err != nil {
-		utils.Logger().Error().
-			Uint32("shardID", shardID).
-			Uint64("blockNum", blockNum).
-			Msg("[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys")
-		return errors.Wrapf(
-			err,
-			"[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys",
-		)
-	}
-
-	for _, key := range pubKeys {
-		if node.Consensus.GetPublicKeys().Contains(key.Object) {
-			utils.Logger().Info().
-				Uint64("blockNum", blockNum).
-				Int("numPubKeys", len(pubKeys)).
-				Str("mode", node.Consensus.Mode().String()).
-				Msg("[InitConsensusWithValidators] Successfully updated public keys")
-			node.Consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
-			node.Consensus.SetMode(consensus.Normal)
-			return nil
-		}
-	}
-	return nil
 }
 
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {

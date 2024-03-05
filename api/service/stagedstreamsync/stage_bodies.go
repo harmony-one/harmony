@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -20,13 +21,14 @@ type StageBodies struct {
 }
 
 type StageBodiesCfg struct {
-	bc          core.BlockChain
-	db          kv.RwDB
-	blockDBs    []kv.RwDB
-	concurrency int
-	protocol    syncProtocol
-	isBeacon    bool
-	logProgress bool
+	bc                   core.BlockChain
+	db                   kv.RwDB
+	blockDBs             []kv.RwDB
+	concurrency          int
+	protocol             syncProtocol
+	isBeacon             bool
+	extractReceiptHashes bool
+	logProgress          bool
 }
 
 func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
@@ -35,15 +37,16 @@ func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
 	}
 }
 
-func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeacon bool, logProgress bool) StageBodiesCfg {
+func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeacon bool, extractReceiptHashes bool, logProgress bool) StageBodiesCfg {
 	return StageBodiesCfg{
-		bc:          bc,
-		db:          db,
-		blockDBs:    blockDBs,
-		concurrency: concurrency,
-		protocol:    protocol,
-		isBeacon:    isBeacon,
-		logProgress: logProgress,
+		bc:                   bc,
+		db:                   db,
+		blockDBs:             blockDBs,
+		concurrency:          concurrency,
+		protocol:             protocol,
+		isBeacon:             isBeacon,
+		extractReceiptHashes: extractReceiptHashes,
+		logProgress:          logProgress,
 	}
 }
 
@@ -67,7 +70,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	}
 
 	maxHeight := s.state.status.targetBN
-	currentHead := b.configs.bc.CurrentBlock().NumberU64()
+	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
@@ -118,7 +121,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 
 	for i := 0; i != s.state.config.Concurrency; i++ {
 		wg.Add(1)
-		go b.runBlockWorkerLoop(ctx, s.state.gbm, &wg, i, startTime)
+		go b.runBlockWorkerLoop(ctx, s.state.gbm, &wg, i, s, startTime)
 	}
 
 	wg.Wait()
@@ -133,9 +136,9 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 }
 
 // runBlockWorkerLoop creates a work loop for download blocks
-func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownloadManager, wg *sync.WaitGroup, loopID int, startTime time.Time) {
+func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, startTime time.Time) {
 
-	currentBlock := int(b.configs.bc.CurrentBlock().NumberU64())
+	currentBlock := int(s.state.CurrentBlockNumber())
 
 	defer wg.Done()
 
@@ -145,7 +148,8 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 			return
 		default:
 		}
-		batch := gbm.GetNextBatch()
+		curHeight := s.state.CurrentBlockNumber()
+		batch := gbm.GetNextBatch(curHeight)
 		if len(batch) == 0 {
 			select {
 			case <-ctx.Done():
@@ -202,6 +206,34 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 			}
 		}
 	}
+}
+
+func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte, batchSigBytes [][]byte, s *StageState) error {
+	var block *types.Block
+	for i := uint64(0); i < uint64(len(batchBlockBytes)); i++ {
+		blockBytes := batchBlockBytes[i]
+		sigBytes := batchSigBytes[i]
+		if blockBytes == nil {
+			continue
+		}
+		if err := rlp.DecodeBytes(blockBytes, &block); err != nil {
+			utils.Logger().Error().
+				Uint64("block number", i).
+				Msg("block size invalid")
+			return ErrInvalidBlockBytes
+		}
+		if sigBytes != nil {
+			block.SetCurrentCommitSig(sigBytes)
+		}
+
+		// if block.NumberU64() != i {
+		// 	return ErrInvalidBlockNumber
+		// }
+		if err := verifyBlock(b.configs.bc, block); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // redownloadBadBlock tries to redownload the bad block from other streams
@@ -403,7 +435,7 @@ func (b *StageBodies) Revert(ctx context.Context, firstCycle bool, u *RevertStat
 		defer tx.Rollback()
 	}
 	// save progress
-	currentHead := b.configs.bc.CurrentBlock().NumberU64()
+	currentHead := s.state.CurrentBlockNumber()
 	if err = s.Update(tx, currentHead); err != nil {
 		utils.Logger().Error().
 			Err(err).
