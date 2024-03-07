@@ -42,6 +42,8 @@ const (
 
 func (ts testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.TestnetChainConfig.IsTestnetExternalEpoch(epoch):
+		return testnetV6
 	case params.TestnetChainConfig.IsHIP30(epoch):
 		return testnetV5
 	case params.TestnetChainConfig.IsFeeCollectEpoch(epoch):
@@ -164,6 +166,14 @@ var (
 	testnetV5 = MustNewInstance(
 		2, 30, 8, 0.15,
 		numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccountsV1,
+		genesis.TNFoundationalAccounts, emptyAllowlist,
+		feeCollectorsTestnet, numeric.MustNewDecFromStr("0.25"),
+		hip30CollectionAddressTestnet, testnetReshardingEpoch,
+		TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV6 = MustNewInstance(
+		2, 30, 0, 0,
+		numeric.MustNewDecFromStr("0.0"), genesis.TNHarmonyAccountsV1,
 		genesis.TNFoundationalAccounts, emptyAllowlist,
 		feeCollectorsTestnet, numeric.MustNewDecFromStr("0.25"),
 		hip30CollectionAddressTestnet, testnetReshardingEpoch,
