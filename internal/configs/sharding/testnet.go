@@ -172,7 +172,7 @@ var (
 		TestnetSchedule.BlocksPerEpoch(),
 	)
 	testnetV6 = MustNewInstance(
-		2, 30, 8, 0,
+		2, 30, 0, 0,
 		numeric.MustNewDecFromStr("0.0"), genesis.TNHarmonyAccountsV1,
 		genesis.TNFoundationalAccounts, emptyAllowlist,
 		feeCollectorsTestnet, numeric.MustNewDecFromStr("0.25"),
