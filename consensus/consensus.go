@@ -254,6 +254,8 @@ func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 }
 
 func (consensus *Consensus) IsBackup() bool {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
 	return consensus.isBackup
 }
 
