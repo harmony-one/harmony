@@ -31,6 +31,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -66,7 +68,6 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -353,7 +354,11 @@ func newBlockChainWithOptions(
 			NoBuild:    bc.cacheConfig.SnapshotNoBuild,
 			AsyncBuild: !bc.cacheConfig.SnapshotWait,
 		}
-		bc.snaps, _ = snapshot.New(snapconfig, bc.db, bc.triedb, head.Hash())
+		fmt.Println("loading/generating snapshot...")
+		utils.Logger().Info().
+			Str("Root", head.Root().Hex()).
+			Msg("loading/generating snapshot")
+		bc.snaps, _ = snapshot.New(snapconfig, bc.db, bc.triedb, head.Root())
 	}
 
 	curHeader := bc.CurrentBlock().Header()
@@ -781,6 +786,20 @@ func (bc *BlockChainImpl) resetWithGenesisBlock(genesis *types.Block) error {
 	return nil
 }
 
+func (bc *BlockChainImpl) repairRecreateStateTries(head **types.Block) error {
+	for {
+		blk := bc.GetBlockByNumber((*head).NumberU64() + 1)
+		if blk != nil {
+			_, _, _, err := bc.insertChain([]*types.Block{blk}, true)
+			if err != nil {
+				return err
+			}
+			*head = blk
+			continue
+		}
+	}
+}
+
 // repair tries to repair the current blockchain by rolling back the current block
 // until one with associated state is found. This is needed to fix incomplete db
 // writes caused either by crashes/power outages, or simply non-committed tries.
@@ -788,6 +807,16 @@ func (bc *BlockChainImpl) resetWithGenesisBlock(genesis *types.Block) error {
 // This method only rolls back the current block. The current header and current
 // fast block are left intact.
 func (bc *BlockChainImpl) repair(head **types.Block) error {
+	if err := bc.repairValidatorsAndCommitSigs(head); err != nil {
+		return errors.WithMessage(err, "failed to repair validators and commit sigs")
+	}
+	if err := bc.repairRecreateStateTries(head); err != nil {
+		return errors.WithMessage(err, "failed to recreate state tries")
+	}
+	return nil
+}
+
+func (bc *BlockChainImpl) repairValidatorsAndCommitSigs(head **types.Block) error {
 	valsToRemove := map[common.Address]struct{}{}
 	for {
 		// Abort if we've rewound to a head block that does have associated state
@@ -796,12 +825,23 @@ func (bc *BlockChainImpl) repair(head **types.Block) error {
 				Str("number", (*head).Number().String()).
 				Str("hash", (*head).Hash().Hex()).
 				Msg("Rewound blockchain to past state")
+			if err := rawdb.WriteHeadBlockHash(bc.db, (*head).Hash()); err != nil {
+				return errors.WithMessagef(err, "failed to write head block hash number %d", (*head).NumberU64())
+			}
 			return bc.removeInValidatorList(valsToRemove)
 		}
 		// Repair last commit sigs
 		lastSig := (*head).Header().LastCommitSignature()
 		sigAndBitMap := append(lastSig[:], (*head).Header().LastCommitBitmap()...)
 		bc.WriteCommitSig((*head).NumberU64()-1, sigAndBitMap)
+
+		err := rawdb.DeleteBlock(bc.db, (*head).Hash(), (*head).NumberU64())
+		if err != nil {
+			return errors.WithMessagef(err, "failed to delete block %d", (*head).NumberU64())
+		}
+		if err := rawdb.WriteHeadBlockHash(bc.db, (*head).ParentHash()); err != nil {
+			return errors.WithMessagef(err, "failed to write head block hash number %d", (*head).NumberU64()-1)
+		}
 
 		// Otherwise rewind one block and recheck state availability there
 		for _, stkTxn := range (*head).StakingTransactions() {
@@ -897,6 +937,9 @@ func (bc *BlockChainImpl) writeHeadBlock(block *types.Block) error {
 		return err
 	}
 	if err := rawdb.WriteHeadHeaderHash(batch, block.Hash()); err != nil {
+		return err
+	}
+	if err := rawdb.WriteHeaderNumber(batch, block.Hash(), block.NumberU64()); err != nil {
 		return err
 	}
 
@@ -1731,21 +1774,16 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			err = NewBlockValidator(bc).ValidateBody(block)
 		}
 		switch {
-		case err == ErrKnownBlock:
-			// Block and state both already known. However if the current block is below
-			// this number we did a rollback and we should reimport it nonetheless.
-			if bc.CurrentBlock().NumberU64() >= block.NumberU64() {
-				stats.ignored++
-				continue
-			}
+		case errors.Is(err, ErrKnownBlock):
+			return i, events, coalescedLogs, err
 
 		case err == consensus_engine.ErrFutureBlock:
 			return i, events, coalescedLogs, err
 
-		case err == consensus_engine.ErrUnknownAncestor:
+		case errors.Is(err, consensus_engine.ErrUnknownAncestor):
 			return i, events, coalescedLogs, err
 
-		case err == consensus_engine.ErrPrunedAncestor:
+		case errors.Is(err, consensus_engine.ErrPrunedAncestor):
 			// TODO: add fork choice mechanism
 			// Block competing with the canonical chain, store in the db, but don't process
 			// until the competitor TD goes above the canonical TD
@@ -1772,9 +1810,7 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			// Prune in case non-empty winner chain
 			if len(winner) > 0 {
 				// Import all the pruned blocks to make the state available
-				bc.chainmu.Unlock()
 				_, evs, logs, err := bc.insertChain(winner, true /* verifyHeaders */)
-				bc.chainmu.Lock()
 				events, coalescedLogs = evs, logs
 
 				if err != nil {
@@ -1909,10 +1945,10 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 
 // insertStats tracks and reports on block insertion.
 type insertStats struct {
-	queued, processed, ignored int
-	usedGas                    uint64
-	lastIndex                  int
-	startTime                  mclock.AbsTime
+	queued, processed int
+	usedGas           uint64
+	lastIndex         int
+	startTime         mclock.AbsTime
 }
 
 // statsReportLimit is the time limit during import and export after which we
@@ -1950,9 +1986,6 @@ func (st *insertStats) report(chain []*types.Block, index int, cache common.Stor
 
 		if st.queued > 0 {
 			context = context.Int("queued", st.queued)
-		}
-		if st.ignored > 0 {
-			context = context.Int("ignored", st.ignored)
 		}
 
 		logger := context.Logger()

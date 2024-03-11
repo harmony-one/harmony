@@ -4,15 +4,13 @@ import (
 	"bytes"
 	"errors"
 
-	protobuf "github.com/golang/protobuf/proto"
-
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
+	protobuf "google.golang.org/protobuf/proto"
 )
 
 // NetworkMessage is a message intended to be
@@ -82,7 +80,7 @@ func (consensus *Consensus) construct(
 		)
 	} else {
 		// TODO: use a persistent bitmap to report bitmap
-		mask := bls.NewMask(consensus.Decider.Participants())
+		mask := bls.NewMask(consensus.decider.Participants())
 		for _, key := range priKeys {
 			mask.SetKey(key.Pub.Bytes, true)
 		}
@@ -161,7 +159,7 @@ func (consensus *Consensus) construct(
 func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.Phase) []byte {
 	buffer := bytes.Buffer{}
 	// 96 bytes aggregated signature
-	aggSig := consensus.Decider.AggregateVotes(p)
+	aggSig := consensus.decider.AggregateVotes(p)
 	buffer.Write(aggSig.Serialize())
 	// Bitmap
 	if p == quorum.Prepare {

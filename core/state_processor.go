@@ -22,8 +22,6 @@ import (
 	"math/big"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -40,6 +38,7 @@ import (
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )
 

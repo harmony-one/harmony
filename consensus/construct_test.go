@@ -81,7 +81,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	validatorKey := bls.SerializedPublicKey{}
 	validatorKey.FromLibBLSPublicKey(validatorPubKey)
 	validatorKeyWrapper := bls.PublicKeyWrapper{Object: validatorPubKey, Bytes: validatorKey}
-	consensus.Decider.AddNewVote(
+	consensus.Decider().AddNewVote(
 		quorum.Prepare,
 		[]*bls.PublicKeyWrapper{&leaderKeyWrapper},
 		leaderPriKey.Sign(message),
@@ -89,7 +89,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		consensus.BlockNum(),
 		consensus.GetCurBlockViewID(),
 	)
-	if _, err := consensus.Decider.AddNewVote(
+	if _, err := consensus.Decider().AddNewVote(
 		quorum.Prepare,
 		[]*bls.PublicKeyWrapper{&validatorKeyWrapper},
 		validatorPriKey.Sign(message),

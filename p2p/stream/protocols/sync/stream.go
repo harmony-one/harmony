@@ -5,17 +5,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	protobuf "google.golang.org/protobuf/proto"
 )
 
 // syncStream is the structure for a stream running sync protocol.
@@ -84,7 +83,7 @@ func (st *syncStream) readMsgLoop() {
 func (st *syncStream) deliverMsg(msg protobuf.Message) {
 	syncMsg := msg.(*syncpb.Message)
 	if syncMsg == nil {
-		st.logger.Info().Str("message", msg.String()).Msg("received unexpected sync message")
+		st.logger.Info().Interface("message", msg).Msg("received unexpected sync message")
 		return
 	}
 	if req := syncMsg.GetReq(); req != nil {

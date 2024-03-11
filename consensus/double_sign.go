@@ -17,7 +17,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 	if consensus.couldThisBeADoubleSigner(recvMsg) {
 		addrSet := map[common.Address]struct{}{}
 		for _, pubKey2 := range recvMsg.SenderPubkeys {
-			if alreadyCastBallot := consensus.Decider.ReadBallot(
+			if alreadyCastBallot := consensus.decider.ReadBallot(
 				quorum.Commit, pubKey2.Bytes,
 			); alreadyCastBallot != nil {
 				for _, pubKey1 := range alreadyCastBallot.SignerPubKeys {

@@ -5,27 +5,26 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/webhooks"
-
 	"github.com/ethereum/go-ethereum/common"
-	protobuf "github.com/golang/protobuf/proto"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/webhooks"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	protobuf "google.golang.org/protobuf/proto"
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -82,7 +81,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 }
 
 func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
-	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
+	consensus.decider.UpdateParticipants(pubKeys, allowlist)
 	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
 		consensus.getLogger().Info().
@@ -91,7 +90,7 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 			Msg("Member")
 	}
 
-	allKeys := consensus.Decider.Participants()
+	allKeys := consensus.decider.Participants()
 	if len(allKeys) != 0 {
 		consensus.LeaderPubKey = &allKeys[0]
 		consensus.getLogger().Info().
@@ -115,7 +114,7 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	if !consensus.isViewChangingMode() {
 		consensus.resetViewChangeState()
 	}
-	return consensus.Decider.ParticipantsCount()
+	return consensus.decider.ParticipantsCount()
 }
 
 // Sign on the hash of the message
@@ -144,7 +143,7 @@ func (consensus *Consensus) updateBitmaps() {
 	consensus.getLogger().Debug().
 		Str("MessageType", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
-	members := consensus.Decider.Participants()
+	members := consensus.decider.Participants()
 	prepareBitmap := bls_cosi.NewMask(members)
 	commitBitmap := bls_cosi.NewMask(members)
 	multiSigBitmap := bls_cosi.NewMask(members)
@@ -160,7 +159,7 @@ func (consensus *Consensus) resetState() {
 
 	consensus.blockHash = [32]byte{}
 	consensus.block = []byte{}
-	consensus.Decider.ResetPrepareAndCommitVotes()
+	consensus.decider.ResetPrepareAndCommitVotes()
 	if consensus.prepareBitmap != nil {
 		consensus.prepareBitmap.Clear()
 	}
@@ -179,7 +178,7 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 }
 
 func (consensus *Consensus) isValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
-	return consensus.Decider.IndexOf(pubKey) != -1
+	return consensus.decider.IndexOf(pubKey) != -1
 }
 
 // SetMode sets the mode of consensus
@@ -191,10 +190,6 @@ func (consensus *Consensus) SetMode(m Mode) {
 
 // SetMode sets the mode of consensus
 func (consensus *Consensus) setMode(m Mode) {
-	if m == Normal && consensus.isBackup {
-		m = NormalBackup
-	}
-
 	consensus.getLogger().Debug().
 		Str("Mode", m.String()).
 		Msg("[SetMode]")
@@ -203,11 +198,12 @@ func (consensus *Consensus) setMode(m Mode) {
 
 // SetIsBackup sets the mode of consensus
 func (consensus *Consensus) SetIsBackup(isBackup bool) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.getLogger().Debug().
 		Bool("IsBackup", isBackup).
 		Msg("[SetIsBackup]")
 	consensus.isBackup = isBackup
-	consensus.current.SetIsBackup(isBackup)
 }
 
 // Mode returns the mode of consensus
@@ -271,7 +267,7 @@ func (consensus *Consensus) setBlockNum(blockNum uint64) {
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
 func (consensus *Consensus) ReadSignatureBitmapPayload(recvPayload []byte, offset int) (*bls_core.Sign, *bls_cosi.Mask, error) {
 	consensus.mutex.RLock()
-	members := consensus.Decider.Participants()
+	members := consensus.decider.Participants()
 	consensus.mutex.RUnlock()
 	return consensus.readSignatureBitmapPayload(recvPayload, offset, members)
 }
@@ -334,12 +330,12 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	isFirstTimeStaking := consensus.Blockchain().Config().IsStaking(nextEpoch) &&
 		curHeader.IsLastBlockInEpoch() && !consensus.Blockchain().Config().IsStaking(curEpoch)
 	haventUpdatedDecider := consensus.Blockchain().Config().IsStaking(curEpoch) &&
-		consensus.Decider.Policy() != quorum.SuperMajorityStake
+		consensus.decider.Policy() != quorum.SuperMajorityStake
 
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
-		consensus.Decider = decider
+		consensus.decider = decider
 	}
 
 	var committeeToSet *shard.Committee
@@ -412,7 +408,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	consensus.updatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(nextEpoch).ExternalAllowlist())
 
 	// Update voters in the committee
-	if _, err := consensus.Decider.SetVoters(
+	if _, err := consensus.decider.SetVoters(
 		committeeToSet, epochToSet,
 	); err != nil {
 		consensus.getLogger().Error().
@@ -582,7 +578,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 		return errGetPreparedBlock
 	}
 
-	aggSig, mask, err := consensus.readSignatureBitmapPayload(payload, 32, consensus.Decider.Participants())
+	aggSig, mask, err := consensus.readSignatureBitmapPayload(payload, 32, consensus.decider.Participants())
 	if err != nil {
 		return errReadBitmapPayload
 	}
@@ -606,7 +602,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 			continue
 		}
 
-		if _, err := consensus.Decider.AddNewVote(
+		if _, err := consensus.decider.AddNewVote(
 			quorum.Commit,
 			[]*bls_cosi.PublicKeyWrapper{key.Pub},
 			key.Pri.SignHash(commitPayload),
@@ -628,7 +624,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uint32 {
 	count := uint32(0)
 	consensus.mutex.Lock()
-	members := consensus.Decider.Participants()
+	members := consensus.decider.Participants()
 	pubKeys := consensus.getPublicKeys()
 	consensus.mutex.Unlock()
 

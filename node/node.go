@@ -11,28 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/registry"
-	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
-	"github.com/harmony-one/harmony/internal/tikv"
-	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
-	"github.com/harmony-one/harmony/internal/utils/lrucache"
-
-	"github.com/ethereum/go-ethereum/rlp"
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
-	"github.com/harmony-one/harmony/internal/utils/crosslinks"
-
 	"github.com/ethereum/go-ethereum/common"
-	protobuf "github.com/golang/protobuf/proto"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	lru "github.com/hashicorp/golang-lru"
-	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
-	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rcrowley/go-metrics"
-	"golang.org/x/sync/semaphore"
-
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -46,9 +28,16 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/registry"
+	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
+	"github.com/harmony-one/harmony/internal/tikv"
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/utils/crosslinks"
+	"github.com/harmony-one/harmony/internal/utils/lrucache"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -56,6 +45,14 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
+	lru "github.com/hashicorp/golang-lru"
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rcrowley/go-metrics"
+	"golang.org/x/sync/semaphore"
+	protobuf "google.golang.org/protobuf/proto"
 )
 
 const (
@@ -81,7 +78,7 @@ type syncConfig struct {
 }
 
 type ISync interface {
-	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error
+	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain) error
 	AddLastMileBlock(block *types.Block)
 	GetActivePeerNumber() int
 	CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error
@@ -655,7 +652,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 		}
 	} else {
-		count := consensus.Decider.ParticipantsCount()
+		count := consensus.Decider().ParticipantsCount()
 		if (count+7)>>3 != int64(len(senderBitmap)) {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_participant_count"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongSizeOfBitmap)
@@ -1022,7 +1019,7 @@ func New(
 	host p2p.Host,
 	consensusObj *consensus.Consensus,
 	blacklist map[common.Address]struct{},
-	allowedTxs map[common.Address]core.AllowedTxData,
+	allowedTxs map[common.Address][]core.AllowedTxData,
 	localAccounts []common.Address,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
 	registry *registry.Registry,
@@ -1177,6 +1174,45 @@ func New(
 	nodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
 
 	node.serviceManager = service.NewManager()
+
+	// delete old pending crosslinks
+	if node.Blockchain().ShardID() == shard.BeaconChainShardID {
+		ten := big.NewInt(10)
+		crossLinkEpochThreshold := new(big.Int).Sub(node.Blockchain().CurrentHeader().Epoch(), ten)
+
+		invalidToDelete := make([]types.CrossLink, 0, 1000)
+		allPending, err := node.Blockchain().ReadPendingCrossLinks()
+		if err == nil {
+			for _, pending := range allPending {
+				// if pending crosslink is older than 10 epochs, delete it
+				if pending.EpochF.Cmp(crossLinkEpochThreshold) <= 0 {
+					invalidToDelete = append(invalidToDelete, pending)
+					utils.Logger().Info().
+						Uint32("shard", pending.ShardID()).
+						Int64("epoch", pending.Epoch().Int64()).
+						Uint64("blockNum", pending.BlockNum()).
+						Int64("viewID", pending.ViewID().Int64()).
+						Interface("hash", pending.Hash()).
+						Msg("[PendingCrossLinksOnInit] delete old pending cross links")
+				}
+			}
+
+			if n, err := node.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete); err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Msg("[PendingCrossLinksOnInit] deleting old pending cross links failed")
+			} else if len(invalidToDelete) > 0 {
+				utils.Logger().Info().
+					Int("not-deleted", n).
+					Int("deleted", len(invalidToDelete)).
+					Msg("[PendingCrossLinksOnInit] deleted old pending cross links")
+			}
+		} else {
+			utils.Logger().Error().
+				Err(err).
+				Msg("[PendingCrossLinksOnInit] read pending cross links failed")
+		}
+	}
 
 	return &node
 }

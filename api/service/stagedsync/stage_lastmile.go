@@ -49,7 +49,7 @@ func (lm *StageLastMile) Exec(firstCycle bool, invalidBlockRevert bool, s *Stage
 		if block == nil {
 			break
 		}
-		err = s.state.UpdateBlockAndStatus(block, bc, true)
+		err = s.state.UpdateBlockAndStatus(block, bc)
 		if err != nil {
 			break
 		}
@@ -70,7 +70,7 @@ func (lm *StageLastMile) Exec(firstCycle bool, invalidBlockRevert bool, s *Stage
 		if block == nil {
 			break
 		}
-		err = s.state.UpdateBlockAndStatus(block, bc, false)
+		err = s.state.UpdateBlockAndStatus(block, bc)
 		if err != nil {
 			break
 		}
