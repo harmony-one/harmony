@@ -1440,7 +1440,7 @@ func TestCacheFlags(t *testing.T) {
 				TrieNodeLimit:   defaultCacheConfig.TrieNodeLimit,
 				TriesInMemory:   defaultCacheConfig.TriesInMemory,
 				TrieTimeLimit:   defaultCacheConfig.TrieTimeLimit,
-				SnapshotLimit:   defaultCacheConfig.SnapshotLimit,
+				SnapshotLimit:   0, // based on network type,
 				SnapshotWait:    defaultCacheConfig.SnapshotWait,
 				Preimages:       defaultCacheConfig.Preimages, // based on network type
 				SnapshotNoBuild: defaultCacheConfig.SnapshotNoBuild,

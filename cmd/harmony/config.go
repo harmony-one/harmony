@@ -161,9 +161,15 @@ func getDefaultCacheConfig(nt nodeconfig.NetworkType) harmonyconfig.CacheConfig 
 	case nodeconfig.Mainnet:
 		cacheConfig.Disabled = true
 		cacheConfig.Preimages = true
+		cacheConfig.SnapshotLimit = 0
 	case nodeconfig.Testnet:
-		cacheConfig.Disabled = false
+		cacheConfig.Disabled = true
 		cacheConfig.Preimages = true
+		cacheConfig.SnapshotLimit = 0
+	case nodeconfig.Partner:
+		cacheConfig.Disabled = true
+		cacheConfig.Preimages = true
+		cacheConfig.SnapshotLimit = 0
 	case nodeconfig.Localnet:
 		cacheConfig.Disabled = false
 		cacheConfig.Preimages = false
