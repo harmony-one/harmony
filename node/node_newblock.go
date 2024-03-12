@@ -124,11 +124,15 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to update worker")
 	}
+	header := env.CurrentHeader()
+	shardState, err := node.Blockchain().ReadShardState(header.Epoch())
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to read shard")
+	}
 
 	var (
-		header      = env.CurrentHeader()
 		leaderKey   = node.Consensus.GetLeaderPubKey()
-		coinbase    = node.GetAddressForBLSKey(leaderKey.Object, header.Epoch())
+		coinbase    = node.registry.GetAddressToBLSKey().GetAddressForBLSKey(node.Consensus.GetPublicKeys(), shardState, leaderKey.Object)
 		beneficiary = coinbase
 	)
 
@@ -294,7 +298,6 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 
 	node.Worker.ApplyShardReduction()
 	// Prepare shard state
-	var shardState *shard.State
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
 		node.Beaconchain(), node.Worker.GetCurrentHeader(), false,
 	); err != nil {

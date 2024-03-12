@@ -3,23 +3,30 @@ package registry
 import (
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain"
+	"github.com/harmony-one/harmony/multibls"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 )
 
 // Registry consolidates services at one place.
 type Registry struct {
-	mu          sync.Mutex
-	blockchain  core.BlockChain
-	beaconchain core.BlockChain
-	webHooks    *webhooks.Hooks
-	txPool      *core.TxPool
-	cxPool      *core.CxPool
-	isBackup    bool
-	engine      engine.Engine
-	collection  *shardchain.CollectionImpl
+	mu              sync.Mutex
+	blockchain      core.BlockChain
+	beaconchain     core.BlockChain
+	webHooks        *webhooks.Hooks
+	txPool          *core.TxPool
+	cxPool          *core.CxPool
+	isBackup        bool
+	engine          engine.Engine
+	collection      *shardchain.CollectionImpl
+	nodeConfig      *nodeconfig.ConfigType
+	addressToBLSKey AddressToBLSKey
 }
 
 // New creates a new registry.
@@ -159,4 +166,39 @@ func (r *Registry) GetShardChainCollection() *shardchain.CollectionImpl {
 	defer r.mu.Unlock()
 
 	return r.collection
+}
+
+func (r *Registry) SetNodeConfig(n *nodeconfig.ConfigType) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.nodeConfig = n
+	return r
+}
+
+func (r *Registry) GetNodeConfig() *nodeconfig.ConfigType {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.nodeConfig
+}
+
+func (r *Registry) GetAddressToBLSKey() AddressToBLSKey {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.addressToBLSKey
+}
+
+func (r *Registry) SetAddressToBLSKey(a AddressToBLSKey) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.addressToBLSKey = a
+	return r
+}
+
+type AddressToBLSKey interface {
+	GetAddressForBLSKey(publicKeys multibls.PublicKeys, shardState *shard.State, blskey *bls_core.PublicKey) common.Address
+	GetAddresses(publicKeys multibls.PublicKeys, shardState *shard.State) map[string]common.Address
 }
