@@ -53,7 +53,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
 						Uint64("blockNum", cs.Blockchain().CurrentBlock().NumberU64()+1).
-						Bool("asyncProposal", proposalType == consensus.AsyncProposal).
+						Bool("asyncProposal", proposalType.Type == consensus.AsyncProposal).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					// Prepare last commit signatures
@@ -61,7 +61,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 
 					go func() {
 						waitTime := 0 * time.Second
-						if proposalType == consensus.AsyncProposal {
+						if proposalType.Type == consensus.AsyncProposal {
 							waitTime = consensus.CommitSigReceiverTimeout
 						}
 						select {

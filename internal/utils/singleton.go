@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -211,4 +212,10 @@ func GetPort() int {
 		}
 	}
 	return 0
+}
+
+// FileNo returns source code file and line
+func FileNo() string {
+	_, file, line, _ := runtime.Caller(1)
+	return fmt.Sprintf("%s:%d", file, line)
 }

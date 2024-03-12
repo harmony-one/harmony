@@ -258,7 +258,7 @@ func (consensus *Consensus) finalCommit() {
 			// No pipelining
 			go func() {
 				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-				consensus.ReadySignal(SyncProposal)
+				consensus.ReadySignal(NewProposal(SyncProposal))
 			}()
 		} else {
 			// pipelining
@@ -334,7 +334,7 @@ func (consensus *Consensus) StartChannel() {
 		consensus.start = true
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(SyncProposal)
+		consensus.ReadySignal(NewProposal(SyncProposal))
 		return
 	}
 	consensus.mutex.Unlock()
@@ -586,7 +586,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		// Send signal to Node to propose the new block for consensus
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(AsyncProposal)
+		consensus.ReadySignal(NewProposal(AsyncProposal))
 	}()
 
 	return nil
@@ -814,7 +814,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 				blockPeriod := consensus.BlockPeriod
 				go func() {
 					<-time.After(blockPeriod)
-					consensus.ReadySignal(SyncProposal)
+					consensus.ReadySignal(NewProposal(SyncProposal))
 				}()
 			}
 		}
