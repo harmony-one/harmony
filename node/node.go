@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/abool"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -27,7 +26,6 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
@@ -37,7 +35,6 @@ import (
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/crosslinks"
-	"github.com/harmony-one/harmony/internal/utils/lrucache"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -124,9 +121,7 @@ type Node struct {
 	// Chain configuration.
 	chainConfig         params.ChainConfig
 	unixTimeAtNodeStart int64
-	// KeysToAddrs holds the addresses of bls keys run by the node
-	keysToAddrs      *lrucache.Cache[uint64, map[string]common.Address]
-	keysToAddrsMutex sync.Mutex
+
 	// TransactionErrorSink contains error messages for any failed transaction, in memory only
 	TransactionErrorSink *types.TransactionErrorSink
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
@@ -1025,12 +1020,11 @@ func New(
 	registry *registry.Registry,
 ) *Node {
 	node := Node{
-		registry:             registry,
+		registry:             registry.SetAddressToBLSKey(NewAddressToBLSKey(consensusObj.ShardID)),
 		unixTimeAtNodeStart:  time.Now().Unix(),
 		TransactionErrorSink: types.NewTransactionErrorSink(),
 		crosslinks:           crosslinks.New(),
 		syncID:               GenerateSyncID(),
-		keysToAddrs:          lrucache.NewCache[uint64, map[string]common.Address](10),
 	}
 	if consensusObj == nil {
 		panic("consensusObj is nil")
@@ -1297,77 +1291,6 @@ func (node *Node) ShutDown() {
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
 	os.Exit(0)
-}
-
-func (node *Node) populateSelfAddresses(epoch *big.Int) {
-	shardID := node.Consensus.ShardID
-	shardState, err := node.Consensus.Blockchain().ReadShardState(epoch)
-	if err != nil {
-		utils.Logger().Error().Err(err).
-			Int64("epoch", epoch.Int64()).
-			Uint32("shard-id", shardID).
-			Msg("[PopulateSelfAddresses] failed to read shard")
-		return
-	}
-
-	committee, err := shardState.FindCommitteeByID(shardID)
-	if err != nil {
-		utils.Logger().Error().Err(err).
-			Int64("epoch", epoch.Int64()).
-			Uint32("shard-id", shardID).
-			Msg("[PopulateSelfAddresses] failed to find shard committee")
-		return
-	}
-	keysToAddrs := map[string]common.Address{}
-	for _, blskey := range node.Consensus.GetPublicKeys() {
-		blsStr := blskey.Bytes.Hex()
-		shardkey := bls.FromLibBLSPublicKeyUnsafe(blskey.Object)
-		if shardkey == nil {
-			utils.Logger().Error().
-				Int64("epoch", epoch.Int64()).
-				Uint32("shard-id", shardID).
-				Str("blskey", blsStr).
-				Msg("[PopulateSelfAddresses] failed to get shard key from bls key")
-			return
-		}
-		addr, err := committee.AddressForBLSKey(*shardkey)
-		if err != nil {
-			utils.Logger().Error().Err(err).
-				Int64("epoch", epoch.Int64()).
-				Uint32("shard-id", shardID).
-				Str("blskey", blsStr).
-				Msg("[PopulateSelfAddresses] could not find address")
-			return
-		}
-		keysToAddrs[blsStr] = *addr
-		utils.Logger().Debug().
-			Int64("epoch", epoch.Int64()).
-			Uint32("shard-id", shardID).
-			Str("bls-key", blsStr).
-			Str("address", common2.MustAddressToBech32(*addr)).
-			Msg("[PopulateSelfAddresses]")
-	}
-	node.keysToAddrs.Set(epoch.Uint64(), keysToAddrs)
-}
-
-// GetAddressForBLSKey retrieves the ECDSA address associated with bls key for epoch
-func (node *Node) GetAddressForBLSKey(blskey *bls_core.PublicKey, epoch *big.Int) common.Address {
-	return node.GetAddresses(epoch)[blskey.SerializeToHexStr()]
-}
-
-// GetAddresses retrieves all ECDSA addresses of the bls keys for epoch
-func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
-	// populate if new epoch
-	if rs, ok := node.keysToAddrs.Get(epoch.Uint64()); ok {
-		return rs
-	}
-	node.keysToAddrsMutex.Lock()
-	node.populateSelfAddresses(epoch)
-	node.keysToAddrsMutex.Unlock()
-	if rs, ok := node.keysToAddrs.Get(epoch.Uint64()); ok {
-		return rs
-	}
-	return make(map[string]common.Address)
 }
 
 // IsRunningBeaconChain returns whether the node is running on beacon chain.
