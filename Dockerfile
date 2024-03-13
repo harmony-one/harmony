@@ -1,7 +1,7 @@
 FROM ubuntu:18.04
 
 ARG TARGETARCH
-ARG GOLANG_VERSION="1.19"
+ARG GOLANG_VERSION="1.21"
 
 SHELL ["/bin/bash", "-c"]
 

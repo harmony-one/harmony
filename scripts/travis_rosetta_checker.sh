@@ -7,6 +7,7 @@ echo $DIR
 echo $GOPATH
 cd $GOPATH/src/github.com/harmony-one/harmony-test
 git fetch
+git checkout $TRAVIS_PULL_REQUEST_BRANCH || true
 git pull
 git checkout $TRAVIS_PULL_REQUEST_BRANCH || true
 git branch --show-current
