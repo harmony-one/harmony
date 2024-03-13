@@ -88,8 +88,8 @@ func (ms mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 		// Decrease internal voting power from 68% to 60%
 		// which happens around 1/27/2021 22:00 PDT
 		return mainnetV3_1
-	case params.MainnetChainConfig.IsTwoSeconds(epoch):
-		// Enable 2s block time and change blocks/epoch to 32768
+	case params.MainnetChainConfig.IsOneSecond(epoch):
+		// Enable 1s block time and change blocks/epoch to 32768
 		// which happens around 12/08/2020 08:00 PDT
 		return mainnetV3
 	case epoch.Cmp(big.NewInt(mainnetV2_2Epoch)) >= 0:
@@ -143,10 +143,10 @@ func (ms mainnetSchedule) BlocksPerEpoch() uint64 {
 }
 
 func (ms mainnetSchedule) twoSecondsFirstBlock() uint64 {
-	if params.MainnetChainConfig.TwoSecondsEpoch.Uint64() == 0 {
+	if params.MainnetChainConfig.oneSecondsEpoch.Uint64() == 0 {
 		return 0
 	}
-	return (params.MainnetChainConfig.TwoSecondsEpoch.Uint64()-1)*ms.BlocksPerEpochOld() + mainnetEpochBlock1
+	return (params.MainnetChainConfig.oneSecondsEpoch.Uint64()-1)*ms.BlocksPerEpochOld() + mainnetEpochBlock1
 }
 
 func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
@@ -161,8 +161,8 @@ func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	firstBlock2s := ms.twoSecondsFirstBlock()
 
 	switch {
-	case params.MainnetChainConfig.IsTwoSeconds(big.NewInt(oldEpochNumber)):
-		return big.NewInt(int64((blockNum-firstBlock2s)/ms.BlocksPerEpoch() + params.MainnetChainConfig.TwoSecondsEpoch.Uint64()))
+	case params.MainnetChainConfig.IsOneSecond(big.NewInt(oldEpochNumber)):
+		return big.NewInt(int64((blockNum-firstBlock2s)/ms.BlocksPerEpoch() + params.MainnetChainConfig.oneSecondsEpoch.Uint64()))
 	default: // genesis
 		return big.NewInt(int64(oldEpochNumber))
 	}
@@ -192,8 +192,8 @@ func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	default:
 		firstBlock2s := ms.twoSecondsFirstBlock()
 		switch {
-		case params.MainnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
-			return firstBlock2s - 1 + ms.BlocksPerEpoch()*(epochNum-params.MainnetChainConfig.TwoSecondsEpoch.Uint64()+1)
+		case params.MainnetChainConfig.IsOneSecond(big.NewInt(int64(epochNum))):
+			return firstBlock2s - 1 + ms.BlocksPerEpoch()*(epochNum-params.MainnetChainConfig.oneSecondsEpoch.Uint64()+1)
 		default: // genesis
 			return mainnetEpochBlock1 - 1 + ms.BlocksPerEpochOld()*epochNum
 		}
@@ -225,7 +225,7 @@ func (ms mainnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 	return false
 }
 
-var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch), big.NewInt(mainnetV1_3Epoch), big.NewInt(mainnetV1_4Epoch), big.NewInt(mainnetV1_5Epoch), big.NewInt(mainnetV2_0Epoch), big.NewInt(mainnetV2_1Epoch), big.NewInt(mainnetV2_2Epoch), params.MainnetChainConfig.TwoSecondsEpoch, params.MainnetChainConfig.SixtyPercentEpoch, params.MainnetChainConfig.HIP6And8Epoch}
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch), big.NewInt(mainnetV1_3Epoch), big.NewInt(mainnetV1_4Epoch), big.NewInt(mainnetV1_5Epoch), big.NewInt(mainnetV2_0Epoch), big.NewInt(mainnetV2_1Epoch), big.NewInt(mainnetV2_2Epoch), params.MainnetChainConfig.oneSecondsEpoch, params.MainnetChainConfig.SixtyPercentEpoch, params.MainnetChainConfig.HIP6And8Epoch}
 
 var (
 	mainnetV0 = MustNewInstance(

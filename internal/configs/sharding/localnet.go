@@ -45,7 +45,7 @@ func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 		return localnetV3_2
 	case params.LocalnetChainConfig.IsSixtyPercent(epoch):
 		return localnetV3_1
-	case params.LocalnetChainConfig.IsTwoSeconds(epoch):
+	case params.LocalnetChainConfig.IsOneSecond(epoch):
 		return localnetV3
 	case params.LocalnetChainConfig.IsStaking(epoch):
 		return localnetV2
@@ -65,10 +65,10 @@ func (ls localnetSchedule) BlocksPerEpoch() uint64 {
 }
 
 func (ls localnetSchedule) twoSecondsFirstBlock() uint64 {
-	if params.LocalnetChainConfig.TwoSecondsEpoch.Uint64() == 0 {
+	if params.LocalnetChainConfig.oneSecondsEpoch.Uint64() == 0 {
 		return 0
 	}
-	return (params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()-1)*ls.BlocksPerEpochOld() + localnetEpochBlock1
+	return (params.LocalnetChainConfig.oneSecondsEpoch.Uint64()-1)*ls.BlocksPerEpochOld() + localnetEpochBlock1
 }
 
 func (ls localnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
@@ -84,7 +84,7 @@ func (ls localnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 			blockNum -= localnetEpochBlock1
 			extra = 1
 		}
-		return big.NewInt(int64(extra + (blockNum-firstBlock2s)/ls.BlocksPerEpoch() + params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()))
+		return big.NewInt(int64(extra + (blockNum-firstBlock2s)/ls.BlocksPerEpoch() + params.LocalnetChainConfig.oneSecondsEpoch.Uint64()))
 	}
 }
 
@@ -115,10 +115,10 @@ func (ls localnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 		return localnetEpochBlock1 - 1
 	default:
 		switch {
-		case params.LocalnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
+		case params.LocalnetChainConfig.IsOneSecond(big.NewInt(int64(epochNum))):
 			blocks := ls.BlocksPerEpoch()
 			firstBlock2s := ls.twoSecondsFirstBlock()
-			block2s := (1 + epochNum - params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()) * blocks
+			block2s := (1 + epochNum - params.LocalnetChainConfig.oneSecondsEpoch.Uint64()) * blocks
 			if firstBlock2s == 0 {
 				return block2s - blocks + localnetEpochBlock1 - 1
 			}
@@ -159,7 +159,7 @@ func (ls localnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 
 var (
 	localnetReshardingEpoch = []*big.Int{
-		big.NewInt(0), big.NewInt(localnetV1Epoch), params.LocalnetChainConfig.StakingEpoch, params.LocalnetChainConfig.TwoSecondsEpoch,
+		big.NewInt(0), big.NewInt(localnetV1Epoch), params.LocalnetChainConfig.StakingEpoch, params.LocalnetChainConfig.oneSecondsEpoch,
 	}
 	// Number of shards, how many slots on each , how many slots owned by Harmony
 	localnetV0 = MustNewInstance(
