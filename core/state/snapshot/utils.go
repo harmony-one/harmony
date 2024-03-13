@@ -23,7 +23,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -111,8 +110,8 @@ func CheckJournalAccount(db ethdb.KeyValueStore, hash common.Hash) error {
 	baseRoot := rawdb.ReadSnapshotRoot(db)
 	fmt.Printf("Disklayer: Root: %x\n", baseRoot)
 	if data := rawdb.ReadAccountSnapshot(db, hash); data != nil {
-		account := new(Account)
-		if err := rlp.DecodeBytes(data, account); err != nil {
+		account, err := FullAccount(data)
+		if err != nil {
 			panic(err)
 		}
 		fmt.Printf("\taccount.nonce: %d\n", account.Nonce)
@@ -142,8 +141,8 @@ func CheckJournalAccount(db ethdb.KeyValueStore, hash common.Hash) error {
 		}
 		fmt.Printf("Disklayer+%d: Root: %x, parent %x\n", depth, root, pRoot)
 		if data, ok := accounts[hash]; ok {
-			account := new(Account)
-			if err := rlp.DecodeBytes(data, account); err != nil {
+			account, err := FullAccount(data)
+			if err != nil {
 				panic(err)
 			}
 			fmt.Printf("\taccount.nonce: %d\n", account.Nonce)

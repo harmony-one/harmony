@@ -78,9 +78,15 @@ func GenerateTrie(snaptree *Tree, root common.Hash, src ethdb.Database, dst ethd
 		if codeHash != types.EmptyCodeHash {
 			code := rawdb.ReadCode(src, codeHash)
 			if len(code) == 0 {
-				return common.Hash{}, errors.New("failed to read code")
+				code = rawdb.ReadValidatorCode(src, codeHash)
+				if len(code) == 0 {
+					return common.Hash{}, errors.New("failed to read code")
+				} else {
+					rawdb.WriteValidatorCode(dst, codeHash, code)
+				}
+			} else {
+				rawdb.WriteCode(dst, codeHash, code)
 			}
-			rawdb.WriteCode(dst, codeHash, code)
 		}
 		// Then migrate all storage trie nodes into the tmp db.
 		storageIt, err := snaptree.StorageIterator(root, accountHash, common.Hash{})
