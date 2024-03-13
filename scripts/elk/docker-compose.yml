@@ -1,0 +1,36 @@
+version: '3'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.14
+    container_name: elasticsearch
+    networks:
+      - elastic
+    ports:
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9300:9300"
+    environment:
+      - discovery.type=single-node
+
+  kib01-test:
+    image: docker.elastic.co/kibana/kibana:7.17.14
+    container_name: kib01-test
+    networks:
+      - elastic
+    ports:
+      - "0.0.0.0:5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.1
+    container_name: logstash-container
+    networks:
+      - elastic
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/config/logstash.conf
+      - ../../tmp_log:/tmp_log
+    command: logstash -f /usr/share/logstash/config/logstash.conf
+
+networks:
+  elastic:
+    driver: bridge
