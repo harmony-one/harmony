@@ -22,11 +22,14 @@ import (
 	"encoding/binary"
 	//Needed for SHA3-256 FIPS202
 	"encoding/hex"
-	"errors"
 	"fmt"
+	"io"
 	"math/big"
 
+	"github.com/consensys/gnark/backend/groth16"
 	"github.com/ethereum/go-ethereum/crypto/blake2b"
+	groth16bn256 "github.com/harmony-one/harmony/crypto/groth16/bn256"
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -38,8 +41,6 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/consensys/gnark-crypto/ecc"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	gnark "github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/backend/witness"
 	//gnarkLog "github.com/consensys/gnark/logger"
 )
@@ -171,81 +172,77 @@ func (g groth16Verify) RequiredGas(input []byte) uint64 {
 }
 
 func (g groth16Verify) Run(input []byte) ([]byte, error) {
-	//TODO implement me
-	panic("implement me")
+	buf := make([]byte, 2)
+	r := bytes.NewReader(input)
+	_, err := io.ReadFull(r, buf)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to read first input")
+	}
+	s := binary.BigEndian.Uint16(buf)
+	verifyingKey := make([]byte, s)
+	_, err = io.ReadFull(r, verifyingKey)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "failed to read data for first input of size %d", s)
+	}
+	_, err = io.ReadFull(r, buf)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to read second input")
+	}
+	s = binary.BigEndian.Uint16(buf)
+	proof := make([]byte, s)
+	_, err = io.ReadFull(r, proof)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "failed to read data for second input of size %d", s)
+	}
+	_, err = io.ReadFull(r, buf)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to read third input")
+	}
+	s = binary.BigEndian.Uint16(buf)
+	inputs := make([]byte, s)
+	_, err = io.ReadFull(r, inputs)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "failed to read data for third input of size %d", s)
+	}
+
+	Groth16Verify(verifyingKey, proof, inputs, ecc.BN254)
 }
 
 func Groth16Verify(verifyingKey []byte, proofBytes []byte, inputsBytes []byte, curve ecc.ID) (bool, error) {
 
-	var vk gnark.VerifyingKey
-	var proof gnark.Proof
+	var vk groth16.VerifyingKey
+	var proof groth16.Proof
 
 	switch curve {
 	case ecc.BN254:
-		bn256vk, err := FromBytesToVerifyingKey(verifyingKey)
+		bn256vk, err := groth16bn256.FromBytesToVerifyingKey(verifyingKey)
 		if err != nil {
 			return false, err
 		}
 		vk = bn256vk
 
-		bn256proof, err := bn256.FromBytesToProof(proofBytes)
+		bn256proof, err := groth16bn256.FromBytesToProof(proofBytes)
 		if err != nil {
 			return false, err
 		}
 		proof = bn256proof
 	default:
-		return false, errors.Errorf("unknown eliptic curve")
+		return false, errors.New("unknown eliptic curve")
 	}
 
-	var buf bytes.Buffer
-	buf.Grow(8 + 4 + len(inputsBytes))
-	// Add 8 bytes for correct reading
-	// Gnark witness has two addition number in the start
-	// These numbers aren't used for verification
-	buf.Write(make([]byte, 8))
-	err := binary.Write(&buf, binary.BigEndian, uint32(len(inputsBytes)/(fr.Limbs*sizeUint64)))
-	if err != nil {
-		return false, err
-	}
-	buf.Write(inputsBytes)
 	wit, err := witness.New(curve.ScalarField())
 	if err != nil {
 		return false, err
 	}
-	err = wit.UnmarshalBinary(buf.Bytes())
+	err = wit.UnmarshalBinary(inputsBytes)
 	if err != nil {
 		return false, err
 	}
-	err = gnark.Verify(proof, vk, wit)
+	err = groth16.Verify(proof, vk, wit)
 	if err != nil {
 		return false, nil
 	}
 	return true, nil
-}
-
-func FromBytesToProof(proofBytes []byte) (gnark.Proof, error) {
-	var bproof BellmanProofBn256
-	proofBytes, err := changeFlagsInProofToGnarkType(proofBytes)
-	if err != nil {
-		return nil, err
-	}
-	_, err = bproof.ReadFrom(bytes.NewReader(proofBytes))
-	if err != nil {
-		return nil, err
-	}
-
-	var b bytes.Buffer
-	_, err = bproof.WriteTo(&b)
-	if err != nil {
-		return nil, err
-	}
-
-	proof := gnark.NewProof(ecc.BN254)
-	_, err = proof.ReadFrom(bytes.NewReader(b.Bytes()))
-	if err != nil {
-		return nil, err
-	}
-	return proof, nil
 }
 
 func init() {

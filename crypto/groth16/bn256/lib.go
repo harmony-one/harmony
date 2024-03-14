@@ -1,4 +1,4 @@
-package bn254
+package bn256
 
 import (
 	"bytes"
@@ -14,4 +14,13 @@ func FromBytesToVerifyingKey(verifyingKey []byte) (gnark.VerifyingKey, error) {
 		return nil, err
 	}
 	return vk, nil
+}
+
+func FromBytesToProof(proofBytes []byte) (gnark.Proof, error) {
+	proof := gnark.NewProof(ecc.BN254)
+	_, err := proof.ReadFrom(bytes.NewReader(proofBytes))
+	if err != nil {
+		return nil, err
+	}
+	return proof, nil
 }

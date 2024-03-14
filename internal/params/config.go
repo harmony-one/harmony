@@ -879,6 +879,7 @@ type Rules struct {
 	// precompiles
 	IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
 	IsStakingPrecompile, IsCrossShardXferPrecompile,
+	IsGroth16Precompile,
 	// eip-155 chain id fix
 	IsChainIdFix bool
 	IsValidatorCodeFix bool
