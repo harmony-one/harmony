@@ -231,7 +231,7 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 
 // startViewChange start the view change process
 func (consensus *Consensus) startViewChange() {
-	if consensus.disableViewChange || consensus.isBackup {
+	if consensus.disableViewChange || consensus.registry.IsBackup() {
 		return
 	}
 
