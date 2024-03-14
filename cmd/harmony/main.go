@@ -877,6 +877,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
 
+	currentNode.Consensus.Registry().SetNodeConfig(currentNode.NodeConfig)
 	currentConsensus.PostConsensusJob = currentNode.PostConsensusProcessing
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
