@@ -106,7 +106,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 		consensus.isLeader()
 
 	// if in backup normal mode, force ignore view change event and leader event.
-	if consensus.isBackup {
+	if consensus.registry.IsBackup() {
 		canHandleViewChange = false
 		intendedForLeader = false
 	}

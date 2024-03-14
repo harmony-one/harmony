@@ -199,11 +199,11 @@ func (consensus *Consensus) setMode(m Mode) {
 // SetIsBackup sets the mode of consensus
 func (consensus *Consensus) SetIsBackup(isBackup bool) {
 	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 	consensus.getLogger().Debug().
 		Bool("IsBackup", isBackup).
 		Msg("[SetIsBackup]")
-	consensus.isBackup = isBackup
+	consensus.mutex.Unlock()
+	consensus.registry.SetIsBackup(isBackup)
 }
 
 // Mode returns the mode of consensus
