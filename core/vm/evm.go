@@ -87,6 +87,9 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 			precompiles = PrecompiledContractsStaking
 			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
 		}
+		if evm.chainRules.IsGroth16Precompile {
+			precompiles = PrecompiledContractsGroth16
+		}
 		if evm.chainRules.IsCrossShardXferPrecompile {
 			writeCapablePrecompiles = WriteCapablePrecompiledContractsCrossXfer
 		}
