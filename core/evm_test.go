@@ -32,7 +32,7 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChainImpl, *state.D
 	var (
 		testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
 		testBankFunds   = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(40000))
-		chainConfig     = params.TestChainConfig
+		chainConfig     = params.LocalnetChainConfig
 		blockFactory    = blockfactory.ForTest
 		database        = rawdb.NewMemoryDatabase()
 		gspec           = Genesis{
@@ -50,7 +50,7 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChainImpl, *state.D
 	chain, _ := NewBlockChain(database, nil, nil, cacheConfig, gspec.Config, engine, vm.Config{})
 	db, _ := chain.StateAt(genesis.Root())
 
-	// make a fake block header (use epoch 1 so that locked tokens can be tested)
+	// make a fake block header
 	header := blockFactory.NewHeader(common.Big0)
 
 	return chain, db, header, database
@@ -117,6 +117,51 @@ func TestEVMStaking(t *testing.T) {
 	err = ctx.Undelegate(db, nil, &undelegate)
 	if err != nil {
 		t.Errorf("Got error %v in Undelegate", err)
+	}
+
+	// undelegate test - epoch 3 to test NoNilDelegationsEpoch case
+	delegatorKey, _ := crypto.GenerateKey()
+	ctx3 := NewEVMContext(msg, blockfactory.ForTest.NewHeader(common.Big3), chain, nil)
+	delegate = sampleDelegate(*delegatorKey) // 1000 ONE
+	db.AddBalance(delegate.DelegatorAddress, delegate.Amount)
+	delegate.ValidatorAddress = wrapper.Address
+	err = ctx.Delegate(db, nil, &delegate)
+	if err != nil {
+		t.Errorf("Got error %v in Delegate for new delegator", err)
+	}
+	undelegate = sampleUndelegate(*delegatorKey)
+	// try undelegating such that remaining < minimum (100 ONE)
+	undelegate.ValidatorAddress = wrapper.Address
+	undelegate.Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(901))
+	err = ctx3.Undelegate(db, nil, &undelegate)
+	if err == nil {
+		t.Errorf("Got no error in Undelegate for new delegator")
+	} else {
+		if err.Error() != "Minimum: 100000000000000000000, Remaining: 99000000000000000000: remaining delegation must be 0 or >= 100 ONE" {
+			t.Errorf("Got error %v but expected %v", err, staking.ErrUndelegationRemaining)
+		}
+	}
+	// now undelegate such that remaining == minimum (100 ONE)
+	undelegate.Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(900))
+	err = ctx3.Undelegate(db, nil, &undelegate)
+	if err != nil {
+		t.Errorf("Got error %v in Undelegate for new delegator", err)
+	}
+	// remaining < 100 ONE after remaining = minimum
+	undelegate.Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(1))
+	err = ctx3.Undelegate(db, nil, &undelegate)
+	if err == nil {
+		t.Errorf("Got no error in Undelegate for new delegator")
+	} else {
+		if err.Error() != "Minimum: 100000000000000000000, Remaining: 99000000000000000000: remaining delegation must be 0 or >= 100 ONE" {
+			t.Errorf("Got error %v but expected %v", err, staking.ErrUndelegationRemaining)
+		}
+	}
+	// remaining == 0
+	undelegate.Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))
+	err = ctx3.Undelegate(db, nil, &undelegate)
+	if err != nil {
+		t.Errorf("Got error %v in Undelegate for new delegator", err)
 	}
 
 	// collectRewards test

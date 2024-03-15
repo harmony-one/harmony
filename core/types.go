@@ -17,6 +17,7 @@
 package core
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -55,6 +56,7 @@ type Validator interface {
 type Processor interface {
 	Process(block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool) (
 		types.Receipts, types.CXReceipts, []stakingTypes.StakeMsg,
+		map[common.Address][]common.Address,
 		[]*types.Log, uint64, reward.Reader, *state.DB, error,
 	)
 	CacheProcessorResult(cacheKey interface{}, result *ProcessorResult)

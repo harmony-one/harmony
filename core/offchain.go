@@ -28,6 +28,7 @@ func (bc *BlockChainImpl) CommitOffChainData(
 	receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
 	stakeMsgs []staking.StakeMsg,
+	delegationsToRemove map[common.Address][]common.Address,
 	payout reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
@@ -118,7 +119,7 @@ func (bc *BlockChainImpl) CommitOffChainData(
 
 	// Do bookkeeping for new staking txns
 	newVals, err := bc.UpdateStakingMetaData(
-		batch, block, stakeMsgs, state, epoch, nextBlockEpoch,
+		batch, block, stakeMsgs, delegationsToRemove, state, epoch, nextBlockEpoch,
 	)
 	if err != nil {
 		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")
@@ -326,4 +327,34 @@ func (bc *BlockChainImpl) getNextBlockEpoch(header *block.Header) (*big.Int, err
 		}
 	}
 	return nextBlockEpoch, nil
+}
+
+func (bc *BlockChainImpl) RemoveDelegationsFromDelegator(
+	batch rawdb.DatabaseWriter,
+	delegatorAddress common.Address,
+	validatorAddresses []common.Address,
+) error {
+	delegationIndexes, err := bc.ReadDelegationsByDelegator(delegatorAddress)
+	if err != nil {
+		return err
+	}
+	finalDelegationIndexes := delegationIndexes[:0]
+	for _, validatorAddress := range validatorAddresses {
+		// TODO: can this be sped up from O(vd) to something shorter?
+		for _, delegationIndex := range delegationIndexes {
+			if bytes.Equal(
+				validatorAddress.Bytes(),
+				delegationIndex.ValidatorAddress.Bytes(),
+			) {
+				// do nothing
+				break
+			}
+			finalDelegationIndexes = append(
+				finalDelegationIndexes,
+				delegationIndex,
+			)
+		}
+	}
+	bc.writeDelegationsByDelegator(batch, delegatorAddress, finalDelegationIndexes)
+	return nil
 }

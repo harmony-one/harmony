@@ -19,7 +19,7 @@ var (
 func TestUndelegate(t *testing.T) {
 	epoch1 := big.NewInt(10)
 	amount1 := big.NewInt(1000)
-	delegation.Undelegate(epoch1, amount1)
+	delegation.Undelegate(epoch1, amount1, nil)
 
 	// check the undelegation's Amount
 	if delegation.Undelegations[0].Amount.Cmp(amount1) != 0 {
@@ -32,7 +32,7 @@ func TestUndelegate(t *testing.T) {
 
 	epoch2 := big.NewInt(12)
 	amount2 := big.NewInt(2000)
-	delegation.Undelegate(epoch2, amount2)
+	delegation.Undelegate(epoch2, amount2, nil)
 
 	// check the number of undelegations
 	if len(delegation.Undelegations) != 2 {
@@ -54,7 +54,7 @@ func TestDeleteEntry(t *testing.T) {
 	// Undelegations[]: 1000, 2000, 3000
 	epoch3 := big.NewInt(15)
 	amount3 := big.NewInt(3000)
-	delegation.Undelegate(epoch3, amount3)
+	delegation.Undelegate(epoch3, amount3, nil)
 
 	// delete the second undelegation entry
 	// Undelegations[]: 1000, 3000
@@ -73,7 +73,7 @@ func TestUnlockedLastEpochInCommittee(t *testing.T) {
 
 	epoch4 := big.NewInt(21)
 	amount4 := big.NewInt(4000)
-	delegation.Undelegate(epoch4, amount4)
+	delegation.Undelegate(epoch4, amount4, nil)
 
 	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
 	if result.Cmp(big.NewInt(8000)) != 0 {
@@ -88,7 +88,7 @@ func TestUnlockedLastEpochInCommitteeFail(t *testing.T) {
 
 	epoch4 := big.NewInt(21)
 	amount4 := big.NewInt(4000)
-	delegation.Undelegate(epoch4, amount4)
+	delegation.Undelegate(epoch4, amount4, nil)
 
 	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
@@ -102,7 +102,7 @@ func TestUnlockedFullPeriod(t *testing.T) {
 
 	epoch5 := big.NewInt(27)
 	amount5 := big.NewInt(4000)
-	delegation.Undelegate(epoch5, amount5)
+	delegation.Undelegate(epoch5, amount5, nil)
 
 	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
 	if result.Cmp(big.NewInt(4000)) != 0 {
@@ -116,7 +116,7 @@ func TestQuickUnlock(t *testing.T) {
 
 	epoch7 := big.NewInt(44)
 	amount7 := big.NewInt(4000)
-	delegation.Undelegate(epoch7, amount7)
+	delegation.Undelegate(epoch7, amount7, nil)
 
 	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 0, false, false)
 	if result.Cmp(big.NewInt(4000)) != 0 {
@@ -131,7 +131,7 @@ func TestUnlockedFullPeriodFail(t *testing.T) {
 
 	epoch5 := big.NewInt(28)
 	amount5 := big.NewInt(4000)
-	delegation.Undelegate(epoch5, amount5)
+	delegation.Undelegate(epoch5, amount5, nil)
 
 	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
@@ -145,7 +145,7 @@ func TestUnlockedPremature(t *testing.T) {
 
 	epoch6 := big.NewInt(42)
 	amount6 := big.NewInt(4000)
-	delegation.Undelegate(epoch6, amount6)
+	delegation.Undelegate(epoch6, amount6, nil)
 
 	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
@@ -159,7 +159,7 @@ func TestNoEarlyUnlock(t *testing.T) {
 
 	epoch4 := big.NewInt(21)
 	amount4 := big.NewInt(4000)
-	delegation.Undelegate(epoch4, amount4)
+	delegation.Undelegate(epoch4, amount4, nil)
 
 	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false)
 	if result.Cmp(big.NewInt(0)) != 0 {

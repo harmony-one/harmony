@@ -2,18 +2,21 @@ package types
 
 import (
 	"encoding/json"
-	"errors"
+	//"errors"
+	"fmt"
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/pkg/errors"
 )
 
 var (
-	errInsufficientBalance = errors.New("insufficient balance to undelegate")
-	errInvalidAmount       = errors.New("invalid amount, must be positive")
+	errInsufficientBalance   = errors.New("insufficient balance to undelegate")
+	errInvalidAmount         = errors.New("invalid amount, must be positive")
+	ErrUndelegationRemaining = errors.New("remaining delegation must be 0 or >= 100 ONE")
 )
 
 const (
@@ -120,12 +123,24 @@ func NewDelegation(delegatorAddr common.Address,
 }
 
 // Undelegate - append entry to the undelegation
-func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
+func (d *Delegation) Undelegate(
+	epoch *big.Int,
+	amt *big.Int,
+	minimumRemainingDelegation *big.Int,
+) error {
 	if amt.Sign() <= 0 {
 		return errInvalidAmount
 	}
 	if d.Amount.Cmp(amt) < 0 {
 		return errInsufficientBalance
+	}
+	if minimumRemainingDelegation != nil {
+		finalAmount := big.NewInt(0).Sub(d.Amount, amt)
+		if finalAmount.Cmp(minimumRemainingDelegation) < 0 && finalAmount.Cmp(common.Big0) != 0 {
+			return errors.Wrapf(ErrUndelegationRemaining,
+				fmt.Sprintf("Minimum: %d, Remaining: %d", minimumRemainingDelegation, finalAmount),
+			)
+		}
 	}
 	d.Amount.Sub(d.Amount, amt)
 
