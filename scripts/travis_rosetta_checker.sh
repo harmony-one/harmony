@@ -7,8 +7,8 @@ echo $DIR
 echo $GOPATH
 cd $GOPATH/src/github.com/harmony-one/harmony-test
 git fetch
-git pull
 git checkout $TRAVIS_PULL_REQUEST_BRANCH || true
+git pull
 git branch --show-current
 cd localnet
 docker build -t harmonyone/localnet-test .
