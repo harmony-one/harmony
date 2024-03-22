@@ -895,7 +895,10 @@ func (db *DB) Finalise(deleteEmptyObjects bool) {
 	// TODO: remove validator cache after commit
 	for addr, wrapper := range db.stateValidators {
 		if err := db.UpdateValidatorWrapper(addr, wrapper); err != nil {
-			utils.Logger().Warn().Err(err).Msg("Unable to update the validator wrapper on the finalize")
+			utils.Logger().Warn().Err(err).
+				Str("name", wrapper.Name).
+				Str("addr", addr.String()).
+				Msg("Unable to update the validator wrapper on the finalize")
 		}
 	}
 	addressesToPrefetch := make([][]byte, 0, len(db.journal.dirties))
