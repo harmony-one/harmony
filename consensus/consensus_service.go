@@ -368,6 +368,9 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 			return Syncing
 		}
 
+		utils.Logger().Info().Int64("nextEpoch", nextEpoch.Int64()).
+			Msg("[updateConsensusInformation] last block")
+
 		subComm, err := nextShardState.FindCommitteeByID(curHeader.ShardID())
 		if err != nil {
 			consensus.getLogger().Error().
@@ -380,6 +383,8 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		committeeToSet = subComm
 		epochToSet = nextEpoch
 	} else {
+		utils.Logger().Info().Int64("current epoch", curHeader.Epoch().Int64()).
+			Msg("[updateConsensusInformation] non last block")
 		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
 		if err != nil {
 			consensus.getLogger().Error().
