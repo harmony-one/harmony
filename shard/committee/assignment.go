@@ -324,11 +324,19 @@ func eposStakedCommittee(
 	hAccounts := s.HmyAccounts()
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 
+	utils.Logger().Info().Int("harmony_nodes", shardHarmonyNodes).
+		Int("num_accounts", len(hAccounts)).
+		Int("shard_count", shardCount).
+		Msg("[eposStakedCommittee]")
 	for i := 0; i < shardCount; i++ {
 		shardState.Shards[i] = shard.Committee{ShardID: uint32(i), Slots: shard.SlotList{}}
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardCount
 			pub := &bls_core.PublicKey{}
+			utils.Logger().Info().Int("index", index).
+				Str("bls_key", hAccounts[index].BLSPublicKey).
+				Str("bls_index", hAccounts[index].Index).
+				Msg("[eposStakedCommittee] loop")
 			if err := pub.DeserializeHexStr(hAccounts[index].BLSPublicKey); err != nil {
 				return nil, err
 			}
