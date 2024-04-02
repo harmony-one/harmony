@@ -75,8 +75,8 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
-		MaxRateEpoch:                          EpochTBD,
 		TopMaxRateEpoch:                       EpochTBD,
+		MaxRateEpoch:                          big.NewInt(1733), // 2023-12-17 12:20:15+00:00
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 	}
@@ -116,16 +116,16 @@ var (
 		ChainIdFixEpoch:                       big.NewInt(0),
 		CrossShardXferPrecompileEpoch:         big.NewInt(2),
 		AllowlistEpoch:                        big.NewInt(2),
-		LeaderRotationInternalValidatorsEpoch: EpochTBD,
-		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: big.NewInt(3044),
+		LeaderRotationExternalValidatorsEpoch: big.NewInt(3044),
 		FeeCollectEpoch:                       big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(2176), // 2023-10-12 10:00:00+00:00
-		MaxRateEpoch:                          EpochTBD,
 		TopMaxRateEpoch:                       EpochTBD,
+		MaxRateEpoch:                          big.NewInt(2520), // 2023-12-16 12:17:14+00:00
 		DevnetExternalEpoch:                   EpochTBD,
-		TestnetExternalEpoch:                  EpochTBD,
+		TestnetExternalEpoch:                  big.NewInt(3044),
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
