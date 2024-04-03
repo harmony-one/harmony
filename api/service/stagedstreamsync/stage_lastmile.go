@@ -25,9 +25,9 @@ func NewStageLastMile(cfg StageLastMileCfg) *StageLastMile {
 	}
 }
 
-func NewStageLastMileCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) StageLastMileCfg {
+func NewStageLastMileCfg(bc core.BlockChain, db kv.RwDB) StageLastMileCfg {
 	return StageLastMileCfg{
-		ctx: ctx,
+		ctx: context.TODO(),
 		bc:  bc,
 		db:  db,
 	}

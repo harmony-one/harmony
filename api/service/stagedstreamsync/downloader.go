@@ -68,9 +68,17 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, consensus *consensus.Conse
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// create an instance of staged sync for the downloader
-	stagedSyncInstance, err := CreateStagedSync(ctx, bc, consensus, dbDir, isBeaconNode, sp, config, logger)
+	mainDB, dbs, err := InitDB(ctx, bc.ShardID(), config, isBeaconNode, dbDir)
 	if err != nil {
+		logger.Error().Err(err).Msg("failed to init db")
+		cancel()
+		return nil
+	}
+
+	// create an instance of staged sync for the downloader
+	stagedSyncInstance, err := CreateStagedSync(bc, consensus, mainDB, dbs, isBeaconNode, sp, config, logger)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to create staged sync instance")
 		cancel()
 		return nil
 	}

@@ -1,9 +1,5 @@
 package stagedstreamsync
 
-import (
-	"context"
-)
-
 type ForwardOrder []SyncStageID
 type RevertOrder []SyncStageID
 type CleanUpOrder []SyncStageID
@@ -95,7 +91,7 @@ func initFastSyncStagesOrder() {
 	}
 }
 
-func DefaultStages(ctx context.Context,
+func DefaultStages(
 	headsCfg StageHeadsCfg,
 	seCfg StageEpochCfg,
 	srCfg StageShortRangeCfg,

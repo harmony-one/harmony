@@ -875,8 +875,6 @@ func (node *Node) SyncPeers() map[string]int {
 type Downloaders interface {
 	Start()
 	Close()
-	DownloadAsync(shardID uint32)
-	// GetShardDownloader(shardID uint32) *Downloader
 	NumPeers() map[uint32]int
 	SyncStatus(shardID uint32) (bool, uint64, uint64)
 	IsActive() bool

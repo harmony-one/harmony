@@ -40,10 +40,11 @@ var Buckets = []string{
 }
 
 // CreateStagedSync creates an instance of staged sync
-func CreateStagedSync(ctx context.Context,
+func CreateStagedSync(
 	bc core.BlockChain,
 	consensus *consensus.Consensus,
-	dbDir string,
+	mainDB kv.RwDB,
+	dbs []kv.RwDB,
 	isBeaconNode bool,
 	protocol syncProtocol,
 	config Config,
@@ -54,34 +55,9 @@ func CreateStagedSync(ctx context.Context,
 		Uint32("shard", bc.ShardID()).
 		Bool("beaconNode", isBeaconNode).
 		Bool("memdb", config.UseMemDB).
-		Str("dbDir", dbDir).
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
 		Msg(WrapStagedSyncMsg("creating staged sync"))
-
-	var mainDB kv.RwDB
-	dbs := make([]kv.RwDB, config.Concurrency)
-	if config.UseMemDB {
-		mainDB = memdb.New(getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir))
-		for i := 0; i < config.Concurrency; i++ {
-			dbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, i, dbDir)
-			dbs[i] = memdb.New(dbPath)
-		}
-	} else {
-		logger.Info().
-			Str("path", getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)).
-			Msg(WrapStagedSyncMsg("creating main db"))
-		mainDB = mdbx.NewMDBX(log.New()).Path(getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)).MustOpen()
-		for i := 0; i < config.Concurrency; i++ {
-			dbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, i, dbDir)
-			dbs[i] = mdbx.NewMDBX(log.New()).Path(dbPath).MustOpen()
-		}
-	}
-
-	if errInitDB := initDB(ctx, mainDB, dbs, config.Concurrency); errInitDB != nil {
-		logger.Error().Err(errInitDB).Msg("create staged sync instance failed")
-		return nil, errInitDB
-	}
 
 	extractReceiptHashes := config.SyncMode == FastSync || config.SyncMode == SnapSync
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
@@ -92,13 +68,13 @@ func CreateStagedSync(ctx context.Context,
 	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageFullStateSyncCfg := NewStageFullStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
-	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)
+	lastMileCfg := NewStageLastMileCfg(bc, mainDB)
 	stageFinishCfg := NewStageFinishCfg(mainDB)
 
 	// init stages order based on sync mode
 	initStagesOrder(config.SyncMode)
 
-	defaultStages := DefaultStages(ctx,
+	defaultStages := DefaultStages(
 		stageHeadsCfg,
 		stageSyncEpochCfg,
 		stageShortRangeCfg,
@@ -115,7 +91,6 @@ func CreateStagedSync(ctx context.Context,
 		Uint32("shard", bc.ShardID()).
 		Bool("beaconNode", isBeaconNode).
 		Bool("memdb", config.UseMemDB).
-		Str("dbDir", dbDir).
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
 		Msg(WrapStagedSyncMsg("staged sync created successfully"))
@@ -133,8 +108,30 @@ func CreateStagedSync(ctx context.Context,
 	), nil
 }
 
+func InitDB(ctx context.Context, shardID uint32, config Config, isBeaconNode bool, dbDir string) (kv.RwDB, []kv.RwDB, error) {
+	var mainDB kv.RwDB
+	dbs := make([]kv.RwDB, config.Concurrency)
+	if config.UseMemDB {
+		mainDB = memdb.New(getBlockDbPath(shardID, isBeaconNode, -1, dbDir))
+		for i := 0; i < config.Concurrency; i++ {
+			dbPath := getBlockDbPath(shardID, isBeaconNode, i, dbDir)
+			dbs[i] = memdb.New(dbPath)
+		}
+	} else {
+		mainDB = mdbx.NewMDBX(log.New()).Path(getBlockDbPath(shardID, isBeaconNode, -1, dbDir)).MustOpen()
+		for i := 0; i < config.Concurrency; i++ {
+			dbPath := getBlockDbPath(shardID, isBeaconNode, i, dbDir)
+			dbs[i] = mdbx.NewMDBX(log.New()).Path(dbPath).MustOpen()
+		}
+	}
+	if errInitDB := initDB(ctx, mainDB, dbs); errInitDB != nil {
+		return nil, nil, errors.WithMessage(errInitDB, "create staged sync instance failed")
+	}
+	return mainDB, dbs, nil
+}
+
 // initDB inits the sync loop main database and create buckets
-func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB, concurrency int) error {
+func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB) error {
 
 	// create buckets for mainDB
 	tx, errRW := mainDB.BeginRw(ctx)

@@ -59,14 +59,6 @@ func (ds *Downloaders) Close() {
 	}
 }
 
-// DownloadAsync triggers a download
-func (ds *Downloaders) DownloadAsync(shardID uint32) {
-	d, ok := ds.ds[shardID]
-	if !ok && d != nil {
-		d.DownloadAsync()
-	}
-}
-
 // GetShardDownloader returns the downloader with the given shard ID
 func (ds *Downloaders) GetShardDownloader(shardID uint32) *Downloader {
 	return ds.ds[shardID]
