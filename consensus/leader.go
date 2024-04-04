@@ -18,6 +18,10 @@ import (
 
 // announce fires leader
 func (consensus *Consensus) announce(block *types.Block) {
+	if consensus.registry.IsBackup() {
+		consensus.getLogger().Warn().Msg("[Announce] I am a backup node")
+		return
+	}
 	blockHash := block.Hash()
 
 	// prepare message and broadcast to validators

@@ -107,6 +107,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 
 	// if in backup normal mode, force ignore view change event and leader event.
 	if consensus.registry.IsBackup() {
+		consensus.getLogger().Info().Msgf("IsBackup: true")
 		canHandleViewChange = false
 		intendedForLeader = false
 	}
@@ -424,7 +425,7 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 		Msg("[ConsensusMainLoop] Received Proposed New Block!")
 
 	if newBlock.NumberU64() < consensus.BlockNum() {
-		consensus.getLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
+		consensus.GetLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
 			Msg("[ConsensusMainLoop] received old block, abort")
 		return
 	}

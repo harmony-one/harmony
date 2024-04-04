@@ -18,6 +18,9 @@ import (
 )
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
+	if consensus.registry.IsBackup() {
+		return
+	}
 	recvMsg, err := consensus.parseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Error().
