@@ -156,6 +156,7 @@ func (consensus *Consensus) prepare() {
 // sendCommitMessages send out commit messages to leader
 func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 	if consensus.IsBackup() || blockObj == nil {
+		consensus.getLogger().Warn().Msg("[sendCommitMessages] I am a backup node, will not send commit message")
 		return
 	}
 
