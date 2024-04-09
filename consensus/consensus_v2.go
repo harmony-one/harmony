@@ -73,7 +73,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 		// Only validator needs to check whether the message is from the correct leader
 		if !bytes.Equal(senderKey[:], consensus.LeaderPubKey.Bytes[:]) &&
 			consensus.current.Mode() == Normal && !consensus.IgnoreViewIDCheck.IsSet() {
-			return errSenderPubKeyNotLeader
+			return errors.WithMessagef(errSenderPubKeyNotLeader, "current: %s sender: %s", consensus.LeaderPubKey.Hex(), senderKey.Hex())
 		}
 	}
 

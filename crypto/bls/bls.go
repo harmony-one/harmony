@@ -32,6 +32,10 @@ type PublicKeyWrapper struct {
 	Object *bls.PublicKey
 }
 
+func (a PublicKeyWrapper) Hex() string {
+	return a.Bytes.Hex()
+}
+
 // WrapperFromPrivateKey makes a PrivateKeyWrapper from bls secret key
 func WrapperFromPrivateKey(pri *bls.SecretKey) PrivateKeyWrapper {
 	pub := pri.GetPublicKey()

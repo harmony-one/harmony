@@ -204,7 +204,11 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 		} else { // Our node
 			member.IsHarmonyNode = true
 			member.OverallPercent = harmonyPercent.Quo(asDecHMYSlotCount)
-			member.GroupPercent = member.OverallPercent.Quo(harmonyPercent)
+			if harmonyPercent.Equal(numeric.ZeroDec()) {
+				member.GroupPercent = numeric.ZeroDec()
+			} else {
+				member.GroupPercent = numeric.OneDec().Quo(asDecHMYSlotCount)
+			}
 			ourPercentage = ourPercentage.Add(member.OverallPercent)
 		}
 
