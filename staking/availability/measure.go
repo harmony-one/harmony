@@ -92,7 +92,6 @@ type signerKind struct {
 }
 
 func bumpCount(
-	bc Reader,
 	state ValidatorState,
 	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
@@ -129,13 +128,12 @@ func bumpCount(
 
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
-	bc Reader,
 	staked *shard.StakedSlots,
 	state ValidatorState,
 	signers, missing shard.SlotList,
 ) error {
 	return bumpCount(
-		bc, state, []signerKind{{false, missing}, {true, signers}},
+		state, []signerKind{{false, missing}, {true, signers}},
 		staked.LookupSet,
 	)
 }
