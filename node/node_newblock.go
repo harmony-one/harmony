@@ -48,12 +48,13 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 				utils.Logger().Warn().
 					Msg("Consensus new block proposal: STOPPED!")
 				return
-			case proposalType := <-cs.GetReadySignal():
+			case proposal := <-cs.GetReadySignal():
 				for retryCount := 0; retryCount < 3 && cs.IsLeader(); retryCount++ {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
 						Uint64("blockNum", cs.Blockchain().CurrentBlock().NumberU64()+1).
-						Bool("asyncProposal", proposalType == consensus.AsyncProposal).
+						Bool("asyncProposal", proposal.Type == consensus.AsyncProposal).
+						Str("called", proposal.Caller).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					// Prepare last commit signatures
@@ -61,7 +62,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 
 					go func() {
 						waitTime := 0 * time.Second
-						if proposalType == consensus.AsyncProposal {
+						if proposal.Type == consensus.AsyncProposal {
 							waitTime = consensus.CommitSigReceiverTimeout
 						}
 						select {

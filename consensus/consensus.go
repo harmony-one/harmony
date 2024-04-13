@@ -31,6 +31,16 @@ const (
 
 var errLeaderPriKeyNotFound = errors.New("leader private key not found locally")
 
+type Proposal struct {
+	Type   ProposalType
+	Caller string
+}
+
+// NewProposal creates a new proposal
+func NewProposal(t ProposalType) Proposal {
+	return Proposal{Type: t, Caller: utils.GetCallStackInfo(2)}
+}
+
 // ProposalType is to indicate the type of signal for new block proposal
 type ProposalType byte
 
@@ -90,7 +100,7 @@ type Consensus struct {
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
-	readySignal chan ProposalType
+	readySignal chan Proposal
 	// Channel to send full commit signatures to finish new block proposal
 	commitSigChannel chan []byte
 	// The post-consensus job func passed from Node object
@@ -151,11 +161,11 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 	return consensus.Blockchain()
 }
 
-func (consensus *Consensus) ReadySignal(p ProposalType) {
+func (consensus *Consensus) ReadySignal(p Proposal) {
 	consensus.readySignal <- p
 }
 
-func (consensus *Consensus) GetReadySignal() chan ProposalType {
+func (consensus *Consensus) GetReadySignal() chan Proposal {
 	return consensus.readySignal
 }
 
@@ -304,7 +314,7 @@ func New(
 	// displayed on explorer as Height right now
 	consensus.setCurBlockViewID(0)
 	consensus.SlashChan = make(chan slash.Record)
-	consensus.readySignal = make(chan ProposalType)
+	consensus.readySignal = make(chan Proposal)
 	consensus.commitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)

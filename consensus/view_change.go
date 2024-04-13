@@ -429,7 +429,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 				consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 				return
 			}
-			go consensus.ReadySignal(SyncProposal)
+			go consensus.ReadySignal(NewProposal(SyncProposal))
 			return
 		}
 

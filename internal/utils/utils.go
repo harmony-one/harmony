@@ -92,9 +92,9 @@ func GetCallStackInfo(depthList ...int) string {
 	} else {
 		depth = depthList[0]
 	}
-	function, file, line, _ := runtime.Caller(depth)
-	return fmt.Sprintf("File: %s  Function: %s Line: %d",
-		chopPath(file), runtime.FuncForPC(function).Name(), line,
+	_, file, line, _ := runtime.Caller(depth)
+	return fmt.Sprintf("%s:%d",
+		file, line,
 	)
 }
 
