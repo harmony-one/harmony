@@ -165,8 +165,7 @@ var defaultLogContext = harmonyconfig.LogContext{
 }
 
 var defaultConsensusConfig = harmonyconfig.ConsensusConfig{
-	MinPeers:     6,
-	AggregateSig: true,
+	MinPeers: 6,
 }
 
 var defaultPrometheusConfig = harmonyconfig.PrometheusConfig{

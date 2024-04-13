@@ -180,8 +180,7 @@ type GasPriceOracleConfig struct {
 }
 
 type ConsensusConfig struct {
-	MinPeers     int
-	AggregateSig bool
+	MinPeers int
 }
 
 type BlsConfig struct {

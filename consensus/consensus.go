@@ -117,8 +117,6 @@ type Consensus struct {
 	BlockPeriod time.Duration
 	// The time due for next block proposal
 	NextBlockDue time.Time
-	// Temporary flag to control whether aggregate signature signing is enabled
-	AggregateSig bool
 
 	// TODO (leo): an new metrics system to keep track of the consensus/viewchange
 	// finality of previous consensus in the unit of milliseconds
@@ -271,20 +269,19 @@ func (consensus *Consensus) getBlockNum() uint64 {
 func New(
 	host p2p.Host, shard uint32, multiBLSPriKey multibls.PrivateKeys,
 	registry *registry.Registry,
-	Decider quorum.Decider, minPeers int, aggregateSig bool,
+	Decider quorum.Decider, minPeers int,
 ) (*Consensus, error) {
 	consensus := Consensus{
-		mutex:        &sync.RWMutex{},
-		ShardID:      shard,
-		fBFTLog:      NewFBFTLog(),
-		phase:        FBFTAnnounce,
-		current:      State{mode: Normal},
-		decider:      Decider,
-		registry:     registry,
-		MinPeers:     minPeers,
-		AggregateSig: aggregateSig,
-		host:         host,
-		msgSender:    NewMessageSender(host),
+		mutex:     &sync.RWMutex{},
+		ShardID:   shard,
+		fBFTLog:   NewFBFTLog(),
+		phase:     FBFTAnnounce,
+		current:   State{mode: Normal},
+		decider:   Decider,
+		registry:  registry,
+		MinPeers:  minPeers,
+		host:      host,
+		msgSender: NewMessageSender(host),
 		// FBFT timeout
 		consensusTimeout: createTimeout(),
 		dHelper:          downloadAsync{},

@@ -81,7 +81,7 @@ func GenerateConsensusForTesting() (p2p.Host, multibls.PrivateKeys, *Consensus, 
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
 	multiBLSPrivateKey := multibls.GetPrivateKeys(bls.RandPrivateKey())
 
-	consensus, err := New(host, shard.BeaconChainShardID, multiBLSPrivateKey, registry.New(), decider, 3, false)
+	consensus, err := New(host, shard.BeaconChainShardID, multiBLSPrivateKey, registry.New(), decider, 3)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
