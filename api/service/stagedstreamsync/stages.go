@@ -40,7 +40,7 @@ func GetStageID(stage SyncStageID, isBeacon bool, prune bool) []byte {
 // GetStageProgress retrieves saved progress of a given sync stage from the database
 func GetStageProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
 	stgID := GetStageID(stage, isBeacon, false)
-	v, err := db.GetOne(kv.SyncStageProgress, stgID)
+	v, err := db.GetOne(StageProgressBucket, stgID)
 	if err != nil {
 		return 0, err
 	}
@@ -50,13 +50,13 @@ func GetStageProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, e
 // SaveStageProgress saves progress of given sync stage
 func SaveStageProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
 	stgID := GetStageID(stage, isBeacon, false)
-	return db.Put(kv.SyncStageProgress, stgID, marshalData(progress))
+	return db.Put(StageProgressBucket, stgID, marshalData(progress))
 }
 
 // GetStageCleanUpProgress retrieves saved progress of given sync stage from the database
 func GetStageCleanUpProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
 	stgID := GetStageID(stage, isBeacon, true)
-	v, err := db.GetOne(kv.SyncStageProgress, stgID)
+	v, err := db.GetOne(StageProgressBucket, stgID)
 	if err != nil {
 		return 0, err
 	}
@@ -66,5 +66,5 @@ func GetStageCleanUpProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (ui
 // SaveStageCleanUpProgress stores the progress of the clean up for a given sync stage to the database
 func SaveStageCleanUpProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
 	stgID := GetStageID(stage, isBeacon, true)
-	return db.Put(kv.SyncStageProgress, stgID, marshalData(progress))
+	return db.Put(StageProgressBucket, stgID, marshalData(progress))
 }
