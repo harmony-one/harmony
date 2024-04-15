@@ -241,9 +241,9 @@ var (
 	}
 
 	defaultPartnerSyncConfig = harmonyconfig.SyncConfig{
-		Enabled:              true,
+		Enabled:              false,
 		SyncMode:             0,
-		Downloader:           true,
+		Downloader:           false,
 		StagedSync:           false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          2,
@@ -257,9 +257,9 @@ var (
 	}
 
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{
-		Enabled:              true,
+		Enabled:              false,
 		SyncMode:             0,
-		Downloader:           true,
+		Downloader:           false,
 		StagedSync:           false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          4,
