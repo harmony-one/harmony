@@ -158,6 +158,7 @@ func ComputeCurrentSigning(
 	)
 
 	if toSign.Cmp(common.Big0) == 0 {
+		computed.IsBelowThreshold = false
 		return computed
 	}
 

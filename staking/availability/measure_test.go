@@ -176,7 +176,7 @@ func TestComputeCurrentSigning(t *testing.T) {
 		pctNum, pctDiv                    int64
 		isBelowThreshold                  bool
 	}{
-		{0, 0, 0, 0, 0, 0, 0, 1, true},
+		{0, 0, 0, 0, 0, 0, 0, 1, false},
 		{0, 1, 1, 0, 1, 1, 1, 1, false},
 		{0, 2, 2, 0, 3, 3, 2, 3, true},
 		{0, 1, 1, 0, 3, 3, 1, 3, true},
