@@ -137,7 +137,7 @@ func (w *Worker) CommitSortedTransactions(
 
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
-		err := w.commitTransaction(tx, coinbase)
+		err := w.current.commitTransaction(w.chain, tx, coinbase)
 
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
@@ -293,24 +293,24 @@ var (
 	errNilReceipt = errors.New("nil receipt")
 )
 
-func (w *Worker) commitTransaction(
+func (current *environment) commitTransaction(chain core.ChainContext,
 	tx *types.Transaction, coinbase common.Address,
 ) error {
-	snap := w.current.state.Snapshot()
-	gasUsed := w.current.header.GasUsed()
+	snap := current.state.Snapshot()
+	gasUsed := current.header.GasUsed()
 	receipt, cx, stakeMsgs, _, err := core.ApplyTransaction(
-		w.chain,
+		chain,
 		&coinbase,
-		w.current.gasPool,
-		w.current.state,
-		w.current.header,
+		current.gasPool,
+		current.state,
+		current.header,
 		tx,
 		&gasUsed,
 		vm.Config{},
 	)
-	w.current.header.SetGasUsed(gasUsed)
+	current.header.SetGasUsed(gasUsed)
 	if err != nil {
-		w.current.state.RevertToSnapshot(snap)
+		current.state.RevertToSnapshot(snap)
 		utils.Logger().Error().
 			Err(err).Interface("txn", tx).
 			Msg("Transaction failed commitment")
@@ -321,13 +321,13 @@ func (w *Worker) commitTransaction(
 		return errNilReceipt
 	}
 
-	w.current.txs = append(w.current.txs, tx)
-	w.current.receipts = append(w.current.receipts, receipt)
-	w.current.logs = append(w.current.logs, receipt.Logs...)
-	w.current.stakeMsgs = append(w.current.stakeMsgs, stakeMsgs...)
+	current.txs = append(current.txs, tx)
+	current.receipts = append(current.receipts, receipt)
+	current.logs = append(current.logs, receipt.Logs...)
+	current.stakeMsgs = append(current.stakeMsgs, stakeMsgs...)
 
 	if cx != nil {
-		w.current.outcxs = append(w.current.outcxs, cx)
+		current.outcxs = append(current.outcxs, cx)
 	}
 	return nil
 }
