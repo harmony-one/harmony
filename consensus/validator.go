@@ -29,6 +29,15 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 	// NOTE let it handle its own logs
 	if !consensus.onAnnounceSanityChecks(recvMsg) {
+		if consensus.isViewChangingMode() && recvMsg.BlockNum > consensus.BlockNum() {
+			consensus.getLogger().Info().
+				Uint64("myBlockNum", consensus.BlockNum()).
+				Uint64("MsgBlockNum", recvMsg.BlockNum).
+				Hex("myBlockHash", consensus.blockHash[:]).
+				Hex("MsgBlockHash", recvMsg.BlockHash[:]).
+				Msg("[OnCommitted] low consensus block number. Spin up state sync")
+			consensus.spinUpStateSync()
+		}
 		return
 	}
 	consensus.StartFinalityCount()
