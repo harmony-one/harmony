@@ -132,7 +132,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 
 	var (
 		leaderKey   = node.Consensus.GetLeaderPubKey()
-		coinbase    = node.registry.GetAddressToBLSKey().GetAddressForBLSKey(node.Consensus.GetPublicKeys(), shardState, leaderKey.Object)
+		coinbase    = node.registry.GetAddressToBLSKey().GetAddressForBLSKey(node.Consensus.GetPublicKeys(), shardState, leaderKey.Object, header.Epoch())
 		beneficiary = coinbase
 	)
 

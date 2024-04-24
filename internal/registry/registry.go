@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -198,7 +199,11 @@ func (r *Registry) SetAddressToBLSKey(a AddressToBLSKey) *Registry {
 	return r
 }
 
+type FindCommitteeByID interface {
+	FindCommitteeByID(shardID uint32) (*shard.Committee, error)
+}
+
 type AddressToBLSKey interface {
-	GetAddressForBLSKey(publicKeys multibls.PublicKeys, shardState *shard.State, blskey *bls_core.PublicKey) common.Address
-	GetAddresses(publicKeys multibls.PublicKeys, shardState *shard.State) map[string]common.Address
+	GetAddressForBLSKey(publicKeys multibls.PublicKeys, shardState FindCommitteeByID, blskey *bls_core.PublicKey, epoch *big.Int) common.Address
+	GetAddresses(publicKeys multibls.PublicKeys, shardState FindCommitteeByID, epoch *big.Int) map[string]common.Address
 }

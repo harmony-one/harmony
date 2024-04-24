@@ -8,10 +8,10 @@ import (
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/lrucache"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/shard"
 )
 
 type AddressToBLSKey struct {
@@ -31,26 +31,26 @@ func NewAddressToBLSKey(shardID uint32) *AddressToBLSKey {
 }
 
 // GetAddressForBLSKey retrieves the ECDSA address associated with bls key for epoch
-func (a *AddressToBLSKey) GetAddressForBLSKey(publicKeys multibls.PublicKeys, shardState *shard.State, blskey *bls_core.PublicKey) common.Address {
-	return a.GetAddresses(publicKeys, shardState)[blskey.SerializeToHexStr()]
+func (a *AddressToBLSKey) GetAddressForBLSKey(publicKeys multibls.PublicKeys, shardState registry.FindCommitteeByID, blskey *bls_core.PublicKey, epoch *big.Int) common.Address {
+	return a.GetAddresses(publicKeys, shardState, epoch)[blskey.SerializeToHexStr()]
 }
 
 // GetAddresses retrieves all ECDSA addresses of the bls keys for epoch
-func (a *AddressToBLSKey) GetAddresses(publicKeys multibls.PublicKeys, shardState *shard.State) map[string]common.Address {
+func (a *AddressToBLSKey) GetAddresses(publicKeys multibls.PublicKeys, shardState registry.FindCommitteeByID, epoch *big.Int) map[string]common.Address {
 	// populate if new epoch
-	if rs, ok := a.keysToAddrs.Get(shardState.Epoch.Uint64()); ok {
+	if rs, ok := a.keysToAddrs.Get(epoch.Uint64()); ok {
 		return rs
 	}
 	a.keysToAddrsMutex.Lock()
-	a.populateSelfAddresses(publicKeys, shardState, shardState.Epoch)
+	a.populateSelfAddresses(publicKeys, shardState, epoch)
 	a.keysToAddrsMutex.Unlock()
-	if rs, ok := a.keysToAddrs.Get(shardState.Epoch.Uint64()); ok {
+	if rs, ok := a.keysToAddrs.Get(epoch.Uint64()); ok {
 		return rs
 	}
 	return make(map[string]common.Address)
 }
 
-func (a *AddressToBLSKey) populateSelfAddresses(publicKeys multibls.PublicKeys, shardState *shard.State, epoch *big.Int) {
+func (a *AddressToBLSKey) populateSelfAddresses(publicKeys multibls.PublicKeys, shardState registry.FindCommitteeByID, epoch *big.Int) {
 	shardID := a.shardID
 
 	committee, err := shardState.FindCommitteeByID(shardID)

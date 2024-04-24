@@ -382,7 +382,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 					Msg("failed to read shard state")
 				return err
 			}
-			for _, addr := range node.Consensus.Registry().GetAddressToBLSKey().GetAddresses(node.Consensus.GetPublicKeys(), shardState) {
+			for _, addr := range node.Consensus.Registry().GetAddressToBLSKey().GetAddresses(node.Consensus.GetPublicKeys(), shardState, newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
 					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator info")
