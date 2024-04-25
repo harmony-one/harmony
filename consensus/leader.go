@@ -82,12 +82,12 @@ func (consensus *Consensus) announce(block *types.Block) {
 			Str("groupID", string(nodeconfig.NewGroupIDByShardID(
 				nodeconfig.ShardID(consensus.ShardID),
 			))).
-			Msg("[Announce] Cannot send announce message")
+			Msgf("[Announce] Cannot send announce message with message signer %s", key.Pub.Hex())
 	} else {
 		consensus.getLogger().Info().
 			Str("blockHash", block.Hash().Hex()).
 			Uint64("blockNum", block.NumberU64()).
-			Msg("[Announce] Sent Announce Message!!")
+			Msgf("[Announce] Sent Announce Message with message signer %s", key.Pub.Hex())
 	}
 
 	consensus.switchPhase("Announce", FBFTPrepare)

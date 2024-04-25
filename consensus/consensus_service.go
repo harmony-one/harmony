@@ -435,7 +435,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		} else {
 			consensus.getLogger().Info().
 				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
-				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
+				Msgf("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain, blocknum: %d", curHeader.NumberU64())
 			consensus.LeaderPubKey = leaderPubKey
 		}
 	}
@@ -466,7 +466,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		}
 	}
 	consensus.getLogger().Info().
-		Msg("[UpdateConsensusInformation] not in committee, Listening")
+		Msgf("[UpdateConsensusInformation] not in committee, keys len %d Listening", len(pubKeys))
 
 	// not in committee
 	return Listening
@@ -652,6 +652,7 @@ func (consensus *Consensus) GetLogger() *zerolog.Logger {
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
+		Uint32("shardID", consensus.ShardID).
 		Uint64("myBlock", consensus.blockNum).
 		Uint64("myViewID", consensus.getCurBlockViewID()).
 		Str("phase", consensus.phase.String()).
