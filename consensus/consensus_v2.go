@@ -331,7 +331,6 @@ func (consensus *Consensus) StartChannel() {
 	consensus.mutex.Lock()
 	consensus.isInitialLeader = consensus.isLeader()
 	if consensus.isInitialLeader {
-		consensus.start = true
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 		consensus.mutex.Unlock()
 		consensus.ReadySignal(NewProposal(SyncProposal))
@@ -378,9 +377,6 @@ func (consensus *Consensus) Tick() {
 }
 
 func (consensus *Consensus) tick() {
-	if !consensus.start && consensus.isInitialLeader {
-		return
-	}
 	for k, v := range consensus.consensusTimeout {
 		// stop timer in listening mode
 		if consensus.current.Mode() == Listening {
