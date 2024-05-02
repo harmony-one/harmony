@@ -77,6 +77,15 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	currProgress := uint64(0)
 	targetHeight := s.state.currentCycle.TargetHeight
 
+	if useInternalTx {
+		var err error
+		tx, err = b.configs.db.BeginRw(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+
 	if errV := CreateView(ctx, b.configs.db, tx, func(etx kv.Tx) error {
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
 			return err
@@ -97,24 +106,14 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return nil
 	}
 
-	// size := uint64(0)
 	startTime := time.Now()
 	// startBlock := currProgress
 	if b.configs.logProgress {
 		fmt.Print("\033[s") // save the cursor position
 	}
 
-	if useInternalTx {
-		var err error
-		tx, err = b.configs.db.BeginRw(ctx)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	}
-
 	// Fetch blocks from neighbors
-	s.state.gbm = newBlockDownloadManager(tx, b.configs.bc, targetHeight, s.state.logger)
+	s.state.gbm = newBlockDownloadManager(b.configs.bc, targetHeight, s.state.logger)
 
 	// Setup workers to fetch blocks from remote node
 	var wg sync.WaitGroup
@@ -188,7 +187,7 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 			gbm.HandleRequestError(batch, err, stid)
 			b.configs.protocol.RemoveStream(stid)
 		} else {
-			if err = b.saveBlocks(ctx, gbm.tx, batch, blockBytes, sigBytes, loopID, stid); err != nil {
+			if err = b.saveBlocks(ctx, nil, batch, blockBytes, sigBytes, loopID, stid); err != nil {
 				panic(ErrSaveBlocksToDbFailed)
 			}
 			gbm.HandleRequestResult(batch, blockBytes, sigBytes, loopID, stid)
@@ -239,8 +238,9 @@ func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte
 // redownloadBadBlock tries to redownload the bad block from other streams
 func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) error {
 
-	batch := make([]uint64, 1)
-	batch = append(batch, s.state.invalidBlock.Number)
+	batch := []uint64{s.state.invalidBlock.Number}
+
+badBlockDownloadLoop:
 
 	for {
 		if b.configs.protocol.NumStreams() == 0 {
@@ -253,21 +253,20 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 			}
 			continue
 		}
-		isOneOfTheBadStreams := false
 		for _, id := range s.state.invalidBlock.StreamID {
 			if id == stid {
+				// TODO: if block is invalid then call StreamFailed
 				b.configs.protocol.StreamFailed(stid, "re-download bad block from this stream failed")
-				isOneOfTheBadStreams = true
-				break
+				continue badBlockDownloadLoop
 			}
-		}
-		if isOneOfTheBadStreams {
-			continue
 		}
 		s.state.gbm.SetDownloadDetails(batch, 0, stid)
 		if errU := b.configs.blockDBs[0].Update(ctx, func(tx kv.RwTx) error {
 			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, 0, stid); err != nil {
-				return errors.Errorf("[STAGED_STREAM_SYNC] saving re-downloaded bad block to db failed.")
+				utils.Logger().Error().
+					Err(err).
+					Msg("[STAGED_STREAM_SYNC] saving re-downloaded bad block to db failed")
+				return errors.Errorf("%s: %s", ErrSaveBlocksToDbFailed.Error(), err.Error())
 			}
 			return nil
 		}); errU != nil {
@@ -314,11 +313,14 @@ func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 // saveBlocks saves the blocks into db
 func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, stid sttypes.StreamID) error {
 
-	tx, err := b.configs.blockDBs[loopID].BeginRw(ctx)
-	if err != nil {
-		return err
+	if tx == nil {
+		var err error
+		tx, err = b.configs.blockDBs[loopID].BeginRw(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
 	}
-	defer tx.Rollback()
 
 	for i := uint64(0); i < uint64(len(blockBytes)); i++ {
 		block := blockBytes[i]
