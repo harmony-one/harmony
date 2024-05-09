@@ -5,15 +5,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path"
 
 	"github.com/ethereum/go-ethereum/log"
-	net "github.com/libp2p/go-libp2p/core/network"
-	ma "github.com/multiformats/go-multiaddr"
-
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	net "github.com/libp2p/go-libp2p/core/network"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 // ConnLogger ..
@@ -104,6 +105,12 @@ func main() {
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
 
+	pprof := flag.Bool("pprof", false, "enabled pprof")
+	pprofAddr := flag.String("pprof.addr", "127.0.0.1:6060", "http pprof address")
+	//keyFile := flag.String("pprof.profile.names", "", "the private key file of the bootnode")
+	//keyFile := flag.String("pprof.profile.intervals", "600", "the private key file of the bootnode")
+	//keyFile := flag.String("pprof.profile.intervals", "", "the private key file of the bootnode")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -146,6 +153,11 @@ func main() {
 
 	if *logConn {
 		host.GetP2PHost().Network().Notify(NewConnLogger(utils.GetLogInstance()))
+	}
+
+	if *pprof {
+		fmt.Printf("starting pprof on http://%s/debug/pprof/\n", *pprofAddr)
+		http.ListenAndServe(*pprofAddr, nil)
 	}
 
 	select {}
