@@ -237,6 +237,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 			for _, pending := range allPending {
 				// if pending crosslink is older than 10 epochs, delete it and continue. this logic is also applied when the node starts
 				if pending.EpochF.Cmp(crossLinkEpochThreshold) <= 0 {
+					utils.Logger().Debug().
+						Msgf("[ProposeNewBlock] pending crosslink is older than 10 epochs, deleting, block: %d, shard %d ", pending.BlockNumberF.Int64(), pending.ShardIDF)
 					invalidToDelete = append(invalidToDelete, pending)
 					continue
 				}
