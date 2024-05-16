@@ -102,7 +102,6 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 
 // ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
 func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
-	utils.Logger().Debug().Msgf("ProcessCrossLinkMessage called, IsRunningBeaconChain %q", node.IsRunningBeaconChain())
 	if node.IsRunningBeaconChain() {
 		pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
 		if err != nil {
