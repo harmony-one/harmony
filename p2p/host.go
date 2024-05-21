@@ -20,22 +20,28 @@ import (
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2p_config "github.com/libp2p/go-libp2p/config"
 	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/host"
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
-	"github.com/libp2p/go-libp2p/p2p/security/noise"
-	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+
+	"github.com/libp2p/go-libp2p/core/sec/insecure"
+	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
+	mplex "github.com/libp2p/go-libp2p/p2p/muxer/mplex"
+	yamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
+	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	madns "github.com/multiformats/go-multiaddr-dns"
 )
 
 type ConnectCallback func(net libp2p_network.Network, conn libp2p_network.Conn) error
@@ -85,6 +91,15 @@ const (
 	MaxMessageSize = 1 << 21
 )
 
+// Host Multiplexer's Type
+type MuxerType int
+
+const (
+	Unknown MuxerType = iota
+	Yamux
+	Mplex
+)
+
 // HostConfig is the config structure to create a new host
 type HostConfig struct {
 	Self                     *Peer
@@ -99,6 +114,12 @@ type HostConfig struct {
 	ConnManagerHighWatermark int
 	WaitForEachPeerToConnect bool
 	ForceReachabilityPublic  bool
+	NoTransportSecurity      bool
+	NAT                      bool
+	UserAgent                string
+	DialTimeout              time.Duration
+	MuxerType                MuxerType
+	NoRelay                  bool
 }
 
 func init() {
@@ -124,64 +145,90 @@ func NewHost(cfg HostConfig) (Host, error) {
 
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port)
 	listenAddr := libp2p.ListenAddrStrings(
-		addr,         // regular tcp connections
-		addr+"/quic", // a UDP endpoint for the QUIC transport
+		addr, // regular tcp connections
 	)
+
+	// transporters
+	tcpTransport := libp2p.Transport(
+		tcp.NewTCPTransport,
+		tcp.WithConnectionTimeout(time.Minute*60)) // break unused connections
+
+	// create NAT Manager; it takes care of setting NAT port mappings, and discovering external addresses
+	var nat libp2p_config.NATManagerC // disabled if nil
+	if cfg.NAT {
+		nat = basichost.NewNATManager
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// create connection manager
 	low := cfg.ConnManagerLowWatermark
 	high := cfg.ConnManagerHighWatermark
-	if high < low {
+	connMngr, err := connectionManager(low, high)
+	if err != nil {
 		cancel()
-		utils.Logger().Error().
-			Int("low", cfg.ConnManagerLowWatermark).
-			Int("high", cfg.ConnManagerHighWatermark).
-			Msg("connection manager watermarks are invalid")
-		return nil, errors.New("invalid connection manager watermarks")
+		return nil, fmt.Errorf("failed to open connection manager: %w", err)
+	}
+
+	// relay
+	var relay libp2p_config.Option
+	if cfg.NoRelay {
+		relay = libp2p.DisableRelay() // No relay services, direct connections between peers only.
+	} else {
+		relay = libp2p.EnableRelayService()
 	}
 
 	// prepare host options
 	var idht *dht.IpfsDHT
-	var opt discovery.DHTConfig
 	p2pHostConfig := []libp2p.Option{
-		listenAddr,
 		libp2p.Identity(key),
-		// Support TLS connections
-		libp2p.Security(libp2ptls.ID, libp2ptls.New),
-		// Support noise connections
-		libp2p.Security(noise.ID, noise.New),
-		// Support any other default transports (TCP)
-		libp2p.DefaultTransports,
-		// Prevent the peer from having too many
-		// connections by attaching a connection manager.
-		connectionManager(low, high),
-		// Attempt to open ports using uPNP for NATed hosts.
-		libp2p.NATPortMap(),
-		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			opt = discovery.DHTConfig{
-				BootNodes:       cfg.BootNodes,
-				DataStoreFile:   cfg.DataStoreFile,
-				DiscConcurrency: cfg.DiscConcurrency,
-			}
-			opts, err := opt.GetLibp2pRawOptions()
-			if err != nil {
-				return nil, err
-			}
-			idht, err = dht.New(ctx, h, opts...)
-			return idht, err
-		}),
-		// To help other peers to figure out if they are behind
-		// NATs, launch the server-side of AutoNAT too (AutoRelay
-		// already runs the client)
-		// This service is highly rate-limited and should not cause any
-		// performance issues.
+		// Explicitly set the user-agent, so we can differentiate from other Go libp2p users.
+		libp2p.UserAgent(cfg.UserAgent),
+		// regular tcp connections
+		tcpTransport,
+		// dial timeout
+		libp2p.WithDialTimeout(cfg.DialTimeout),
+		// No relay services, direct connections between peers only.
+		relay,
+		// host will start and listen to network directly after construction from config.
+		listenAddr,
+		/*
+			libp2p.ConnectionGater(connGtr), // TODO use connection gater to monitor the connections
+			libp2p.ResourceManager(nil), // TODO use resource manager interface to manage resources per peer better
+			libp2p.Peerstore(ps), // TODO add extended peer store
+		*/
+		// Connection manager
+		connMngr,
+		// NAT manager
+		libp2p.NATManager(nat),
+		// Band width Reporter
+		libp2p.BandwidthReporter(newCounter()), // may be nil if disabled
+		// Resolver
+		libp2p.MultiaddrResolver(madns.DefaultResolver),
+		// Ping is a small built-in libp2p protocol that helps us check/debug latency between peers.
+		libp2p.Ping(true),
+		// Help peers with their NAT reachability status, but throttle to avoid too much work.
 		libp2p.EnableNATService(),
-		// Bandwidth Reporter
-		libp2p.BandwidthReporter(newCounter()),
-		// Enable relay service, to disable relay we can use libp2p.DisableRelay()
-		libp2p.EnableRelayService(),
+		// NAT Rate Limiter
+		libp2p.AutoNATServiceRateLimit(10, 5, time.Second*60),
+	}
+
+	// Set host security
+	if cfg.NoTransportSecurity {
+		p2pHostConfig = append(p2pHostConfig, libp2p.Security(insecure.ID, insecure.NewWithIdentity))
+	} else {
+		p2pHostConfig = append(p2pHostConfig, NoiseC(), TlsC())
+	}
+
+	// Set Muxer (default: Mplex)
+	switch cfg.MuxerType {
+	case Yamux:
+		p2pHostConfig = append(p2pHostConfig, YamuxC())
+	case Mplex:
+		p2pHostConfig = append(p2pHostConfig, MplexC())
+	default:
+		cancel()
+		return nil, fmt.Errorf("could not recognize mux %d", cfg.MuxerType)
 	}
 
 	if cfg.ForceReachabilityPublic {
@@ -202,6 +249,22 @@ func NewHost(cfg HostConfig) (Host, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 
+	// DHT
+	opt := discovery.DHTConfig{
+		BootNodes:       cfg.BootNodes,
+		DataStoreFile:   cfg.DataStoreFile,
+		DiscConcurrency: cfg.DiscConcurrency,
+	}
+	opts, err := opt.GetLibp2pRawOptions()
+	if err != nil {
+		cancel()
+		return nil, errors.Wrapf(err, "initialize libp2p raw options failed")
+	}
+	idht, errDHT := dht.New(ctx, p2pHost, opts...)
+	if errDHT != nil {
+		cancel()
+		return nil, errors.Wrapf(errDHT, "cannot initialize libp2p DHT")
+	}
 	disc, err := discovery.NewDHTDiscovery(ctx, cancel, p2pHost, idht, opt)
 	if err != nil {
 		cancel()
@@ -209,6 +272,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		return nil, errors.Wrap(err, "cannot create DHT discovery")
 	}
 
+	// Gossip Pub Sub
 	options := []libp2p_pubsub.Option{
 		// WithValidateQueueSize sets the buffer of validate queue. Defaults to 32. When queue is full, validation is throttled and new messages are dropped.
 		libp2p_pubsub.WithValidateQueueSize(512),
@@ -280,31 +344,50 @@ func NewHost(cfg HostConfig) (Host, error) {
 	return h, nil
 }
 
+func YamuxC() libp2p.Option {
+	return libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport)
+}
+
+func MplexC() libp2p.Option {
+	return libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport)
+}
+
+func NoiseC() libp2p.Option {
+	return libp2p.Security(noise.ID, noise.New)
+}
+
+func TlsC() libp2p.Option {
+	return libp2p.Security(tls.ID, tls.New)
+}
+
 // connectionManager creates a new connection manager and configures libp2p to use the
 // given connection manager.
 // lo and hi are watermarks governing the number of connections that'll be maintained.
 // When the peer count exceeds the 'high watermark', as many peers will be pruned (and
 // their connections terminated) until 'low watermark' peers remain.
-func connectionManager(low int, high int) libp2p_config.Option {
-	if low > 0 && high > low {
-		connmgr, err := connmgr.NewConnManager(
-			low,  // Low Watermark
-			high, // High Watermark
-			connmgr.WithGracePeriod(time.Minute),
-		)
-		if err != nil {
-			utils.Logger().Error().
-				Err(err).
-				Int("low", low).
-				Int("high", high).
-				Msg("create connection manager failed")
-			return nil
-		}
-		return libp2p.ConnectionManager(connmgr)
+func connectionManager(low int, high int) (libp2p_config.Option, error) {
+	if low < 0 || high < low {
+		utils.Logger().Error().
+			Int("low", low).
+			Int("high", high).
+			Msg("connection manager watermarks are invalid")
+		return nil, errors.New("invalid connection manager watermarks")
 	}
-	return func(p2pConfig *libp2p_config.Config) error {
-		return nil
+	connmgr, err := connmgr.NewConnManager(
+		low,  // Low Watermark
+		high, // High Watermark
+		connmgr.WithGracePeriod(time.Minute),
+		connmgr.WithSilencePeriod(time.Minute),
+		connmgr.WithEmergencyTrim(true))
+	if err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Int("low", low).
+			Int("high", high).
+			Msg("create connection manager failed")
+		return nil, err
 	}
+	return libp2p.ConnectionManager(connmgr), nil
 }
 
 // HostV2 is the version 2 p2p host

@@ -637,6 +637,31 @@ var (
 		Usage:    "node waits for each single peer to connect and it doesn't add them to peers list after timeout",
 		DefValue: defaultConfig.P2P.WaitForEachPeerToConnect,
 	}
+	noTransportSecurityFlag = cli.BoolFlag{
+		Name:     "p2p.no-transport-security",
+		Usage:    "enable TLS encrypted transport",
+		DefValue: defaultConfig.P2P.NoTransportSecurity,
+	}
+	natFlag = cli.BoolFlag{
+		Name:     "p2p.nat",
+		Usage:    "enable NAT Manager. it takes care of setting NAT port mappings, and discovering external addresses",
+		DefValue: defaultConfig.P2P.NAT,
+	}
+	userAgentFlag = cli.StringFlag{
+		Name:     "user-agent",
+		Usage:    "explicitly set the user-agent, so we can differentiate from other Go libp2p users",
+		DefValue: defaultConfig.P2P.UserAgent,
+	}
+	muxerTypeFlag = cli.IntFlag{
+		Name:     "p2p.muxer",
+		Usage:    "protocol muxer to mux per-protocol streams (default:Mplex, 1:Yamux, 2:Mplex)",
+		DefValue: defaultConfig.P2P.MuxerType,
+	}
+	noRelayFlag = cli.BoolFlag{
+		Name:     "p2p.no-relay",
+		Usage:    "no relay services, direct connections between peers only",
+		DefValue: defaultConfig.P2P.NoRelay,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -687,6 +712,26 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {
 		config.P2P.DisablePrivateIPScan = cli.GetBoolFlagValue(cmd, p2pDisablePrivateIPScanFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, noTransportSecurityFlag) {
+		config.P2P.NoTransportSecurity = cli.GetBoolFlagValue(cmd, noTransportSecurityFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, natFlag) {
+		config.P2P.NAT = cli.GetBoolFlagValue(cmd, natFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, userAgentFlag) {
+		config.P2P.UserAgent = cli.GetStringFlagValue(cmd, userAgentFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, muxerTypeFlag) {
+		config.P2P.MuxerType = cli.GetIntFlagValue(cmd, muxerTypeFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, noRelayFlag) {
+		config.P2P.NoRelay = cli.GetBoolFlagValue(cmd, noRelayFlag)
 	}
 }
 
