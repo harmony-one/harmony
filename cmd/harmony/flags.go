@@ -66,6 +66,11 @@ var (
 		maxPeersFlag,
 		connManagerLowWatermarkFlag,
 		connManagerHighWatermarkFlag,
+		noTransportSecurityFlag,
+		natFlag,
+		userAgentFlag,
+		muxerTypeFlag,
+		noRelayFlag,
 	}
 
 	httpFlags = []cli.Flag{
@@ -639,7 +644,7 @@ var (
 	}
 	noTransportSecurityFlag = cli.BoolFlag{
 		Name:     "p2p.no-transport-security",
-		Usage:    "enable TLS encrypted transport",
+		Usage:    "disable TLS encrypted transport",
 		DefValue: defaultConfig.P2P.NoTransportSecurity,
 	}
 	natFlag = cli.BoolFlag{
@@ -648,13 +653,13 @@ var (
 		DefValue: defaultConfig.P2P.NAT,
 	}
 	userAgentFlag = cli.StringFlag{
-		Name:     "user-agent",
+		Name:     "p2p.user-agent",
 		Usage:    "explicitly set the user-agent, so we can differentiate from other Go libp2p users",
 		DefValue: defaultConfig.P2P.UserAgent,
 	}
 	muxerTypeFlag = cli.IntFlag{
 		Name:     "p2p.muxer",
-		Usage:    "protocol muxer to mux per-protocol streams (default:Mplex, 1:Yamux, 2:Mplex)",
+		Usage:    "protocol muxer to mux per-protocol streams (0:Mplex, 1:Yamux, default:0)",
 		DefValue: defaultConfig.P2P.MuxerType,
 	}
 	noRelayFlag = cli.BoolFlag{
