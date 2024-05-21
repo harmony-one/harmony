@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	net "github.com/libp2p/go-libp2p/core/network"
@@ -90,6 +91,9 @@ func printVersion(me string) {
 }
 
 func main() {
+	timestamp := time.Now().Format("20060102150405")
+	defUserAgent := fmt.Sprintf("bootnode-%s", timestamp)
+
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
 	console := flag.Bool("console_only", false, "Output to console only")
@@ -103,6 +107,9 @@ func main() {
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
+	noTransportSecurity := flag.Bool("no_transport_security", true, "disable TLS encrypted transport")
+	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
+	noRelay := flag.Bool("no_relay", true, "no relay services, direct connections between peers only")
 
 	flag.Parse()
 
@@ -133,6 +140,12 @@ func main() {
 		DataStoreFile:           &dataStorePath,
 		MaxConnPerIP:            *maxConnPerIP,
 		ForceReachabilityPublic: *forceReachabilityPublic,
+		NoTransportSecurity:     *noTransportSecurity,
+		NAT:                     true,
+		UserAgent:               *userAgent,
+		DialTimeout:             time.Minute,
+		MuxerType:               p2p.Mplex,
+		NoRelay:                 *noRelay,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")
