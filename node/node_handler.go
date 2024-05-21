@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils/crosslinks"
-	"github.com/harmony-one/harmony/multibls"
 
 	"github.com/harmony-one/harmony/api/proto"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -186,8 +185,8 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	}
 
 	utils.Logger().Info().Msgf(
-		"Construct and Broadcasting new crosslink to beacon chain groupID %s, LastKnownCrosslinkHeartbeatSignal %d",
-		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID), node.crosslinks.LatestSentCrosslinkBlockNumber(),
+		"Construct and Broadcasting new crosslink to beacon chain groupID %s",
+		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 	)
 
 	headers, err := getCrosslinkHeadersForShards(node.Blockchain(), curBlock, node.crosslinks)
@@ -217,21 +216,6 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	}
 }
 
-func (node *Node) hasOutdatedCrosslinks(curBlock *block.Header) bool {
-	instance := shard.Schedule.InstanceForEpoch(curBlock.Epoch())
-	for shardID := uint32(1); shardID < instance.NumShards(); shardID++ {
-		lastLink, err := node.Blockchain().ReadShardLastCrossLink(shardID)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get crosslinks")
-			continue
-		}
-		if lastLink.Epoch().Uint64() < curBlock.Epoch().Uint64() {
-			return true
-		}
-	}
-	return false
-}
-
 // BroadcastCrosslinkHeartbeatSignalFromBeaconToShards is called by consensus leader or 1% validators to
 // send last cross link to shard chains.
 func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // leader of 0 shard
@@ -247,16 +231,22 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 		return
 	}
 
-	ok := node.IsCurrentlyLeader() || rand.Intn(100) == 0 || node.hasOutdatedCrosslinks(curBlock.Header())
-	if !ok {
-		return
-	}
-
 	if !node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
 		// no need to broadcast crosslink if it's beacon chain, or it's not crosslink epoch
 		return
 	}
 
+	var privToSing *bls.PrivateKeyWrapper
+	for _, priv := range node.Consensus.GetPrivateKeys() {
+		if node.Consensus.IsValidatorInCommittee(priv.Pub.Bytes) {
+			privToSing = &priv
+			break
+		}
+	}
+
+	if privToSing == nil {
+		return
+	}
 	instance := shard.Schedule.InstanceForEpoch(curBlock.Epoch())
 	for shardID := uint32(1); shardID < instance.NumShards(); shardID++ {
 		lastLink, err := node.Blockchain().ReadShardLastCrossLink(shardID)
@@ -264,23 +254,6 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get crosslinks")
 			continue
 		}
-		ss, err := node.EpochChain().ReadShardState(lastLink.Epoch())
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get shard state")
-			continue
-		}
-		comm, err := ss.FindCommitteeByID(0)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get committee")
-			continue
-		}
-		privToSing := getPrivToSign(node.Consensus.GetPrivateKeys(), comm)
-		if privToSing == nil {
-			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get privToSing")
-			continue
-		}
-
-		utils.Logger().Debug().Msgf("broadcast CrosslinkHeartbeat %d for epoch %d, curEpoch %d, shard %d", lastLink.BlockNum(), lastLink.Epoch(), curBlock.Epoch().Uint64(), curBlock.ShardID())
 
 		hb := types.CrosslinkHeartbeat{
 			ShardID:                  lastLink.ShardID(),
@@ -302,27 +275,6 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 			p2p.ConstructMessage(bts),
 		)
 	}
-}
-
-func createVoters(comm *shard.Committee) map[bls.SerializedPublicKey]struct{} {
-	d := make(map[bls.SerializedPublicKey]struct{})
-	for _, c := range comm.Slots {
-		d[c.BLSPublicKey] = struct{}{}
-	}
-	return d
-}
-
-func getPrivToSign(privs multibls.PrivateKeys, comm *shard.Committee) *bls.PrivateKeyWrapper {
-	var privToSing *bls.PrivateKeyWrapper
-	q := createVoters(comm)
-	for _, priv := range privs {
-		_, found := q[priv.Pub.Bytes]
-		if found { // if key is in committee
-			privToSing = &priv
-			break
-		}
-	}
-	return privToSing
 }
 
 // getCrosslinkHeadersForShards get headers required for crosslink creation.

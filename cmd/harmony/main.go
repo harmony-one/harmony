@@ -510,15 +510,6 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 
 	go listenOSSigAndShutDown(currentNode)
 
-	if hc.Network.NetworkType == nodeconfig.Partner || hc.Network.NetworkType == nodeconfig.Testnet { // devnet
-		go func() {
-			for {
-				<-time.After(10 * time.Second)
-				go currentNode.BroadcastCrossLinkFromShardsToBeacon()
-			}
-		}()
-	}
-
 	if !hc.General.IsOffline {
 		if err := myHost.Start(); err != nil {
 			utils.Logger().Fatal().

@@ -1,8 +1,6 @@
 package node
 
 import (
-	"math/big"
-
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
@@ -36,7 +34,8 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	if err != nil {
 		return errors.WithMessagef(err, "cannot decode crosslink heartbeat message, len: %d", len(msgPayload))
 	}
-	shardID := node.Blockchain().CurrentBlock().ShardID()
+	cur := node.Blockchain().CurrentBlock()
+	shardID := cur.ShardID()
 	if hb.ShardID != shardID {
 		return errors.Errorf("invalid shard id: expected %d, got %d", shardID, hb.ShardID)
 	}
@@ -69,9 +68,9 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return errors.New("invalid signature")
 	}
 
-	state, err := node.EpochChain().ReadShardState(big.NewInt(int64(hb.Epoch)))
+	state, err := node.EpochChain().ReadShardState(cur.Epoch())
 	if err != nil {
-		return errors.WithMessagef(err, "cannot read shard state for epoch %d", hb.Epoch)
+		return errors.WithMessagef(err, "cannot read shard state for epoch %d", cur.Epoch())
 	}
 	committee, err := state.FindCommitteeByID(shard.BeaconChainShardID)
 	if err != nil {
