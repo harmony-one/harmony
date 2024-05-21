@@ -9,7 +9,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.6.1"
+const tomlConfigVersion = "2.6.2"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -43,7 +43,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		NAT:                      true,
 		UserAgent:                "",
 		DialTimeout:              time.Minute,
-		MuxerType:                2, // 0:unknown, 1:Yamux, 2: Mplex
+		MuxerType:                0, // 0:Mplex 1:Yamux
 		NoRelay:                  true,
 	},
 	HTTP: harmonyconfig.HttpConfig{
