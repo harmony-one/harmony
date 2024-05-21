@@ -95,9 +95,8 @@ const (
 type MuxerType int
 
 const (
-	Unknown MuxerType = iota
+	Mplex MuxerType = iota
 	Yamux
-	Mplex
 )
 
 // HostConfig is the config structure to create a new host
@@ -178,6 +177,12 @@ func NewHost(cfg HostConfig) (Host, error) {
 		relay = libp2p.EnableRelayService()
 	}
 
+	// set dial timeout
+	dto := cfg.DialTimeout
+	if dto <= 0 {
+		dto = time.Minute
+	}
+
 	// prepare host options
 	var idht *dht.IpfsDHT
 	p2pHostConfig := []libp2p.Option{
@@ -187,7 +192,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		// regular tcp connections
 		tcpTransport,
 		// dial timeout
-		libp2p.WithDialTimeout(cfg.DialTimeout),
+		libp2p.WithDialTimeout(dto),
 		// No relay services, direct connections between peers only.
 		relay,
 		// host will start and listen to network directly after construction from config.
@@ -227,8 +232,10 @@ func NewHost(cfg HostConfig) (Host, error) {
 	case Mplex:
 		p2pHostConfig = append(p2pHostConfig, MplexC())
 	default:
-		cancel()
-		return nil, fmt.Errorf("could not recognize mux %d", cfg.MuxerType)
+		utils.Logger().Error().
+			Interface("muxer", cfg.MuxerType).
+			Msg("Muxer type is invalid, it is set on default value (mplex)")
+		p2pHostConfig = append(p2pHostConfig, MplexC())
 	}
 
 	if cfg.ForceReachabilityPublic {
