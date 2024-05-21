@@ -26,6 +26,7 @@ func ImportPreimages(chain BlockChain, path string) error {
 	if err != nil {
 		return fmt.Errorf("could not open file for reading: %s", err)
 	}
+	defer reader.Close()
 	csvReader := csv.NewReader(reader)
 	dbReader := chain.ChainDb()
 	imported := uint64(0)
