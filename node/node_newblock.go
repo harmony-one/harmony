@@ -248,6 +248,16 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 						AnErr("[ProposeNewBlock] pending crosslink is already committed onchain", err)
 					continue
 				}
+				last, err := node.Blockchain().ReadShardLastCrossLink(pending.ShardID())
+				if err != nil {
+					utils.Logger().Debug().
+						AnErr("[ProposeNewBlock] failed to read last crosslink", err)
+					// no return
+				}
+				// if pending crosslink is older than the last crosslink, delete it and continue
+				if exist == nil && last != nil && last.BlockNum() >= pending.BlockNum() {
+					invalidToDelete = append(invalidToDelete, pending)
+				}
 
 				// Crosslink is already verified before it's accepted to pending,
 				// no need to verify again in proposal.
