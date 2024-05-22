@@ -39,12 +39,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ConnManagerLowWatermark:  nodeconfig.DefaultConnManagerLowWatermark,
 		ConnManagerHighWatermark: nodeconfig.DefaultConnManagerHighWatermark,
 		WaitForEachPeerToConnect: nodeconfig.DefaultWaitForEachPeerToConnect,
-		NoTransportSecurity:      true,
-		NAT:                      true,
-		UserAgent:                "",
-		DialTimeout:              time.Minute,
-		MuxerType:                0, // 0:Mplex 1:Yamux
-		NoRelay:                  true,
+		NoTransportSecurity:      nodeconfig.DefaultNoTransportSecurity,
+		NAT:                      nodeconfig.DefaultNAT,
+		UserAgent:                nodeconfig.DefaultUserAgent,
+		DialTimeout:              nodeconfig.DefaultDialTimeout,
+		MuxerType:                nodeconfig.DefaultMuxerType,
+		NoRelay:                  nodeconfig.DefaultNoRelay,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
