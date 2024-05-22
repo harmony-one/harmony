@@ -251,7 +251,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	}
 
 	self.PeerID = p2pHost.ID()
-	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
+	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().String()).Logger()
 
 	banned := blockedpeers.NewManager(1024)
 	security := security.NewManager(cfg.MaxConnPerIP, int(cfg.MaxPeers), banned)
@@ -505,7 +505,7 @@ func (host *HostV2) GetPeerCount() int {
 // ConnectHostPeer connects to peer host
 func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	ctx := context.Background()
-	addr := fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", peer.IP, peer.Port, peer.PeerID.Pretty())
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", peer.IP, peer.Port, peer.PeerID.String())
 	peerAddr, err := ma.NewMultiaddr(addr)
 	if err != nil {
 		host.logger.Error().Err(err).Interface("peer", peer).Msg("ConnectHostPeer")
