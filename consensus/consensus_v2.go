@@ -248,7 +248,7 @@ func (consensus *Consensus) finalCommit() {
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
-
+	consensus.postConsensusProcessing(block)
 	consensus.UpdateLeaderMetrics(float64(numCommits), float64(block.NumberU64()))
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
@@ -257,7 +257,7 @@ func (consensus *Consensus) finalCommit() {
 		if block.IsLastBlockInEpoch() {
 			// No pipelining
 			go func() {
-				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
+				consensus.GetLogger().Info().Msg("[finalCommit] sending block proposal signal")
 				consensus.ReadySignal(NewProposal(SyncProposal))
 			}()
 		} else {
@@ -669,7 +669,6 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	}
 
 	consensus.FinishFinalityCount()
-	consensus.PostConsensusJob(blk)
 	consensus.setupForNewConsensus(blk, committedMsg)
 	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
 		Str("hash", blk.Header().Hash().Hex()).

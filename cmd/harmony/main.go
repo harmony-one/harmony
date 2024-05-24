@@ -826,6 +826,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 
 	// Consensus object.
 	registry.SetIsBackup(isBackup(hc))
+	registry.SetNodeConfig(nodeConfig)
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, registry, decider, minPeers, aggregateSig)
 
@@ -883,8 +884,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
 
-	currentNode.Consensus.Registry().SetNodeConfig(currentNode.NodeConfig)
-	currentConsensus.PostConsensusJob = currentNode.PostConsensusProcessing
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
 	currentConsensus.NextBlockDue = time.Now()

@@ -103,9 +103,6 @@ type Consensus struct {
 	readySignal chan Proposal
 	// Channel to send full commit signatures to finish new block proposal
 	commitSigChannel chan []byte
-	// The post-consensus job func passed from Node object
-	// Called when consensus on a new block is done
-	PostConsensusJob func(*types.Block) error
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
