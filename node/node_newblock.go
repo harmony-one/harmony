@@ -255,7 +255,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 					// no return
 				}
 				// if pending crosslink is older than the last crosslink, delete it and continue
-				if exist == nil && last != nil && last.BlockNum() >= pending.BlockNum() {
+				if err == nil && exist == nil && last != nil && last.BlockNum() >= pending.BlockNum() {
 					invalidToDelete = append(invalidToDelete, pending)
 				}
 
