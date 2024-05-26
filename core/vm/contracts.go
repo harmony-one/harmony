@@ -17,13 +17,19 @@
 package vm
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
+	//Needed for SHA3-256 FIPS202
+	"encoding/hex"
 	"fmt"
+	"io"
 	"math/big"
 
+	"github.com/consensys/gnark/backend/groth16"
 	"github.com/ethereum/go-ethereum/crypto/blake2b"
+	groth16bn256 "github.com/harmony-one/harmony/crypto/groth16/bn256"
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -32,10 +38,11 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"golang.org/x/crypto/ripemd160"
 
-	//Needed for SHA3-256 FIPS202
-	"encoding/hex"
-
 	"golang.org/x/crypto/sha3"
+
+	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark/backend/witness"
+	//gnarkLog "github.com/consensys/gnark/logger"
 )
 
 // PrecompiledContract is the basic interface for native Go contracts. The implementation
@@ -135,6 +142,107 @@ var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{253}): &sha3fip{},
 	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
 	common.BytesToAddress([]byte{255}): &vrf{},
+}
+
+var PrecompiledContractsGroth16 = map[common.Address]PrecompiledContract{
+	common.BytesToAddress([]byte{1}): &ecrecover{},
+	common.BytesToAddress([]byte{2}): &sha256hash{},
+	common.BytesToAddress([]byte{3}): &ripemd160hash{},
+	common.BytesToAddress([]byte{4}): &dataCopy{},
+	common.BytesToAddress([]byte{5}): &bigModExp{},
+	common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
+	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
+	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
+	common.BytesToAddress([]byte{9}): &blake2F{},
+
+	common.BytesToAddress([]byte{250}): &groth16Verify{},
+	common.BytesToAddress([]byte{251}): &epoch{},
+	// marked nil to ensure no overwrite
+	common.BytesToAddress([]byte{252}): nil, // used by WriteCapablePrecompiledContractsStaking
+	common.BytesToAddress([]byte{253}): &sha3fip{},
+	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
+	common.BytesToAddress([]byte{255}): &vrf{},
+}
+
+type groth16Verify struct{}
+
+func (g groth16Verify) RequiredGas(input []byte) uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (g groth16Verify) Run(input []byte) ([]byte, error) {
+	buf := make([]byte, 2)
+	r := bytes.NewReader(input)
+	_, err := io.ReadFull(r, buf)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to read first input")
+	}
+	s := binary.BigEndian.Uint16(buf)
+	verifyingKey := make([]byte, s)
+	_, err = io.ReadFull(r, verifyingKey)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "failed to read data for first input of size %d", s)
+	}
+	_, err = io.ReadFull(r, buf)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to read second input")
+	}
+	s = binary.BigEndian.Uint16(buf)
+	proof := make([]byte, s)
+	_, err = io.ReadFull(r, proof)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "failed to read data for second input of size %d", s)
+	}
+	_, err = io.ReadFull(r, buf)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to read third input")
+	}
+	s = binary.BigEndian.Uint16(buf)
+	inputs := make([]byte, s)
+	_, err = io.ReadFull(r, inputs)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "failed to read data for third input of size %d", s)
+	}
+
+	Groth16Verify(verifyingKey, proof, inputs, ecc.BN254)
+}
+
+func Groth16Verify(verifyingKey []byte, proofBytes []byte, inputsBytes []byte, curve ecc.ID) (bool, error) {
+
+	var vk groth16.VerifyingKey
+	var proof groth16.Proof
+
+	switch curve {
+	case ecc.BN254:
+		bn256vk, err := groth16bn256.FromBytesToVerifyingKey(verifyingKey)
+		if err != nil {
+			return false, err
+		}
+		vk = bn256vk
+
+		bn256proof, err := groth16bn256.FromBytesToProof(proofBytes)
+		if err != nil {
+			return false, err
+		}
+		proof = bn256proof
+	default:
+		return false, errors.New("unknown eliptic curve")
+	}
+
+	wit, err := witness.New(curve.ScalarField())
+	if err != nil {
+		return false, err
+	}
+	err = wit.UnmarshalBinary(inputsBytes)
+	if err != nil {
+		return false, err
+	}
+	err = groth16.Verify(proof, vk, wit)
+	if err != nil {
+		return false, nil
+	}
+	return true, nil
 }
 
 func init() {
