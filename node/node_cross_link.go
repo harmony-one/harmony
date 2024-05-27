@@ -105,6 +105,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 		pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
 		if err != nil {
 			utils.Logger().Debug().
+				Err(err).
 				Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
 			return
 		}
