@@ -70,13 +70,21 @@ func (consensus *Consensus) postConsensusProcessing(newBlock *types.Block) error
 
 	if h := consensus.registry.GetNodeConfig().WebHooks.Hooks; h != nil {
 		if h.Availability != nil {
-			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
-				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
+			shardState, err := consensus.Blockchain().ReadShardState(newBlock.Epoch())
+			if err != nil {
+				utils.Logger().Error().Err(err).
+					Int64("epoch", newBlock.Epoch().Int64()).
+					Uint32("shard-id", consensus.ShardID).
+					Msg("failed to read shard state")
+				return err
+			}
+			for _, addr := range consensus.Registry().GetAddressToBLSKey().GetAddresses(consensus.getPublicKeys(), shardState, newBlock.Epoch()) {
+				wrapper, err := consensus.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
 					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator info")
 					return nil
 				}
-				snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
+				snapshot, err := consensus.Beaconchain().ReadValidatorSnapshot(addr)
 				if err != nil {
 					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator snapshot")
 					return nil
@@ -84,9 +92,9 @@ func (consensus *Consensus) postConsensusProcessing(newBlock *types.Block) error
 				computed := availability.ComputeCurrentSigning(
 					snapshot.Validator, wrapper,
 				)
-				lastBlockOfEpoch := shard.Schedule.EpochLastBlock(node.Beaconchain().CurrentBlock().Header().Epoch().Uint64())
+				lastBlockOfEpoch := shard.Schedule.EpochLastBlock(consensus.Beaconchain().CurrentBlock().Header().Epoch().Uint64())
 
-				computed.BlocksLeftInEpoch = lastBlockOfEpoch - node.Beaconchain().CurrentBlock().Header().Number().Uint64()
+				computed.BlocksLeftInEpoch = lastBlockOfEpoch - consensus.Beaconchain().CurrentBlock().Header().Number().Uint64()
 
 				if err != nil && computed.IsBelowThreshold {
 					url := h.Availability.OnDroppedBelowThreshold
