@@ -249,7 +249,8 @@ func (consensus *Consensus) finalCommit() {
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
-	consensus.UpdateLeaderMetrics(float64(numCommits), float64(block.NumberU64()))
+	power := consensus.decider.VoteTally(quorum.Commit)
+	consensus.UpdateLeaderMetrics(float64(numCommits), float64(block.NumberU64()), roundPower(power))
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.

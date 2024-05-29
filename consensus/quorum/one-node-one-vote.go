@@ -135,3 +135,7 @@ func (v *uniformVoteWeight) CurrentTotalPower(p Phase) (*numeric.Dec, error) {
 		return nil, errors.New("uniformVoteWeight not cache this phase")
 	}
 }
+
+func (v *uniformVoteWeight) VoteTally(p Phase) numeric.Dec {
+	return numeric.NewDec(v.SignersCount(p))
+}

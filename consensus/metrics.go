@@ -143,11 +143,12 @@ func (consensus *Consensus) UpdateValidatorMetrics(numSig float64, blockNum floa
 }
 
 // UpdateLeaderMetrics will udpate leader metrics
-func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum float64) {
+func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum float64, power float64) {
 	consensusCounterVec.With(prometheus.Labels{"consensus": "hooray"}).Inc()
 	consensusGaugeVec.With(prometheus.Labels{"consensus": "block_num"}).Set(blockNum)
 	consensusCounterVec.With(prometheus.Labels{"consensus": "num_commits"}).Add(numCommits)
 	consensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(numCommits)
+	consensusGaugeVec.With(prometheus.Labels{"consensus": "vote_power"}).Set(power)
 }
 func (consensus *Consensus) UpdatePreimageGenerationMetrics(
 	preimageStart uint64,

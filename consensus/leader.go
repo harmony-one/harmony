@@ -7,6 +7,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/numeric"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -130,8 +131,9 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	}
 	signerCount := consensus.decider.SignersCount(quorum.Prepare)
 	//// Read - End
+	power := consensus.decider.VoteTally(quorum.Prepare)
 
-	consensus.UpdateLeaderMetrics(float64(signerCount), float64(consensus.getBlockNum()))
+	consensus.UpdateLeaderMetrics(float64(signerCount), float64(consensus.getBlockNum()), roundPower(power))
 
 	// Check BLS signature for the multi-sig
 	prepareSig := recvMsg.Payload
@@ -191,6 +193,11 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 		consensus.switchPhase("onPrepare", FBFTCommit)
 	}
 	//// Read - End
+}
+
+func roundPower(power numeric.Dec) float64 {
+	round := float64(power.MulInt64(10000).RoundInt64()) / 10000
+	return round
 }
 
 // this method is called by leader
@@ -269,6 +276,8 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			return
 		}
 	*/
+	power := consensus.decider.VoteTally(quorum.Commit)
+	consensus.UpdateLeaderMetrics(float64(signerCount), float64(consensus.getBlockNum()), roundPower(power))
 	if _, err := consensus.decider.AddNewVote(
 		quorum.Commit, recvMsg.SenderPubkeys,
 		&sign, recvMsg.BlockHash,

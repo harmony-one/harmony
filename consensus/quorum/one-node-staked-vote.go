@@ -3,6 +3,7 @@ package quorum
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -187,6 +188,19 @@ func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 // IsAllSigsCollected ..
 func (v *stakedVoteWeight) IsAllSigsCollected() bool {
 	return v.voteTally.Commit.tally.Equal(numeric.NewDec(1))
+}
+
+func (v *stakedVoteWeight) VoteTally(p Phase) numeric.Dec {
+	switch p {
+	case Prepare:
+		return v.voteTally.Prepare.tally
+	case Commit:
+		return v.voteTally.Commit.tally
+	case ViewChange:
+		return v.voteTally.ViewChange.tally
+	default:
+		panic(fmt.Sprintf("stakedVoteWeight not cache this phase: %s", p.String()))
+	}
 }
 
 func (v *stakedVoteWeight) SetVoters(
