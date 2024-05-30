@@ -42,6 +42,8 @@ const (
 
 func (ts testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case epoch.Cmp(big.NewInt(3392)) >= 0: // add harmony node, estimated 31 May 2:20AM UTC
+		return testnetV6_2
 	case epoch.Cmp(big.NewInt(3388)) >= 0: // one time fix for devnet shard 1 down, estimated 30 May 7:50AM UTC
 		return testnetV6_1
 	case params.TestnetChainConfig.IsTestnetExternalEpoch(epoch):
@@ -183,6 +185,14 @@ var (
 	)
 	testnetV6_1 = MustNewInstance(
 		2, 30, 0, 0,
+		numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccountsV1,
+		genesis.TNFoundationalAccounts, emptyAllowlist,
+		feeCollectorsTestnet, numeric.MustNewDecFromStr("0.25"),
+		hip30CollectionAddressTestnet, testnetReshardingEpoch,
+		TestnetSchedule.BlocksPerEpoch(),
+	)
+	testnetV6_2 = MustNewInstance(
+		2, 30, 8, 0,
 		numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccountsV1,
 		genesis.TNFoundationalAccounts, emptyAllowlist,
 		feeCollectorsTestnet, numeric.MustNewDecFromStr("0.25"),
