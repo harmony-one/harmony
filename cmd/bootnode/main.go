@@ -109,7 +109,7 @@ func main() {
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
 	noTransportSecurity := flag.Bool("no_transport_security", true, "disable TLS encrypted transport")
-	muxerType := flag.Int("muxer", 0, "protocol muxer to mux per-protocol streams (0:Mplex, 1:Yamux, default:0)")
+	muxer := flag.String("muxer", "mplex, yamux", "protocol muxer to mux per-protocol streams (mplex, yamux)")
 	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
 	noRelay := flag.Bool("no_relay", true, "no relay services, direct connections between peers only")
 
@@ -152,7 +152,7 @@ func main() {
 		NAT:                     true,
 		UserAgent:               *userAgent,
 		DialTimeout:             time.Minute,
-		MuxerType:               p2p.MuxerType(*muxerType),
+		Muxer:                   *muxer,
 		NoRelay:                 *noRelay,
 	})
 	if err != nil {
