@@ -659,7 +659,7 @@ var (
 	}
 	muxerFlag = cli.StringFlag{
 		Name:     "p2p.muxer",
-		Usage:    "protocol muxer to mux per-protocol streams (0:Mplex, 1:Yamux, default:0)",
+		Usage:    "protocol muxer to mux per-protocol streams, should be comma separated string (mplex, yamux)",
 		DefValue: defaultConfig.P2P.Muxer,
 	}
 	noRelayFlag = cli.BoolFlag{
