@@ -91,14 +91,6 @@ const (
 	MaxMessageSize = 1 << 21
 )
 
-// Host Multiplexer's Type
-type MuxerType int
-
-const (
-	Mplex MuxerType = iota
-	Yamux
-)
-
 // HostConfig is the config structure to create a new host
 type HostConfig struct {
 	Self                     *Peer
@@ -117,7 +109,7 @@ type HostConfig struct {
 	NAT                      bool
 	UserAgent                string
 	DialTimeout              time.Duration
-	MuxerType                MuxerType
+	Muxer                    string
 	NoRelay                  bool
 }
 
@@ -184,7 +176,6 @@ func NewHost(cfg HostConfig) (Host, error) {
 	}
 
 	// prepare host options
-	var idht *dht.IpfsDHT
 	p2pHostConfig := []libp2p.Option{
 		libp2p.Identity(key),
 		// Explicitly set the user-agent, so we can differentiate from other Go libp2p users.
@@ -225,17 +216,23 @@ func NewHost(cfg HostConfig) (Host, error) {
 		p2pHostConfig = append(p2pHostConfig, NoiseC(), TlsC())
 	}
 
-	// Set Muxer (default: Mplex)
-	switch cfg.MuxerType {
-	case Yamux:
-		p2pHostConfig = append(p2pHostConfig, YamuxC())
-	case Mplex:
-		p2pHostConfig = append(p2pHostConfig, MplexC())
-	default:
-		utils.Logger().Error().
-			Interface("muxer", cfg.MuxerType).
-			Msg("Muxer type is invalid, it is set on default value (mplex)")
-		p2pHostConfig = append(p2pHostConfig, MplexC())
+	// Set Muxer
+	if cfg.Muxer != "" {
+		for _, v := range strings.Split(cfg.Muxer, ",") {
+			v = strings.ToLower(strings.TrimSpace(v))
+			switch v {
+			case "yamux":
+				p2pHostConfig = append(p2pHostConfig, YamuxC())
+			case "mplex":
+				p2pHostConfig = append(p2pHostConfig, MplexC())
+			default:
+				cancel()
+				utils.Logger().Error().
+					Str("muxer", v).
+					Msg("Muxer type is invalid")
+				return nil, fmt.Errorf("could not recognize mux %s", v)
+			}
+		}
 	}
 
 	if cfg.ForceReachabilityPublic {

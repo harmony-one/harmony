@@ -43,7 +43,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		NAT:                      nodeconfig.DefaultNAT,
 		UserAgent:                nodeconfig.DefaultUserAgent,
 		DialTimeout:              nodeconfig.DefaultDialTimeout,
-		MuxerType:                nodeconfig.DefaultMuxerType,
+		Muxer:                    nodeconfig.DefaultMuxer,
 		NoRelay:                  nodeconfig.DefaultNoRelay,
 	},
 	HTTP: harmonyconfig.HttpConfig{

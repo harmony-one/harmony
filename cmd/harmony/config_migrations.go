@@ -429,8 +429,8 @@ func init() {
 		if confTree.Get("P2P.DialTimeout") == nil {
 			confTree.Set("P2P.DialTimeout", defaultConfig.P2P.DialTimeout)
 		}
-		if confTree.Get("P2P.MuxerType") == nil {
-			confTree.Set("P2P.MuxerType", defaultConfig.P2P.MuxerType)
+		if confTree.Get("P2P.Muxer") == nil {
+			confTree.Set("P2P.Muxer", defaultConfig.P2P.Muxer)
 		}
 		if confTree.Get("P2P.NoRelay") == nil {
 			confTree.Set("P2P.NoRelay", defaultConfig.P2P.NoRelay)
