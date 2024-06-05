@@ -484,6 +484,9 @@ func (consensus *Consensus) IsLeader() bool {
 // isLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key. This function assume it runs under lock.
 func (consensus *Consensus) isLeader() bool {
+	if consensus.LeaderPubKey == nil {
+		return false
+	}
 	obj := consensus.LeaderPubKey.Object
 	for _, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(obj) {
