@@ -74,6 +74,7 @@ var (
 		FeeCollectEpoch:                       big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
+		NoNilDelegationsEpoch:                 EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          big.NewInt(1733), // 2023-12-17 12:20:15+00:00
@@ -121,6 +122,7 @@ var (
 		FeeCollectEpoch:                       big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
+		NoNilDelegationsEpoch:                 EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          big.NewInt(2520), // 2023-12-16 12:17:14+00:00
@@ -168,6 +170,7 @@ var (
 		FeeCollectEpoch:                       EpochTBD,
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
+		NoNilDelegationsEpoch:                 EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
 		MaxRateEpoch:                          EpochTBD,
 		TopMaxRateEpoch:                       EpochTBD,
@@ -217,6 +220,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
 		HIP30Epoch:                            big.NewInt(7),
 		BlockGas30MEpoch:                      big.NewInt(7),
+		NoNilDelegationsEpoch:                 EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		DevnetExternalEpoch:                   big.NewInt(144),
@@ -263,6 +267,7 @@ var (
 		LeaderRotationExternalValidatorsEpoch: EpochTBD,
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
+		NoNilDelegationsEpoch:                 big.NewInt(2),
 		BlockGas30MEpoch:                      big.NewInt(0),
 		TopMaxRateEpoch:                       big.NewInt(0),
 		MaxRateEpoch:                          EpochTBD,
@@ -310,6 +315,7 @@ var (
 		FeeCollectEpoch:                       big.NewInt(2),
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            EpochTBD,
+		NoNilDelegationsEpoch:                 big.NewInt(2),
 		BlockGas30MEpoch:                      big.NewInt(0),
 		MaxRateEpoch:                          EpochTBD,
 		TopMaxRateEpoch:                       EpochTBD,
@@ -359,7 +365,8 @@ var (
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 		big.NewInt(0),                      // BlockGas30M
-		big.NewInt(0),                      // BlockGas30M
+		big.NewInt(0),                      // HIP30Epoch
+		big.NewInt(0),                      // NoNilDelegationsEpoch
 		big.NewInt(0),                      // MaxRateEpoch
 		big.NewInt(0),                      // MaxRateEpoch
 		big.NewInt(0),
@@ -408,6 +415,7 @@ var (
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 		big.NewInt(0),        // HIP30Epoch
+		big.NewInt(0),        // NoNilDelegationsEpoch
 		big.NewInt(0),        // BlockGas30M
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
@@ -552,6 +560,9 @@ type ChainConfig struct {
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
 
+	// The first epoch at the end of which stale delegations are removed
+	NoNilDelegationsEpoch *big.Int `json:"no-nil-delegations-epoch,omitempty"`
+
 	LeaderRotationInternalValidatorsEpoch *big.Int `json:"leader-rotation-internal-validators,omitempty"`
 
 	LeaderRotationExternalValidatorsEpoch *big.Int `json:"leader-rotation-external-validators,omitempty"`
@@ -592,7 +603,19 @@ type ChainConfig struct {
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v}",
+	// use string1 + string2 here instead of concatening in the end
+	return fmt.Sprintf("{ChainID: %v "+
+		"EthCompatibleChainID: %v "+
+		"EIP155: %v "+
+		"CrossTx: %v "+
+		"Staking: %v "+
+		"CrossLink: %v "+
+		"ReceiptLog: %v "+
+		"SHA3Epoch: %v "+
+		"StakingPrecompileEpoch: %v "+
+		"ChainIdFixEpoch: %v "+
+		"CrossShardXferPrecompileEpoch: %v "+
+		"NoNilDelegationsEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -604,6 +627,7 @@ func (c *ChainConfig) String() string {
 		c.StakingPrecompileEpoch,
 		c.ChainIdFixEpoch,
 		c.CrossShardXferPrecompileEpoch,
+		c.NoNilDelegationsEpoch,
 	)
 }
 
@@ -800,10 +824,16 @@ func (c *ChainConfig) IsHIP6And8Epoch(epoch *big.Int) bool {
 	return isForked(c.HIP6And8Epoch, epoch)
 }
 
-// IsStakingPrecompileEpoch determines whether staking
+// IsStakingPrecompile determines whether staking
 // precompiles are available in the EVM
 func (c *ChainConfig) IsStakingPrecompile(epoch *big.Int) bool {
 	return isForked(c.StakingPrecompileEpoch, epoch)
+}
+
+// IsNoNilDelegations determines whether to clear
+// nil delegations regularly (and of course also once)
+func (c *ChainConfig) IsNoNilDelegations(epoch *big.Int) bool {
+	return isForked(c.NoNilDelegationsEpoch, epoch)
 }
 
 // IsCrossShardXferPrecompile determines whether the
@@ -927,6 +957,7 @@ type Rules struct {
 	// eip-155 chain id fix
 	IsChainIdFix bool
 	IsValidatorCodeFix bool
+	IsNoNilDelegations bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -952,5 +983,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsCrossShardXferPrecompile: c.IsCrossShardXferPrecompile(epoch),
 		IsChainIdFix:               c.IsChainIdFix(epoch),
 		IsValidatorCodeFix:         c.IsValidatorCodeFix(epoch),
+		IsNoNilDelegations:         c.IsNoNilDelegations(epoch),
 	}
 }

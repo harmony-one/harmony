@@ -116,6 +116,7 @@ type BlockChain interface {
 		block *types.Block, receipts []*types.Receipt,
 		cxReceipts []*types.CXReceipt,
 		stakeMsgs []types2.StakeMsg,
+		delegationsToRemove map[common.Address][]common.Address,
 		paid reward.Reader,
 		state *state.DB,
 	) (status WriteStatus, err error)
@@ -296,6 +297,7 @@ type BlockChain interface {
 	UpdateStakingMetaData(
 		batch rawdb.DatabaseWriter, block *types.Block,
 		stakeMsgs []types2.StakeMsg,
+		delegationsToRemove map[common.Address][]common.Address,
 		state *state.DB, epoch, newEpoch *big.Int,
 	) (newValidators []common.Address, err error)
 	// ReadBlockRewardAccumulator must only be called on beaconchain
@@ -336,6 +338,7 @@ type BlockChain interface {
 		receipts []*types.Receipt,
 		cxReceipts []*types.CXReceipt,
 		stakeMsgs []types2.StakeMsg,
+		delegationsToRemove map[common.Address][]common.Address,
 		payout reward.Reader,
 		state *state.DB,
 	) (status WriteStatus, err error)

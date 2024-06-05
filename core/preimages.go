@@ -227,7 +227,7 @@ func GeneratePreimages(chain BlockChain, start, end uint64) error {
 			return fmt.Errorf("block %d not found", i)
 		}
 		stateAt, _ := chain.StateAt(block.Root())
-		_, _, _, _, _, _, endingState, errProcess = chain.Processor().Process(block, startingState, *chain.GetVMConfig(), false)
+		_, _, _, _, _, _, _, endingState, errProcess = chain.Processor().Process(block, startingState, *chain.GetVMConfig(), false)
 		if errProcess != nil {
 			return fmt.Errorf("error executing block #%d: %s", i, errProcess)
 		}

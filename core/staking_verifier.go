@@ -367,7 +367,7 @@ func VerifyAndDelegateFromMsg(
 //
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndUndelegateFromMsg(
-	stateDB vm.StateDB, epoch *big.Int, msg *staking.Undelegate,
+	stateDB vm.StateDB, epoch *big.Int, chainConfig *params.ChainConfig, msg *staking.Undelegate,
 ) (*staking.ValidatorWrapper, error) {
 	if stateDB == nil {
 		return nil, errStateDBIsMissing
@@ -389,10 +389,15 @@ func VerifyAndUndelegateFromMsg(
 		return nil, err
 	}
 
+	var minimumRemainingDelegation *big.Int
+	if chainConfig.IsNoNilDelegations(epoch) {
+		minimumRemainingDelegation = minimumDelegationV2 // 100 ONE
+	}
+
 	for i := range wrapper.Delegations {
 		delegation := &wrapper.Delegations[i]
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
-			if err := delegation.Undelegate(epoch, msg.Amount); err != nil {
+			if err := delegation.Undelegate(epoch, msg.Amount, minimumRemainingDelegation); err != nil {
 				return nil, err
 			}
 			if err := wrapper.SanityCheck(); err != nil {
