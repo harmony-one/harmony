@@ -69,7 +69,7 @@ var (
 		noTransportSecurityFlag,
 		natFlag,
 		userAgentFlag,
-		muxerTypeFlag,
+		muxerFlag,
 		noRelayFlag,
 	}
 
@@ -657,10 +657,10 @@ var (
 		Usage:    "explicitly set the user-agent, so we can differentiate from other Go libp2p users",
 		DefValue: defaultConfig.P2P.UserAgent,
 	}
-	muxerTypeFlag = cli.IntFlag{
+	muxerFlag = cli.StringFlag{
 		Name:     "p2p.muxer",
-		Usage:    "protocol muxer to mux per-protocol streams (0:Mplex, 1:Yamux, default:0)",
-		DefValue: defaultConfig.P2P.MuxerType,
+		Usage:    "protocol muxer to mux per-protocol streams, should be comma separated string (mplex, yamux)",
+		DefValue: defaultConfig.P2P.Muxer,
 	}
 	noRelayFlag = cli.BoolFlag{
 		Name:     "p2p.no-relay",
@@ -731,8 +731,8 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		config.P2P.UserAgent = cli.GetStringFlagValue(cmd, userAgentFlag)
 	}
 
-	if cli.IsFlagChanged(cmd, muxerTypeFlag) {
-		config.P2P.MuxerType = cli.GetIntFlagValue(cmd, muxerTypeFlag)
+	if cli.IsFlagChanged(cmd, muxerFlag) {
+		config.P2P.Muxer = cli.GetStringFlagValue(cmd, muxerFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, noRelayFlag) {
