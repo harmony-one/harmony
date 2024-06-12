@@ -75,6 +75,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 	}
@@ -120,6 +121,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(2176), // 2023-10-12 10:00:00+00:00
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 	}
@@ -165,6 +167,7 @@ var (
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 	}
@@ -211,6 +214,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
 		HIP30Epoch:                            big.NewInt(7),
 		BlockGas30MEpoch:                      big.NewInt(7),
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   big.NewInt(144),
 	}
@@ -257,6 +261,7 @@ var (
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 	}
@@ -302,6 +307,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 	}
@@ -351,6 +357,7 @@ var (
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // MaxRateEpoch
 		big.NewInt(0),
+		big.NewInt(0),
 	}
 
 	// TestChainConfig ...
@@ -397,6 +404,7 @@ var (
 		big.NewInt(0),        // HIP30Epoch
 		big.NewInt(0),        // BlockGas30M
 		big.NewInt(0),        // MaxRateEpoch
+		big.NewInt(0),
 		big.NewInt(0),
 	}
 
@@ -568,6 +576,9 @@ type ChainConfig struct {
 
 	// MaxRateEpoch will make sure the validator max-rate is at least equal to the minRate + the validator max-rate-increase
 	MaxRateEpoch *big.Int `json:"max-rate-epoch,omitempty"`
+
+	// TopMaxRateEpoch will make sure the validator max-rate is less to 100% for the cases where the minRate + the validator max-rate-increase > 100%
+	TopMaxRateEpoch *big.Int `json:"top-max-rate-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -833,6 +844,10 @@ func (c *ChainConfig) IsDevnetExternalEpoch(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsMaxRate(epoch *big.Int) bool {
 	return isForked(c.MaxRateEpoch, epoch)
+}
+
+func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
+	return isForked(c.TopMaxRateEpoch, epoch)
 }
 
 // During this epoch, shards 2 and 3 will start sending

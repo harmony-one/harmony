@@ -458,7 +458,7 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 
 	if config.IsMaxRate(newShardState.Epoch) {
 		for _, addr := range chain.ValidatorCandidates() {
-			if _, err := availability.UpdateMaxCommissionFee(state, addr, minRate); err != nil {
+			if _, err := availability.UpdateMaxCommissionFee(newShardState.Epoch, config, state, addr, minRate); err != nil {
 				return err
 			}
 		}
@@ -489,7 +489,7 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 	// higher than the the MaxRate by UpdateMinimumCommissionFee above
 	if config.IsMaxRate(newShardState.Epoch) && minRateNotZero {
 		for _, addr := range chain.ValidatorCandidates() {
-			if _, err := availability.UpdateMaxCommissionFee(state, addr, minRate); err != nil {
+			if _, err := availability.UpdateMaxCommissionFee(newShardState.Epoch, config, state, addr, minRate); err != nil {
 				return err
 			}
 		}
