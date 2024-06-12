@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -269,7 +270,7 @@ func UpdateMinimumCommissionFee(
 }
 
 // UpdateMaxCommissionFee makes sure the max-rate is at least higher than the rate + max-rate-change.
-func UpdateMaxCommissionFee(state *state.DB, addr common.Address, minRate numeric.Dec) (bool, error) {
+func UpdateMaxCommissionFee(epoch *big.Int, config *params.ChainConfig, state *state.DB, addr common.Address, minRate numeric.Dec) (bool, error) {
 	utils.Logger().Info().Msg("begin update max commission fee")
 
 	wrapper, err := state.ValidatorWrapper(addr, true, false)
@@ -278,6 +279,12 @@ func UpdateMaxCommissionFee(state *state.DB, addr common.Address, minRate numeri
 	}
 
 	minMaxRate := minRate.Add(wrapper.MaxChangeRate)
+	if config.IsTopMaxRate(epoch) {
+		hundredPercent := numeric.NewDec(1)
+		if minMaxRate.GT(hundredPercent) {
+			minMaxRate = hundredPercent
+		}
+	}
 
 	if wrapper.MaxRate.LT(minMaxRate) {
 		utils.Logger().Info().
