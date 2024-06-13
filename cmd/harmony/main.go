@@ -705,7 +705,7 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		NAT:                      hc.P2P.NAT,
 		UserAgent:                hc.P2P.UserAgent,
 		DialTimeout:              hc.P2P.DialTimeout,
-		MuxerType:                p2p.MuxerType(hc.P2P.MuxerType),
+		Muxer:                    hc.P2P.Muxer,
 		NoRelay:                  hc.P2P.NoRelay,
 	})
 	if err != nil {

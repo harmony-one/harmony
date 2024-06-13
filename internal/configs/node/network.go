@@ -87,8 +87,8 @@ const (
 	DefaultUserAgent = ""
 	// DefaultDialTimeout dial timeout
 	DefaultDialTimeout = time.Minute
-	// DefaultMuxerType P2P multiplexer type (default:Mplex, 0:Mplex, 1:Yamux)
-	DefaultMuxerType = 0 // 0:Mplex 1:Yamux
+	// DefaultMuxerType P2P multiplexer type
+	DefaultMuxer = "mplex, yamux"
 	// DefaultNoRelay disables p2p host relay
 	DefaultNoRelay = true
 )

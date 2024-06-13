@@ -133,8 +133,8 @@ type P2pConfig struct {
 	UserAgent string
 	// p2p dial timeout
 	DialTimeout time.Duration
-	// P2P multiplexer type (default:Mplex, 0:Mplex, 1:Yamux)
-	MuxerType int
+	// P2P multiplexer type, should be comma separated (mplex, Yamux)
+	Muxer string
 	// No relay services, direct connections between peers only
 	NoRelay bool
 }
