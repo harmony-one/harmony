@@ -76,7 +76,7 @@ var (
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		TopMaxRateEpoch:                       EpochTBD,
-		MaxRateEpoch:                          big.NewInt(1983),
+		MaxRateEpoch:                          big.NewInt(1733),
 		DevnetExternalEpoch:                   EpochTBD,
 	}
 
