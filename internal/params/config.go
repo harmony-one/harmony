@@ -75,7 +75,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
-		TopMaxRateEpoch:                       big.NewInt(1983), // around 2024-06-25 01:30:00+00:00
+		TopMaxRateEpoch:                       big.NewInt(1976), // around 2024-06-20
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 	}
