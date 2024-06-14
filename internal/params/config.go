@@ -169,8 +169,8 @@ var (
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
-		MaxRateEpoch:                          EpochTBD,
 		TopMaxRateEpoch:                       EpochTBD,
+		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 	}
@@ -217,6 +217,7 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
 		HIP30Epoch:                            big.NewInt(7),
 		BlockGas30MEpoch:                      big.NewInt(7),
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		DevnetExternalEpoch:                   big.NewInt(144),
@@ -311,8 +312,8 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
-		MaxRateEpoch:                          EpochTBD,
 		TopMaxRateEpoch:                       EpochTBD,
+		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 	}
