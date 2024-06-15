@@ -278,7 +278,7 @@ var defaultCacheConfig = harmonyconfig.CacheConfig{
 	TrieNodeLimit:   256,
 	TriesInMemory:   128,
 	TrieTimeLimit:   2 * time.Minute,
-	SnapshotLimit:   256,
+	SnapshotLimit:   0,
 	SnapshotWait:    true,
 	Preimages:       true,
 	SnapshotNoBuild: false,
