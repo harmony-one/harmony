@@ -235,11 +235,18 @@ func IsPrivateIP(ip net.IP) bool {
 	return false
 }
 
+type CXKey struct {
+	shardID  uint32
+	blockNum uint64
+}
+
 // GetPendingCXKey creates pending CXReceiptsProof key given shardID and blockNum
 // it is to avoid adding duplicated CXReceiptsProof from the same source shard
-func GetPendingCXKey(shardID uint32, blockNum uint64) string {
-	key := strconv.FormatUint(uint64(shardID), 10) + "-" + strconv.FormatUint(blockNum, 10)
-	return key
+func GetPendingCXKey(shardID uint32, blockNum uint64) CXKey {
+	return CXKey{
+		shardID:  shardID,
+		blockNum: blockNum,
+	}
 }
 
 // AppendIfMissing appends an item if it's missing in the slice, returns appended slice and true

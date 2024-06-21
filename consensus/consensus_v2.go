@@ -38,9 +38,6 @@ var (
 const (
 	// CommitSigSenderTimeout is the timeout for sending the commit sig to finish block proposal
 	CommitSigSenderTimeout = 10 * time.Second
-	// CommitSigReceiverTimeout is the timeout for the receiving side of the commit sig
-	// if timeout, the receiver should instead ready directly from db for the commit sig
-	CommitSigReceiverTimeout = 8 * time.Second
 )
 
 // IsViewChangingMode return true if curernt mode is viewchanging
@@ -845,6 +842,12 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
 func (consensus *Consensus) GenerateVrfAndProof(newHeader *block.Header) error {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	return consensus.generateVrfAndProof(newHeader)
+}
+
+func (consensus *Consensus) generateVrfAndProof(newHeader *block.Header) error {
 	key, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		return errors.New("[GenerateVrfAndProof] no leader private key provided")

@@ -11,6 +11,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/multibls"
+	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 )
@@ -28,6 +29,7 @@ type Registry struct {
 	collection      *shardchain.CollectionImpl
 	nodeConfig      *nodeconfig.ConfigType
 	addressToBLSKey AddressToBLSKey
+	worker          *worker.Worker
 }
 
 // New creates a new registry.
@@ -197,6 +199,23 @@ func (r *Registry) SetAddressToBLSKey(a AddressToBLSKey) *Registry {
 
 	r.addressToBLSKey = a
 	return r
+}
+
+// SetWorker sets the worker to registry.
+func (r *Registry) SetWorker(w *worker.Worker) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.worker = w
+	return r
+}
+
+// GetWorker gets the worker from registry.
+func (r *Registry) GetWorker() *worker.Worker {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.worker
 }
 
 type FindCommitteeByID interface {

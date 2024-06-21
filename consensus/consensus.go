@@ -75,6 +75,7 @@ type Consensus struct {
 
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
 
+	pendingCXReceipts map[utils.CXKey]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	// Registry for services.
 	registry *registry.Registry
 	// Minimal number of peers in the shard
@@ -296,8 +297,9 @@ func New(
 		host:         host,
 		msgSender:    NewMessageSender(host),
 		// FBFT timeout
-		consensusTimeout: createTimeout(),
-		dHelper:          downloadAsync{},
+		consensusTimeout:  createTimeout(),
+		dHelper:           downloadAsync{},
+		pendingCXReceipts: make(map[utils.CXKey]*types.CXReceiptsProof), // All the receipts received but not yet processed for Consensus
 	}
 
 	if multiBLSPriKey != nil {
