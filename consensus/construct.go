@@ -92,10 +92,10 @@ func (consensus *Consensus) construct(
 	// Do the signing, 96 byte of bls signature
 	needMsgSig := true
 	switch p {
-	case msg_pb.MessageType_ANNOUNCE:
+	case msg_pb.MessageType_ANNOUNCE: // send by leader
 		consensusMsg.Block = consensus.block
 		consensusMsg.Payload = consensus.blockHash[:]
-	case msg_pb.MessageType_PREPARE:
+	case msg_pb.MessageType_PREPARE: // send by validator
 		needMsgSig = false
 		sig := bls_core.Sign{}
 		for _, priKey := range priKeys {

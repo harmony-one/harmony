@@ -589,6 +589,9 @@ type ChainConfig struct {
 
 	// TopMaxRateEpoch will make sure the validator max-rate is less to 100% for the cases where the minRate + the validator max-rate-increase > 100%
 	TopMaxRateEpoch *big.Int `json:"top-max-rate-epoch,omitempty"`
+
+	// ChainedConsensusEpoch activates the chained consensus protocol
+	ChainedConsensusEpoch *big.Int `json:"chained-consensus-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -862,6 +865,10 @@ func (c *ChainConfig) IsMaxRate(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 	return isForked(c.TopMaxRateEpoch, epoch)
+}
+
+func (c *ChainConfig) IsChainedConsensus(epoch *big.Int) bool {
+	return isForked(c.ChainedConsensusEpoch, epoch)
 }
 
 // During this epoch, shards 2 and 3 will start sending

@@ -3,6 +3,7 @@ package consensus
 import (
 	"encoding/hex"
 
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -269,6 +270,26 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 
 	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
 	if consensus.current.Mode() == Normal {
+
+		if consensus.Blockchain().Config().IsChainedConsensus(blockObj.Epoch()) {
+			if blockObj.IsLastBlockInEpoch() {
+				panic("not yet implemented")
+			} else {
+				state, err := consensus.Blockchain().ReadShardState(blockObj.Epoch())
+				if err != nil {
+					panic(err)
+				}
+				c, err := state.FindCommitteeByID(consensus.ShardID)
+				if err != nil {
+					panic(err)
+				}
+				if quorum.IsMyTurnBeingLeader(c.Slots, consensus.LeaderPubKey, consensus.getCurBlockViewID()+1) {
+					proposeNewBlock
+				}
+			}
+
+		}
+
 		consensus.sendCommitMessages(blockObj)
 		consensus.switchPhase("onPrepared", FBFTCommit)
 	} else {

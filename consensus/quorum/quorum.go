@@ -250,6 +250,17 @@ func (s *cIdentities) NthNextValidator(slotList shard.SlotList, pubKey *bls.Publ
 	}
 }
 
+// IsMyTurnBeingLeader
+func /*(s *cIdentities)*/ IsMyTurnBeingLeader(slotList shard.SlotList, myPubKey *bls.PublicKeyWrapper, viewID uint64) bool {
+	for i, slot := range slotList {
+		if slot.BLSPublicKey == myPubKey.Bytes {
+			return (viewID % uint64(len(slotList))) == uint64(i)
+		}
+	}
+
+	return false
+}
+
 func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 

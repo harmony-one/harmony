@@ -36,6 +36,8 @@ type FBFTMessage struct {
 	M3AggSig           *bls_core.Sign
 	M3Bitmap           *bls_cosi.Mask
 	Verified           bool
+	// chained stuff
+	NextBlock []byte
 }
 
 func (m *FBFTMessage) Hash() []byte {
