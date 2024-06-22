@@ -60,3 +60,8 @@ func (s fixedSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 func NewFixedSchedule(instance Instance) Schedule {
 	return fixedSchedule{instance: instance}
 }
+
+// RewardFrequency returns the frequency of block reward
+func (s fixedSchedule) RewardFrequency() uint64 {
+	return RewardFrequency
+}

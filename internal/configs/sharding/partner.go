@@ -88,6 +88,11 @@ func (ps partnerSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 	return false
 }
 
+// RewardFrequency returns the frequency of block reward
+func (ps partnerSchedule) RewardFrequency() uint64 {
+	return RewardFrequency
+}
+
 var partnerReshardingEpoch = []*big.Int{
 	big.NewInt(0),
 	params.PartnerChainConfig.StakingEpoch,

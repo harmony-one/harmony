@@ -74,6 +74,11 @@ func (ss stressnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool 
 	return false
 }
 
+// RewardFrequency returns the frequency of block reward
+func (ss stressnetSchedule) RewardFrequency() uint64 {
+	return RewardFrequency
+}
+
 var stressnetReshardingEpoch = []*big.Int{
 	big.NewInt(0),
 	params.StressnetChainConfig.StakingEpoch,

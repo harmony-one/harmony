@@ -125,6 +125,11 @@ func (ts testnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 	return false
 }
 
+// RewardFrequency returns the frequency of block reward
+func (ts testnetSchedule) RewardFrequency() uint64 {
+	return RewardFrequency
+}
+
 var testnetReshardingEpoch = []*big.Int{
 	big.NewInt(0),
 	params.TestnetChainConfig.StakingEpoch,
