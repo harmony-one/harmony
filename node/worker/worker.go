@@ -7,20 +7,17 @@ import (
 	"sort"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/consensus/reward"
-	"github.com/harmony-one/harmony/crypto/bls"
-
-	"github.com/harmony-one/harmony/crypto/hash"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -609,7 +606,7 @@ func (w *Worker) FinalizeNewBlock(
 				copyHeader.SetLastCommitBitmap(signers)
 			}
 			sigsReady <- true
-		case <-time.After(consensus.CommitSigReceiverTimeout):
+		case <-time.After(CommitSigReceiverTimeout):
 			// Exit goroutine
 			utils.Logger().Warn().Msg("Timeout waiting for commit sigs")
 		}

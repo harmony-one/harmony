@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"os"
 	"runtime/pprof"
-	"strings"
 	"sync"
 	"time"
 
@@ -23,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
@@ -90,11 +88,10 @@ type ISync interface {
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus          *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BeaconBlockChannel chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
-	pendingCXReceipts  map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
-	pendingCXMutex     sync.Mutex
-	crosslinks         *crosslinks.Crosslinks // Memory storage for crosslink processing.
+	Consensus          *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	BeaconBlockChannel chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
+
+	crosslinks *crosslinks.Crosslinks // Memory storage for crosslink processing.
 
 	SelfPeer         p2p.Peer
 	stateMutex       sync.Mutex // mutex for change node state
@@ -363,67 +360,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 
 // AddPendingReceipts adds one receipt message to pending list.
 func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
-	node.pendingCXMutex.Lock()
-	defer node.pendingCXMutex.Unlock()
-
-	if receipts.ContainsEmptyField() {
-		utils.Logger().Info().
-			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
-			Msg("CXReceiptsProof contains empty field")
-		return
-	}
-
-	blockNum := receipts.Header.Number().Uint64()
-	shardID := receipts.Header.ShardID()
-
-	// Sanity checks
-
-	if err := core.NewBlockValidator(node.Blockchain()).ValidateCXReceiptsProof(receipts); err != nil {
-		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
-			utils.Logger().Error().Err(err).Msg("[AddPendingReceipts] Invalid CXReceiptsProof")
-			return
-		}
-	}
-
-	// cross-shard receipt should not be coming from our shard
-	if s := node.Consensus.ShardID; s == shardID {
-		utils.Logger().Info().
-			Uint32("my-shard", s).
-			Uint32("receipt-shard", shardID).
-			Msg("ShardID of incoming receipt was same as mine")
-		return
-	}
-
-	if e := receipts.Header.Epoch(); blockNum == 0 ||
-		!node.Blockchain().Config().AcceptsCrossTx(e) {
-		utils.Logger().Info().
-			Uint64("incoming-epoch", e.Uint64()).
-			Msg("Incoming receipt had meaningless epoch")
-		return
-	}
-
-	key := utils.GetPendingCXKey(shardID, blockNum)
-
-	// DDoS protection
-	const maxCrossTxnSize = 4096
-	if s := len(node.pendingCXReceipts); s >= maxCrossTxnSize {
-		utils.Logger().Info().
-			Int("pending-cx-receipts-size", s).
-			Int("pending-cx-receipts-limit", maxCrossTxnSize).
-			Msg("Current pending cx-receipts reached size limit")
-		return
-	}
-
-	if _, ok := node.pendingCXReceipts[key]; ok {
-		utils.Logger().Info().
-			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
-			Msg("Already Got Same Receipt message")
-		return
-	}
-	node.pendingCXReceipts[key] = receipts
-	utils.Logger().Info().
-		Int("totalPendingReceipts", len(node.pendingCXReceipts)).
-		Msg("Got ONE more receipt message")
+	node.Consensus.AddPendingReceipts(receipts)
 }
 
 type withError struct {
@@ -1108,11 +1045,10 @@ func New(
 		node.registry.SetTxPool(node.TxPool)
 		node.CxPool = node.registry.GetCxPool()
 		node.Worker = worker.New(blockchain, beaconChain)
+		node.registry.SetWorker(node.Worker)
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
-
-		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
