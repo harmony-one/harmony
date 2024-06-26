@@ -160,7 +160,7 @@ func main() {
 	}
 
 	fmt.Printf("bootnode BN_MA=%s",
-		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()),
+		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().String()),
 	)
 
 	host.Start()

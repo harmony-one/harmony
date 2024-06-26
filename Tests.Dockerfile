@@ -23,20 +23,25 @@ RUN git config --global --add safe.directory $GOPATH/src/github.com/harmony-one/
     && git config --global --add safe.directory $GOPATH/src/github.com/harmony-one/mcl > /dev/null 2>1
 
 # Build to fetch all dependencies for faster test builds
-#CRUN cd /go/src/github.com/harmony-one/harmony
-RUN pwd
-COPY harmony harmony
+WORKDIR $GOPATH/src/github.com/harmony-one/harmony
+COPY . .
+# Выполняем команду pwd для вывода текущего каталога
+RUN echo "Current directory:" && pwd
+
+# Проверяем содержимое каталога
+RUN echo "Listing directory contents:" && ls -la
+
 RUN go mod tidy
-RUN go get github.com/pborman/uuid > /dev/null 2>1
-RUN go get github.com/rjeczalik/notify > /dev/null 2>1
-RUN go get github.com/cespare/cp > /dev/null 2>1
-RUN    && go get github.com/libp2p/go-libp2p-crypto > /dev/null 2>1
-RUN    && go get github.com/kr/pretty > /dev/null 2>1
-RUN    && go get github.com/kr/text > /dev/null 2>1
-RUN    && go get gopkg.in/check.v1 > /dev/null 2>1
-RUN    && bash scripts/install_build_tools.sh > /dev/null 2>1
-RUN    && make > /dev/null 2>1
-RUN rm -rf harmony
+#RUN go get github.com/pborman/uuid > /dev/null 2>1
+#RUN go get github.com/rjeczalik/notify > /dev/null 2>1
+#RUN go get github.com/cespare/cp > /dev/null 2>1
+#RUN go get github.com/libp2p/go-libp2p-crypto > /dev/null 2>1
+#RUN go get github.com/kr/pretty > /dev/null 2>1
+#RUN go get github.com/kr/text > /dev/null 2>1
+#RUN go get gopkg.in/check.v1 > /dev/null 2>1
+RUN bash scripts/install_build_tools.sh > /dev/null 2>1
+RUN make > /dev/null 2>1
+#RUN rm -rf harmony
 
 # Install testing tools
 RUN curl -L -o /go/bin/hmy https://harmony.one/hmycli > /dev/null 2>1 && chmod +x /go/bin/hmy > /dev/null 2>1
@@ -48,14 +53,16 @@ RUN cd rosetta-cli && make install > /dev/null 2>1
 
 WORKDIR $GOPATH/src/github.com/harmony-one/harmony/tests
 
-COPY scripts scripts
-COPY rpc_tests rpc_tests
-COPY configs configs
-COPY requirements.txt requirements.txt
-
-# Since we are running as root in Docker, `--break-system-packages` is required
-RUN python3 -m pip install -r requirements.txt --break-system-packages > /dev/null 2>1 && rm requirements.txt
-RUN chmod +x $GOPATH/src/github.com/harmony-one/harmony-test/localnet/scripts/run.sh
+#COPY scripts scripts
+#COPY rpc_tests rpc_tests
+#COPY configs configs
+#COPY requirements.txt requirements.txt
 
 WORKDIR $GOPATH/src/github.com/harmony-one/harmony
+
+# Since we are running as root in Docker, `--break-system-packages` is required
+RUN python3 -m pip install -r tests/requirements.txt --break-system-packages
+RUN chmod +x tests/scripts/run.sh
+
+
 ENTRYPOINT ["/go/src/github.com/harmony-one/harmony/tests/scripts/run.sh"]

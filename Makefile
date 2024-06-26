@@ -184,5 +184,5 @@ debug_external: clean
 build_localnet_validator:
 	bash test/build-localnet-validator.sh
 
-generate:
+protofiles:
 	bash ./scripts/gogenerate.sh
