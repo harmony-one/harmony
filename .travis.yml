@@ -14,12 +14,10 @@ env:
   - TEST="bash ./scripts/travis_rosetta_checker.sh"
 
 # upgrade docker to latest stable version
-addons:
-  apt:
-    sources:
-      - sourceline: deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable
-    packages:
-    - docker.io
+before_install:
+  - echo "deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
 
 install:
   # default working directory with source code is automatically set to
