@@ -18,6 +18,9 @@ import (
 )
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
+	if consensus.registry.IsBackup() {
+		return
+	}
 	recvMsg, err := consensus.parseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Error().
@@ -142,7 +145,7 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 }
 
 func (consensus *Consensus) prepare() {
-	if consensus.isBackup {
+	if consensus.registry.IsBackup() {
 		return
 	}
 
@@ -165,7 +168,8 @@ func (consensus *Consensus) prepare() {
 
 // sendCommitMessages send out commit messages to leader
 func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
-	if consensus.isBackup || blockObj == nil {
+	if consensus.IsBackup() || blockObj == nil {
+		consensus.getLogger().Warn().Msg("[sendCommitMessages] I am a backup node, will not send commit message")
 		return
 	}
 

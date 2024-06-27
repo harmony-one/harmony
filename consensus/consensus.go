@@ -63,8 +63,6 @@ type Consensus struct {
 	phase FBFTPhase
 	// current indicates what state a node is in
 	current State
-	// isBackup declarative the node is in backup mode
-	isBackup bool
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 	// Commits collected from validators.
@@ -265,9 +263,7 @@ func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 }
 
 func (consensus *Consensus) IsBackup() bool {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
-	return consensus.isBackup
+	return consensus.registry.IsBackup()
 }
 
 func (consensus *Consensus) BlockNum() uint64 {
