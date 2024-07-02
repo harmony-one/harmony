@@ -126,7 +126,6 @@ func NewHost(cfg HostConfig) (Host, error) {
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port)
 	listenAddr := libp2p.ListenAddrStrings(
 		addr,         // regular tcp connections
-		addr+"/quic", // a UDP endpoint for the QUIC transport
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
