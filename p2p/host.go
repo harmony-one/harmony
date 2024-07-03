@@ -223,8 +223,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 			switch v {
 			case "yamux":
 				p2pHostConfig = append(p2pHostConfig, YamuxC())
-			//case "mplex":
-			//	p2pHostConfig = append(p2pHostConfig, MplexC())
+			case "mplex":
+				//p2pHostConfig = append(p2pHostConfig, MplexC())
 			default:
 				cancel()
 				utils.Logger().Error().
