@@ -22,6 +22,12 @@ RUN git config --global --add safe.directory $GOPATH/src/github.com/harmony-one/
     && git config --global --add safe.directory $GOPATH/src/github.com/harmony-one/bls > /dev/null 2>1 \
     && git config --global --add safe.directory $GOPATH/src/github.com/harmony-one/mcl > /dev/null 2>1
 
+# Install testing tools
+RUN curl -L -o /go/bin/hmy https://harmony.one/hmycli > /dev/null 2>1 && chmod +x /go/bin/hmy > /dev/null 2>1
+
+RUN git clone https://github.com/coinbase/rosetta-cli.git > /dev/null 2>1
+RUN cd rosetta-cli && make install > /dev/null 2>1
+
 # Build to fetch all dependencies for faster test builds
 WORKDIR $GOPATH/src/github.com/harmony-one/harmony
 COPY . .
@@ -40,16 +46,12 @@ RUN go mod tidy
 #RUN go get github.com/kr/text > /dev/null 2>1
 #RUN go get gopkg.in/check.v1 > /dev/null 2>1
 RUN bash scripts/install_build_tools.sh > /dev/null 2>1
-RUN make > /dev/null 2>1
+RUN make
 #RUN rm -rf harmony
 
-# Install testing tools
-RUN curl -L -o /go/bin/hmy https://harmony.one/hmycli > /dev/null 2>1 && chmod +x /go/bin/hmy > /dev/null 2>1
 
 WORKDIR $GOPATH/src/github.com/coinbase
 
-RUN git clone https://github.com/coinbase/rosetta-cli.git > /dev/null 2>1
-RUN cd rosetta-cli && make install > /dev/null 2>1
 
 WORKDIR $GOPATH/src/github.com/harmony-one/harmony/tests
 

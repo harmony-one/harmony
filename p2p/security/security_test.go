@@ -85,7 +85,7 @@ func TestManager_OnConnectCheck(t *testing.T) {
 	h2, err := newPeer(GetFreePort(t))
 	assert.Nil(t, err)
 	defer h2.Close()
-	err = h2.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
+	err = h2.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Addrs()})
 	require.NoError(t, err)
 
 	security.RangePeers(func(k string, peers []string) bool {
@@ -96,7 +96,7 @@ func TestManager_OnConnectCheck(t *testing.T) {
 	h3, err := newPeer(GetFreePort(t))
 	assert.Nil(t, err)
 	defer h3.Close()
-	err = h3.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
+	err = h3.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Addrs()})
 	assert.Nil(t, err)
 	security.RangePeers(func(k string, peers []string) bool {
 		require.Equal(t, 2, len(peers))
@@ -106,7 +106,7 @@ func TestManager_OnConnectCheck(t *testing.T) {
 	h4, err := newPeer(GetFreePort(t))
 	assert.Nil(t, err)
 	defer h4.Close()
-	err = h4.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
+	err = h4.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Addrs()})
 	assert.Nil(t, err)
 	security.RangePeers(func(k string, peers []string) bool {
 		require.Equal(t, 2, len(peers))
@@ -143,7 +143,7 @@ func TestManager_OnDisconnectCheck(t *testing.T) {
 	fakeHost.SetConnectCallback(OnConnectCheck)
 	fakeHost.SetDisconnectCallback(OnDisconnectCheck)
 
-	err = h2.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Network().ListenAddresses()})
+	err = h2.Connect(context.Background(), peer.AddrInfo{ID: h1.ID(), Addrs: h1.Addrs()})
 	assert.Nil(t, err)
 
 	security.RangePeers(func(k string, peers []string) bool {

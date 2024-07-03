@@ -7,4 +7,4 @@ echo $DIR
 echo $GOPATH
 pwd
 docker build --progress=plain -t harmonyone/localnet-test -f Tests.Dockerfile .
-docker run harmonyone/localnet-test -r
+docker run -v "$DIR/tmp_log:/go/src/github.com/harmony-one/harmony/tmp_log" harmonyone/localnet-test -r
