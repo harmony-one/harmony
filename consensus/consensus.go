@@ -120,8 +120,6 @@ type Consensus struct {
 	host p2p.Host
 	// MessageSender takes are of sending consensus message and the corresponding retry logic.
 	msgSender *MessageSender
-	// If true, this consensus will not propose view change.
-	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
 	SlashChan chan slash.Record
 	// How long in second the leader needs to wait to propose a new block.
