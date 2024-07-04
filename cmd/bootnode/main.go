@@ -159,7 +159,7 @@ func main() {
 		utils.FatalErrMsg(err, "cannot initialize network")
 	}
 
-	fmt.Printf("bootnode BN_MA=%s",
+	fmt.Printf("bootnode BN_MA=%s\n",
 		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().String()),
 	)
 
