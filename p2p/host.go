@@ -57,6 +57,7 @@ type Host interface {
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
 	GetDiscovery() discovery.Discovery
+	Network() libp2p_network.Network
 	GetPeerCount() int
 	ConnectHostPeer(Peer) error
 	// AddStreamProtocol add the given protocol
@@ -443,17 +444,9 @@ func (host *HostV2) Close() error {
 
 // PeerConnectivity returns total number of known, connected and not connected peers.
 func (host *HostV2) PeerConnectivity() (int, int, int) {
-	connected, not := 0, 0
-	peers := host.h.Peerstore().Peers()
-	for _, peer := range peers {
-		result := host.h.Network().Connectedness(peer)
-		if result == libp2p_network.Connected {
-			connected++
-		} else if result == libp2p_network.NotConnected {
-			not++
-		}
-	}
-	return len(peers), connected, not
+	known := len(host.h.Peerstore().Peers())
+	connected := len(host.h.Network().Peers())
+	return known, connected, known - connected
 }
 
 // AddStreamProtocol adds the stream protocols to the host to be started and closed
@@ -587,6 +580,10 @@ func (host *HostV2) ListBlockedPeer() []libp2p_peer.ID {
 // GetPeerCount ...
 func (host *HostV2) GetPeerCount() int {
 	return host.h.Peerstore().Peers().Len()
+}
+
+func (host *HostV2) Network() libp2p_network.Network {
+	return host.h.Network()
 }
 
 // ConnectHostPeer connects to peer host
