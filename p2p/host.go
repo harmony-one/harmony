@@ -33,6 +33,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -124,9 +125,13 @@ func NewHost(cfg HostConfig) (Host, error) {
 
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port)
 	listenAddr := libp2p.ListenAddrStrings(
-		addr,         // regular tcp connections
-		addr+"/quic", // a UDP endpoint for the QUIC transport
+		addr, // regular tcp connections
 	)
+
+	// transporters
+	tcpTransport := libp2p.Transport(
+		tcp.NewTCPTransport,
+		tcp.WithConnectionTimeout(time.Minute*60)) // break unused connections
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -152,8 +157,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.Security(libp2ptls.ID, libp2ptls.New),
 		// Support noise connections
 		libp2p.Security(noise.ID, noise.New),
-		// Support any other default transports (TCP)
-		libp2p.DefaultTransports,
+		// regular tcp connections
+		tcpTransport,
 		// Prevent the peer from having too many
 		// connections by attaching a connection manager.
 		connectionManager(low, high),
@@ -291,6 +296,8 @@ func connectionManager(low int, high int) libp2p_config.Option {
 			low,  // Low Watermark
 			high, // High Watermark
 			connmgr.WithGracePeriod(time.Minute),
+			connmgr.WithSilencePeriod(time.Minute),
+			connmgr.WithEmergencyTrim(true),
 		)
 		if err != nil {
 			utils.Logger().Error().
