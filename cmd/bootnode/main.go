@@ -103,6 +103,7 @@ func main() {
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
+	connMgrHighWaterMark := flag.Int("cmg_high_watermark", 900, "connection manager trims excess connections when they pass the high watermark")
 
 	flag.Parse()
 
@@ -127,12 +128,13 @@ func main() {
 	selfPeer := p2p.Peer{IP: *ip, Port: *port}
 
 	host, err := p2p.NewHost(p2p.HostConfig{
-		Self:                    &selfPeer,
-		BLSKey:                  privKey,
-		BootNodes:               nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
-		DataStoreFile:           &dataStorePath,
-		MaxConnPerIP:            *maxConnPerIP,
-		ForceReachabilityPublic: *forceReachabilityPublic,
+		Self:                     &selfPeer,
+		BLSKey:                   privKey,
+		BootNodes:                nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
+		DataStoreFile:            &dataStorePath,
+		MaxConnPerIP:             *maxConnPerIP,
+		ForceReachabilityPublic:  *forceReachabilityPublic,
+		ConnManagerHighWatermark: *connMgrHighWaterMark,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")
