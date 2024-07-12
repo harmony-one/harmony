@@ -33,18 +33,21 @@ func getMaxPeerHeight(syncConfig *SyncConfig) (uint64, error) {
 				syncConfig.RemovePeer(peerConfig, fmt.Sprintf("failed getMaxPeerHeight for shard %d with message: %s", syncConfig.ShardID(), err.Error()))
 				return
 			}
-			utils.Logger().Info().Str("peerIP", peerConfig.peer.IP).Uint64("blockHeight", response.BlockHeight).
-				Msg("[SYNC] getMaxPeerHeight")
 
-			lock.Lock()
 			if response != nil {
+				lock.Lock()
+				utils.Logger().Info().
+					Str("peerIP", peerConfig.peer.IP).
+					Uint64("blockHeight", response.BlockHeight).
+					Msg("[SYNC] getMaxPeerHeight")
 				if response.BlockHeight < math.MaxUint32 { // That's enough for decades.
 					if maxHeight == uint64(math.MaxUint64) || maxHeight < response.BlockHeight {
 						maxHeight = response.BlockHeight
 					}
 				}
+				lock.Unlock()
 			}
-			lock.Unlock()
+
 		}()
 		return
 	})
