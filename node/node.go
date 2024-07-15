@@ -1055,9 +1055,10 @@ func New(
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 	}
 
+	h := node.Blockchain().GetHeaderByNumber(0)
 	utils.Logger().Info().
-		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
-		Msg("Genesis block hash")
+		Interface("genesis block header", h).
+		Msgf("Genesis block hash %s", h.Hash())
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = map[string]*syncConfig{}
 	// Broadcast double-signers reported by consensus
