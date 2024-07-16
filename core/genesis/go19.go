@@ -3,6 +3,12 @@
 
 package genesis
 
+import (
+	"crypto/ecdsa"
+
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
 var ContractDeployerKey *ecdsa.PrivateKey
 
 func init() {
