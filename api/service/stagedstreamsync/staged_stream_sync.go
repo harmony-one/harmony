@@ -248,6 +248,9 @@ func (s *StagedStreamSync) cleanUp(ctx context.Context, fromStage int, db kv.RwD
 			continue
 		}
 		if err := s.pruneStage(ctx, firstCycle, s.pruningOrder[i], db, tx); err != nil {
+			utils.Logger().Error().Err(err).
+				Interface("stage id", s.pruningOrder[i].ID).
+				Msgf(WrapStagedSyncMsg("stage cleanup failed"))
 			panic(err)
 		}
 	}
