@@ -5,6 +5,7 @@ package genesis
 
 import (
 	"crypto/ecdsa"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
 )
