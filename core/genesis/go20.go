@@ -14,11 +14,11 @@ var ContractDeployerKey *ecdsa.PrivateKey
 
 func init() {
 	D := &big.Int{}
-	D.SetString("65737420636f6e7472616374206b657920737472696e672073747265616d2074", 16)
+	D.SetString("7472616374206b65e45ffeb29e933944f5027ef139f124f430641487e70ea9a1", 16)
 	X := &big.Int{}
-	X.SetString("3d4fc035410b035f72da12df457ce17e255cede9fc9e72796ac3868ceb2ed226", 16)
+	X.SetString("9b6b422147204489291d40321b154e5f3a07d341e8fa4db42a0eccb51c5cf768", 16)
 	Y := &big.Int{}
-	Y.SetString("808248810e75eb32859e46cdd8e541ed9f323bde6076d2ca6fd75d6cf0ffd089", 16)
+	Y.SetString("308741f739674f61424fe8245ce2d9bf4914832deabddc2ba22de0f2c397a3ed", 16)
 
 	ContractDeployerKey = &ecdsa.PrivateKey{
 		D: D,
