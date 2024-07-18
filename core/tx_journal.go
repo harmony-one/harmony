@@ -116,7 +116,7 @@ func (journal *txJournal) load(add func(types.PoolTransactions) []error) error {
 	for {
 		// Parse the next transaction and terminate on errors
 		var tx types.PoolTransaction
-		switch txType, err := stream.Uint(); txType {
+		switch txType, err := stream.Uint64(); txType {
 		case plainTxID:
 			tx = new(types.Transaction)
 		case stakingTxID:
