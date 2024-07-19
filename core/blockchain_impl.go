@@ -490,6 +490,9 @@ func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block, beaconChain Block
 	if block.NumberU64() <= bc.CurrentBlock().NumberU64() {
 		return errors.Errorf("block with the same block number is already committed: %d", block.NumberU64())
 	}
+
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 	if err := bc.validator.ValidateHeader(block, true); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", block.Hash().Hex()).
