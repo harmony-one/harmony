@@ -99,14 +99,15 @@ func TestDecString(t *testing.T) {
 		d    Dec
 		want string
 	}{
-		{NewDec(0), "0.000000000000000000"},
-		{NewDec(1), "1.000000000000000000"},
-		{NewDec(10), "10.000000000000000000"},
-		{NewDec(12340), "12340.000000000000000000"},
-		{NewDecWithPrec(12340, 4), "1.234000000000000000"},
-		{NewDecWithPrec(12340, 5), "0.123400000000000000"},
-		{NewDecWithPrec(12340, 8), "0.000123400000000000"},
-		{NewDecWithPrec(1009009009009009009, 17), "10.090090090090090090"},
+		{NewDec(0), "0"},
+		{NewDec(1), "1"},
+		{NewDec(10), "10"},
+		{NewDec(12340), "12340"},
+		{NewDecWithPrec(12340, 4), "1.234"},
+		{NewDecWithPrec(12340, 5), "0.1234"},
+		{NewDecWithPrec(12340, 8), "0.0001234"},
+		{NewDecWithPrec(1009009009009009009, 17), "10.09009009009009009"},
+		{Dec{Int: nil}, "<nil>"},
 	}
 	for tcIndex, tc := range tests {
 		assert.Equal(t, tc.want, tc.d.String(), "bad String(), index: %v", tcIndex)
@@ -297,14 +298,14 @@ func TestDecMarshalJSON(t *testing.T) {
 		want    string
 		wantErr bool // if wantErr = false, will also attempt unmarshaling
 	}{
-		{"zero", decimal(0), "\"0.000000000000000000\"", false},
+		{"zero", decimal(0), "\"0\"", false},
 		{"one", decimal(1), "\"0.000000000000000001\"", false},
-		{"ten", decimal(10), "\"0.000000000000000010\"", false},
-		{"12340", decimal(12340), "\"0.000000000000012340\"", false},
-		{"zeroInt", NewDec(0), "\"0.000000000000000000\"", false},
-		{"oneInt", NewDec(1), "\"1.000000000000000000\"", false},
-		{"tenInt", NewDec(10), "\"10.000000000000000000\"", false},
-		{"12340Int", NewDec(12340), "\"12340.000000000000000000\"", false},
+		{"ten", decimal(10), "\"0.00000000000000001\"", false},
+		{"12340", decimal(12340), "\"0.00000000000001234\"", false},
+		{"zeroInt", NewDec(0), "\"0\"", false},
+		{"oneInt", NewDec(1), "\"1\"", false},
+		{"tenInt", NewDec(10), "\"10\"", false},
+		{"12340Int", NewDec(12340), "\"12340\"", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -343,7 +344,7 @@ func TestStringOverflow(t *testing.T) {
 	require.NoError(t, err)
 	dec3 := dec1.Add(dec2)
 	require.Equal(t,
-		"19844653375691057515930281852116324640.000000000000000000",
+		"19844653375691057515930281852116324640",
 		dec3.String(),
 	)
 }
@@ -390,5 +391,26 @@ func TestDiv(t *testing.T) {
 		res := tc.d1.Quo(tc.d2)
 		require.True(t, res.Equal(tc.exp), "unexpected result for test case %d, input: %s %s %s", i, tc.d1, tc.d2, tc.exp)
 	}
+}
 
+func TestIsZeroes(t *testing.T) {
+	tests := []struct {
+		d    []byte
+		want bool
+	}{
+		{[]byte{}, true},
+		{[]byte{'0'}, true},
+		{[]byte{'1'}, false},
+		{[]byte{'0', '0'}, true},
+		{[]byte{'0', '1'}, false},
+		{[]byte{'1', '0'}, false},
+		{[]byte{'1', '1'}, false},
+		{[]byte{'0', '0', '0'}, true},
+		{[]byte{'0', '0', '1'}, false},
+	}
+
+	for i, tc := range tests {
+		res := IsZeroes(tc.d)
+		require.Equal(t, tc.want, res, "unexpected result for test case index %d, expected %v, value %s", i, tc.want, tc.d)
+	}
 }
