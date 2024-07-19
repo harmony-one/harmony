@@ -105,6 +105,9 @@ linux_static:
 	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
 	bash ./scripts/go_executable_build.sh -s
 
+linux_static_quick:
+	bash ./scripts/go_executable_build.sh -s
+
 deb_init:
 	rm -rf $(DEBBUILD)
 	mkdir -p $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/{etc/systemd/system,usr/sbin,etc/sysctl.d,etc/harmony}
