@@ -421,16 +421,17 @@ func (node *Node) BootstrapConsensus() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	min := node.Consensus.MinPeers
-	enoughMinPeers := make(chan struct{})
+	enoughMinPeers := make(chan struct{}, 1)
 	const checkEvery = 3 * time.Second
 	go func() {
 		for {
 			<-time.After(checkEvery)
 			numPeersNow := node.host.GetPeerCount()
-			if numPeersNow >= min {
+			connectedPeers := len(node.host.Network().Peers())
+			if connectedPeers >= min {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				enoughMinPeers <- struct{}{}
-				fmt.Println("Bootstrap consensus done.", numPeersNow, " peers are connected")
+				fmt.Printf("Bootstrap consensus done. Connected %d, known %d, shard: %d\n", connectedPeers, numPeersNow, node.Consensus.ShardID)
 				return
 			}
 			utils.Logger().Info().
