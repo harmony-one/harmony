@@ -8,6 +8,8 @@ import (
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // HarmonyConfig contains all the configs user can set for running harmony binary. Served as the bridge
@@ -253,8 +255,9 @@ type LogVerbosePrints struct {
 func FlagSliceToLogVerbosePrints(verbosePrintsFlagSlice []string) LogVerbosePrints {
 	verbosePrints := LogVerbosePrints{}
 	verbosePrintsReflect := reflect.Indirect(reflect.ValueOf(&verbosePrints))
+	caser := cases.Title(language.English)
 	for _, verbosePrint := range verbosePrintsFlagSlice {
-		verbosePrint = strings.Title(verbosePrint)
+		verbosePrint = caser.String(strings.ToLower(verbosePrint))
 		field := verbosePrintsReflect.FieldByName(verbosePrint)
 		if field.IsValid() && field.CanSet() {
 			field.SetBool(true)
