@@ -39,6 +39,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ConnManagerLowWatermark:  nodeconfig.DefaultConnManagerLowWatermark,
 		ConnManagerHighWatermark: nodeconfig.DefaultConnManagerHighWatermark,
 		WaitForEachPeerToConnect: nodeconfig.DefaultWaitForEachPeerToConnect,
+		NoTransportSecurity:      nodeconfig.DefaultNoTransportSecurity,
+		NAT:                      nodeconfig.DefaultNAT,
+		UserAgent:                nodeconfig.DefaultUserAgent,
+		DialTimeout:              nodeconfig.DefaultDialTimeout,
+		Muxer:                    nodeconfig.DefaultMuxer,
+		NoRelay:                  nodeconfig.DefaultNoRelay,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
