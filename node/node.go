@@ -471,14 +471,12 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	return payload[p2pNodeMsgPrefixSize:], msgType, nil
 }
 
-type ignore = bool
-
 // validateShardBoundMessage validate consensus message
 // validate shardID
 // validate public key size
 // verify message signature
 func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.ID, nodeConfig *nodeconfig.ConfigType, payload []byte,
-) (*msg_pb.Message, *bls.SerializedPublicKey, ignore, error) {
+) (*msg_pb.Message, *bls.SerializedPublicKey, bool, error) {
 	var (
 		m msg_pb.Message
 		//consensus = registry.GetConsensus()
@@ -530,16 +528,11 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 		}
 	}
 
-	var (
-		maybeCon     = m.GetConsensus()
-		maybeVC      = m.GetViewchange()
-		maybeSP      = m.GetLastSignPower()
-		senderKey    []byte
-		senderBitmap []byte
-	)
+	maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
+	senderKey := []byte{}
+	senderBitmap := []byte{}
 
-	switch {
-	case maybeCon != nil:
+	if maybeCon != nil {
 		if maybeCon.ShardId != consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
@@ -553,7 +546,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 		if maybeCon.ViewId+5 < consensus.GetCurBlockViewID() {
 			return nil, nil, true, errors.WithStack(errViewIDTooOld)
 		}
-	case maybeVC != nil:
+	} else if maybeVC != nil {
 		if maybeVC.ShardId != consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
@@ -563,14 +556,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 		if maybeVC.ViewId+5 < consensus.GetViewChangingID() {
 			return nil, nil, true, errors.WithStack(errViewIDTooOld)
 		}
-	case maybeSP != nil:
-		if maybeSP.ShardId != consensus.ShardID {
-			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
-			return nil, nil, true, errors.WithStack(errWrongShardID)
-		}
-		senderKey = maybeSP.SenderPubkey
-		consensus.SetLastKnownSignPower(maybeSP.Commit)
-	default:
+	} else {
 		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid"}).Inc()
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
 	}

@@ -36,7 +36,6 @@ type FBFTMessage struct {
 	M3AggSig           *bls_core.Sign
 	M3Bitmap           *bls_cosi.Mask
 	Verified           bool
-	LastVotePower      int64
 }
 
 func (m *FBFTMessage) Hash() []byte {
