@@ -226,7 +226,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 			case "yamux":
 				//p2pHostConfig = append(p2pHostConfig, YamuxC())
 			case "mplex":
-				p2pHostConfig = append(p2pHostConfig, MplexC())
+				p2pHostConfig = append(p2pHostConfig, MplexC6(), MplexC0())
 			default:
 				cancel()
 				utils.Logger().Error().
@@ -354,7 +354,11 @@ func YamuxC() libp2p.Option {
 	return libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport)
 }
 
-func MplexC() libp2p.Option {
+func MplexC6() libp2p.Option {
+	return libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport)
+}
+
+func MplexC0() libp2p.Option {
 	return libp2p.Muxer("/mplex/0.7.0", mplex.DefaultTransport)
 }
 
