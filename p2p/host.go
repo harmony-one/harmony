@@ -210,7 +210,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	}
 
 	// Set host security
-	if cfg.NoTransportSecurity {
+	if cfg.NoTransportSecurity || true {
 		p2pHostConfig = append(p2pHostConfig, libp2p.Security(insecure.ID, insecure.NewWithIdentity))
 	} else {
 		p2pHostConfig = append(p2pHostConfig, NoiseC(), TlsC())
