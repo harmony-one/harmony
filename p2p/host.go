@@ -40,6 +40,8 @@ import (
 	yamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
 	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	//mplex "github.com/libp2p/go-mplex"
+	mplex "github.com/libp2p/go-libp2p-mplex"
 	madns "github.com/multiformats/go-multiaddr-dns"
 )
 
@@ -222,9 +224,9 @@ func NewHost(cfg HostConfig) (Host, error) {
 			v = strings.ToLower(strings.TrimSpace(v))
 			switch v {
 			case "yamux":
-				p2pHostConfig = append(p2pHostConfig, YamuxC())
+				//p2pHostConfig = append(p2pHostConfig, YamuxC())
 			case "mplex":
-				//p2pHostConfig = append(p2pHostConfig, MplexC())
+				p2pHostConfig = append(p2pHostConfig, MplexC())
 			default:
 				cancel()
 				utils.Logger().Error().
@@ -352,9 +354,9 @@ func YamuxC() libp2p.Option {
 	return libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport)
 }
 
-//func MplexC() libp2p.Option {
-//	return libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport)
-//}
+func MplexC() libp2p.Option {
+	return libp2p.Muxer("/mplex/0.7.0", mplex.DefaultTransport)
+}
 
 func NoiseC() libp2p.Option {
 	return libp2p.Security(noise.ID, noise.New)
@@ -363,6 +365,43 @@ func NoiseC() libp2p.Option {
 func TlsC() libp2p.Option {
 	return libp2p.Security(tls.ID, tls.New)
 }
+
+//var _ libp2p_network.MuxedConn = &Mplex{}
+//
+//type Mplex struct {
+//	m *mplex.Multiplex
+//}
+//
+//func (m *Mplex) Close() error {
+//	return m.m.Close()
+//}
+//
+//func (m *Mplex) IsClosed() bool {
+//	return m.m.IsClosed()
+//}
+//
+//func (m *Mplex) OpenStream(ctx context.Context) (libp2p_network.MuxedStream, error) {
+//	fmt.Println("Open stream")
+//	return m.m.NewStream(ctx)
+//}
+//
+//func (m *Mplex) AcceptStream() (libp2p_network.MuxedStream, error) {
+//	fmt.Println("accept stream")
+//	return m.m.NewStream(context.Background())
+//}
+//
+//func (m DefaultMplex) NewConn(nc net.Conn, isServer bool, scope libp2p_network.PeerScope) (libp2p_network.MuxedConn, error) {
+//	rs, err := mplex.NewMultiplex(nc, isServer, scope)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return &Mplex{
+//		m: rs,
+//	}, nil
+//}
+//
+//type DefaultMplex struct {
+//}
 
 // connectionManager creates a new connection manager and configures libp2p to use the
 // given connection manager.
