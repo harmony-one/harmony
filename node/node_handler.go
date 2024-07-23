@@ -418,6 +418,7 @@ func IsRunningBeaconChain(c *consensus.Consensus) bool {
 
 // BootstrapConsensus is a goroutine to check number of peers and start the consensus
 func (node *Node) BootstrapConsensus() error {
+	go node.PrintPeers()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	min := node.Consensus.MinPeers
@@ -450,5 +451,14 @@ func (node *Node) BootstrapConsensus() error {
 			node.Consensus.StartChannel()
 		}()
 		return nil
+	}
+}
+
+func (node *Node) PrintPeers() {
+	for {
+		<-time.After(5 * time.Second)
+		known := node.host.GetPeerCount()
+		connected := len(node.host.Network().Peers())
+		fmt.Printf("connected %d, known %d\n", connected, known)
 	}
 }
