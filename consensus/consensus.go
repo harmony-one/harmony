@@ -140,6 +140,9 @@ type Consensus struct {
 	// Both flags only for initialization state.
 	start           bool
 	isInitialLeader bool
+
+	// value receives from
+	lastKnownSignPower int64
 }
 
 // Blockchain returns the blockchain.
@@ -397,6 +400,18 @@ func (consensus *Consensus) InitConsensusWithValidators() (err error) {
 		}
 	}
 	return nil
+}
+
+func (consensus *Consensus) SetLastKnownSignPower(i int64) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.lastKnownSignPower = i
+}
+
+func (consensus *Consensus) GetLastKnownSignPower() int64 {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return consensus.lastKnownSignPower
 }
 
 type downloadAsync struct {
