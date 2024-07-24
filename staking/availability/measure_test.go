@@ -758,7 +758,7 @@ func TestUpdateMaxCommissionFee(t *testing.T) {
 
 		err := UpdateMaxCommissionFee(true, v1, common.Address{}, numeric.MustNewDecFromStr("0.6"))
 		require.NoError(t, err)
-		require.Equal(t, "1.000000000000000000", v1.v.Commission.CommissionRates.MaxRate.String())
+		require.Equal(t, "1", v1.v.Commission.CommissionRates.MaxRate.String())
 	})
 
 	t.Run("0.07 + 0.5 = 0.57", func(t *testing.T) {
@@ -776,7 +776,7 @@ func TestUpdateMaxCommissionFee(t *testing.T) {
 		}
 		err := UpdateMaxCommissionFee(true, v2, common.Address{}, numeric.MustNewDecFromStr("0.07"))
 		require.NoError(t, err)
-		require.Equal(t, "0.570000000000000000", v2.v.Commission.CommissionRates.MaxRate.String())
+		require.Equal(t, "0.57", v2.v.Commission.CommissionRates.MaxRate.String())
 	})
 
 	t.Run("error", func(t *testing.T) {
