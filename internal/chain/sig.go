@@ -40,8 +40,8 @@ func DecodeSigBitmap(sigBytes bls.SerializedSignature, bitmap []byte, pubKeys []
 	}
 	mask := bls.NewMask(pubKeys)
 	if err := mask.SetMask(bitmap); err != nil {
-		utils.Logger().Warn().Err(errors.WithStack(err)).Msg("mask.SetMask failed")
-		return nil, nil, errors.New("mask.SetMask failed")
+		utils.Logger().Warn().Err(errors.WithStack(err)).Msgf("mask.SetMask failed %+v", err)
+		return nil, nil, errors.Errorf("mask.SetMask failed %+v", err)
 	}
 	return &aggSig, mask, nil
 }
