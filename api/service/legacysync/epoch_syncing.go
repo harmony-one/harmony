@@ -204,7 +204,7 @@ func processWithPayload(payload [][]byte, bc core.BlockChain) error {
 	for idx, blockBytes := range payload {
 		block, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
 		if err != nil {
-			return errors.Wrap(err, "failed decode")
+			return errors.WithMessagef(err, "failed decode %x", blockBytes)
 		}
 
 		if !block.IsLastBlockInEpoch() {
