@@ -5,15 +5,17 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	net "github.com/libp2p/go-libp2p/core/network"
-	ma "github.com/multiformats/go-multiaddr"
-
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	net "github.com/libp2p/go-libp2p/core/network"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 // ConnLogger ..
@@ -90,6 +92,9 @@ func printVersion(me string) {
 }
 
 func main() {
+	timestamp := time.Now().Format("20060102150405")
+	defUserAgent := fmt.Sprintf("bootnode-%s", timestamp)
+
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
 	console := flag.Bool("console_only", false, "Output to console only")
@@ -103,6 +108,16 @@ func main() {
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
+	noTransportSecurity := flag.Bool("no_transport_security", false, "disable TLS encrypted transport")
+	muxer := flag.String("muxer", "mplex, yamux", "protocol muxer to mux per-protocol streams (mplex, yamux)")
+	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
+	noRelay := flag.Bool("no_relay", true, "no relay services, direct connections between peers only")
+
+	pprof := flag.Bool("pprof", false, "enabled pprof")
+	pprofAddr := flag.String("pprof.addr", "127.0.0.1:6060", "http pprof address")
+	//keyFile := flag.String("pprof.profile.names", "", "the private key file of the bootnode")
+	//keyFile := flag.String("pprof.profile.intervals", "600", "the private key file of the bootnode")
+	//keyFile := flag.String("pprof.profile.intervals", "", "the private key file of the bootnode")
 
 	flag.Parse()
 
@@ -133,19 +148,30 @@ func main() {
 		DataStoreFile:           &dataStorePath,
 		MaxConnPerIP:            *maxConnPerIP,
 		ForceReachabilityPublic: *forceReachabilityPublic,
+		NoTransportSecurity:     *noTransportSecurity,
+		NAT:                     true,
+		UserAgent:               *userAgent,
+		DialTimeout:             time.Minute,
+		Muxer:                   *muxer,
+		NoRelay:                 *noRelay,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")
 	}
 
-	fmt.Printf("bootnode BN_MA=%s",
-		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()),
+	fmt.Printf("bootnode BN_MA=%s\n",
+		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().String()),
 	)
 
 	host.Start()
 
 	if *logConn {
 		host.GetP2PHost().Network().Notify(NewConnLogger(utils.GetLogInstance()))
+	}
+
+	if *pprof {
+		fmt.Printf("starting pprof on http://%s/debug/pprof/\n", *pprofAddr)
+		http.ListenAndServe(*pprofAddr, nil)
 	}
 
 	select {}

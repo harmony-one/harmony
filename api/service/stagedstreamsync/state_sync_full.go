@@ -789,7 +789,7 @@ func (s *FullStateDownloadManager) cleanAccountTasks() {
 		return
 	}
 	// Sync wasn't finished previously, check for any task that can be finalized
-	for taskID, _ := range s.tasks.accountTasks {
+	for taskID := range s.tasks.accountTasks {
 		if s.tasks.accountTasks[taskID].done {
 			s.tasks.deleteAccountTask(taskID)
 		}
@@ -2333,7 +2333,7 @@ func (s *FullStateDownloadManager) onHealByteCodes(task *healTask,
 		Msg("Delivering set of healing bytecodes")
 
 	s.lock.Lock()
-	s.lock.Unlock()
+	defer s.lock.Unlock()
 
 	// Response is valid, but check if peer is signalling that it does not have
 	// the requested data. For bytecode range queries that means the peer is not

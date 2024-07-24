@@ -2,7 +2,7 @@ os: linux
 dist: jammy
 language: go
 go:
-  - 1.19.5
+  - 1.21.11
 go_import_path: github.com/harmony-one/harmony
 cache:
   directories:
@@ -14,12 +14,10 @@ env:
   - TEST="bash ./scripts/travis_rosetta_checker.sh"
 
 # upgrade docker to latest stable version
-addons:
-  apt:
-    sources:
-      - sourceline: deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable
-    packages:
-    - docker.io
+before_install:
+  - echo "deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
 
 install:
   # default working directory with source code is automatically set to
@@ -28,7 +26,6 @@ install:
   - echo $TRAVIS_PULL_REQUEST_BRANCH
   - git clone https://github.com/harmony-one/mcl.git $GOPATH/src/github.com/harmony-one/mcl
   - git clone https://github.com/harmony-one/bls.git $GOPATH/src/github.com/harmony-one/bls
-  - git clone https://github.com/harmony-one/harmony-test.git $GOPATH/src/github.com/harmony-one/harmony-test
   - (cd $GOPATH/src/github.com/harmony-one/mcl; make -j4)
   - (cd $GOPATH/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
 #  - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.41.1

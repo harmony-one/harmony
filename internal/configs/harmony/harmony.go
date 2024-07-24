@@ -8,6 +8,8 @@ import (
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // HarmonyConfig contains all the configs user can set for running harmony binary. Served as the bridge
@@ -125,6 +127,18 @@ type P2pConfig struct {
 	ConnManagerLowWatermark  int
 	ConnManagerHighWatermark int
 	WaitForEachPeerToConnect bool
+	// to disable p2p security (tls and noise)
+	NoTransportSecurity bool
+	// enable p2p NAT. NAT Manager takes care of setting NAT port mappings, and discovering external addresses
+	NAT bool
+	// custom user agent; explicitly set the user-agent, so we can differentiate from other Go libp2p users
+	UserAgent string
+	// p2p dial timeout
+	DialTimeout time.Duration
+	// P2P multiplexer type, should be comma separated (mplex, Yamux)
+	Muxer string
+	// No relay services, direct connections between peers only
+	NoRelay bool
 }
 
 type GeneralConfig struct {
@@ -241,8 +255,9 @@ type LogVerbosePrints struct {
 func FlagSliceToLogVerbosePrints(verbosePrintsFlagSlice []string) LogVerbosePrints {
 	verbosePrints := LogVerbosePrints{}
 	verbosePrintsReflect := reflect.Indirect(reflect.ValueOf(&verbosePrints))
+	caser := cases.Title(language.English)
 	for _, verbosePrint := range verbosePrintsFlagSlice {
-		verbosePrint = strings.Title(verbosePrint)
+		verbosePrint = caser.String(strings.ToLower(verbosePrint))
 		field := verbosePrintsReflect.FieldByName(verbosePrint)
 		if field.IsValid() && field.CanSet() {
 			field.SetBool(true)

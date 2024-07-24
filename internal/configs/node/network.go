@@ -1,5 +1,7 @@
 package nodeconfig
 
+import "time"
+
 var (
 	mainnetBootNodes = []string{
 		"/dnsaddr/bootstrap.t.hmny.io",
@@ -77,6 +79,18 @@ const (
 	DefaultConnManagerHighWatermark = 192
 	// DefaultWaitForEachPeerToConnect sets the sync configs to connect to neighbor peers one by one and waits for each peer to connect.
 	DefaultWaitForEachPeerToConnect = false
+	// DefaultNoTransportSecurity
+	DefaultNoTransportSecurity = false
+	// DefaultNAT enables NAT manager for P2P
+	DefaultNAT = true
+	// DefaultUserAgent set the user agent to differentiate between libp2p users
+	DefaultUserAgent = ""
+	// DefaultDialTimeout dial timeout
+	DefaultDialTimeout = time.Minute
+	// DefaultMuxerType P2P multiplexer type
+	DefaultMuxer = "mplex, yamux"
+	// DefaultNoRelay disables p2p host relay
+	DefaultNoRelay = true
 )
 
 const (

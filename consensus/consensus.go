@@ -31,6 +31,16 @@ const (
 
 var errLeaderPriKeyNotFound = errors.New("leader private key not found locally")
 
+type Proposal struct {
+	Type   ProposalType
+	Caller string
+}
+
+// NewProposal creates a new proposal
+func NewProposal(t ProposalType) Proposal {
+	return Proposal{Type: t, Caller: utils.GetCallStackInfo(2)}
+}
+
 // ProposalType is to indicate the type of signal for new block proposal
 type ProposalType byte
 
@@ -65,6 +75,7 @@ type Consensus struct {
 
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
 
+	pendingCXReceipts map[utils.CXKey]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	// Registry for services.
 	registry *registry.Registry
 	// Minimal number of peers in the shard
@@ -90,7 +101,7 @@ type Consensus struct {
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
-	readySignal chan ProposalType
+	readySignal chan Proposal
 	// Channel to send full commit signatures to finish new block proposal
 	commitSigChannel chan []byte
 	// The post-consensus job func passed from Node object
@@ -109,8 +120,6 @@ type Consensus struct {
 	host p2p.Host
 	// MessageSender takes are of sending consensus message and the corresponding retry logic.
 	msgSender *MessageSender
-	// If true, this consensus will not propose view change.
-	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
 	SlashChan chan slash.Record
 	// How long in second the leader needs to wait to propose a new block.
@@ -131,6 +140,9 @@ type Consensus struct {
 	// Both flags only for initialization state.
 	start           bool
 	isInitialLeader bool
+
+	// value receives from
+	lastKnownSignPower int64
 }
 
 // Blockchain returns the blockchain.
@@ -151,11 +163,11 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 	return consensus.Blockchain()
 }
 
-func (consensus *Consensus) ReadySignal(p ProposalType) {
+func (consensus *Consensus) ReadySignal(p Proposal) {
 	consensus.readySignal <- p
 }
 
-func (consensus *Consensus) GetReadySignal() chan ProposalType {
+func (consensus *Consensus) GetReadySignal() chan Proposal {
 	return consensus.readySignal
 }
 
@@ -254,6 +266,8 @@ func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 }
 
 func (consensus *Consensus) IsBackup() bool {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
 	return consensus.isBackup
 }
 
@@ -284,8 +298,9 @@ func New(
 		host:         host,
 		msgSender:    NewMessageSender(host),
 		// FBFT timeout
-		consensusTimeout: createTimeout(),
-		dHelper:          downloadAsync{},
+		consensusTimeout:  createTimeout(),
+		dHelper:           downloadAsync{},
+		pendingCXReceipts: make(map[utils.CXKey]*types.CXReceiptsProof), // All the receipts received but not yet processed for Consensus
 	}
 
 	if multiBLSPriKey != nil {
@@ -302,7 +317,7 @@ func New(
 	// displayed on explorer as Height right now
 	consensus.setCurBlockViewID(0)
 	consensus.SlashChan = make(chan slash.Record)
-	consensus.readySignal = make(chan ProposalType)
+	consensus.readySignal = make(chan Proposal)
 	consensus.commitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
@@ -385,6 +400,18 @@ func (consensus *Consensus) InitConsensusWithValidators() (err error) {
 		}
 	}
 	return nil
+}
+
+func (consensus *Consensus) SetLastKnownSignPower(i int64) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.lastKnownSignPower = i
+}
+
+func (consensus *Consensus) GetLastKnownSignPower() int64 {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return consensus.lastKnownSignPower
 }
 
 type downloadAsync struct {

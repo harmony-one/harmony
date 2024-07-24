@@ -5,11 +5,6 @@ echo $TRAVIS_PULL_REQUEST_BRANCH
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 echo $DIR
 echo $GOPATH
-cd $GOPATH/src/github.com/harmony-one/harmony-test
-git fetch
-git pull
-git checkout $TRAVIS_PULL_REQUEST_BRANCH || true
-git branch --show-current
-cd localnet
-docker build -t harmonyone/localnet-test .
-docker run -v "$DIR/../:/go/src/github.com/harmony-one/harmony" harmonyone/localnet-test -r
+pwd
+docker build --progress=plain -t harmonyone/localnet-test -f Tests.Dockerfile .
+docker run -v "$DIR/tmp_log:/go/src/github.com/harmony-one/harmony/tmp_log" harmonyone/localnet-test -r

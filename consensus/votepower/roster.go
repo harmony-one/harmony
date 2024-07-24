@@ -90,19 +90,16 @@ func (v AccommodateHarmonyVote) String() string {
 	return string(s)
 }
 
-type topLevelRegistry struct {
+// Roster ..
+type Roster struct {
+	Voters       map[bls.SerializedPublicKey]*AccommodateHarmonyVote
+	ShardID      uint32
+	OrderedSlots []bls.SerializedPublicKey
+
 	OurVotingPowerTotalPercentage   numeric.Dec
 	TheirVotingPowerTotalPercentage numeric.Dec
 	TotalEffectiveStake             numeric.Dec
 	HMYSlotCount                    int64
-}
-
-// Roster ..
-type Roster struct {
-	Voters map[bls.SerializedPublicKey]*AccommodateHarmonyVote
-	topLevelRegistry
-	ShardID      uint32
-	OrderedSlots []bls.SerializedPublicKey
 }
 
 func (r Roster) String() string {
@@ -204,7 +201,11 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 		} else { // Our node
 			member.IsHarmonyNode = true
 			member.OverallPercent = harmonyPercent.Quo(asDecHMYSlotCount)
-			member.GroupPercent = member.OverallPercent.Quo(harmonyPercent)
+			if member.OverallPercent.IsZero() {
+				member.GroupPercent = member.OverallPercent.Copy()
+			} else {
+				member.GroupPercent = member.OverallPercent.Quo(harmonyPercent)
+			}
 			ourPercentage = ourPercentage.Add(member.OverallPercent)
 		}
 
@@ -244,13 +245,12 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 func NewRoster(shardID uint32) *Roster {
 	m := map[bls.SerializedPublicKey]*AccommodateHarmonyVote{}
 	return &Roster{
-		Voters: m,
-		topLevelRegistry: topLevelRegistry{
-			OurVotingPowerTotalPercentage:   numeric.ZeroDec(),
-			TheirVotingPowerTotalPercentage: numeric.ZeroDec(),
-			TotalEffectiveStake:             numeric.ZeroDec(),
-		},
+		Voters:  m,
 		ShardID: shardID,
+
+		OurVotingPowerTotalPercentage:   numeric.ZeroDec(),
+		TheirVotingPowerTotalPercentage: numeric.ZeroDec(),
+		TotalEffectiveStake:             numeric.ZeroDec(),
 	}
 }
 

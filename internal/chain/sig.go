@@ -1,12 +1,10 @@
 package chain
 
 import (
-	"errors"
-
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 )
 
 // ReadSignatureBitmapByPublicKeys read the payload of signature and bitmap based on public keys
@@ -42,8 +40,8 @@ func DecodeSigBitmap(sigBytes bls.SerializedSignature, bitmap []byte, pubKeys []
 	}
 	mask := bls.NewMask(pubKeys)
 	if err := mask.SetMask(bitmap); err != nil {
-		utils.Logger().Warn().Err(err).Msg("mask.SetMask failed")
-		return nil, nil, errors.New("mask.SetMask failed")
+		utils.Logger().Warn().Err(errors.WithStack(err)).Msgf("mask.SetMask failed %+v", err)
+		return nil, nil, errors.Errorf("mask.SetMask failed %+v", err)
 	}
 	return &aggSig, mask, nil
 }

@@ -17,7 +17,6 @@ import (
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon-lib/kv/mdbx"
-	"github.com/ledgerwatch/erigon-lib/kv/memdb"
 	"github.com/ledgerwatch/log/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -62,23 +61,34 @@ func CreateStagedSync(ctx context.Context,
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
 	if config.UseMemDB {
-		mainDB = memdb.New(getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir))
+		mdbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)
+		logger.Info().
+			Str("path", mdbPath).
+			Msg(WrapStagedSyncMsg("creating main db in memory"))
+		mainDB = mdbx.NewMDBX(log.New()).InMem(mdbPath).MustOpen()
 		for i := 0; i < config.Concurrency; i++ {
 			dbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, i, dbDir)
-			dbs[i] = memdb.New(dbPath)
+			logger.Info().
+				Str("path", dbPath).
+				Msg(WrapStagedSyncMsg("creating blocks db in memory"))
+			dbs[i] = mdbx.NewMDBX(log.New()).InMem(dbPath).MustOpen()
 		}
 	} else {
+		mdbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)
 		logger.Info().
-			Str("path", getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)).
-			Msg(WrapStagedSyncMsg("creating main db"))
-		mainDB = mdbx.NewMDBX(log.New()).Path(getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)).MustOpen()
+			Str("path", mdbPath).
+			Msg(WrapStagedSyncMsg("creating main db in disk"))
+		mainDB = mdbx.NewMDBX(log.New()).Path(mdbPath).MustOpen()
 		for i := 0; i < config.Concurrency; i++ {
 			dbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, i, dbDir)
+			logger.Info().
+				Str("path", dbPath).
+				Msg(WrapStagedSyncMsg("creating blocks db in disk"))
 			dbs[i] = mdbx.NewMDBX(log.New()).Path(dbPath).MustOpen()
 		}
 	}
 
-	if errInitDB := initDB(ctx, mainDB, dbs, config.Concurrency); errInitDB != nil {
+	if errInitDB := initDB(ctx, mainDB, dbs); errInitDB != nil {
 		logger.Error().Err(errInitDB).Msg("create staged sync instance failed")
 		return nil, errInitDB
 	}
@@ -118,7 +128,8 @@ func CreateStagedSync(ctx context.Context,
 		Str("dbDir", dbDir).
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
-		Msg(WrapStagedSyncMsg("staged sync created successfully"))
+		Str("dbDir", dbDir).
+		Msg(WrapStagedSyncMsg("staged stream sync created successfully"))
 
 	return New(
 		bc,
@@ -134,7 +145,7 @@ func CreateStagedSync(ctx context.Context,
 }
 
 // initDB inits the sync loop main database and create buckets
-func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB, concurrency int) error {
+func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB) error {
 
 	// create buckets for mainDB
 	tx, errRW := mainDB.BeginRw(ctx)
@@ -143,8 +154,8 @@ func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB, concurrency int)
 	}
 	defer tx.Rollback()
 
-	for _, name := range Buckets {
-		if err := tx.CreateBucket(GetStageName(name, false, false)); err != nil {
+	for _, bucketName := range Buckets {
+		if err := tx.CreateBucket(bucketName); err != nil {
 			return err
 		}
 	}
@@ -152,34 +163,32 @@ func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB, concurrency int)
 		return err
 	}
 
-	// create buckets for block cache DBs
-	for _, db := range dbs {
-		tx, errRW := db.BeginRw(ctx)
-		if errRW != nil {
-			return errRW
+	createBlockBuckets := func(db kv.RwDB) error {
+		tx, err := db.BeginRw(ctx)
+		if err != nil {
+			return err
 		}
-
+		defer tx.Rollback()
 		if err := tx.CreateBucket(BlocksBucket); err != nil {
 			return err
 		}
 		if err := tx.CreateBucket(BlockSignaturesBucket); err != nil {
 			return err
 		}
-
 		if err := tx.Commit(); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// create buckets for block cache DBs
+	for _, db := range dbs {
+		if err := createBlockBuckets(db); err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-// getMemDbTempPath returns the path of the temporary cache database for memdb
-func getMemDbTempPath(dbDir string, dbIndex int) string {
-	if dbIndex >= 0 {
-		return fmt.Sprintf("%s_%d", filepath.Join(dbDir, "cache/memdb/db"), dbIndex)
-	}
-	return filepath.Join(dbDir, "cache/memdb/db_main")
 }
 
 // getBlockDbPath returns the path of the cache database which stores blocks

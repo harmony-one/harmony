@@ -154,6 +154,8 @@ func (rm *requestManager) loop() {
 				if req == nil {
 					break loop
 				}
+				rm.logger.Debug().Str("request", req.String()).
+					Msg("add new incoming request to pending queue")
 				rm.addPendingRequest(req, st)
 				b, err := req.Encode()
 				if err != nil {
@@ -202,7 +204,8 @@ func (rm *requestManager) loop() {
 func (rm *requestManager) handleNewRequest(req *request) bool {
 	rm.lock.Lock()
 	defer rm.lock.Unlock()
-
+	rm.logger.Debug().Str("request", req.String()).
+		Msg("add new outgoing request to waiting queue")
 	err := rm.addRequestToWaitings(req, reqPriorityLow)
 	if err != nil {
 		rm.logger.Warn().Err(err).Msg("failed to add new request to waitings")
@@ -359,11 +362,11 @@ func (rm *requestManager) refreshStreams() {
 	added, removed := checkStreamUpdates(rm.streams, rm.sm.GetStreams())
 
 	for _, st := range added {
-		rm.logger.Info().Str("streamID", string(st.ID())).Msg("add new stream")
+		rm.logger.Info().Str("streamID", string(st.ID())).Msg("adding new stream")
 		rm.addNewStream(st)
 	}
 	for _, st := range removed {
-		rm.logger.Info().Str("streamID", string(st.ID())).Msg("remove stream")
+		rm.logger.Info().Str("streamID", string(st.ID())).Msg("removing stream")
 		rm.removeStream(st)
 	}
 }

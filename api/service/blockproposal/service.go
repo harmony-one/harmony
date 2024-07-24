@@ -8,20 +8,18 @@ import (
 
 // Service is a block proposal service.
 type Service struct {
-	stopChan              chan struct{}
-	stoppedChan           chan struct{}
-	c                     *consensus.Consensus
-	messageChan           chan *msg_pb.Message
-	waitForConsensusReady func(c *consensus.Consensus, stopChan chan struct{}, stoppedChan chan struct{})
+	stopChan    chan struct{}
+	stoppedChan chan struct{}
+	c           *consensus.Consensus
+	messageChan chan *msg_pb.Message
 }
 
 // New returns a block proposal service.
-func New(c *consensus.Consensus, waitForConsensusReady func(c *consensus.Consensus, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
+func New(c *consensus.Consensus) *Service {
 	return &Service{
-		c:                     c,
-		waitForConsensusReady: waitForConsensusReady,
-		stopChan:              make(chan struct{}),
-		stoppedChan:           make(chan struct{}),
+		c:           c,
+		stopChan:    make(chan struct{}),
+		stoppedChan: make(chan struct{}),
 	}
 }
 
@@ -32,7 +30,7 @@ func (s *Service) Start() error {
 }
 
 func (s *Service) run() {
-	s.waitForConsensusReady(s.c, s.stopChan, s.stoppedChan)
+	s.c.WaitForConsensusReadyV2(s.stopChan, s.stoppedChan)
 }
 
 // Stop stops block proposal service.

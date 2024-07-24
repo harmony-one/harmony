@@ -3,9 +3,8 @@ package availability
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/core/state"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -92,7 +91,6 @@ type signerKind struct {
 }
 
 func bumpCount(
-	bc Reader,
 	state ValidatorState,
 	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
@@ -129,13 +127,12 @@ func bumpCount(
 
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
-	bc Reader,
 	staked *shard.StakedSlots,
 	state ValidatorState,
 	signers, missing shard.SlotList,
 ) error {
 	return bumpCount(
-		bc, state, []signerKind{{false, missing}, {true, signers}},
+		state, []signerKind{{false, missing}, {true, signers}},
 		staked.LookupSet,
 	)
 }
@@ -268,26 +265,36 @@ func UpdateMinimumCommissionFee(
 	return false, nil
 }
 
+type stateValidatorWrapper interface {
+	ValidatorWrapper(addr common.Address, sendOriginal bool, copyDelegations bool) (*staking.ValidatorWrapper, error)
+}
+
 // UpdateMaxCommissionFee makes sure the max-rate is at least higher than the rate + max-rate-change.
-func UpdateMaxCommissionFee(state *state.DB, addr common.Address, minRate numeric.Dec) (bool, error) {
+func UpdateMaxCommissionFee(IsTopMaxRate bool, state stateValidatorWrapper, addr common.Address, curRate numeric.Dec) error {
 	utils.Logger().Info().Msg("begin update max commission fee")
 
 	wrapper, err := state.ValidatorWrapper(addr, true, false)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	minMaxRate := minRate.Add(wrapper.MaxChangeRate)
+	newRate := curRate.Add(wrapper.MaxChangeRate)
 
-	if wrapper.MaxRate.LT(minMaxRate) {
+	if IsTopMaxRate {
+		hundredPercent := numeric.NewDec(1)
+		if newRate.GT(hundredPercent) {
+			newRate = hundredPercent
+		}
+	}
+
+	if wrapper.MaxRate.LT(newRate) {
 		utils.Logger().Info().
 			Str("addr", addr.Hex()).
 			Str("old max-rate", wrapper.MaxRate.String()).
-			Str("new max-rate", minMaxRate.String()).
+			Str("new max-rate", newRate.String()).
 			Msg("updating max commission rate")
-		wrapper.MaxRate.SetBytes(minMaxRate.Bytes())
-		return true, nil
+		wrapper.MaxRate.SetBytes(newRate.Bytes())
 	}
 
-	return false, nil
+	return nil
 }

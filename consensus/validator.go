@@ -29,6 +29,15 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 	// NOTE let it handle its own logs
 	if !consensus.onAnnounceSanityChecks(recvMsg) {
+		if consensus.isViewChangingMode() && recvMsg.BlockNum > consensus.BlockNum() {
+			consensus.getLogger().Info().
+				Uint64("myBlockNum", consensus.BlockNum()).
+				Uint64("MsgBlockNum", recvMsg.BlockNum).
+				Hex("myBlockHash", consensus.blockHash[:]).
+				Hex("MsgBlockHash", recvMsg.BlockHash[:]).
+				Msg("[OnCommitted] low consensus block number. Spin up state sync")
+			consensus.spinUpStateSync()
+		}
 		return
 	}
 	consensus.StartFinalityCount()
@@ -133,11 +142,15 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 }
 
 func (consensus *Consensus) prepare() {
-	if consensus.IsBackup() {
+	if consensus.isBackup {
 		return
 	}
 
-	priKeys := consensus.getPriKeysInCommittee()
+	priKeys, err := consensus.getPriKeysInCommittee()
+	if err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot get priKey in committee")
+		return
+	}
 
 	p2pMsgs := consensus.constructP2pMessages(msg_pb.MessageType_PREPARE, nil, priKeys)
 
@@ -152,11 +165,15 @@ func (consensus *Consensus) prepare() {
 
 // sendCommitMessages send out commit messages to leader
 func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
-	if consensus.IsBackup() || blockObj == nil {
+	if consensus.isBackup || blockObj == nil {
 		return
 	}
 
-	priKeys := consensus.getPriKeysInCommittee()
+	priKeys, err := consensus.getPriKeysInCommittee()
+	if err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[sendCommitMessages] Cannot get priKey in committee")
+		return
+	}
 
 	// Sign commit signature on the received block and construct the p2p messages
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain().Config(),
@@ -392,7 +409,10 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 
 // Collect private keys that are part of the current committee.
 // TODO: cache valid private keys and only update when keys change.
-func (consensus *Consensus) getPriKeysInCommittee() []*bls.PrivateKeyWrapper {
+func (consensus *Consensus) getPriKeysInCommittee() ([]*bls.PrivateKeyWrapper, error) {
+	if len(consensus.priKey) == 0 {
+		return nil, errors.New("no private keys in the committee")
+	}
 	priKeys := []*bls.PrivateKeyWrapper{}
 	for i, key := range consensus.priKey {
 		if !consensus.isValidatorInCommittee(key.Pub.Bytes) {
@@ -400,7 +420,7 @@ func (consensus *Consensus) getPriKeysInCommittee() []*bls.PrivateKeyWrapper {
 		}
 		priKeys = append(priKeys, &consensus.priKey[i])
 	}
-	return priKeys
+	return priKeys, nil
 }
 
 func (consensus *Consensus) constructP2pMessages(msgType msg_pb.MessageType, payloadForSign []byte, priKeys []*bls.PrivateKeyWrapper) []*NetworkMessage {

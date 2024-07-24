@@ -57,6 +57,9 @@ trace-pointer:
 
 debug:
 	rm -rf .dht-127.0.0.1*
+	# uncomment the following lines to enable debug logging for libp2p, it produces a lot of logs, so disabled by default
+	#export GOLOG_LOG_LEVEL=debug
+	#export GOLOG_OUTPUT=stdout
 	bash ./test/debug.sh
 
 debug-kill:
@@ -103,6 +106,9 @@ test-rosetta-attach:
 linux_static:
 	make -C $(TOP)/mcl -j8
 	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
+	bash ./scripts/go_executable_build.sh -s
+
+linux_static_quick:
 	bash ./scripts/go_executable_build.sh -s
 
 deb_init:
@@ -180,3 +186,6 @@ debug_external: clean
 
 build_localnet_validator:
 	bash test/build-localnet-validator.sh
+
+protofiles:
+	bash ./scripts/gogenerate.sh

@@ -5,27 +5,29 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/webhooks"
-
 	"github.com/ethereum/go-ethereum/common"
-	protobuf "github.com/golang/protobuf/proto"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/webhooks"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	protobuf "google.golang.org/protobuf/proto"
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -154,6 +156,47 @@ func (consensus *Consensus) updateBitmaps() {
 
 }
 
+func (consensus *Consensus) sendLastSignPower() {
+	if consensus.isLeader() {
+		k, err := consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
+		if err != nil {
+			consensus.getLogger().Err(err).Msg("Leader not found in the committee")
+			return
+		}
+		comm, _ := consensus.decider.CurrentTotalPower(quorum.Commit)
+		prep, _ := consensus.decider.CurrentTotalPower(quorum.Prepare)
+		view, _ := consensus.decider.CurrentTotalPower(quorum.ViewChange)
+		msg := &msg_pb.Message{
+			ServiceType: msg_pb.ServiceType_CONSENSUS,
+			Type:        msg_pb.MessageType_LAST_SIGN_POWER,
+			Request: &msg_pb.Message_LastSignPower{
+				LastSignPower: &msg_pb.LastSignPowerRequest{
+					Prepare:      getOrZero(prep),
+					Commit:       getOrZero(comm),
+					Change:       getOrZero(view),
+					SenderPubkey: k.Pub.Bytes[:],
+					ShardId:      consensus.ShardID,
+				},
+			},
+		}
+		marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg, k.Pri)
+		if err != nil {
+			consensus.getLogger().Err(err).
+				Msg("[constructNewViewMessage] failed to sign and marshal the new view message")
+			return
+		}
+		msgToSend := proto.ConstructConsensusMessage(marshaledMessage)
+		if err := consensus.msgSender.SendWithoutRetry(
+			[]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+			p2p.ConstructMessage(msgToSend),
+		); err != nil {
+			consensus.getLogger().Err(err).
+				Msg("[LastSignPower] could not send out the ViewChange message")
+		}
+	}
+}
+
 // ResetState resets the state of the consensus
 func (consensus *Consensus) resetState() {
 	consensus.switchPhase("ResetState", FBFTAnnounce)
@@ -161,6 +204,8 @@ func (consensus *Consensus) resetState() {
 	consensus.blockHash = [32]byte{}
 	consensus.block = []byte{}
 	consensus.decider.ResetPrepareAndCommitVotes()
+	consensus.sendLastSignPower()
+
 	if consensus.prepareBitmap != nil {
 		consensus.prepareBitmap.Clear()
 	}
@@ -191,10 +236,6 @@ func (consensus *Consensus) SetMode(m Mode) {
 
 // SetMode sets the mode of consensus
 func (consensus *Consensus) setMode(m Mode) {
-	if m == Normal && consensus.isBackup {
-		m = NormalBackup
-	}
-
 	consensus.getLogger().Debug().
 		Str("Mode", m.String()).
 		Msg("[SetMode]")
@@ -203,11 +244,12 @@ func (consensus *Consensus) setMode(m Mode) {
 
 // SetIsBackup sets the mode of consensus
 func (consensus *Consensus) SetIsBackup(isBackup bool) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.getLogger().Debug().
 		Bool("IsBackup", isBackup).
 		Msg("[SetIsBackup]")
 	consensus.isBackup = isBackup
-	consensus.current.SetIsBackup(isBackup)
 }
 
 // Mode returns the mode of consensus
@@ -439,7 +481,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		} else {
 			consensus.getLogger().Info().
 				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
-				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
+				Msgf("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain, blocknum: %d", curHeader.NumberU64())
 			consensus.LeaderPubKey = leaderPubKey
 		}
 	}
@@ -463,14 +505,14 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal(SyncProposal)
+					consensus.ReadySignal(NewProposal(SyncProposal))
 				}()
 			}
 			return Normal
 		}
 	}
 	consensus.getLogger().Info().
-		Msg("[UpdateConsensusInformation] not in committee, Listening")
+		Msgf("[UpdateConsensusInformation] not in committee, keys len %d Listening", len(pubKeys))
 
 	// not in committee
 	return Listening
@@ -488,6 +530,9 @@ func (consensus *Consensus) IsLeader() bool {
 // isLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key. This function assume it runs under lock.
 func (consensus *Consensus) isLeader() bool {
+	if consensus.LeaderPubKey == nil {
+		return false
+	}
 	obj := consensus.LeaderPubKey.Object
 	for _, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(obj) {
@@ -656,6 +701,7 @@ func (consensus *Consensus) GetLogger() *zerolog.Logger {
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
+		Uint32("shardID", consensus.ShardID).
 		Uint64("myBlock", consensus.blockNum).
 		Uint64("myViewID", consensus.getCurBlockViewID()).
 		Str("phase", consensus.phase.String()).

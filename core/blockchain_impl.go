@@ -490,6 +490,9 @@ func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block, beaconChain Block
 	if block.NumberU64() <= bc.CurrentBlock().NumberU64() {
 		return errors.Errorf("block with the same block number is already committed: %d", block.NumberU64())
 	}
+
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 	if err := bc.validator.ValidateHeader(block, true); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", block.Hash().Hex()).
@@ -1707,6 +1710,9 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
 		return 0, nil, nil, ErrEmptyChain
+	}
+	if first := chain[0]; true {
+		fmt.Println(utils.GetPort(), first.ShardID(), first.Epoch().Uint64(), first.NumberU64())
 	}
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {

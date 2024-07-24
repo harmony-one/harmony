@@ -440,7 +440,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		Str("Role", currentNode.NodeConfig.Role().String()).
 		Str("Version", getHarmonyVersion()).
 		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.P2P.IP, hc.P2P.Port, myHost.GetID().Pretty()),
+			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.P2P.IP, hc.P2P.Port, myHost.GetID().String()),
 		).
 		Msg(startMsg)
 
@@ -701,6 +701,12 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		ConnManagerHighWatermark: hc.P2P.ConnManagerHighWatermark,
 		WaitForEachPeerToConnect: hc.P2P.WaitForEachPeerToConnect,
 		ForceReachabilityPublic:  forceReachabilityPublic,
+		NoTransportSecurity:      hc.P2P.NoTransportSecurity,
+		NAT:                      hc.P2P.NAT,
+		UserAgent:                hc.P2P.UserAgent,
+		DialTimeout:              hc.P2P.DialTimeout,
+		Muxer:                    hc.P2P.Muxer,
+		NoRelay:                  hc.P2P.NoRelay,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
@@ -877,6 +883,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
 
+	currentNode.Consensus.Registry().SetNodeConfig(currentNode.NodeConfig)
 	currentConsensus.PostConsensusJob = currentNode.PostConsensusProcessing
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
@@ -952,7 +959,7 @@ func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid
 		Legacy:     hc.General.NoStaking,
 		NodeType:   hc.General.NodeType,
 		Shard:      sid,
-		Instance:   myHost.GetID().Pretty(),
+		Instance:   myHost.GetID().String(),
 	}
 
 	if hc.General.RunElasticMode {
