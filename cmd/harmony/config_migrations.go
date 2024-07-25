@@ -416,6 +416,29 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.6.1"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.NoTransportSecurity") == nil {
+			confTree.Set("P2P.NoTransportSecurity", defaultConfig.P2P.NoTransportSecurity)
+		}
+		if confTree.Get("P2P.NAT") == nil {
+			confTree.Set("P2P.NAT", defaultConfig.P2P.NAT)
+		}
+		if confTree.Get("P2P.UserAgent") == nil {
+			confTree.Set("P2P.UserAgent", defaultConfig.P2P.UserAgent)
+		}
+		if confTree.Get("P2P.DialTimeout") == nil {
+			confTree.Set("P2P.DialTimeout", defaultConfig.P2P.DialTimeout)
+		}
+		if confTree.Get("P2P.Muxer") == nil {
+			confTree.Set("P2P.Muxer", defaultConfig.P2P.Muxer)
+		}
+		if confTree.Get("P2P.NoRelay") == nil {
+			confTree.Set("P2P.NoRelay", defaultConfig.P2P.NoRelay)
+		}
+		confTree.Set("Version", "2.6.2")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {
