@@ -9,7 +9,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.6.1"
+const tomlConfigVersion = "2.6.2"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -39,6 +39,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ConnManagerLowWatermark:  nodeconfig.DefaultConnManagerLowWatermark,
 		ConnManagerHighWatermark: nodeconfig.DefaultConnManagerHighWatermark,
 		WaitForEachPeerToConnect: nodeconfig.DefaultWaitForEachPeerToConnect,
+		NoTransportSecurity:      nodeconfig.DefaultNoTransportSecurity,
+		NAT:                      nodeconfig.DefaultNAT,
+		UserAgent:                nodeconfig.DefaultUserAgent,
+		DialTimeout:              nodeconfig.DefaultDialTimeout,
+		Muxer:                    nodeconfig.DefaultMuxer,
+		NoRelay:                  nodeconfig.DefaultNoRelay,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,

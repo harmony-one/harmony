@@ -701,6 +701,12 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		ConnManagerHighWatermark: hc.P2P.ConnManagerHighWatermark,
 		WaitForEachPeerToConnect: hc.P2P.WaitForEachPeerToConnect,
 		ForceReachabilityPublic:  forceReachabilityPublic,
+		NoTransportSecurity:      hc.P2P.NoTransportSecurity,
+		NAT:                      hc.P2P.NAT,
+		UserAgent:                hc.P2P.UserAgent,
+		DialTimeout:              hc.P2P.DialTimeout,
+		Muxer:                    hc.P2P.Muxer,
+		NoRelay:                  hc.P2P.NoRelay,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")

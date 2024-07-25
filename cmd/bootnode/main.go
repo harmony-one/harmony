@@ -5,15 +5,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	_ "net/http/pprof"
 	"os"
 	"path"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	net "github.com/libp2p/go-libp2p/core/network"
-	ma "github.com/multiformats/go-multiaddr"
-
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	net "github.com/libp2p/go-libp2p/core/network"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 // ConnLogger ..
@@ -90,6 +91,9 @@ func printVersion(me string) {
 }
 
 func main() {
+	timestamp := time.Now().Format("20060102150405")
+	defUserAgent := fmt.Sprintf("bootnode-%s", timestamp)
+
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
 	console := flag.Bool("console_only", false, "Output to console only")
@@ -104,6 +108,10 @@ func main() {
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
 	connMgrHighWaterMark := flag.Int("cmg_high_watermark", 900, "connection manager trims excess connections when they pass the high watermark")
+	noTransportSecurity := flag.Bool("no_transport_security", false, "disable TLS encrypted transport")
+	muxer := flag.String("muxer", "mplex, yamux", "protocol muxer to mux per-protocol streams (mplex, yamux)")
+	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
+	noRelay := flag.Bool("no_relay", true, "no relay services, direct connections between peers only")
 
 	flag.Parse()
 
@@ -135,6 +143,12 @@ func main() {
 		MaxConnPerIP:             *maxConnPerIP,
 		ForceReachabilityPublic:  *forceReachabilityPublic,
 		ConnManagerHighWatermark: *connMgrHighWaterMark,
+		NoTransportSecurity:      *noTransportSecurity,
+		NAT:                      true,
+		UserAgent:                *userAgent,
+		DialTimeout:              time.Minute,
+		Muxer:                    *muxer,
+		NoRelay:                  *noRelay,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")

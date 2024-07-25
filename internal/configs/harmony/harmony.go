@@ -125,6 +125,18 @@ type P2pConfig struct {
 	ConnManagerLowWatermark  int
 	ConnManagerHighWatermark int
 	WaitForEachPeerToConnect bool
+	// to disable p2p security (tls and noise)
+	NoTransportSecurity bool
+	// enable p2p NAT. NAT Manager takes care of setting NAT port mappings, and discovering external addresses
+	NAT bool
+	// custom user agent; explicitly set the user-agent, so we can differentiate from other Go libp2p users
+	UserAgent string
+	// p2p dial timeout
+	DialTimeout time.Duration
+	// P2P multiplexer type, should be comma separated (mplex, Yamux)
+	Muxer string
+	// No relay services, direct connections between peers only
+	NoRelay bool
 }
 
 type GeneralConfig struct {
