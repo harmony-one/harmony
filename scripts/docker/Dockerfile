@@ -1,14 +1,17 @@
 ARG GOPATH_DEFAULT=/root/go
 ARG SRC_PATH=src/github.com/harmony-one
+ARG BUILD_BRANCH=main
 
 FROM golang:1.19-bullseye as builder
 
 ARG GOPATH_DEFAULT
 ARG SRC_PATH
+ARG BUILD_BRANCH
 
 ENV GOPATH=${GOPATH_DEFAULT}
 ENV GO111MODULE=on
 ENV HMY_PATH=${GOPATH}/${SRC_PATH}
+ENV BRANCH=${BUILD_BRANCH}
 
 ENV PACKAGES libgmp-dev libssl-dev curl git \
 	psmisc dnsutils jq make gcc g++ bash tig tree
@@ -18,7 +21,7 @@ RUN apt-get update && apt-get install -y $PACKAGES --no-install-recommends
 
 WORKDIR ${HMY_PATH}
 
-RUN git clone https://github.com/harmony-one/harmony.git harmony \
+RUN git clone --branch ${BRANCH} https://github.com/harmony-one/harmony.git harmony \
   && git clone https://github.com/harmony-one/bls.git bls \
   && git clone https://github.com/harmony-one/mcl.git mcl \
   && git clone https://github.com/harmony-one/go-sdk.git go-sdk
@@ -39,6 +42,7 @@ ARG HARMONY_USER_GID=1000
 ENV HARMONY_HOME=/harmony
 ENV HOME=${HARMONY_HOME}
 
+# hadolint ignore=DL3018
 RUN apk add --no-cache bash bind-tools tini curl sed \
     && rm -rf /var/cache/apk/* \
     && addgroup -g ${HARMONY_USER_GID} ${HARMONY_USER} \
