@@ -1,4 +1,4 @@
-FROM golang:1.21
+FROM golang:1.22
 
 WORKDIR $GOPATH/src/github.com/harmony-one
 
