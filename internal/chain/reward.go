@@ -135,34 +135,27 @@ func lookupDelegatorShares(
 
 // Handle block rewards during pre-staking era
 func accumulateRewardsAndCountSigsBeforeStaking(
-	bc engine.ChainReader, state *state.DB,
-	header *block.Header, sigsReady chan bool,
+	state *state.DB, header *block.Header, parentShardState *shard.State,
 ) (numeric.Dec, reward.Reader, error) {
-	parentHeader := bc.GetHeaderByHash(header.ParentHash())
+	//parentHeader := bc.GetHeaderByHash(header.ParentHash())
 
-	if parentHeader == nil {
-		return numeric.ZeroDec(), network.EmptyPayout, errors.Errorf(
-			"cannot find parent block header in DB at parent hash %s",
-			header.ParentHash().Hex(),
-		)
-	}
-	if parentHeader.Number().Cmp(common.Big0) == 0 {
-		// Parent is an epoch block,
-		// which is not signed in the usual manner therefore rewards nothing.
-		return numeric.ZeroDec(), network.EmptyPayout, nil
-	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
-	if err != nil {
-		return numeric.ZeroDec(), nil, errors.Wrapf(
-			err, "cannot read shard state at epoch %v", parentHeader.Epoch(),
-		)
-	}
-
-	// Block here until the commit sigs are ready or timeout.
-	// sigsReady signal indicates that the commit sigs are already populated in the header object.
-	if err := waitForCommitSigs(sigsReady); err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, err
-	}
+	//if parentHeader == nil {
+	//	return numeric.ZeroDec(), network.EmptyPayout, errors.Errorf(
+	//		"cannot find parent block header in DB at parent hash %s",
+	//		header.ParentHash().Hex(),
+	//	)
+	//}
+	//if parentHeader.Number().Cmp(common.Big0) == 0 {
+	//	// Parent is an epoch block,
+	//	// which is not signed in the usual manner therefore rewards nothing.
+	//	return numeric.ZeroDec(), network.EmptyPayout, nil
+	//}
+	//parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
+	//if err != nil {
+	//	return numeric.ZeroDec(), nil, errors.Wrapf(
+	//		err, "cannot read shard state at epoch %v", parentHeader.Epoch(),
+	//	)
+	//}
 
 	_, signers, _, err := availability.BallotResult(header.LastCommitBitmap(), parentShardState, header.ShardID())
 	if err != nil {
@@ -247,9 +240,25 @@ func AccumulateRewardsAndCountSigs(
 		return numeric.ZeroDec(), network.EmptyPayout, err
 	}
 
+	parent := bc.GetHeaderByHash(header.ParentHash())
+	if parent.NumberU64() == 0 {
+		return numeric.ZeroDec(), network.EmptyPayout, nil
+	}
+	parentShardState, err := bc.ReadShardState(parent.Epoch())
+	if err != nil {
+		return numeric.ZeroDec(), network.EmptyPayout, errors.Wrapf(
+			err, "cannot read shard state at epoch %v", parent.Epoch(),
+		)
+	}
+
 	// Pre-staking era
 	if !bc.Config().IsStaking(epoch) {
-		return accumulateRewardsAndCountSigsBeforeStaking(bc, state, header, sigsReady)
+		// Block here until the commit sigs are ready or timeout.
+		// sigsReady signal indicates that the commit sigs are already populated in the header object.
+		if err := waitForCommitSigs(sigsReady); err != nil {
+			return numeric.ZeroDec(), network.EmptyPayout, err
+		}
+		return accumulateRewardsAndCountSigsBeforeStaking(state, header, parentShardState)
 	}
 
 	// Rewards are accumulated only in the beaconchain, so just wait for commit sigs and return.

@@ -124,6 +124,9 @@ func (h *Header) Hash() common.Hash {
 
 // NumberU64 returns the block number of the header as a uint64.
 func (h *Header) NumberU64() uint64 {
+	if h == nil {
+		return 0
+	}
 	return h.Number().Uint64()
 }
 
