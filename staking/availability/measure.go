@@ -66,21 +66,16 @@ func BlockSigners(
 
 // BallotResult returns
 // (parentCommittee.Slots, payable, missings, err)
-func BallotResult(
-	parentHeader, header RoundHeader, parentShardState *shard.State, shardID uint32,
+func BallotResult(bitmap []byte, parentShardState *shard.State, shardID uint32,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
 	parentCommittee, err := parentShardState.FindCommitteeByID(shardID)
 
 	if err != nil {
-		return nil, nil, nil, errors.Errorf(
-			"cannot find shard in the shard state %d %d",
-			parentHeader.Number(),
-			parentHeader.ShardID(),
-		)
+		return nil, nil, nil, errors.Errorf("cannot find shard in the shard state")
 	}
 
 	payable, missing, err := BlockSigners(
-		header.LastCommitBitmap(), parentCommittee,
+		bitmap, parentCommittee,
 	)
 	return parentCommittee.Slots, payable, missing, err
 }

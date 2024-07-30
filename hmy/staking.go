@@ -150,7 +150,7 @@ func (hmy *Harmony) IsMaxRate(epoch *big.Int) bool {
 
 // IsCommitteeSelectionBlock checks if the given block is the committee selection block
 func (hmy *Harmony) IsCommitteeSelectionBlock(header *block.Header) bool {
-	return chain.IsCommitteeSelectionBlock(hmy.BlockChain, header)
+	return chain.IsCommitteeSelectionBlock(hmy.BlockChain.Config(), header)
 }
 
 // GetDelegationLockingPeriodInEpoch ...

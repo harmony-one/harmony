@@ -119,10 +119,9 @@ func TestBallotResult(t *testing.T) {
 	}
 	for i, test := range tests {
 		sstate := makeTestShardState(test.numStateShards, test.numShardSlots)
-		parHeader := newTestHeader(test.parBN, test.parShardID, test.numShardSlots, test.parVerified)
 		chdHeader := newTestHeader(test.chdBN, test.chdShardID, test.numShardSlots, test.chdVerified)
 
-		slots, payable, missing, err := BallotResult(parHeader, chdHeader, sstate, chdHeader.ShardID())
+		slots, payable, missing, err := BallotResult(chdHeader.LastCommitBitmap(), sstate, chdHeader.ShardID())
 		if err != nil {
 			if test.expErr == nil {
 				t.Errorf("Test %v: unexpected error: %v", i, err)

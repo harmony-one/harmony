@@ -97,7 +97,7 @@ func (hmy *Harmony) GetDetailedBlockSignerInfo(
 		return nil, err
 	}
 	committee, signers, _, err := availability.BallotResult(
-		parentBlk.Header(), blk.Header(), parentShardState, blk.ShardID(),
+		blk.Header().LastCommitBitmap(), parentShardState, blk.ShardID(),
 	)
 	return &DetailedBlockSignerInfo{
 		Signers:   signers,

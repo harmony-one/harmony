@@ -6,12 +6,11 @@ import (
 	"sort"
 	"time"
 
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
+	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
-
-	bls2 "github.com/harmony-one/bls/ffi/go/bls"
-	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
 
 	"github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru"
@@ -276,7 +275,7 @@ func (e *engineImpl) Finalize(
 
 	// Process Undelegations, set LastEpochInCommittee and set EPoS status
 	// Needs to be before AccumulateRewardsAndCountSigs
-	if IsCommitteeSelectionBlock(chain, header) {
+	if IsCommitteeSelectionBlock(chain.Config(), header) {
 		startTime := time.Now()
 		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, err
@@ -409,9 +408,9 @@ func payoutUndelegations(
 
 // IsCommitteeSelectionBlock checks if the given header is for the committee selection block
 // which can only occur on beacon chain and if epoch > pre-staking epoch.
-func IsCommitteeSelectionBlock(chain engine.ChainReader, header *block.Header) bool {
+func IsCommitteeSelectionBlock(config *params.ChainConfig, header *block.Header) bool {
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
-	inPreStakingEra := chain.Config().IsPreStaking(header.Epoch())
+	inPreStakingEra := config.IsPreStaking(header.Epoch())
 	return isBeaconChain && header.IsLastBlockInEpoch() && inPreStakingEra
 }
 

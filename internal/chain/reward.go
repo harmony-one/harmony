@@ -67,7 +67,7 @@ func ballotResultBeaconchain(
 	}
 
 	members, payable, missing, err :=
-		availability.BallotResult(parentHeader, header, parentShardState, shard.BeaconChainShardID)
+		availability.BallotResult(header.LastCommitBitmap(), parentShardState, shard.BeaconChainShardID)
 	return parentHeader.Epoch(), members, payable, missing, err
 }
 
@@ -164,10 +164,7 @@ func accumulateRewardsAndCountSigsBeforeStaking(
 		return numeric.ZeroDec(), network.EmptyPayout, err
 	}
 
-	_, signers, _, err := availability.BallotResult(
-		parentHeader, header, parentShardState, header.ShardID(),
-	)
-
+	_, signers, _, err := availability.BallotResult(header.LastCommitBitmap(), parentShardState, header.ShardID())
 	if err != nil {
 		return numeric.ZeroDec(), network.EmptyPayout, err
 	}
