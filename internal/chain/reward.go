@@ -236,10 +236,8 @@ func AccumulateRewardsAndCountSigs(
 	isBeaconChain := bc.CurrentHeader().ShardID() == shard.BeaconChainShardID
 
 	if blockNum == 0 {
-		err := waitForCommitSigs(sigsReady) // wait for commit signatures, or timeout and return err.
-		return numeric.ZeroDec(), network.EmptyPayout, err
+		return numeric.ZeroDec(), network.EmptyPayout, errors.New("blockNum is 0")
 	}
-
 	parent := bc.GetHeaderByHash(header.ParentHash())
 	if parent.NumberU64() == 0 {
 		return numeric.ZeroDec(), network.EmptyPayout, nil
