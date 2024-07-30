@@ -11,6 +11,7 @@ import (
 	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/staking/network"
 
 	"github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru"
@@ -270,6 +271,10 @@ func (e *engineImpl) Finalize(
 	doubleSigners slash.Records, sigsReady chan bool, viewID func() uint64,
 ) (*types.Block, reward.Reader, error) {
 
+	if header.NumberU64() == 0 {
+		return nil, nil, errors.New("cannot finalize block 0")
+	}
+
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 
@@ -310,11 +315,21 @@ func (e *engineImpl) Finalize(
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("ComputeAndMutateEPOSStatus")
 	}
 
-	// Accumulate block rewards and commit the final state root
-	// Header seems complete, assemble into a block and return
-	remainder, payout, err := AccumulateRewardsAndCountSigs(
-		chain, state, header, beacon, sigsReady,
+	var (
+		remainder numeric.Dec
+		payout    reward.Reader
+		err       error
 	)
+	if header.NumberU64() == 1 {
+		remainder = numeric.ZeroDec()
+		payout = network.EmptyPayout
+	} else {
+		// Accumulate block rewards and commit the final state root
+		// Header seems complete, assemble into a block and return
+		remainder, payout, err = AccumulateRewardsAndCountSigs(
+			chain, state, header, beacon, sigsReady,
+		)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
