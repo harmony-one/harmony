@@ -324,10 +324,13 @@ func (e *engineImpl) Finalize(
 		remainder = numeric.ZeroDec()
 		payout = network.EmptyPayout
 	} else {
+		if err := waitForCommitSigs(sigsReady); err != nil {
+			return nil, nil, err
+		}
 		// Accumulate block rewards and commit the final state root
 		// Header seems complete, assemble into a block and return
 		remainder, payout, err = AccumulateRewardsAndCountSigs(
-			chain, state, header, beacon, sigsReady,
+			chain, state, header, beacon,
 		)
 	}
 	if err != nil {

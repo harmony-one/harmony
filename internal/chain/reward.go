@@ -229,7 +229,7 @@ func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uin
 // param sigsReady: Signal indicating that commit sigs are already populated in the header object.
 func AccumulateRewardsAndCountSigs(
 	bc engine.ChainReader, state *state.DB,
-	header *block.Header, beaconChain engine.ChainReader, sigsReady chan bool,
+	header *block.Header, beaconChain engine.ChainReader,
 ) (numeric.Dec, reward.Reader, error) {
 	blockNum := header.Number().Uint64()
 	epoch := header.Epoch()
@@ -251,18 +251,12 @@ func AccumulateRewardsAndCountSigs(
 
 	// Pre-staking era
 	if !bc.Config().IsStaking(epoch) {
-		// Block here until the commit sigs are ready or timeout.
-		// sigsReady signal indicates that the commit sigs are already populated in the header object.
-		if err := waitForCommitSigs(sigsReady); err != nil {
-			return numeric.ZeroDec(), network.EmptyPayout, err
-		}
 		return accumulateRewardsAndCountSigsBeforeStaking(state, header, parentShardState)
 	}
 
 	// Rewards are accumulated only in the beaconchain, so just wait for commit sigs and return.
 	if !isBeaconChain {
-		err := waitForCommitSigs(sigsReady)
-		return numeric.ZeroDec(), network.EmptyPayout, err
+		return numeric.ZeroDec(), network.EmptyPayout, nil
 	}
 
 	defaultReward := getDefaultStakingReward(bc, epoch, blockNum)
@@ -272,15 +266,10 @@ func AccumulateRewardsAndCountSigs(
 
 	// Handle rewards on pre-aggregated rewards era.
 	if !bc.Config().IsAggregatedRewardEpoch(header.Epoch()) {
-		return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
+		return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward)
 	}
 
 	// Aggregated Rewards Era: Rewards are aggregated every 64 blocks.
-
-	// Wait for commit signatures, or timeout and return err.
-	if err := waitForCommitSigs(sigsReady); err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, err
-	}
 
 	// Only do reward distribution at the 63th block in the modulus.
 	if blockNum%shard.Schedule.RewardFrequency() != shard.Schedule.RewardFrequency()-1 {
@@ -421,7 +410,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 }
 
 func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
-	defaultReward numeric.Dec, sigsReady chan bool) (numeric.Dec, reward.Reader, error) {
+	defaultReward numeric.Dec) (numeric.Dec, reward.Reader, error) {
 	newRewards, payouts :=
 		big.NewInt(0), []reward.Payout{}
 
@@ -496,12 +485,6 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 		}
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (AddReward)")
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Shard Chain Reward")
-	}
-
-	// Block here until the commit sigs are ready or timeout.
-	// sigsReady signal indicates that the commit sigs are already populated in the header object.
-	if err := waitForCommitSigs(sigsReady); err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, err
 	}
 
 	startTime := time.Now()
