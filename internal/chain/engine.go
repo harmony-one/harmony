@@ -135,7 +135,7 @@ func (e *engineImpl) VerifyShardState(
 
 // VerifyVRF implements Engine, checking the vrf is valid
 func (e *engineImpl) VerifyVRF(
-	bc engine.ChainReader, header *block.Header,
+	bc engine.ChainReader, header block.ReadHeader,
 ) error {
 	if bc.ShardID() != header.ShardID() {
 		return errors.Errorf(
@@ -190,7 +190,7 @@ func (e *engineImpl) VerifyVRF(
 
 // GetLeaderPubKeyFromCoinbase retrieve corresponding blsPublicKey from Coinbase Address
 func GetLeaderPubKeyFromCoinbase(
-	blockchain engine.ChainReader, h *block.Header,
+	blockchain engine.ChainReader, h block.ReadHeader,
 ) (*bls.PublicKeyWrapper, error) {
 	shardState, err := blockchain.ReadShardState(h.Epoch())
 	if err != nil {
@@ -374,7 +374,7 @@ func (e *engineImpl) Finalize(
 
 // Withdraw unlocked tokens to the delegators' accounts
 func payoutUndelegations(
-	chain engine.ChainReader, header *block.Header, state *state.DB,
+	chain engine.ChainReader, header block.ReadHeader, state *state.DB,
 ) error {
 	currentHeader := chain.CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
@@ -426,13 +426,13 @@ func payoutUndelegations(
 
 // IsCommitteeSelectionBlock checks if the given header is for the committee selection block
 // which can only occur on beacon chain and if epoch > pre-staking epoch.
-func IsCommitteeSelectionBlock(config *params.ChainConfig, header *block.Header) bool {
+func IsCommitteeSelectionBlock(config *params.ChainConfig, header block.ReadHeader) bool {
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	inPreStakingEra := config.IsPreStaking(header.Epoch())
 	return isBeaconChain && header.IsLastBlockInEpoch() && inPreStakingEra
 }
 
-func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, state *state.DB, config *params.ChainConfig) error {
+func setElectionEpochAndMinFee(chain engine.ChainReader, header block.ReadHeader, state *state.DB, config *params.ChainConfig) error {
 	newShardState, err := header.GetShardState()
 	if err != nil {
 		const msg = "[Finalize] failed to read shard state"
@@ -517,7 +517,7 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 
 func applySlashes(
 	chain engine.ChainReader,
-	header *block.Header,
+	header block.ReadHeader,
 	state *state.DB,
 	doubleSigners slash.Records,
 ) error {

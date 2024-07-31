@@ -50,7 +50,7 @@ type slotMissing struct {
 }
 
 func ballotResultBeaconchain(
-	bc engine.ChainReader, header *block.Header,
+	bc engine.ChainReader, header block.ReadHeader,
 ) (*big.Int, shard.SlotList, shard.SlotList, shard.SlotList, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	if parentHeader == nil {
@@ -135,7 +135,7 @@ func lookupDelegatorShares(
 
 // Handle block rewards during pre-staking era
 func accumulateRewardsAndCountSigsBeforeStaking(
-	state *state.DB, header *block.Header, parentShardState *shard.State,
+	state *state.DB, header block.ReadHeader, parentShardState *shard.State,
 ) (numeric.Dec, reward.Reader, error) {
 	//parentHeader := bc.GetHeaderByHash(header.ParentHash())
 
@@ -229,7 +229,7 @@ func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uin
 // param sigsReady: Signal indicating that commit sigs are already populated in the header object.
 func AccumulateRewardsAndCountSigs(
 	bc engine.ChainReader, state *state.DB,
-	header *block.Header, beaconChain engine.ChainReader,
+	header block.ReadHeader, beaconChain engine.ChainReader,
 ) (numeric.Dec, reward.Reader, error) {
 	blockNum := header.Number().Uint64()
 	epoch := header.Epoch()
@@ -292,7 +292,7 @@ func waitForCommitSigs(sigsReady chan bool) error {
 	return nil
 }
 
-func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
+func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header block.ReadHeader, beaconChain engine.ChainReader,
 	rewardToDistribute numeric.Dec) (numeric.Dec, reward.Reader, error) {
 	epoch := header.Epoch()
 	defaultReward := rewardToDistribute
@@ -318,7 +318,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 			continue
 		}
 
-		var curHeader *block.Header
+		var curHeader block.ReadHeader
 		if i == curBlockNum {
 			// When it's the current block (63th), we should use the provided header since it's not written in db yet.
 			curHeader = header
@@ -409,7 +409,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	), nil
 }
 
-func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
+func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB, header block.ReadHeader, beaconChain engine.ChainReader,
 	defaultReward numeric.Dec) (numeric.Dec, reward.Reader, error) {
 	newRewards, payouts :=
 		big.NewInt(0), []reward.Payout{}

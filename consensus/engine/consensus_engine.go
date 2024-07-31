@@ -135,7 +135,7 @@ type Engine interface {
 	VerifyShardState(chain ChainReader, beacon ChainReader, header *block.Header) error
 
 	// VerifyVRF verifies the vrf of the block
-	VerifyVRF(chain ChainReader, header *block.Header) error
+	VerifyVRF(chain ChainReader, header block.ReadHeader) error
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.

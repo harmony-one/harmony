@@ -16,10 +16,146 @@ import (
 	v2 "github.com/harmony-one/harmony/block/v2"
 	v3 "github.com/harmony-one/harmony/block/v3"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/taggedrlp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
+
+type ReadHeader interface {
+	// ParentHash is the header hash of the parent block.  For the genesis block
+	// which has no parent by definition, this field is zeroed out.
+	ParentHash() common.Hash
+
+	// Coinbase is the address of the node that proposed this block and all
+	// transactions in it.
+	Coinbase() common.Address
+
+	// Root is the state (account) trie root hash.
+	Root() common.Hash
+
+	// TxHash is the transaction trie root hash.
+	TxHash() common.Hash
+
+	// ReceiptHash is the same-shard transaction receipt trie hash.
+	ReceiptHash() common.Hash
+
+	// OutgoingReceiptHash is the egress transaction receipt trie hash.
+	OutgoingReceiptHash() common.Hash
+
+	// IncomingReceiptHash is the ingress transaction receipt trie hash.
+	IncomingReceiptHash() common.Hash
+
+	// Bloom is the Bloom filter that indexes accounts and topics logged by smart
+	// contract transactions (executions) in this block.
+	Bloom() types.Bloom
+
+	// Number is the block number.
+	//
+	// The returned instance is a copy; the caller may do anything with it.
+	Number() *big.Int
+
+	// GasLimit is the gas limit for transactions in this block.
+	GasLimit() uint64
+
+	// GasUsed is the amount of gas used by transactions in this block.
+	GasUsed() uint64
+
+	// Time is the UNIX timestamp of this block.
+	//
+	// The returned instance is a copy; the caller may do anything with it.
+	Time() *big.Int
+
+	// Extra is the extra data field of this block.
+	//
+	// The returned slice is a copy; the caller may do anything with it.
+	Extra() []byte
+
+	// MixDigest is the mixhash.
+	//
+	// This field is a remnant from Ethereum, and Harmony does not use it and always
+	// zeroes it out.
+	MixDigest() common.Hash
+
+	// ViewID is the ID of the view in which this block was originally proposed.
+	//
+	// It normally increases by one for each subsequent block, or by more than one
+	// if one or more PBFT/FBFT view changes have occurred.
+	//
+	// The returned instance is a copy; the caller may do anything with it.
+	ViewID() *big.Int
+
+	// Epoch is the epoch number of this block.
+	//
+	// The returned instance is a copy; the caller may do anything with it.
+	Epoch() *big.Int
+
+	// ShardStateHash is the shard state hash.
+	ShardStateHash() common.Hash
+
+	// LastCommitBitmap is the signatory bitmap of the previous block.  Bit
+	// positions index into committee member array.
+	//
+	// The returned slice is a copy; the caller may do anything with it.
+	LastCommitBitmap() []byte
+
+	// Vrf is the output of the VRF for the epoch.
+	//
+	// The returned slice is a copy; the caller may do anything with it.
+	Vrf() []byte
+
+	// ShardID is the shard ID to which this block belongs.
+	ShardID() uint32
+
+	// Vdf is the output of the VDF for the epoch.
+	//
+	// The returned slice is a copy; the caller may do anything with it.
+	Vdf() []byte
+
+	// CrossLinks is the RLP-encoded form of non-beacon block headers chosen to be
+	// canonical by the beacon committee.  This field is present only on beacon
+	// chain block headers.
+	//
+	// The returned slice is a copy; the caller may do anything with it.
+	CrossLinks() []byte
+
+	// LastCommitSignature is the FBFT commit group signature for the last block.
+	LastCommitSignature() [96]byte
+
+	// ShardState is the RLP-encoded form of shard state (list of committees) for
+	// the next epoch.
+	//
+	// The returned slice is a copy; the caller may do anything with it.
+	ShardState() []byte
+
+	// Hash returns the block hash of the header, which is simply the legacy
+	// Keccak256 hash of its RLP encoding.
+	Hash() common.Hash
+
+	// Size returns the approximate memory used by all internal contents. It is
+	// used to approximate and limit the memory consumption of various caches.
+	Size() common.StorageSize
+
+	// Logger returns a sub-logger with block contexts added.
+	Logger(logger *zerolog.Logger) *zerolog.Logger
+
+	// GetShardState returns the deserialized shard state object.
+	// Note that header encoded shard state only exists in the last block of the previous epoch
+	GetShardState() (shard.State, error)
+
+	// Copy returns a copy of the header.
+	Copy() *Header
+
+	// Slashes is the RLP-encoded form of []slash.Record,
+	// The returned slice is a copy; the caller may do anything with it
+	Slashes() []byte
+
+	IsLastBlockInEpoch() bool
+
+	NumberU64() uint64
+}
+
+var _ ReadHeader = (*Header)(nil)
 
 // Header represents a block header in the Harmony blockchain.
 type Header struct {
@@ -159,6 +295,10 @@ func (h *Header) With() HeaderFieldSetter {
 // Note that the last block contains the shard state of the next epoch.
 func (h *Header) IsLastBlockInEpoch() bool {
 	return len(h.ShardState()) > 0
+}
+
+func (h *Header) Copy() *Header {
+	return &Header{Header: h.Header.Copy()}
 }
 
 // HeaderRegistry is the taggedrlp type registry for versioned headers.
