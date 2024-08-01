@@ -5,16 +5,16 @@ import (
 )
 
 // RegisterService register a service to the node service manager
-func (node *BootNode) RegisterService(st service.Type, s service.Service) {
-	node.serviceManager.Register(st, s)
+func (bootnode *BootNode) RegisterService(st service.Type, s service.Service) {
+	bootnode.serviceManager.Register(st, s)
 }
 
 // StartServices runs registered services.
-func (node *BootNode) StartServices() error {
-	return node.serviceManager.StartServices()
+func (bootnode *BootNode) StartServices() error {
+	return bootnode.serviceManager.StartServices()
 }
 
 // StopServices runs registered services.
-func (node *BootNode) StopServices() error {
-	return node.serviceManager.StopServices()
+func (bootnode *BootNode) StopServices() error {
+	return bootnode.serviceManager.StopServices()
 }
