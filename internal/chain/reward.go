@@ -191,11 +191,11 @@ func accumulateRewardsAndCountSigsBeforeStaking(
 }
 
 // getDefaultStakingReward returns the static default reward based on the the block production interval and the chain.
-func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uint64) numeric.Dec {
+func getDefaultStakingReward(config *params.ChainConfig, epoch *big.Int, blockNum uint64) numeric.Dec {
 	defaultReward := stakingReward.StakedBlocks
 
 	// the block reward is adjusted accordingly based on 5s and 3s block time forks
-	if bc.Config().ChainID == params.TestnetChainID && bc.Config().FiveSecondsEpoch.Cmp(big.NewInt(16500)) == 0 {
+	if config.ChainID == params.TestnetChainID && config.FiveSecondsEpoch.Cmp(big.NewInt(16500)) == 0 {
 		// Testnet:
 		// This is testnet requiring the one-off forking logic
 		if blockNum > 634644 {
@@ -207,16 +207,16 @@ func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uin
 				}
 			}
 		}
-		if bc.Config().IsTwoSeconds(epoch) {
+		if config.IsTwoSeconds(epoch) {
 			defaultReward = stakingReward.TwoSecStakedBlocks
 		}
 	} else {
 		// Mainnet (other nets):
-		if bc.Config().IsHIP30(epoch) {
+		if config.IsHIP30(epoch) {
 			defaultReward = stakingReward.HIP30StakedBlocks
-		} else if bc.Config().IsTwoSeconds(epoch) {
+		} else if config.IsTwoSeconds(epoch) {
 			defaultReward = stakingReward.TwoSecStakedBlocks
-		} else if bc.Config().IsFiveSeconds(epoch) {
+		} else if config.IsFiveSeconds(epoch) {
 			defaultReward = stakingReward.FiveSecStakedBlocks
 		}
 	}
@@ -259,7 +259,7 @@ func AccumulateRewardsAndCountSigs(
 		return numeric.ZeroDec(), network.EmptyPayout, nil
 	}
 
-	defaultReward := getDefaultStakingReward(bc, epoch, blockNum)
+	defaultReward := getDefaultStakingReward(bc.Config(), epoch, blockNum)
 	if defaultReward.IsNegative() { // TODO: Figure out whether that's possible.
 		return numeric.ZeroDec(), network.EmptyPayout, nil
 	}
@@ -602,11 +602,13 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 	allSignersShare := numeric.ZeroDec()
 	for j := range payableSigners {
 		voter := votingPower.Voters[payableSigners[j].BLSPublicKey]
+		fmt.Println("voter.IsHarmonyNode", voter.IsHarmonyNode)
 		if !voter.IsHarmonyNode {
 			voterShare := voter.OverallPercent
 			allSignersShare = allSignersShare.Add(voterShare)
 		}
 	}
+	fmt.Println("allSignersShare", allSignersShare.String())
 
 	allPayables, allMissing := []slotPayable{}, []slotMissing{}
 	startTimeLocal = time.Now()
