@@ -11,7 +11,6 @@ import (
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -81,7 +80,6 @@ type BootNode struct {
 func New(
 	host p2p.Host,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
-	registry *registry.Registry,
 ) *BootNode {
 	node := BootNode{
 		//registry:             registry.SetAddressToBLSKey(NewAddressToBLSKey(consensusObj.ShardID)),

@@ -13,13 +13,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	//cmdharmony "github.com/harmony-one/harmony/cmd/harmony"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	harmonyConfigs "github.com/harmony-one/harmony/cmd/config"
 	bootnodeconfig "github.com/harmony-one/harmony/internal/configs/bootnode"
+	"github.com/harmony-one/harmony/internal/configs/harmony"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	bootnode "github.com/harmony-one/harmony/node/boot"
 	"github.com/harmony-one/harmony/p2p"
 	net "github.com/libp2p/go-libp2p/core/network"
 	ma "github.com/multiformats/go-multiaddr"
-	harmonyConfigs "github.com/harmony-one/harmony/cmd/config"
 )
 
 // ConnLogger ..
@@ -169,9 +171,9 @@ func main() {
 		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s\n", *ip, *port, host.GetID().String()),
 	)
 
-	rpcServerConfig := getRPCServerConfig(*networkType)
-	fmt.Println("boot node configs:", rpcServerConfig)
-	
+	hc := harmonyConfigs.GetDefaultHmyConfigCopy(nodeconfig.NetworkType(*networkType))
+	rpcServerConfig := getRPCServerConfig(hc)
+	fmt.Println("boot node rpc configs:", rpcServerConfig)
 
 	host.Start()
 
@@ -184,12 +186,18 @@ func main() {
 		http.ListenAndServe(*pprofAddr, nil)
 	}
 
+	currentBootNode := bootnode.New(host, &hc)
+
+	if err := currentBootNode.StartRPC(); err != nil {
+		utils.Logger().Warn().
+			Err(err).
+			Msg("StartRPC failed")
+	}
+
 	select {}
 }
 
-func getRPCServerConfig(nt string) bootnodeconfig.RPCServerConfig {
-
-	cfg := harmonyConfigs.GetDefaultHmyConfigCopy(nodeconfig.NetworkType(nt))
+func getRPCServerConfig(cfg harmony.HarmonyConfig) bootnodeconfig.RPCServerConfig {
 
 	readTimeout, err := time.ParseDuration(cfg.HTTP.ReadTimeout)
 	if err != nil {
