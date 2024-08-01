@@ -80,7 +80,7 @@ const (
 	// DefaultWaitForEachPeerToConnect sets the sync configs to connect to neighbor peers one by one and waits for each peer to connect.
 	DefaultWaitForEachPeerToConnect = false
 	// DefaultNoTransportSecurity
-	DefaultNoTransportSecurity = false
+	DefaultNoTransportSecurity = true
 	// DefaultNAT enables NAT manager for P2P
 	DefaultNAT = true
 	// DefaultUserAgent set the user agent to differentiate between libp2p users

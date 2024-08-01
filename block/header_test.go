@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/stretchr/testify/require"
 
 	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
@@ -779,4 +780,8 @@ func compareHeaders(x, y blockif.Header) bool {
 		equal(x.Vdf(), y.Vdf()) &&
 		equal(x.ShardState(), y.ShardState()) &&
 		equal(x.CrossLinks(), y.CrossLinks())
+}
+
+func TestHeader_NumberU64(t *testing.T) {
+	require.EqualValues(t, 0, (*Header)(nil).NumberU64())
 }

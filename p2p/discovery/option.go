@@ -24,14 +24,14 @@ func (opt DHTConfig) GetLibp2pRawOptions() ([]libp2p_dht.Option, error) {
 
 	bootOption, err := getBootstrapOption(opt.BootNodes)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessage(err, "failed to get bootstrap option")
 	}
 	opts = append(opts, bootOption)
 
 	if opt.DataStoreFile != nil && len(*opt.DataStoreFile) != 0 {
 		dsOption, err := getDataStoreOption(*opt.DataStoreFile)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithMessage(err, "failed to get data store option")
 		}
 		opts = append(opts, dsOption)
 	}

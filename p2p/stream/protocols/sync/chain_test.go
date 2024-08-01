@@ -154,7 +154,7 @@ func checkBlocksResult(bns []uint64, b []byte) error {
 func makeTestBlock(bn uint64) *types.Block {
 	header := testHeader.Copy()
 	header.SetNumber(big.NewInt(int64(bn)))
-	return types.NewBlockWithHeader(&block.Header{Header: header})
+	return types.NewBlockWithHeader(&block.Header{Header: header.Header})
 }
 
 // makeTestReceipts creates fake node data

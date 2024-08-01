@@ -50,7 +50,7 @@ type slotMissing struct {
 }
 
 func ballotResultBeaconchain(
-	bc engine.ChainReader, header *block.Header,
+	bc engine.ChainReader, header block.ReadHeader,
 ) (*big.Int, shard.SlotList, shard.SlotList, shard.SlotList, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	if parentHeader == nil {
@@ -67,7 +67,7 @@ func ballotResultBeaconchain(
 	}
 
 	members, payable, missing, err :=
-		availability.BallotResult(parentHeader, header, parentShardState, shard.BeaconChainShardID)
+		availability.BallotResult(header.LastCommitBitmap(), parentShardState, shard.BeaconChainShardID)
 	return parentHeader.Epoch(), members, payable, missing, err
 }
 
@@ -135,39 +135,29 @@ func lookupDelegatorShares(
 
 // Handle block rewards during pre-staking era
 func accumulateRewardsAndCountSigsBeforeStaking(
-	bc engine.ChainReader, state *state.DB,
-	header *block.Header, sigsReady chan bool,
+	state *state.DB, header block.ReadHeader, parentShardState *shard.State,
 ) (numeric.Dec, reward.Reader, error) {
-	parentHeader := bc.GetHeaderByHash(header.ParentHash())
+	//parentHeader := bc.GetHeaderByHash(header.ParentHash())
 
-	if parentHeader == nil {
-		return numeric.ZeroDec(), network.EmptyPayout, errors.Errorf(
-			"cannot find parent block header in DB at parent hash %s",
-			header.ParentHash().Hex(),
-		)
-	}
-	if parentHeader.Number().Cmp(common.Big0) == 0 {
-		// Parent is an epoch block,
-		// which is not signed in the usual manner therefore rewards nothing.
-		return numeric.ZeroDec(), network.EmptyPayout, nil
-	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
-	if err != nil {
-		return numeric.ZeroDec(), nil, errors.Wrapf(
-			err, "cannot read shard state at epoch %v", parentHeader.Epoch(),
-		)
-	}
+	//if parentHeader == nil {
+	//	return numeric.ZeroDec(), network.EmptyPayout, errors.Errorf(
+	//		"cannot find parent block header in DB at parent hash %s",
+	//		header.ParentHash().Hex(),
+	//	)
+	//}
+	//if parentHeader.Number().Cmp(common.Big0) == 0 {
+	//	// Parent is an epoch block,
+	//	// which is not signed in the usual manner therefore rewards nothing.
+	//	return numeric.ZeroDec(), network.EmptyPayout, nil
+	//}
+	//parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
+	//if err != nil {
+	//	return numeric.ZeroDec(), nil, errors.Wrapf(
+	//		err, "cannot read shard state at epoch %v", parentHeader.Epoch(),
+	//	)
+	//}
 
-	// Block here until the commit sigs are ready or timeout.
-	// sigsReady signal indicates that the commit sigs are already populated in the header object.
-	if err := waitForCommitSigs(sigsReady); err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, err
-	}
-
-	_, signers, _, err := availability.BallotResult(
-		parentHeader, header, parentShardState, header.ShardID(),
-	)
-
+	_, signers, _, err := availability.BallotResult(header.LastCommitBitmap(), parentShardState, header.ShardID())
 	if err != nil {
 		return numeric.ZeroDec(), network.EmptyPayout, err
 	}
@@ -201,11 +191,11 @@ func accumulateRewardsAndCountSigsBeforeStaking(
 }
 
 // getDefaultStakingReward returns the static default reward based on the the block production interval and the chain.
-func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uint64) numeric.Dec {
+func getDefaultStakingReward(config *params.ChainConfig, epoch *big.Int, blockNum uint64) numeric.Dec {
 	defaultReward := stakingReward.StakedBlocks
 
 	// the block reward is adjusted accordingly based on 5s and 3s block time forks
-	if bc.Config().ChainID == params.TestnetChainID && bc.Config().FiveSecondsEpoch.Cmp(big.NewInt(16500)) == 0 {
+	if config.ChainID == params.TestnetChainID && config.FiveSecondsEpoch.Cmp(big.NewInt(16500)) == 0 {
 		// Testnet:
 		// This is testnet requiring the one-off forking logic
 		if blockNum > 634644 {
@@ -217,16 +207,16 @@ func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uin
 				}
 			}
 		}
-		if bc.Config().IsTwoSeconds(epoch) {
+		if config.IsTwoSeconds(epoch) {
 			defaultReward = stakingReward.TwoSecStakedBlocks
 		}
 	} else {
 		// Mainnet (other nets):
-		if bc.Config().IsHIP30(epoch) {
+		if config.IsHIP30(epoch) {
 			defaultReward = stakingReward.HIP30StakedBlocks
-		} else if bc.Config().IsTwoSeconds(epoch) {
+		} else if config.IsTwoSeconds(epoch) {
 			defaultReward = stakingReward.TwoSecStakedBlocks
-		} else if bc.Config().IsFiveSeconds(epoch) {
+		} else if config.IsFiveSeconds(epoch) {
 			defaultReward = stakingReward.FiveSecStakedBlocks
 		}
 	}
@@ -239,44 +229,47 @@ func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uin
 // param sigsReady: Signal indicating that commit sigs are already populated in the header object.
 func AccumulateRewardsAndCountSigs(
 	bc engine.ChainReader, state *state.DB,
-	header *block.Header, beaconChain engine.ChainReader, sigsReady chan bool,
+	header block.ReadHeader, beaconChain engine.ChainReader,
 ) (numeric.Dec, reward.Reader, error) {
 	blockNum := header.Number().Uint64()
 	epoch := header.Epoch()
 	isBeaconChain := bc.CurrentHeader().ShardID() == shard.BeaconChainShardID
 
 	if blockNum == 0 {
-		err := waitForCommitSigs(sigsReady) // wait for commit signatures, or timeout and return err.
-		return numeric.ZeroDec(), network.EmptyPayout, err
+		return numeric.ZeroDec(), network.EmptyPayout, errors.New("blockNum is 0")
+	}
+	parent := bc.GetHeaderByHash(header.ParentHash())
+	if parent.NumberU64() == 0 {
+		return numeric.ZeroDec(), network.EmptyPayout, nil
+	}
+	parentShardState, err := bc.ReadShardState(parent.Epoch())
+	if err != nil {
+		return numeric.ZeroDec(), network.EmptyPayout, errors.Wrapf(
+			err, "cannot read shard state at epoch %v", parent.Epoch(),
+		)
 	}
 
 	// Pre-staking era
 	if !bc.Config().IsStaking(epoch) {
-		return accumulateRewardsAndCountSigsBeforeStaking(bc, state, header, sigsReady)
+		return accumulateRewardsAndCountSigsBeforeStaking(state, header, parentShardState)
 	}
 
 	// Rewards are accumulated only in the beaconchain, so just wait for commit sigs and return.
 	if !isBeaconChain {
-		err := waitForCommitSigs(sigsReady)
-		return numeric.ZeroDec(), network.EmptyPayout, err
+		return numeric.ZeroDec(), network.EmptyPayout, nil
 	}
 
-	defaultReward := getDefaultStakingReward(bc, epoch, blockNum)
+	defaultReward := getDefaultStakingReward(bc.Config(), epoch, blockNum)
 	if defaultReward.IsNegative() { // TODO: Figure out whether that's possible.
 		return numeric.ZeroDec(), network.EmptyPayout, nil
 	}
 
 	// Handle rewards on pre-aggregated rewards era.
 	if !bc.Config().IsAggregatedRewardEpoch(header.Epoch()) {
-		return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
+		return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward)
 	}
 
 	// Aggregated Rewards Era: Rewards are aggregated every 64 blocks.
-
-	// Wait for commit signatures, or timeout and return err.
-	if err := waitForCommitSigs(sigsReady); err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, err
-	}
 
 	// Only do reward distribution at the 63th block in the modulus.
 	if blockNum%shard.Schedule.RewardFrequency() != shard.Schedule.RewardFrequency()-1 {
@@ -299,7 +292,7 @@ func waitForCommitSigs(sigsReady chan bool) error {
 	return nil
 }
 
-func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
+func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header block.ReadHeader, beaconChain engine.ChainReader,
 	rewardToDistribute numeric.Dec) (numeric.Dec, reward.Reader, error) {
 	epoch := header.Epoch()
 	defaultReward := rewardToDistribute
@@ -325,7 +318,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 			continue
 		}
 
-		var curHeader *block.Header
+		var curHeader block.ReadHeader
 		if i == curBlockNum {
 			// When it's the current block (63th), we should use the provided header since it's not written in db yet.
 			curHeader = header
@@ -416,8 +409,8 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	), nil
 }
 
-func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
-	defaultReward numeric.Dec, sigsReady chan bool) (numeric.Dec, reward.Reader, error) {
+func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB, header block.ReadHeader, beaconChain engine.ChainReader,
+	defaultReward numeric.Dec) (numeric.Dec, reward.Reader, error) {
 	newRewards, payouts :=
 		big.NewInt(0), []reward.Payout{}
 
@@ -492,12 +485,6 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 		}
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (AddReward)")
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Shard Chain Reward")
-	}
-
-	// Block here until the commit sigs are ready or timeout.
-	// sigsReady signal indicates that the commit sigs are already populated in the header object.
-	if err := waitForCommitSigs(sigsReady); err != nil {
-		return numeric.ZeroDec(), network.EmptyPayout, err
 	}
 
 	startTime := time.Now()
@@ -615,11 +602,13 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 	allSignersShare := numeric.ZeroDec()
 	for j := range payableSigners {
 		voter := votingPower.Voters[payableSigners[j].BLSPublicKey]
+		fmt.Println("voter.IsHarmonyNode", voter.IsHarmonyNode)
 		if !voter.IsHarmonyNode {
 			voterShare := voter.OverallPercent
 			allSignersShare = allSignersShare.Add(voterShare)
 		}
 	}
+	fmt.Println("allSignersShare", allSignersShare.String())
 
 	allPayables, allMissing := []slotPayable{}, []slotMissing{}
 	startTimeLocal = time.Now()

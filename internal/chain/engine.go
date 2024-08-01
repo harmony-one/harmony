@@ -6,12 +6,12 @@ import (
 	"sort"
 	"time"
 
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
+	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
-
-	bls2 "github.com/harmony-one/bls/ffi/go/bls"
-	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
+	"github.com/harmony-one/harmony/staking/network"
 
 	"github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru"
@@ -135,7 +135,7 @@ func (e *engineImpl) VerifyShardState(
 
 // VerifyVRF implements Engine, checking the vrf is valid
 func (e *engineImpl) VerifyVRF(
-	bc engine.ChainReader, header *block.Header,
+	bc engine.ChainReader, header block.ReadHeader,
 ) error {
 	if bc.ShardID() != header.ShardID() {
 		return errors.Errorf(
@@ -190,7 +190,7 @@ func (e *engineImpl) VerifyVRF(
 
 // GetLeaderPubKeyFromCoinbase retrieve corresponding blsPublicKey from Coinbase Address
 func GetLeaderPubKeyFromCoinbase(
-	blockchain engine.ChainReader, h *block.Header,
+	blockchain engine.ChainReader, h block.ReadHeader,
 ) (*bls.PublicKeyWrapper, error) {
 	shardState, err := blockchain.ReadShardState(h.Epoch())
 	if err != nil {
@@ -271,12 +271,16 @@ func (e *engineImpl) Finalize(
 	doubleSigners slash.Records, sigsReady chan bool, viewID func() uint64,
 ) (*types.Block, reward.Reader, error) {
 
+	if header.NumberU64() == 0 {
+		return nil, nil, errors.New("cannot finalize block 0")
+	}
+
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 
 	// Process Undelegations, set LastEpochInCommittee and set EPoS status
 	// Needs to be before AccumulateRewardsAndCountSigs
-	if IsCommitteeSelectionBlock(chain, header) {
+	if IsCommitteeSelectionBlock(chain.Config(), header) {
 		startTime := time.Now()
 		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, err
@@ -311,11 +315,24 @@ func (e *engineImpl) Finalize(
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("ComputeAndMutateEPOSStatus")
 	}
 
-	// Accumulate block rewards and commit the final state root
-	// Header seems complete, assemble into a block and return
-	remainder, payout, err := AccumulateRewardsAndCountSigs(
-		chain, state, header, beacon, sigsReady,
+	var (
+		remainder numeric.Dec
+		payout    reward.Reader
+		err       error
 	)
+	if header.NumberU64() == 1 {
+		remainder = numeric.ZeroDec()
+		payout = network.EmptyPayout
+	} else {
+		if err := waitForCommitSigs(sigsReady); err != nil {
+			return nil, nil, err
+		}
+		// Accumulate block rewards and commit the final state root
+		// Header seems complete, assemble into a block and return
+		remainder, payout, err = AccumulateRewardsAndCountSigs(
+			chain, state, header, beacon,
+		)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -357,7 +374,7 @@ func (e *engineImpl) Finalize(
 
 // Withdraw unlocked tokens to the delegators' accounts
 func payoutUndelegations(
-	chain engine.ChainReader, header *block.Header, state *state.DB,
+	chain engine.ChainReader, header block.ReadHeader, state *state.DB,
 ) error {
 	currentHeader := chain.CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
@@ -409,13 +426,13 @@ func payoutUndelegations(
 
 // IsCommitteeSelectionBlock checks if the given header is for the committee selection block
 // which can only occur on beacon chain and if epoch > pre-staking epoch.
-func IsCommitteeSelectionBlock(chain engine.ChainReader, header *block.Header) bool {
+func IsCommitteeSelectionBlock(config *params.ChainConfig, header block.ReadHeader) bool {
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
-	inPreStakingEra := chain.Config().IsPreStaking(header.Epoch())
+	inPreStakingEra := config.IsPreStaking(header.Epoch())
 	return isBeaconChain && header.IsLastBlockInEpoch() && inPreStakingEra
 }
 
-func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, state *state.DB, config *params.ChainConfig) error {
+func setElectionEpochAndMinFee(chain engine.ChainReader, header block.ReadHeader, state *state.DB, config *params.ChainConfig) error {
 	newShardState, err := header.GetShardState()
 	if err != nil {
 		const msg = "[Finalize] failed to read shard state"
@@ -500,7 +517,7 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 
 func applySlashes(
 	chain engine.ChainReader,
-	header *block.Header,
+	header block.ReadHeader,
 	state *state.DB,
 	doubleSigners slash.Records,
 ) error {

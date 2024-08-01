@@ -108,7 +108,7 @@ func main() {
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
-	noTransportSecurity := flag.Bool("no_transport_security", false, "disable TLS encrypted transport")
+	noTransportSecurity := flag.Bool("no_transport_security", true, "disable TLS encrypted transport")
 	muxer := flag.String("muxer", "mplex, yamux", "protocol muxer to mux per-protocol streams (mplex, yamux)")
 	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
 	noRelay := flag.Bool("no_relay", true, "no relay services, direct connections between peers only")
@@ -159,8 +159,8 @@ func main() {
 		utils.FatalErrMsg(err, "cannot initialize network")
 	}
 
-	fmt.Printf("bootnode BN_MA=%s",
-		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()),
+	fmt.Printf("bootnode BN_MA=%s\n",
+		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().String()),
 	)
 
 	host.Start()

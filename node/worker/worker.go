@@ -588,7 +588,7 @@ func (w *Worker) FinalizeNewBlock(
 	state := w.current.state
 	copyHeader := types.CopyHeader(w.current.header)
 
-	sigsReady := make(chan bool)
+	sigsReady := make(chan bool, 1)
 	go func() {
 		select {
 		case sigs := <-commitSigs:
@@ -596,6 +596,7 @@ func (w *Worker) FinalizeNewBlock(
 			if err != nil {
 				utils.Logger().Error().Err(err).Msg("Failed to parse commit sigs")
 				sigsReady <- false
+				return
 			}
 			// Put sig, signers, viewID, coinbase into header
 			if len(sig) > 0 && len(signers) > 0 {
