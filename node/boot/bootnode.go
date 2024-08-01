@@ -5,12 +5,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/core/types"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -54,7 +52,7 @@ type BootNode struct {
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.
-	chainConfig         params.ChainConfig
+	// chainConfig         params.ChainConfig
 	unixTimeAtNodeStart int64
 
 	// TransactionErrorSink contains error messages for any failed transaction, in memory only
@@ -63,7 +61,7 @@ type BootNode struct {
 	// BroadcastInvalidTx bool
 
 	// InSync flag indicates the node is in-sync or not
-	IsSynchronized *abool.AtomicBool
+	// IsSynchronized *abool.AtomicBool
 
 	// deciderCache   *lru.Cache
 	// committeeCache *lru.Cache
@@ -96,10 +94,10 @@ func New(
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
-	networkType := node.NodeConfig.GetNetworkType()
-	chainConfig := networkType.ChainConfig()
-	node.chainConfig = chainConfig
-	node.IsSynchronized = abool.NewBool(false)
+	// networkType := node.NodeConfig.GetNetworkType()
+	// chainConfig := networkType.ChainConfig()
+	// node.chainConfig = chainConfig
+	// node.IsSynchronized = abool.NewBool(false)
 
 	// init metrics
 	initMetrics()

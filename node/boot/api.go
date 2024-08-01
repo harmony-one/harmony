@@ -4,6 +4,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/eth/rpc"
 	hmy_boot "github.com/harmony-one/harmony/hmy_boot"
+	"github.com/harmony-one/harmony/internal/params"
 	boot_rpc "github.com/harmony-one/harmony/rpc/boot"
 	rpc_common "github.com/harmony-one/harmony/rpc/harmony/common"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -65,6 +66,6 @@ func (bootnode *BootNode) GetConfig() rpc_common.Config {
 	return rpc_common.Config{
 		HarmonyConfig: *bootnode.HarmonyConfig,
 		NodeConfig:    *bootnode.NodeConfig,
-		ChainConfig:   bootnode.chainConfig,
+		ChainConfig:   params.ChainConfig{},
 	}
 }
