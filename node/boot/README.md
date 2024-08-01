@@ -1,0 +1,3 @@
+BootNode struct is the core entity that represents a bootstrap node participating in the Harmony protocol.
+
+A boot node is the main ...

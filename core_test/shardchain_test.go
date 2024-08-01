@@ -15,7 +15,7 @@ import (
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/node"
+	node "github.com/harmony-one/harmony/node/harmony"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/require"

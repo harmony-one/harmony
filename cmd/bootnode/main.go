@@ -12,10 +12,14 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	//cmdharmony "github.com/harmony-one/harmony/cmd/harmony"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	bootnodeconfig "github.com/harmony-one/harmony/internal/configs/bootnode"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	net "github.com/libp2p/go-libp2p/core/network"
 	ma "github.com/multiformats/go-multiaddr"
+	harmonyConfigs "github.com/harmony-one/harmony/cmd/config"
 )
 
 // ConnLogger ..
@@ -113,7 +117,7 @@ func main() {
 	muxer := flag.String("muxer", "mplex, yamux", "protocol muxer to mux per-protocol streams (mplex, yamux)")
 	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
 	noRelay := flag.Bool("no_relay", true, "no relay services, direct connections between peers only")
-
+	networkType := flag.String("network", "mainnet", "network type (mainnet, testnet, pangaea, partner, stressnet, devnet, localnet)")
 	pprof := flag.Bool("pprof", false, "enabled pprof")
 	pprofAddr := flag.String("pprof.addr", "127.0.0.1:6060", "http pprof address")
 	//keyFile := flag.String("pprof.profile.names", "", "the private key file of the bootnode")
@@ -165,6 +169,10 @@ func main() {
 		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s\n", *ip, *port, host.GetID().String()),
 	)
 
+	rpcServerConfig := getRPCServerConfig(*networkType)
+	fmt.Println("boot node configs:", rpcServerConfig)
+	
+
 	host.Start()
 
 	if *logConn {
@@ -177,4 +185,59 @@ func main() {
 	}
 
 	select {}
+}
+
+func getRPCServerConfig(nt string) bootnodeconfig.RPCServerConfig {
+
+	cfg := harmonyConfigs.GetDefaultHmyConfigCopy(nodeconfig.NetworkType(nt))
+
+	readTimeout, err := time.ParseDuration(cfg.HTTP.ReadTimeout)
+	if err != nil {
+		readTimeout, _ = time.ParseDuration(nodeconfig.DefaultHTTPTimeoutRead)
+		utils.Logger().Warn().
+			Str("provided", cfg.HTTP.ReadTimeout).
+			Dur("updated", readTimeout).
+			Msg("Sanitizing invalid http read timeout")
+	}
+	writeTimeout, err := time.ParseDuration(cfg.HTTP.WriteTimeout)
+	if err != nil {
+		writeTimeout, _ = time.ParseDuration(nodeconfig.DefaultHTTPTimeoutWrite)
+		utils.Logger().Warn().
+			Str("provided", cfg.HTTP.WriteTimeout).
+			Dur("updated", writeTimeout).
+			Msg("Sanitizing invalid http write timeout")
+	}
+	idleTimeout, err := time.ParseDuration(cfg.HTTP.IdleTimeout)
+	if err != nil {
+		idleTimeout, _ = time.ParseDuration(nodeconfig.DefaultHTTPTimeoutIdle)
+		utils.Logger().Warn().
+			Str("provided", cfg.HTTP.IdleTimeout).
+			Dur("updated", idleTimeout).
+			Msg("Sanitizing invalid http idle timeout")
+	}
+	evmCallTimeout, err := time.ParseDuration(cfg.RPCOpt.EvmCallTimeout)
+	if err != nil {
+		evmCallTimeout, _ = time.ParseDuration(nodeconfig.DefaultEvmCallTimeout)
+		utils.Logger().Warn().
+			Str("provided", cfg.RPCOpt.EvmCallTimeout).
+			Dur("updated", evmCallTimeout).
+			Msg("Sanitizing invalid evm_call timeout")
+	}
+	return bootnodeconfig.RPCServerConfig{
+		HTTPEnabled:        cfg.HTTP.Enabled,
+		HTTPIp:             cfg.HTTP.IP,
+		HTTPPort:           cfg.HTTP.Port,
+		HTTPAuthPort:       cfg.HTTP.AuthPort,
+		HTTPTimeoutRead:    readTimeout,
+		HTTPTimeoutWrite:   writeTimeout,
+		HTTPTimeoutIdle:    idleTimeout,
+		WSEnabled:          cfg.WS.Enabled,
+		WSIp:               cfg.WS.IP,
+		WSPort:             cfg.WS.Port,
+		WSAuthPort:         cfg.WS.AuthPort,
+		DebugEnabled:       cfg.RPCOpt.DebugEnabled,
+		RpcFilterFile:      cfg.RPCOpt.RpcFilterFile,
+		RateLimiterEnabled: cfg.RPCOpt.RateLimterEnabled,
+		RequestsPerSecond:  cfg.RPCOpt.RequestsPerSecond,
+	}
 }
