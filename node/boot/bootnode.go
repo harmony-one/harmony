@@ -7,8 +7,8 @@ import (
 
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/core/types"
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	harmonyConfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	nodeConfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -29,9 +29,9 @@ type BootNode struct {
 	// Service manager.
 	serviceManager *service.Manager
 	// harmony configurations
-	HarmonyConfig *harmonyconfig.HarmonyConfig
+	HarmonyConfig *harmonyConfig.HarmonyConfig
 	// node configuration, including group ID, shard ID, etc
-	NodeConfig *nodeconfig.ConfigType
+	NodeConfig *nodeConfig.ConfigType
 	// node start time
 	unixTimeAtNodeStart int64
 	// TransactionErrorSink contains error messages for any failed transaction, in memory only
@@ -43,14 +43,14 @@ type BootNode struct {
 // New creates a new boot node.
 func New(
 	host p2p.Host,
-	harmonyconfig *harmonyconfig.HarmonyConfig,
+	hc *harmonyConfig.HarmonyConfig,
 ) *BootNode {
 	node := BootNode{
 		unixTimeAtNodeStart:  time.Now().Unix(),
 		TransactionErrorSink: types.NewTransactionErrorSink(),
 	}
 
-	node.HarmonyConfig = harmonyconfig
+	node.HarmonyConfig = hc
 
 	if host != nil {
 		node.host = host
@@ -59,7 +59,7 @@ func New(
 
 	// init metrics
 	initMetrics()
-	nodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
+	nodeStringCounterVec.WithLabelValues("version", nodeConfig.GetVersion()).Inc()
 
 	node.serviceManager = service.NewManager()
 

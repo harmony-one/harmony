@@ -14,9 +14,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	//cmdharmony "github.com/harmony-one/harmony/cmd/harmony"
 	harmonyConfigs "github.com/harmony-one/harmony/cmd/config"
-	bootnodeconfig "github.com/harmony-one/harmony/internal/configs/bootnode"
+	bootnodeConfigs "github.com/harmony-one/harmony/internal/configs/bootnode"
 	"github.com/harmony-one/harmony/internal/configs/harmony"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	nodeConfigs "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	bootnode "github.com/harmony-one/harmony/node/boot"
 	"github.com/harmony-one/harmony/p2p"
@@ -170,8 +170,9 @@ func main() {
 	fmt.Printf("bootnode BN_MA=%s",
 		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s\n", *ip, *port, host.GetID().String()),
 	)
-
-	nt := nodeconfig.NetworkType(*networkType)
+	
+	nt := nodeConfigs.NetworkType(*networkType)
+	nodeConfigs.SetVersion(harmonyConfigs.GetHarmonyVersion())
 	hc := harmonyConfigs.GetDefaultConfigCopy()
 	rpcServerConfig := getRPCServerConfig(hc)
 	utils.Logger().Info().
@@ -201,11 +202,11 @@ func main() {
 	select {}
 }
 
-func getRPCServerConfig(cfg harmony.HarmonyConfig) bootnodeconfig.RPCServerConfig {
+func getRPCServerConfig(cfg harmony.HarmonyConfig) bootnodeConfigs.RPCServerConfig {
 
 	readTimeout, err := time.ParseDuration(cfg.HTTP.ReadTimeout)
 	if err != nil {
-		readTimeout, _ = time.ParseDuration(nodeconfig.DefaultHTTPTimeoutRead)
+		readTimeout, _ = time.ParseDuration(nodeConfigs.DefaultHTTPTimeoutRead)
 		utils.Logger().Warn().
 			Str("provided", cfg.HTTP.ReadTimeout).
 			Dur("updated", readTimeout).
@@ -213,7 +214,7 @@ func getRPCServerConfig(cfg harmony.HarmonyConfig) bootnodeconfig.RPCServerConfi
 	}
 	writeTimeout, err := time.ParseDuration(cfg.HTTP.WriteTimeout)
 	if err != nil {
-		writeTimeout, _ = time.ParseDuration(nodeconfig.DefaultHTTPTimeoutWrite)
+		writeTimeout, _ = time.ParseDuration(nodeConfigs.DefaultHTTPTimeoutWrite)
 		utils.Logger().Warn().
 			Str("provided", cfg.HTTP.WriteTimeout).
 			Dur("updated", writeTimeout).
@@ -221,13 +222,13 @@ func getRPCServerConfig(cfg harmony.HarmonyConfig) bootnodeconfig.RPCServerConfi
 	}
 	idleTimeout, err := time.ParseDuration(cfg.HTTP.IdleTimeout)
 	if err != nil {
-		idleTimeout, _ = time.ParseDuration(nodeconfig.DefaultHTTPTimeoutIdle)
+		idleTimeout, _ = time.ParseDuration(nodeConfigs.DefaultHTTPTimeoutIdle)
 		utils.Logger().Warn().
 			Str("provided", cfg.HTTP.IdleTimeout).
 			Dur("updated", idleTimeout).
 			Msg("Sanitizing invalid http idle timeout")
 	}
-	return bootnodeconfig.RPCServerConfig{
+	return bootnodeConfigs.RPCServerConfig{
 		HTTPEnabled:        cfg.HTTP.Enabled,
 		HTTPIp:             cfg.HTTP.IP,
 		HTTPPort:           cfg.HTTP.Port,
