@@ -170,7 +170,7 @@ func main() {
 	fmt.Printf("bootnode BN_MA=%s",
 		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s\n", *ip, *port, host.GetID().String()),
 	)
-	
+
 	nt := nodeConfigs.NetworkType(*networkType)
 	nodeConfigs.SetVersion(harmonyConfigs.GetHarmonyVersion())
 	hc := harmonyConfigs.GetDefaultConfigCopy()
