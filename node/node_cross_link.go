@@ -4,12 +4,14 @@ import (
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/protobuf/proto"
 )
 
 var CrosslinkOutdatedErr = errors.New("crosslink signal is outdated")
@@ -99,8 +101,8 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	return nil
 }
 
-// ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
-func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
+// ProcessCrossLinkV1Message verify and process Node/CrossLink message into crosslink when it's valid
+func (node *Node) ProcessCrossLinkV1Message(msgPayload []byte) {
 	if node.IsRunningBeaconChain() {
 		pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
 		if err != nil {
@@ -141,6 +143,85 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
 				utils.Logger().Debug().Err(err).
 					Msgf("[ProcessingCrossLink] Cross Link already exists in pending queue, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d",
+						node.Blockchain().CurrentHeader().Epoch(), cl.Number().Uint64(), cl.Epoch(), cl.ShardID())
+				continue
+			}
+
+			// ReadCrossLink beacon chain usage.
+			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
+			if err == nil && exist != nil {
+				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
+				utils.Logger().Debug().Err(err).
+					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d", node.Blockchain().CurrentHeader().Epoch(), cl.Number().Uint64(), cl.Epoch(), cl.ShardID())
+				continue
+			}
+
+			if err = core.VerifyCrossLink(node.Blockchain(), cl); err != nil {
+				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "invalid_crosslink"}).Inc()
+				utils.Logger().Info().
+					Str("cross-link-issue", err.Error()).
+					Msgf("[ProcessingCrossLink] Failed to verify new cross link for blockNum %d epochNum %d shard %d skipped: %v", cl.Number().Uint64(), cl.Epoch().Uint64(), cl.ShardID(), cl)
+				continue
+			}
+
+			candidates = append(candidates, cl)
+			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "new_crosslink"}).Inc()
+
+			utils.Logger().Debug().
+				Msgf("[ProcessingCrossLink] Committing for shardID %d, blockNum %d",
+					cl.ShardID(), cl.Number().Uint64(),
+				)
+		}
+		Len, _ := node.Blockchain().AddPendingCrossLinks(candidates)
+		utils.Logger().Debug().
+			Msgf("[ProcessingCrossLink] Add pending crosslinks,  total pending: %d", Len)
+	}
+}
+
+// ProcessCrossLink2Message verify and process Node/CrossLink message into crosslink when it's valid
+func (node *Node) ProcessCrossLinkV2Message(msgPayload []byte) {
+	if node.IsRunningBeaconChain() {
+		pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
+		if err != nil {
+			utils.Logger().Debug().
+				Err(err).
+				Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
+			return
+		}
+		if len(pendingCLs) >= maxPendingCrossLinkSize {
+			utils.Logger().Debug().
+				Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
+			return
+		}
+
+		existingCLs := map[common2.Hash]struct{}{}
+		for _, pending := range pendingCLs {
+			existingCLs[pending.Hash()] = struct{}{}
+		}
+
+		var crosslinks message.CrosslinkMessages
+		if err := proto.Unmarshal(msgPayload, &crosslinks); err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
+			return
+		}
+
+		var candidates []types.CrossLink
+		utils.Logger().Debug().
+			Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks.Messages))
+
+		for i, cl := range crosslinks.Messages {
+			if i > crossLinkBatchSize*2 { // A sanity check to prevent spamming
+				break
+			}
+
+			cl := message.CreateCrossLinkV2(cl)
+
+			if _, ok := existingCLs[cl.Hash()]; ok {
+				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
+				utils.Logger().Debug().Err(err).
+					Msgf("[ProcessingCrossLink] Cross Link already exists in pending queue, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d",
 						node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
 				continue
 			}
@@ -150,7 +231,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			if err == nil && exist != nil {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
 				utils.Logger().Debug().Err(err).
-					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d", node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
+					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d", node.Blockchain().CurrentHeader().Epoch(), cl.Number().Uint64(), cl.Epoch(), cl.ShardID())
 				continue
 			}
 
@@ -158,7 +239,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "invalid_crosslink"}).Inc()
 				utils.Logger().Info().
 					Str("cross-link-issue", err.Error()).
-					Msgf("[ProcessingCrossLink] Failed to verify new cross link for blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
+					Msgf("[ProcessingCrossLink] Failed to verify new cross link for blockNum %d epochNum %d shard %d skipped: %v", cl.Number().Uint64(), cl.Epoch().Uint64(), cl.ShardID(), cl)
 				continue
 			}
 

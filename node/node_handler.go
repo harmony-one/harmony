@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"time"
 
@@ -42,7 +43,9 @@ func (node *Node) processSkippedMsgTypeByteValue(
 	case proto_node.Receipt:
 		node.ProcessReceiptMessage(content)
 	case proto_node.CrossLink:
-		node.ProcessCrossLinkMessage(content)
+		node.ProcessCrossLinkV1Message(content)
+	case proto_node.CrossLink2:
+		node.ProcessCrossLinkV2Message(content)
 	case proto_node.CrosslinkHeartbeat:
 		node.ProcessCrossLinkHeartbeatMessage(content)
 	default:
@@ -89,6 +92,7 @@ func (node *Node) HandleNodeMessage(
 			proto_node.SlashCandidate,
 			proto_node.Receipt,
 			proto_node.CrossLink,
+			proto_node.CrossLink2,
 			proto_node.CrosslinkHeartbeat:
 			// skip first byte which is blockMsgType
 			node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
@@ -204,11 +208,19 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 		utils.Logger().Info().Msgf("[BroadcastCrossLink] header shard %d blockNum %d", h.ShardID(), h.Number().Uint64())
 	}
 
-	err = node.host.SendMessageToGroups(
-		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-		p2p.ConstructMessage(
-			proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain(), headers)),
-	)
+	if node.Consensus.Blockchain().CurrentBlock().Epoch().Cmp(big.NewInt(5)) >= 0 {
+		err = node.host.SendMessageToGroups(
+			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
+			proto.ConstructConsensusMessage(proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain(), headers)),
+		)
+	} else {
+		err = node.host.SendMessageToGroups(
+			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
+			p2p.ConstructMessage(
+				proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain(), headers)),
+		)
+	}
+
 	if err != nil {
 		utils.Logger().Error().Err(err).Msgf("[BroadcastCrossLink] failed to broadcast message")
 	} else {

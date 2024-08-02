@@ -2364,13 +2364,15 @@ func (bc *BlockChainImpl) DeleteCrossLinks(cls []types.CrossLink) error {
 	return err
 }
 
-func (bc *BlockChainImpl) ReadCrossLink(shardID uint32, blockNum uint64) (*types.CrossLink, error) {
+func (bc *BlockChainImpl) ReadCrossLink(shardID uint32, blockNum uint64) (types.CrossLink, error) {
 	bytes, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum)
 	if err != nil {
 		return nil, err
 	}
-	crossLink, err := types.DeserializeCrossLink(bytes)
-
+	if cl, err := types.DeserializeCrossLinkV2(bytes); err == nil {
+		return cl, nil
+	}
+	crossLink, err := types.DeserializeCrossLinkV1(bytes)
 	return crossLink, err
 }
 
@@ -2397,12 +2399,15 @@ func (bc *BlockChainImpl) LastContinuousCrossLink(batch rawdb.DatabaseWriter, sh
 	return nil
 }
 
-func (bc *BlockChainImpl) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error) {
+func (bc *BlockChainImpl) ReadShardLastCrossLink(shardID uint32) (types.CrossLink, error) {
 	bytes, err := rawdb.ReadShardLastCrossLink(bc.db, shardID)
 	if err != nil {
 		return nil, err
 	}
-	return types.DeserializeCrossLink(bytes)
+	if cl, err := types.DeserializeCrossLinkV2(bytes); err == nil {
+		return cl, nil
+	}
+	return types.DeserializeCrossLinkV1(bytes)
 }
 
 func (bc *BlockChainImpl) writeSlashes(processed slash.Records) error {

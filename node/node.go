@@ -1116,7 +1116,7 @@ func New(
 		if err == nil {
 			for _, pending := range allPending {
 				// if pending crosslink is older than 10 epochs, delete it
-				if pending.EpochF.Cmp(crossLinkEpochThreshold) <= 0 {
+				if pending.Epoch().Cmp(crossLinkEpochThreshold) <= 0 {
 					invalidToDelete = append(invalidToDelete, pending)
 					utils.Logger().Info().
 						Uint32("shard", pending.ShardID()).

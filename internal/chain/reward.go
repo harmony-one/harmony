@@ -316,7 +316,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	allPayables := []slotPayable{}
 	curBlockNum := header.Number().Uint64()
 
-	allCrossLinks := types.CrossLinks{}
+	allCrossLinks := make([]types.CrossLink, 0, 64)
 	startTime := time.Now()
 	// loop through [0...63] position in the modulus index of the 64 blocks
 	// Note the current block is at position 63 of the modulus.
@@ -334,12 +334,12 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		}
 
 		// Put shard 0 signatures as a crosslink for easy and consistent processing as other shards' crosslinks
-		allCrossLinks = append(allCrossLinks, *types.NewCrossLink(curHeader, bc.GetHeaderByHash(curHeader.ParentHash())))
+		allCrossLinks = append(allCrossLinks, types.NewCrossLinkV1(curHeader, bc.GetHeaderByHash(curHeader.ParentHash())))
 
 		// Put the real crosslinks in the list
 		if cxLinks := curHeader.CrossLinks(); len(cxLinks) > 0 {
-			crossLinks := types.CrossLinks{}
-			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
+			crossLinks, err := types.DeserializeCrossLinks(cxLinks)
+			if err != nil {
 				return numeric.ZeroDec(), network.EmptyPayout, err
 			}
 			allCrossLinks = append(allCrossLinks, crossLinks...)
@@ -347,11 +347,11 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	}
 
 	for i := range allCrossLinks {
-		cxLink := allCrossLinks[i]
+		var cxLink types.CrossLink = allCrossLinks[i]
 		if !bc.Config().IsStaking(cxLink.Epoch()) {
 			continue
 		}
-		utils.Logger().Info().Msg(fmt.Sprintf("allCrossLinks shard %d block %d", cxLink.ShardID(), cxLink.BlockNum()))
+		utils.Logger().Info().Msg(fmt.Sprintf("allCrossLinks shard %d block %d", cxLink.ShardID(), cxLink.Number().Uint64()))
 		payables, _, err := processOneCrossLink(bc, state, cxLink, defaultReward, i)
 
 		if err != nil {
@@ -408,7 +408,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		}
 	}
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("After Chain Reward (AddReward)")
-	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("After Chain Reward")
+	utils.Logger().Debug().Msgf("After Chain Reward elapsed time %s, cx count %d", time.Now().Sub(startTime).Milliseconds(), len(allCrossLinks))
 
 	// remainingReward needs to be multipled with the number of crosslinks across all shards
 	return remainingReward.MulInt(big.NewInt(int64(len(allCrossLinks)))), network.NewStakingEraRewardForRound(
@@ -590,7 +590,7 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (BlockSigners)")
 
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "shard %d block %d reward error with bitmap %x", shardID, cxLink.BlockNum(), cxLink.Bitmap())
+		return nil, nil, errors.Wrapf(err, "shard %d block %d reward error with bitmap %x", shardID, cxLink.Number().Uint64(), cxLink.Bitmap())
 	}
 
 	staked := subComm.StakedValidators()

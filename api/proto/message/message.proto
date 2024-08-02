@@ -116,3 +116,18 @@ message ViewChangeRequest {
   bytes m3_bitmap= 12;
   bytes prepared_block = 13;
 }
+
+message CrosslinkMessages {
+  repeated CrosslinkMessage messages = 1;
+}
+
+message CrosslinkMessage {
+  bytes hash = 1;
+  bytes block_number = 2;
+  bytes view_id = 3;
+  bytes signature = 4;
+  bytes bitmap = 5;
+  uint32 shard_id = 6;
+  bytes epoch = 7;
+  bytes proposer = 8;
+}

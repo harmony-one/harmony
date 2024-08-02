@@ -42,11 +42,12 @@ type BlockMessageType int
 
 // Block sync message subtype
 const (
-	Sync               BlockMessageType = iota
-	CrossLink                           // used for crosslink from beacon chain to shard chain
-	Receipt                             // cross-shard transaction receipts
-	SlashCandidate                      // A report of a double-signing event
-	CrosslinkHeartbeat                  // Heart beat signal for crosslinks. Needed for epoch chain.
+	Sync               BlockMessageType = 0
+	CrossLink          BlockMessageType = 1 // used for crosslink from beacon chain to shard chain
+	Receipt            BlockMessageType = 2 // cross-shard transaction receipts
+	SlashCandidate     BlockMessageType = 3 // A report of a double-signing event
+	CrosslinkHeartbeat BlockMessageType = 4 // Heart beat signal for crosslinks. Needed for epoch chain.
+	CrossLink2         BlockMessageType = 5 // used for crosslink from beacon chain to shard chain
 )
 
 var (
@@ -59,6 +60,7 @@ var (
 	stakingB            = byte(Staking)
 	syncB               = byte(Sync)
 	crossLinkB          = byte(CrossLink)
+	crossLink2B         = byte(CrossLink2)
 	crossLinkHeardBeatB = byte(CrosslinkHeartbeat)
 	receiptB            = byte(Receipt)
 	// H suffix means header
@@ -67,6 +69,7 @@ var (
 	stakingTxnListH     = []byte{nodeB, stakingB, sendB}
 	syncH               = []byte{nodeB, blockB, syncB}
 	crossLinkH          = []byte{nodeB, blockB, crossLinkB}
+	crossLink2H         = []byte{nodeB, blockB, crossLink2B}
 	cxReceiptH          = []byte{nodeB, blockB, receiptB}
 	crossLinkHeartBeatH = []byte{nodeB, blockB, crossLinkHeardBeatB}
 )
@@ -123,7 +126,7 @@ func ConstructCrossLinkHeartBeatMessage(hb types.CrosslinkHeartbeat) []byte {
 // ConstructCrossLinkMessage constructs cross link message to send to beacon chain
 func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
 	byteBuffer := bytes.NewBuffer(crossLinkH)
-	crosslinks := []*types.CrossLink{}
+	crosslinks := make([]*types.CrossLinkV1, 0, len(headers))
 	for _, header := range headers {
 		if header.Number().Uint64() <= 1 || !bc.Config().IsCrossLink(header.Epoch()) {
 			continue
@@ -132,7 +135,7 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 		if parentHeader == nil {
 			continue
 		}
-		crosslinks = append(crosslinks, types.NewCrossLink(header, parentHeader))
+		crosslinks = append(crosslinks, types.NewCrossLinkV1(header, parentHeader))
 	}
 	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
 	byteBuffer.Write(crosslinksData)

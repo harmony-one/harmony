@@ -190,8 +190,8 @@ func (hmy *Harmony) GetLatestChainHeaders() *block.HeaderPair {
 }
 
 // GetLastCrossLinks ..
-func (hmy *Harmony) GetLastCrossLinks() ([]*types.CrossLink, error) {
-	crossLinks := []*types.CrossLink{}
+func (hmy *Harmony) GetLastCrossLinks() ([]types.CrossLink, error) {
+	crossLinks := []types.CrossLink{}
 	for i := uint32(1); i < shard.Schedule.InstanceForEpoch(hmy.CurrentBlock().Epoch()).NumShards(); i++ {
 		link, err := hmy.BlockChain.ReadShardLastCrossLink(i)
 		if err != nil {

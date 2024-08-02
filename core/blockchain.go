@@ -189,14 +189,14 @@ type BlockChain interface {
 	// DeleteCrossLinks removes the hashes of crosslinks by shardID and blockNum combination key.
 	DeleteCrossLinks(cls []types.CrossLink) error
 	// ReadCrossLink retrieves crosslink given shardID and blockNum.
-	ReadCrossLink(shardID uint32, blockNum uint64) (*types.CrossLink, error)
+	ReadCrossLink(shardID uint32, blockNum uint64) (types.CrossLink, error)
 	// LastContinuousCrossLink saves the last crosslink of a shard
 	// This function will update the latest crosslink in the sense that
 	// any previous block's crosslink is received up to this point
 	// there is no missing hole between genesis to this crosslink of given shardID.
 	LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardID uint32) error
 	// ReadShardLastCrossLink retrieves the last crosslink of a shard.
-	ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error)
+	ReadShardLastCrossLink(shardID uint32) (types.CrossLink, error)
 	// DeleteFromPendingSlashingCandidates ..
 	DeleteFromPendingSlashingCandidates(
 		processed slash.Records,

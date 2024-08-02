@@ -183,3 +183,6 @@ debug_external: clean
 
 build_localnet_validator:
 	bash test/build-localnet-validator.sh
+
+protofiles:
+	bash ./scripts/gogenerate.sh

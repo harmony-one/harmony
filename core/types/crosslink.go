@@ -11,12 +11,12 @@ import (
 	"github.com/harmony-one/harmony/block"
 )
 
-// CrossLink is only used on beacon chain to store the hash links from other shards
+// CrossLinkV1 is only used on beacon chain to store the hash links from other shards
 // signature and bitmap correspond to |blockNumber|parentHash| byte array
 // Capital to enable rlp encoding
 // Here we replace header to signatures only, the basic assumption is the committee will not be
 // corrupted during one epoch, which is the same as consensus assumption
-type CrossLink struct {
+type CrossLinkV1 struct {
 	HashF        common.Hash
 	BlockNumberF *big.Int
 	ViewIDF      *big.Int
@@ -26,8 +26,8 @@ type CrossLink struct {
 	EpochF       *big.Int
 }
 
-// NewCrossLink returns a new cross link object
-func NewCrossLink(header *block.Header, parentHeader *block.Header) *CrossLink {
+// NewCrossLinkV1 returns a new cross link object
+func NewCrossLinkV1(header *block.Header, parentHeader *block.Header) *CrossLinkV1 {
 	parentBlockNum := big.NewInt(0)
 	parentViewID := big.NewInt(0)
 	parentEpoch := big.NewInt(0)
@@ -36,7 +36,7 @@ func NewCrossLink(header *block.Header, parentHeader *block.Header) *CrossLink {
 		parentViewID = parentHeader.ViewID()
 		parentEpoch = parentHeader.Epoch()
 	}
-	return &CrossLink{
+	return &CrossLinkV1{
 		HashF:        header.ParentHash(),
 		BlockNumberF: parentBlockNum,
 		ViewIDF:      parentViewID,
@@ -48,47 +48,47 @@ func NewCrossLink(header *block.Header, parentHeader *block.Header) *CrossLink {
 }
 
 // ShardID returns shardID
-func (cl *CrossLink) ShardID() uint32 {
+func (cl *CrossLinkV1) ShardID() uint32 {
 	return cl.ShardIDF
 }
 
 // Number returns blockNum with big.Int format
-func (cl *CrossLink) Number() *big.Int {
+func (cl *CrossLinkV1) Number() *big.Int {
 	return cl.BlockNumberF
 }
 
 // ViewID returns viewID with big.Int format
-func (cl *CrossLink) ViewID() *big.Int {
+func (cl *CrossLinkV1) ViewID() *big.Int {
 	return cl.ViewIDF
 }
 
 // Epoch returns epoch with big.Int format
-func (cl *CrossLink) Epoch() *big.Int {
+func (cl *CrossLinkV1) Epoch() *big.Int {
 	return cl.EpochF
 }
 
 // BlockNum returns blockNum
-func (cl *CrossLink) BlockNum() uint64 {
+func (cl *CrossLinkV1) BlockNum() uint64 {
 	return cl.BlockNumberF.Uint64()
 }
 
 // Hash returns hash
-func (cl *CrossLink) Hash() common.Hash {
+func (cl *CrossLinkV1) Hash() common.Hash {
 	return cl.HashF
 }
 
 // Bitmap returns bitmap
-func (cl *CrossLink) Bitmap() []byte {
+func (cl *CrossLinkV1) Bitmap() []byte {
 	return cl.BitmapF
 }
 
 // Signature returns aggregated signature
-func (cl *CrossLink) Signature() [96]byte {
+func (cl *CrossLinkV1) Signature() [96]byte {
 	return cl.SignatureF
 }
 
 // MarshalJSON ..
-func (cl *CrossLink) MarshalJSON() ([]byte, error) {
+func (cl *CrossLinkV1) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Hash        common.Hash `json:"hash"`
 		BlockNumber *big.Int    `json:"block-number"`
@@ -109,14 +109,18 @@ func (cl *CrossLink) MarshalJSON() ([]byte, error) {
 }
 
 // Serialize returns bytes of cross link rlp-encoded content
-func (cl *CrossLink) Serialize() []byte {
+func (cl *CrossLinkV1) Serialize() []byte {
 	bytes, _ := rlp.EncodeToBytes(cl)
 	return bytes
 }
 
-// DeserializeCrossLink rlp-decode the bytes into cross link object.
-func DeserializeCrossLink(bytes []byte) (*CrossLink, error) {
-	cl := &CrossLink{}
+func (cl *CrossLinkV1) BlockProposer() common.Address {
+	return common.Address{}
+}
+
+// DeserializeCrossLinkV1 rlp-decode the bytes into cross link object.
+func DeserializeCrossLinkV1(bytes []byte) (*CrossLinkV1, error) {
+	cl := &CrossLinkV1{}
 	err := rlp.DecodeBytes(bytes, cl)
 	if err != nil {
 		return nil, err
@@ -124,7 +128,33 @@ func DeserializeCrossLink(bytes []byte) (*CrossLink, error) {
 	return cl, err
 }
 
-// CrossLinks is a collection of cross links
+func DeserializeCrossLinks(bytes []byte) (CrossLinks, error) {
+	if rs, err := DeserializeCrossLinkV2(bytes); err == nil {
+		return CrossLinks{rs}, nil
+	}
+	rs, err := DeserializeCrossLinkV1(bytes)
+	if err != nil {
+		return nil, err
+	}
+	return CrossLinks{rs}, nil
+}
+
+func DeserializeCrossLinkV2(bytes []byte) (*CrossLinkV2, error) {
+	cl := &CrossLinkV2{}
+	err := rlp.DecodeBytes(bytes, cl)
+	if err != nil {
+		return nil, err
+	}
+	return cl, err
+}
+
+func (cl *CrossLinkV2) Serialize() []byte {
+	bytes, _ := rlp.EncodeToBytes(cl)
+	return bytes
+}
+
+// CrossLinksV1 is a collection of crosslinks
+type CrossLinksV1 []CrossLinkV1
 type CrossLinks []CrossLink
 
 // Sort crosslinks by shardID and then tie break by blockNum then by viewID
@@ -151,4 +181,26 @@ func (cls CrossLinks) IsSorted() bool {
 		}
 		return cls[i].ViewID().Cmp(cls[j].ViewID()) < 0
 	})
+}
+
+type CrossLinkV2 struct {
+	CrossLinkV1
+	Proposer common.Address
+}
+
+func (cl *CrossLinkV2) BlockProposer() common.Address {
+	return cl.Proposer
+}
+
+type CrossLink interface {
+	ShardID() uint32
+	ViewID() *big.Int
+	Epoch() *big.Int
+	Number() *big.Int
+	Hash() common.Hash
+	Bitmap() []byte
+	Signature() [96]byte
+	BlockProposer() common.Address
+	BlockNum() uint64
+	Serialize() []byte
 }

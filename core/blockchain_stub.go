@@ -264,7 +264,7 @@ func (a Stub) DeleteCrossLinks(cls []types.CrossLink) error {
 	return errors.Errorf("method DeleteCrossLinks not implemented for %s", a.Name)
 }
 
-func (a Stub) ReadCrossLink(shardID uint32, blockNum uint64) (*types.CrossLink, error) {
+func (a Stub) ReadCrossLink(shardID uint32, blockNum uint64) (types.CrossLink, error) {
 	return nil, errors.Errorf("method ReadCrossLink not implemented for %s", a.Name)
 }
 
@@ -272,7 +272,7 @@ func (a Stub) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardID uint32
 	return errors.Errorf("method LastContinuousCrossLink not implemented for %s", a.Name)
 }
 
-func (a Stub) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error) {
+func (a Stub) ReadShardLastCrossLink(shardID uint32) (types.CrossLink, error) {
 	return nil, errors.Errorf("method ReadShardLastCrossLink not implemented for %s", a.Name)
 }
 
