@@ -294,6 +294,11 @@ const (
 	DefaultBroadcastInvalidTx = false
 )
 
+func GetDefaultConfigCopy() harmonyconfig.HarmonyConfig {
+	config := defaultConfig
+	return config
+}
+
 func GetDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyconfig.HarmonyConfig {
 	config := defaultConfig
 

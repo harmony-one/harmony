@@ -171,9 +171,13 @@ func main() {
 		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s\n", *ip, *port, host.GetID().String()),
 	)
 
-	hc := harmonyConfigs.GetDefaultHmyConfigCopy(nodeconfig.NetworkType(*networkType))
+	nt := nodeconfig.NetworkType(*networkType)
+	hc := harmonyConfigs.GetDefaultConfigCopy()
 	rpcServerConfig := getRPCServerConfig(hc)
-	fmt.Println("boot node rpc configs:", rpcServerConfig)
+	utils.Logger().Info().
+		Interface("rpc server config", rpcServerConfig).
+		Interface("network", nt).
+		Msg("default configs are set")
 
 	host.Start()
 
@@ -222,14 +226,6 @@ func getRPCServerConfig(cfg harmony.HarmonyConfig) bootnodeconfig.RPCServerConfi
 			Str("provided", cfg.HTTP.IdleTimeout).
 			Dur("updated", idleTimeout).
 			Msg("Sanitizing invalid http idle timeout")
-	}
-	evmCallTimeout, err := time.ParseDuration(cfg.RPCOpt.EvmCallTimeout)
-	if err != nil {
-		evmCallTimeout, _ = time.ParseDuration(nodeconfig.DefaultEvmCallTimeout)
-		utils.Logger().Warn().
-			Str("provided", cfg.RPCOpt.EvmCallTimeout).
-			Dur("updated", evmCallTimeout).
-			Msg("Sanitizing invalid evm_call timeout")
 	}
 	return bootnodeconfig.RPCServerConfig{
 		HTTPEnabled:        cfg.HTTP.Enabled,
