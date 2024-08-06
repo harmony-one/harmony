@@ -11,7 +11,6 @@ import (
 	nodeConfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -48,9 +47,9 @@ func New(
 	node := BootNode{
 		unixTimeAtNodeStart:  time.Now().Unix(),
 		TransactionErrorSink: types.NewTransactionErrorSink(),
+		HarmonyConfig:        hc,
+		NodeConfig:           &nodeConfig.ConfigType{},
 	}
-
-	node.HarmonyConfig = hc
 
 	if host != nil {
 		node.host = host
@@ -91,9 +90,4 @@ func (bootnode *BootNode) ShutDown() {
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
 	os.Exit(0)
-}
-
-// IsRunningBeaconChain returns whether the node is running on beacon chain.
-func (bootnode *BootNode) IsRunningBeaconChain() bool {
-	return bootnode.NodeConfig.ShardID == shard.BeaconChainShardID
 }
