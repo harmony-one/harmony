@@ -14,8 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	//cmdharmony "github.com/harmony-one/harmony/cmd/harmony"
 	harmonyConfigs "github.com/harmony-one/harmony/cmd/config"
-	bootnodeConfigs "github.com/harmony-one/harmony/internal/configs/bootnode"
-	"github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeConfigs "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	bootnode "github.com/harmony-one/harmony/node/boot"
@@ -174,13 +172,12 @@ func main() {
 	nt := nodeConfigs.NetworkType(*networkType)
 	nodeConfigs.SetVersion(harmonyConfigs.GetHarmonyVersion())
 	hc := harmonyConfigs.GetDefaultConfigCopy()
-	rpcServerConfig := getRPCServerConfig(hc)
-	utils.Logger().Info().
-		Interface("rpc server config", rpcServerConfig).
-		Interface("network", nt).
-		Msg("default configs are set")
 
 	host.Start()
+
+	utils.Logger().Info().
+		Interface("network", nt).
+		Msg("boot node host started")
 
 	if *logConn {
 		host.GetP2PHost().Network().Notify(NewConnLogger(utils.GetLogInstance()))
@@ -200,49 +197,4 @@ func main() {
 	}
 
 	select {}
-}
-
-func getRPCServerConfig(cfg harmony.HarmonyConfig) bootnodeConfigs.RPCServerConfig {
-
-	readTimeout, err := time.ParseDuration(cfg.HTTP.ReadTimeout)
-	if err != nil {
-		readTimeout, _ = time.ParseDuration(nodeConfigs.DefaultHTTPTimeoutRead)
-		utils.Logger().Warn().
-			Str("provided", cfg.HTTP.ReadTimeout).
-			Dur("updated", readTimeout).
-			Msg("Sanitizing invalid http read timeout")
-	}
-	writeTimeout, err := time.ParseDuration(cfg.HTTP.WriteTimeout)
-	if err != nil {
-		writeTimeout, _ = time.ParseDuration(nodeConfigs.DefaultHTTPTimeoutWrite)
-		utils.Logger().Warn().
-			Str("provided", cfg.HTTP.WriteTimeout).
-			Dur("updated", writeTimeout).
-			Msg("Sanitizing invalid http write timeout")
-	}
-	idleTimeout, err := time.ParseDuration(cfg.HTTP.IdleTimeout)
-	if err != nil {
-		idleTimeout, _ = time.ParseDuration(nodeConfigs.DefaultHTTPTimeoutIdle)
-		utils.Logger().Warn().
-			Str("provided", cfg.HTTP.IdleTimeout).
-			Dur("updated", idleTimeout).
-			Msg("Sanitizing invalid http idle timeout")
-	}
-	return bootnodeConfigs.RPCServerConfig{
-		HTTPEnabled:        cfg.HTTP.Enabled,
-		HTTPIp:             cfg.HTTP.IP,
-		HTTPPort:           cfg.HTTP.Port,
-		HTTPAuthPort:       cfg.HTTP.AuthPort,
-		HTTPTimeoutRead:    readTimeout,
-		HTTPTimeoutWrite:   writeTimeout,
-		HTTPTimeoutIdle:    idleTimeout,
-		WSEnabled:          cfg.WS.Enabled,
-		WSIp:               cfg.WS.IP,
-		WSPort:             cfg.WS.Port,
-		WSAuthPort:         cfg.WS.AuthPort,
-		DebugEnabled:       cfg.RPCOpt.DebugEnabled,
-		RpcFilterFile:      cfg.RPCOpt.RpcFilterFile,
-		RateLimiterEnabled: cfg.RPCOpt.RateLimterEnabled,
-		RequestsPerSecond:  cfg.RPCOpt.RequestsPerSecond,
-	}
 }
