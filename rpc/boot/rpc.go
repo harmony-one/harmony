@@ -7,8 +7,8 @@ import (
 
 	"github.com/harmony-one/harmony/eth/rpc"
 	hmyboot "github.com/harmony-one/harmony/hmy_boot"
+	bootnodeConfigs "github.com/harmony-one/harmony/internal/configs/bootnode"
 	"github.com/harmony-one/harmony/internal/configs/harmony"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -23,9 +23,9 @@ const (
 
 const (
 	// APIVersion used for DApp's, bumped after RPC refactor (7/2020)
-	APIVersion = "1.1"
+	APIVersion = "1.0"
 	// LogTag is the tag found in the log for all RPC logs
-	LogTag = "[RPC]"
+	LogTag = "[BOOT_RPC]"
 	// HTTPPortOffset ..
 	HTTPPortOffset = 500
 	// WSPortOffset ..
@@ -48,9 +48,7 @@ var (
 	wsListener       net.Listener
 	wsHandler        *rpc.Server
 	httpEndpoint     = ""
-	httpAuthEndpoint = ""
 	wsEndpoint       = ""
-	wsAuthEndpoint   = ""
 	httpVirtualHosts = []string{"*"}
 	httpOrigins      = []string{"*"}
 	wsOrigins        = []string{"*"}
@@ -65,7 +63,7 @@ func (n Version) Namespace() string {
 }
 
 // StartServers starts the http & ws servers
-func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config nodeconfig.RPCServerConfig, rpcOpt harmony.RpcOptConfig) error {
+func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config bootnodeConfigs.RPCServerConfig, rpcOpt harmony.RpcOptConfig) error {
 	apis = append(apis, getBootAPIs(hmyboot, config)...)
 
 	// load method filter from file (if exist)
@@ -132,7 +130,7 @@ func StopServers() error {
 }
 
 // getBootAPIs returns all the API methods for the RPC interface
-func getBootAPIs(hmyboot *hmyboot.BootService, config nodeconfig.RPCServerConfig) []rpc.API {
+func getBootAPIs(hmyboot *hmyboot.BootService, config bootnodeConfigs.RPCServerConfig) []rpc.API {
 	publicAPIs := []rpc.API{
 		// Public methods
 		NewPublicBootAPI(hmyboot, V1),
