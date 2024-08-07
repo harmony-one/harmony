@@ -92,7 +92,6 @@ var (
 
 func printVersion(me string) {
 	fmt.Fprintf(os.Stderr, "Harmony (C) 2019. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
-	os.Exit(0)
 }
 
 func main() {
@@ -128,12 +127,13 @@ func main() {
 
 	if *versionFlag {
 		printVersion(os.Args[0])
+		os.Exit(0)
 	}
 
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	if *console != true {
+	if !*console {
 		utils.AddLogFile(fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port), *logMaxSize, *logRotateCount, *logRotateMaxAge)
 	}
 
@@ -170,6 +170,7 @@ func main() {
 	)
 
 	nt := nodeConfigs.NetworkType(*networkType)
+	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, path.Base(os.Args[0]), version, commit, builtBy, builtAt)
 	nodeConfigs.SetVersion(harmonyConfigs.GetHarmonyVersion())
 	hc := harmonyConfigs.GetDefaultConfigCopy()
 
