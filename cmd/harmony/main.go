@@ -56,6 +56,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version string variables
+var (
+	version string
+	builtBy string
+	builtAt string
+	commit  string
+)
+
 // Host
 var (
 	myHost          p2p.Host
@@ -88,6 +96,7 @@ Examples usage:
 }
 
 func init() {
+	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, "harmony", version, commit, builtBy, builtAt)
 	harmonyConfigs.Init(rootCmd)
 }
 

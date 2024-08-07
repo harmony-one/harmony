@@ -12,13 +12,7 @@ const (
 	versionFormat = "Harmony (C) 2023. %v, version %v-%v (%v %v)"
 )
 
-// Version string variables
-var (
-	version string
-	builtBy string
-	builtAt string
-	commit  string
-)
+var VersionMetaData []interface{}
 
 var versionFlag = cli.BoolFlag{
 	Name:      "version",
@@ -42,7 +36,7 @@ func VersionFlag() cli.BoolFlag {
 }
 
 func GetHarmonyVersion() string {
-	return fmt.Sprintf(versionFormat, "harmony", version, commit, builtBy, builtAt)
+	return fmt.Sprintf(versionFormat, VersionMetaData[:5]...) // "harmony", version, commit, builtBy, builtAt
 }
 
 func PrintVersion() {

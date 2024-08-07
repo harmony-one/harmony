@@ -191,10 +191,17 @@ func main() {
 	currentBootNode := bootnode.New(host, &hc)
 
 	if err := currentBootNode.StartRPC(); err != nil {
-		utils.Logger().Warn().
+		utils.Logger().Error().
 			Err(err).
 			Msg("StartRPC failed")
 	}
+
+	utils.Logger().Info().
+		Interface("network", nt).
+		Interface("ip", currentBootNode.SelfPeer.IP).
+		Interface("port", currentBootNode.SelfPeer.Port).
+		Interface("PeerID", currentBootNode.SelfPeer.PeerID).
+		Msg("boot node RPC started")
 
 	select {}
 }
