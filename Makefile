@@ -173,9 +173,13 @@ travis_go_checker:
 	bash ./scripts/travis_go_checker.sh
 
 travis_rpc_checker:
+	# value from command line will override this value, use point test to non-default
+	TEST_REPO_BRANCH='master'
 	bash ./scripts/travis_rpc_checker.sh
 
 travis_rosetta_checker:
+	# value from command line will override this value, use point test to non-default
+	TEST_REPO_BRANCH='master'
 	bash ./scripts/travis_rosetta_checker.sh
 
 debug_external: clean
