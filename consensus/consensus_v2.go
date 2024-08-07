@@ -260,6 +260,9 @@ func (consensus *Consensus) finalCommit() {
 		} else {
 			// pipelining
 			go func() {
+				//if consensus.Blockchain().Config().IsOneSecond(block.Epoch()) {
+				//	consensus.ReadySignal(NewProposal(AsyncProposal))
+				//}
 				select {
 				case consensus.GetCommitSigChannel() <- commitSigAndBitmap:
 				case <-time.After(CommitSigSenderTimeout):

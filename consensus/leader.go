@@ -301,6 +301,9 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 		go func(viewID uint64) {
 			waitTime := 1000 * time.Millisecond
+			if consensus.Blockchain().Config().IsOneSecond(blockObj.Epoch()) {
+				waitTime = 0 * time.Second
+			}
 			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
 			if maxWaitTime > waitTime {
 				waitTime = maxWaitTime
