@@ -350,7 +350,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		} else if clockAccuracyResp.NtpFailed() {
 			fmt.Fprintf(os.Stderr, "Error: NTP servers are not properly configured, %v\n", err)
 		} else {
-			fmt.Fprintf(os.Stderr, "Error: local time clock is not accurate, %v\n", clockAccuracyResp.Error())
+			fmt.Fprintf(os.Stderr, "Error: local time clock is not accurate, %s\n", clockAccuracyResp.Message())
 		}
 	}
 	if err != nil {

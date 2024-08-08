@@ -11,7 +11,7 @@ func TestCheckLocalTimeAccurate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query ntp pool should failed: %v\n", err)
 		}
-		t.Fatalf("query ntp pool should failed: %v\n", response.Error())
+		t.Fatalf("query ntp pool should failed: %s\n", response.Message())
 	}
 	if err == nil {
 		t.Fatalf("query invalid ntp pool should return error\n")
@@ -20,24 +20,24 @@ func TestCheckLocalTimeAccurate(t *testing.T) {
 	response, err = CheckLocalTimeAccurate("0.pool.ntp.org")
 	if !response.IsAccurate() || err != nil {
 		if response.AllNtpServersTimedOut() {
-			t.Skip(response.Error())
+			t.Skip(response.Message())
 		}
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("query valid ntp pool shouldn't return error: %v\n", err)
 		}
-		t.Fatal(response.Error())
+		t.Fatalf("local clock is not accurate: %v\n", response.Message())
 	}
 
 	// test multiple ntp servers, the second one is a valid server
 	response, err = CheckLocalTimeAccurate("wrong.ip,0.pool.ntp.org")
 	if !response.IsAccurate() || err != nil {
 		if response.AllNtpServersTimedOut() {
-			t.Skip(response.Error())
+			t.Skip(response.Message())
 		}
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("query multiple ntp pools shouldn't return error: %v\n", err)
 		}
-		t.Fatal(response.Error())
+		t.Fatalf("local clock is not accurate: %v\n", response.Message())
 	}
 
 	// test multiple ntp servers, both invalid server

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	beevik_ntp "github.com/beevik/ntp"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -17,10 +16,11 @@ const (
 )
 
 var (
-	errDriftTooMuch          = errors.New("local time drift off ntp server more than 30 seconds")
-	errDriftInRange          = errors.New("local time drift off ntp server more than 10 seconds")
-	errAllNtpServersTimedOut = errors.New("querying all NTP servers timed out")
-	errNtpServersFailed      = errors.New("querying all NTP servers failed")
+	msgClockIsAccurate       = "local time is accurate"
+	msgDriftTooMuch          = "local time drift off ntp server more than 30 seconds"
+	msgDriftInRange          = "local time drift off ntp server more than 10 seconds"
+	msgAllNtpServersTimedOut = "querying all NTP servers timed out"
+	msgNtpServersFailed      = "querying all NTP servers failed"
 )
 
 type ClockStatus int
@@ -33,8 +33,8 @@ const (
 	NtpServersFailed
 )
 
-func (s ClockStatus) Error() error {
-	return [...]error{nil, errDriftTooMuch, errDriftInRange, errAllNtpServersTimedOut, errNtpServersFailed}[s]
+func (s ClockStatus) Message() string {
+	return [...]string{msgClockIsAccurate, msgDriftTooMuch, msgDriftInRange, msgAllNtpServersTimedOut, msgNtpServersFailed}[s]
 }
 
 func (s ClockStatus) IsAccurate() bool {
