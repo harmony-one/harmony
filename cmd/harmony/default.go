@@ -142,7 +142,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 }
 
 var defaultSysConfig = harmonyconfig.SysConfig{
-	NtpServer: "1.pool.ntp.org",
+	NtpServer: "1.pool.ntp.org,0.beevik-ntp.pool.ntp.org",
 }
 
 var defaultDevnetConfig = harmonyconfig.DevnetConfig{

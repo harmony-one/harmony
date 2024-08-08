@@ -343,14 +343,14 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeconfig.GetDefaultConfig().StagedSync = nodeConfig.StagedSync
 
 	// Check NTP configuration
-	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
-	if !accurate {
-		if os.IsTimeout(err) {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			fmt.Fprintf(os.Stderr, "NTP query timed out. Continuing.\n")
+	clockAccuracyResp, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
+	if !clockAccuracyResp.IsAccurate() {
+		if clockAccuracyResp.AllNtpServersTimedOut() {
+			fmt.Fprintf(os.Stderr, "Error: querying NTP servers timed out, Continuing.\n")
+		} else if clockAccuracyResp.NtpFailed() {
+			fmt.Fprintf(os.Stderr, "Error: NTP servers are not properly configured, %v\n", err)
 		} else {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			fmt.Fprintf(os.Stderr, "Error: local timeclock is not accurate. Please config NTP properly.\n")
+			fmt.Fprintf(os.Stderr, "Error: local time clock is not accurate, %v\n", clockAccuracyResp.Error())
 		}
 	}
 	if err != nil {
