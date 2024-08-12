@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -199,6 +200,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
+	currentBlock := consensus.Blockchain().CurrentBlock()
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
 		signed := consensus.decider.ReadBallot(quorum.Commit, signer.Bytes)
@@ -294,14 +296,21 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
-		if !blockObj.IsLastBlockInEpoch() {
-			// only do early commit if it's not epoch block to avoid problems
-			consensus.preCommitAndPropose(blockObj)
+		if consensus.Blockchain().Config().IsOneSecond(currentBlock.Epoch()) {
+			//if !blockObj.IsLastBlockInEpoch() {
+			consensus.preCommitAndPropose1s(blockObj)
+			//}
+		} else {
+			if !blockObj.IsLastBlockInEpoch() {
+				// only do early commit if it's not epoch block to avoid problems
+				consensus.preCommitAndPropose(blockObj)
+			}
+			//consensus.ReadySignal(NewProposal(AsyncProposal))
 		}
 
 		go func(viewID uint64) {
 			waitTime := 1000 * time.Millisecond
-			if consensus.Blockchain().Config().IsOneSecond(blockObj.Epoch()) {
+			if consensus.Blockchain().Config().IsOneSecond(currentBlock.Epoch()) {
 				waitTime = 0 * time.Second
 			}
 			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
@@ -316,7 +325,14 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			consensus.mutex.Lock()
 			defer consensus.mutex.Unlock()
 			if viewID == consensus.getCurBlockViewID() {
-				consensus.finalCommit()
+				if currentBlock.ShardID() == 0 {
+					fmt.Println("final commit", blockObj.NumberU64())
+				}
+				if consensus.Blockchain().Config().IsOneSecond(currentBlock.Epoch()) {
+					consensus.finalCommit1s(blockObj)
+				} else {
+					consensus.finalCommit(blockObj)
+				}
 			}
 		}(viewID)
 
