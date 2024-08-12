@@ -301,11 +301,10 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 		return nil, nil
 	}
 	lastCommits, err := consensus.Blockchain().ReadCommitSig(blockNum)
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	if err != nil ||
-		len(lastCommits) < bls.BLSSignatureSizeInBytes {
-		msgs := consensus.FBFTLog().GetMessagesByTypeSeq(
+	if err != nil || len(lastCommits) < bls.BLSSignatureSizeInBytes {
+		consensus.mutex.Lock()
+		defer consensus.mutex.Unlock()
+		msgs := consensus.fBFTLog.GetMessagesByTypeSeq(
 			msg_pb.MessageType_COMMITTED, blockNum,
 		)
 		if len(msgs) != 1 {
