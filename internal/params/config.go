@@ -316,6 +316,7 @@ var (
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		IsOneSecondEpoch:                      EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -363,6 +364,7 @@ var (
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // MaxRateEpoch
 		big.NewInt(0),                      // MaxRateEpoch
+		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
 	}
@@ -413,6 +415,7 @@ var (
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
+		big.NewInt(0),
 		big.NewInt(0),
 	}
 
@@ -589,6 +592,8 @@ type ChainConfig struct {
 
 	// TopMaxRateEpoch will make sure the validator max-rate is less to 100% for the cases where the minRate + the validator max-rate-increase > 100%
 	TopMaxRateEpoch *big.Int `json:"top-max-rate-epoch,omitempty"`
+
+	IsOneSecondEpoch *big.Int `json:"is-one-second-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -712,6 +717,10 @@ func (c *ChainConfig) IsFiveSeconds(epoch *big.Int) bool {
 // IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
 func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
 	return isForked(c.TwoSecondsEpoch, epoch)
+}
+
+func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
+	return isForked(c.IsOneSecondEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%
