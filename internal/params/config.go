@@ -323,7 +323,7 @@ var (
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
-		IsOneSecondEpoch:                      EpochTBD,
+		IsOneSecondEpoch:                      big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...

@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"time"
-
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
@@ -223,6 +221,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
+	currentHeader := consensus.Blockchain().CurrentHeader()
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
 		signed := consensus.decider.ReadBallot(quorum.Commit, signer.Bytes)
