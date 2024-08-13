@@ -53,7 +53,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 	return r
 }
 
-// IsQuorumAchivedByMask ..
+// IsQuorumAchievedByMask ..
 func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	if mask == nil {
 		return false
