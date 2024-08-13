@@ -28,6 +28,7 @@ echo "Working dir is ${DIR}"
 echo "GOPATH is ${GOPATH}"
 cd "${GOPATH}/src/github.com/harmony-one/harmony-test"
 # cover possible force pushes to remote branches - just rebase local on top of origin
+git fetch origin "${TEST_REPO_BRANCH}"
 git checkout "${TEST_REPO_BRANCH}"
 git pull --rebase=true
 cd localnet
