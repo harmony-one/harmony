@@ -138,7 +138,22 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	return nil
 }
 
-func (consensus *Consensus) finalCommit(isLeader bool) {
+// finalCommit uses locks, not suited to be called internally
+func (consensus *Consensus) finalCommit(viewID uint64, isLeader bool) {
+	waitTime := 1000 * time.Millisecond
+	maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
+	if maxWaitTime > waitTime {
+		waitTime = maxWaitTime
+	}
+	consensus.GetLogger().Info().Str("waitTime", waitTime.String()).
+		Msg("[OnCommit] Starting Grace Period")
+	time.Sleep(waitTime)
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	if viewID != consensus.getCurBlockViewID() {
+		return
+	}
 	numCommits := consensus.decider.SignersCount(quorum.Commit)
 
 	consensus.getLogger().Info().
