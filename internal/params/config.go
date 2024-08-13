@@ -323,6 +323,7 @@ var (
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		IsOneSecondEpoch:                      EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -606,6 +607,8 @@ type ChainConfig struct {
 	// vote power feature  https://github.com/harmony-one/harmony/pull/4683
 	// if crosslink are not sent for an entire epoch signed and toSign will be 0 and 0. when that happen, next epoch there will no shard 1 validator elected in the committee.
 	HIP32Epoch *big.Int `json:"hip32-epoch,omitempty"`
+
+	IsOneSecondEpoch *big.Int `json:"is-one-second-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -729,6 +732,10 @@ func (c *ChainConfig) IsFiveSeconds(epoch *big.Int) bool {
 // IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
 func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
 	return isForked(c.TwoSecondsEpoch, epoch)
+}
+
+func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
+	return isForked(c.IsOneSecondEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%

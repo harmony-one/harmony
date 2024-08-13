@@ -51,6 +51,8 @@ const (
 
 func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.LocalnetChainConfig.IsOneSecond(epoch):
+		return localnetV4
 	case params.LocalnetChainConfig.IsHIP30(epoch):
 		return localnetV4
 	case params.LocalnetChainConfig.IsFeeCollectEpoch(epoch):
@@ -129,7 +131,7 @@ func (ls localnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 		return localnetEpochBlock1 - 1
 	default:
 		switch {
-		case params.LocalnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
+		case params.LocalnetChainConfig.IsOneSecond(big.NewInt(int64(epochNum))), params.LocalnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
 			blocks := ls.BlocksPerEpoch()
 			firstBlock2s := ls.twoSecondsFirstBlock()
 			block2s := (1 + epochNum - params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()) * blocks
