@@ -135,13 +135,13 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	return nil
 }
 
-func (consensus *Consensus) finalCommit1s(blockObj *types.Block) {
+func (consensus *Consensus) finalCommit1s(block *types.Block) {
 	numCommits := consensus.decider.SignersCount(quorum.Commit)
 
 	consensus.getLogger().Info().
 		Int64("NumCommits", numCommits).
 		Msg("[finalCommit] Finalizing Consensus")
-	beforeCatchupNum := consensus.getBlockNum()
+	//beforeCatchupNum := consensus.getBlockNum()
 
 	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
@@ -157,29 +157,29 @@ func (consensus *Consensus) finalCommit1s(blockObj *types.Block) {
 	}
 	var (
 		//msgToSend          = network.Bytes
-		FBFTMsg            = network.FBFTMsg
-		commitSigAndBitmap = FBFTMsg.Payload
+		FBFTMsg = network.FBFTMsg
+		//commitSigAndBitmap = FBFTMsg.Payload
 	)
 	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
 	// find correct block content
-	curBlockHash := consensus.blockHash
-	block := consensus.fBFTLog.GetBlockByHash(curBlockHash)
-	if block == nil {
-		consensus.getLogger().Warn().
-			Str("blockHash", hex.EncodeToString(curBlockHash[:])).
-			Msg("[finalCommit] Cannot find block by hash")
-		return
-	}
+	//curBlockHash := consensus.blockHash
+	//block := consensus.fBFTLog.GetBlockByHash(curBlockHash)
+	//if block == nil {
+	//	consensus.getLogger().Warn().
+	//		Str("blockHash", hex.EncodeToString(curBlockHash[:])).
+	//		Msg("[finalCommit] Cannot find block by hash")
+	//	return
+	//}
 
-	if err := consensus.verifyLastCommitSig(commitSigAndBitmap, block); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed verifying last commit sig")
-		return
-	}
-	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
+	//if err := consensus.verifyLastCommitSig(commitSigAndBitmap, block); err != nil {
+	//	consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed verifying last commit sig")
+	//	return
+	//}
+	//consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 
-	if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
-	}
+	//if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
+	//	consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+	//}
 
 	// Send committed message before block insertion.
 	// if leader successfully finalizes the block, send committed message to validators
@@ -218,14 +218,14 @@ func (consensus *Consensus) finalCommit1s(blockObj *types.Block) {
 		//	Msg("[finalCommit] Queued Committed Message")
 	}
 
-	block.SetCurrentCommitSig(commitSigAndBitmap)
-	err = consensus.commitBlock(block, FBFTMsg)
-
-	if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
-		consensus.getLogger().Err(err).
-			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
-			Msg("[finalCommit] Leader failed to commit the confirmed block")
-	}
+	//block.SetCurrentCommitSig(commitSigAndBitmap)
+	//err = consensus.commitBlock(block, FBFTMsg)
+	//
+	//if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
+	//	consensus.getLogger().Err(err).
+	//		Uint64("beforeCatchupBlockNum", beforeCatchupNum).
+	//		Msg("[finalCommit] Leader failed to commit the confirmed block")
+	//}
 
 	// Dump new block into level db
 	// In current code, we add signatures in block in tryCatchup, the block dump to explorer does not contains signatures
@@ -252,19 +252,23 @@ func (consensus *Consensus) finalCommit1s(blockObj *types.Block) {
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
 	if consensus.isLeader() {
-		if block.IsLastBlockInEpoch() {
-
+		if !block.IsLastBlockInEpoch() {
+			select {
+			case consensus.GetCommitSigChannel() <- block.GetCurrentCommitSig():
+			case <-time.After(CommitSigSenderTimeout):
+				utils.Logger().Error().Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
+			}
 		} else {
 			// pipelining
 
 			//if consensus.Blockchain().Config().IsOneSecond(block.Epoch()) {
 			//	consensus.ReadySignal(NewProposal(AsyncProposal))
 			//}
-			select {
-			case consensus.GetCommitSigChannel() <- commitSigAndBitmap:
-			case <-time.After(CommitSigSenderTimeout):
-				utils.Logger().Error().Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
-			}
+			//select {
+			//case consensus.GetCommitSigChannel() <- commitSigAndBitmap:
+			//case <-time.After(CommitSigSenderTimeout):
+			//	utils.Logger().Error().Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
+			//}
 
 		}
 	}
@@ -687,9 +691,9 @@ func (consensus *Consensus) preCommitAndPropose1s(blk *types.Block) error {
 		return errors.Wrap(err, "[preCommitAndPropose] failed verifying last commit sig")
 	}
 	blk.SetCurrentCommitSig(bareMinimumCommit)
-	//if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
-	//	consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
-	//}
+	if err := consensus.Blockchain().WriteCommitSig(blk.NumberU64(), bareMinimumCommit); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+	}
 
 	// Send committed message to validators since 2/3 commit is already collected
 	if err := consensus.msgSender.SendWithRetry(
