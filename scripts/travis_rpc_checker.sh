@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+#TODO: return back to master
+TEST_REPO_BRANCH="feat_1.22_update"
 TEST_REPO_BRANCH=${TEST_REPO_BRANCH:-master}
 # handle for the Travis build run:
 # * uses TRAVIS_PULL_REQUEST_BRANCH for RP branch
