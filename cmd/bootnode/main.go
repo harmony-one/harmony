@@ -191,11 +191,11 @@ func main() {
 
 	currentBootNode := bootnode.New(host, &hc)
 
-	if err := currentBootNode.StartRPC(); err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("StartRPC failed")
-	}
+	// if err := currentBootNode.StartRPC(); err != nil {
+	// 	utils.Logger().Error().
+	// 		Err(err).
+	// 		Msg("StartRPC failed")
+	// }
 
 	utils.Logger().Info().
 		Interface("network", nt).
