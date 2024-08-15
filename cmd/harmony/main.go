@@ -454,6 +454,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		}).Msg("verbose prints config")
 	}
 
+	fmt.Println(os.Args)
+	fmt.Println("hc.Sync.Enabled ", hc.Sync.Enabled, "hc.Sync.StagedSync", hc.Sync.StagedSync)
 	// Setup services
 	if hc.Sync.Enabled {
 		if hc.Sync.StagedSync {

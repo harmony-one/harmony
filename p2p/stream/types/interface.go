@@ -14,8 +14,8 @@ type Protocol interface {
 	Specifier() string
 	Version() *version.Version
 	ProtoID() ProtoID
-	// ShardProtoID() ProtoID
-	IsBeaconNode() bool
+	//ShardProtoID() ProtoID
+	//IsBeaconNode() bool
 	Match(id protocol.ID) bool
 	HandleStream(st libp2p_network.Stream)
 }

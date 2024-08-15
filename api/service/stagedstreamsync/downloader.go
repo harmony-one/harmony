@@ -25,7 +25,7 @@ type (
 		syncProtocol       syncProtocol
 		bh                 *beaconHelper
 		stagedSyncInstance *StagedStreamSync
-		isBeaconNode       bool
+		//isBeaconNode       bool
 
 		downloadC chan struct{}
 		closeC    chan struct{}
@@ -47,7 +47,6 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, consensus *consensus.Conse
 		Discovery:            host.GetDiscovery(),
 		ShardID:              nodeconfig.ShardID(bc.ShardID()),
 		Network:              config.Network,
-		BeaconNode:           isBeaconNode,
 		MaxAdvertiseWaitTime: config.MaxAdvertiseWaitTime,
 		SmSoftLowCap:         config.SmSoftLowCap,
 		SmHardLowCap:         config.SmHardLowCap,
@@ -80,7 +79,7 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, consensus *consensus.Conse
 		syncProtocol:       sp,
 		bh:                 bh,
 		stagedSyncInstance: stagedSyncInstance,
-		isBeaconNode:       isBeaconNode,
+		//isBeaconNode:       isBeaconNode,
 
 		downloadC: make(chan struct{}),
 		closeC:    make(chan struct{}),
@@ -204,7 +203,7 @@ func (d *Downloader) loop() {
 	// for shard chain and beacon chain node, first we start with initSync=true to
 	// make sure it goes through the long range sync first.
 	// for epoch chain we do only need to go through epoch sync process
-	initSync := d.isBeaconNode || d.bc.ShardID() != shard.BeaconChainShardID
+	initSync := d.bc.ShardID() != shard.BeaconChainShardID
 
 	trigger := func() {
 		select {

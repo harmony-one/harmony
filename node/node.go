@@ -623,6 +623,20 @@ func (node *Node) StartPubSub() error {
 		}
 	}
 
+	if node.Consensus.ShardID != 0 {
+		groups[nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(node.Consensus.ShardID))] = false
+	}
+
+	if utils.GetPort() == 9000 {
+		fmt.Println("GROUPS 9000", groups)
+	}
+	if utils.GetPort() == 9002 {
+		fmt.Println("GROUPS 9002", groups)
+	}
+	if utils.GetPort() == 9004 {
+		fmt.Println("GROUPS 9004", groups)
+	}
+
 	type u struct {
 		p2p.NamedTopic
 		consensusBound bool
@@ -641,12 +655,10 @@ func (node *Node) StartPubSub() error {
 			if err != nil {
 				return err
 			}
-			allTopics = append(
-				allTopics, u{
-					NamedTopic:     p2p.NamedTopic{Name: string(key), Topic: topicHandle},
-					consensusBound: isCon,
-				},
-			)
+			allTopics = append(allTopics, u{
+				NamedTopic:     p2p.NamedTopic{Name: string(key), Topic: topicHandle},
+				consensusBound: isCon,
+			})
 		}
 	}
 	pubsub := node.host.PubSub()

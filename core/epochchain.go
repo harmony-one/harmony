@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -115,6 +116,7 @@ func (bc *EpochChain) Stop() {
 }
 
 func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
+	fmt.Println("EpochChain insertchain")
 	if len(blocks) == 0 {
 		return 0, nil
 	}
