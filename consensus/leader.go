@@ -293,14 +293,17 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
-		if !blockObj.IsLastBlockInEpoch() {
-			// only do early commit if it's not epoch block to avoid problems
-			consensus.preCommitAndPropose(blockObj)
-		}
-
 		if consensus.Blockchain().Config().IsOneSecond(currentHeader.Epoch()) {
-			go consensus.finalCommit(viewID)
+			if !blockObj.IsLastBlockInEpoch() {
+				// only do early commit if it's not epoch block to avoid problems
+				consensus.preCommitAndPropose(blockObj)
+			}
+			go consensus.finalCommit1s(viewID, consensus.NextBlockDue)
 		} else {
+			if !blockObj.IsLastBlockInEpoch() {
+				// only do early commit if it's not epoch block to avoid problems
+				consensus.preCommitAndPropose(blockObj)
+			}
 			go consensus.finalCommit(viewID)
 		}
 
