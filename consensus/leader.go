@@ -327,7 +327,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 		if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems
-			consensus.preCommitAndPropose(blockObj)
+			consensus.preCommitAndPropose1s(blockObj)
 		}
 		consensus.transitions.finalCommit = true
 		waitTime := 1000 * time.Millisecond
