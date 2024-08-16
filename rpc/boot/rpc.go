@@ -67,8 +67,8 @@ func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config bootnodeC
 	// apis = append(apis, getBootAPIs(hmyboot, config)...)
 
 	// load method filter from file (if exist)
-	var rmf rpc.RpcMethodFilter
 	/*
+		var rmf rpc.RpcMethodFilter
 		rpcFilterFilePath := strings.TrimSpace(rpcOpt.RpcFilterFile)
 		if len(rpcFilterFilePath) > 0 {
 			if err := rmf.LoadRpcMethodFiltersFromFile(rpcFilterFilePath); err != nil {
@@ -77,26 +77,25 @@ func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config bootnodeC
 		} else {
 			rmf.ExposeAll()
 		}
+		if config.HTTPEnabled {
+			timeouts := rpc.HTTPTimeouts{
+				ReadTimeout:  config.HTTPTimeoutRead,
+				WriteTimeout: config.HTTPTimeoutWrite,
+				IdleTimeout:  config.HTTPTimeoutIdle,
+			}
+			httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
+			if err := startBootServiceHTTP(apis, &rmf, timeouts); err != nil {
+				return err
+			}
+		}
+
+		if config.WSEnabled {
+			wsEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSPort)
+			if err := startBootServiceWS(apis, &rmf); err != nil {
+				return err
+			}
+		}
 	*/
-	if config.HTTPEnabled {
-		timeouts := rpc.HTTPTimeouts{
-			ReadTimeout:  config.HTTPTimeoutRead,
-			WriteTimeout: config.HTTPTimeoutWrite,
-			IdleTimeout:  config.HTTPTimeoutIdle,
-		}
-		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
-		if err := startBootServiceHTTP(apis, &rmf, timeouts); err != nil {
-			return err
-		}
-	}
-
-	if config.WSEnabled {
-		wsEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSPort)
-		if err := startBootServiceWS(apis, &rmf); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
