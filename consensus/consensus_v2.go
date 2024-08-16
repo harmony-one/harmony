@@ -754,6 +754,78 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	return nil
 }
 
+// preCommitAndPropose commit the current block with 67% commit signatures and start
+// proposing new block which will wait on the full commit signatures to finish
+func (consensus *Consensus) preCommitAndPropose1s(blk *types.Block) error {
+	if blk == nil {
+		return errors.New("block to pre-commit is nil")
+	}
+
+	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
+	if err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] leader not found")
+		return err
+	}
+
+	// Construct committed message
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
+	if err != nil {
+		consensus.getLogger().Warn().Err(err).
+			Msg("[preCommitAndPropose] Unable to construct Committed message")
+		return err
+	}
+
+	msgToSend, FBFTMsg :=
+		network.Bytes,
+		network.FBFTMsg
+	bareMinimumCommit := FBFTMsg.Payload
+	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
+
+	if err := consensus.verifyLastCommitSig(bareMinimumCommit, blk); err != nil {
+		return errors.Wrap(err, "[preCommitAndPropose] failed verifying last commit sig")
+	}
+
+	go func() {
+		blk.SetCurrentCommitSig(bareMinimumCommit)
+
+		// Send committed message to validators since 2/3 commit is already collected
+		if err := consensus.msgSender.SendWithRetry(
+			blk.NumberU64(),
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+			},
+			p2p.ConstructMessage(msgToSend)); err != nil {
+			consensus.GetLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")
+		} else {
+			consensus.GetLogger().Info().
+				Str("blockHash", blk.Hash().Hex()).
+				Uint64("blockNum", consensus.BlockNum()).
+				Hex("lastCommitSig", bareMinimumCommit).
+				Msg("[preCommitAndPropose] Sent Committed Message")
+		}
+
+		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog().IsBlockVerified(blk.Hash())); err != nil {
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+				consensus.GetLogger().Info().Msg("[preCommitAndPropose] Block already known")
+			default:
+				consensus.GetLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+				return
+			}
+		}
+		consensus.mutex.Lock()
+		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
+		consensus.consensusTimeout[timeoutConsensus].Start()
+
+		// Send signal to Node to propose the new block for consensus
+		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
+		consensus.mutex.Unlock()
+		consensus.ReadySignal(NewProposal(AsyncProposal))
+	}()
+
+	return nil
+}
+
 func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types.Block) error {
 	if len(lastCommitSig) < bls.BLSSignatureSizeInBytes {
 		return errors.New("lastCommitSig not have enough length")

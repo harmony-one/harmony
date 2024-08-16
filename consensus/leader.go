@@ -296,7 +296,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		if consensus.Blockchain().Config().IsOneSecond(currentHeader.Epoch()) {
 			if !blockObj.IsLastBlockInEpoch() {
 				// only do early commit if it's not epoch block to avoid problems
-				consensus.preCommitAndPropose(blockObj)
+				consensus.preCommitAndPropose1s(blockObj)
 			}
 			go consensus.finalCommit1s(viewID, consensus.NextBlockDue)
 		} else {
