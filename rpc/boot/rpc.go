@@ -167,7 +167,7 @@ func startBootServiceWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
 	// }
 
 	utils.Logger().Info().
-		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
+		Str("url", fmt.Sprintf("ws://%s", wsEndpoint)).
 		Msg("WebSocket endpoint opened")
 	fmt.Printf("Started Boot Node WS server at: %v\n", wsEndpoint)
 	return nil
