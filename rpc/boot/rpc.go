@@ -141,27 +141,28 @@ func getBootAPIs(hmyboot *hmyboot.BootService, config bootnodeConfigs.RPCServerC
 }
 
 func startBootServiceHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter, httpTimeouts rpc.HTTPTimeouts) (err error) {
-	httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
-		httpEndpoint, apis, HTTPModules, rmf, httpOrigins, httpVirtualHosts, httpTimeouts,
-	)
-	if err != nil {
-		return err
-	}
+	// httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
+	// 	httpEndpoint, apis, HTTPModules, rmf, httpOrigins, httpVirtualHosts, httpTimeouts,
+	// )
+	// if err != nil {
+	// 	return err
+	// }
 
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("http://%s", httpEndpoint)).
 		Str("cors", strings.Join(httpOrigins, ",")).
 		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
 		Msg("HTTP endpoint opened")
+
 	fmt.Printf("Started Boot Node RPC server at: %v\n", httpEndpoint)
 	return nil
 }
 
 func startBootServiceWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
-	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsEndpoint, apis, WSModules, rmf, wsOrigins, true)
-	if err != nil {
-		return err
-	}
+	// wsListener, wsHandler, err = rpc.StartWSEndpoint(wsEndpoint, apis, WSModules, rmf, wsOrigins, true)
+	// if err != nil {
+	// 	return err
+	// }
 
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
