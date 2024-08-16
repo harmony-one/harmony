@@ -65,18 +65,19 @@ func (n Version) Namespace() string {
 // StartServers starts the http & ws servers
 func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config bootnodeConfigs.RPCServerConfig, rpcOpt harmony.RpcOptConfig) error {
 	// apis = append(apis, getBootAPIs(hmyboot, config)...)
-
+	fmt.Println("start servers, config:", config)
+	fmt.Println("start servers, rpcOpt:", rpcOpt)
 	// load method filter from file (if exist)
-	/*
-		var rmf rpc.RpcMethodFilter
-		rpcFilterFilePath := strings.TrimSpace(rpcOpt.RpcFilterFile)
-		if len(rpcFilterFilePath) > 0 {
-			if err := rmf.LoadRpcMethodFiltersFromFile(rpcFilterFilePath); err != nil {
-				return err
-			}
-		} else {
-			rmf.ExposeAll()
+	var rmf rpc.RpcMethodFilter
+	rpcFilterFilePath := strings.TrimSpace(rpcOpt.RpcFilterFile)
+	if len(rpcFilterFilePath) > 0 {
+		if err := rmf.LoadRpcMethodFiltersFromFile(rpcFilterFilePath); err != nil {
+			return err
 		}
+	} else {
+		rmf.ExposeAll()
+	}
+	/*
 		if config.HTTPEnabled {
 			timeouts := rpc.HTTPTimeouts{
 				ReadTimeout:  config.HTTPTimeoutRead,
