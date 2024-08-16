@@ -479,7 +479,7 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time,
 }
 
 // finalCommit uses locks, not suited to be called internally
-func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time) {
+func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time, network *NetworkMessage) {
 	waitTime := 0 * time.Millisecond
 	maxWaitTime := time.Until(nextBlockDue) - 200*time.Millisecond
 	if maxWaitTime > waitTime {
@@ -501,18 +501,18 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time)
 		Msg("[finalCommit] Finalizing Consensus")
 	beforeCatchupNum := consensus.getBlockNum()
 
-	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
-	if err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[finalCommit] leader not found")
-		return
-	}
+	//leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
+	//if err != nil {
+	//	consensus.getLogger().Error().Err(err).Msg("[finalCommit] leader not found")
+	//	return
+	//}
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
-	if err != nil {
-		consensus.getLogger().Warn().Err(err).
-			Msg("[finalCommit] Unable to construct Committed message")
-		return
-	}
+	//network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
+	//if err != nil {
+	//	consensus.getLogger().Warn().Err(err).
+	//		Msg("[finalCommit] Unable to construct Committed message")
+	//	return
+	//}
 	var (
 		msgToSend          = network.Bytes
 		FBFTMsg            = network.FBFTMsg
@@ -535,9 +535,9 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time)
 	}
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 
-	if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
-	}
+	//if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
+	//	consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+	//}
 
 	// Send committed message before block insertion.
 	// if leader successfully finalizes the block, send committed message to validators
@@ -577,7 +577,7 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time)
 	}
 
 	block.SetCurrentCommitSig(commitSigAndBitmap)
-	err = consensus.commitBlock(block, FBFTMsg)
+	err := consensus.commitBlock1s(block, FBFTMsg)
 
 	if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
 		consensus.getLogger().Err(err).
@@ -997,6 +997,24 @@ func (consensus *Consensus) preCommitAndPropose1s(blk *types.Block) (*NetworkMes
 		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
 	}
 
+	blk.SetCurrentCommitSig(bareMinimumCommit)
+
+	if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.fBFTLog.IsBlockVerified(blk.Hash())); err != nil {
+		switch {
+		case errors.Is(err, core.ErrKnownBlock):
+			consensus.getLogger().Info().Msg("[preCommitAndPropose] Block already known")
+		default:
+			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+			return nil, err
+		}
+	}
+
+	consensus.getLogger().Info().Hex("new", bareMinimumCommit).Msg("[finalCommit] Overriding commit signatures!!")
+
+	if err := consensus.Blockchain().WriteCommitSig(blk.NumberU64(), bareMinimumCommit); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+	}
+
 	go func() {
 
 		// Send committed message to validators since 2/3 commit is already collected
@@ -1108,6 +1126,32 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 
 	consensus.FinishFinalityCount()
 	consensus.PostConsensusProcessing(blk)
+	consensus.setupForNewConsensus(blk, committedMsg)
+	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
+		Str("hash", blk.Header().Hash().Hex()).
+		Msg("Added New Block to Blockchain!!!")
+
+	return nil
+}
+
+func (consensus *Consensus) commitBlock1s(blk *types.Block, committedMsg *FBFTMessage) error {
+	//if consensus.Blockchain().CurrentBlock().NumberU64() < blk.NumberU64() {
+	//	_, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.fBFTLog.IsBlockVerified(blk.Hash()))
+	//	if err != nil && !errors.Is(err, core.ErrKnownBlock) {
+	//		consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
+	//		return err
+	//	}
+	//}
+
+	if !committedMsg.HasSingleSender() {
+		consensus.getLogger().Error().Msg("[TryCatchup] Leader message can not have multiple sender keys")
+		return errIncorrectSender
+	}
+
+	consensus.FinishFinalityCount()
+	go func() {
+		consensus.PostConsensusJob(blk)
+	}()
 	consensus.setupForNewConsensus(blk, committedMsg)
 	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
 		Str("hash", blk.Header().Hash().Hex()).
