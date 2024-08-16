@@ -480,6 +480,157 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time,
 	}
 }
 
+// finalCommit uses locks, not suited to be called internally
+func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time) {
+	waitTime := 0 * time.Millisecond
+	maxWaitTime := time.Until(nextBlockDue) - 200*time.Millisecond
+	if maxWaitTime > waitTime {
+		waitTime = maxWaitTime
+	}
+	consensus.GetLogger().Info().Str("waitTime", waitTime.String()).
+		Msg("[OnCommit] Starting Grace Period")
+	time.Sleep(waitTime)
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	if viewID != consensus.getCurBlockViewID() {
+		return
+	}
+	numCommits := consensus.decider.SignersCount(quorum.Commit)
+
+	consensus.getLogger().Info().
+		Int64("NumCommits", numCommits).
+		Msg("[finalCommit] Finalizing Consensus")
+	beforeCatchupNum := consensus.getBlockNum()
+
+	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
+	if err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[finalCommit] leader not found")
+		return
+	}
+	// Construct committed message
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
+	if err != nil {
+		consensus.getLogger().Warn().Err(err).
+			Msg("[finalCommit] Unable to construct Committed message")
+		return
+	}
+	var (
+		msgToSend          = network.Bytes
+		FBFTMsg            = network.FBFTMsg
+		commitSigAndBitmap = FBFTMsg.Payload
+	)
+	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
+	// find correct block content
+	curBlockHash := consensus.blockHash
+	block := consensus.fBFTLog.GetBlockByHash(curBlockHash)
+	if block == nil {
+		consensus.getLogger().Warn().
+			Str("blockHash", hex.EncodeToString(curBlockHash[:])).
+			Msg("[finalCommit] Cannot find block by hash")
+		return
+	}
+
+	if err := consensus.verifyLastCommitSig(commitSigAndBitmap, block); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed verifying last commit sig")
+		return
+	}
+	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
+
+	if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+	}
+
+	// Send committed message before block insertion.
+	// if leader successfully finalizes the block, send committed message to validators
+	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
+	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
+	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
+	if !consensus.isLeader() || block.IsLastBlockInEpoch() {
+		// send immediately
+		if err := consensus.msgSender.SendWithRetry(
+			block.NumberU64(),
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+			},
+			p2p.ConstructMessage(msgToSend)); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send committed message")
+		} else {
+			consensus.getLogger().Info().
+				Hex("blockHash", curBlockHash[:]).
+				Uint64("blockNum", consensus.BlockNum()).
+				Msg("[finalCommit] Sent Committed Message")
+		}
+		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
+		consensus.consensusTimeout[timeoutConsensus].Start()
+	} else {
+		// delayed send
+		consensus.msgSender.DelayedSendWithRetry(
+			block.NumberU64(),
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+			},
+			p2p.ConstructMessage(msgToSend))
+		consensus.getLogger().Info().
+			Hex("blockHash", curBlockHash[:]).
+			Uint64("blockNum", consensus.BlockNum()).
+			Hex("lastCommitSig", commitSigAndBitmap).
+			Msg("[finalCommit] Queued Committed Message")
+	}
+
+	block.SetCurrentCommitSig(commitSigAndBitmap)
+	err = consensus.commitBlock(block, FBFTMsg)
+
+	if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
+		consensus.getLogger().Err(err).
+			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
+			Msg("[finalCommit] Leader failed to commit the confirmed block")
+	}
+
+	// Dump new block into level db
+	// In current code, we add signatures in block in tryCatchup, the block dump to explorer does not contains signatures
+	// but since explorer doesn't need signatures, it should be fine
+	// in future, we will move signatures to next block
+	//explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(block, beforeCatchupNum)
+
+	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
+		consensus.consensusTimeout[timeoutBootstrap].Stop()
+		consensus.getLogger().Info().Msg("[finalCommit] stop bootstrap timer only once")
+	}
+
+	consensus.getLogger().Info().
+		Uint64("blockNum", block.NumberU64()).
+		Uint64("epochNum", block.Epoch().Uint64()).
+		Uint64("ViewId", block.Header().ViewID().Uint64()).
+		Str("blockHash", block.Hash().String()).
+		Int("numTxns", len(block.Transactions())).
+		Int("numStakingTxns", len(block.StakingTransactions())).
+		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
+
+	consensus.UpdateLeaderMetrics(float64(numCommits), float64(block.NumberU64()))
+
+	// If still the leader, send commit sig/bitmap to finish the new block proposal,
+	// else, the block proposal will timeout by itself.
+	if consensus.isLeader() {
+		if block.IsLastBlockInEpoch() {
+			// No pipelining
+			go func() {
+				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
+				consensus.ReadySignal(NewProposal(SyncProposal))
+			}()
+		} else {
+			// pipelining
+			go func() {
+				select {
+				case consensus.GetCommitSigChannel() <- commitSigAndBitmap:
+				case <-time.After(CommitSigSenderTimeout):
+					utils.Logger().Error().Err(err).Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
+				}
+			}()
+		}
+	}
+}
+
 // BlockCommitSigs returns the byte array of aggregated
 // commit signature and bitmap signed on the block
 func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {

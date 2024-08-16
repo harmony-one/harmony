@@ -294,17 +294,17 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
 		if consensus.Blockchain().Config().IsOneSecond(currentHeader.Epoch()) {
-			//if !blockObj.IsLastBlockInEpoch() {
-			// only do early commit if it's not epoch block to avoid problems
-			network, _ := consensus.preCommitAndPropose1s(blockObj)
-			//}
-			go consensus.finalCommit1s(viewID, consensus.NextBlockDue, network)
+			if !blockObj.IsLastBlockInEpoch() {
+				// only do early commit if it's not epoch block to avoid problems
+				consensus.preCommitAndPropose(blockObj)
+			}
+			go consensus.finalCommit1s(consensus.isLeader(), viewID, consensus.NextBlockDue)
 		} else {
 			if !blockObj.IsLastBlockInEpoch() {
 				// only do early commit if it's not epoch block to avoid problems
 				consensus.preCommitAndPropose(blockObj)
 			}
-			go consensus.finalCommit(viewID)
+			go consensus.finalCommit(consensus.isLeader(), viewID)
 		}
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
