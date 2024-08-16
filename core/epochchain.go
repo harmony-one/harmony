@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -118,6 +119,7 @@ func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
 	if len(blocks) == 0 {
 		return 0, nil
 	}
+	fmt.Println("InsertEpocj")
 	bc.mu <- struct{}{}
 	defer func() {
 		<-bc.mu

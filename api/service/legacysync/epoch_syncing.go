@@ -98,7 +98,7 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 		utils.Logger().Info().
 			Msgf("[EPOCHSYNC] No peers to sync (isBeacon: %t, ShardID: %d, peersCount: %d)",
 				isBeacon, bc.ShardID(), syncConfig.PeersCount())
-		return 10
+		return 5
 	}
 
 	utils.Logger().Info().
@@ -120,7 +120,7 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 				Uint64("currentEpoch", curEpoch).
 				Int("peers count", syncConfig.PeersCount()).
 				Msg("[EPOCHSYNC] Node is now IN SYNC!")
-			return 60
+			return 2
 		}
 		if otherEpoch < curEpoch {
 			for _, peerCfg := range syncConfig.GetPeers() {
@@ -231,6 +231,7 @@ func processWithPayload(payload [][]byte, bc core.BlockChain) error {
 // CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *EpochSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32, selfPeerID libp2p_peer.ID, waitForEachPeerToConnect bool) error {
 	var err error
+	fmt.Println("CreateEpochSync")
 	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID, selfPeerID, waitForEachPeerToConnect)
 	return err
 }
