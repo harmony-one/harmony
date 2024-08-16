@@ -68,14 +68,16 @@ func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config bootnodeC
 
 	// load method filter from file (if exist)
 	var rmf rpc.RpcMethodFilter
-	rpcFilterFilePath := strings.TrimSpace(rpcOpt.RpcFilterFile)
-	if len(rpcFilterFilePath) > 0 {
-		if err := rmf.LoadRpcMethodFiltersFromFile(rpcFilterFilePath); err != nil {
-			return err
+	/*
+		rpcFilterFilePath := strings.TrimSpace(rpcOpt.RpcFilterFile)
+		if len(rpcFilterFilePath) > 0 {
+			if err := rmf.LoadRpcMethodFiltersFromFile(rpcFilterFilePath); err != nil {
+				return err
+			}
+		} else {
+			rmf.ExposeAll()
 		}
-	} else {
-		rmf.ExposeAll()
-	}
+	*/
 	if config.HTTPEnabled {
 		timeouts := rpc.HTTPTimeouts{
 			ReadTimeout:  config.HTTPTimeoutRead,
