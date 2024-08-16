@@ -64,7 +64,7 @@ func (n Version) Namespace() string {
 
 // StartServers starts the http & ws servers
 func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config bootnodeConfigs.RPCServerConfig, rpcOpt harmony.RpcOptConfig) error {
-	apis = append(apis, getBootAPIs(hmyboot, config)...)
+	// apis = append(apis, getBootAPIs(hmyboot, config)...)
 
 	// load method filter from file (if exist)
 	var rmf rpc.RpcMethodFilter
