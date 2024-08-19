@@ -65,7 +65,6 @@ func (n Version) Namespace() string {
 // StartServers starts the http & ws servers
 func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config bootnodeConfigs.RPCServerConfig, rpcOpt harmony.RpcOptConfig) error {
 	apis = append(apis, getBootAPIs(hmyboot, config)...)
-	fmt.Println("len(apis): ", len(apis))
 	// load method filter from file (if exist)
 	var rmf rpc.RpcMethodFilter
 	rpcFilterFilePath := strings.TrimSpace(rpcOpt.RpcFilterFile)
@@ -84,19 +83,16 @@ func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config bootnodeC
 			IdleTimeout:  config.HTTPTimeoutIdle,
 		}
 		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
-		fmt.Println("httpEndpoint: ", httpEndpoint)
-		fmt.Println("timeouts: ", timeouts)
-		// if err := startBootServiceHTTP(apis, &rmf, timeouts); err != nil {
-		// 	return err
-		// }
+		if err := startBootServiceHTTP(apis, &rmf, timeouts); err != nil {
+			return err
+		}
 	}
 
 	if config.WSEnabled {
 		wsEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSPort)
-		fmt.Println("wsEndpoint: ", wsEndpoint)
-		// if err := startBootServiceWS(apis, &rmf); err != nil {
-		// 	return err
-		// }
+		if err := startBootServiceWS(apis, &rmf); err != nil {
+			return err
+		}
 	}
 
 	return nil
