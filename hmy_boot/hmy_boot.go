@@ -1,7 +1,6 @@
 package hmy_boot
 
 import (
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/api/proto"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	commonRPC "github.com/harmony-one/harmony/rpc/harmony/common"
@@ -16,8 +15,6 @@ type BootService struct {
 	BootNodeAPI BootNodeAPI
 	// Shard ID
 	ShardID uint32
-	// Internals
-	eventMux *event.TypeMux
 }
 
 // BootNodeAPI is the list of functions from node used to call rpc apis.
@@ -37,8 +34,6 @@ func New(nodeAPI BootNodeAPI) *BootService {
 	backend := &BootService{
 		ShutdownChan: make(chan bool),
 
-		eventMux: new(event.TypeMux),
-		// chainDb:     nodeAPI.Blockchain().ChainDb(),
 		BootNodeAPI: nodeAPI,
 	}
 
@@ -52,26 +47,15 @@ func (hmyboot *BootService) ProtocolVersion() int {
 
 // GetNodeMetadata returns the node metadata.
 func (hmyboot *BootService) GetNodeMetadata() commonRPC.NodeMetadata {
-	var (
-		blockEpoch *uint64
-		blsKeys    []string
-		c          = commonRPC.C{}
-	)
+	var c commonRPC.C
 
 	c.TotalKnownPeers, c.Connected, c.NotConnected = hmyboot.BootNodeAPI.PeerConnectivity()
 
 	return commonRPC.NodeMetadata{
-		BLSPublicKey:   blsKeys,
-		Version:        nodeconfig.GetVersion(),
-		ShardID:        hmyboot.ShardID,
-		BlocksPerEpoch: blockEpoch,
-		NodeBootTime:   hmyboot.BootNodeAPI.GetNodeBootTime(),
-		PeerID:         nodeconfig.GetPeerID(),
-		C:              c,
+		Version:      nodeconfig.GetVersion(),
+		ShardID:      hmyboot.ShardID,
+		NodeBootTime: hmyboot.BootNodeAPI.GetNodeBootTime(),
+		PeerID:       nodeconfig.GetPeerID(),
+		C:            c,
 	}
-}
-
-// EventMux ..
-func (hmyboot *BootService) EventMux() *event.TypeMux {
-	return hmyboot.eventMux
 }

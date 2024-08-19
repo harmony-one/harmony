@@ -30,18 +30,13 @@ const (
 	HTTPPortOffset = 500
 	// WSPortOffset ..
 	WSPortOffset = 800
-
-	netNamespace   = "net"
-	netV1Namespace = "netv1"
-	netV2Namespace = "netv2"
-	web3Namespace  = "web3"
 )
 
 var (
 	// HTTPModules ..
-	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", "trace", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "explorer", "preimages"}
+	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", "trace"}
 	// WSModules ..
-	WSModules = []string{"hmy", "hmyv2", "eth", "debug", "trace", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "web3"}
+	WSModules = []string{"hmy", "hmyv2", "eth", "debug", "trace"}
 
 	httpListener     net.Listener
 	httpHandler      *rpc.Server

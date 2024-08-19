@@ -78,20 +78,20 @@ func (bootnode *BootNode) ServiceManager() *service.Manager {
 // ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.
 func (bootnode *BootNode) ShutDown() {
 	if err := bootnode.StopRPC(); err != nil {
-		utils.Logger().Error().Err(err).Msg("failed to stop RPC")
+		utils.Logger().Error().Err(err).Msg("failed to stop boot RPC")
 	}
 
-	utils.Logger().Info().Msg("stopping services")
+	utils.Logger().Info().Msg("stopping boot services")
 	if err := bootnode.StopServices(); err != nil {
-		utils.Logger().Error().Err(err).Msg("failed to stop services")
+		utils.Logger().Error().Err(err).Msg("failed to stop boot services")
 	}
 
-	utils.Logger().Info().Msg("stopping host")
+	utils.Logger().Info().Msg("stopping boot host")
 	if err := bootnode.host.Close(); err != nil {
-		utils.Logger().Error().Err(err).Msg("failed to stop p2p host")
+		utils.Logger().Error().Err(err).Msg("failed to stop boot p2p host")
 	}
 
-	const msg = "Successfully shut down!\n"
+	const msg = "Successfully shut down boot!\n"
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
 	os.Exit(0)

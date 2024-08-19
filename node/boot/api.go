@@ -3,7 +3,6 @@ package bootnode
 import (
 	"time"
 
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/eth/rpc"
 	hmy_boot "github.com/harmony-one/harmony/hmy_boot"
 	bootnodeConfigs "github.com/harmony-one/harmony/internal/configs/bootnode"
@@ -38,11 +37,6 @@ func (bootnode *BootNode) ListBlockedPeer() []peer.ID {
 // GetNodeBootTime ..
 func (bootnode *BootNode) GetNodeBootTime() int64 {
 	return bootnode.unixTimeAtNodeStart
-}
-
-// ReportPlainErrorSink is the report of failed transactions this node has (held in memory only)
-func (bootnode *BootNode) ReportPlainErrorSink() types.TransactionErrorReports {
-	return bootnode.TransactionErrorSink.PlainReport()
 }
 
 // StartRPC start RPC service
