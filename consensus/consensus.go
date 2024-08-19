@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -84,7 +85,7 @@ type Consensus struct {
 	// private/public keys of current node
 	priKey multibls.PrivateKeys
 	// the publickey of leader
-	LeaderPubKey *bls.PublicKeyWrapper
+	leaderPubKey unsafe.Pointer //*bls.PublicKeyWrapper
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
@@ -104,9 +105,6 @@ type Consensus struct {
 	readySignal chan Proposal
 	// Channel to send full commit signatures to finish new block proposal
 	commitSigChannel chan []byte
-	// The post-consensus job func passed from Node object
-	// Called when consensus on a new block is done
-	PostConsensusJob func(*types.Block) error
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
@@ -230,7 +228,7 @@ func (consensus *Consensus) GetLeaderPubKey() *bls_cosi.PublicKeyWrapper {
 }
 
 func (consensus *Consensus) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {
-	return consensus.LeaderPubKey
+	return (*bls_cosi.PublicKeyWrapper)(atomic.LoadPointer(&consensus.leaderPubKey))
 }
 
 func (consensus *Consensus) SetLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
@@ -240,7 +238,7 @@ func (consensus *Consensus) SetLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
 }
 
 func (consensus *Consensus) setLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
-	consensus.LeaderPubKey = pub
+	atomic.StorePointer(&consensus.leaderPubKey, unsafe.Pointer(pub))
 }
 
 func (consensus *Consensus) GetPrivateKeys() multibls.PrivateKeys {
@@ -259,7 +257,7 @@ func (consensus *Consensus) getLeaderPrivateKey(leaderKey *bls_core.PublicKey) (
 
 // getConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
 func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
-	return consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
+	return consensus.getLeaderPrivateKey(consensus.getLeaderPubKey().Object)
 }
 
 func (consensus *Consensus) IsBackup() bool {
@@ -287,7 +285,7 @@ func New(
 		ShardID:      shard,
 		fBFTLog:      NewFBFTLog(),
 		phase:        FBFTAnnounce,
-		current:      State{mode: Normal},
+		current:      NewState(Normal),
 		decider:      Decider,
 		registry:     registry,
 		MinPeers:     minPeers,

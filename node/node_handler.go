@@ -14,17 +14,14 @@ import (
 	"github.com/harmony-one/harmony/api/proto"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/harmony-one/harmony/webhooks"
 )
 
 const p2pMsgPrefixSize = 5
@@ -323,97 +320,6 @@ func getCrosslinkHeadersForShards(shardChain core.BlockChain, curBlock *types.Bl
 	}
 
 	return headers, nil
-}
-
-// PostConsensusProcessing is called by consensus participants, after consensus is done, to:
-// 1. [leader] send new block to the client
-// 2. [leader] send cross shard tx receipts to destination shard
-func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
-	if node.Consensus.IsLeader() {
-		if IsRunningBeaconChain(node.Consensus) {
-			// TODO: consider removing this and letting other nodes broadcast new blocks.
-			// But need to make sure there is at least 1 node that will do the job.
-			BroadcastNewBlock(node.host, newBlock, node.NodeConfig)
-		}
-		BroadcastCXReceipts(newBlock, node.Consensus)
-	} else {
-		if mode := node.Consensus.Mode(); mode != consensus.Listening {
-			numSignatures := node.Consensus.NumSignaturesIncludedInBlock(newBlock)
-			utils.Logger().Info().
-				Uint64("blockNum", newBlock.NumberU64()).
-				Uint64("epochNum", newBlock.Epoch().Uint64()).
-				Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
-				Str("blockHash", newBlock.Hash().String()).
-				Int("numTxns", len(newBlock.Transactions())).
-				Int("numStakingTxns", len(newBlock.StakingTransactions())).
-				Uint32("numSignatures", numSignatures).
-				Str("mode", mode.String()).
-				Msg("BINGO !!! Reached Consensus")
-			if node.Consensus.Mode() == consensus.Syncing {
-				mode = node.Consensus.UpdateConsensusInformation()
-				utils.Logger().Info().Msgf("Switching to mode %s", mode)
-				node.Consensus.SetMode(mode)
-			}
-
-			node.Consensus.UpdateValidatorMetrics(float64(numSignatures), float64(newBlock.NumberU64()))
-
-			// 1% of the validator also need to do broadcasting
-			rnd := rand.Intn(100)
-			if rnd < 1 {
-				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
-				if IsRunningBeaconChain(node.Consensus) {
-					BroadcastNewBlock(node.host, newBlock, node.NodeConfig)
-				}
-				BroadcastCXReceipts(newBlock, node.Consensus)
-			}
-		}
-	}
-
-	// Broadcast client requested missing cross shard receipts if there is any
-	BroadcastMissingCXReceipts(node.Consensus)
-
-	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
-		if h.Availability != nil {
-			shardState, err := node.Blockchain().ReadShardState(newBlock.Epoch())
-			if err != nil {
-				utils.Logger().Error().Err(err).
-					Int64("epoch", newBlock.Epoch().Int64()).
-					Uint32("shard-id", node.Consensus.ShardID).
-					Msg("failed to read shard state")
-				return err
-			}
-			for _, addr := range node.Consensus.Registry().GetAddressToBLSKey().GetAddresses(node.Consensus.GetPublicKeys(), shardState, newBlock.Epoch()) {
-				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
-				if err != nil {
-					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator info")
-					return nil
-				}
-				snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
-				if err != nil {
-					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator snapshot")
-					return nil
-				}
-				computed := availability.ComputeCurrentSigning(
-					snapshot.Validator, wrapper,
-				)
-				lastBlockOfEpoch := shard.Schedule.EpochLastBlock(node.Beaconchain().CurrentBlock().Header().Epoch().Uint64())
-
-				computed.BlocksLeftInEpoch = lastBlockOfEpoch - node.Beaconchain().CurrentBlock().Header().Number().Uint64()
-
-				if err != nil && computed.IsBelowThreshold {
-					url := h.Availability.OnDroppedBelowThreshold
-					go func() {
-						webhooks.DoPost(url, computed)
-					}()
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func IsRunningBeaconChain(c *consensus.Consensus) bool {
-	return c.ShardID == shard.BeaconChainShardID
 }
 
 // BootstrapConsensus is a goroutine to check number of peers and start the consensus
