@@ -159,10 +159,10 @@ func startBootServiceHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter, httpTimeouts
 }
 
 func startBootServiceWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
-	// wsListener, wsHandler, err = rpc.StartWSEndpoint(wsEndpoint, apis, WSModules, rmf, wsOrigins, true)
-	// if err != nil {
-	// 	return err
-	// }
+	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsEndpoint, apis, WSModules, rmf, wsOrigins, true)
+	if err != nil {
+		return err
+	}
 
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("ws://%s", wsEndpoint)).
