@@ -7,6 +7,7 @@ import (
 
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/core/types"
+	bootnodeConfigs "github.com/harmony-one/harmony/internal/configs/bootnode"
 	harmonyConfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeConfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -31,6 +32,8 @@ type BootNode struct {
 	HarmonyConfig *harmonyConfig.HarmonyConfig
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeConfig.ConfigType
+	// RPC configurations
+	RPCConfig *bootnodeConfigs.RPCServerConfig
 	// node start time
 	unixTimeAtNodeStart int64
 	// TransactionErrorSink contains error messages for any failed transaction, in memory only
@@ -61,6 +64,8 @@ func New(
 	nodeStringCounterVec.WithLabelValues("version", nodeConfig.GetVersion()).Inc()
 
 	node.serviceManager = service.NewManager()
+
+	node.initRPCServerConfig()
 
 	return &node
 }

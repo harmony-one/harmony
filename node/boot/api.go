@@ -51,14 +51,12 @@ func (bootnode *BootNode) StartRPC() error {
 	// Gather all the possible APIs to surface
 	apis := bootnode.APIs(bootService)
 
-	rpcConfig := bootnode.getRPCServerConfig()
-
-	err := boot_rpc.StartServers(bootService, apis, rpcConfig, bootnode.HarmonyConfig.RPCOpt)
+	err := boot_rpc.StartServers(bootService, apis, *bootnode.RPCConfig, bootnode.HarmonyConfig.RPCOpt)
 
 	return err
 }
 
-func (bootnode *BootNode) getRPCServerConfig() bootnodeConfigs.RPCServerConfig {
+func (bootnode *BootNode) initRPCServerConfig() {
 	cfg := bootnode.HarmonyConfig
 
 	readTimeout, err := time.ParseDuration(cfg.HTTP.ReadTimeout)
@@ -85,7 +83,7 @@ func (bootnode *BootNode) getRPCServerConfig() bootnodeConfigs.RPCServerConfig {
 			Dur("updated", idleTimeout).
 			Msg("Sanitizing invalid http idle timeout")
 	}
-	return bootnodeConfigs.RPCServerConfig{
+	bootnode.RPCConfig = &bootnodeConfigs.RPCServerConfig{
 		HTTPEnabled:        cfg.HTTP.Enabled,
 		HTTPIp:             cfg.HTTP.IP,
 		HTTPPort:           cfg.HTTP.Port,
@@ -102,6 +100,10 @@ func (bootnode *BootNode) getRPCServerConfig() bootnodeConfigs.RPCServerConfig {
 		RateLimiterEnabled: cfg.RPCOpt.RateLimterEnabled,
 		RequestsPerSecond:  cfg.RPCOpt.RequestsPerSecond,
 	}
+}
+
+func (bootnode *BootNode) GetRPCServerConfig() *bootnodeConfigs.RPCServerConfig {
+	return bootnode.RPCConfig
 }
 
 // StopRPC stop RPC service
