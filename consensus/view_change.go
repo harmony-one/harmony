@@ -345,7 +345,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	consensus.current.SetMode(Normal)
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 	consensus.setViewIDs(viewID)
-	consensus.resetViewChangeState()
+	consensus.resetViewChangeState("startNewView")
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
 	consensus.getLogger().Info().
@@ -548,7 +548,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	// newView message verified success, override my state
 	consensus.setViewIDs(recvMsg.ViewID)
 	consensus.setLeaderPubKey(senderKey)
-	consensus.resetViewChangeState()
+	consensus.resetViewChangeState("onNewView")
 
 	consensus.msgSender.StopRetry(msg_pb.MessageType_VIEWCHANGE)
 
@@ -568,17 +568,17 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 }
 
 // ResetViewChangeState resets the view change structure
-func (consensus *Consensus) ResetViewChangeState() {
+func (consensus *Consensus) ResetViewChangeState(reason string) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.resetViewChangeState()
+	consensus.resetViewChangeState(reason)
 }
 
 // ResetViewChangeState resets the view change structure
-func (consensus *Consensus) resetViewChangeState() {
+func (consensus *Consensus) resetViewChangeState(reason string) {
 	consensus.getLogger().Info().
 		Str("Phase", consensus.phase.String()).
-		Msg("[ResetViewChangeState] Resetting view change state")
+		Msgf("[ResetViewChangeState] Resetting view change state, reason %s", reason)
 	consensus.current.SetMode(Normal)
 	consensus.vc.Reset()
 	consensus.decider.ResetViewChangeVotes()

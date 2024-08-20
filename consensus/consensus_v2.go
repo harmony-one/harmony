@@ -307,20 +307,7 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time,
 		Msg("[finalCommit] Finalizing Consensus")
 	beforeCatchupNum := consensus.getBlockNum()
 
-	//leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
-	//if err != nil {
-	//	consensus.getLogger().Error().Err(err).Msg("[finalCommit] leader not found")
-	//	return
-	//}
-	// Construct committed message
-	//network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
-	//if err != nil {
-	//	consensus.getLogger().Warn().Err(err).
-	//		Msg("[finalCommit] Unable to construct Committed message")
-	//	return
-	//}
 	var (
-		msgToSend          = network.Bytes
 		FBFTMsg            = network.FBFTMsg
 		commitSigAndBitmap = FBFTMsg.Payload
 	)
@@ -341,40 +328,15 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time,
 	}
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 
-	//if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
-	//	consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
-	//}
-
 	// Send committed message before block insertion.
 	// if leader successfully finalizes the block, send committed message to validators
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
 	if !consensus.isLeader() || block.IsLastBlockInEpoch() {
-		// send immediately
-		if err := consensus.msgSender.SendWithRetry(
-			block.NumberU64(),
-			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
-			p2p.ConstructMessage(msgToSend)); err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send committed message")
-		} else {
-			consensus.getLogger().Info().
-				Hex("blockHash", curBlockHash[:]).
-				Uint64("blockNum", consensus.BlockNum()).
-				Msg("[finalCommit] Sent Committed Message")
-		}
 		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 	} else {
-		// delayed send
-		consensus.msgSender.DelayedSendWithRetry(
-			block.NumberU64(),
-			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
-			p2p.ConstructMessage(msgToSend))
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
 			Uint64("blockNum", consensus.BlockNum()).
@@ -917,7 +879,8 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	consensus.setupForNewConsensus(blk, committedMsg)
 	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
 		Str("hash", blk.Header().Hash().Hex()).
-		Msg("Added New Block to Blockchain!!!")
+		Uint64("consensus.block number", consensus.getBlockNum()).
+		Msgf("Added New Block to Blockchain %d", blk.NumberU64())
 
 	return nil
 }
@@ -937,13 +900,11 @@ func (consensus *Consensus) commitBlock1s(blk *types.Block, committedMsg *FBFTMe
 	}
 
 	consensus.FinishFinalityCount()
-	go func() {
-		consensus.PostConsensusJob(blk)
-	}()
+	consensus.PostConsensusProcessing(blk)
 	consensus.setupForNewConsensus(blk, committedMsg)
 	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
 		Str("hash", blk.Header().Hash().Hex()).
-		Msg("Added New Block to Blockchain!!!")
+		Msgf("Added New Block to Blockchain %d", blk.NumberU64())
 
 	return nil
 }

@@ -157,7 +157,7 @@ func (node *Node) SetNodeBackupMode(isBackup bool) bool {
 	}
 
 	node.Consensus.SetIsBackup(isBackup)
-	node.Consensus.ResetViewChangeState()
+	node.Consensus.ResetViewChangeState("SetNodeBackupMode")
 	return true
 }
 

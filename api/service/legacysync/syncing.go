@@ -1081,11 +1081,6 @@ func (ss *StateSync) IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool) {
 	return otherHeight, currentHeight == otherHeight
 }
 
-// GetMaxPeerHeight ..
-func (ss *StateSync) GetMaxPeerHeight() (uint64, error) {
-	return getMaxPeerHeight(ss.syncConfig)
-}
-
 // SyncLoop will keep syncing with peers until catches up
 func (ss *StateSync) SyncLoop(bc core.BlockChain, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration) {
 	utils.Logger().Info().Msgf("legacy sync is executing ...")
