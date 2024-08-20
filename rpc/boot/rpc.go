@@ -34,9 +34,9 @@ const (
 
 var (
 	// HTTPModules ..
-	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", "trace"}
+	HTTPModules = []string{"hmyboot", "hmybootv2", "eth", "debug", "trace"}
 	// WSModules ..
-	WSModules = []string{"hmy", "hmyv2", "eth", "debug", "trace"}
+	WSModules = []string{"hmyboot", "hmybootv2", "eth", "debug", "trace"}
 
 	httpListener     net.Listener
 	httpHandler      *rpc.Server
