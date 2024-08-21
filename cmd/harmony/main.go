@@ -1112,9 +1112,11 @@ func setupAllowedTxs(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address][]co
 		return parseAllowedTxs(data)
 	} else if errors.Is(err, os.ErrNotExist) {
 		// file path does not exist
+		utils.Logger().Debug().Str("AllowedTxsFile", hc.TxPool.AllowedTxsFile).Msgf("AllowedTxs file doesn't exist")
 		return make(map[ethCommon.Address][]core.AllowedTxData), nil
 	} else {
 		// some other errors happened
+		utils.Logger().Error().Err(err).Msg("setup allowedTxs failed")
 		return nil, err
 	}
 }
