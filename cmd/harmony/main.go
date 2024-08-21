@@ -342,19 +342,22 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeconfig.GetDefaultConfig().Downloader = nodeConfig.Downloader
 	nodeconfig.GetDefaultConfig().StagedSync = nodeConfig.StagedSync
 
-	// Check NTP configuration
-	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
-	if !accurate {
-		if os.IsTimeout(err) {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			fmt.Fprintf(os.Stderr, "NTP query timed out. Continuing.\n")
-		} else {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			fmt.Fprintf(os.Stderr, "Error: local timeclock is not accurate. Please config NTP properly.\n")
+	// Check NTP and time accuracy
+	// It skips the time accuracy check on the localnet since all nodes are running on the same machine
+	if hc.Network.NetworkType != nodeconfig.Localnet {
+		clockAccuracyResp, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
+		if !clockAccuracyResp.IsAccurate() {
+			if clockAccuracyResp.AllNtpServersTimedOut() {
+				fmt.Fprintf(os.Stderr, "Error: querying NTP servers timed out, Continuing.\n")
+			} else if clockAccuracyResp.NtpFailed() {
+				fmt.Fprintf(os.Stderr, "Error: NTP servers are not properly configured, %v\n", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: local time clock is not accurate, %s\n", clockAccuracyResp.Message())
+			}
 		}
-	}
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("Check Local Time Accuracy Error")
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("Check Local Time Accuracy Error")
+		}
 	}
 
 	// Parse RPC config
