@@ -1104,12 +1104,26 @@ func parseAllowedTxs(data []byte) (map[ethCommon.Address][]core.AllowedTxData, e
 }
 
 func setupAllowedTxs(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address][]core.AllowedTxData, error) {
-	utils.Logger().Debug().Msgf("Using AllowedTxs file at `%s`", hc.TxPool.AllowedTxsFile)
-	data, err := os.ReadFile(hc.TxPool.AllowedTxsFile)
-	if err != nil {
+	// check if the file exists
+	if _, err := os.Stat(hc.TxPool.AllowedTxsFile); err == nil {
+		// read the file and parse allowed transactions
+		utils.Logger().Debug().Msgf("Using AllowedTxs file at `%s`", hc.TxPool.AllowedTxsFile)
+		data, err := os.ReadFile(hc.TxPool.AllowedTxsFile)
+		if err != nil {
+			return nil, err
+		}
+		return parseAllowedTxs(data)
+	} else if errors.Is(err, os.ErrNotExist) {
+		// file path does not exist
+		utils.Logger().Debug().
+			Str("AllowedTxsFile", hc.TxPool.AllowedTxsFile).
+			Msg("AllowedTxs file doesn't exist")
+		return make(map[ethCommon.Address][]core.AllowedTxData), nil
+	} else {
+		// some other errors happened
+		utils.Logger().Error().Err(err).Msg("setup allowedTxs failed")
 		return nil, err
 	}
-	return parseAllowedTxs(data)
 }
 
 func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.Address]struct{}) ([]ethCommon.Address, error) {
