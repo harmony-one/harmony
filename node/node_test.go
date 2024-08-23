@@ -52,7 +52,7 @@ func TestNewNode(t *testing.T) {
 		SetShardChainCollection(collection)
 
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

@@ -797,13 +797,11 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 
 	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
-	var aggregateSig bool
+
 	if hc.Consensus != nil {
 		minPeers = hc.Consensus.MinPeers
-		aggregateSig = hc.Consensus.AggregateSig
 	} else {
 		minPeers = defaultConsensusConfig.MinPeers
-		aggregateSig = defaultConsensusConfig.AggregateSig
 	}
 
 	blacklist, err := setupBlacklist(hc)
@@ -830,7 +828,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	// Consensus object.
 	registry.SetIsBackup(isBackup(hc))
 	currentConsensus, err := consensus.New(
-		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, registry, decider, minPeers, aggregateSig)
+		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, registry, decider, minPeers)
 
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)

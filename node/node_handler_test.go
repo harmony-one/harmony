@@ -49,7 +49,7 @@ func TestAddNewBlock(t *testing.T) {
 		SetBlockchain(blockchain).
 		SetEngine(engine).
 		SetShardChainCollection(collection)
-	consensus, err := consensus.New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false)
+	consensus, err := consensus.New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestVerifyNewBlock(t *testing.T) {
 		SetShardChainCollection(collection)
 
 	consensusObj, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -168,7 +168,7 @@ func TestVerifyVRF(t *testing.T) {
 		SetEngine(engine).
 		SetShardChainCollection(collection)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3, false,
+		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsKey), reg, decider, 3,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
