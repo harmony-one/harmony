@@ -443,7 +443,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		Str("Role", currentNode.NodeConfig.Role().String()).
 		Str("Version", getHarmonyVersion()).
 		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.P2P.IP, hc.P2P.Port, myHost.GetID().Pretty()),
+			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.P2P.IP, hc.P2P.Port, myHost.GetID().String()),
 		).
 		Msg(startMsg)
 
@@ -962,7 +962,7 @@ func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid
 		Legacy:     hc.General.NoStaking,
 		NodeType:   hc.General.NodeType,
 		Shard:      sid,
-		Instance:   myHost.GetID().Pretty(),
+		Instance:   myHost.GetID().String(),
 	}
 
 	if hc.General.RunElasticMode {

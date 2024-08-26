@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+#TODO: return back to master
+TEST_REPO_BRANCH="feature/go1.22"
 TEST_REPO_BRANCH=${TEST_REPO_BRANCH:-master}
 # handle for the Travis build run:
 # * uses TRAVIS_PULL_REQUEST_BRANCH for RP branch
@@ -28,6 +30,7 @@ echo "Working dir is ${DIR}"
 echo "GOPATH is ${GOPATH}"
 cd "${GOPATH}/src/github.com/harmony-one/harmony-test"
 # cover possible force pushes to remote branches - just rebase local on top of origin
+git fetch origin "${TEST_REPO_BRANCH}"
 git checkout "${TEST_REPO_BRANCH}"
 git pull --rebase=true
 cd localnet

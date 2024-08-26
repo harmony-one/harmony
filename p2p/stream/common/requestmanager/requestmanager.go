@@ -362,11 +362,11 @@ func (rm *requestManager) refreshStreams() {
 	added, removed := checkStreamUpdates(rm.streams, rm.sm.GetStreams())
 
 	for _, st := range added {
-		rm.logger.Info().Str("streamID", string(st.ID())).Msg("add new stream")
+		rm.logger.Info().Str("streamID", string(st.ID())).Msg("adding new stream")
 		rm.addNewStream(st)
 	}
 	for _, st := range removed {
-		rm.logger.Info().Str("streamID", string(st.ID())).Msg("remove stream")
+		rm.logger.Info().Str("streamID", string(st.ID())).Msg("removing stream")
 		rm.removeStream(st)
 	}
 }

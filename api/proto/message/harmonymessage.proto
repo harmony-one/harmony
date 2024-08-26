@@ -1,6 +1,6 @@
 syntax = "proto3";
-package message;
-option go_package="./;message";
+package harmonymessage;
+option go_package="./;harmonymessage";
 
 
 // Client is the service used for any client-facing requests.

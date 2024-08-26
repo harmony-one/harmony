@@ -1,4 +1,4 @@
-FROM golang:1.19-bullseye
+FROM golang:1.22.5-bullseye
 
 RUN apt update
 RUN apt install -y protobuf-compiler

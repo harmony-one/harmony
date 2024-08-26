@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v3.12.4
-// source: message.proto
+// source: harmonymessage.proto
 
-package message
+package harmonymessage
 
 import (
 	context "context"
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ClientService_Process_FullMethodName = "/message.ClientService/Process"
+	ClientService_Process_FullMethodName = "/harmonymessage.ClientService/Process"
 )
 
 // ClientServiceClient is the client API for ClientService service.
@@ -96,7 +96,7 @@ func _ClientService_Process_Handler(srv interface{}, ctx context.Context, dec fu
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ClientService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "message.ClientService",
+	ServiceName: "harmonymessage.ClientService",
 	HandlerType: (*ClientServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -105,5 +105,5 @@ var ClientService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "message.proto",
+	Metadata: "harmonymessage.proto",
 }

@@ -20,7 +20,7 @@ import (
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-
+	mplex "github.com/libp2p/go-libp2p-mplex"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2p_config "github.com/libp2p/go-libp2p/config"
 	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
@@ -29,19 +29,17 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
-	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
-	ma "github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
-
 	"github.com/libp2p/go-libp2p/core/sec/insecure"
 	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	mplex "github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	yamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
 	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 type ConnectCallback func(net libp2p_network.Network, conn libp2p_network.Conn) error
@@ -225,7 +223,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 			case "yamux":
 				p2pHostConfig = append(p2pHostConfig, YamuxC())
 			case "mplex":
-				p2pHostConfig = append(p2pHostConfig, MplexC())
+				p2pHostConfig = append(p2pHostConfig, MplexC6(), MplexC0())
 			default:
 				cancel()
 				utils.Logger().Error().
@@ -320,7 +318,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	}
 
 	self.PeerID = p2pHost.ID()
-	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
+	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().String()).Logger()
 
 	banned := blockedpeers.NewManager(1024)
 	security := security.NewManager(cfg.MaxConnPerIP, int(cfg.MaxPeers), banned)
@@ -353,8 +351,12 @@ func YamuxC() libp2p.Option {
 	return libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport)
 }
 
-func MplexC() libp2p.Option {
+func MplexC6() libp2p.Option {
 	return libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport)
+}
+
+func MplexC0() libp2p.Option {
+	return libp2p.Muxer("/mplex/0.7.0", mplex.DefaultTransport)
 }
 
 func NoiseC() libp2p.Option {
@@ -589,7 +591,7 @@ func (host *HostV2) Network() libp2p_network.Network {
 // ConnectHostPeer connects to peer host
 func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	ctx := context.Background()
-	addr := fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", peer.IP, peer.Port, peer.PeerID.Pretty())
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", peer.IP, peer.Port, peer.PeerID.String())
 	peerAddr, err := ma.NewMultiaddr(addr)
 	if err != nil {
 		host.logger.Error().Err(err).Interface("peer", peer).Msg("ConnectHostPeer")
