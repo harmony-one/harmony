@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/internal/params"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -12,6 +13,7 @@ type Reader interface {
 	ReadValidatorSnapshot(
 		addr common.Address,
 	) (*staking.ValidatorSnapshot, error)
+	Config() *params.ChainConfig
 }
 
 // RoundHeader is the interface of block.Header for calculating the BallotResult.
