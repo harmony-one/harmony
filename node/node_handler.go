@@ -328,6 +328,7 @@ func getCrosslinkHeadersForShards(shardChain core.BlockChain, curBlock *types.Bl
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. [leader] send new block to the client
 // 2. [leader] send cross shard tx receipts to destination shard
+// newBlock is already inserted.
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	if node.Consensus.IsLeader() {
 		if IsRunningBeaconChain(node.Consensus) {
@@ -394,7 +395,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 					return nil
 				}
 				computed := availability.ComputeCurrentSigning(
-					snapshot.Validator, wrapper,
+					snapshot.Validator, wrapper, node.Beaconchain().Config().IsHIP32(newBlock.Epoch()),
 				)
 				lastBlockOfEpoch := shard.Schedule.EpochLastBlock(node.Beaconchain().CurrentBlock().Header().Epoch().Uint64())
 
