@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-#TODO: return back to master
-TEST_REPO_BRANCH="feature/go1.22"
 TEST_REPO_BRANCH=${TEST_REPO_BRANCH:-master}
 # handle for the Travis build run:
 # * uses TRAVIS_PULL_REQUEST_BRANCH for RP branch
