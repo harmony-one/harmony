@@ -198,12 +198,12 @@ func main() {
 
 	// TODO: enable boot services
 	/*
-	if err := currentBootNode.StartServices(); err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
-		os.Exit(-1)
-	}
+		if err := currentBootNode.StartServices(); err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			os.Exit(-1)
+		}
 	*/
-	
+
 	if err := currentBootNode.StartRPC(); err != nil {
 		utils.Logger().Error().
 			Err(err).
