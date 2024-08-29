@@ -58,10 +58,3 @@ func (s *PrivateDebugService) GetConfig(
 ) (StructuredResponse, error) {
 	return NewStructuredResponse(s.hmy.NodeAPI.GetConfig())
 }
-
-// GetLastSigningPower get last signed power
-func (s *PrivateDebugService) GetLastSigningPower(
-	ctx context.Context,
-) (float64, error) {
-	return s.hmy.NodeAPI.GetLastSigningPower()
-}
