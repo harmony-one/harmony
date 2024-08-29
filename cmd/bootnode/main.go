@@ -108,6 +108,7 @@ func main() {
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
+	connMgrHighWaterMark := flag.Int("cmg_high_watermark", 900, "connection manager trims excess connections when they pass the high watermark")
 	noTransportSecurity := flag.Bool("no_transport_security", false, "disable TLS encrypted transport")
 	muxer := flag.String("muxer", "mplex, yamux", "protocol muxer to mux per-protocol streams (mplex, yamux)")
 	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
@@ -142,18 +143,19 @@ func main() {
 	selfPeer := p2p.Peer{IP: *ip, Port: *port}
 
 	host, err := p2p.NewHost(p2p.HostConfig{
-		Self:                    &selfPeer,
-		BLSKey:                  privKey,
-		BootNodes:               nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
-		DataStoreFile:           &dataStorePath,
-		MaxConnPerIP:            *maxConnPerIP,
-		ForceReachabilityPublic: *forceReachabilityPublic,
-		NoTransportSecurity:     *noTransportSecurity,
-		NAT:                     true,
-		UserAgent:               *userAgent,
-		DialTimeout:             time.Minute,
-		Muxer:                   *muxer,
-		NoRelay:                 *noRelay,
+		Self:                     &selfPeer,
+		BLSKey:                   privKey,
+		BootNodes:                nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
+		DataStoreFile:            &dataStorePath,
+		MaxConnPerIP:             *maxConnPerIP,
+		ForceReachabilityPublic:  *forceReachabilityPublic,
+		ConnManagerHighWatermark: *connMgrHighWaterMark,
+		NoTransportSecurity:      *noTransportSecurity,
+		NAT:                      true,
+		UserAgent:                *userAgent,
+		DialTimeout:              time.Minute,
+		Muxer:                    *muxer,
+		NoRelay:                  *noRelay,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")
