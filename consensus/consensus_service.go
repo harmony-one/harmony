@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -17,8 +18,10 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/webhooks"
@@ -151,6 +154,50 @@ func (consensus *Consensus) updateBitmaps() {
 	consensus.commitBitmap = commitBitmap
 	consensus.multiSigBitmap = multiSigBitmap
 
+}
+
+func (consensus *Consensus) sendLastSignPower() {
+	if consensus.isLeader() {
+		k, err := consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
+		if err != nil {
+			consensus.getLogger().Err(err).Msg("Leader not found in the committee")
+			return
+		}
+		comm := getOrZero(consensus.decider.CurrentTotalPower(quorum.Commit))
+		prep := getOrZero(consensus.decider.CurrentTotalPower(quorum.Prepare))
+		view := getOrZero(consensus.decider.CurrentTotalPower(quorum.ViewChange))
+		msg := &msg_pb.Message{
+			ServiceType: msg_pb.ServiceType_CONSENSUS,
+			Type:        msg_pb.MessageType_LAST_SIGN_POWER,
+			Request: &msg_pb.Message_LastSignPower{
+				LastSignPower: &msg_pb.LastSignPowerBroadcast{
+					Prepare:      prep,
+					Commit:       comm,
+					Change:       view,
+					SenderPubkey: k.Pub.Bytes[:],
+					ShardId:      consensus.ShardID,
+				},
+			},
+		}
+		marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg, k.Pri)
+		if err != nil {
+			consensus.getLogger().Err(err).
+				Msg("[constructNewViewMessage] failed to sign and marshal the new view message")
+			return
+		}
+		if comm == 0 && prep == 0 && view == 0 {
+			return
+		}
+		msgToSend := proto.ConstructConsensusMessage(marshaledMessage)
+		if err := consensus.msgSender.SendWithoutRetry(
+			[]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+			p2p.ConstructMessage(msgToSend),
+		); err != nil {
+			consensus.getLogger().Err(err).
+				Msg("[LastSignPower] could not send out the ViewChange message")
+		}
+	}
 }
 
 // ResetState resets the state of the consensus
