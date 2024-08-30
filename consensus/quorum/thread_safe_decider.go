@@ -47,8 +47,6 @@ func (a threadSafeDeciderImpl) IndexOf(key bls.SerializedPublicKey) int {
 }
 
 func (a threadSafeDeciderImpl) ParticipantsCount() int64 {
-	a.mu.Lock()
-	defer a.mu.Unlock()
 	return a.decider.ParticipantsCount()
 }
 

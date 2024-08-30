@@ -92,9 +92,9 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 
 	allKeys := consensus.decider.Participants()
 	if len(allKeys) != 0 {
-		consensus.LeaderPubKey = &allKeys[0]
+		consensus.setLeaderPubKey(&allKeys[0])
 		consensus.getLogger().Info().
-			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("Setting leader as first validator, because provided new keys")
+			Str("info", consensus.getLeaderPubKey().Bytes.Hex()).Msg("Setting leader as first validator, because provided new keys")
 	} else {
 		consensus.getLogger().Error().
 			Msg("[UpdatePublicKeys] Participants is empty")
@@ -112,7 +112,7 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 
 	// do not reset view change state if it is in view changing mode
 	if !consensus.isViewChangingMode() {
-		consensus.resetViewChangeState()
+		consensus.resetViewChangeState("updatePublicKeys")
 	}
 	return consensus.decider.ParticipantsCount()
 }
@@ -172,8 +172,6 @@ func (consensus *Consensus) resetState() {
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
 	return consensus.isValidatorInCommittee(pubKey)
 }
 
@@ -207,9 +205,8 @@ func (consensus *Consensus) SetIsBackup(isBackup bool) {
 }
 
 // Mode returns the mode of consensus
+// Method is thread safe.
 func (consensus *Consensus) Mode() Mode {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
 	return consensus.mode()
 }
 
@@ -239,11 +236,11 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		if !msg.HasSingleSender() {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
-		consensus.LeaderPubKey = msg.SenderPubkeys[0]
+		consensus.setLeaderPubKey(msg.SenderPubkeys[0])
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		consensus.getLogger().Info().
-			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
+			Str("leaderKey", consensus.getLeaderPubKey().Bytes.Hex()).
 			Msg("[checkViewID] Start consensus timer")
 		return nil
 	} else if msg.ViewID > consensus.getCurBlockViewID() {
@@ -326,6 +323,9 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	if consensus.Blockchain().Config().IsTwoSeconds(nextEpoch) {
 		consensus.BlockPeriod = 2 * time.Second
 	}
+	if consensus.Blockchain().Config().IsOneSecond(nextEpoch) {
+		consensus.BlockPeriod = 1 * time.Second
+	}
 
 	isFirstTimeStaking := consensus.Blockchain().Config().IsStaking(nextEpoch) &&
 		curHeader.IsLastBlockInEpoch() && !consensus.Blockchain().Config().IsStaking(curEpoch)
@@ -399,7 +399,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	}
 
 	// update public keys in the committee
-	oldLeader := consensus.LeaderPubKey
+	oldLeader := consensus.getLeaderPubKey()
 	pubKeys, _ := committeeToSet.BLSPublicKeys()
 
 	consensus.getLogger().Info().
@@ -436,7 +436,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 			consensus.getLogger().Info().
 				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
 				Msgf("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain, blocknum: %d", curHeader.NumberU64())
-			consensus.LeaderPubKey = leaderPubKey
+			consensus.setLeaderPubKey(leaderPubKey)
 		}
 	}
 
@@ -453,8 +453,8 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 			}
 
 			// If the leader changed and I myself become the leader
-			if (oldLeader != nil && consensus.LeaderPubKey != nil &&
-				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
+			if (oldLeader != nil && consensus.getLeaderPubKey() != nil &&
+				!consensus.getLeaderPubKey().Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
 				go func() {
 					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
@@ -474,20 +474,19 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
+// Method is thread safe
 func (consensus *Consensus) IsLeader() bool {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
-
 	return consensus.isLeader()
 }
 
 // isLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key. This function assume it runs under lock.
 func (consensus *Consensus) isLeader() bool {
-	if consensus.LeaderPubKey == nil {
+	pub := consensus.getLeaderPubKey()
+	if pub == nil {
 		return false
 	}
-	obj := consensus.LeaderPubKey.Object
+	obj := pub.Object
 	for _, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(obj) {
 			return true
@@ -624,12 +623,11 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 }
 
 // NumSignaturesIncludedInBlock returns the number of signatures included in the block
+// Method is thread safe.
 func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uint32 {
 	count := uint32(0)
-	consensus.mutex.Lock()
 	members := consensus.decider.Participants()
 	pubKeys := consensus.getPublicKeys()
-	consensus.mutex.Unlock()
 
 	// TODO(audit): do not reconstruct the Mask
 	mask := bls.NewMask(members)

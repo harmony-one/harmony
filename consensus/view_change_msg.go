@@ -27,7 +27,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 				BlockNum:     consensus.getBlockNum(),
 				ShardId:      consensus.ShardID,
 				SenderPubkey: priKey.Pub.Bytes[:],
-				LeaderPubkey: consensus.LeaderPubKey.Bytes[:],
+				LeaderPubkey: consensus.getLeaderPubKey().Bytes[:],
 			},
 		},
 	}
@@ -71,7 +71,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 
 	consensus.getLogger().Info().
 		Hex("m1Payload", vcMsg.Payload).
-		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
+		Str("NextLeader", consensus.getLeaderPubKey().Bytes.Hex()).
 		Str("SenderPubKey", priKey.Pub.Bytes.Hex()).
 		Msg("[constructViewChangeMessage]")
 

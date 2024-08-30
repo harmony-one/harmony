@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"time"
-
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
@@ -199,6 +197,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
+	currentHeader := consensus.Blockchain().CurrentHeader()
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
 		signed := consensus.decider.ReadBallot(quorum.Commit, signer.Bytes)
@@ -294,28 +293,19 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
-		if !blockObj.IsLastBlockInEpoch() {
+		if consensus.Blockchain().Config().IsOneSecond(currentHeader.Epoch()) {
+			//if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems
-			consensus.preCommitAndPropose(blockObj)
+			network, _ := consensus.preCommitAndPropose1s(blockObj)
+			//}
+			go consensus.finalCommit1s(viewID, consensus.NextBlockDue, network)
+		} else {
+			if !blockObj.IsLastBlockInEpoch() {
+				// only do early commit if it's not epoch block to avoid problems
+				consensus.preCommitAndPropose(blockObj)
+			}
+			go consensus.finalCommit(viewID)
 		}
-
-		go func(viewID uint64) {
-			waitTime := 1000 * time.Millisecond
-			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
-			if maxWaitTime > waitTime {
-				waitTime = maxWaitTime
-			}
-			consensus.getLogger().Info().Str("waitTime", waitTime.String()).
-				Msg("[OnCommit] Starting Grace Period")
-			time.Sleep(waitTime)
-			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
-
-			consensus.mutex.Lock()
-			defer consensus.mutex.Unlock()
-			if viewID == consensus.getCurBlockViewID() {
-				consensus.finalCommit()
-			}
-		}(viewID)
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
