@@ -101,13 +101,25 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 		return 10
 	}
 
+	utils.Logger().Info().
+		Bool("isBeacon", isBeacon).
+		Uint32("ShardID", bc.ShardID()).
+		Uint64("otherEpoch", shard.Schedule.CalcEpochNumber(maxHeight).Uint64()).
+		Uint64("currentEpoch", bc.CurrentBlock().Epoch().Uint64()).
+		Int("peers count", syncConfig.PeersCount()).
+		Msg("[EPOCHSYNC] Node is OUT OF SYNC, it's trying to get fully synchronized")
+
 	for {
 		curEpoch := bc.CurrentBlock().Epoch().Uint64()
 		otherEpoch := shard.Schedule.CalcEpochNumber(maxHeight).Uint64()
 		if otherEpoch == curEpoch+1 {
 			utils.Logger().Info().
-				Msgf("[EPOCHSYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d, peersCount: %d)",
-					isBeacon, bc.ShardID(), otherEpoch, curEpoch, syncConfig.PeersCount())
+				Bool("isBeacon", isBeacon).
+				Uint32("ShardID", bc.ShardID()).
+				Uint64("otherEpoch", otherEpoch).
+				Uint64("currentEpoch", curEpoch).
+				Int("peers count", syncConfig.PeersCount()).
+				Msg("[EPOCHSYNC] Node is now IN SYNC!")
 			return 60
 		}
 		if otherEpoch < curEpoch {
@@ -116,10 +128,6 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 			}
 			return 2
 		}
-
-		utils.Logger().Info().
-			Msgf("[EPOCHSYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d, peers count %d)",
-				isBeacon, bc.ShardID(), otherEpoch, curEpoch, syncConfig.PeersCount())
 
 		var heights []uint64
 		loopEpoch := curEpoch + 1
@@ -142,8 +150,12 @@ func syncLoop(bc core.BlockChain, syncConfig *SyncConfig) (timeout int) {
 				return 10
 			}
 			utils.Logger().Error().Err(err).
-				Msgf("[EPOCHSYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d)",
-					isBeacon, bc.ShardID(), otherEpoch, curEpoch)
+				Bool("isBeacon", isBeacon).
+				Uint32("ShardID", bc.ShardID()).
+				Uint64("otherEpoch", otherEpoch).
+				Uint64("currentEpoch", curEpoch).
+				Int("peers count", syncConfig.PeersCount()).
+				Msg("[EPOCHSYNC] ProcessStateSync failed")
 			return 2
 		}
 	}

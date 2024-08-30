@@ -137,7 +137,7 @@ func (node *Node) stakingMessageHandler(msgPayload []byte) {
 // BroadcastNewBlock is called by consensus leader to sync new blocks with other clients/nodes.
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
-func (node *Node) BroadcastNewBlock(newBlock *types.Block, nodeConfig *nodeconfig.ConfigType) {
+func BroadcastNewBlock(host p2p.Host, newBlock *types.Block, nodeConfig *nodeconfig.ConfigType) {
 	groups := []nodeconfig.GroupID{nodeConfig.GetClientGroupID()}
 	utils.Logger().Info().
 		Msgf(
@@ -146,7 +146,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block, nodeConfig *nodeconfi
 	msg := p2p.ConstructMessage(
 		proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}),
 	)
-	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
+	if err := host.SendMessageToGroups(groups, msg); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot broadcast new block")
 	}
 }
@@ -330,10 +330,10 @@ func getCrosslinkHeadersForShards(shardChain core.BlockChain, curBlock *types.Bl
 // 2. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	if node.Consensus.IsLeader() {
-		if node.IsRunningBeaconChain() {
+		if IsRunningBeaconChain(node.Consensus) {
 			// TODO: consider removing this and letting other nodes broadcast new blocks.
 			// But need to make sure there is at least 1 node that will do the job.
-			node.BroadcastNewBlock(newBlock, node.NodeConfig)
+			BroadcastNewBlock(node.host, newBlock, node.NodeConfig)
 		}
 		BroadcastCXReceipts(newBlock, node.Consensus)
 	} else {
@@ -361,8 +361,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			rnd := rand.Intn(100)
 			if rnd < 1 {
 				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
-				if node.IsRunningBeaconChain() {
-					node.BroadcastNewBlock(newBlock, node.NodeConfig)
+				if IsRunningBeaconChain(node.Consensus) {
+					BroadcastNewBlock(node.host, newBlock, node.NodeConfig)
 				}
 				BroadcastCXReceipts(newBlock, node.Consensus)
 			}
@@ -374,7 +374,15 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
 		if h.Availability != nil {
-			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
+			shardState, err := node.Blockchain().ReadShardState(newBlock.Epoch())
+			if err != nil {
+				utils.Logger().Error().Err(err).
+					Int64("epoch", newBlock.Epoch().Int64()).
+					Uint32("shard-id", node.Consensus.ShardID).
+					Msg("failed to read shard state")
+				return err
+			}
+			for _, addr := range node.Consensus.Registry().GetAddressToBLSKey().GetAddresses(node.Consensus.GetPublicKeys(), shardState, newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
 					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator info")
@@ -404,21 +412,26 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	return nil
 }
 
+func IsRunningBeaconChain(c *consensus.Consensus) bool {
+	return c.ShardID == shard.BeaconChainShardID
+}
+
 // BootstrapConsensus is a goroutine to check number of peers and start the consensus
 func (node *Node) BootstrapConsensus() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	min := node.Consensus.MinPeers
-	enoughMinPeers := make(chan struct{})
+	enoughMinPeers := make(chan struct{}, 1)
 	const checkEvery = 3 * time.Second
 	go func() {
 		for {
 			<-time.After(checkEvery)
 			numPeersNow := node.host.GetPeerCount()
-			if numPeersNow >= min {
+			connectedPeers := len(node.host.Network().Peers())
+			if connectedPeers >= min {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				enoughMinPeers <- struct{}{}
-				fmt.Println("Bootstrap consensus done.", numPeersNow, " peers are connected")
+				fmt.Printf("Bootstrap consensus done. Connected %d, known %d, shard: %d\n", connectedPeers, numPeersNow, node.Consensus.ShardID)
 				return
 			}
 			utils.Logger().Info().

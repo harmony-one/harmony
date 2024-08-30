@@ -42,13 +42,7 @@ func (node *Node) ListBlockedPeer() []peer.ID {
 
 // PendingCXReceipts returns node.pendingCXReceiptsProof
 func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
-	cxReceipts := make([]*types.CXReceiptsProof, len(node.pendingCXReceipts))
-	i := 0
-	for _, cxReceipt := range node.pendingCXReceipts {
-		cxReceipts[i] = cxReceipt
-		i++
-	}
-	return cxReceipts
+	return node.Consensus.PendingCXReceipts()
 }
 
 // ReportStakingErrorSink is the report of failed staking transactions this node has (held in memory only)

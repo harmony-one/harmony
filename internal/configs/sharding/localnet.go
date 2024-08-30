@@ -31,8 +31,8 @@ const (
 	localnetV1Epoch = 1
 
 	localnetEpochBlock1      = 5
-	localnetBlocksPerEpoch   = 64
-	localnetBlocksPerEpochV2 = 64
+	localnetBlocksPerEpoch   = 16
+	localnetBlocksPerEpochV2 = 16
 
 	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
 )
@@ -155,6 +155,11 @@ func (ls localnetSchedule) GetShardingStructure(numShard, shardID int) []map[str
 // IsSkippedEpoch returns if an epoch was skipped on shard due to staking epoch
 func (ls localnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 	return false
+}
+
+// RewardFrequency returns the frequency of block reward
+func (ls localnetSchedule) RewardFrequency() uint64 {
+	return 16
 }
 
 var (

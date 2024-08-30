@@ -7,32 +7,12 @@ import (
 	"math/big"
 	"os"
 	"runtime/pprof"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/registry"
-	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
-	"github.com/harmony-one/harmony/internal/tikv"
-	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
-	"github.com/harmony-one/harmony/internal/utils/lrucache"
-
-	"github.com/ethereum/go-ethereum/rlp"
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
-	"github.com/harmony-one/harmony/internal/utils/crosslinks"
-
 	"github.com/ethereum/go-ethereum/common"
-	protobuf "github.com/golang/protobuf/proto"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/abool"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	lru "github.com/hashicorp/golang-lru"
-	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
-	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rcrowley/go-metrics"
-	"golang.org/x/sync/semaphore"
-
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -42,13 +22,17 @@ import (
 	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/registry"
+	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
+	"github.com/harmony-one/harmony/internal/tikv"
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/utils/crosslinks"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -56,6 +40,14 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
+	lru "github.com/hashicorp/golang-lru"
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rcrowley/go-metrics"
+	"golang.org/x/sync/semaphore"
+	protobuf "google.golang.org/protobuf/proto"
 )
 
 const (
@@ -96,11 +88,10 @@ type ISync interface {
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus          *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BeaconBlockChannel chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
-	pendingCXReceipts  map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
-	pendingCXMutex     sync.Mutex
-	crosslinks         *crosslinks.Crosslinks // Memory storage for crosslink processing.
+	Consensus          *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	BeaconBlockChannel chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
+
+	crosslinks *crosslinks.Crosslinks // Memory storage for crosslink processing.
 
 	SelfPeer         p2p.Peer
 	stateMutex       sync.Mutex // mutex for change node state
@@ -127,9 +118,7 @@ type Node struct {
 	// Chain configuration.
 	chainConfig         params.ChainConfig
 	unixTimeAtNodeStart int64
-	// KeysToAddrs holds the addresses of bls keys run by the node
-	keysToAddrs      *lrucache.Cache[uint64, map[string]common.Address]
-	keysToAddrsMutex sync.Mutex
+
 	// TransactionErrorSink contains error messages for any failed transaction, in memory only
 	TransactionErrorSink *types.TransactionErrorSink
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
@@ -371,67 +360,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 
 // AddPendingReceipts adds one receipt message to pending list.
 func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
-	node.pendingCXMutex.Lock()
-	defer node.pendingCXMutex.Unlock()
-
-	if receipts.ContainsEmptyField() {
-		utils.Logger().Info().
-			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
-			Msg("CXReceiptsProof contains empty field")
-		return
-	}
-
-	blockNum := receipts.Header.Number().Uint64()
-	shardID := receipts.Header.ShardID()
-
-	// Sanity checks
-
-	if err := core.NewBlockValidator(node.Blockchain()).ValidateCXReceiptsProof(receipts); err != nil {
-		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
-			utils.Logger().Error().Err(err).Msg("[AddPendingReceipts] Invalid CXReceiptsProof")
-			return
-		}
-	}
-
-	// cross-shard receipt should not be coming from our shard
-	if s := node.Consensus.ShardID; s == shardID {
-		utils.Logger().Info().
-			Uint32("my-shard", s).
-			Uint32("receipt-shard", shardID).
-			Msg("ShardID of incoming receipt was same as mine")
-		return
-	}
-
-	if e := receipts.Header.Epoch(); blockNum == 0 ||
-		!node.Blockchain().Config().AcceptsCrossTx(e) {
-		utils.Logger().Info().
-			Uint64("incoming-epoch", e.Uint64()).
-			Msg("Incoming receipt had meaningless epoch")
-		return
-	}
-
-	key := utils.GetPendingCXKey(shardID, blockNum)
-
-	// DDoS protection
-	const maxCrossTxnSize = 4096
-	if s := len(node.pendingCXReceipts); s >= maxCrossTxnSize {
-		utils.Logger().Info().
-			Int("pending-cx-receipts-size", s).
-			Int("pending-cx-receipts-limit", maxCrossTxnSize).
-			Msg("Current pending cx-receipts reached size limit")
-		return
-	}
-
-	if _, ok := node.pendingCXReceipts[key]; ok {
-		utils.Logger().Info().
-			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
-			Msg("Already Got Same Receipt message")
-		return
-	}
-	node.pendingCXReceipts[key] = receipts
-	utils.Logger().Info().
-		Int("totalPendingReceipts", len(node.pendingCXReceipts)).
-		Msg("Got ONE more receipt message")
+	node.Consensus.AddPendingReceipts(receipts)
 }
 
 type withError struct {
@@ -1028,12 +957,11 @@ func New(
 	registry *registry.Registry,
 ) *Node {
 	node := Node{
-		registry:             registry,
+		registry:             registry.SetAddressToBLSKey(NewAddressToBLSKey(consensusObj.ShardID)),
 		unixTimeAtNodeStart:  time.Now().Unix(),
 		TransactionErrorSink: types.NewTransactionErrorSink(),
 		crosslinks:           crosslinks.New(),
 		syncID:               GenerateSyncID(),
-		keysToAddrs:          lrucache.NewCache[uint64, map[string]common.Address](10),
 	}
 	if consensusObj == nil {
 		panic("consensusObj is nil")
@@ -1117,20 +1045,20 @@ func New(
 		node.registry.SetTxPool(node.TxPool)
 		node.CxPool = node.registry.GetCxPool()
 		node.Worker = worker.New(blockchain, beaconChain)
+		node.registry.SetWorker(node.Worker)
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
-
-		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 	}
 
+	h := node.Blockchain().GetHeaderByNumber(0)
 	utils.Logger().Info().
-		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
-		Msg("Genesis block hash")
+		Interface("genesis block header", h).
+		Msgf("Genesis block hash %s", h.Hash())
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = map[string]*syncConfig{}
 	// Broadcast double-signers reported by consensus
@@ -1300,77 +1228,6 @@ func (node *Node) ShutDown() {
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
 	os.Exit(0)
-}
-
-func (node *Node) populateSelfAddresses(epoch *big.Int) {
-	shardID := node.Consensus.ShardID
-	shardState, err := node.Consensus.Blockchain().ReadShardState(epoch)
-	if err != nil {
-		utils.Logger().Error().Err(err).
-			Int64("epoch", epoch.Int64()).
-			Uint32("shard-id", shardID).
-			Msg("[PopulateSelfAddresses] failed to read shard")
-		return
-	}
-
-	committee, err := shardState.FindCommitteeByID(shardID)
-	if err != nil {
-		utils.Logger().Error().Err(err).
-			Int64("epoch", epoch.Int64()).
-			Uint32("shard-id", shardID).
-			Msg("[PopulateSelfAddresses] failed to find shard committee")
-		return
-	}
-	keysToAddrs := map[string]common.Address{}
-	for _, blskey := range node.Consensus.GetPublicKeys() {
-		blsStr := blskey.Bytes.Hex()
-		shardkey := bls.FromLibBLSPublicKeyUnsafe(blskey.Object)
-		if shardkey == nil {
-			utils.Logger().Error().
-				Int64("epoch", epoch.Int64()).
-				Uint32("shard-id", shardID).
-				Str("blskey", blsStr).
-				Msg("[PopulateSelfAddresses] failed to get shard key from bls key")
-			return
-		}
-		addr, err := committee.AddressForBLSKey(*shardkey)
-		if err != nil {
-			utils.Logger().Error().Err(err).
-				Int64("epoch", epoch.Int64()).
-				Uint32("shard-id", shardID).
-				Str("blskey", blsStr).
-				Msg("[PopulateSelfAddresses] could not find address")
-			return
-		}
-		keysToAddrs[blsStr] = *addr
-		utils.Logger().Debug().
-			Int64("epoch", epoch.Int64()).
-			Uint32("shard-id", shardID).
-			Str("bls-key", blsStr).
-			Str("address", common2.MustAddressToBech32(*addr)).
-			Msg("[PopulateSelfAddresses]")
-	}
-	node.keysToAddrs.Set(epoch.Uint64(), keysToAddrs)
-}
-
-// GetAddressForBLSKey retrieves the ECDSA address associated with bls key for epoch
-func (node *Node) GetAddressForBLSKey(blskey *bls_core.PublicKey, epoch *big.Int) common.Address {
-	return node.GetAddresses(epoch)[blskey.SerializeToHexStr()]
-}
-
-// GetAddresses retrieves all ECDSA addresses of the bls keys for epoch
-func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
-	// populate if new epoch
-	if rs, ok := node.keysToAddrs.Get(epoch.Uint64()); ok {
-		return rs
-	}
-	node.keysToAddrsMutex.Lock()
-	node.populateSelfAddresses(epoch)
-	node.keysToAddrsMutex.Unlock()
-	if rs, ok := node.keysToAddrs.Get(epoch.Uint64()); ok {
-		return rs
-	}
-	return make(map[string]common.Address)
 }
 
 // IsRunningBeaconChain returns whether the node is running on beacon chain.

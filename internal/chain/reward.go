@@ -33,8 +33,6 @@ import (
 const (
 	// AsyncBlockProposalTimeout is the timeout which will abort the async block proposal.
 	AsyncBlockProposalTimeout = 9 * time.Second
-	// RewardFrequency the number of blocks between each aggregated reward distribution
-	RewardFrequency = 64
 )
 
 type slotPayable struct {
@@ -281,7 +279,7 @@ func AccumulateRewardsAndCountSigs(
 	}
 
 	// Only do reward distribution at the 63th block in the modulus.
-	if blockNum%RewardFrequency != RewardFrequency-1 {
+	if blockNum%shard.Schedule.RewardFrequency() != shard.Schedule.RewardFrequency()-1 {
 		return numeric.ZeroDec(), network.EmptyPayout, nil
 	}
 
@@ -322,7 +320,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	startTime := time.Now()
 	// loop through [0...63] position in the modulus index of the 64 blocks
 	// Note the current block is at position 63 of the modulus.
-	for i := curBlockNum - RewardFrequency + 1; i <= curBlockNum; i++ {
+	for i := curBlockNum - shard.Schedule.RewardFrequency() + 1; i <= curBlockNum; i++ {
 		if i < 0 {
 			continue
 		}
@@ -511,7 +509,6 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 	subComm := shard.Committee{ShardID: shard.BeaconChainShardID, Slots: members}
 
 	if err := availability.IncrementValidatorSigningCounts(
-		beaconChain,
 		subComm.StakedValidators(),
 		state,
 		payable,
@@ -599,7 +596,7 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 	staked := subComm.StakedValidators()
 	startTimeLocal = time.Now()
 	if err := availability.IncrementValidatorSigningCounts(
-		bc, staked, state, payableSigners, missing,
+		staked, state, payableSigners, missing,
 	); err != nil {
 		return nil, nil, err
 	}

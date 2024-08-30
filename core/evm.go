@@ -171,7 +171,7 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 
 		db.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
 
-		if rosettaTracer != nil && balanceToBeDeducted != big.NewInt(0) {
+		if rosettaTracer != nil && balanceToBeDeducted.Sign() != 0 {
 			//add rosetta log
 			rosettaTracer.AddRosettaLog(
 				vm.CALL,

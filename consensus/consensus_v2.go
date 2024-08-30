@@ -38,9 +38,6 @@ var (
 const (
 	// CommitSigSenderTimeout is the timeout for sending the commit sig to finish block proposal
 	CommitSigSenderTimeout = 10 * time.Second
-	// CommitSigReceiverTimeout is the timeout for the receiving side of the commit sig
-	// if timeout, the receiver should instead ready directly from db for the commit sig
-	CommitSigReceiverTimeout = 8 * time.Second
 )
 
 // IsViewChangingMode return true if curernt mode is viewchanging
@@ -106,7 +103,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 		consensus.isLeader()
 
 	// if in backup normal mode, force ignore view change event and leader event.
-	if consensus.current.Mode() == NormalBackup {
+	if consensus.isBackup {
 		canHandleViewChange = false
 		intendedForLeader = false
 	}
@@ -258,7 +255,7 @@ func (consensus *Consensus) finalCommit() {
 			// No pipelining
 			go func() {
 				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-				consensus.ReadySignal(SyncProposal)
+				consensus.ReadySignal(NewProposal(SyncProposal))
 			}()
 		} else {
 			// pipelining
@@ -334,7 +331,7 @@ func (consensus *Consensus) StartChannel() {
 		consensus.start = true
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(SyncProposal)
+		consensus.ReadySignal(NewProposal(SyncProposal))
 		return
 	}
 	consensus.mutex.Unlock()
@@ -586,7 +583,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		// Send signal to Node to propose the new block for consensus
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(AsyncProposal)
+		consensus.ReadySignal(NewProposal(AsyncProposal))
 	}()
 
 	return nil
@@ -814,7 +811,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 				blockPeriod := consensus.BlockPeriod
 				go func() {
 					<-time.After(blockPeriod)
-					consensus.ReadySignal(SyncProposal)
+					consensus.ReadySignal(NewProposal(SyncProposal))
 				}()
 			}
 		}
@@ -845,6 +842,12 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
 func (consensus *Consensus) GenerateVrfAndProof(newHeader *block.Header) error {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	return consensus.generateVrfAndProof(newHeader)
+}
+
+func (consensus *Consensus) generateVrfAndProof(newHeader *block.Header) error {
 	key, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		return errors.New("[GenerateVrfAndProof] no leader private key provided")

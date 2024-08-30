@@ -342,19 +342,22 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeconfig.GetDefaultConfig().Downloader = nodeConfig.Downloader
 	nodeconfig.GetDefaultConfig().StagedSync = nodeConfig.StagedSync
 
-	// Check NTP configuration
-	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
-	if !accurate {
-		if os.IsTimeout(err) {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			fmt.Fprintf(os.Stderr, "NTP query timed out. Continuing.\n")
-		} else {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			fmt.Fprintf(os.Stderr, "Error: local timeclock is not accurate. Please config NTP properly.\n")
+	// Check NTP and time accuracy
+	// It skips the time accuracy check on the localnet since all nodes are running on the same machine
+	if hc.Network.NetworkType != nodeconfig.Localnet {
+		clockAccuracyResp, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
+		if !clockAccuracyResp.IsAccurate() {
+			if clockAccuracyResp.AllNtpServersTimedOut() {
+				fmt.Fprintf(os.Stderr, "Error: querying NTP servers timed out, Continuing.\n")
+			} else if clockAccuracyResp.NtpFailed() {
+				fmt.Fprintf(os.Stderr, "Error: NTP servers are not properly configured, %v\n", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: local time clock is not accurate, %s\n", clockAccuracyResp.Message())
+			}
 		}
-	}
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("Check Local Time Accuracy Error")
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("Check Local Time Accuracy Error")
+		}
 	}
 
 	// Parse RPC config
@@ -440,7 +443,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		Str("Role", currentNode.NodeConfig.Role().String()).
 		Str("Version", getHarmonyVersion()).
 		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.P2P.IP, hc.P2P.Port, myHost.GetID().Pretty()),
+			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.P2P.IP, hc.P2P.Port, myHost.GetID().String()),
 		).
 		Msg(startMsg)
 
@@ -701,6 +704,12 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		ConnManagerHighWatermark: hc.P2P.ConnManagerHighWatermark,
 		WaitForEachPeerToConnect: hc.P2P.WaitForEachPeerToConnect,
 		ForceReachabilityPublic:  forceReachabilityPublic,
+		NoTransportSecurity:      hc.P2P.NoTransportSecurity,
+		NAT:                      hc.P2P.NAT,
+		UserAgent:                hc.P2P.UserAgent,
+		DialTimeout:              hc.P2P.DialTimeout,
+		Muxer:                    hc.P2P.Muxer,
+		NoRelay:                  hc.P2P.NoRelay,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
@@ -877,6 +886,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
 
+	currentNode.Consensus.Registry().SetNodeConfig(currentNode.NodeConfig)
 	currentConsensus.PostConsensusJob = currentNode.PostConsensusProcessing
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
@@ -952,7 +962,7 @@ func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid
 		Legacy:     hc.General.NoStaking,
 		NodeType:   hc.General.NodeType,
 		Shard:      sid,
-		Instance:   myHost.GetID().Pretty(),
+		Instance:   myHost.GetID().String(),
 	}
 
 	if hc.General.RunElasticMode {
@@ -1094,12 +1104,26 @@ func parseAllowedTxs(data []byte) (map[ethCommon.Address][]core.AllowedTxData, e
 }
 
 func setupAllowedTxs(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address][]core.AllowedTxData, error) {
-	utils.Logger().Debug().Msgf("Using AllowedTxs file at `%s`", hc.TxPool.AllowedTxsFile)
-	data, err := os.ReadFile(hc.TxPool.AllowedTxsFile)
-	if err != nil {
+	// check if the file exists
+	if _, err := os.Stat(hc.TxPool.AllowedTxsFile); err == nil {
+		// read the file and parse allowed transactions
+		utils.Logger().Debug().Msgf("Using AllowedTxs file at `%s`", hc.TxPool.AllowedTxsFile)
+		data, err := os.ReadFile(hc.TxPool.AllowedTxsFile)
+		if err != nil {
+			return nil, err
+		}
+		return parseAllowedTxs(data)
+	} else if errors.Is(err, os.ErrNotExist) {
+		// file path does not exist
+		utils.Logger().Debug().
+			Str("AllowedTxsFile", hc.TxPool.AllowedTxsFile).
+			Msg("AllowedTxs file doesn't exist")
+		return make(map[ethCommon.Address][]core.AllowedTxData), nil
+	} else {
+		// some other errors happened
+		utils.Logger().Error().Err(err).Msg("setup allowedTxs failed")
 		return nil, err
 	}
-	return parseAllowedTxs(data)
 }
 
 func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.Address]struct{}) ([]ethCommon.Address, error) {

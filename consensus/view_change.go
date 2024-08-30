@@ -33,8 +33,6 @@ type State struct {
 	// view changing id is used during view change mode
 	// it is the next view id
 	viewChangingID uint64
-
-	isBackup bool
 }
 
 // Mode return the current node mode
@@ -44,10 +42,6 @@ func (pm *State) Mode() Mode {
 
 // SetMode set the node mode as required
 func (pm *State) SetMode(s Mode) {
-	if s == Normal && pm.isBackup {
-		s = NormalBackup
-	}
-
 	pm.mode = s
 }
 
@@ -79,10 +73,6 @@ func (pm *State) SetViewChangingID(id uint64) {
 func (pm *State) GetViewChangeDuraion() time.Duration {
 	diff := int64(pm.viewChangingID - pm.blockViewID)
 	return time.Duration(diff * diff * int64(viewChangeDuration))
-}
-
-func (pm *State) SetIsBackup(isBackup bool) {
-	pm.isBackup = isBackup
 }
 
 // fallbackNextViewID return the next view ID and duration when there is an exception
@@ -241,7 +231,7 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 
 // startViewChange start the view change process
 func (consensus *Consensus) startViewChange() {
-	if consensus.disableViewChange || consensus.isBackup {
+	if consensus.isBackup {
 		return
 	}
 
@@ -439,7 +429,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 				consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 				return
 			}
-			go consensus.ReadySignal(SyncProposal)
+			go consensus.ReadySignal(NewProposal(SyncProposal))
 			return
 		}
 

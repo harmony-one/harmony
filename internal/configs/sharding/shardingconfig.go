@@ -13,6 +13,11 @@ import (
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
+const (
+	// RewardFrequency the number of blocks between each aggregated reward distribution
+	RewardFrequency = 64
+)
+
 // Schedule returns the sharding configuration instance for the given
 // epoch.
 type Schedule interface {
@@ -40,6 +45,9 @@ type Schedule interface {
 
 	// IsSkippedEpoch returns if epoch was skipped on shard chain
 	IsSkippedEpoch(uint32, *big.Int) bool
+
+	// RewardFrequency returns the frequency of block reward
+	RewardFrequency() uint64
 }
 
 // Instance is one sharding configuration instance.

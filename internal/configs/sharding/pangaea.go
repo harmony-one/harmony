@@ -71,6 +71,11 @@ func (ps pangaeaSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 	return false
 }
 
+// RewardFrequency returns the frequency of block reward
+func (ps pangaeaSchedule) RewardFrequency() uint64 {
+	return RewardFrequency
+}
+
 var pangaeaReshardingEpoch = []*big.Int{
 	big.NewInt(0),
 	params.PangaeaChainConfig.StakingEpoch,

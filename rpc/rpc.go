@@ -256,7 +256,7 @@ func startWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
 
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
-		Msg("WebSocket endpoint opened")
+		Msg("WebSocket WS endpoint opened")
 	fmt.Printf("Started WS server at: %v\n", wsEndpoint)
 	return nil
 }
@@ -269,7 +269,7 @@ func startAuthWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
 
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
-		Msg("WebSocket endpoint opened")
+		Msg("WebSocket Auth-WS endpoint opened")
 	fmt.Printf("Started Auth-WS server at: %v\n", wsAuthEndpoint)
 	return nil
 }

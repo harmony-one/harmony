@@ -7,14 +7,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBlockSigners(t *testing.T) {
@@ -158,7 +158,7 @@ func TestIncrementValidatorSigningCounts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := IncrementValidatorSigningCounts(nil, ctx.staked, ctx.state, ctx.signers,
+		if err := IncrementValidatorSigningCounts(ctx.staked, ctx.state, ctx.signers,
 			ctx.missings); err != nil {
 
 			t.Fatal(err)
@@ -730,4 +730,61 @@ func makeTestWrapper(addr common.Address, numSigned, numToSign int64) staking.Va
 	val.Counters.NumBlocksToSign = new(big.Int).SetInt64(numToSign)
 	val.Counters.NumBlocksSigned = new(big.Int).SetInt64(numSigned)
 	return val
+}
+
+type stateValidatorWrapperImpl struct {
+	v   *staking.ValidatorWrapper
+	err error
+}
+
+func (a stateValidatorWrapperImpl) ValidatorWrapper(addr common.Address, sendOriginal bool, copyDelegations bool) (*staking.ValidatorWrapper, error) {
+	return a.v, a.err
+}
+
+func TestUpdateMaxCommissionFee(t *testing.T) {
+	t.Run("0.6 + 0.6 = 1 (100%)", func(t *testing.T) {
+		v1 := stateValidatorWrapperImpl{
+			v: &staking.ValidatorWrapper{
+				Validator: staking.Validator{
+					Commission: staking.Commission{
+						CommissionRates: staking.CommissionRates{
+							MaxChangeRate: numeric.MustNewDecFromStr("0.6"),
+							MaxRate:       numeric.MustNewDecFromStr("0.95"),
+						},
+					},
+				},
+			},
+		}
+
+		err := UpdateMaxCommissionFee(true, v1, common.Address{}, numeric.MustNewDecFromStr("0.6"))
+		require.NoError(t, err)
+		require.Equal(t, "1", v1.v.Commission.CommissionRates.MaxRate.String())
+	})
+
+	t.Run("0.07 + 0.5 = 0.57", func(t *testing.T) {
+		v2 := stateValidatorWrapperImpl{
+			v: &staking.ValidatorWrapper{
+				Validator: staking.Validator{
+					Commission: staking.Commission{
+						CommissionRates: staking.CommissionRates{
+							MaxChangeRate: numeric.MustNewDecFromStr("0.5"),
+							MaxRate:       numeric.MustNewDecFromStr("0"),
+						},
+					},
+				},
+			},
+		}
+		err := UpdateMaxCommissionFee(true, v2, common.Address{}, numeric.MustNewDecFromStr("0.07"))
+		require.NoError(t, err)
+		require.Equal(t, "0.57", v2.v.Commission.CommissionRates.MaxRate.String())
+	})
+
+	t.Run("error", func(t *testing.T) {
+		s := stateValidatorWrapperImpl{
+			v:   &staking.ValidatorWrapper{},
+			err: errors.New("error"),
+		}
+		err := UpdateMaxCommissionFee(true, s, common.Address{}, numeric.MustNewDecFromStr("0.07"))
+		require.Error(t, err)
+	})
 }

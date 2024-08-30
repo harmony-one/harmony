@@ -156,7 +156,7 @@ jobs:
         run: |
           mv $GITHUB_WORKSPACE/harmony-amd64 ./scripts/docker/harmony
         working-directory: harmony
-  
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -171,6 +171,8 @@ jobs:
         with:
           context: ./harmony/scripts/docker
           file: ./harmony/scripts/docker/Dockerfile
+          build-args: |
+            BUILD_BRANCH=${{ github.ref_name }}
           push: true
           tags: |
             harmonyone/harmony:latest

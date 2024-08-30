@@ -75,8 +75,10 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(1673), // 2023-11-02 17:30:00+00:00
-		MaxRateEpoch:                          EpochTBD,
+		TopMaxRateEpoch:                       big.NewInt(1976), // around 2024-06-20 00:06:05  UTC
+		MaxRateEpoch:                          big.NewInt(1733), // 2023-12-17 12:20:15+00:00
 		DevnetExternalEpoch:                   EpochTBD,
+		TestnetExternalEpoch:                  EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -114,14 +116,16 @@ var (
 		ChainIdFixEpoch:                       big.NewInt(0),
 		CrossShardXferPrecompileEpoch:         big.NewInt(2),
 		AllowlistEpoch:                        big.NewInt(2),
-		LeaderRotationInternalValidatorsEpoch: EpochTBD,
-		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: big.NewInt(3044),
+		LeaderRotationExternalValidatorsEpoch: big.NewInt(3044),
 		FeeCollectEpoch:                       big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
 		BlockGas30MEpoch:                      big.NewInt(2176), // 2023-10-12 10:00:00+00:00
-		MaxRateEpoch:                          EpochTBD,
+		TopMaxRateEpoch:                       EpochTBD,
+		MaxRateEpoch:                          big.NewInt(2520), // 2023-12-16 12:17:14+00:00
 		DevnetExternalEpoch:                   EpochTBD,
+		TestnetExternalEpoch:                  big.NewInt(3044),
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -165,8 +169,10 @@ var (
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
+		TestnetExternalEpoch:                  EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -211,7 +217,9 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
 		HIP30Epoch:                            big.NewInt(7),
 		BlockGas30MEpoch:                      big.NewInt(7),
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
+		TestnetExternalEpoch:                  EpochTBD,
 		DevnetExternalEpoch:                   big.NewInt(144),
 	}
 
@@ -257,8 +265,10 @@ var (
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
+		TopMaxRateEpoch:                       big.NewInt(0),
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
+		TestnetExternalEpoch:                  EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -302,8 +312,10 @@ var (
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
+		TopMaxRateEpoch:                       EpochTBD,
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
+		TestnetExternalEpoch:                  EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -350,6 +362,8 @@ var (
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // MaxRateEpoch
+		big.NewInt(0),                      // MaxRateEpoch
+		big.NewInt(0),
 		big.NewInt(0),
 	}
 
@@ -396,6 +410,8 @@ var (
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 		big.NewInt(0),        // HIP30Epoch
 		big.NewInt(0),        // BlockGas30M
+		big.NewInt(0),        // MaxRateEpoch
+		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),
 	}
@@ -564,10 +580,15 @@ type ChainConfig struct {
 
 	DevnetExternalEpoch *big.Int `json:"devnet-external-epoch,omitempty"`
 
+	TestnetExternalEpoch *big.Int `json:"testnet-external-epoch,omitempty"`
+
 	BlockGas30MEpoch *big.Int `json:"block-gas-30m-epoch,omitempty"`
 
 	// MaxRateEpoch will make sure the validator max-rate is at least equal to the minRate + the validator max-rate-increase
 	MaxRateEpoch *big.Int `json:"max-rate-epoch,omitempty"`
+
+	// TopMaxRateEpoch will make sure the validator max-rate is less to 100% for the cases where the minRate + the validator max-rate-increase > 100%
+	TopMaxRateEpoch *big.Int `json:"top-max-rate-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -831,8 +852,16 @@ func (c *ChainConfig) IsDevnetExternalEpoch(epoch *big.Int) bool {
 	return isForked(c.DevnetExternalEpoch, epoch)
 }
 
+func (c *ChainConfig) IsTestnetExternalEpoch(epoch *big.Int) bool {
+	return isForked(c.TestnetExternalEpoch, epoch)
+}
+
 func (c *ChainConfig) IsMaxRate(epoch *big.Int) bool {
 	return isForked(c.MaxRateEpoch, epoch)
+}
+
+func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
+	return isForked(c.TopMaxRateEpoch, epoch)
 }
 
 // During this epoch, shards 2 and 3 will start sending

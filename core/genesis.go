@@ -18,14 +18,12 @@ package core
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"os"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -35,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
+	"github.com/harmony-one/harmony/core/genesis"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/staking/slash"
 
@@ -124,11 +123,8 @@ func NewGenesisSpec(netType nodeconfig.NetworkType, shardID uint32) *Genesis {
 	if netType != nodeconfig.Mainnet {
 		gasLimit = params.TestGenesisGasLimit
 		// Smart contract deployer account used to deploy initial smart contract
-		contractDeployerKey, _ := ecdsa.GenerateKey(
-			crypto.S256(),
-			strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"),
-		)
-		contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
+
+		contractDeployerAddress := crypto.PubkeyToAddress(genesis.ContractDeployerKey.PublicKey)
 		contractDeployerFunds := big.NewInt(ContractDeployerInitFund)
 		contractDeployerFunds = contractDeployerFunds.Mul(
 			contractDeployerFunds, big.NewInt(denominations.One),

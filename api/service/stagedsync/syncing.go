@@ -112,6 +112,24 @@ func CreateStagedSync(
 		finishCfg,
 	)
 
+	utils.Logger().Info().
+		Str("ip", ip).
+		Str("port", port).
+		Uint32("shard", bc.ShardID()).
+		Bool("isExplorer", isExplorer).
+		Bool("TurboMode", TurboMode).
+		Bool("memdb", UseMemDB).
+		Bool("doubleCheckBlockHashes", doubleCheckBlockHashes).
+		Uint64("maxBlocksPerCycle", maxBlocksPerCycle).
+		Uint64("maxBackgroundBlocks", maxBackgroundBlocks).
+		Uint64("maxMemSyncCycleSize", maxMemSyncCycleSize).
+		Bool("verifyAllSig", verifyAllSig).
+		Uint64("verifyHeaderBatchSize", verifyHeaderBatchSize).
+		Int("insertChainBatchSize", insertChainBatchSize).
+		Bool("debugMode", debugMode).
+		Str("dbDir", dbDir).
+		Msg("[STAGED_SYNC] staged sync created successfully")
+
 	return New(ctx,
 		ip,
 		port,

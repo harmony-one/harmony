@@ -1,8 +1,6 @@
 package node
 
 import (
-	"math/big"
-
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
@@ -13,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+var CrosslinkOutdatedErr = errors.New("crosslink signal is outdated")
 
 const (
 	maxPendingCrossLinkSize = 1000
@@ -32,34 +32,35 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	hb := types.CrosslinkHeartbeat{}
 	err := rlp.DecodeBytes(msgPayload, &hb)
 	if err != nil {
-		return err
+		return errors.WithMessagef(err, "cannot decode crosslink heartbeat message, len: %d", len(msgPayload))
 	}
-	shardID := node.Blockchain().CurrentBlock().ShardID()
+	cur := node.Blockchain().CurrentBlock()
+	shardID := cur.ShardID()
 	if hb.ShardID != shardID {
 		return errors.Errorf("invalid shard id: expected %d, got %d", shardID, hb.ShardID)
 	}
 
 	// Outdated signal.
 	if s := node.crosslinks.LastKnownCrosslinkHeartbeatSignal(); s != nil && s.LatestContinuousBlockNum > hb.LatestContinuousBlockNum {
-		return nil
+		return errors.WithMessagef(CrosslinkOutdatedErr, "latest continuous block num: %d, got %d", s.LatestContinuousBlockNum, hb.LatestContinuousBlockNum)
 	}
 
 	sig := &ffi_bls.Sign{}
 	err = sig.Deserialize(hb.Signature)
 	if err != nil {
-		return err
+		return errors.WithMessagef(err, "cannot deserialize signature, len: %d", len(hb.Signature))
 	}
 
 	hb.Signature = nil
 	serialized, err := rlp.EncodeToBytes(hb)
 	if err != nil {
-		return err
+		return errors.WithMessage(err, "cannot serialize crosslink heartbeat message")
 	}
 
 	pub := ffi_bls.PublicKey{}
 	err = pub.Deserialize(hb.PublicKey)
 	if err != nil {
-		return err
+		return errors.WithMessagef(err, "cannot deserialize public key, len: %d", len(hb.PublicKey))
 	}
 
 	ok := sig.VerifyHash(&pub, serialized)
@@ -67,18 +68,17 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return errors.New("invalid signature")
 	}
 
-	state, err := node.EpochChain().ReadShardState(big.NewInt(int64(hb.Epoch)))
+	state, err := node.EpochChain().ReadShardState(cur.Epoch())
 	if err != nil {
-		return err
+		return errors.WithMessagef(err, "cannot read shard state for epoch %d", cur.Epoch())
 	}
-
 	committee, err := state.FindCommitteeByID(shard.BeaconChainShardID)
 	if err != nil {
-		return err
+		return errors.WithMessagef(err, "cannot find committee for shard %d", shard.BeaconChainShardID)
 	}
 	pubs, err := committee.BLSPublicKeys()
 	if err != nil {
-		return err
+		return errors.WithMessage(err, "cannot get BLS public keys")
 	}
 
 	keyExists := false
@@ -90,7 +90,7 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	}
 
 	if !keyExists {
-		return errors.New("pub key doesn't exist")
+		return errors.Errorf("pub key %s not found in committiee for epoch %d and shard %d, my current shard is %d, pub keys len %d", pub.SerializeToHexStr(), hb.Epoch, shard.BeaconChainShardID, shardID, len(pubs))
 	}
 
 	utils.Logger().Info().
@@ -103,7 +103,13 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 	if node.IsRunningBeaconChain() {
 		pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
-		if err == nil && len(pendingCLs) >= maxPendingCrossLinkSize {
+		if err != nil {
+			utils.Logger().Debug().
+				Err(err).
+				Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
+			return
+		}
+		if len(pendingCLs) >= maxPendingCrossLinkSize {
 			utils.Logger().Debug().
 				Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
 			return

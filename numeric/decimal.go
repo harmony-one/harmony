@@ -383,32 +383,45 @@ func (d Dec) String() string {
 
 	var bzStr []byte
 
-	// TODO: Remove trailing zeros
 	// case 1, purely decimal
 	if inputSize <= Precision {
-		bzStr = make([]byte, Precision+2)
+		bzStr = make([]byte, 0, Precision+2)
 
 		// 0. prefix
-		bzStr[0] = byte('0')
-		bzStr[1] = byte('.')
+		bzStr = append(bzStr, byte('0'))
+		if !IsZeroes(bzInt) {
+			bzStr = append(bzStr, '.')
 
-		// set relevant digits to 0
-		for i := 0; i < Precision-inputSize; i++ {
-			bzStr[i+2] = byte('0')
+			// set relevant digits to 0
+			for i := 0; i < Precision-inputSize; i++ {
+				bzStr = append(bzStr, byte('0'))
+			}
+
+			// set final digits
+			for len(bzInt) > 0 {
+				if !IsZeroes(bzInt) {
+					bzStr = append(bzStr, bzInt[0])
+				}
+				bzInt = bzInt[1:]
+			}
 		}
 
-		// set final digits
-		copy(bzStr[2+(Precision-inputSize):], bzInt)
-
 	} else {
-
 		// inputSize + 1 to account for the decimal point that is being added
-		bzStr = make([]byte, inputSize+1)
+		bzStr = make([]byte, 0, inputSize+1)
 		decPointPlace := inputSize - Precision
 
-		copy(bzStr, bzInt[:decPointPlace])                   // pre-decimal digits
-		bzStr[decPointPlace] = byte('.')                     // decimal point
-		copy(bzStr[decPointPlace+1:], bzInt[decPointPlace:]) // post-decimal digits
+		bzStr = append(bzStr, bzInt[:decPointPlace]...) // pre-decimal digits
+		if !IsZeroes(bzInt[decPointPlace:]) {
+			bzStr = append(bzStr, byte('.')) // decimal point
+		}
+		bzInt = bzInt[decPointPlace:] // post-decimal digits
+		for len(bzInt) > 0 {
+			if !IsZeroes(bzInt) {
+				bzStr = append(bzStr, bzInt[0])
+			}
+			bzInt = bzInt[1:]
+		}
 	}
 
 	if isNeg {
@@ -416,6 +429,16 @@ func (d Dec) String() string {
 	}
 
 	return string(bzStr)
+}
+
+// IsZeroes checks if the byte array is all zeroes
+func IsZeroes(b []byte) bool {
+	for _, c := range b {
+		if c != '0' {
+			return false
+		}
+	}
+	return true
 }
 
 //     ____
