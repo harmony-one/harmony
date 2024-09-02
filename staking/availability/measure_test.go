@@ -776,6 +776,7 @@ func indexesToBitMap(idxs []int, n int) ([]byte, error) {
 	return res, nil
 }
 
+// makeTestWrapper makes test wrapper
 func makeTestWrapper(addr common.Address, numSigned, numToSign int64) staking.ValidatorWrapper {
 	var val staking.ValidatorWrapper
 	val.Address = addr
