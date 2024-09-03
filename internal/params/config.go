@@ -368,6 +368,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
+		big.NewInt(0),
 	}
 
 	// TestChainConfig ...
@@ -416,6 +417,7 @@ var (
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
+		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
 	}
@@ -599,6 +601,8 @@ type ChainConfig struct {
 	HIP32Epoch *big.Int `json:"hip32-epoch,omitempty"`
 
 	IsOneSecondEpoch *big.Int `json:"is-one-second-epoch,omitempty"`
+
+	IsRotationEachBlockEpoch *big.Int `json:"is-rotation-each-block-epoch"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -886,6 +890,10 @@ func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 // their balances over to shard 0 or 1.
 func (c *ChainConfig) IsOneEpochBeforeHIP30(epoch *big.Int) bool {
 	return new(big.Int).Sub(c.HIP30Epoch, epoch).Cmp(common.Big1) == 0
+}
+
+func (c *ChainConfig) IsRotationEachBlock(epoch *big.Int) bool {
+	return isForked(c.IsRotationEachBlockEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
