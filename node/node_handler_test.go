@@ -203,7 +203,7 @@ func TestVerifyVRF(t *testing.T) {
 	shardState.Epoch = big.NewInt(1)
 	shardState.Shards = append(shardState.Shards, com)
 
-	node.Consensus.LeaderPubKey = &bls.PublicKeyWrapper{Bytes: spKey, Object: pubKey}
+	node.Consensus.SetLeaderPubKey(&bls.PublicKeyWrapper{Bytes: spKey, Object: pubKey})
 	node.Worker.GetCurrentHeader().SetEpoch(big.NewInt(1))
 	node.Consensus.GenerateVrfAndProof(node.Worker.GetCurrentHeader())
 	block, _ := node.Worker.FinalizeNewBlock(

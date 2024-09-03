@@ -40,10 +40,9 @@ const (
 	CommitSigSenderTimeout = 10 * time.Second
 )
 
-// IsViewChangingMode return true if curernt mode is viewchanging
+// IsViewChangingMode return true if current mode is viewchanging.
+// Method is thread safe.
 func (consensus *Consensus) IsViewChangingMode() bool {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
 	return consensus.isViewChangingMode()
 }
 
@@ -68,7 +67,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	// Do easier check before signature check
 	if msg.Type == msg_pb.MessageType_ANNOUNCE || msg.Type == msg_pb.MessageType_PREPARED || msg.Type == msg_pb.MessageType_COMMITTED {
 		// Only validator needs to check whether the message is from the correct leader
-		if !bytes.Equal(senderKey[:], consensus.LeaderPubKey.Bytes[:]) &&
+		if !bytes.Equal(senderKey[:], consensus.getLeaderPubKey().Bytes[:]) &&
 			consensus.current.Mode() == Normal && !consensus.IgnoreViewIDCheck.IsSet() {
 			return errSenderPubKeyNotLeader
 		}
@@ -666,9 +665,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	}
 
 	consensus.FinishFinalityCount()
-	go func() {
-		consensus.PostConsensusJob(blk)
-	}()
+	consensus.PostConsensusProcessing(blk)
 	consensus.setupForNewConsensus(blk, committedMsg)
 	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
 		Str("hash", blk.Header().Hash().Hex()).

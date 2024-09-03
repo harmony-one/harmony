@@ -2,15 +2,14 @@ package consensus
 
 import (
 	"math/big"
+	"sync/atomic"
 	"time"
-
-	"github.com/harmony-one/harmony/internal/chain"
-
-	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -24,7 +23,7 @@ const MaxViewIDDiff = 249
 
 // State contains current mode and current viewID
 type State struct {
-	mode Mode
+	mode uint32
 
 	// current view id in normal mode
 	// it changes per successful consensus
@@ -35,43 +34,49 @@ type State struct {
 	viewChangingID uint64
 }
 
+func NewState(mode Mode) State {
+	return State{
+		mode: uint32(mode),
+	}
+}
+
 // Mode return the current node mode
 func (pm *State) Mode() Mode {
-	return pm.mode
+	return Mode(atomic.LoadUint32(&pm.mode))
 }
 
 // SetMode set the node mode as required
 func (pm *State) SetMode(s Mode) {
-	pm.mode = s
+	atomic.StoreUint32(&pm.mode, uint32(s))
 }
 
 // GetCurBlockViewID return the current view id
 func (pm *State) GetCurBlockViewID() uint64 {
-	return pm.blockViewID
+	return atomic.LoadUint64(&pm.blockViewID)
 }
 
 // SetCurBlockViewID sets the current view id
 func (pm *State) SetCurBlockViewID(viewID uint64) uint64 {
-	pm.blockViewID = viewID
-	return pm.blockViewID
+	atomic.StoreUint64(&pm.blockViewID, viewID)
+	return viewID
 }
 
 // GetViewChangingID return the current view changing id
 // It is meaningful during view change mode
 func (pm *State) GetViewChangingID() uint64 {
-	return pm.viewChangingID
+	return atomic.LoadUint64(&pm.viewChangingID)
 }
 
 // SetViewChangingID set the current view changing id
 // It is meaningful during view change mode
 func (pm *State) SetViewChangingID(id uint64) {
-	pm.viewChangingID = id
+	atomic.StoreUint64(&pm.viewChangingID, id)
 }
 
 // GetViewChangeDuraion return the duration of the current view change
 // It increase in the power of difference betweeen view changing ID and current view ID
 func (pm *State) GetViewChangeDuraion() time.Duration {
-	diff := int64(pm.viewChangingID - pm.blockViewID)
+	diff := int64(pm.GetViewChangingID() - pm.GetCurBlockViewID())
 	return time.Duration(diff * diff * int64(viewChangeDuration))
 }
 
@@ -152,12 +157,12 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 	epoch := big.NewInt(0)
 	if blockchain == nil {
 		consensus.getLogger().Error().Msg("[getNextLeaderKey] Blockchain is nil. Use consensus.LeaderPubKey")
-		lastLeaderPubKey = consensus.LeaderPubKey
+		lastLeaderPubKey = consensus.getLeaderPubKey()
 	} else {
 		curHeader := blockchain.CurrentHeader()
 		if curHeader == nil {
 			consensus.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
-			lastLeaderPubKey = consensus.LeaderPubKey
+			lastLeaderPubKey = consensus.getLeaderPubKey()
 		} else {
 			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
 			gap = int(viewID - stuckBlockViewID)
@@ -166,7 +171,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 			if err != nil || lastLeaderPubKey == nil {
 				consensus.getLogger().Error().Err(err).
 					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
-				lastLeaderPubKey = consensus.LeaderPubKey
+				lastLeaderPubKey = consensus.getLeaderPubKey()
 			}
 			epoch = curHeader.Epoch()
 			// viewchange happened at the first block of new epoch
@@ -183,7 +188,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 	}
 	consensus.getLogger().Info().
 		Str("lastLeaderPubKey", lastLeaderPubKey.Bytes.Hex()).
-		Str("leaderPubKey", consensus.LeaderPubKey.Bytes.Hex()).
+		Str("leaderPubKey", consensus.getLeaderPubKey().Bytes.Hex()).
 		Int("gap", gap).
 		Uint64("newViewID", viewID).
 		Uint64("myCurBlockViewID", consensus.getCurBlockViewID()).
@@ -212,7 +217,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 	}
 	if !wasFound {
 		consensus.getLogger().Warn().
-			Str("key", consensus.LeaderPubKey.Bytes.Hex()).
+			Str("key", consensus.getLeaderPubKey().Bytes.Hex()).
 			Msg("[getNextLeaderKey] currentLeaderKey not found")
 	}
 	consensus.getLogger().Info().
@@ -257,13 +262,13 @@ func (consensus *Consensus) startViewChange() {
 	// aganist the consensus.LeaderPubKey variable.
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
-	consensus.LeaderPubKey = consensus.getNextLeaderKey(nextViewID, committee)
+	consensus.setLeaderPubKey(consensus.getNextLeaderKey(nextViewID, committee))
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).
 		Uint64("viewChangingID", consensus.getViewChangingID()).
 		Dur("timeoutDuration", duration).
-		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
+		Str("NextLeader", consensus.getLeaderPubKey().Bytes.Hex()).
 		Msg("[startViewChange]")
 	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "started"}).Inc()
 
@@ -540,7 +545,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 
 	// newView message verified success, override my state
 	consensus.setViewIDs(recvMsg.ViewID)
-	consensus.LeaderPubKey = senderKey
+	consensus.setLeaderPubKey(senderKey)
 	consensus.resetViewChangeState()
 
 	consensus.msgSender.StopRetry(msg_pb.MessageType_VIEWCHANGE)
@@ -554,7 +559,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		consensus.getLogger().Info().Msg("onNewView === announce")
 	}
 	consensus.getLogger().Info().
-		Str("newLeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
+		Str("newLeaderKey", consensus.getLeaderPubKey().Bytes.Hex()).
 		Msg("new leader changed")
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "finished"}).Inc()
