@@ -21,15 +21,11 @@ type BootNodeConfig struct {
 	HTTP       HttpConfig
 	WS         WsConfig
 	RPCOpt     RpcOptConfig
-	BLSKeys    BlsConfig
 	Pprof      PprofConfig
 	Log        LogConfig
 	Sys        *SysConfig        `toml:",omitempty"`
 	Devnet     *DevnetConfig     `toml:",omitempty"`
-	Revert     *RevertConfig     `toml:",omitempty"`
-	Legacy     *LegacyConfig     `toml:",omitempty"`
 	Prometheus *PrometheusConfig `toml:",omitempty"`
-	ShardData  ShardDataConfig
 	Cache      CacheConfig
 }
 
@@ -184,40 +180,6 @@ type GasPriceOracleConfig struct {
 	BlockGasLimit int
 }
 
-type ConsensusConfig struct {
-	MinPeers     int
-	AggregateSig bool
-}
-
-type BlsConfig struct {
-	KeyDir   string
-	KeyFiles []string
-	MaxKeys  int
-
-	PassEnabled    bool
-	PassSrcType    string
-	PassFile       string
-	SavePassphrase bool
-
-	KMSEnabled       bool
-	KMSConfigSrcType string
-	KMSConfigFile    string
-}
-
-type TxPoolConfig struct {
-	BlacklistFile     string
-	AllowedTxsFile    string
-	RosettaFixFile    string
-	AccountSlots      uint64
-	AccountQueue      uint64
-	GlobalQueue       uint64
-	LocalAccountsFile string
-	GlobalSlots       uint64
-	Lifetime          time.Duration
-	PriceLimit        PriceLimit
-	PriceBump         uint64
-}
-
 type PprofConfig struct {
 	Enabled            bool
 	ListenAddr         string
@@ -304,13 +266,6 @@ type DevnetConfig struct {
 	SlotsLimit  int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 }
 
-// TODO: make `revert` to a separate command
-type RevertConfig struct {
-	RevertBeacon bool
-	RevertTo     int
-	RevertBefore int
-}
-
 type CacheConfig struct {
 	Disabled        bool          // Whether to disable trie write caching (archive node)
 	TrieNodeLimit   int           // Memory limit (MB) at which to flush the current in-memory trie to disk
@@ -329,48 +284,12 @@ type PreimageConfig struct {
 	GenerateEnd   uint64
 }
 
-type LegacyConfig struct {
-	WebHookConfig         *string `toml:",omitempty"`
-	TPBroadcastInvalidTxn *bool   `toml:",omitempty"`
-}
-
 type PrometheusConfig struct {
 	Enabled    bool
 	IP         string
 	Port       int
 	EnablePush bool
 	Gateway    string
-}
-
-type SyncConfig struct {
-	// TODO: Remove this bool after stream sync is fully up.
-	Enabled              bool             // enable the stream sync protocol
-	SyncMode             uint32           // sync mode (default:Full sync, 1: Fast Sync, 2: Snap Sync(not implemented yet))
-	Downloader           bool             // start the sync downloader client
-	StagedSync           bool             // use staged sync
-	StagedSyncCfg        StagedSyncConfig // staged sync configurations
-	Concurrency          int              // concurrency used for stream sync protocol
-	MinPeers             int              // minimum streams to start a sync task.
-	InitStreams          int              // minimum streams in bootstrap to start sync loop.
-	MaxAdvertiseWaitTime int              // maximum time duration between advertisements
-	DiscSoftLowCap       int              // when number of streams is below this value, spin discover during check
-	DiscHardLowCap       int              // when removing stream, num is below this value, spin discovery immediately
-	DiscHighCap          int              // upper limit of streams in one sync protocol
-	DiscBatch            int              // size of each discovery
-}
-
-type StagedSyncConfig struct {
-	TurboMode              bool   // turn on turbo mode
-	DoubleCheckBlockHashes bool   // double check all block hashes before download blocks
-	MaxBlocksPerSyncCycle  uint64 // max number of blocks per each sync cycle, if set to zero, all blocks will be synced in one full cycle
-	MaxBackgroundBlocks    uint64 // max number of background blocks in turbo mode
-	InsertChainBatchSize   int    // number of blocks to build a batch and insert to chain in staged sync
-	MaxMemSyncCycleSize    uint64 // max number of blocks to use a single transaction for staged sync
-	VerifyAllSig           bool   // verify signatures for all blocks regardless of height and batch size
-	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
-	UseMemDB               bool   // it uses memory by default. set it to false to use disk
-	LogProgress            bool   // log the full sync progress in console
-	DebugMode              bool   // log every single process and error to help to debug syncing issues (DebugMode is not accessible to the end user and is only an aid for development)
 }
 
 type PriceLimit int64
