@@ -1,7 +1,6 @@
 package bootnode
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -14,19 +13,15 @@ import (
 // from user set flags to internal node configs. Also user can persist this structure to a toml file
 // to avoid inputting all arguments.
 type BootNodeConfig struct {
-	Version    string
-	General    GeneralConfig
-	Network    NetworkConfig
-	P2P        P2pConfig
-	HTTP       HttpConfig
-	WS         WsConfig
-	RPCOpt     RpcOptConfig
-	Pprof      PprofConfig
-	Log        LogConfig
-	Sys        *SysConfig        `toml:",omitempty"`
-	Devnet     *DevnetConfig     `toml:",omitempty"`
-	Prometheus *PrometheusConfig `toml:",omitempty"`
-	Cache      CacheConfig
+	Version string
+	General GeneralConfig
+	P2P     P2pConfig
+	HTTP    HttpConfig
+	WS      WsConfig
+	RPCOpt  RpcOptConfig
+	Pprof   PprofConfig
+	Log     LogConfig
+	Sys     *SysConfig `toml:",omitempty"`
 }
 
 func (bnc BootNodeConfig) ToRPCServerConfig() nodeconfig.RPCServerConfig {
@@ -54,49 +49,23 @@ func (bnc BootNodeConfig) ToRPCServerConfig() nodeconfig.RPCServerConfig {
 			Dur("updated", idleTimeout).
 			Msg("Sanitizing invalid http idle timeout")
 	}
-	evmCallTimeout, err := time.ParseDuration(bnc.RPCOpt.EvmCallTimeout)
-	if err != nil {
-		evmCallTimeout, _ = time.ParseDuration(nodeconfig.DefaultEvmCallTimeout)
-		utils.Logger().Warn().
-			Str("provided", bnc.RPCOpt.EvmCallTimeout).
-			Dur("updated", evmCallTimeout).
-			Msg("Sanitizing invalid evm_call timeout")
-	}
 	return nodeconfig.RPCServerConfig{
 		HTTPEnabled:        bnc.HTTP.Enabled,
 		HTTPIp:             bnc.HTTP.IP,
 		HTTPPort:           bnc.HTTP.Port,
-		HTTPAuthPort:       bnc.HTTP.AuthPort,
 		HTTPTimeoutRead:    readTimeout,
 		HTTPTimeoutWrite:   writeTimeout,
 		HTTPTimeoutIdle:    idleTimeout,
 		WSEnabled:          bnc.WS.Enabled,
 		WSIp:               bnc.WS.IP,
 		WSPort:             bnc.WS.Port,
-		WSAuthPort:         bnc.WS.AuthPort,
 		DebugEnabled:       bnc.RPCOpt.DebugEnabled,
-		PreimagesEnabled:   bnc.RPCOpt.PreimagesEnabled,
 		EthRPCsEnabled:     bnc.RPCOpt.EthRPCsEnabled,
-		StakingRPCsEnabled: bnc.RPCOpt.StakingRPCsEnabled,
 		LegacyRPCsEnabled:  bnc.RPCOpt.LegacyRPCsEnabled,
 		RpcFilterFile:      bnc.RPCOpt.RpcFilterFile,
 		RateLimiterEnabled: bnc.RPCOpt.RateLimterEnabled,
 		RequestsPerSecond:  bnc.RPCOpt.RequestsPerSecond,
-		EvmCallTimeout:     evmCallTimeout,
 	}
-}
-
-type DnsSync struct {
-	Port       int    // replaces: Network.DNSSyncPort
-	Zone       string // replaces: Network.DNSZone
-	Client     bool   // replaces: Sync.LegacyClient
-	Server     bool   // replaces: Sync.LegacyServer
-	ServerPort int
-}
-
-type NetworkConfig struct {
-	NetworkType string
-	BootNodes   []string
 }
 
 type P2pConfig struct {
@@ -129,55 +98,9 @@ type P2pConfig struct {
 }
 
 type GeneralConfig struct {
-	NodeType               string
-	NoStaking              bool
-	ShardID                int
-	IsArchival             bool
-	IsBackup               bool
-	IsBeaconArchival       bool
-	IsOffline              bool
-	DataDir                string
-	TraceEnable            bool
-	EnablePruneBeaconChain bool
-	RunElasticMode         bool
-}
-
-type TiKVConfig struct {
-	Debug bool
-
-	PDAddr                      []string
-	Role                        string
-	StateDBCacheSizeInMB        uint32
-	StateDBCachePersistencePath string
-	StateDBRedisServerAddr      []string
-	StateDBRedisLRUTimeInDay    uint32
-}
-
-type ShardDataConfig struct {
-	EnableShardData bool
-	DiskCount       int
-	ShardCount      int
-	CacheTime       int
-	CacheSize       int
-}
-
-type GasPriceOracleConfig struct {
-	// the number of blocks to sample
-	Blocks int
-	// the number of transactions to sample, per block
-	Transactions int
-	// the percentile to pick from there
-	Percentile int
-	// the default gas price, if the above data is not available
-	DefaultPrice int64
-	// the maximum suggested gas price
-	MaxPrice int64
-	// when block usage (gas) for last `Blocks` blocks is below `LowUsageThreshold`,
-	// we return the Default price
-	LowUsageThreshold int
-	// hack: our block header reports an 80m gas limit, but it is actually 30M.
-	// if set to non-zero, this is applied UNCHECKED
-	BlockGasLimit int
+	NodeType    string
+	ShardID     int
+	TraceEnable bool
 }
 
 type PprofConfig struct {
@@ -248,40 +171,12 @@ type WsConfig struct {
 }
 
 type RpcOptConfig struct {
-	DebugEnabled       bool   // Enables PrivateDebugService APIs, including the EVM tracer
-	EthRPCsEnabled     bool   // Expose Eth RPCs
-	StakingRPCsEnabled bool   // Expose Staking RPCs
-	LegacyRPCsEnabled  bool   // Expose Legacy RPCs
-	RpcFilterFile      string // Define filters to enable/disable RPC exposure
-	RateLimterEnabled  bool   // Enable Rate limiter for RPC
-	RequestsPerSecond  int    // for RPC rate limiter
-	EvmCallTimeout     string // Timeout for eth_call
-	PreimagesEnabled   bool   // Expose preimage API
-}
-
-type DevnetConfig struct {
-	NumShards   int
-	ShardSize   int
-	HmyNodeSize int
-	SlotsLimit  int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
-}
-
-type CacheConfig struct {
-	Disabled        bool          // Whether to disable trie write caching (archive node)
-	TrieNodeLimit   int           // Memory limit (MB) at which to flush the current in-memory trie to disk
-	TrieTimeLimit   time.Duration // Time limit after which to flush the current in-memory trie to disk
-	TriesInMemory   uint64        // Block number from the head stored in disk before exiting
-	Preimages       bool          // Whether to store preimage of trie key to the disk
-	SnapshotLimit   int           // Memory allowance (MB) to use for caching snapshot entries in memory
-	SnapshotNoBuild bool          // Whether the background generation is allowed
-	SnapshotWait    bool          // Wait for snapshot construction on startup
-}
-
-type PreimageConfig struct {
-	ImportFrom    string
-	ExportTo      string
-	GenerateStart uint64
-	GenerateEnd   uint64
+	DebugEnabled      bool   // Enables PrivateDebugService APIs, including the EVM tracer
+	EthRPCsEnabled    bool   // Expose Eth RPCs
+	LegacyRPCsEnabled bool   // Expose Legacy RPCs
+	RpcFilterFile     string // Define filters to enable/disable RPC exposure
+	RateLimterEnabled bool   // Enable Rate limiter for RPC
+	RequestsPerSecond int    // for RPC rate limiter
 }
 
 type PrometheusConfig struct {
@@ -290,27 +185,4 @@ type PrometheusConfig struct {
 	Port       int
 	EnablePush bool
 	Gateway    string
-}
-
-type PriceLimit int64
-
-func (s *PriceLimit) UnmarshalTOML(data interface{}) error {
-	switch v := data.(type) {
-	case float64:
-		*s = PriceLimit(v)
-	case int64:
-		*s = PriceLimit(v)
-	case PriceLimit:
-		*s = v
-	default:
-		return fmt.Errorf("PriceLimit.UnmarshalTOML: %T", data)
-	}
-	return nil
-}
-
-func (s PriceLimit) MarshalTOML() ([]byte, error) {
-	if s > 1_000_000_000 {
-		return []byte(fmt.Sprintf("%de9", s/1_000_000_000)), nil
-	}
-	return []byte(fmt.Sprintf("%d", s)), nil
 }

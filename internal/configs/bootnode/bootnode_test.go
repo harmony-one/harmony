@@ -6,9 +6,7 @@ import (
 	"time"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestToRPCServerConfig(t *testing.T) {
@@ -36,14 +34,12 @@ func TestToRPCServerConfig(t *testing.T) {
 					AuthPort: nodeconfig.DefaultAuthWSPort,
 				},
 				RPCOpt: RpcOptConfig{
-					DebugEnabled:       false,
-					EthRPCsEnabled:     true,
-					StakingRPCsEnabled: true,
-					LegacyRPCsEnabled:  true,
-					RpcFilterFile:      "./.hmy/rpc_filter.txt",
-					RateLimterEnabled:  true,
-					RequestsPerSecond:  nodeconfig.DefaultRPCRateLimit,
-					EvmCallTimeout:     "-4",
+					DebugEnabled:      false,
+					EthRPCsEnabled:    true,
+					LegacyRPCsEnabled: true,
+					RpcFilterFile:     "./.hmy/rpc_filter.txt",
+					RateLimterEnabled: true,
+					RequestsPerSecond: nodeconfig.DefaultRPCRateLimit,
 				},
 			},
 			output: nodeconfig.RPCServerConfig{
@@ -80,39 +76,4 @@ func TestToRPCServerConfig(t *testing.T) {
 			)
 		})
 	}
-}
-
-var data = `big = 100e9
-small = 100
-zero = 0
-`
-
-func TestPriceLimit_UnmarshalTOML(t *testing.T) {
-	type V struct {
-		Big   PriceLimit `toml:"big"`
-		Small PriceLimit `toml:"small"`
-		Zero  PriceLimit `toml:"zero"`
-	}
-	var v V
-	require.NoError(t, toml.Unmarshal([]byte(data), &v))
-
-	require.Equal(t, PriceLimit(100e9), v.Big)
-	require.Equal(t, PriceLimit(100), v.Small)
-	require.Equal(t, PriceLimit(0), v.Zero)
-}
-
-func TestPriceLimit_MarshalTOML(t *testing.T) {
-	type V struct {
-		Big   PriceLimit `toml:"big"`
-		Small PriceLimit `toml:"small"`
-		Zero  PriceLimit `toml:"zero"`
-	}
-	v := V{
-		Big:   PriceLimit(100e9),
-		Small: PriceLimit(100),
-		Zero:  PriceLimit(0),
-	}
-	e, err := toml.Marshal(v)
-	require.NoError(t, err)
-	require.Equal(t, data, string(e))
 }
