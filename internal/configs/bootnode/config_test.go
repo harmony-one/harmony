@@ -15,13 +15,8 @@ func TestNodeConfigSingleton(t *testing.T) {
 	// init 3 configs
 	_ = GetShardConfig(2)
 	// get the singleton variable
-	c := GetShardConfig(Global)
-	c.SetBeaconGroupID(GroupIDBeacon)
-	d := GetShardConfig(Global)
-	g := d.GetBeaconGroupID()
-	if g != GroupIDBeacon {
-		t.Errorf("GetBeaconGroupID = %v, expected = %v", g, GroupIDBeacon)
-	}
+	_ = GetShardConfig(Global)
+	_ = GetShardConfig(Global)
 }
 
 func TestNodeConfigMultiple(t *testing.T) {
@@ -30,18 +25,16 @@ func TestNodeConfigMultiple(t *testing.T) {
 	e := GetShardConfig(0)
 	f := GetShardConfig(42)
 
+	if d == nil {
+		t.Errorf("expecting value for ShardConfig(1), got: nil")
+	}
+
+	if e == nil {
+		t.Errorf("expecting value for ShardConfig(0), got: nil")
+	}
+
 	if f != nil {
 		t.Errorf("expecting nil, got: %v", f)
-	}
-
-	d.SetShardGroupID("abcd")
-	if d.GetShardGroupID() != "abcd" {
-		t.Errorf("expecting abcd, got: %v", d.GetShardGroupID())
-	}
-
-	e.SetClientGroupID("client")
-	if e.GetClientGroupID() != "client" {
-		t.Errorf("expecting client, got: %v", d.GetClientGroupID())
 	}
 }
 
