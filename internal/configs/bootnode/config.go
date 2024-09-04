@@ -78,12 +78,6 @@ func (n NetworkType) String() string {
 	return string(n)
 }
 
-// Global is the index of the global node configuration
-const (
-	Global    = 0
-	MaxShards = 32 // maximum number of shards. It is also the maxium number of configs.
-)
-
 var version string
 var peerID peer.ID // PeerID of the node
 
@@ -138,25 +132,6 @@ type RPCServerConfig struct {
 // The first one is the default, global node configuration
 var shardConfigs []ConfigType
 var defaultConfig ConfigType
-var onceForConfigs sync.Once
-
-func ensureShardConfigs() {
-	onceForConfigs.Do(func() {
-		shardConfigs = make([]ConfigType, MaxShards)
-		for i := range shardConfigs {
-			shardConfigs[i].ShardID = uint32(i)
-		}
-	})
-}
-
-// GetShardConfig return the shard's ConfigType variable
-func GetShardConfig(shardID uint32) *ConfigType {
-	ensureShardConfigs()
-	if int(shardID) >= cap(shardConfigs) {
-		return nil
-	}
-	return &shardConfigs[shardID]
-}
 
 // GetDefaultConfig returns default config.
 func GetDefaultConfig() *ConfigType {
@@ -194,7 +169,6 @@ func (conf *ConfigType) Role() Role {
 
 // SetNetworkType set the networkType
 func SetNetworkType(networkType NetworkType) {
-	ensureShardConfigs()
 	defaultConfig.networkType = networkType
 	for i := range shardConfigs {
 		shardConfigs[i].networkType = networkType
@@ -238,7 +212,6 @@ func (conf *ConfigType) SetShardingSchedule(schedule shardingconfig.Schedule) {
 
 // SetShardingSchedule sets the sharding schedule for all config instances.
 func SetShardingSchedule(schedule shardingconfig.Schedule) {
-	ensureShardConfigs()
 	defaultConfig.SetShardingSchedule(schedule)
 	for _, config := range shardConfigs {
 		config.SetShardingSchedule(schedule)
