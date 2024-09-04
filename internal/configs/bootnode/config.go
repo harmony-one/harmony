@@ -15,9 +15,7 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
-	p2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 )
@@ -91,40 +89,18 @@ var peerID peer.ID // PeerID of the node
 
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
-	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon                 GroupID         // the beacon group ID
-	group                  GroupID         // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
-	client                 GroupID         // the client group ID of the shard
-	isClient               bool            // whether this node is a client node, such as wallet
-	ShardID                uint32          // ShardID of this node; TODO ek – revisit when resharding
-	role                   Role            // Role of the node
-	Port                   string          // Port of the node.
-	IP                     string          // IP of the node.
-	RPCServer              RPCServerConfig // RPC server port and ip
-	IsOffline              bool
-	Downloader             bool // Whether stream downloader is running; TODO: remove this after sync up
-	StagedSync             bool // use staged sync
-	StagedSyncTurboMode    bool // use Turbo mode for staged sync
-	UseMemDB               bool // use mem db for staged sync
-	DoubleCheckBlockHashes bool
-	MaxBlocksPerSyncCycle  uint64 // Maximum number of blocks per each cycle. if set to zero, all blocks will be  downloaded and synced in one full cycle.
-	MaxMemSyncCycleSize    uint64 // max number of blocks to use a single transaction for staged sync
-	MaxBackgroundBlocks    uint64 // max number of background blocks in turbo mode
-	InsertChainBatchSize   int    // number of blocks to build a batch and insert to chain in staged sync
-	VerifyAllSig           bool   // verify signatures for all blocks regardless of height and batch size
-	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
-	LogProgress            bool   // log the full sync progress in console
-	DebugMode              bool   // log every single process and error to help to debug the syncing issues
-	NtpServer              string
-	StringRole             string
-	P2PPriKey              p2p_crypto.PrivKey   `json:"-"`
-	ConsensusPriKey        multibls.PrivateKeys `json:"-"`
-	// Database directory
-	DBDir            string
-	networkType      NetworkType
+	ShardID   uint32          // ShardID of this node; TODO ek – revisit when resharding
+	role      Role            // Role of the node
+	Port      string          // Port of the node.
+	IP        string          // IP of the node.
+	RPCServer RPCServerConfig // RPC server port and ip
+	IsOffline bool
+	DebugMode bool // log every single process and error to help to debug the syncing issues
+	NtpServer string
+
 	shardingSchedule shardingconfig.Schedule
+	networkType      NetworkType
 	DNSZone          string
-	isArchival       map[uint32]bool
 	WebHooks         struct {
 		Hooks *webhooks.Hooks
 	}
@@ -193,22 +169,7 @@ func SetDefaultRole(r Role) {
 }
 
 func (conf *ConfigType) String() string {
-	return fmt.Sprintf("%s/%s/%s:%v,%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.ShardID)
-}
-
-// SetBeaconGroupID set the groupID for beacon group
-func (conf *ConfigType) SetBeaconGroupID(g GroupID) {
-	conf.beacon = g
-}
-
-// SetShardGroupID set the groupID for shard group
-func (conf *ConfigType) SetShardGroupID(g GroupID) {
-	conf.group = g
-}
-
-// SetClientGroupID set the groupID for client group
-func (conf *ConfigType) SetClientGroupID(g GroupID) {
-	conf.client = g
+	return fmt.Sprintf("%v", conf.ShardID)
 }
 
 // SetShardID set the ShardID
@@ -221,29 +182,9 @@ func (conf *ConfigType) SetRole(r Role) {
 	conf.role = r
 }
 
-// GetBeaconGroupID returns the groupID for beacon group
-func (conf *ConfigType) GetBeaconGroupID() GroupID {
-	return conf.beacon
-}
-
-// GetShardGroupID returns the groupID for shard group
-func (conf *ConfigType) GetShardGroupID() GroupID {
-	return conf.group
-}
-
 // GetShardID returns the shardID.
 func (conf *ConfigType) GetShardID() uint32 {
 	return conf.ShardID
-}
-
-// GetClientGroupID returns the groupID for client group
-func (conf *ConfigType) GetClientGroupID() GroupID {
-	return conf.client
-}
-
-// GetArchival returns archival mode
-func (conf *ConfigType) GetArchival() bool {
-	return conf.isArchival[conf.ShardID]
 }
 
 // Role returns the role
@@ -258,22 +199,6 @@ func SetNetworkType(networkType NetworkType) {
 	for i := range shardConfigs {
 		shardConfigs[i].networkType = networkType
 	}
-}
-
-// SetArchival set archival mode
-// for beacon chain node, the archival variable will
-// overrdie bcArchival as the shardID is the same
-func (conf *ConfigType) SetArchival(bcArchival, archival bool) {
-	if conf.isArchival == nil {
-		conf.isArchival = make(map[uint32]bool)
-	}
-	conf.isArchival[shard.BeaconChainShardID] = bcArchival
-	conf.isArchival[conf.ShardID] = archival
-}
-
-// ArchiveModes return the map of the archive setting
-func (conf *ConfigType) ArchiveModes() map[uint32]bool {
-	return conf.isArchival
 }
 
 // GetNetworkType gets the networkType
@@ -332,12 +257,6 @@ func (conf *ConfigType) ShardIDFromKey(key *bls_core.PublicKey) (uint32, error) 
 	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
 	shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
 	return uint32(shardID.Uint64()), nil
-}
-
-// ShardIDFromConsensusKey returns the shard ID statically determined from the
-// consensus key.
-func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
-	return conf.ShardIDFromKey(conf.ConsensusPriKey[0].Pub.Object)
 }
 
 // ValidateConsensusKeysForSameShard checks if all consensus public keys belong to the same shard
