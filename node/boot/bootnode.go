@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/api/service"
-	"github.com/harmony-one/harmony/core/types"
 	bootnodeConfigs "github.com/harmony-one/harmony/internal/configs/bootnode"
 	harmonyConfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeConfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -36,8 +35,6 @@ type BootNode struct {
 	RPCConfig *bootnodeConfigs.RPCServerConfig
 	// node start time
 	unixTimeAtNodeStart int64
-	// TransactionErrorSink contains error messages for any failed transaction, in memory only
-	TransactionErrorSink *types.TransactionErrorSink
 	// metrics
 	Metrics metrics.Registry
 }
@@ -48,10 +45,9 @@ func New(
 	hc *harmonyConfig.HarmonyConfig,
 ) *BootNode {
 	node := BootNode{
-		unixTimeAtNodeStart:  time.Now().Unix(),
-		TransactionErrorSink: types.NewTransactionErrorSink(),
-		HarmonyConfig:        hc,
-		NodeConfig:           &nodeConfig.ConfigType{},
+		unixTimeAtNodeStart: time.Now().Unix(),
+		HarmonyConfig:       hc,
+		NodeConfig:          &nodeConfig.ConfigType{},
 	}
 
 	if host != nil {
