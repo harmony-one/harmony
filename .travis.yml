@@ -36,6 +36,8 @@ install:
   - make go-get
   - go install golang.org/x/tools/cmd/goimports@latest
   - go install github.com/harmony-ek/gencodec@latest
+before_script:
+  - cd $GOPATH/src/github.com/harmony-one/harmony
 script:
   - ${TEST}
 after_success:
