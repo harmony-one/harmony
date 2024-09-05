@@ -11,33 +11,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TestNodeConfigSingleton(t *testing.T) {
-	// init 3 configs
-	_ = GetShardConfig(2)
-	// get the singleton variable
-	_ = GetShardConfig(Global)
-	_ = GetShardConfig(Global)
-}
-
-func TestNodeConfigMultiple(t *testing.T) {
-	// init 3 configs
-	d := GetShardConfig(1)
-	e := GetShardConfig(0)
-	f := GetShardConfig(42)
-
-	if d == nil {
-		t.Errorf("expecting value for ShardConfig(1), got: nil")
-	}
-
-	if e == nil {
-		t.Errorf("expecting value for ShardConfig(0), got: nil")
-	}
-
-	if f != nil {
-		t.Errorf("expecting nil, got: %v", f)
-	}
-}
-
 func TestValidateConsensusKeysForSameShard(t *testing.T) {
 	// set localnet config
 	networkType := "localnet"

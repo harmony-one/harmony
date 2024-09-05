@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"sync"
 	"time"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -88,8 +87,7 @@ type ConfigType struct {
 	Port      string          // Port of the node.
 	IP        string          // IP of the node.
 	RPCServer RPCServerConfig // RPC server port and ip
-	IsOffline bool
-	DebugMode bool // log every single process and error to help to debug the syncing issues
+	DebugMode bool            // log every single process and error to help to debug the syncing issues
 	NtpServer string
 
 	shardingSchedule shardingconfig.Schedule
@@ -103,19 +101,17 @@ type ConfigType struct {
 
 // RPCServerConfig is the config for rpc listen addresses
 type RPCServerConfig struct {
-	HTTPEnabled  bool
-	HTTPIp       string
-	HTTPPort     int
-	HTTPAuthPort int
+	HTTPEnabled bool
+	HTTPIp      string
+	HTTPPort    int
 
 	HTTPTimeoutRead  time.Duration
 	HTTPTimeoutWrite time.Duration
 	HTTPTimeoutIdle  time.Duration
 
-	WSEnabled  bool
-	WSIp       string
-	WSPort     int
-	WSAuthPort int
+	WSEnabled bool
+	WSIp      string
+	WSPort    int
 
 	DebugEnabled bool
 
