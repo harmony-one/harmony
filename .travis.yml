@@ -3,7 +3,7 @@ dist: jammy
 language: go
 go:
   - 1.22.5
-go_import_path: src/github.com/harmony-one/harmony
+go_import_path: github.com/harmony-one/harmony
 cache:
   directories:
     - docker_images
