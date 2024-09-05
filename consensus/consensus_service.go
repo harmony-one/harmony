@@ -158,7 +158,7 @@ func (consensus *Consensus) updateBitmaps() {
 
 func (consensus *Consensus) sendLastSignPower() {
 	if consensus.isLeader() {
-		k, err := consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
+		k, err := consensus.getLeaderPrivateKey(consensus.getLeaderPubKey().Object)
 		if err != nil {
 			consensus.getLogger().Err(err).Msg("Leader not found in the committee")
 			return
