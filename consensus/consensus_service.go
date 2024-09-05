@@ -165,7 +165,10 @@ func (consensus *Consensus) sendLastSignPower() {
 		}
 		comm := getOrZero(consensus.decider.CurrentTotalPower(quorum.Commit))
 		prep := getOrZero(consensus.decider.CurrentTotalPower(quorum.Prepare))
-		view := getOrZero(consensus.decider.CurrentTotalPower(quorum.ViewChange))
+		view := consensus.decider.ComputeTotalPowerByMask(consensus.vc.GetViewIDBitmap(consensus.current.viewChangingID)).Int64()
+		for view > 100 {
+			view /= 10
+		}
 		msg := &msg_pb.Message{
 			ServiceType: msg_pb.ServiceType_CONSENSUS,
 			Type:        msg_pb.MessageType_LAST_SIGN_POWER,

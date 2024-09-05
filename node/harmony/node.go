@@ -567,7 +567,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderKey = maybeSP.SenderPubkey
-		consensus.SetLastKnownSignPower(maybeSP.Commit)
+		consensus.SetLastKnownSignPower(maybeSP.Commit, maybeSP.Change)
 	default:
 		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid"}).Inc()
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)

@@ -141,6 +141,7 @@ type Consensus struct {
 
 	// value receives from
 	lastKnownSignPower int64
+	lastKnowViewChange int64
 }
 
 // Blockchain returns the blockchain.
@@ -398,15 +399,19 @@ func (consensus *Consensus) InitConsensusWithValidators() (err error) {
 	return nil
 }
 
-func (consensus *Consensus) SetLastKnownSignPower(i int64) {
+func (consensus *Consensus) SetLastKnownSignPower(signPower, viewChange int64) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.lastKnownSignPower = i
+	consensus.lastKnownSignPower = signPower
+	consensus.lastKnowViewChange = viewChange
 }
 
 func (consensus *Consensus) GetLastKnownSignPower() int64 {
 	consensus.mutex.RLock()
 	defer consensus.mutex.RUnlock()
+	if consensus.isViewChangingMode() {
+		return consensus.lastKnowViewChange
+	}
 	return consensus.lastKnownSignPower
 }
 

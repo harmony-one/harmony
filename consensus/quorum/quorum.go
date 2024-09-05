@@ -118,6 +118,7 @@ type Decider interface {
 	) (*votepower.Ballot, error)
 	IsQuorumAchieved(Phase) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
+	ComputeTotalPowerByMask(mask *bls_cosi.Mask) numeric.Dec
 	QuorumThreshold() numeric.Dec
 	IsAllSigsCollected() bool
 	ResetPrepareAndCommitVotes()
