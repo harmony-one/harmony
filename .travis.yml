@@ -3,7 +3,7 @@ dist: jammy
 language: go
 go:
   - 1.22.5
-# go_import_path: src/github.com/harmony-one/harmony
+go_import_path: src/github.com/harmony-one/harmony
 cache:
   directories:
     - docker_images
@@ -19,25 +19,25 @@ before_install:
   - sudo apt-get update
   - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
 
-install:
-  # default working directory with source code is automatically set to
-  #   /home/travis/gopath/src/github.com/harmony-one/harmony
-  # https://docs.travis-ci.com/user/languages/go/#go-import-path
-  - echo $TRAVIS_PULL_REQUEST_BRANCH
-    #TODO: return back to master
-  - TEST_REPO_BRANCH="feature/go1.22"
-  - git clone https://github.com/harmony-one/mcl.git $GOPATH/src/github.com/harmony-one/mcl
-  - git clone https://github.com/harmony-one/bls.git $GOPATH/src/github.com/harmony-one/bls
-    #TODO: return back harmony instead of personal fork
-  - git clone --branch $TEST_REPO_BRANCH https://github.com/harmony-one/harmony-test.git $GOPATH/src/github.com/harmony-one/harmony-test
-  - (cd $GOPATH/src/github.com/harmony-one/mcl; make -j4)
-  - (cd $GOPATH/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
-#  - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.41.1
-  - make go-get
-  - go install golang.org/x/tools/cmd/goimports@latest
-  - go install github.com/harmony-ek/gencodec@latest
+# install:
+#   # default working directory with source code is automatically set to
+#   #   /home/travis/gopath/src/github.com/harmony-one/harmony
+#   # https://docs.travis-ci.com/user/languages/go/#go-import-path
+#   - echo $TRAVIS_PULL_REQUEST_BRANCH
+#     #TODO: return back to master
+#   - TEST_REPO_BRANCH="feature/go1.22"
+#   - git clone https://github.com/harmony-one/mcl.git $GOPATH/src/github.com/harmony-one/mcl
+#   - git clone https://github.com/harmony-one/bls.git $GOPATH/src/github.com/harmony-one/bls
+#     #TODO: return back harmony instead of personal fork
+#   - git clone --branch $TEST_REPO_BRANCH https://github.com/harmony-one/harmony-test.git $GOPATH/src/github.com/harmony-one/harmony-test
+#   - (cd $GOPATH/src/github.com/harmony-one/mcl; make -j4)
+#   - (cd $GOPATH/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
+# #  - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.41.1
+#   - make go-get
+#   - go install golang.org/x/tools/cmd/goimports@latest
+#   - go install github.com/harmony-ek/gencodec@latest
 before_script:
-  - cd $GOPATH/src/github.com/harmony-one/harmony
+  - pwd && ls -l
 script:
   - ${TEST}
 after_success:
