@@ -50,7 +50,6 @@ func TestToRPCServerConfig(t *testing.T) {
 				WSEnabled:          true,
 				WSIp:               "127.0.0.1",
 				WSPort:             nodeconfig.DefaultWSPort,
-				WSAuthPort:         nodeconfig.DefaultAuthWSPort,
 				DebugEnabled:       false,
 				EthRPCsEnabled:     true,
 				LegacyRPCsEnabled:  true,
