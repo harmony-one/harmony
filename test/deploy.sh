@@ -167,7 +167,7 @@ MIN=4
 SHARDS=2
 DRYRUN=
 NETWORK=localnet
-VERBOSE=false
+VERBOSE=true
 NOBUILD=false
 EXPOSEAPIS=false
 
