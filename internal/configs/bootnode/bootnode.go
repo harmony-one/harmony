@@ -152,15 +152,13 @@ type SysConfig struct {
 }
 
 type HttpConfig struct {
-	Enabled        bool
-	IP             string
-	Port           int
-	AuthPort       int
-	RosettaEnabled bool
-	RosettaPort    int
-	ReadTimeout    string
-	WriteTimeout   string
-	IdleTimeout    string
+	Enabled      bool
+	IP           string
+	Port         int
+	AuthPort     int
+	ReadTimeout  string
+	WriteTimeout string
+	IdleTimeout  string
 }
 
 type WsConfig struct {

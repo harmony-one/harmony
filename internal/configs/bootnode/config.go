@@ -5,18 +5,12 @@ package bootnode
 
 import (
 	"fmt"
-	"math/big"
-	"strings"
 	"time"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/crypto/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/webhooks"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/pkg/errors"
 )
 
 // Role defines a role of a node.
@@ -194,59 +188,4 @@ func SetPeerID(pid peer.ID) {
 // GetPeerID returns the peer ID of the node
 func GetPeerID() peer.ID {
 	return peerID
-}
-
-// ShardingSchedule returns the sharding schedule for this node config.
-func (conf *ConfigType) ShardingSchedule() shardingconfig.Schedule {
-	return conf.shardingSchedule
-}
-
-// SetShardingSchedule sets the sharding schedule for this node config.
-func (conf *ConfigType) SetShardingSchedule(schedule shardingconfig.Schedule) {
-	conf.shardingSchedule = schedule
-}
-
-// SetShardingSchedule sets the sharding schedule for all config instances.
-func SetShardingSchedule(schedule shardingconfig.Schedule) {
-	defaultConfig.SetShardingSchedule(schedule)
-	for _, config := range shardConfigs {
-		config.SetShardingSchedule(schedule)
-	}
-}
-
-// ShardIDFromKey returns the shard ID statically determined from the input key
-func (conf *ConfigType) ShardIDFromKey(key *bls_core.PublicKey) (uint32, error) {
-	var pubKey bls.SerializedPublicKey
-	if err := pubKey.FromLibBLSPublicKey(key); err != nil {
-		return 0, errors.Wrapf(err,
-			"cannot convert libbls public key %s to internal form",
-			key.SerializeToHexStr())
-	}
-	epoch := conf.networkType.ChainConfig().StakingEpoch
-	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
-	shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
-	return uint32(shardID.Uint64()), nil
-}
-
-// ValidateConsensusKeysForSameShard checks if all consensus public keys belong to the same shard
-func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys multibls.PublicKeys, sID uint32) error {
-	keyShardStrs := []string{}
-	isSameShard := true
-	for _, key := range pubkeys {
-		shardID, err := conf.ShardIDFromKey(key.Object)
-		if err != nil {
-			return err
-		}
-		if shardID != sID {
-			isSameShard = false
-		}
-		keyShardStrs = append(
-			keyShardStrs,
-			fmt.Sprintf("key: %s, shard id: %d", key.Bytes.Hex(), shardID),
-		)
-	}
-	if !isSameShard {
-		return errors.Errorf("bls keys do not belong to same shard\n%s", strings.Join(keyShardStrs, "\n"))
-	}
-	return nil
 }

@@ -17,14 +17,12 @@ func TestToRPCServerConfig(t *testing.T) {
 		{
 			input: BootNodeConfig{
 				HTTP: HttpConfig{
-					Enabled:        true,
-					RosettaEnabled: false,
-					IP:             "127.0.0.1",
-					Port:           nodeconfig.DefaultRPCPort,
-					RosettaPort:    nodeconfig.DefaultRosettaPort,
-					ReadTimeout:    "-1",
-					WriteTimeout:   "-2",
-					IdleTimeout:    "-3",
+					Enabled:      true,
+					IP:           "127.0.0.1",
+					Port:         nodeconfig.DefaultRPCPort,
+					ReadTimeout:  "-1",
+					WriteTimeout: "-2",
+					IdleTimeout:  "-3",
 				},
 				WS: WsConfig{
 					Enabled: true,
