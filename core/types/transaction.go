@@ -178,6 +178,10 @@ func (d *txdata) CopyFrom(d2 *txdata) {
 	d.Hash = copyHash(d2.Hash)
 }
 
+func (d *txdata) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
+	return dst.Set(d.Price)
+}
+
 type txdataMarshaling struct {
 	AccountNonce hexutil.Uint64
 	Price        *hexutil.Big
