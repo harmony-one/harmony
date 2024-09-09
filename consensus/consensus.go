@@ -400,19 +400,15 @@ func (consensus *Consensus) InitConsensusWithValidators() (err error) {
 }
 
 func (consensus *Consensus) SetLastKnownSignPower(signPower, viewChange int64) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	consensus.lastKnownSignPower = signPower
-	consensus.lastKnowViewChange = viewChange
+	atomic.StoreInt64(&consensus.lastKnownSignPower, signPower)
+	atomic.StoreInt64(&consensus.lastKnowViewChange, viewChange)
 }
 
 func (consensus *Consensus) GetLastKnownSignPower() int64 {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
-	if consensus.isViewChangingMode() {
-		return consensus.lastKnowViewChange
+	if consensus.IsViewChangingMode() {
+		return atomic.LoadInt64(&consensus.lastKnowViewChange)
 	}
-	return consensus.lastKnownSignPower
+	return atomic.LoadInt64(&consensus.lastKnownSignPower)
 }
 
 type downloadAsync struct {
