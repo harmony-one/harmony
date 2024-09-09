@@ -10,7 +10,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	boot_rpc "github.com/harmony-one/harmony/rpc/boot"
-	rpc_common "github.com/harmony-one/harmony/rpc/harmony/common"
+	rpc_common "github.com/harmony-one/harmony/rpc/boot/common"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 

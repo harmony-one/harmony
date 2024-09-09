@@ -3,7 +3,7 @@ package hmy_boot
 import (
 	"github.com/harmony-one/harmony/api/proto"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	commonRPC "github.com/harmony-one/harmony/rpc/harmony/common"
+	rpc_common "github.com/harmony-one/harmony/rpc/boot/common"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
@@ -24,7 +24,7 @@ type BootNodeAPI interface {
 	ListPeer(topic string) []peer.ID
 	ListTopic() []string
 	ListBlockedPeer() []peer.ID
-	GetConfig() commonRPC.Config
+	GetConfig() rpc_common.Config
 	ShutDown()
 }
 
@@ -46,12 +46,12 @@ func (hmyboot *BootService) ProtocolVersion() int {
 }
 
 // GetNodeMetadata returns the node metadata.
-func (hmyboot *BootService) GetNodeMetadata() commonRPC.NodeMetadata {
-	var c commonRPC.C
+func (hmyboot *BootService) GetNodeMetadata() rpc_common.BootNodeMetadata {
+	var c rpc_common.C
 
 	c.TotalKnownPeers, c.Connected, c.NotConnected = hmyboot.BootNodeAPI.PeerConnectivity()
 
-	return commonRPC.NodeMetadata{
+	return rpc_common.BootNodeMetadata{
 		Version:      nodeconfig.GetVersion(),
 		ShardID:      hmyboot.ShardID,
 		NodeBootTime: hmyboot.BootNodeAPI.GetNodeBootTime(),
