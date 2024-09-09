@@ -1,27 +1,22 @@
 package hmy_boot
 
 import (
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	commonRPC "github.com/harmony-one/harmony/rpc/harmony/common"
-	"github.com/libp2p/go-libp2p/core/peer"
+	commonRPC "github.com/harmony-one/harmony/rpc/boot/common"
 )
 
 // GetPeerInfo returns the peer info to the node, including blocked peer, connected peer, number of peers
-func (hmyboot *BootService) GetPeerInfo() commonRPC.NodePeerInfo {
+func (hmyboot *BootService) GetPeerInfo() commonRPC.BootNodePeerInfo {
 
-	topics := hmyboot.BootNodeAPI.ListTopic()
-	p := make([]commonRPC.P, len(topics))
+	var c commonRPC.C
+	c.TotalKnownPeers, c.Connected, c.NotConnected = hmyboot.BootNodeAPI.PeerConnectivity()
 
-	for i, t := range topics {
-		topicPeer := hmyboot.BootNodeAPI.ListPeer(t)
-		p[i].Topic = t
-		p[i].Peers = make([]peer.ID, len(topicPeer))
-		copy(p[i].Peers, topicPeer)
-	}
+	knownPeers := hmyboot.BootNodeAPI.ListKnownPeers()
+	connectedPeers := hmyboot.BootNodeAPI.ListConnectedPeers()
 
-	return commonRPC.NodePeerInfo{
-		PeerID:       nodeconfig.GetPeerID(),
-		BlockedPeers: hmyboot.BootNodeAPI.ListBlockedPeer(),
-		P:            p,
+	return commonRPC.BootNodePeerInfo{
+		PeerID:         hmyboot.BootNodeAPI.PeerID(),
+		KnownPeers:     knownPeers,
+		ConnectedPeers: connectedPeers,
+		C:              c,
 	}
 }

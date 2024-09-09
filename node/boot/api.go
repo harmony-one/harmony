@@ -14,9 +14,28 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
+// PeerID returns self Peer ID
+func (bootnode *BootNode) PeerID() peer.ID {
+	return bootnode.host.GetID()
+}
+
 // PeerConnectivity ..
 func (bootnode *BootNode) PeerConnectivity() (int, int, int) {
 	return bootnode.host.PeerConnectivity()
+}
+
+// ListKnownPeers return known peers
+func (bootnode *BootNode) ListKnownPeers() peer.IDSlice {
+	bs := bootnode.host.GetP2PHost().Peerstore()
+	if bs == nil {
+		return peer.IDSlice{}
+	}
+	return bs.Peers()
+}
+
+// ListConnectedPeers return connected peers
+func (bootnode *BootNode) ListConnectedPeers() []peer.ID {
+	return bootnode.host.Network().Peers()
 }
 
 // ListPeer return list of peers for a certain topic

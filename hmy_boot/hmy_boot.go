@@ -20,7 +20,10 @@ type BootService struct {
 // BootNodeAPI is the list of functions from node used to call rpc apis.
 type BootNodeAPI interface {
 	GetNodeBootTime() int64
+	PeerID() peer.ID
 	PeerConnectivity() (int, int, int)
+	ListKnownPeers() peer.IDSlice
+	ListConnectedPeers() []peer.ID
 	ListPeer(topic string) []peer.ID
 	ListTopic() []string
 	ListBlockedPeer() []peer.ID
