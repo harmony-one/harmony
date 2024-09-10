@@ -79,7 +79,13 @@ debug-kill:
 	bash ./test/kill_node.sh
 
 debug-ext:
-	bash ./test/debug-external.sh
+	# update localnet block per epoch to ensure a stable localnet
+	sed -i 's/localnetBlocksPerEpoch\s*=\s*[0-9]*/localnetBlocksPerEpoch = 64/' internal/configs/sharding/localnet.go
+	sed -i 's/localnetBlocksPerEpochV2\s*=\s*[0-9]*/localnetBlocksPerEpochV2 = 64/' internal/configs/sharding/localnet.go
+	bash ./test/debug-external.sh &
+	echo sleep 10s before creating the external validator
+	sleep 10
+	bash ./test/build-localnet-validator.sh
 
 clean:
 	rm -rf ./tmp_log*
