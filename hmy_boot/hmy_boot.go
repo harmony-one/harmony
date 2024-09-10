@@ -56,7 +56,7 @@ func (hmyboot *BootService) GetNodeMetadata() rpc_common.BootNodeMetadata {
 
 	return rpc_common.BootNodeMetadata{
 		Version:      nodeconfig.GetVersion(),
-		ShardID:      hmyboot.ShardID,
+		Network:      string(nodeconfig.GetDefaultConfig().GetNetworkType()) ,
 		NodeBootTime: hmyboot.BootNodeAPI.GetNodeBootTime(),
 		PeerID:       nodeconfig.GetPeerID(),
 		C:            c,

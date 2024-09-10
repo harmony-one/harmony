@@ -19,7 +19,7 @@ type C struct {
 // BootNodeMetadata captures select metadata of the RPC answering boot node
 type BootNodeMetadata struct {
 	Version      string  `json:"version"`
-	ShardID      uint32  `json:"shard-id"`
+	Network      string  `json:"network"`
 	NodeBootTime int64   `json:"node-unix-start-time"`
 	PeerID       peer.ID `json:"peerid"`
 	C            C       `json:"p2p-connectivity"`

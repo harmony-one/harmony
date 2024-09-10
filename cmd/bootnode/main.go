@@ -172,6 +172,7 @@ func main() {
 	)
 
 	nt := nodeConfigs.NetworkType(*networkType)
+	nodeConfigs.SetNetworkType(nt)
 	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, path.Base(os.Args[0]), version, commit, builtBy, builtAt)
 	nodeConfigs.SetVersion(harmonyConfigs.GetHarmonyVersion())
 	nodeConfigs.SetPeerID(host.GetID())
