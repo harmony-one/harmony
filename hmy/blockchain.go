@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	v3 "github.com/harmony-one/harmony/block/v3"
+	"github.com/harmony-one/harmony/eth/rpc"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/bloombits"
@@ -17,7 +18,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	internal_bls "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/eth/rpc"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"

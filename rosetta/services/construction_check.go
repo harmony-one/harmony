@@ -15,7 +15,7 @@ import (
 	ethRpc "github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
-	"github.com/harmony-one/harmony/rpc"
+	rpc "github.com/harmony-one/harmony/rpc/harmony"
 )
 
 // ConstructMetadataOptions is constructed by ConstructionPreprocess for ConstructionMetadata options
