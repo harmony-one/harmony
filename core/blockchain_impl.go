@@ -2435,7 +2435,7 @@ func (bc *BlockChainImpl) ReadPendingSlashingCandidates() slash.Records {
 	return append(bc.pendingSlashes[0:0], bc.pendingSlashes...)
 }
 
-func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
+func (bc *BlockChainImpl) readPendingCrossLinks() ([]types.CrossLink, error) {
 	cls := []types.CrossLink{}
 	bytes := []byte{}
 	if cached, ok := bc.pendingCrossLinksCache.Get(pendingCLCacheKey); ok {
@@ -2525,11 +2525,19 @@ func (bc *BlockChainImpl) AddPendingSlashingCandidates(
 	return bc.writeSlashes(bc.pendingSlashes)
 }
 
+// ReadPendingCrossLinks returns pending crosslinks
+func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
+	bc.pendingCrossLinksMutex.Lock()
+	defer bc.pendingCrossLinksMutex.Unlock()
+
+	return bc.readPendingCrossLinks()
+}
+
 func (bc *BlockChainImpl) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error) {
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
 
-	cls, err := bc.ReadPendingCrossLinks()
+	cls, err := bc.readPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		err := bc.CachePendingCrossLinks(pendingCLs)
 		return len(pendingCLs), err
@@ -2543,7 +2551,7 @@ func (bc *BlockChainImpl) DeleteFromPendingCrossLinks(crossLinks []types.CrossLi
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
 
-	cls, err := bc.ReadPendingCrossLinks()
+	cls, err := bc.readPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		return 0, err
 	}
