@@ -481,9 +481,13 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 		m msg_pb.Message
 		//consensus = registry.GetConsensus()
 	)
+
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
 		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_unmarshal"}).Inc()
 		return nil, nil, true, errors.WithStack(err)
+	}
+	if m.GetEpochBlockBroadcast() != nil {
+		fmt.Println("YES")
 	}
 
 	// ignore messages not intended for explorer
@@ -528,9 +532,13 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 		}
 	}
 
-	maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
-	senderKey := []byte{}
-	senderBitmap := []byte{}
+	var (
+		maybeCon     = m.GetConsensus()
+		maybeVC      = m.GetViewchange()
+		maybeEB      = m.GetEpochBlockBroadcast()
+		senderKey    = []byte{}
+		senderBitmap = []byte{}
+	)
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != consensus.ShardID {
@@ -556,6 +564,8 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 		if maybeVC.ViewId+5 < consensus.GetViewChangingID() {
 			return nil, nil, true, errors.WithStack(errViewIDTooOld)
 		}
+	} else if maybeEB != nil {
+		return nil, nil, false, nil
 	} else {
 		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid"}).Inc()
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
@@ -718,6 +728,7 @@ func (node *Node) StartPubSub() error {
 				case proto.Consensus:
 					// received consensus message in non-consensus bound topic
 					if !isConsensusBound {
+						fmt.Println("not consenssu bound")
 						nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_bound"}).Inc()
 						errChan <- withError{
 							errors.WithStack(errConsensusMessageOnUnexpectedTopic), msg,

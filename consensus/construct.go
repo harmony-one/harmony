@@ -56,6 +56,24 @@ func (consensus *Consensus) populateMessageFieldsAndSender(
 }
 
 // construct is the single creation point of messages intended for the wire.
+func (consensus *Consensus) constructEpochBlockMarshaledMessage(
+	block []byte,
+) ([]byte, error) {
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msg_pb.MessageType_EPOCH_BLOCK,
+		Request: &msg_pb.Message_EpochBlockBroadcast{
+			EpochBlockBroadcast: &msg_pb.EpochBlockBroadcast{
+				Block: block,
+			},
+		},
+	}
+	marshaledMessage, err := protobuf.Marshal(message)
+	return marshaledMessage, err
+	//return message, nil
+}
+
+// construct is the single creation point of messages intended for the wire.
 func (consensus *Consensus) construct(
 	p msg_pb.MessageType, payloadForSign []byte, priKeys []*bls.PrivateKeyWrapper,
 ) (*NetworkMessage, error) {

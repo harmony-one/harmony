@@ -29,6 +29,8 @@ enum MessageType {
   DRAND_INIT = 10 [deprecated=true];
   DRAND_COMMIT = 11 [deprecated=true];
   LOTTERY_REQUEST = 12 [deprecated=true]; // it should be either ENTER or GETPLAYERS but it will be removed later.
+
+  EPOCH_BLOCK = 13;
 }
 
 // This is universal message for all communication protocols.
@@ -47,6 +49,8 @@ message Message {
     ViewChangeRequest viewchange = 7;
     // Refactor this later after demo.
     LotteryRequest lottery_request = 8 [deprecated=true];
+
+    EpochBlockBroadcast epoch_block_broadcast = 9;
   }
 }
 
@@ -115,4 +119,8 @@ message ViewChangeRequest {
   bytes m3_aggsigs = 11; // m3: |viewID|
   bytes m3_bitmap= 12;
   bytes prepared_block = 13;
+}
+
+message EpochBlockBroadcast {
+  bytes block = 1;
 }

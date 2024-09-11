@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
@@ -54,6 +56,20 @@ func (consensus *Consensus) isViewChangingMode() bool {
 func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message, senderKey *bls.SerializedPublicKey) error {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
+
+	if msg.Type == msg_pb.MessageType_EPOCH_BLOCK {
+		fmt.Println("HandleMessageUpdate MessageType_EPOCH_BLOCK")
+		if consensus.ShardID == 0 {
+			return nil
+		}
+		if b := msg.GetEpochBlockBroadcast(); b != nil {
+			select {
+			case consensus.EpochBlockChan <- b.Block:
+			default:
+			}
+		}
+	}
+
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
@@ -186,6 +202,7 @@ func (consensus *Consensus) finalCommit() {
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
 	if !consensus.isLeader() || block.IsLastBlockInEpoch() {
 		// send immediately
+
 		if err := consensus.msgSender.SendWithRetry(
 			block.NumberU64(),
 			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
@@ -223,6 +240,30 @@ func (consensus *Consensus) finalCommit() {
 		consensus.getLogger().Err(err).
 			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
 			Msg("[finalCommit] Leader failed to commit the confirmed block")
+	}
+
+	if consensus.ShardID == 0 && consensus.isLeader() && block.IsLastBlockInEpoch() {
+		fmt.Println("consensus.isLeader() && block.IsLastBlockInEpoch()", utils.GetPort())
+		encodedBlock, err := rlp.EncodeToBytes(block)
+		if err != nil {
+			consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
+			return
+		}
+		msgToSend, err := consensus.constructEpochBlockMarshaledMessage(encodedBlock)
+		if err != nil {
+			consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
+			return
+		}
+		fmt.Println("X1")
+		if err := consensus.msgSender.SendWithRetry(
+			block.NumberU64(),
+			msg_pb.MessageType_EPOCH_BLOCK, []nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(1),
+			},
+			p2p.ConstructMessage(msgToSend)); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send epoch block message")
+		}
+		fmt.Println("X2")
 	}
 
 	// Dump new block into level db

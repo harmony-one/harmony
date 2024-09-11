@@ -107,6 +107,9 @@ type Consensus struct {
 	commitSigChannel chan []byte
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
+
+	EpochBlockChan chan []byte
+
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
 	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -279,17 +282,18 @@ func New(
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
 	consensus := Consensus{
-		mutex:        &sync.RWMutex{},
-		ShardID:      shard,
-		fBFTLog:      NewFBFTLog(),
-		phase:        FBFTAnnounce,
-		current:      NewState(Normal),
-		decider:      Decider,
-		registry:     registry,
-		MinPeers:     minPeers,
-		AggregateSig: aggregateSig,
-		host:         host,
-		msgSender:    NewMessageSender(host),
+		EpochBlockChan: make(chan []byte, 1),
+		mutex:          &sync.RWMutex{},
+		ShardID:        shard,
+		fBFTLog:        NewFBFTLog(),
+		phase:          FBFTAnnounce,
+		current:        NewState(Normal),
+		decider:        Decider,
+		registry:       registry,
+		MinPeers:       minPeers,
+		AggregateSig:   aggregateSig,
+		host:           host,
+		msgSender:      NewMessageSender(host),
 		// FBFT timeout
 		consensusTimeout:  createTimeout(),
 		dHelper:           downloadAsync{},

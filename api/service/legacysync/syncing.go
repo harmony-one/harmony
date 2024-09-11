@@ -199,7 +199,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, peerID libp2p_peer.ID, isExplorer bool, role nodeconfig.Role) *StateSync {
+func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, peerID libp2p_peer.ID, isExplorer bool, role nodeconfig.Role, epochBlockChan chan []byte) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.blockChain = bc
 	stateSync.selfip = ip
@@ -211,6 +211,7 @@ func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, p
 	stateSync.syncConfig = NewSyncConfig(bc.ShardID(), peerID, nil)
 
 	stateSync.syncStatus = newSyncStatus(role)
+	stateSync.epochBlockChan = epochBlockChan
 	return stateSync
 }
 
@@ -218,6 +219,7 @@ func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, p
 type blockChain interface {
 	CurrentBlock() *types.Block
 	ShardID() uint32
+	InsertChain(chain types.Blocks, verifyHeaders bool) (int, error)
 }
 
 // StateSync is the struct that implements StateSyncInterface.
@@ -233,12 +235,13 @@ type StateSync struct {
 	stateSyncTaskQueue *queue.Queue
 	syncMux            sync.Mutex
 	lastMileMux        sync.Mutex
+	epochBlockChan     chan []byte
 
 	syncStatus syncStatus
 }
 
 func (ss *StateSync) IntoEpochSync() *EpochSync {
-	return &EpochSync{
+	sync := &EpochSync{
 		beaconChain:        ss.blockChain,
 		selfip:             ss.selfip,
 		selfport:           ss.selfport,
@@ -252,6 +255,16 @@ func (ss *StateSync) IntoEpochSync() *EpochSync {
 		lastMileMux:        sync.Mutex{},
 		syncStatus:         ss.syncStatus.Clone(),
 	}
+
+	go func() {
+		for block := range ss.epochBlockChan {
+			err := processWithPayload([][]byte{block}, ss.blockChain)
+			if err != nil {
+				utils.Logger().Err(err).Msg("failed to insert epoch block")
+			}
+		}
+	}()
+	return sync
 }
 
 func (ss *StateSync) purgeAllBlocksFromCache() {
