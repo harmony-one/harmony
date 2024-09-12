@@ -68,6 +68,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
+	goleveldb "github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
@@ -2443,8 +2444,12 @@ func (bc *BlockChainImpl) readPendingCrossLinks() ([]types.CrossLink, error) {
 		return cls, nil
 	} else {
 		by, err := rawdb.ReadPendingCrossLinks(bc.db)
-		if err != nil || len(by) == 0 {
+		if err == goleveldb.ErrNotFound {
+			return []types.CrossLink{}, nil
+		} else if err != nil {
 			return nil, err
+		} else if len(by) == 0 {
+			return []types.CrossLink{}, nil
 		}
 		bytes = by
 	}
