@@ -29,7 +29,6 @@ type EpochSync struct {
 	stateSyncTaskQueue *queue.Queue
 	syncMux            sync.Mutex
 	lastMileMux        sync.Mutex
-	//epochBlockChan     chan []byte
 
 	syncStatus syncStatus
 }
@@ -200,7 +199,7 @@ func ProcessStateSync(syncConfig *SyncConfig, heights []uint64, bc core.BlockCha
 	return nil
 }
 
-func processWithPayload(payload [][]byte, bc blockChain) error {
+func processWithPayload(payload [][]byte, bc core.BlockChain) error {
 	decoded := make([]*types.Block, 0, len(payload))
 	for idx, blockBytes := range payload {
 		block, err := core.RlpDecodeBlockOrBlockWithSig(blockBytes)
@@ -216,7 +215,6 @@ func processWithPayload(payload [][]byte, bc blockChain) error {
 	}
 
 	for _, block := range decoded {
-
 		_, err := bc.InsertChain([]*types.Block{block}, true)
 		switch {
 		case errors.Is(err, core.ErrKnownBlock):
@@ -224,9 +222,6 @@ func processWithPayload(payload [][]byte, bc blockChain) error {
 		case err != nil:
 			return err
 		default:
-		}
-		if utils.GetPort() == 9002 {
-			fmt.Println("inserted ", block.NumberU64())
 		}
 	}
 

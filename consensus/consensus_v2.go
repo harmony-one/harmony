@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -57,20 +56,6 @@ func (consensus *Consensus) isViewChangingMode() bool {
 func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message, senderKey *bls.SerializedPublicKey) error {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-
-	if msg.Type == msg_pb.MessageType_EPOCH_BLOCK {
-		fmt.Println("HandleMessageUpdate MessageType_EPOCH_BLOCK")
-		if consensus.ShardID == 0 {
-			return nil
-		}
-		if b := msg.GetEpochBlockBroadcast(); b != nil {
-			select {
-			case consensus.EpochBlockChan <- b.Block:
-			default:
-			}
-		}
-	}
-
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
@@ -203,7 +188,6 @@ func (consensus *Consensus) finalCommit() {
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
 	if !consensus.isLeader() || block.IsLastBlockInEpoch() {
 		// send immediately
-
 		if err := consensus.msgSender.SendWithRetry(
 			block.NumberU64(),
 			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{

@@ -86,7 +86,7 @@ func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
 	role := node.NodeConfig.Role()
 	return legacysync.CreateStateSync(bc, node.SelfPeer.IP, mutatedPort,
 		node.GetSyncID(), node.host.GetID(),
-		node.NodeConfig.Role() == nodeconfig.ExplorerNode, role, node.Consensus.EpochBlockChan)
+		node.NodeConfig.Role() == nodeconfig.ExplorerNode, role)
 }
 
 func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
