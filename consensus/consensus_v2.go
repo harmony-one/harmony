@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -243,27 +244,23 @@ func (consensus *Consensus) finalCommit() {
 	}
 
 	if consensus.ShardID == 0 && consensus.isLeader() && block.IsLastBlockInEpoch() {
-		fmt.Println("consensus.isLeader() && block.IsLastBlockInEpoch()", utils.GetPort())
-		encodedBlock, err := rlp.EncodeToBytes(block)
+		blockWithSig := core.BlockWithSig{
+			Block:              block,
+			CommitSigAndBitmap: commitSigAndBitmap,
+		}
+		encodedBlock, err := rlp.EncodeToBytes(blockWithSig)
 		if err != nil {
 			consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
 			return
 		}
-		msgToSend, err := consensus.constructEpochBlockMarshaledMessage(encodedBlock)
+		err = consensus.host.SendMessageToGroups(
+			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(1)},
+			p2p.ConstructMessage(
+				proto_node.ConstructEpochBlockMessage(encodedBlock)),
+		)
 		if err != nil {
-			consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
-			return
+			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed to send epoch block")
 		}
-		fmt.Println("X1")
-		if err := consensus.msgSender.SendWithRetry(
-			block.NumberU64(),
-			msg_pb.MessageType_EPOCH_BLOCK, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(1),
-			},
-			p2p.ConstructMessage(msgToSend)); err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send epoch block message")
-		}
-		fmt.Println("X2")
 	}
 
 	// Dump new block into level db

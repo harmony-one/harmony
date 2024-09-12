@@ -459,6 +459,10 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			if node.IsRunningBeaconChain() {
 				return nil, 0, errInvalidShard
 			}
+		case proto_node.Epoch:
+			if node.IsRunningBeaconChain() {
+				return nil, 0, errInvalidShard
+			}
 		default:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
 			return nil, 0, errInvalidNodeMsg
@@ -565,7 +569,7 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 			return nil, nil, true, errors.WithStack(errViewIDTooOld)
 		}
 	} else if maybeEB != nil {
-		return nil, nil, false, nil
+		return &m, nil, false, nil
 	} else {
 		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid"}).Inc()
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
@@ -728,7 +732,7 @@ func (node *Node) StartPubSub() error {
 				case proto.Consensus:
 					// received consensus message in non-consensus bound topic
 					if !isConsensusBound {
-						fmt.Println("not consenssu bound")
+
 						nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_bound"}).Inc()
 						errChan <- withError{
 							errors.WithStack(errConsensusMessageOnUnexpectedTopic), msg,

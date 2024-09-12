@@ -17,11 +17,13 @@
 package core
 
 import (
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // Validator is an interface which defines the standard for block validation. It
@@ -58,4 +60,29 @@ type Processor interface {
 		[]*types.Log, uint64, reward.Reader, *state.DB, error,
 	)
 	CacheProcessorResult(cacheKey interface{}, result *ProcessorResult)
+}
+
+// RlpDecodeBlockOrBlockWithSig decode payload to types.Block or BlockWithSig.
+// Return the block with commitSig if set.
+func RlpDecodeBlockOrBlockWithSig(payload []byte) (*types.Block, error) {
+	var block *types.Block
+	if err := rlp.DecodeBytes(payload, &block); err == nil {
+		// received payload as *types.Block
+		return block, nil
+	}
+
+	var bws BlockWithSig
+	if err := rlp.DecodeBytes(payload, &bws); err == nil {
+		block := bws.Block
+		block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
+		return block, nil
+	}
+	return nil, errors.New("failed to decode to either types.Block or BlockWithSig")
+}
+
+// BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
+// The block is encoded as block + commit signature
+type BlockWithSig struct {
+	Block              *types.Block
+	CommitSigAndBitmap []byte
 }
