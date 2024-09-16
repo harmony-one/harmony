@@ -1,0 +1,18 @@
+services:
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - 3100:3100
+    volumes:
+      - ./loki-config.yml:/etc/loki/loki-config.yaml
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/promtail-config.yaml
+      - ${CURRENT_SESSION_LOGS}:/var/log/
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - ./loki-datasource.yaml:/etc/grafana/provisioning/datasources/loki-datasource.yaml

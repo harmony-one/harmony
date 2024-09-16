@@ -216,3 +216,11 @@ build_localnet_validator:
 
 protofiles:
 	bash ./scripts/gogenerate.sh
+
+# start a log aggregation toolset(Promtail->Loki->Grafana)
+# needs docker and docker-compose
+debug-start-log-aggregator:
+	bash ./test/logs_aggregator/start_log_aggregator.sh
+
+debug-stop-log-aggregator:
+	bash ./test/logs_aggregator/stop_log_aggregator.sh
