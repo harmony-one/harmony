@@ -27,10 +27,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/internal/params"
-	"github.com/pkg/errors"
 )
 
 // no go:generate gencodec -type Receipt -field-override receiptMarshaling -out gen_receipt_json.go
@@ -87,6 +84,7 @@ type receiptStorageRLP struct {
 	ContractAddress   common.Address
 	Logs              []*LogForStorage
 	GasUsed           uint64
+	effectiveGasPrice *big.Int
 }
 
 // NewReceipt creates a barebone transaction receipt, copying the init fields.
@@ -171,6 +169,7 @@ func (r *ReceiptForStorage) EncodeRLP(w io.Writer) error {
 		ContractAddress:   r.ContractAddress,
 		Logs:              make([]*LogForStorage, len(r.Logs)),
 		GasUsed:           r.GasUsed,
+		effectiveGasPrice: r.EffectiveGasPrice,
 	}
 	for i, log := range r.Logs {
 		enc.Logs[i] = (*LogForStorage)(log)
@@ -241,6 +240,7 @@ func FindLogsWithTopic(
 	return logs
 }
 
+/*
 // DeriveFields fills the receipts with their computed fields based on consensus
 // data and contextual infos like containing block and transactions.
 func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, number uint64, time uint64, baseFee *big.Int, blobGasPrice *big.Int, txs []*Transaction) error {
@@ -252,15 +252,17 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 	}
 	for i := 0; i < len(rs); i++ {
 		// The transaction type and hash can be retrieved from the transaction itself
-		rs[i].Type = txs[i].Type()
+		//rs[i].Type = txs[i].Type()
 		rs[i].TxHash = txs[i].Hash()
 		rs[i].EffectiveGasPrice = txs[i].data.effectiveGasPrice(new(big.Int), baseFee)
 
-		// EIP-4844 blob transaction fields
-		if txs[i].Type() == BlobTxType {
-			rs[i].BlobGasUsed = txs[i].BlobGas()
-			rs[i].BlobGasPrice = blobGasPrice
-		}
+
+			// EIP-4844 blob transaction fields
+			if txs[i].Type() == BlobTxType {
+				rs[i].BlobGasUsed = txs[i].BlobGas()
+				rs[i].BlobGasPrice = blobGasPrice
+			}
+
 
 		// block location fields
 		rs[i].BlockHash = hash
@@ -295,3 +297,4 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 	}
 	return nil
 }
+*/
