@@ -1,12 +1,15 @@
 package types
 
 import (
+	"math/big"
 	"reflect"
 	"testing"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/staking"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFindLogsWithTopic(t *testing.T) {
@@ -135,4 +138,43 @@ func TestEffectiveGasPriceNotRequired(t *testing.T) {
 	if err != nil {
 		t.Fatal("error unmarshalling receipt from json:", err)
 	}
+}
+
+func TestReceiptEncDec(t *testing.T) {
+	r := ReceiptForStorage(Receipt{
+		Status:            ReceiptStatusFailed,
+		CumulativeGasUsed: 1,
+		Logs:              []*Log{},
+		// derived fields:
+		TxHash:            ethcommon.BytesToHash([]byte{0x03, 0x14}),
+		ContractAddress:   ethcommon.HexToAddress("0x5a443704dd4b594b382c22a083e2bd3090a6fef3"),
+		GasUsed:           1,
+		EffectiveGasPrice: big.NewInt(1),
+	})
+
+	bytes, err := rlp.EncodeToBytes(&r)
+	if err != nil {
+		t.Fatal("error encoding receipt to bytes:", err)
+	}
+
+	r2 := ReceiptForStorage{}
+	err = rlp.DecodeBytes(bytes, &r2)
+	if err != nil {
+		t.Fatal("error decoding receipt from bytes:", err)
+	}
+
+	require.Equal(t, r, r2)
+}
+
+func TestReceiptDecodeEmptyEffectiveGasPrice(t *testing.T) {
+	r := ReceiptForStorage(Receipt{})
+
+	bytes, err := rlp.EncodeToBytes(&r)
+	require.NoError(t, err, "error encoding receipt to bytes")
+
+	r2 := ReceiptForStorage{}
+	err = rlp.DecodeBytes(bytes, &r2)
+	require.NoError(t, err, "error decoding receipt from bytes")
+
+	require.EqualValues(t, r.EffectiveGasPrice, r2.EffectiveGasPrice)
 }
