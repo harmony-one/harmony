@@ -235,6 +235,7 @@ type StakingTxReceipt struct {
 	Type              staking.Directive `json:"type"`
 	Root              hexutil.Bytes     `json:"root"`
 	Status            uint              `json:"status"`
+	EffectiveGasPrice *big.Int          `json:"effectiveGasPrice"`
 }
 
 // CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
