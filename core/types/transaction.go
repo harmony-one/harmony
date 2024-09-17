@@ -536,6 +536,11 @@ func (tx *Transaction) SenderAddress() (common.Address, error) {
 	return addr, nil
 }
 
+// EffectiveGasPrice returns the effective gas price of the transaction.
+func (tx *Transaction) EffectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
+	return tx.data.effectiveGasPrice(dst, baseFee)
+}
+
 // TxByNonce implements the sort interface to allow sorting a list of transactions
 // by their nonces. This is usually only useful for sorting transactions from a
 // single account, otherwise a nonce comparison doesn't make much sense.
