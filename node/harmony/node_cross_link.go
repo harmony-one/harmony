@@ -103,16 +103,16 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 	if node.IsRunningBeaconChain() {
 		pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
-		if err != nil {
+		if err == nil && len(pendingCLs) >= maxPendingCrossLinkSize {
 			utils.Logger().Debug().
-				Err(err).
 				Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
 			return
 		}
-		if len(pendingCLs) >= maxPendingCrossLinkSize {
+		if err != nil {
 			utils.Logger().Debug().
-				Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
-			return
+				Err(err).
+				Int("num crosslinks", len(pendingCLs)).
+				Msg("[ProcessingCrossLink] Read Pending Crosslink failed")
 		}
 
 		existingCLs := map[common2.Hash]struct{}{}

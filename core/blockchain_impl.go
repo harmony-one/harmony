@@ -68,6 +68,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
+	goleveldb "github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
@@ -2435,7 +2436,7 @@ func (bc *BlockChainImpl) ReadPendingSlashingCandidates() slash.Records {
 	return append(bc.pendingSlashes[0:0], bc.pendingSlashes...)
 }
 
-func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
+func (bc *BlockChainImpl) readPendingCrossLinks() ([]types.CrossLink, error) {
 	cls := []types.CrossLink{}
 	bytes := []byte{}
 	if cached, ok := bc.pendingCrossLinksCache.Get(pendingCLCacheKey); ok {
@@ -2443,8 +2444,12 @@ func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 		return cls, nil
 	} else {
 		by, err := rawdb.ReadPendingCrossLinks(bc.db)
-		if err != nil || len(by) == 0 {
+		if err == goleveldb.ErrNotFound {
+			return []types.CrossLink{}, nil
+		} else if err != nil {
 			return nil, err
+		} else if len(by) == 0 {
+			return []types.CrossLink{}, nil
 		}
 		bytes = by
 	}
@@ -2525,11 +2530,19 @@ func (bc *BlockChainImpl) AddPendingSlashingCandidates(
 	return bc.writeSlashes(bc.pendingSlashes)
 }
 
+// ReadPendingCrossLinks returns pending crosslinks
+func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
+	bc.pendingCrossLinksMutex.Lock()
+	defer bc.pendingCrossLinksMutex.Unlock()
+
+	return bc.readPendingCrossLinks()
+}
+
 func (bc *BlockChainImpl) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error) {
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
 
-	cls, err := bc.ReadPendingCrossLinks()
+	cls, err := bc.readPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		err := bc.CachePendingCrossLinks(pendingCLs)
 		return len(pendingCLs), err
@@ -2543,7 +2556,7 @@ func (bc *BlockChainImpl) DeleteFromPendingCrossLinks(crossLinks []types.CrossLi
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
 
-	cls, err := bc.ReadPendingCrossLinks()
+	cls, err := bc.readPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		return 0, err
 	}
