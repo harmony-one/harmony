@@ -206,10 +206,13 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 		return nil, errors.Errorf(
 			"shard ID %d out of range 0..%d", shardID, p.numShards-1)
 	}
-	firstPort := uint32(p.basePort) + shardID
-	endPort := uint32(p.basePort) + p.numShards*p.shardSize
-	for port := firstPort; port < endPort; port += p.numShards {
-		if port == uint32(p.selfPort) {
+	shards := [][]string{
+		{"6000", "6004", "6008", "6012", "6016", "6020", "6100", "6104", "6108", "6112", "6116", "6120"},
+		{"6002", "6006", "6010", "6014", "6018", "6022", "6102", "6106", "6110", "6114", "6118", "6122"},
+	}
+	selfport := fmt.Sprint(p.selfPort)
+	for _, port := range shards[shardID] {
+		if port == selfport {
 			continue // do not sync from self
 		}
 		peers = append(peers, p2p.Peer{IP: "127.0.0.1", Port: fmt.Sprint(port)})

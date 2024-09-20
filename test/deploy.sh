@@ -198,3 +198,4 @@ setup
 launch_localnet
 sleep "${DURATION}"
 cleanup || true
+
