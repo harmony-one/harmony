@@ -76,8 +76,8 @@ debug:
 	# uncomment the following lines to enable debug logging for libp2p, it produces a lot of logs, so disabled by default
 	#export GOLOG_LOG_LEVEL=debug
 	#export GOLOG_OUTPUT=stdout
-	# uncomment the following line to enable max logging
-	# export VERBOSE=true
+	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
+	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	bash ./test/debug.sh
 
 debug-kill:
@@ -87,8 +87,8 @@ debug-ext:
 	# update localnet block per epoch to ensure a stable localnet
 	sed -i 's/localnetBlocksPerEpoch\s*=\s*[0-9]*/localnetBlocksPerEpoch = 64/' internal/configs/sharding/localnet.go
 	sed -i 's/localnetBlocksPerEpochV2\s*=\s*[0-9]*/localnetBlocksPerEpochV2 = 64/' internal/configs/sharding/localnet.go
-	# uncomment the following line to enable max logging
-	# export VERBOSE=true
+	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
+	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	bash ./test/debug-external.sh &
 	echo sleep 10s before creating the external validator
 	sleep 10
