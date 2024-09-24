@@ -79,7 +79,7 @@ func (rm *requestManager) Start() {
 }
 
 func (rm *requestManager) Close() {
-	rm.stopC <- struct{}{}
+	close(rm.stopC)
 }
 
 // DoRequest do the given request with a stream picked randomly. Return the response, stream id that
@@ -342,10 +342,10 @@ func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
 		}
 		st, ok := rm.streams[id]
 		if !ok {
-			return nil, errors.New("sanity error: available stream not registered")
+			continue
 		}
 		if st.req != nil {
-			return nil, errors.New("sanity error: available stream has pending requests")
+			continue
 		}
 		spec, _ := st.ProtoSpec()
 		if req.Request.IsSupportedByProto(spec) {
