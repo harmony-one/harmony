@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"time"
 
@@ -176,8 +177,10 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 	st := p.wrapStream(raw)
 	if err := p.sm.NewStream(st); err != nil {
 		// Possibly we have reach the hard limit of the stream
-		p.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
-			Msg("failed to add new stream")
+		if !errors.Is(err, streammanager.ErrStreamAlreadyExist) {
+			p.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
+				Msg("failed to add new stream")
+		}
 		return
 	}
 	//to get my ID use raw.Conn().LocalPeer().String()

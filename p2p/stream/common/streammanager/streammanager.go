@@ -22,6 +22,10 @@ import (
 var (
 	// ErrStreamAlreadyRemoved is the error that a stream has already been removed
 	ErrStreamAlreadyRemoved = errors.New("stream already removed")
+	// ErrStreamAlreadyExist is the error that a stream has already exist
+	ErrStreamAlreadyExist = errors.New("stream already exist")
+	// ErrTooManyStreams is the error that the number of streams is exceeded the capacity
+	ErrTooManyStreams = errors.New("too many streams")
 )
 
 // streamManager is the implementation of StreamManager. It manages streams on
@@ -232,6 +236,9 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 	if err != nil {
 		return err
 	}
+	if sttypes.StreamID(sm.host.ID()) == st.ID() {
+		return fmt.Errorf("can't connect to itself")
+	}
 	if mySpec.Service != rmSpec.Service {
 		return fmt.Errorf("unexpected service: %v/%v", rmSpec.Service, mySpec.Service)
 	}
@@ -247,10 +254,10 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	id := st.ID()
 	if sm.streams.size() >= sm.config.HiCap {
-		return errors.New("too many streams")
+		return ErrTooManyStreams
 	}
 	if _, ok := sm.streams.get(id); ok {
-		return errors.New("stream already exist")
+		return ErrStreamAlreadyExist
 	}
 
 	sm.streams.addStream(st)
