@@ -98,3 +98,6 @@ profiles/*.pb.gz
 # cache db
 cache/
 cache_*_db
+
+# log aggregation logs folder variable file, no sense to track it
+test/logs_aggregator/.env

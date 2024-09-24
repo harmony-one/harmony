@@ -54,6 +54,9 @@ help:
 	@echo "travis_rosetta_checker - run the Travis Rosetta checker script, defaulting the test branch to 'master' unless overridden by TEST_REPO_BRANCH"
 	@echo "debug_external - cleans up environment, rebuilds the binary, and deploys with external nodes"
 	@echo "build_localnet_validator - imports validator keys, funds validator accounts, waits for the epoch, and creates external validators on a local network"
+	@echo "debug-start-log - start a docker compose Promtail->Loki->Grafana stack against localnet logs, needs docker compose and started localnet"
+	@echo "debug-stop-log - stops a docker compose Promtail->Loki->Grafana stack"
+	@echo "debug-restart-log - restart a docker compose Promtail->Loki->Grafana stack"
 
 libs:
 	make -C $(TOP)/mcl -j8
@@ -216,3 +219,11 @@ build_localnet_validator:
 
 protofiles:
 	bash ./scripts/gogenerate.sh
+
+debug-start-log:
+	bash ./test/logs_aggregator/start_log_aggregator.sh
+
+debug-stop-log:
+	bash ./test/logs_aggregator/stop_log_aggregator.sh
+
+debug-restart-log: debug-stop-log debug-start-log
