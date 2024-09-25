@@ -36,3 +36,10 @@ func (s *PublicDebugService) SetLogVerbosity(ctx context.Context, level int) (ma
 	utils.SetLogVerbosity(verbosity)
 	return map[string]interface{}{"verbosity": verbosity.String()}, nil
 }
+
+// GetLastSigningPower get last signed power
+func (s *PublicDebugService) GetLastSigningPower(
+	ctx context.Context,
+) (float64, error) {
+	return s.hmy.NodeAPI.GetLastSigningPower()
+}

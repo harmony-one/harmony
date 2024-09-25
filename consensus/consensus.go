@@ -138,6 +138,10 @@ type Consensus struct {
 	// Both flags only for initialization state.
 	start           bool
 	isInitialLeader bool
+
+	// value receives from
+	lastKnownSignPower int64
+	lastKnowViewChange int64
 }
 
 // Blockchain returns the blockchain.
@@ -393,6 +397,18 @@ func (consensus *Consensus) InitConsensusWithValidators() (err error) {
 		}
 	}
 	return nil
+}
+
+func (consensus *Consensus) SetLastKnownSignPower(signPower, viewChange int64) {
+	atomic.StoreInt64(&consensus.lastKnownSignPower, signPower)
+	atomic.StoreInt64(&consensus.lastKnowViewChange, viewChange)
+}
+
+func (consensus *Consensus) GetLastKnownSignPower() int64 {
+	if consensus.IsViewChangingMode() {
+		return atomic.LoadInt64(&consensus.lastKnowViewChange)
+	}
+	return atomic.LoadInt64(&consensus.lastKnownSignPower)
 }
 
 type downloadAsync struct {

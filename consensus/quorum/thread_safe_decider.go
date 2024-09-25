@@ -169,3 +169,9 @@ func (a threadSafeDeciderImpl) IsQuorumAchieved(p Phase) bool {
 	defer a.mu.Unlock()
 	return a.decider.IsQuorumAchieved(p)
 }
+
+func (a threadSafeDeciderImpl) ComputeTotalPowerByMask(mask *bls.Mask) numeric.Dec {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.decider.ComputeTotalPowerByMask(mask)
+}

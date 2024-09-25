@@ -29,6 +29,7 @@ enum MessageType {
   DRAND_INIT = 10 [deprecated=true];
   DRAND_COMMIT = 11 [deprecated=true];
   LOTTERY_REQUEST = 12 [deprecated=true]; // it should be either ENTER or GETPLAYERS but it will be removed later.
+  LAST_SIGN_POWER = 13;
 }
 
 // This is universal message for all communication protocols.
@@ -47,6 +48,7 @@ message Message {
     ViewChangeRequest viewchange = 7;
     // Refactor this later after demo.
     LotteryRequest lottery_request = 8 [deprecated=true];
+    LastSignPowerBroadcast last_sign_power = 9;
   }
 }
 
@@ -115,4 +117,12 @@ message ViewChangeRequest {
   bytes m3_aggsigs = 11; // m3: |viewID|
   bytes m3_bitmap= 12;
   bytes prepared_block = 13;
+}
+
+message LastSignPowerBroadcast {
+  int64 prepare = 1;
+  int64 commit = 2;
+  int64 change = 3;
+  bytes sender_pubkey = 4;
+  uint32 shard_id = 5;
 }

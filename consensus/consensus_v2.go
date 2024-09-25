@@ -20,6 +20,7 @@ import (
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
@@ -89,6 +90,8 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	case t == msg_pb.MessageType_NEWVIEW:
 		members := consensus.decider.Participants()
 		fbftMsg, err = ParseNewViewMessage(msg, members)
+	case t == msg_pb.MessageType_LAST_SIGN_POWER:
+		return nil
 	default:
 		fbftMsg, err = consensus.parseFBFTMessage(msg)
 	}
@@ -820,6 +823,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	}
 	consensus.fBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.resetState()
+	consensus.sendLastSignPower()
 }
 
 func (consensus *Consensus) postCatchup(initBN uint64) {
@@ -967,4 +971,11 @@ func (consensus *Consensus) DeleteMessagesLessThan(number uint64) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	consensus.fBFTLog.deleteMessagesLessThan(number)
+}
+
+func getOrZero(n *numeric.Dec, err error) int64 {
+	if n == nil {
+		return 0
+	}
+	return (*n).Mul(numeric.NewDec(100)).TruncateInt64()
 }

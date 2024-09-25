@@ -424,6 +424,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 			Msg("[onViewChange] process View Change message error")
 		return
 	}
+	consensus.sendLastSignPower()
 
 	// received enough view change messages, change state to normal consensus
 	if consensus.decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) && consensus.isViewChangingMode() {
