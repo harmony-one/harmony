@@ -73,6 +73,8 @@ type mainnetSchedule struct{}
 
 func (ms mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.MainnetChainConfig.IsOneSecond(epoch):
+		return mainnetV4
 	case params.MainnetChainConfig.IsHIP30(epoch):
 		return mainnetV4
 	case params.MainnetChainConfig.IsFeeCollectEpoch(epoch):
@@ -161,7 +163,7 @@ func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	firstBlock2s := ms.twoSecondsFirstBlock()
 
 	switch {
-	case params.MainnetChainConfig.IsTwoSeconds(big.NewInt(oldEpochNumber)):
+	case params.MainnetChainConfig.IsOneSecond(big.NewInt(oldEpochNumber)), params.MainnetChainConfig.IsTwoSeconds(big.NewInt(oldEpochNumber)):
 		return big.NewInt(int64((blockNum-firstBlock2s)/ms.BlocksPerEpoch() + params.MainnetChainConfig.TwoSecondsEpoch.Uint64()))
 	default: // genesis
 		return big.NewInt(int64(oldEpochNumber))
@@ -192,7 +194,7 @@ func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	default:
 		firstBlock2s := ms.twoSecondsFirstBlock()
 		switch {
-		case params.MainnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
+		case params.MainnetChainConfig.IsOneSecond(big.NewInt(int64(epochNum))), params.MainnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
 			return firstBlock2s - 1 + ms.BlocksPerEpoch()*(epochNum-params.MainnetChainConfig.TwoSecondsEpoch.Uint64()+1)
 		default: // genesis
 			return mainnetEpochBlock1 - 1 + ms.BlocksPerEpochOld()*epochNum
