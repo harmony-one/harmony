@@ -77,6 +77,7 @@ func TestRequestManager_NewStream(t *testing.T) {
 
 	time.Sleep(defTestSleep)
 
+	ts.rm.lock.Lock()
 	if ts.rm.streams.Length() != 4 || ts.rm.available.Length() != 4 {
 		t.Errorf("unexpected stream size")
 	}
