@@ -337,8 +337,10 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	s.startSyncing()
 	defer s.finishSyncing()
 
+	ctx, cancel := context.WithCancel(downloaderContext)
+	defer cancel()
+
 	for {
-		ctx, cancel := context.WithCancel(downloaderContext)
 
 		n, err := s.doSyncCycle(ctx)
 		if err != nil {
@@ -353,10 +355,10 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			pl["error"] = err.Error()
 			numFailedDownloadCounterVec.With(pl).Inc()
 
-			cancel()
+			//cancel()
 			return estimatedHeight, totalInserted + n, err
 		}
-		cancel()
+		//cancel()
 
 		totalInserted += n
 
