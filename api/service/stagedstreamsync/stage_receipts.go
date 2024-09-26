@@ -286,7 +286,7 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 		// download receipts
 		receipts, stid, err := r.downloadReceipts(ctx, hashes)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) {
+			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				r.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
 			}
 			utils.Logger().Error().

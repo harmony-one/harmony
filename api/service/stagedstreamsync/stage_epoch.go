@@ -123,7 +123,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, nil
 		}
-		return 0, errors.Wrap(err, "getHashChain")
+		return 0, errors.Wrap(err, "getBlocksChain")
 	}
 	if len(blocks) == 0 {
 		// short circuit for no sync is needed
@@ -138,6 +138,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		case err != nil:
 			utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
 			sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
+			numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 			return n, err
 		default:
 		}

@@ -520,7 +520,7 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 			if err != nil {
 				s.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("getCurrentNumber request failed"))
-				if !errors.Is(err, context.Canceled) {
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 					s.protocol.StreamFailed(stid, "getCurrentNumber request failed")
 				}
 				return
@@ -559,7 +559,7 @@ func (s *StagedStreamSync) queryAllPeersForBlockByNumber(ctx context.Context, bn
 			if err != nil {
 				s.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("getBlockByNumber request failed"))
-				if !errors.Is(err, context.Canceled) {
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 					s.protocol.StreamFailed(stid, "getBlockByNumber request failed")
 				}
 				return

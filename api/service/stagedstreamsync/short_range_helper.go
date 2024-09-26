@@ -192,15 +192,16 @@ func (sh *srHelper) doGetBlocksByHashesRequest(ctx context.Context, hashes []com
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	blocks, stid, err := sh.syncProtocol.GetBlocksByHashes(ctx, hashes,
-		syncProto.WithWhitelist(wl))
+	blocks, stid, err := sh.syncProtocol.GetBlocksByHashes(ctx, hashes, syncProto.WithWhitelist(wl))
 	if err != nil {
 		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg("failed to getBlockByHashes")
 		return nil, stid, err
 	}
 	if err := checkGetBlockByHashesResult(blocks, hashes); err != nil {
 		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg(WrapStagedSyncMsg("failed to getBlockByHashes"))
-		sh.syncProtocol.StreamFailed(stid, "failed to getBlockByHashes")
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			sh.syncProtocol.StreamFailed(stid, "failed to getBlockByHashes")
+		}
 		return nil, stid, err
 	}
 	return blocks, stid, nil
