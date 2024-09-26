@@ -79,7 +79,7 @@ func (rm *requestManager) Start() {
 }
 
 func (rm *requestManager) Close() {
-	close(rm.stopC)
+	rm.stopC <- struct{}{}
 }
 
 // DoRequest do the given request with a stream picked randomly. Return the response, stream id that
