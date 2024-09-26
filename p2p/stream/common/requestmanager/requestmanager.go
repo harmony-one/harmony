@@ -20,10 +20,10 @@ import (
 // TODO: each peer is able to have a queue of requests instead of one request at a time.
 // TODO: add QoS evaluation for each stream
 type requestManager struct {
-	streams   map[sttypes.StreamID]*stream  // All streams
-	available map[sttypes.StreamID]struct{} // Streams that are available for request
-	pendings  map[uint64]*request           // requests that are sent but not received response
-	waitings  requestQueues                 // double linked list of requests that are on the waiting list
+	streams   *sttypes.SafeMap[sttypes.StreamID, *stream]  // All streams
+	available *sttypes.SafeMap[sttypes.StreamID, struct{}] // Streams that are available for request
+	pendings  *sttypes.SafeMap[uint64, *request]           // requests that are sent but not received response
+	waitings  requestQueues                                // double linked list of requests that are on the waiting list
 
 	// Stream events
 	sm         streammanager.Reader
@@ -56,9 +56,9 @@ func newRequestManager(sm streammanager.ReaderSubscriber) *requestManager {
 	logger := utils.Logger().With().Str("module", "request manager").Logger()
 
 	return &requestManager{
-		streams:   make(map[sttypes.StreamID]*stream),
-		available: make(map[sttypes.StreamID]struct{}),
-		pendings:  make(map[uint64]*request),
+		streams:   sttypes.NewSafeMap[sttypes.StreamID, *stream](),
+		available: sttypes.NewSafeMap[sttypes.StreamID, struct{}](),
+		pendings:  sttypes.NewSafeMap[uint64, *request](),
 		waitings:  newRequestQueues(),
 
 		sm:          sm,
@@ -79,7 +79,7 @@ func (rm *requestManager) Start() {
 }
 
 func (rm *requestManager) Close() {
-	close(rm.stopC)
+	rm.stopC <- struct{}{}
 }
 
 // DoRequest do the given request with a stream picked randomly. Return the response, stream id that
@@ -202,8 +202,6 @@ func (rm *requestManager) loop() {
 }
 
 func (rm *requestManager) handleNewRequest(req *request) bool {
-	rm.lock.Lock()
-	defer rm.lock.Unlock()
 	rm.logger.Debug().Str("request", req.String()).
 		Msg("add new outgoing request to waiting queue")
 	err := rm.addRequestToWaitings(req, reqPriorityLow)
@@ -218,9 +216,6 @@ func (rm *requestManager) handleNewRequest(req *request) bool {
 }
 
 func (rm *requestManager) handleDeliverData(data responseData) {
-	rm.lock.Lock()
-	defer rm.lock.Unlock()
-
 	if err := rm.validateDelivery(data); err != nil {
 		// if error happens in delivery, most likely it's a stale delivery. No action needed
 		// and return
@@ -228,7 +223,7 @@ func (rm *requestManager) handleDeliverData(data responseData) {
 		return
 	}
 	// req and st is ensured not to be empty in validateDelivery
-	req := rm.pendings[data.resp.ReqID()]
+	req, _ := rm.pendings.Get(data.resp.ReqID())
 	req.doneWithResponse(data)
 	rm.removePendingRequest(req)
 }
@@ -237,11 +232,11 @@ func (rm *requestManager) validateDelivery(data responseData) error {
 	if data.err != nil {
 		return data.err
 	}
-	st := rm.streams[data.stID]
+	st, _ := rm.streams.Get(data.stID)
 	if st == nil {
 		return fmt.Errorf("data delivered from dead stream: %v", data.stID)
 	}
-	req := rm.pendings[data.resp.ReqID()]
+	req, _ := rm.pendings.Get(data.resp.ReqID())
 	if req == nil {
 		return fmt.Errorf("stale p2p response delivery")
 	}
@@ -256,9 +251,6 @@ func (rm *requestManager) validateDelivery(data responseData) error {
 }
 
 func (rm *requestManager) handleCancelRequest(data cancelReqData) {
-	rm.lock.Lock()
-	defer rm.lock.Unlock()
-
 	var (
 		req = data.req
 		err = data.err
@@ -277,12 +269,9 @@ func (rm *requestManager) handleCancelRequest(data cancelReqData) {
 }
 
 func (rm *requestManager) getNextRequest() (*request, *stream) {
-	rm.lock.Lock()
-	defer rm.lock.Unlock()
-
 	var req *request
 	for {
-		req = rm.waitings.Pop()
+		req = rm.popRequestFromWaitings()
 		if req == nil {
 			return nil, nil
 		}
@@ -303,44 +292,42 @@ func (rm *requestManager) getNextRequest() (*request, *stream) {
 func (rm *requestManager) genReqID() uint64 {
 	for {
 		rid := sttypes.GenReqID()
-		if _, ok := rm.pendings[rid]; !ok {
+		if _, ok := rm.pendings.Get(rid); !ok {
 			return rid
 		}
 	}
 }
 
 func (rm *requestManager) addPendingRequest(req *request, st *stream) {
-	rm.lock.Lock()
-	defer rm.lock.Unlock()
-
 	reqID := rm.genReqID()
 	req.SetReqID(reqID)
 
 	req.owner = st
 	st.req = req
 
-	delete(rm.available, st.ID())
-	rm.pendings[req.ReqID()] = req
+	rm.available.Delete(st.ID())
+	rm.pendings.Set(req.ReqID(), req)
 }
 
 func (rm *requestManager) removePendingRequest(req *request) {
-	if _, ok := rm.pendings[req.ReqID()]; !ok {
+	if _, ok := rm.pendings.Get(req.ReqID()); !ok {
 		return
 	}
-	delete(rm.pendings, req.ReqID())
+	rm.pendings.Delete(req.ReqID())
 
 	if st := req.owner; st != nil {
 		st.clearPendingRequest()
-		rm.available[st.ID()] = struct{}{}
+		rm.available.Set(st.ID(), struct{}{})
 	}
 }
 
 func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
-	for id := range rm.available {
+	availableStreamIDs := rm.available.Keys()
+	for _, id := range availableStreamIDs {
 		if !req.isStreamAllowed(id) {
 			continue
 		}
-		st, ok := rm.streams[id]
+		st, ok := rm.streams.Get(id)
 		if !ok {
 			continue
 		}
@@ -356,9 +343,6 @@ func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
 }
 
 func (rm *requestManager) refreshStreams() {
-	rm.lock.Lock()
-	defer rm.lock.Unlock()
-
 	added, removed := checkStreamUpdates(rm.streams, rm.sm.GetStreams())
 
 	for _, st := range added {
@@ -371,35 +355,35 @@ func (rm *requestManager) refreshStreams() {
 	}
 }
 
-func checkStreamUpdates(exists map[sttypes.StreamID]*stream, targets []sttypes.Stream) (added []sttypes.Stream, removed []*stream) {
+func checkStreamUpdates(exists *sttypes.SafeMap[sttypes.StreamID, *stream], targets []sttypes.Stream) (added []sttypes.Stream, removed []*stream) {
 	targetM := make(map[sttypes.StreamID]sttypes.Stream)
 
 	for _, target := range targets {
 		id := target.ID()
 		targetM[id] = target
-		if _, ok := exists[id]; !ok {
+		if _, ok := exists.Get(id); !ok {
 			added = append(added, target)
 		}
 	}
-	for id, exist := range exists {
+	exists.Iterate(func(id sttypes.StreamID, st *stream) {
 		if _, ok := targetM[id]; !ok {
-			removed = append(removed, exist)
+			removed = append(removed, st)
 		}
-	}
+	})
 	return
 }
 
 func (rm *requestManager) addNewStream(st sttypes.Stream) {
-	rm.streams[st.ID()] = &stream{Stream: st}
-	rm.available[st.ID()] = struct{}{}
+	rm.streams.Set(st.ID(), &stream{Stream: st})
+	rm.available.Set(st.ID(), struct{}{})
 }
 
 // removeStream remove the stream from request manager, clear the pending request
 // of the stream.
 func (rm *requestManager) removeStream(st *stream) {
 	id := st.ID()
-	delete(rm.available, id)
-	delete(rm.streams, id)
+	rm.available.Clear()
+	rm.streams.Clear()
 
 	cleared := st.clearPendingRequest()
 	if cleared != nil {
@@ -411,18 +395,15 @@ func (rm *requestManager) removeStream(st *stream) {
 }
 
 func (rm *requestManager) close() {
-	rm.lock.Lock()
-	defer rm.lock.Unlock()
-
 	for _, sub := range rm.subs {
 		sub.Unsubscribe()
 	}
-	for _, req := range rm.pendings {
+	rm.pendings.Iterate(func(key uint64, req *request) {
 		req.doneWithResponse(responseData{err: ErrClosed})
-	}
-	rm.pendings = make(map[uint64]*request)
-	rm.available = make(map[sttypes.StreamID]struct{})
-	rm.streams = make(map[sttypes.StreamID]*stream)
+	})
+	rm.streams = sttypes.NewSafeMap[sttypes.StreamID, *stream]()
+	rm.available = sttypes.NewSafeMap[sttypes.StreamID, struct{}]()
+	rm.pendings = sttypes.NewSafeMap[uint64, *request]()
 	rm.waitings = newRequestQueues()
 	close(rm.stopC)
 }
@@ -436,4 +417,8 @@ const (
 
 func (rm *requestManager) addRequestToWaitings(req *request, priority reqPriority) error {
 	return rm.waitings.Push(req, priority)
+}
+
+func (rm *requestManager) popRequestFromWaitings() *request {
+	return rm.waitings.Pop()
 }

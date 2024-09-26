@@ -78,7 +78,7 @@ func TestRequestManager_NewStream(t *testing.T) {
 	time.Sleep(defTestSleep)
 
 	ts.rm.lock.Lock()
-	if len(ts.rm.streams) != 4 || len(ts.rm.available) != 4 {
+	if ts.rm.streams.Length() != 4 || ts.rm.available.Length() != 4 {
 		t.Errorf("unexpected stream size")
 	}
 	ts.rm.lock.Unlock()
@@ -109,7 +109,7 @@ func TestRequestManager_RemoveStream(t *testing.T) {
 	}
 
 	ts.rm.lock.Lock()
-	if len(ts.rm.streams) != 2 || len(ts.rm.available) != 2 {
+	if ts.rm.streams.Length() != 2 || ts.rm.available.Length() != 2 {
 		t.Errorf("unexpected stream size")
 	}
 	ts.rm.lock.Unlock()
@@ -372,21 +372,21 @@ func TestRequestManager_Concurrency(t *testing.T) {
 func TestGenReqID(t *testing.T) {
 	retry := 100000
 	rm := &requestManager{
-		pendings: make(map[uint64]*request),
+		pendings: sttypes.NewSafeMap[uint64, *request](),
 	}
 
 	for i := 0; i != retry; i++ {
 		rid := rm.genReqID()
-		if _, ok := rm.pendings[rid]; ok {
+		if _, ok := rm.pendings.Get(rid); ok {
 			t.Errorf("rid collision")
 		}
-		rm.pendings[rid] = nil
+		rm.pendings.Set(rid, nil)
 	}
 }
 
 func TestCheckStreamUpdates(t *testing.T) {
 	tests := []struct {
-		exists            map[sttypes.StreamID]*stream
+		exists            *sttypes.SafeMap[sttypes.StreamID, *stream]
 		targets           []sttypes.Stream
 		expAddedIndexes   []int
 		expRemovedIndexes []int
@@ -522,7 +522,9 @@ func (ts *testSuite) pickOneOccupiedStream() sttypes.StreamID {
 	ts.rm.lock.Lock()
 	defer ts.rm.lock.Unlock()
 
-	for _, req := range ts.rm.pendings {
+	IDs := ts.rm.pendings.Keys()
+	for _, id := range IDs {
+		req, _ := ts.rm.pendings.Get(id)
 		return req.owner.ID()
 	}
 	return ""
