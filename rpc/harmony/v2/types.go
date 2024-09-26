@@ -218,6 +218,7 @@ type TxReceipt struct {
 	To                string         `json:"to"`
 	Root              hexutil.Bytes  `json:"root"`
 	Status            uint           `json:"status"`
+	EffectiveGasPrice *big.Int       `json:"effectiveGasPrice"`
 }
 
 // StakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
@@ -389,6 +390,7 @@ func NewTxReceipt(
 		To:                receiver,
 		Root:              receipt.PostState,
 		Status:            uint(receipt.Status),
+		EffectiveGasPrice: new(big.Int).Set(receipt.EffectiveGasPrice),
 	}
 
 	// Set optionals
