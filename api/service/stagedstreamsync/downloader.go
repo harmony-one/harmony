@@ -272,13 +272,17 @@ func (d *Downloader) loop() {
 			// the reason why we need to check distanceBeforeSync is because, if it was long distance,
 			// very likely, there are a couple of new blocks have been added to the other nodes which
 			// we should still stay in long range and check them.
-			bnAfterSync := d.bc.CurrentBlock().NumberU64()
-			distanceBeforeSync := estimatedHeight - bnBeforeSync
-			distanceAfterSync := estimatedHeight - bnAfterSync
-			if estimatedHeight > 0 && addedBN > 0 &&
-				distanceBeforeSync <= uint64(LastMileBlocksThreshold) &&
-				distanceAfterSync <= uint64(LastMileBlocksThreshold) {
-				initSync = false
+			if initSync {
+				bnAfterSync := d.bc.CurrentBlock().NumberU64()
+				distanceBeforeSync := estimatedHeight - bnBeforeSync
+				distanceAfterSync := estimatedHeight - bnAfterSync
+				if distanceBeforeSync > uint64(LastMileBlocksThreshold) {
+					if distanceAfterSync <= uint64(LastMileBlocksThreshold) {
+						initSync = false
+					}
+				} else {
+					initSync = false
+				}
 			}
 
 		case <-d.closeC:
