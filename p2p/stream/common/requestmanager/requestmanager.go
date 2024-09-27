@@ -382,8 +382,8 @@ func (rm *requestManager) addNewStream(st sttypes.Stream) {
 // of the stream.
 func (rm *requestManager) removeStream(st *stream) {
 	id := st.ID()
-	rm.available.Clear()
-	rm.streams.Clear()
+	rm.available.Delete(id)
+	rm.streams.Delete(id)
 
 	cleared := st.clearPendingRequest()
 	if cleared != nil {
