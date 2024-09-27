@@ -414,6 +414,26 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time,
 			Msg("[finalCommit] Leader failed to commit the confirmed block")
 	}
 
+	if consensus.ShardID == 0 && isLeader && block.IsLastBlockInEpoch() {
+		blockWithSig := core.BlockWithSig{
+			Block:              block,
+			CommitSigAndBitmap: commitSigAndBitmap,
+		}
+		encodedBlock, err := rlp.EncodeToBytes(blockWithSig)
+		if err != nil {
+			consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
+			return
+		}
+		err = consensus.host.SendMessageToGroups(
+			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(1)},
+			p2p.ConstructMessage(
+				proto_node.ConstructEpochBlockMessage(encodedBlock)),
+		)
+		if err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed to send epoch block")
+		}
+	}
+
 	// Dump new block into level db
 	// In current code, we add signatures in block in tryCatchup, the block dump to explorer does not contains signatures
 	// but since explorer doesn't need signatures, it should be fine
@@ -438,7 +458,7 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time,
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
-	if consensus.isLeader() {
+	if isLeader {
 		if block.IsLastBlockInEpoch() {
 			// No pipelining
 			go func() {
