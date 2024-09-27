@@ -554,7 +554,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
-		block, err := legacysync.RlpDecodeBlockOrBlockWithSig(request.BlockHash)
+		block, err := core.RlpDecodeBlockOrBlockWithSig(request.BlockHash)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("[SYNC] unable to decode received new block")
 			return response, err
@@ -721,7 +721,7 @@ func (node *Node) getEncodedBlockWithSigByHash(hash common.Hash) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-	bwh := legacysync.BlockWithSig{
+	bwh := core.BlockWithSig{
 		Block:              blk,
 		CommitSigAndBitmap: sab,
 	}
@@ -742,7 +742,7 @@ func (node *Node) getEncodedBlockWithSigByHeight(height uint64) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	bwh := legacysync.BlockWithSig{
+	bwh := core.BlockWithSig{
 		Block:              blk,
 		CommitSigAndBitmap: sab,
 	}
@@ -754,7 +754,7 @@ func (node *Node) getEncodedBlockWithSigByHeight(height uint64) ([]byte, error) 
 }
 
 func getEncodedBlockWithSigFromBlock(block *types.Block) ([]byte, error) {
-	bwh := legacysync.BlockWithSig{
+	bwh := core.BlockWithSig{
 		Block:              block,
 		CommitSigAndBitmap: block.GetCurrentCommitSig(),
 	}

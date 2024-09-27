@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -136,7 +138,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	return nil
 }
 
-func (consensus *Consensus) finalCommit() {
+func (consensus *Consensus) finalCommit(isLeader bool) {
 	numCommits := consensus.decider.SignersCount(quorum.Commit)
 
 	consensus.getLogger().Info().
@@ -187,7 +189,7 @@ func (consensus *Consensus) finalCommit() {
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
-	if !consensus.isLeader() || block.IsLastBlockInEpoch() {
+	if !isLeader || block.IsLastBlockInEpoch() {
 		// send immediately
 		if err := consensus.msgSender.SendWithRetry(
 			block.NumberU64(),
@@ -228,6 +230,26 @@ func (consensus *Consensus) finalCommit() {
 			Msg("[finalCommit] Leader failed to commit the confirmed block")
 	}
 
+	if consensus.ShardID == 0 && isLeader && block.IsLastBlockInEpoch() {
+		blockWithSig := core.BlockWithSig{
+			Block:              block,
+			CommitSigAndBitmap: commitSigAndBitmap,
+		}
+		encodedBlock, err := rlp.EncodeToBytes(blockWithSig)
+		if err != nil {
+			consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
+			return
+		}
+		err = consensus.host.SendMessageToGroups(
+			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(1)},
+			p2p.ConstructMessage(
+				proto_node.ConstructEpochBlockMessage(encodedBlock)),
+		)
+		if err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed to send epoch block")
+		}
+	}
+
 	// Dump new block into level db
 	// In current code, we add signatures in block in tryCatchup, the block dump to explorer does not contains signatures
 	// but since explorer doesn't need signatures, it should be fine
@@ -252,7 +274,7 @@ func (consensus *Consensus) finalCommit() {
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
-	if consensus.isLeader() {
+	if isLeader {
 		if block.IsLastBlockInEpoch() {
 			// No pipelining
 			go func() {

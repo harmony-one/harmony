@@ -299,7 +299,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			consensus.preCommitAndPropose(blockObj)
 		}
 
-		go func(viewID uint64) {
+		go func(viewID uint64, isLeader bool) {
 			waitTime := 1000 * time.Millisecond
 			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
 			if maxWaitTime > waitTime {
@@ -313,9 +313,9 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			consensus.mutex.Lock()
 			defer consensus.mutex.Unlock()
 			if viewID == consensus.getCurBlockViewID() {
-				consensus.finalCommit()
+				consensus.finalCommit(isLeader)
 			}
-		}(viewID)
+		}(viewID, consensus.isLeader())
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}

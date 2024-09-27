@@ -28,6 +28,27 @@ func (node *Node) ProcessCrossLinkHeartbeatMessage(msgPayload []byte) {
 	}
 }
 
+func (node *Node) processEpochBlockMessage(msgPayload []byte) error {
+	if node.IsRunningBeaconChain() {
+		return errors.New("received beacon block for beacon chain")
+	}
+	block, err := core.RlpDecodeBlockOrBlockWithSig(msgPayload)
+	if err != nil {
+		return errors.WithMessage(err, "failed to decode block")
+	}
+	if _, err := node.EpochChain().InsertChain(types.Blocks{block}, true); err != nil {
+		return errors.WithMessage(err, "failed insert epoch block")
+	}
+	return nil
+}
+
+func (node *Node) ProcessEpochBlockMessage(msgPayload []byte) {
+	if err := node.processEpochBlockMessage(msgPayload); err != nil {
+		utils.Logger().Err(err).
+			Msg("[ProcessEpochBlock] failed process epoch block")
+	}
+}
+
 func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	hb := types.CrosslinkHeartbeat{}
 	err := rlp.DecodeBytes(msgPayload, &hb)

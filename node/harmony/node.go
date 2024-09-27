@@ -459,6 +459,10 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			if node.IsRunningBeaconChain() {
 				return nil, 0, errInvalidShard
 			}
+		case proto_node.Epoch:
+			if node.IsRunningBeaconChain() {
+				return nil, 0, errInvalidShard
+			}
 		default:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
 			return nil, 0, errInvalidNodeMsg

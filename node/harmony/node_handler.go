@@ -42,6 +42,8 @@ func (node *Node) processSkippedMsgTypeByteValue(
 		node.ProcessCrossLinkMessage(content)
 	case proto_node.CrosslinkHeartbeat:
 		node.ProcessCrossLinkHeartbeatMessage(content)
+	case proto_node.Epoch:
+		node.ProcessEpochBlockMessage(content)
 	default:
 		utils.Logger().Error().
 			Int("message-iota-value", int(cat)).
@@ -86,7 +88,8 @@ func (node *Node) HandleNodeMessage(
 			proto_node.SlashCandidate,
 			proto_node.Receipt,
 			proto_node.CrossLink,
-			proto_node.CrosslinkHeartbeat:
+			proto_node.CrosslinkHeartbeat,
+			proto_node.Epoch:
 			// skip first byte which is blockMsgType
 			node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 		}

@@ -47,6 +47,7 @@ const (
 	Receipt                             // cross-shard transaction receipts
 	SlashCandidate                      // A report of a double-signing event
 	CrosslinkHeartbeat                  // Heart beat signal for crosslinks. Needed for epoch chain.
+	Epoch
 )
 
 var (
@@ -61,6 +62,7 @@ var (
 	crossLinkB          = byte(CrossLink)
 	crossLinkHeardBeatB = byte(CrosslinkHeartbeat)
 	receiptB            = byte(Receipt)
+	epochB              = byte(Epoch)
 	// H suffix means header
 	slashH              = []byte{nodeB, blockB, slashB}
 	transactionListH    = []byte{nodeB, txnB, sendB}
@@ -69,6 +71,7 @@ var (
 	crossLinkH          = []byte{nodeB, blockB, crossLinkB}
 	cxReceiptH          = []byte{nodeB, blockB, receiptB}
 	crossLinkHeartBeatH = []byte{nodeB, blockB, crossLinkHeardBeatB}
+	epochBlockH         = []byte{nodeB, blockB, epochB}
 )
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
@@ -136,6 +139,13 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 	}
 	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
 	byteBuffer.Write(crosslinksData)
+	return byteBuffer.Bytes()
+}
+
+// ConstructEpochBlockMessage creates epoch block message
+func ConstructEpochBlockMessage(blockBytes []byte) []byte {
+	byteBuffer := bytes.NewBuffer(epochBlockH)
+	byteBuffer.Write(blockBytes)
 	return byteBuffer.Bytes()
 }
 
