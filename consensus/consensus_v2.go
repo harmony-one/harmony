@@ -479,7 +479,7 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time,
 }
 
 // finalCommit uses locks, not suited to be called internally
-func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time, network *NetworkMessage) {
+func (consensus *Consensus) finalCommit1s(isLeader bool, viewID uint64, nextBlockDue time.Time, network *NetworkMessage) {
 	waitTime := 0 * time.Millisecond
 	maxWaitTime := time.Until(nextBlockDue) - 200*time.Millisecond
 	if maxWaitTime > waitTime {
@@ -544,7 +544,7 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time,
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
-	if !consensus.isLeader() || block.IsLastBlockInEpoch() {
+	if !isLeader || block.IsLastBlockInEpoch() {
 		// send immediately
 		if err := consensus.msgSender.SendWithRetry(
 			block.NumberU64(),
@@ -609,7 +609,7 @@ func (consensus *Consensus) finalCommit1s(viewID uint64, nextBlockDue time.Time,
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
-	if consensus.isLeader() {
+	if isLeader {
 		if block.IsLastBlockInEpoch() {
 			// No pipelining
 			go func() {
