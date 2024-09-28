@@ -962,9 +962,7 @@ func (consensus *Consensus) commitBlock1s(blk *types.Block, committedMsg *FBFTMe
 	}
 
 	consensus.FinishFinalityCount()
-	go func() {
-		consensus.PostConsensusJob(blk)
-	}()
+	consensus.PostConsensusProcessing(blk)
 	consensus.setupForNewConsensus(blk, committedMsg)
 	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
 		Str("hash", blk.Header().Hash().Hex()).
