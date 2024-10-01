@@ -48,13 +48,11 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, isBeaconNode bool, config 
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{
-		Chain:      bc,
-		Host:       host.GetP2PHost(),
-		Discovery:  host.GetDiscovery(),
-		ShardID:    nodeconfig.ShardID(bc.ShardID()),
-		Network:    config.Network,
-		BeaconNode: isBeaconNode,
-
+		Chain:        bc,
+		Host:         host.GetP2PHost(),
+		Discovery:    host.GetDiscovery(),
+		ShardID:      nodeconfig.ShardID(bc.ShardID()),
+		Network:      config.Network,
 		SmSoftLowCap: config.SmSoftLowCap,
 		SmHardLowCap: config.SmHardLowCap,
 		SmHiCap:      config.SmHiCap,
