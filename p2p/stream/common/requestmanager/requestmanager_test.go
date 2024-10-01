@@ -77,11 +77,9 @@ func TestRequestManager_NewStream(t *testing.T) {
 
 	time.Sleep(defTestSleep)
 
-	ts.rm.lock.Lock()
 	if ts.rm.streams.Length() != 4 || ts.rm.available.Length() != 4 {
 		t.Errorf("unexpected stream size")
 	}
-	ts.rm.lock.Unlock()
 }
 
 // For request assigned to the stream being removed, the request will be rescheduled.
@@ -108,11 +106,9 @@ func TestRequestManager_RemoveStream(t *testing.T) {
 		t.Errorf("unexpected error: %v", errors.New("stream removed when doing request"))
 	}
 
-	ts.rm.lock.Lock()
 	if ts.rm.streams.Length() != 2 || ts.rm.available.Length() != 2 {
 		t.Errorf("unexpected stream size")
 	}
-	ts.rm.lock.Unlock()
 }
 
 // stream delivers an unknown request ID
@@ -519,13 +515,12 @@ func (ts *testSuite) Close() {
 }
 
 func (ts *testSuite) pickOneOccupiedStream() sttypes.StreamID {
-	ts.rm.lock.Lock()
-	defer ts.rm.lock.Unlock()
-
 	IDs := ts.rm.pendings.Keys()
 	for _, id := range IDs {
 		req, _ := ts.rm.pendings.Get(id)
-		return req.owner.ID()
+		if req.owner != nil {
+			return req.owner.ID()
+		}
 	}
 	return ""
 }
