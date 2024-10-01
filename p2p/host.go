@@ -458,7 +458,7 @@ func (host *HostV2) AddStreamProtocol(protocols ...sttypes.Protocol) {
 		host.streamProtos = append(host.streamProtos, proto)
 		host.h.SetStreamHandlerMatch(protocol.ID(proto.ProtoID()), proto.Match, proto.HandleStream)
 		// TODO: do we need to add handler match for shard proto id?
-		// if proto.IsBeaconNode() {
+		// if proto.IsBeaconValidator() {
 		// 	host.h.SetStreamHandlerMatch(protocol.ID(proto.ShardProtoID()), proto.Match, proto.HandleStream)
 		// }
 	}

@@ -79,7 +79,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
 
 	// if it is a beacon node or shard node, print the peer id and proto id
-	if protoSpec.BeaconNode || protoSpec.ShardID != shard.BeaconChainShardID {
+	if protoSpec.IsBeaconValidator || protoSpec.ShardID != shard.BeaconChainShardID {
 		fmt.Println("My peer id: ", host.ID().String())
 		fmt.Println("My proto id: ", pid)
 	}
@@ -344,10 +344,12 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 }
 
 func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrInfo, error) {
+	numStreams := sm.streams.size()
+
 	protoID := sm.targetProtoID()
 	discBatch := sm.config.DiscBatch
-	if sm.config.HiCap-sm.streams.size() < sm.config.DiscBatch {
-		discBatch = sm.config.HiCap - sm.streams.size()
+	if sm.config.HiCap-numStreams < sm.config.DiscBatch {
+		discBatch = sm.config.HiCap - numStreams
 	}
 	if discBatch < 0 {
 		return nil, nil
@@ -364,7 +366,7 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 func (sm *streamManager) targetProtoID() string {
 	targetSpec := sm.myProtoSpec
 	if targetSpec.ShardID == shard.BeaconChainShardID { // for beacon chain, only connect to beacon nodes
-		targetSpec.BeaconNode = true
+		targetSpec.IsBeaconValidator = true
 	}
 	return string(targetSpec.ToProtoID())
 }
@@ -478,7 +480,7 @@ func (ss *streamSet) getStreams() []sttypes.Stream {
 	ss.lock.RLock()
 	defer ss.lock.RUnlock()
 
-	res := make([]sttypes.Stream, 0, len(ss.streams))
+	res := make([]sttypes.Stream, 0)
 	for _, st := range ss.streams {
 		res = append(res, st)
 	}

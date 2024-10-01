@@ -42,13 +42,12 @@ var (
 type (
 	// Protocol is the protocol for sync streaming
 	Protocol struct {
-		chain      engine.ChainReader            // provide SYNC data
-		beaconNode bool                          // is beacon node or shard chain node
-		schedule   shardingconfig.Schedule       // provide schedule information
-		rl         ratelimiter.RateLimiter       // limit the incoming request rate
-		sm         streammanager.StreamManager   // stream management
-		rm         requestmanager.RequestManager // deliver the response from stream
-		disc       discovery.Discovery
+		chain    engine.ChainReader            // provide SYNC data
+		schedule shardingconfig.Schedule       // provide schedule information
+		rl       ratelimiter.RateLimiter       // limit the incoming request rate
+		sm       streammanager.StreamManager   // stream management
+		rm       requestmanager.RequestManager // deliver the response from stream
+		disc     discovery.Discovery
 
 		config Config
 		logger zerolog.Logger
@@ -60,12 +59,14 @@ type (
 
 	// Config is the sync protocol config
 	Config struct {
-		Chain                engine.ChainReader
-		Host                 libp2p_host.Host
-		Discovery            discovery.Discovery
-		ShardID              nodeconfig.ShardID
-		Network              nodeconfig.NetworkType
-		BeaconNode           bool
+		Chain       engine.ChainReader
+		Host        libp2p_host.Host
+		Discovery   discovery.Discovery
+		ShardID     nodeconfig.ShardID
+		Network     nodeconfig.NetworkType
+		isValidator bool
+		isExplorer  bool
+
 		MaxAdvertiseWaitTime int
 		// stream manager config
 		SmSoftLowCap int
@@ -80,13 +81,12 @@ func NewProtocol(config Config) *Protocol {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sp := &Protocol{
-		chain:      config.Chain,
-		beaconNode: config.BeaconNode,
-		disc:       config.Discovery,
-		config:     config,
-		ctx:        ctx,
-		cancel:     cancel,
-		closeC:     make(chan struct{}),
+		chain:  config.Chain,
+		disc:   config.Discovery,
+		config: config,
+		ctx:    ctx,
+		cancel: cancel,
+		closeC: make(chan struct{}),
 	}
 	smConfig := streammanager.Config{
 		SoftLoCap: config.SmSoftLowCap,
@@ -111,7 +111,7 @@ func (p *Protocol) Start() {
 	p.rm.Start()
 	p.rl.Start()
 	// If it's not EpochChain, advertise
-	if p.beaconNode || p.chain.ShardID() != shard.BeaconChainShardID {
+	if p.config.isValidator || p.chain.ShardID() != shard.BeaconChainShardID {
 		go p.advertiseLoop()
 	}
 }
@@ -145,9 +145,19 @@ func (p *Protocol) Version() *version.Version {
 	return MyVersion
 }
 
-// IsBeaconNode returns true if it is a beacon chain node
-func (p *Protocol) IsBeaconNode() bool {
-	return p.beaconNode
+// IsBeaconValidator returns true if it is a beacon chain validator
+func (p *Protocol) IsBeaconValidator() bool {
+	return p.config.ShardID == shard.BeaconChainShardID && p.config.isValidator
+}
+
+// IsValidator returns true if it is a validator node
+func (p *Protocol) IsValidator() bool {
+	return p.config.isValidator
+}
+
+// IsExplorer returns true if it is an explorer node
+func (p *Protocol) IsExplorer() bool {
+	return p.config.isExplorer
 }
 
 // Match checks the compatibility to the target protocol ID.
@@ -234,7 +244,7 @@ func (p *Protocol) supportedProtoIDs() []sttypes.ProtoID {
 		pids = append(pids, p.protoIDByVersion(v))
 		// beacon node needs to inform shard nodes about it supports them as well for EpochChain
 		// basically beacon node can accept connection from shard nodes to share last epoch blocks
-		if p.beaconNode {
+		if p.IsBeaconValidator() {
 			pids = append(pids, p.protoIDByVersionForShardNodes(v))
 		}
 	}
@@ -247,22 +257,22 @@ func (p *Protocol) supportedVersions() []*version.Version {
 
 func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 	spec := sttypes.ProtoSpec{
-		Service:     serviceSpecifier,
-		NetworkType: p.config.Network,
-		ShardID:     p.config.ShardID,
-		Version:     v,
-		BeaconNode:  p.beaconNode,
+		Service:           serviceSpecifier,
+		NetworkType:       p.config.Network,
+		ShardID:           p.config.ShardID,
+		Version:           v,
+		IsBeaconValidator: p.config.isValidator && p.config.ShardID == shard.BeaconChainShardID,
 	}
 	return spec.ToProtoID()
 }
 
 func (p *Protocol) protoIDByVersionForShardNodes(v *version.Version) sttypes.ProtoID {
 	spec := sttypes.ProtoSpec{
-		Service:     serviceSpecifier,
-		NetworkType: p.config.Network,
-		ShardID:     p.config.ShardID,
-		Version:     v,
-		BeaconNode:  false,
+		Service:           serviceSpecifier,
+		NetworkType:       p.config.Network,
+		ShardID:           p.config.ShardID,
+		Version:           v,
+		IsBeaconValidator: false,
 	}
 	return spec.ToProtoID()
 }
@@ -286,10 +296,10 @@ func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
 		st.AddFailedTimes(FaultRecoveryThreshold)
 		p.logger.Info().
 			Str("stream ID", string(st.ID())).
-			Int("num failures", st.FailedTimes()).
+			Int("num failures", st.Failures()).
 			Str("reason", reason).
 			Msg("stream failed")
-		if st.FailedTimes() >= MaxStreamFailures {
+		if st.Failures() >= MaxStreamFailures {
 			st.Close()
 			p.logger.Warn().
 				Str("stream ID", string(st.ID())).
