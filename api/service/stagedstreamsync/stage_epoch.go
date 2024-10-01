@@ -45,7 +45,7 @@ func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return nil
 	}
 
-	if sr.configs.bc.ShardID() != shard.BeaconChainShardID || s.state.isBeaconNode {
+	if !s.state.isEpochChain {
 		return nil
 	}
 
@@ -138,13 +138,13 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		case err != nil:
 			utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
 			sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
-			numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
+			numBlocksInsertedEpochSyncHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 			return n, err
 		default:
 		}
 		n++
 	}
-	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
+	numBlocksInsertedEpochSyncHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	return n, nil
 }
 

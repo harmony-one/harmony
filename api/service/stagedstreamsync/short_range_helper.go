@@ -30,7 +30,7 @@ func (sh *srHelper) getHashChain(ctx context.Context, bns []uint64) ([]common.Ha
 		go func(index int) {
 			defer wg.Done()
 
-			hashes, stid, err := sh.doGetBlockHashesRequest(ctx, bns)
+			hashes, stid, err := sh.doGetBlockHashesRequest(ctx, bns, false)
 			if err != nil {
 				sh.logger.Warn().Err(err).Str("StreamID", string(stid)).
 					Msg(WrapStagedSyncMsg("doGetBlockHashes return error"))
@@ -152,7 +152,7 @@ func (sh *srHelper) prepareBlockHashNumbers(curNumber uint64) []uint64 {
 	return res
 }
 
-func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64) ([]common.Hash, sttypes.StreamID, error) {
+func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64, acceptPartially bool) ([]common.Hash, sttypes.StreamID, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -164,7 +164,7 @@ func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64) (
 			Msg(WrapStagedSyncMsg("failed to doGetBlockHashesRequest"))
 		return nil, stid, err
 	}
-	if len(hashes) != len(bns) {
+	if !acceptPartially && len(hashes) != len(bns) {
 		sh.logger.Warn().Err(ErrUnexpectedBlockHashes).
 			Str("stream", string(stid)).
 			Msg(WrapStagedSyncMsg("failed to doGetBlockHashesRequest"))
