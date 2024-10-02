@@ -196,6 +196,8 @@ func (hmy *Harmony) GetLastCrossLinks() ([]*types.CrossLink, error) {
 		link, err := hmy.BlockChain.ReadShardLastCrossLink(i)
 		if err != nil {
 			return nil, err
+		} else if link == nil { // if it's before epoch crosslink HF, it returns nil
+			continue
 		}
 		crossLinks = append(crossLinks, link)
 	}
