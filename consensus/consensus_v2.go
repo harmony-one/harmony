@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -137,7 +139,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 }
 
 // finalCommit uses locks, not suited to be called internally
-func (consensus *Consensus) finalCommit(isLeader bool, viewID uint64, isLeader bool) {
+func (consensus *Consensus) finalCommit(isLeader bool, viewID uint64) {
 	waitTime := 1000 * time.Millisecond
 	maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
 	if maxWaitTime > waitTime {
