@@ -133,7 +133,7 @@ function launch_localnet() {
       args=("${args[@]}" --run.legacy)
       ;;
     validator)
-      args=("${args[@]}" --run.legacy "--rpc.debug=true")
+      args=("${args[@]}" --run.legacy)
       ;;
     esac
 

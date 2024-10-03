@@ -107,3 +107,10 @@ func (s *PublicHarmonyService) GetNumPendingCrossLinks() (int, error) {
 
 	return len(links), nil
 }
+
+// GetLastSigningPower get last signed power
+func (s *PublicHarmonyService) GetLastSigningPower(
+	ctx context.Context,
+) (float64, error) {
+	return s.hmy.NodeAPI.GetLastSigningPower()
+}
