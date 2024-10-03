@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -136,7 +138,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	return nil
 }
 
-func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64, isLeader bool) {
+func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64) {
 	consensus.getLogger().Info().Str("waitTime", waitTime.String()).
 		Msg("[OnCommit] Starting Grace Period")
 	time.Sleep(waitTime)
