@@ -85,7 +85,7 @@ func (consensus *Consensus) PostConsensusProcessing(newBlock *types.Block) error
 					return nil
 				}
 				computed := availability.ComputeCurrentSigning(
-					snapshot.Validator, wrapper,
+					snapshot.Validator, wrapper, consensus.Blockchain().Config().IsHIP32(newBlock.Epoch()),
 				)
 				lastBlockOfEpoch := shard.Schedule.EpochLastBlock(consensus.Beaconchain().CurrentBlock().Header().Epoch().Uint64())
 
