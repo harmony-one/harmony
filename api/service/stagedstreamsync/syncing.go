@@ -63,7 +63,7 @@ func CreateStagedSync(ctx context.Context,
 
 	isExplorer := nodeConfig.Role() == nodeconfig.ExplorerNode
 	isValidator := nodeConfig.Role() == nodeconfig.Validator
-	isBeaconShard := nodeConfig.GetShardID() == shard.BeaconChainShardID
+	isBeaconShard := bc.ShardID() == shard.BeaconChainShardID
 	isEpochChain := !isBeaconNode && isBeaconShard
 	isBeaconValidator := isBeaconShard && isValidator
 	joinConsensus := false
