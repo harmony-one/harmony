@@ -1123,9 +1123,10 @@ func New(
 	node.serviceManager = service.NewManager()
 
 	// delete old pending crosslinks
-	if node.Blockchain().ShardID() == shard.BeaconChainShardID {
-		ten := big.NewInt(10)
-		crossLinkEpochThreshold := new(big.Int).Sub(node.Blockchain().CurrentHeader().Epoch(), ten)
+	ten := big.NewInt(10)
+	epoch := node.Blockchain().CurrentHeader().Epoch()
+	if node.Blockchain().ShardID() == shard.BeaconChainShardID && node.Blockchain().Config().IsCrossLink(epoch) {
+		crossLinkEpochThreshold := new(big.Int).Sub(epoch, ten)
 
 		invalidToDelete := make([]types.CrossLink, 0, 1000)
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
