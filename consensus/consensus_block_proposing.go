@@ -154,6 +154,12 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 		invalidToDelete := []types.CrossLink{}
 		if err == nil {
 			for _, pending := range allPending {
+				if !consensus.Blockchain().Config().IsCrossLink(pending.Epoch()) {
+					invalidToDelete = append(invalidToDelete, pending)
+					utils.Logger().Debug().
+						AnErr("[ProposeNewBlock] pending crosslink that's before crosslink epoch", err)
+					continue
+				}
 				// ReadCrossLink beacon chain usage.
 				exist, err := consensus.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
 				if err == nil || exist != nil {
@@ -170,14 +176,11 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 				}
 				// if pending crosslink is older than the last crosslink, delete it and continue
 				if err == nil && exist == nil && last != nil && last.BlockNum() >= pending.BlockNum() {
+					// Crosslink is already verified before it's accepted to pending,
+					// no need to verify again in proposal.
 					invalidToDelete = append(invalidToDelete, pending)
-				}
-
-				// Crosslink is already verified before it's accepted to pending,
-				// no need to verify again in proposal.
-				if !consensus.Blockchain().Config().IsCrossLink(pending.Epoch()) {
 					utils.Logger().Debug().
-						AnErr("[ProposeNewBlock] pending crosslink that's before crosslink epoch", err)
+						AnErr("[ProposeNewBlock] pending crosslink is older than last shard crosslink", err)
 					continue
 				}
 

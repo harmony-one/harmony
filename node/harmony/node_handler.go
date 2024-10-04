@@ -236,15 +236,15 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 		return
 	}
 
-	var privToSing *bls.PrivateKeyWrapper
+	var privToSign *bls.PrivateKeyWrapper
 	for _, priv := range node.Consensus.GetPrivateKeys() {
 		if node.Consensus.IsValidatorInCommittee(priv.Pub.Bytes) {
-			privToSing = &priv
+			privToSign = &priv
 			break
 		}
 	}
 
-	if privToSing == nil {
+	if privToSign == nil {
 		return
 	}
 	instance := shard.Schedule.InstanceForEpoch(curBlock.Epoch())
@@ -253,13 +253,14 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get crosslinks")
 			continue
+		} else if lastLink == nil {
+			continue
 		}
-
 		hb := types.CrosslinkHeartbeat{
 			ShardID:                  lastLink.ShardID(),
 			LatestContinuousBlockNum: lastLink.BlockNum(),
 			Epoch:                    lastLink.Epoch().Uint64(),
-			PublicKey:                privToSing.Pub.Bytes[:],
+			PublicKey:                privToSign.Pub.Bytes[:],
 			Signature:                nil,
 		}
 
@@ -268,7 +269,7 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to encode signal")
 			continue
 		}
-		hb.Signature = privToSing.Pri.SignHash(rs).Serialize()
+		hb.Signature = privToSign.Pri.SignHash(rs).Serialize()
 		bts := proto_node.ConstructCrossLinkHeartBeatMessage(hb)
 		node.host.SendMessageToGroups(
 			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(shardID))},
