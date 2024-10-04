@@ -82,6 +82,9 @@ func getBlockByMaxVote(blocks []*types.Block) (*types.Block, error) {
 		if block == nil {
 			continue
 		}
+		if _, exist := hashesVote[block.Header().Hash()]; !exist {
+			hashesVote[block.Header().Hash()] = 0
+		}
 		hashesVote[block.Header().Hash()]++
 		if hashesVote[block.Header().Hash()] > maxVote {
 			maxVote = hashesVote[block.Header().Hash()]
