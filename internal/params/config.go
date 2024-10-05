@@ -69,8 +69,8 @@ var (
 		SlotsLimitedEpoch:                     big.NewInt(999),  // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch:         big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
 		AllowlistEpoch:                        EpochTBD,
-		LeaderRotationInternalValidatorsEpoch: EpochTBD,
-		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: big.NewInt(2151), // 2024-10-30 19:50 UTC
+		LeaderRotationExternalValidatorsEpoch: big.NewInt(2151), // 2024-10-30 19:50 UTC
 		FeeCollectEpoch:                       big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
@@ -79,6 +79,7 @@ var (
 		MaxRateEpoch:                          big.NewInt(1733), // 2023-12-17 12:20:15+00:00
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		HIP32Epoch:                            big.NewInt(2151), // 2024-10-30 19:50 UTC
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
