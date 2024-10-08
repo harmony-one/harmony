@@ -34,7 +34,7 @@ If you need to open another shell, just do:
 docker exec -it harmonyone/harmony /bin/bash
 ```
 
-We also provide a `docker-compose` file for local testing
+We also provide a `docker compose` file for local testing
 
 To use the container in kubernetes, you can use a configmap or secret to mount the `harmony.conf` into the container
 ```bash

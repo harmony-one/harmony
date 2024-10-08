@@ -16,7 +16,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
-	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
+	rpcV2 "github.com/harmony-one/harmony/rpc/harmony/v2"
 	"github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )

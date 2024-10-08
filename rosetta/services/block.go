@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy/tracers"
 
 	"github.com/harmony-one/harmony/core"
@@ -21,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta/common"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"

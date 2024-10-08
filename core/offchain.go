@@ -163,6 +163,11 @@ func (bc *BlockChainImpl) CommitOffChainData(
 					Uint64("blockNum", crossLink.BlockNum()).
 					Uint32("shardID", crossLink.ShardID()).
 					Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
+			} else {
+				utils.Logger().Debug().Err(err).
+					Uint64("blockNum", crossLink.BlockNum()).
+					Uint32("shardID", crossLink.ShardID()).
+					Msg("[insertChain/crosslinks] Cross Link failed to Add to Beaconchain")
 			}
 
 			cl0, _ := bc.ReadShardLastCrossLink(crossLink.ShardID())

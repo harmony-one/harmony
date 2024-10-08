@@ -202,7 +202,7 @@ func ProcessStateSync(syncConfig *SyncConfig, heights []uint64, bc core.BlockCha
 func processWithPayload(payload [][]byte, bc core.BlockChain) error {
 	decoded := make([]*types.Block, 0, len(payload))
 	for idx, blockBytes := range payload {
-		block, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
+		block, err := core.RlpDecodeBlockOrBlockWithSig(blockBytes)
 		if err != nil {
 			return errors.Wrap(err, "failed decode")
 		}

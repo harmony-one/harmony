@@ -11,7 +11,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
-	rpc2 "github.com/harmony-one/harmony/rpc"
+	rpc2 "github.com/harmony-one/harmony/rpc/harmony"
 	"github.com/pkg/errors"
 )
 

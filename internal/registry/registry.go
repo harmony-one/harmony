@@ -11,7 +11,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/node/worker"
+	"github.com/harmony-one/harmony/node/harmony/worker"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 )

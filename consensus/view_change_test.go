@@ -14,14 +14,13 @@ func TestBasicViewChanging(t *testing.T) {
 	_, _, consensus, _, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)
 
-	state := State{mode: Normal}
+	state := NewState(Normal)
 
 	// Change Mode
 	assert.Equal(t, state.mode, consensus.current.mode)
 	assert.Equal(t, state.Mode(), consensus.current.Mode())
 
 	consensus.current.SetMode(ViewChanging)
-	assert.Equal(t, ViewChanging, consensus.current.mode)
 	assert.Equal(t, ViewChanging, consensus.current.Mode())
 
 	// Change ViewID
@@ -114,7 +113,7 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 	consensus.Decider().UpdateParticipants(wrappedBLSKeys, []bls.PublicKeyWrapper{})
 	assert.Equal(t, keyCount, consensus.Decider().ParticipantsCount())
 
-	consensus.LeaderPubKey = &wrappedBLSKeys[0]
+	consensus.setLeaderPubKey(&wrappedBLSKeys[0])
 	nextKey := consensus.getNextLeaderKey(uint64(1), nil)
 
 	assert.Equal(t, nextKey, &wrappedBLSKeys[1])

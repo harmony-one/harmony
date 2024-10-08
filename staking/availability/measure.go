@@ -138,9 +138,7 @@ func IncrementValidatorSigningCounts(
 }
 
 // ComputeCurrentSigning returns (signed, toSign, quotient, error)
-func ComputeCurrentSigning(
-	snapshot, wrapper *staking.ValidatorWrapper,
-) *staking.Computed {
+func ComputeCurrentSigning(snapshot, wrapper *staking.ValidatorWrapper, isHip32 bool) *staking.Computed {
 	statsNow, snapSigned, snapToSign :=
 		wrapper.Counters,
 		snapshot.Counters.NumBlocksSigned,
@@ -155,6 +153,9 @@ func ComputeCurrentSigning(
 	)
 
 	if toSign.Cmp(common.Big0) == 0 {
+		if isHip32 {
+			computed.IsBelowThreshold = false
+		}
 		return computed
 	}
 
@@ -205,7 +206,7 @@ func ComputeAndMutateEPOSStatus(
 		return err
 	}
 
-	computed := ComputeCurrentSigning(snapshot.Validator, wrapper)
+	computed := ComputeCurrentSigning(snapshot.Validator, wrapper, bc.Config().IsHIP32(snapshot.Epoch))
 
 	utils.Logger().
 		Info().Msg("check if signing percent is meeting required threshold")

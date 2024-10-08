@@ -8,7 +8,7 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/harmony-one/harmony/rosetta/common"
-	commonRPC "github.com/harmony-one/harmony/rpc/common"
+	commonRPC "github.com/harmony-one/harmony/rpc/harmony/common"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 

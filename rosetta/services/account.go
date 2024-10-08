@@ -6,13 +6,13 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/eth/rpc"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 
 	hmyTypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"

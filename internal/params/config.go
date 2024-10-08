@@ -69,8 +69,8 @@ var (
 		SlotsLimitedEpoch:                     big.NewInt(999),  // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch:         big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
 		AllowlistEpoch:                        EpochTBD,
-		LeaderRotationInternalValidatorsEpoch: EpochTBD,
-		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		LeaderRotationInternalValidatorsEpoch: big.NewInt(2152), // 2024-10-31 13:02 UTC
+		LeaderRotationExternalValidatorsEpoch: big.NewInt(2152), // 2024-10-31 13:02 UTC
 		FeeCollectEpoch:                       big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
@@ -79,6 +79,7 @@ var (
 		MaxRateEpoch:                          big.NewInt(1733), // 2023-12-17 12:20:15+00:00
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		HIP32Epoch:                            big.NewInt(2152), // 2024-10-31 13:02 UTC
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -365,6 +366,7 @@ var (
 		big.NewInt(0),                      // MaxRateEpoch
 		big.NewInt(0),
 		big.NewInt(0),
+		big.NewInt(0),
 	}
 
 	// TestChainConfig ...
@@ -413,6 +415,7 @@ var (
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
+		big.NewInt(0),
 		big.NewInt(0),
 	}
 
@@ -589,6 +592,10 @@ type ChainConfig struct {
 
 	// TopMaxRateEpoch will make sure the validator max-rate is less to 100% for the cases where the minRate + the validator max-rate-increase > 100%
 	TopMaxRateEpoch *big.Int `json:"top-max-rate-epoch,omitempty"`
+
+	// vote power feature  https://github.com/harmony-one/harmony/pull/4683
+	// if crosslink are not sent for an entire epoch signed and toSign will be 0 and 0. when that happen, next epoch there will no shard 1 validator elected in the committee.
+	HIP32Epoch *big.Int `json:"hip32-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -842,6 +849,10 @@ func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsValidatorCodeFix(epoch *big.Int) bool {
 	return isForked(c.ValidatorCodeFixEpoch, epoch)
+}
+
+func (c *ChainConfig) IsHIP32(epoch *big.Int) bool {
+	return isForked(c.HIP32Epoch, epoch)
 }
 
 func (c *ChainConfig) IsHIP30(epoch *big.Int) bool {

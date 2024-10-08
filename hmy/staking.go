@@ -16,7 +16,7 @@ import (
 	"github.com/harmony-one/harmony/internal/chain"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
-	commonRPC "github.com/harmony-one/harmony/rpc/common"
+	commonRPC "github.com/harmony-one/harmony/rpc/harmony/common"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/availability"
@@ -353,7 +353,7 @@ func (hmy *Harmony) GetValidatorInformation(
 	}
 
 	computed := availability.ComputeCurrentSigning(
-		snapshot.Validator, wrapper,
+		snapshot.Validator, wrapper, bc.Config().IsHIP32(now),
 	)
 
 	lastBlockOfEpoch := shard.Schedule.EpochLastBlock(hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64())
@@ -479,7 +479,7 @@ func (hmy *Harmony) GetMedianRawStakeSnapshot() (
 			// Compute for next epoch
 			epoch := big.NewInt(0).Add(hmy.CurrentBlock().Epoch(), big.NewInt(1))
 			instance := shard.Schedule.InstanceForEpoch(epoch)
-			return committee.NewEPoSRound(epoch, hmy.BlockChain, hmy.BlockChain.Config().IsEPoSBound35(epoch), instance.SlotsLimit(), int(instance.NumShards()))
+			return committee.NewEPoSRound(epoch, hmy.BlockChain, instance.SlotsLimit(), int(instance.NumShards()))
 		},
 	)
 	if err != nil {
@@ -634,7 +634,7 @@ func (hmy *Harmony) GetTotalStakingSnapshot() *big.Int {
 		snapshot, _ := hmy.BlockChain.ReadValidatorSnapshot(candidates[i])
 		validator, _ := hmy.BlockChain.ReadValidatorInformation(candidates[i])
 		if !committee.IsEligibleForEPoSAuction(
-			snapshot, validator,
+			snapshot, validator, hmy.BlockChain.Config(),
 		) {
 			continue
 		}

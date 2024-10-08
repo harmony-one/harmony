@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -188,7 +189,7 @@ func TestComputeCurrentSigning(t *testing.T) {
 		snapWrapper := makeTestWrapper(common.Address{}, test.snapSigned, test.snapToSign)
 		curWrapper := makeTestWrapper(common.Address{}, test.curSigned, test.curToSign)
 
-		computed := ComputeCurrentSigning(&snapWrapper, &curWrapper)
+		computed := ComputeCurrentSigning(&snapWrapper, &curWrapper, false)
 
 		if computed.Signed.Cmp(new(big.Int).SetInt64(test.diffSigned)) != 0 {
 			t.Errorf("test %v: computed signed not expected: %v / %v",
@@ -204,7 +205,48 @@ func TestComputeCurrentSigning(t *testing.T) {
 				i, computed.Percentage, expPct)
 		}
 		if computed.IsBelowThreshold != test.isBelowThreshold {
-			t.Errorf("test %v: computed is below threshold not expected: %v / %v",
+			t.Errorf("test %v: computed is below threshold `%v` expected: `%v`",
+				i, computed.IsBelowThreshold, test.isBelowThreshold)
+		}
+	}
+}
+
+func TestComputeCurrentSigningHIP32(t *testing.T) {
+	tests := []struct {
+		snapSigned, curSigned, diffSigned int64
+		snapToSign, curToSign, diffToSign int64
+		pctNum, pctDiv                    int64
+		isBelowThreshold                  bool
+	}{
+		{0, 0, 0, 0, 0, 0, 0, 1, false},
+		{0, 1, 1, 0, 1, 1, 1, 1, false},
+		{0, 2, 2, 0, 3, 3, 2, 3, true},
+		{0, 1, 1, 0, 3, 3, 1, 3, true},
+		{100, 225, 125, 200, 350, 150, 5, 6, false},
+		{100, 200, 100, 200, 350, 150, 2, 3, true},
+		{100, 200, 100, 200, 400, 200, 1, 2, true},
+	}
+	for i, test := range tests {
+		snapWrapper := makeTestWrapper(common.Address{}, test.snapSigned, test.snapToSign)
+		curWrapper := makeTestWrapper(common.Address{}, test.curSigned, test.curToSign)
+
+		computed := ComputeCurrentSigning(&snapWrapper, &curWrapper, true)
+
+		if computed.Signed.Cmp(new(big.Int).SetInt64(test.diffSigned)) != 0 {
+			t.Errorf("test %v: computed signed not expected: %v / %v",
+				i, computed.Signed, test.diffSigned)
+		}
+		if computed.ToSign.Cmp(new(big.Int).SetInt64(test.diffToSign)) != 0 {
+			t.Errorf("test %v: computed to sign not expected: %v / %v",
+				i, computed.ToSign, test.diffToSign)
+		}
+		expPct := numeric.NewDec(test.pctNum).Quo(numeric.NewDec(test.pctDiv))
+		if !computed.Percentage.Equal(expPct) {
+			t.Errorf("test %v: computed percentage not expected: %v / %v",
+				i, computed.Percentage, expPct)
+		}
+		if computed.IsBelowThreshold != test.isBelowThreshold {
+			t.Errorf("test %v: computed is below threshold `%v`, expected: `%v`",
 				i, computed.IsBelowThreshold, test.isBelowThreshold)
 		}
 	}
@@ -628,16 +670,22 @@ func (state testStateDB) GetCode(addr common.Address, isValidatorCode bool) []by
 }
 
 // testReader is the fake Reader for testing
-type testReader map[common.Address]staking.ValidatorWrapper
+type testReader struct {
+	m      map[common.Address]staking.ValidatorWrapper
+	config *params.ChainConfig
+}
 
 // newTestReader creates an empty test reader
 func newTestReader() testReader {
-	reader := make(testReader)
-	return reader
+	m := make(map[common.Address]staking.ValidatorWrapper)
+	return testReader{
+		m:      m,
+		config: &params.ChainConfig{},
+	}
 }
 
 func (reader testReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error) {
-	wrapper, ok := reader[addr]
+	wrapper, ok := reader.m[addr]
 	if !ok {
 		return nil, errors.New("not a valid validator address")
 	}
@@ -646,8 +694,12 @@ func (reader testReader) ReadValidatorSnapshot(addr common.Address) (*staking.Va
 	}, nil
 }
 
+func (reader testReader) Config() *params.ChainConfig {
+	return reader.config
+}
+
 func (reader testReader) updateValidatorWrapper(addr common.Address, val *staking.ValidatorWrapper) {
-	reader[addr] = *val
+	reader.m[addr] = *val
 }
 
 func makeTestShardState(numShards, numSlots int) *shard.State {
@@ -724,6 +776,7 @@ func indexesToBitMap(idxs []int, n int) ([]byte, error) {
 	return res, nil
 }
 
+// makeTestWrapper makes test wrapper
 func makeTestWrapper(addr common.Address, numSigned, numToSign int64) staking.ValidatorWrapper {
 	var val staking.ValidatorWrapper
 	val.Address = addr

@@ -1,0 +1,25 @@
+services:
+  loki:
+    container_name: loki
+    image: grafana/loki:latest
+    ports:
+      - 3100:3100
+    volumes:
+      - ./loki-config.yml:/etc/loki/loki-config.yaml
+  promtail:
+    container_name: promtail
+    image: grafana/promtail:latest
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/promtail-config.yaml
+      - ${CURRENT_SESSION_LOGS}:/var/log/
+  grafana:
+    container_name: grafana
+    image: grafana/grafana
+    # DANGER: USE THIS TWO OPTIONS ONLY AGAINST LOCAL deploy
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    ports:
+      - 3000:3000
+    volumes:
+      - ./loki-datasource.yaml:/etc/grafana/provisioning/datasources/loki-datasource.yaml

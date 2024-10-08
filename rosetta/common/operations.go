@@ -8,7 +8,7 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 
-	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
+	rpcV2 "github.com/harmony-one/harmony/rpc/harmony/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 

@@ -3,6 +3,7 @@ package quorum
 import (
 	"fmt"
 	"math/big"
+	"sync/atomic"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -117,6 +118,7 @@ type Decider interface {
 	) (*votepower.Ballot, error)
 	IsQuorumAchieved(Phase) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
+	ComputeTotalPowerByMask(mask *bls_cosi.Mask) numeric.Dec
 	QuorumThreshold() numeric.Dec
 	IsAllSigsCollected() bool
 	ResetPrepareAndCommitVotes()
@@ -153,7 +155,8 @@ type cIdentities struct {
 	commit      *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
-	viewChange *votepower.Round
+	viewChange        *votepower.Round
+	participantsCount int64
 }
 
 func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
@@ -286,10 +289,11 @@ func (s *cIdentities) UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapp
 	}
 	s.publicKeys = pubKeys
 	s.keyIndexMap = keyIndexMap
+	atomic.StoreInt64(&s.participantsCount, int64(len(s.publicKeys)))
 }
 
 func (s *cIdentities) ParticipantsCount() int64 {
-	return int64(len(s.publicKeys))
+	return atomic.LoadInt64(&s.participantsCount)
 }
 
 func (s *cIdentities) SignersCount(p Phase) int64 {

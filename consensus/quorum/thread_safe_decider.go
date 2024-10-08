@@ -47,8 +47,6 @@ func (a threadSafeDeciderImpl) IndexOf(key bls.SerializedPublicKey) int {
 }
 
 func (a threadSafeDeciderImpl) ParticipantsCount() int64 {
-	a.mu.Lock()
-	defer a.mu.Unlock()
 	return a.decider.ParticipantsCount()
 }
 
@@ -170,4 +168,10 @@ func (a threadSafeDeciderImpl) IsQuorumAchieved(p Phase) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.decider.IsQuorumAchieved(p)
+}
+
+func (a threadSafeDeciderImpl) ComputeTotalPowerByMask(mask *bls.Mask) numeric.Dec {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.decider.ComputeTotalPowerByMask(mask)
 }
