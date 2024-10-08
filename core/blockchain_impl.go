@@ -2051,7 +2051,7 @@ func (b BadBlock) MarshalJSON() ([]byte, error) {
 }
 
 func (bc *BlockChainImpl) BadBlocks() []BadBlock {
-	blocks := make([]BadBlock, bc.badBlocks.Len())
+	blocks := make([]BadBlock, 0, bc.badBlocks.Len())
 	for _, hash := range bc.badBlocks.Keys() {
 		if blk, exist := bc.badBlocks.Peek(hash); exist {
 			blocks = append(blocks, blk.(BadBlock))

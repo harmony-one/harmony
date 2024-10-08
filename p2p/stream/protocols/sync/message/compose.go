@@ -353,7 +353,7 @@ func hashesToBytes(hashes []common.Hash) [][]byte {
 }
 
 func bytesToHashes(bs [][]byte) []common.Hash {
-	res := make([]common.Hash, len(bs))
+	res := make([]common.Hash, 0, len(bs))
 
 	for _, b := range bs {
 		var h common.Hash
