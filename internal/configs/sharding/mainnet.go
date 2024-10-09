@@ -194,8 +194,6 @@ func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	default:
 		firstBlock2s := ms.twoSecondsFirstBlock()
 		switch {
-		case params.MainnetChainConfig.IsOneSecond(big.NewInt(int64(epochNum))), params.MainnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
-			panic("verify")
 		case params.MainnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
 			return firstBlock2s - 1 + ms.BlocksPerEpoch()*(epochNum-params.MainnetChainConfig.TwoSecondsEpoch.Uint64()+1)
 		default: // genesis

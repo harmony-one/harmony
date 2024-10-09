@@ -588,22 +588,14 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 		return nil, nil, err
 	}
 
-	var (
-		payableSigners shard.SlotList
-		missing        shard.SlotList
+	startTimeLocal = time.Now()
+	payableSigners, missing, err := availability.BlockSigners(
+		cxLink.Bitmap(), subComm,
 	)
+	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (BlockSigners)")
 
-	if bc.Config().IsOneSecond(epoch) {
-		payableSigners = subComm.Slots
-	} else {
-		startTimeLocal = time.Now()
-		payableSigners, missing, err = availability.BlockSigners(
-			cxLink.Bitmap(), subComm,
-		)
-		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (BlockSigners)")
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "shard %d block %d reward error with bitmap %x", shardID, cxLink.BlockNum(), cxLink.Bitmap())
-		}
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "shard %d block %d reward error with bitmap %x", shardID, cxLink.BlockNum(), cxLink.Bitmap())
 	}
 
 	staked := subComm.StakedValidators()
