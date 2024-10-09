@@ -474,7 +474,7 @@ func (s *StagedStreamSync) canExecute(stage *Stage) bool {
 		shardID := s.bc.ShardID()
 		isBeaconValidator := s.isBeaconValidator
 		isShardChain := shardID != shard.BeaconChainShardID
-		isEpochChain := shardID == shard.BeaconChainShardID && !isBeaconValidator
+		isEpochChain := s.isEpochChain
 		switch stage.ChainExecutionMode {
 		case AllChainsExceptEpochChain:
 			if isEpochChain {

@@ -65,7 +65,7 @@ func CreateStagedSync(ctx context.Context,
 	isValidator := nodeConfig.Role() == nodeconfig.Validator
 	isBeaconShard := bc.ShardID() == shard.BeaconChainShardID
 	isEpochChain := !isBeaconNode && isBeaconShard
-	isBeaconValidator := isBeaconShard && isValidator
+	isBeaconValidator := isBeaconNode && isValidator
 	joinConsensus := false
 	switch nodeConfig.Role() {
 	case nodeconfig.Validator:
@@ -145,6 +145,7 @@ func CreateStagedSync(ctx context.Context,
 		Bool("joinConsensus", joinConsensus).
 		Bool("memdb", config.UseMemDB).
 		Str("dbDir", dbDir).
+		Str("SyncMode", config.SyncMode.String()).
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
 		Str("dbDir", dbDir).
