@@ -309,6 +309,7 @@ var (
 		AllowlistEpoch:                        EpochTBD,
 		LeaderRotationInternalValidatorsEpoch: big.NewInt(5),
 		LeaderRotationExternalValidatorsEpoch: big.NewInt(6),
+		LeaderRotationVRF:                     big.NewInt(6),
 		FeeCollectEpoch:                       big.NewInt(2),
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            EpochTBD,
@@ -357,6 +358,7 @@ var (
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
 		big.NewInt(1),                      // LeaderRotationExternalNonBeaconLeaders
+		big.NewInt(1),                      // VRF
 		big.NewInt(1),                      // LeaderRotationExternalBeaconLeaders
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
@@ -407,6 +409,7 @@ var (
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
 		big.NewInt(1),        // LeaderRotationExternalNonBeaconLeaders
+		big.NewInt(1),        // VRF
 		big.NewInt(1),        // LeaderRotationExternalBeaconLeaders
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
@@ -557,6 +560,8 @@ type ChainConfig struct {
 	AllowlistEpoch *big.Int
 
 	LeaderRotationInternalValidatorsEpoch *big.Int `json:"leader-rotation-internal-validators,omitempty"`
+
+	LeaderRotationVRF *big.Int `json:"leader-rotation-vrf,omitempty"`
 
 	LeaderRotationExternalValidatorsEpoch *big.Int `json:"leader-rotation-external-validators,omitempty"`
 
@@ -840,6 +845,9 @@ func (c *ChainConfig) IsBlockGas30M(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int) bool {
 	return isForked(c.LeaderRotationExternalValidatorsEpoch, epoch)
+}
+func (c *ChainConfig) IsLeaderRotationVRF(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationVRF, epoch)
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.
