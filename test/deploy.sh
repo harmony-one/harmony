@@ -54,7 +54,7 @@ function setup() {
 
 function launch_bootnode() {
   echo "launching boot node ..."
-  ${DRYRUN} ${ROOT}/bin/bootnode -port 19876 -rpc_http_port 8888 -rpc_ws_port 8889 -network "localnet" -max_conn_per_ip 100 -force_public true >"${log_folder}"/bootnode.log 2>&1 | tee -a "${LOG_FILE}" &
+  ${DRYRUN} ${ROOT}/bin/bootnode -port 19876 -max_conn_per_ip 100 -force_public true >"${log_folder}"/bootnode.log 2>&1 | tee -a "${LOG_FILE}" &
   sleep 1
   BN_MA=$(grep "BN_MA" "${log_folder}"/bootnode.log | awk -F\= ' { print $2 } ')
   echo "bootnode launched." + " $BN_MA"
@@ -63,8 +63,8 @@ function launch_bootnode() {
 function launch_localnet() {
   launch_bootnode
 
-  unset -v base_args sync_options
-  declare -a base_args args sync_options
+  unset -v base_args
+  declare -a base_args args
 
   if ${VERBOSE}; then
     verbosity=5

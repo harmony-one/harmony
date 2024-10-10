@@ -274,49 +274,51 @@ var (
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
 	LocalnetChainConfig = &ChainConfig{
-		ChainID:                               TestnetChainID,
-		EthCompatibleChainID:                  EthTestnetShard0ChainID,
-		EthCompatibleShard0ChainID:            EthTestnetShard0ChainID,
-		EthCompatibleEpoch:                    big.NewInt(0),
-		CrossTxEpoch:                          big.NewInt(0),
-		CrossLinkEpoch:                        big.NewInt(2),
-		AggregatedRewardEpoch:                 big.NewInt(3),
-		StakingEpoch:                          big.NewInt(2),
-		PreStakingEpoch:                       big.NewInt(0),
-		QuickUnlockEpoch:                      big.NewInt(0),
-		FiveSecondsEpoch:                      big.NewInt(0),
-		TwoSecondsEpoch:                       big.NewInt(0),
-		SixtyPercentEpoch:                     EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		RedelegationEpoch:                     big.NewInt(0),
-		NoEarlyUnlockEpoch:                    big.NewInt(0),
-		VRFEpoch:                              big.NewInt(0),
-		PrevVRFEpoch:                          big.NewInt(0),
-		MinDelegation100Epoch:                 big.NewInt(0),
-		MinCommissionRateEpoch:                big.NewInt(0),
-		MinCommissionPromoPeriod:              big.NewInt(10),
-		EPoSBound35Epoch:                      big.NewInt(0),
-		EIP155Epoch:                           big.NewInt(0),
-		S3Epoch:                               big.NewInt(0),
-		DataCopyFixEpoch:                      big.NewInt(0),
-		IstanbulEpoch:                         big.NewInt(0),
-		ReceiptLogEpoch:                       big.NewInt(0),
-		SHA3Epoch:                             big.NewInt(0),
-		HIP6And8Epoch:                         EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		StakingPrecompileEpoch:                big.NewInt(2),
-		ChainIdFixEpoch:                       big.NewInt(0),
-		SlotsLimitedEpoch:                     EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch:         big.NewInt(1),
-		AllowlistEpoch:                        EpochTBD,
-		LeaderRotationInternalValidatorsEpoch: big.NewInt(5),
-		LeaderRotationExternalValidatorsEpoch: big.NewInt(6),
-		FeeCollectEpoch:                       big.NewInt(2),
-		ValidatorCodeFixEpoch:                 big.NewInt(2),
-		HIP30Epoch:                            EpochTBD,
-		BlockGas30MEpoch:                      big.NewInt(0),
-		TopMaxRateEpoch:                       EpochTBD,
-		MaxRateEpoch:                          EpochTBD,
-		DevnetExternalEpoch:                   EpochTBD,
-		TestnetExternalEpoch:                  EpochTBD,
+		ChainID:                       TestnetChainID,
+		EthCompatibleChainID:          EthTestnetShard0ChainID,
+		EthCompatibleShard0ChainID:    EthTestnetShard0ChainID,
+		EthCompatibleEpoch:            big.NewInt(0),
+		CrossTxEpoch:                  big.NewInt(0),
+		CrossLinkEpoch:                big.NewInt(2),
+		AggregatedRewardEpoch:         big.NewInt(3),
+		StakingEpoch:                  big.NewInt(2),
+		PreStakingEpoch:               big.NewInt(0),
+		QuickUnlockEpoch:              big.NewInt(0),
+		FiveSecondsEpoch:              big.NewInt(0),
+		TwoSecondsEpoch:               big.NewInt(0),
+		SixtyPercentEpoch:             EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		RedelegationEpoch:             big.NewInt(0),
+		NoEarlyUnlockEpoch:            big.NewInt(0),
+		VRFEpoch:                      big.NewInt(0),
+		PrevVRFEpoch:                  big.NewInt(0),
+		MinDelegation100Epoch:         big.NewInt(0),
+		MinCommissionRateEpoch:        big.NewInt(0),
+		MinCommissionPromoPeriod:      big.NewInt(10),
+		EPoSBound35Epoch:              big.NewInt(0),
+		EIP155Epoch:                   big.NewInt(0),
+		S3Epoch:                       big.NewInt(0),
+		DataCopyFixEpoch:              big.NewInt(0),
+		IstanbulEpoch:                 big.NewInt(0),
+		ReceiptLogEpoch:               big.NewInt(0),
+		SHA3Epoch:                     big.NewInt(0),
+		HIP6And8Epoch:                 EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		StakingPrecompileEpoch:        big.NewInt(2),
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
+		//LeaderRotationInternalValidatorsEpoch: big.NewInt(2),
+		//LeaderRotationExternalValidatorsEpoch: big.NewInt(2),
+		FeeCollectEpoch:          big.NewInt(2),
+		ValidatorCodeFixEpoch:    big.NewInt(2),
+		HIP30Epoch:               EpochTBD,
+		BlockGas30MEpoch:         big.NewInt(0),
+		TopMaxRateEpoch:          EpochTBD,
+		MaxRateEpoch:             EpochTBD,
+		DevnetExternalEpoch:      EpochTBD,
+		TestnetExternalEpoch:     EpochTBD,
+		IsOneSecondEpoch:         big.NewInt(2),
+		IsRotationEachBlockEpoch: big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
@@ -364,6 +366,8 @@ var (
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // MaxRateEpoch
 		big.NewInt(0),                      // MaxRateEpoch
+		big.NewInt(0),
+		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
@@ -415,6 +419,8 @@ var (
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
+		big.NewInt(0),
+		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
 	}
@@ -596,6 +602,10 @@ type ChainConfig struct {
 	// vote power feature  https://github.com/harmony-one/harmony/pull/4683
 	// if crosslink are not sent for an entire epoch signed and toSign will be 0 and 0. when that happen, next epoch there will no shard 1 validator elected in the committee.
 	HIP32Epoch *big.Int `json:"hip32-epoch,omitempty"`
+
+	IsOneSecondEpoch *big.Int `json:"is-one-second-epoch,omitempty"`
+
+	IsRotationEachBlockEpoch *big.Int `json:"is-rotation-each-block-epoch"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -719,6 +729,10 @@ func (c *ChainConfig) IsFiveSeconds(epoch *big.Int) bool {
 // IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
 func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
 	return isForked(c.TwoSecondsEpoch, epoch)
+}
+
+func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
+	return isForked(c.IsOneSecondEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%
@@ -879,6 +893,10 @@ func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 // their balances over to shard 0 or 1.
 func (c *ChainConfig) IsOneEpochBeforeHIP30(epoch *big.Int) bool {
 	return new(big.Int).Sub(c.HIP30Epoch, epoch).Cmp(common.Big1) == 0
+}
+
+func (c *ChainConfig) IsRotationEachBlock(epoch *big.Int) bool {
+	return isForked(c.IsRotationEachBlockEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
