@@ -218,7 +218,7 @@ func (ch nonceChange) dirtied() *common.Address {
 }
 
 func (ch codeChange) revert(s *DB) {
-	s.getStateObject(*ch.account).setCode(common.BytesToHash(ch.prevhash), ch.prevcode, false)
+	s.getStateObject(*ch.account).setCode(common.BytesToHash(ch.prevhash), ch.prevcode)
 }
 
 func (ch codeChange) dirtied() *common.Address {
