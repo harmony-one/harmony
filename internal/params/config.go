@@ -309,16 +309,16 @@ var (
 		AllowlistEpoch:                EpochTBD,
 		//LeaderRotationInternalValidatorsEpoch: big.NewInt(2),
 		//LeaderRotationExternalValidatorsEpoch: big.NewInt(2),
-		FeeCollectEpoch:       big.NewInt(2),
-		ValidatorCodeFixEpoch: big.NewInt(2),
-		HIP30Epoch:            EpochTBD,
-		BlockGas30MEpoch:      big.NewInt(0),
-		TopMaxRateEpoch:       EpochTBD,
-		MaxRateEpoch:          EpochTBD,
-		DevnetExternalEpoch:   EpochTBD,
-		TestnetExternalEpoch:  EpochTBD,
-		IsOneSecondEpoch:      big.NewInt(2),
-		IsRotationEachBlockEpoch:              big.NewInt(3),
+		FeeCollectEpoch:          big.NewInt(2),
+		ValidatorCodeFixEpoch:    big.NewInt(2),
+		HIP30Epoch:               EpochTBD,
+		BlockGas30MEpoch:         big.NewInt(0),
+		TopMaxRateEpoch:          EpochTBD,
+		MaxRateEpoch:             EpochTBD,
+		DevnetExternalEpoch:      EpochTBD,
+		TestnetExternalEpoch:     EpochTBD,
+		IsOneSecondEpoch:         big.NewInt(2),
+		IsRotationEachBlockEpoch: big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
@@ -366,6 +366,7 @@ var (
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // MaxRateEpoch
 		big.NewInt(0),                      // MaxRateEpoch
+		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
@@ -418,6 +419,7 @@ var (
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
+		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
