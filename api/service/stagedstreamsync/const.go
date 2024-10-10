@@ -54,6 +54,18 @@ const (
 	SnapSync                 // Download the chain and the state via compact snapshots
 )
 
+func (sm SyncMode) String() string {
+	switch sm {
+	case FullSync:
+		return "Full Sync"
+	case FastSync:
+		return "Fast Sync"
+	case SnapSync:
+		return "Snap Sync"
+	}
+	return "unknown"
+}
+
 type (
 	// Config is the downloader config
 	Config struct {

@@ -897,7 +897,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 			InsertHook: node.BeaconSyncHook,
 		}
 	}
-	s := synchronize.NewService(host, blockchains, dConfig)
+	s := synchronize.NewService(host, blockchains, node.NodeConfig, dConfig)
 
 	node.RegisterService(service.Synchronize, s)
 
@@ -939,7 +939,7 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 		}
 	}
 	//Setup stream sync service
-	s := stagedstreamsync.NewService(host, blockchains, node.Consensus, sConfig, hc.General.DataDir)
+	s := stagedstreamsync.NewService(host, blockchains, node.NodeConfig, node.Consensus, sConfig, hc.General.DataDir)
 
 	node.RegisterService(service.StagedStreamSync, s)
 

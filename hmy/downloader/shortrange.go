@@ -43,7 +43,7 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		return 0, errors.Wrap(err, "prerequisite")
 	}
 	curBN := d.bc.CurrentBlock().NumberU64()
-	hashChain, whitelist, err := sh.getHashChain(sh.prepareBlockHashNumbers(curBN))
+	hashChain, whitelist, err := sh.getHashChain(sh.prepareBlockHashNumbers(curBN), true)
 	if err != nil {
 		return 0, errors.Wrap(err, "getHashChain")
 	}
@@ -150,7 +150,7 @@ type srHelper struct {
 	logger zerolog.Logger
 }
 
-func (sh *srHelper) getHashChain(bns []uint64) ([]common.Hash, []sttypes.StreamID, error) {
+func (sh *srHelper) getHashChain(bns []uint64, acceptPartially bool) ([]common.Hash, []sttypes.StreamID, error) {
 	results := newBlockHashResults(bns)
 
 	var wg sync.WaitGroup
@@ -160,7 +160,7 @@ func (sh *srHelper) getHashChain(bns []uint64) ([]common.Hash, []sttypes.StreamI
 		go func(index int) {
 			defer wg.Done()
 
-			hashes, stid, err := sh.doGetBlockHashesRequest(bns)
+			hashes, stid, err := sh.doGetBlockHashesRequest(bns, acceptPartially)
 			if err != nil {
 				sh.logger.Warn().Err(err).Str("StreamID", string(stid)).
 					Msg("doGetBlockHashes return error")
@@ -281,7 +281,7 @@ func (sh *srHelper) prepareBlockHashNumbers(curNumber uint64) []uint64 {
 	return res
 }
 
-func (sh *srHelper) doGetBlockHashesRequest(bns []uint64) ([]common.Hash, sttypes.StreamID, error) {
+func (sh *srHelper) doGetBlockHashesRequest(bns []uint64, acceptPartially bool) ([]common.Hash, sttypes.StreamID, error) {
 	ctx, cancel := context.WithTimeout(sh.ctx, 1*time.Second)
 	defer cancel()
 
@@ -290,7 +290,7 @@ func (sh *srHelper) doGetBlockHashesRequest(bns []uint64) ([]common.Hash, sttype
 		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg("failed to doGetBlockHashesRequest")
 		return nil, stid, err
 	}
-	if len(hashes) != len(bns) {
+	if !acceptPartially && len(hashes) != len(bns) {
 		err := errors.New("unexpected get block hashes result delivered")
 		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg("failed to doGetBlockHashesRequest")
 		sh.syncProtocol.RemoveStream(stid)

@@ -109,6 +109,7 @@ func (st *syncStream) deliverMsg(msg protobuf.Message) {
 	return
 }
 
+// handleReqLoop replies to incoming requests
 func (st *syncStream) handleReqLoop() {
 	for {
 		select {

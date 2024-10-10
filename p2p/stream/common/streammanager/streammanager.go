@@ -22,6 +22,10 @@ import (
 var (
 	// ErrStreamAlreadyRemoved is the error that a stream has already been removed
 	ErrStreamAlreadyRemoved = errors.New("stream already removed")
+	// ErrStreamAlreadyExist is the error that a stream has already exist
+	ErrStreamAlreadyExist = errors.New("stream already exist")
+	// ErrTooManyStreams is the error that the number of streams is exceeded the capacity
+	ErrTooManyStreams = errors.New("too many streams")
 )
 
 // streamManager is the implementation of StreamManager. It manages streams on
@@ -75,7 +79,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
 
 	// if it is a beacon node or shard node, print the peer id and proto id
-	if protoSpec.BeaconNode || protoSpec.ShardID != shard.BeaconChainShardID {
+	if protoSpec.IsBeaconValidator || protoSpec.ShardID != shard.BeaconChainShardID {
 		fmt.Println("My peer id: ", host.ID().String())
 		fmt.Println("My proto id: ", pid)
 	}
@@ -232,6 +236,9 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 	if err != nil {
 		return err
 	}
+	if sttypes.StreamID(sm.host.ID()) == st.ID() {
+		return fmt.Errorf("can't connect to itself")
+	}
 	if mySpec.Service != rmSpec.Service {
 		return fmt.Errorf("unexpected service: %v/%v", rmSpec.Service, mySpec.Service)
 	}
@@ -247,10 +254,10 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	id := st.ID()
 	if sm.streams.size() >= sm.config.HiCap {
-		return errors.New("too many streams")
+		return ErrTooManyStreams
 	}
 	if _, ok := sm.streams.get(id); ok {
-		return errors.New("stream already exist")
+		return ErrStreamAlreadyExist
 	}
 
 	sm.streams.addStream(st)
@@ -337,10 +344,12 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 }
 
 func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrInfo, error) {
+	numStreams := sm.streams.size()
+
 	protoID := sm.targetProtoID()
 	discBatch := sm.config.DiscBatch
-	if sm.config.HiCap-sm.streams.size() < sm.config.DiscBatch {
-		discBatch = sm.config.HiCap - sm.streams.size()
+	if sm.config.HiCap-numStreams < sm.config.DiscBatch {
+		discBatch = sm.config.HiCap - numStreams
 	}
 	if discBatch < 0 {
 		return nil, nil
@@ -357,7 +366,7 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 func (sm *streamManager) targetProtoID() string {
 	targetSpec := sm.myProtoSpec
 	if targetSpec.ShardID == shard.BeaconChainShardID { // for beacon chain, only connect to beacon nodes
-		targetSpec.BeaconNode = true
+		targetSpec.IsBeaconValidator = true
 	}
 	return string(targetSpec.ToProtoID())
 }
@@ -471,7 +480,7 @@ func (ss *streamSet) getStreams() []sttypes.Stream {
 	ss.lock.RLock()
 	defer ss.lock.RUnlock()
 
-	res := make([]sttypes.Stream, 0, len(ss.streams))
+	res := make([]sttypes.Stream, 0)
 	for _, st := range ss.streams {
 		res = append(res, st)
 	}

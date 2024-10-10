@@ -45,7 +45,7 @@ func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return nil
 	}
 
-	if sr.configs.bc.ShardID() != shard.BeaconChainShardID || s.state.isBeaconNode {
+	if !s.state.isEpochChain {
 		return nil
 	}
 
@@ -57,7 +57,7 @@ func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return err
 	}
 	if n > 0 {
-		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("epoch sync short range blocks inserted successfully")
+		utils.Logger().Info().Int("blocks inserted", n).Msg("epoch sync short range blocks inserted successfully")
 	}
 	useInternalTx := tx == nil
 	if useInternalTx {
@@ -123,7 +123,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, nil
 		}
-		return 0, errors.Wrap(err, "getHashChain")
+		return 0, errors.Wrap(err, "getBlocksChain")
 	}
 	if len(blocks) == 0 {
 		// short circuit for no sync is needed
@@ -138,12 +138,13 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		case err != nil:
 			utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
 			sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
+			numBlocksInsertedEpochSyncHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 			return n, err
 		default:
 		}
 		n++
 	}
-	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
+	numBlocksInsertedEpochSyncHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	return n, nil
 }
 

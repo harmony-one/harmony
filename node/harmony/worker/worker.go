@@ -569,7 +569,7 @@ func (w *Worker) FinalizeNewBlock(
 	// Put shard state into header
 	if shardState != nil && len(shardState.Shards) != 0 {
 		//we store shardstatehash in header only before prestaking epoch (header v0,v1,v2)
-		if !w.config.IsPreStaking(w.current.header.Epoch()) {
+		if !w.config.IsPreStaking(w.current.header.Epoch()) && !w.config.IsStaking(w.current.header.Epoch()) {
 			w.current.header.SetShardStateHash(shardState.Hash())
 		}
 		isStaking := false
