@@ -897,7 +897,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 			InsertHook: node.BeaconSyncHook,
 		}
 	}
-	s := synchronize.NewService(host, blockchains, dConfig)
+	s := synchronize.NewService(host, blockchains, node.NodeConfig, dConfig)
 
 	node.RegisterService(service.Synchronize, s)
 

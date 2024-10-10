@@ -59,13 +59,14 @@ type (
 
 	// Config is the sync protocol config
 	Config struct {
-		Chain       engine.ChainReader
-		Host        libp2p_host.Host
-		Discovery   discovery.Discovery
-		ShardID     nodeconfig.ShardID
-		Network     nodeconfig.NetworkType
-		isValidator bool
-		isExplorer  bool
+		Chain      engine.ChainReader
+		Host       libp2p_host.Host
+		Discovery  discovery.Discovery
+		ShardID    nodeconfig.ShardID
+		Network    nodeconfig.NetworkType
+		BeaconNode bool
+		Validator  bool
+		Explorer   bool
 
 		MaxAdvertiseWaitTime int
 		// stream manager config
@@ -111,7 +112,7 @@ func (p *Protocol) Start() {
 	p.rm.Start()
 	p.rl.Start()
 	// If it's not EpochChain, advertise
-	if p.config.isValidator || p.chain.ShardID() != shard.BeaconChainShardID {
+	if p.config.BeaconNode || p.chain.ShardID() != shard.BeaconChainShardID {
 		go p.advertiseLoop()
 	}
 }
@@ -147,17 +148,17 @@ func (p *Protocol) Version() *version.Version {
 
 // IsBeaconValidator returns true if it is a beacon chain validator
 func (p *Protocol) IsBeaconValidator() bool {
-	return p.config.ShardID == shard.BeaconChainShardID && p.config.isValidator
+	return p.config.BeaconNode && p.config.Validator
 }
 
 // IsValidator returns true if it is a validator node
 func (p *Protocol) IsValidator() bool {
-	return p.config.isValidator
+	return p.config.Validator
 }
 
 // IsExplorer returns true if it is an explorer node
 func (p *Protocol) IsExplorer() bool {
-	return p.config.isExplorer
+	return p.config.Explorer
 }
 
 // Match checks the compatibility to the target protocol ID.
@@ -261,7 +262,7 @@ func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 		NetworkType:       p.config.Network,
 		ShardID:           p.config.ShardID,
 		Version:           v,
-		IsBeaconValidator: p.config.isValidator && p.config.ShardID == shard.BeaconChainShardID,
+		IsBeaconValidator: p.config.Validator && p.config.BeaconNode,
 	}
 	return spec.ToProtoID()
 }
