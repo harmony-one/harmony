@@ -274,7 +274,7 @@ func (d *Downloader) loop() {
 			// We check distanceBeforeSync to handle cases where the previous sync covered a long distance.
 			// In such cases, it’s likely that new blocks were added to other nodes during the sync process,
 			// so the node should remain in long-range mode to catch up with those blocks.
-			if initSync && estimatedHeight > 0 && addedBN > 0 {
+			if initSync && addedBN > 0 {
 				bnAfterSync := d.bc.CurrentBlock().NumberU64()
 				distanceBeforeSync := estimatedHeight - bnBeforeSync
 				distanceAfterSync := estimatedHeight - bnAfterSync
