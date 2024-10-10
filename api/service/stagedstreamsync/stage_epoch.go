@@ -57,7 +57,7 @@ func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return err
 	}
 	if n > 0 {
-		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("epoch sync short range blocks inserted successfully")
+		utils.Logger().Info().Int("blocks inserted", n).Msg("epoch sync short range blocks inserted successfully")
 	}
 	useInternalTx := tx == nil
 	if useInternalTx {

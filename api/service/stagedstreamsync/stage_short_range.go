@@ -56,7 +56,7 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 		return err
 	}
 	if n > 0 {
-		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("short range blocks inserted successfully")
+		utils.Logger().Info().Int("blocks inserted", n).Msg("short range blocks inserted successfully")
 	}
 
 	useInternalTx := tx == nil
