@@ -269,24 +269,22 @@ func (d *Downloader) loop() {
 					d.bh.insertSync()
 				}
 			}
-			// if last doSync needed only to add a few blocks less than LastMileBlocksThreshold and
-			// the node is fully synced now, then switch to short range
-			// the reason why we need to check distanceBeforeSync is because, if it was long distance,
-			// very likely, there are a couple of new blocks have been added to the other nodes which
-			// we should still stay in long range and check them.
-			if initSync {
+			// If the last sync operation only a few blocks (less than LastMileBlocksThreshold)
+			// and the node is now fully synced, switch to short-range syncing.
+			// We check distanceBeforeSync to handle cases where the previous sync covered a long distance.
+			// In such cases, it’s likely that new blocks were added to other nodes during the sync process,
+			// so the node should remain in long-range mode to catch up with those blocks.
+			if initSync && estimatedHeight > 0 && addedBN > 0 {
 				bnAfterSync := d.bc.CurrentBlock().NumberU64()
 				distanceBeforeSync := estimatedHeight - bnBeforeSync
 				distanceAfterSync := estimatedHeight - bnAfterSync
-				if distanceBeforeSync > uint64(LastMileBlocksThreshold) {
-					if distanceAfterSync <= uint64(LastMileBlocksThreshold) {
-						initSync = false
-					}
-				} else {
+				// If after completing a full sync cycle, the node is still within the last mile block range,
+				// switch to short-range sync.
+				if distanceBeforeSync <= uint64(LastMileBlocksThreshold) &&
+					distanceAfterSync <= uint64(LastMileBlocksThreshold) {
 					initSync = false
 				}
 			}
-
 		case <-d.closeC:
 			return
 		}
