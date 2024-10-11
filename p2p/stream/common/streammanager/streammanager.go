@@ -167,6 +167,7 @@ func (sm *streamManager) loop() {
 			rmStream.errC <- err
 
 		case stop := <-sm.stopCh:
+			sm.coolDown.Set() // to immediately block discoveries
 			if discCancel != nil {
 				discCancel()
 			}
