@@ -68,14 +68,19 @@ func (st *syncStream) run() {
 // readMsgLoop is the loop
 func (st *syncStream) readMsgLoop() {
 	for {
-		msg, err := st.readMsg()
-		if err != nil {
-			if err := st.Close(); err != nil {
-				st.logger.Err(err).Msg("failed to close sync stream")
-			}
+		select {
+		case <-st.closeC:
 			return
+		default:
+			msg, err := st.readMsg()
+			if err != nil {
+				if err := st.Close(); err != nil {
+					st.logger.Err(err).Msg("failed to close sync stream")
+				}
+				return
+			}
+			st.deliverMsg(msg)
 		}
-		st.deliverMsg(msg)
 	}
 }
 
