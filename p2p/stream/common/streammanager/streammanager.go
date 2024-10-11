@@ -299,7 +299,8 @@ func (sm *streamManager) removeAllStreamOnClose() {
 			defer wg.Done()
 			err := st.CloseOnExit()
 			if err != nil {
-				sm.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
+				sm.logger.Warn().Err(err).
+					Interface("stream ID", st.ID()).
 					Msg("failed to close stream")
 			}
 		}(st)
@@ -336,7 +337,9 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
 			if err != nil {
 				sm.coolDownCache.Add(pid)
-				sm.logger.Warn().Err(err).Str("peerID", string(pid)).Msg("failed to setup stream with peer")
+				sm.logger.Warn().Err(err).
+					Interface("peerID", pid).
+					Msg("failed to setup stream with peer")
 				return
 			}
 		}(peer.ID)
