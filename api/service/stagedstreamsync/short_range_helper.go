@@ -23,10 +23,15 @@ type srHelper struct {
 func (sh *srHelper) getHashChain(ctx context.Context, bns []uint64) ([]common.Hash, []sttypes.StreamID, error) {
 	results := newBlockHashResults(bns)
 
-	var wg sync.WaitGroup
-	wg.Add(sh.config.Concurrency)
+	concurrency := sh.config.Concurrency
+	if concurrency > sh.syncProtocol.NumStreams() {
+		concurrency = sh.syncProtocol.NumStreams()
+	}
 
-	for i := 0; i != sh.config.Concurrency; i++ {
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+
+	for i := 0; i != concurrency; i++ {
 		go func(index int) {
 			defer wg.Done()
 
@@ -70,8 +75,8 @@ func (sh *srHelper) getBlocksByHashes(ctx context.Context, hashes []common.Hash,
 	)
 
 	concurrency := sh.config.Concurrency
-	if concurrency > m.numRequests() {
-		concurrency = m.numRequests()
+	if concurrency > sh.syncProtocol.NumStreams() {
+		concurrency = sh.syncProtocol.NumStreams()
 	}
 
 	wg.Add(concurrency)
