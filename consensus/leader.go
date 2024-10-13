@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"time"
+
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
@@ -293,18 +295,17 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
-		if consensus.Blockchain().Config().IsOneSecond(currentHeader.Epoch()) {
-			//if !blockObj.IsLastBlockInEpoch() {
+		if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems
-			network, _ := consensus.preCommitAndPropose1s(blockObj)
-			//}
-			go consensus.finalCommit1s(consensus.isLeader(), viewID, consensus.NextBlockDue, network)
+			consensus.preCommitAndPropose(blockObj)
+		}
+		// is one second
+		if consensus.Blockchain().Config().IsOneSecond(currentHeader.Epoch()) {
+			waitTime := 0 * time.Millisecond
+			go consensus.finalCommit(consensus.isLeader(), viewID, waitTime, consensus.NextBlockDue)
 		} else {
-			if !blockObj.IsLastBlockInEpoch() {
-				// only do early commit if it's not epoch block to avoid problems
-				consensus.preCommitAndPropose(blockObj)
-			}
-			go consensus.finalCommit(consensus.isLeader(), viewID)
+			waitTime := 1000 * time.Millisecond
+			go consensus.finalCommit(consensus.isLeader(), viewID, waitTime, consensus.NextBlockDue)
 		}
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
