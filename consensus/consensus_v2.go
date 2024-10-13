@@ -863,30 +863,6 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	return nil
 }
 
-func (consensus *Consensus) commitBlock1s(blk *types.Block, committedMsg *FBFTMessage) error {
-	//if consensus.Blockchain().CurrentBlock().NumberU64() < blk.NumberU64() {
-	//	_, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.fBFTLog.IsBlockVerified(blk.Hash()))
-	//	if err != nil && !errors.Is(err, core.ErrKnownBlock) {
-	//		consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
-	//		return err
-	//	}
-	//}
-
-	if !committedMsg.HasSingleSender() {
-		consensus.getLogger().Error().Msg("[TryCatchup] Leader message can not have multiple sender keys")
-		return errIncorrectSender
-	}
-
-	consensus.FinishFinalityCount()
-	consensus.PostConsensusProcessing(blk)
-	consensus.setupForNewConsensus(blk, committedMsg)
-	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
-		Str("hash", blk.Header().Hash().Hex()).
-		Msg("Added New Block to Blockchain!!!")
-
-	return nil
-}
-
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicKeyWrapper) *bls.PublicKeyWrapper {
