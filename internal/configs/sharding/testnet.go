@@ -99,7 +99,7 @@ func (ts testnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	firstBlock2s := params.TestnetChainConfig.TwoSecondsEpoch.Uint64() * ts.BlocksPerEpochOld()
 
 	switch {
-	case params.TestnetChainConfig.IsOneSecond(big.NewInt(int64(epochNum))), params.TestnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
+	case params.TestnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
 		return firstBlock2s - 1 + ts.BlocksPerEpoch()*(epochNum-params.TestnetChainConfig.TwoSecondsEpoch.Uint64()+1)
 	default: // genesis
 		return ts.BlocksPerEpochOld()*(epochNum+1) - 1
