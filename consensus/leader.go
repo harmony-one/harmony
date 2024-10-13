@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"time"
+
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
