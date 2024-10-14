@@ -73,7 +73,7 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		return nil
 	}
 	currProgress := currentHead
-	targetHeight := s.state.currentCycle.TargetHeight
+	targetHeight := s.state.currentCycle.GetTargetHeight()
 	if currProgress >= targetHeight {
 		return nil
 	}

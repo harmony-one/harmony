@@ -78,7 +78,7 @@ func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		return nil
 	}
 	currProgress := uint64(0)
-	targetHeight := s.state.currentCycle.TargetHeight
+	targetHeight := s.state.currentCycle.GetTargetHeight()
 
 	if errV := CreateView(ctx, r.configs.db, tx, func(etx kv.Tx) error {
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {

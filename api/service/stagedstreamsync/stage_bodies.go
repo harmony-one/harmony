@@ -74,7 +74,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return nil
 	}
 	currProgress := uint64(0)
-	targetHeight := s.state.currentCycle.TargetHeight
+	targetHeight := s.state.currentCycle.GetTargetHeight()
 
 	if useInternalTx {
 		var err error
