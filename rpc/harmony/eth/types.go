@@ -152,6 +152,7 @@ func NewReceipt(senderAddr common.Address, tx *types.EthTransaction, blockHash c
 		"contractAddress":   nil,
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
+		"effectiveGasPrice": new(big.Int).Set(receipt.EffectiveGasPrice),
 	}
 
 	// Assign receipt status or post state.
