@@ -347,7 +347,7 @@ func New(
 		logPrefixes[i] = fmt.Sprintf("%d/%d %s", i+1, len(stagesList), stagesList[i].ID)
 	}
 
-	status := newStatus()
+	status := NewStatus()
 
 	return &StagedStreamSync{
 		bc:                bc,
@@ -362,7 +362,7 @@ func New(
 		joinConsensus:     joinConsensus,
 		lastMileBlocks:    []*types.Block{},
 		gbm:               nil,
-		status:            &status,
+		status:            status,
 		inserted:          0,
 		config:            config,
 		logger:            logger,
