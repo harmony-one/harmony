@@ -12,7 +12,7 @@ type (
 		bns     []uint64
 		results []map[sttypes.StreamID]common.Hash
 
-		lock sync.Mutex
+		lock sync.RWMutex
 	}
 )
 
@@ -40,6 +40,9 @@ func (res *blockHashResults) addResult(hashes []common.Hash, stid sttypes.Stream
 }
 
 func (res *blockHashResults) computeLongestHashChain() ([]common.Hash, []sttypes.StreamID) {
+	res.lock.RLock()
+	defer res.lock.RUnlock()
+
 	var (
 		whitelist map[sttypes.StreamID]struct{}
 		hashChain []common.Hash
@@ -68,8 +71,8 @@ func (res *blockHashResults) computeLongestHashChain() ([]common.Hash, []sttypes
 }
 
 func (res *blockHashResults) numBlocksWithResults() int {
-	res.lock.Lock()
-	defer res.lock.Unlock()
+	res.lock.RLock()
+	defer res.lock.RUnlock()
 
 	cnt := 0
 	for _, result := range res.results {
