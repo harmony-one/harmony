@@ -3,6 +3,7 @@ package stagedstreamsync
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -14,7 +15,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
-	"github.com/harmony-one/harmony/p2p/stream/protocols/sync"
+	streamSyncProtocol "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -34,6 +35,8 @@ type (
 
 		config Config
 		logger zerolog.Logger
+
+		lock sync.Mutex
 	}
 )
 
@@ -41,7 +44,7 @@ type (
 func NewDownloader(host p2p.Host, bc core.BlockChain, nodeConfig *nodeconfig.ConfigType, consensus *consensus.Consensus, dbDir string, isBeaconNode bool, config Config) *Downloader {
 	config.fixValues()
 
-	sp := sync.NewProtocol(sync.Config{
+	sp := streamSyncProtocol.NewProtocol(streamSyncProtocol.Config{
 		Chain:                bc,
 		Host:                 host.GetP2PHost(),
 		Discovery:            host.GetDiscovery(),
@@ -84,7 +87,7 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, nodeConfig *nodeconfig.Con
 		bh:                 bh,
 		stagedSyncInstance: stagedSyncInstance,
 
-		downloadC: make(chan struct{}),
+		downloadC: make(chan struct{}, 1), // It's buffered to avoid missed signals
 		closeC:    make(chan struct{}),
 		ctx:       ctx,
 		cancel:    cancel,
@@ -108,7 +111,17 @@ func (d *Downloader) Start() {
 
 // Close closes the downloader
 func (d *Downloader) Close() {
-	close(d.closeC)
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	select {
+	case <-d.closeC:
+		// Already closed
+		return
+	default:
+		close(d.closeC)
+	}
+
 	d.cancel()
 
 	if d.bh != nil {
@@ -121,8 +134,9 @@ func (d *Downloader) DownloadAsync() {
 	select {
 	case d.downloadC <- struct{}{}:
 		consensusTriggeredDownloadCounterVec.With(d.promLabels()).Inc()
-
-	case <-time.After(100 * time.Millisecond):
+	case <-d.closeC:
+		// Do not send if closed
+	default:
 	}
 }
 
@@ -211,7 +225,8 @@ func (d *Downloader) loop() {
 	trigger := func() {
 		select {
 		case d.downloadC <- struct{}{}:
-		case <-time.After(100 * time.Millisecond):
+		case <-d.closeC:
+		default:
 		}
 	}
 	go trigger()
@@ -289,5 +304,4 @@ func (d *Downloader) loop() {
 			return
 		}
 	}
-
 }
