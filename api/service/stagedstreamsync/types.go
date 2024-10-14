@@ -155,7 +155,7 @@ type getBlocksResult struct {
 
 type resultQueue struct {
 	results *priorityQueue
-	lock    sync.Mutex
+	lock    sync.RWMutex
 }
 
 func newResultQueue() *resultQueue {
@@ -181,11 +181,10 @@ func (rq *resultQueue) addBlockResults(blocks []*types.Block, stid sttypes.Strea
 			stid:  stid,
 		})
 	}
-	return
 }
 
-// popBlockResults pop a continuous list of blocks starting at expStartBN with capped size.
-// Return the stale block numbers as the second return value
+// popBlockResults pops a continuous list of blocks starting at expStartBN with capped size.
+// Returns the stale block numbers as the second return value.
 func (rq *resultQueue) popBlockResults(expStartBN uint64, cap int) ([]*blockResult, []uint64) {
 	rq.lock.Lock()
 	defer rq.lock.Unlock()
@@ -212,30 +211,28 @@ func (rq *resultQueue) popBlockResults(expStartBN uint64, cap int) ([]*blockResu
 	return res, stales
 }
 
-// removeResultsByStreamID removes the block results of the given stream, returns the block
-// number removed from the queue
+// removeResultsByStreamID removes the block results of the given stream,
+// returns the block numbers removed from the queue
 func (rq *resultQueue) removeResultsByStreamID(stid sttypes.StreamID) []uint64 {
 	rq.lock.Lock()
 	defer rq.lock.Unlock()
 
 	var removed []uint64
 
-Loop:
-	for {
-		for i, res := range *rq.results {
-			blockRes := res.(*blockResult)
-			if blockRes.stid == stid {
-				rq.removeByIndex(i)
-				removed = append(removed, blockRes.block.NumberU64())
-				goto Loop
-			}
+	for i := 0; i < rq.results.Len(); i++ {
+		blockRes := (*rq.results)[i].(*blockResult)
+		if blockRes.stid == stid {
+			rq.removeByIndex(i)
+			removed = append(removed, blockRes.block.NumberU64())
+			i-- // Adjust index after removal
 		}
-		break
 	}
 	return removed
 }
 
 func (rq *resultQueue) length() int {
+	rq.lock.RLock()
+	defer rq.lock.RUnlock()
 	return len(*rq.results)
 }
 
