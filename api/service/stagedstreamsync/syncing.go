@@ -447,7 +447,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 	startTime := time.Now()
 
 	// Do one cycle of staged sync
-	initialCycle := s.currentCycle.Number == 0
+	initialCycle := s.currentCycle.GetBlockNumber() == 0
 	if err := s.Run(ctx, s.DB(), tx, initialCycle); err != nil {
 		utils.Logger().Error().
 			Err(err).
@@ -460,9 +460,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 
 	totalInserted += s.inserted
 
-	s.currentCycle.lock.Lock()
-	s.currentCycle.Number++
-	s.currentCycle.lock.Unlock()
+	s.currentCycle.AddBlockNumber(1)
 
 	// calculating sync speed (blocks/second)
 	if s.LogProgress && s.inserted > 0 {
