@@ -307,7 +307,7 @@ func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint6
 					return block, FastSync, err
 				}
 			}
-			s.status.pivotBlock = block
+			s.status.SetPivotBlock(block)
 			s.logger.Info().
 				Uint64("estimatedHeight", estimatedHeight).
 				Uint64("pivot number", pivotBlockNumber).
@@ -339,7 +339,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		} else {
 			estimatedHeight = h
 			//TODO: use directly currentCycle var
-			s.status.setTargetBN(estimatedHeight)
+			s.status.SetTargetBN(estimatedHeight)
 		}
 		if curBN := s.CurrentBlockNumber(); estimatedHeight <= curBN {
 			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
@@ -354,8 +354,8 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		s.logger.Error().Err(err).Msg(WrapStagedSyncMsg("check pivot failed"))
 		return 0, 0, err
 	} else {
-		s.status.cycleSyncMode = cycleSyncMode
-		s.status.pivotBlock = pivotBlock
+		s.status.SetCycleSyncMode(cycleSyncMode)
+		s.status.SetPivotBlock(pivotBlock)
 	}
 
 	s.startSyncing()
@@ -477,14 +477,14 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 }
 
 func (s *StagedStreamSync) startSyncing() {
-	s.status.startSyncing()
+	s.status.StartSyncing()
 	if s.evtDownloadStartedSubscribed {
 		s.evtDownloadStarted.Send(struct{}{})
 	}
 }
 
 func (s *StagedStreamSync) finishSyncing() {
-	s.status.finishSyncing()
+	s.status.FinishSyncing()
 	if s.evtDownloadFinishedSubscribed {
 		s.evtDownloadFinished.Send(struct{}{})
 	}
@@ -496,11 +496,11 @@ func (s *StagedStreamSync) checkPrerequisites() error {
 
 func (s *StagedStreamSync) CurrentBlockNumber() uint64 {
 	// if current head is ahead of pivot block, return chain head regardless of sync mode
-	if s.status.pivotBlock != nil && s.bc.CurrentBlock().NumberU64() >= s.status.pivotBlock.NumberU64() {
+	if s.status.HasPivotBlock() && s.bc.CurrentBlock().NumberU64() >= s.status.GetPivotBlockNumber() {
 		return s.bc.CurrentBlock().NumberU64()
 	}
 
-	if s.status.pivotBlock != nil && s.bc.CurrentFastBlock().NumberU64() >= s.status.pivotBlock.NumberU64() {
+	if s.status.HasPivotBlock() && s.bc.CurrentFastBlock().NumberU64() >= s.status.GetPivotBlockNumber() {
 		return s.bc.CurrentFastBlock().NumberU64()
 	}
 
@@ -521,7 +521,7 @@ func (s *StagedStreamSync) stateSyncStage() bool {
 	case FullSync:
 		return false
 	case FastSync:
-		return s.status.pivotBlock != nil && s.bc.CurrentFastBlock().NumberU64() == s.status.pivotBlock.NumberU64()-1
+		return s.status.HasPivotBlock() && s.bc.CurrentFastBlock().NumberU64() == s.status.GetPivotBlockNumber()-1
 	case SnapSync:
 		return false
 	}

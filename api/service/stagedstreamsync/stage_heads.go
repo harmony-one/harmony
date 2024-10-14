@@ -51,7 +51,7 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 		defer tx.Rollback()
 	}
 
-	maxHeight := s.state.status.targetBN
+	maxHeight := s.state.status.GetTargetBN()
 	maxBlocksPerSyncCycle := uint64(1024) // TODO: should be in config -> s.state.MaxBlocksPerSyncCycle
 	currentHeight := s.state.CurrentBlockNumber()
 	s.state.currentCycle.SetTargetHeight(maxHeight)
@@ -90,10 +90,10 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 	}
 
 	// check pivot: if chain hasn't reached to pivot yet
-	if s.state.status.cycleSyncMode != FullSync && s.state.status.pivotBlock != nil {
+	if !s.state.status.IsFullSyncCycle() && s.state.status.HasPivotBlock() {
 		// set target height on the pivot block
-		if !s.state.status.statesSynced && targetHeight > s.state.status.pivotBlock.NumberU64() {
-			targetHeight = s.state.status.pivotBlock.NumberU64()
+		if !s.state.status.IsStatesSynced() && targetHeight > s.state.status.GetPivotBlockNumber() {
+			targetHeight = s.state.status.GetPivotBlockNumber()
 		}
 	}
 

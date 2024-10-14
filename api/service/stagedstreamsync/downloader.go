@@ -133,7 +133,7 @@ func (d *Downloader) NumPeers() int {
 
 // SyncStatus returns the current sync status
 func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
-	syncing, target := d.stagedSyncInstance.status.get()
+	syncing, target := d.stagedSyncInstance.status.Get()
 	if !syncing {
 		target = d.bc.CurrentBlock().NumberU64()
 	}

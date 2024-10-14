@@ -68,7 +68,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return nil
 	}
 
-	maxHeight := s.state.status.targetBN
+	maxHeight := s.state.status.GetTargetBN()
 	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil

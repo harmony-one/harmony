@@ -52,7 +52,7 @@ func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, con
 func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	// only execute this stage in fast/snap sync mode
-	if s.state.status.cycleSyncMode == FullSync {
+	if s.state.status.IsFullSyncCycle() {
 		return nil
 	}
 
@@ -72,7 +72,7 @@ func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		return nil
 	}
 
-	maxHeight := s.state.status.targetBN
+	maxHeight := s.state.status.GetTargetBN()
 	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil

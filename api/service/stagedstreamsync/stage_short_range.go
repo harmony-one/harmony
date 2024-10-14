@@ -124,7 +124,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 		Interface("hashChain", hashChain).
 		Msg("short range start syncing")
 
-	s.state.status.setTargetBN(expEndBN)
+	s.state.status.SetTargetBN(expEndBN)
 
 	blocks, stids, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
