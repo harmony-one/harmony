@@ -66,9 +66,9 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 	}
 
 	// only execute this stage in fast/snap sync mode and once we reach to pivot
-	if s.state.status.pivotBlock == nil ||
-		s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64() ||
-		s.state.status.statesSynced {
+	if s.state.status.GetPivotBlock() == nil ||
+		s.state.CurrentBlockNumber() != s.state.status.GetPivotBlockNumber() ||
+		s.state.status.IsStatesSynced() {
 		return nil
 	}
 
@@ -122,16 +122,16 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 	wg.Wait()
 
 	// insert block
-	if err := sss.configs.bc.WriteHeadBlock(s.state.status.pivotBlock); err != nil {
+	if err := sss.configs.bc.WriteHeadBlock(s.state.status.GetPivotBlock()); err != nil {
 		sss.configs.logger.Warn().Err(err).
-			Uint64("pivot block number", s.state.status.pivotBlock.NumberU64()).
+			Uint64("pivot block number", s.state.status.GetPivotBlockNumber()).
 			Msg(WrapStagedSyncMsg("insert pivot block failed"))
 		// TODO: panic("pivot block is failed to insert in chain.")
 		return err
 	}
 
 	// states should be fully synced in this stage
-	s.state.status.statesSynced = true
+	s.state.status.SetStatesSynced(true)
 
 	/*
 		gbm := s.state.gbm

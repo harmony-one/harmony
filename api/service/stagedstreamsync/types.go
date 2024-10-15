@@ -19,38 +19,130 @@ type status struct {
 	pivotBlock    *types.Block
 	cycleSyncMode SyncMode
 	statesSynced  bool
-	lock          sync.Mutex
+	lock          sync.RWMutex
 }
 
-func newStatus() status {
-	return status{}
+func NewStatus() *status {
+	return &status{
+		cycleSyncMode: FullSync,
+	}
 }
 
-func (s *status) startSyncing() {
+func (s *status) Reset() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.isSyncing = false
+	s.targetBN = 0
+	s.pivotBlock = nil
+	s.cycleSyncMode = FullSync
+	s.statesSynced = false
+}
+
+func (s *status) StartSyncing() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.isSyncing = true
 }
 
-func (s *status) setTargetBN(val uint64) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (s *status) IsSyncing() bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
-	s.targetBN = val
+	return s.isSyncing
 }
 
-func (s *status) finishSyncing() {
+func (s *status) FinishSyncing() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.isSyncing = false
-	s.targetBN = 0
 }
 
-func (s *status) get() (bool, uint64) {
+func (s *status) SetPivotBlock(pivot *types.Block) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	s.pivotBlock = pivot
+}
+
+func (s *status) GetPivotBlock() *types.Block {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.pivotBlock
+}
+
+func (s *status) HasPivotBlock() bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.pivotBlock != nil
+}
+
+func (s *status) GetPivotBlockNumber() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	if s.pivotBlock == nil {
+		return 0
+	}
+	return s.pivotBlock.NumberU64()
+}
+
+func (s *status) SetCycleSyncMode(sm SyncMode) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.cycleSyncMode = sm
+}
+
+func (s *status) GetCycleSyncMode() SyncMode {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.cycleSyncMode
+}
+
+func (s *status) IsFullSyncCycle() bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.cycleSyncMode == FullSync
+}
+
+func (s *status) SetStatesSynced(ss bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.statesSynced = ss
+}
+
+func (s *status) IsStatesSynced() bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.statesSynced
+}
+
+func (s *status) SetTargetBN(tbn uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.targetBN = tbn
+}
+
+func (s *status) GetTargetBN() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.targetBN
+}
+
+func (s *status) Get() (bool, uint64) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.isSyncing, s.targetBN
 }
@@ -63,7 +155,7 @@ type getBlocksResult struct {
 
 type resultQueue struct {
 	results *priorityQueue
-	lock    sync.Mutex
+	lock    sync.RWMutex
 }
 
 func newResultQueue() *resultQueue {
@@ -89,11 +181,10 @@ func (rq *resultQueue) addBlockResults(blocks []*types.Block, stid sttypes.Strea
 			stid:  stid,
 		})
 	}
-	return
 }
 
-// popBlockResults pop a continuous list of blocks starting at expStartBN with capped size.
-// Return the stale block numbers as the second return value
+// popBlockResults pops a continuous list of blocks starting at expStartBN with capped size.
+// Returns the stale block numbers as the second return value.
 func (rq *resultQueue) popBlockResults(expStartBN uint64, cap int) ([]*blockResult, []uint64) {
 	rq.lock.Lock()
 	defer rq.lock.Unlock()
@@ -120,30 +211,28 @@ func (rq *resultQueue) popBlockResults(expStartBN uint64, cap int) ([]*blockResu
 	return res, stales
 }
 
-// removeResultsByStreamID removes the block results of the given stream, returns the block
-// number removed from the queue
+// removeResultsByStreamID removes the block results of the given stream,
+// returns the block numbers removed from the queue
 func (rq *resultQueue) removeResultsByStreamID(stid sttypes.StreamID) []uint64 {
 	rq.lock.Lock()
 	defer rq.lock.Unlock()
 
 	var removed []uint64
 
-Loop:
-	for {
-		for i, res := range *rq.results {
-			blockRes := res.(*blockResult)
-			if blockRes.stid == stid {
-				rq.removeByIndex(i)
-				removed = append(removed, blockRes.block.NumberU64())
-				goto Loop
-			}
+	for i := 0; i < rq.results.Len(); i++ {
+		blockRes := (*rq.results)[i].(*blockResult)
+		if blockRes.stid == stid {
+			rq.removeByIndex(i)
+			removed = append(removed, blockRes.block.NumberU64())
+			i-- // Adjust index after removal
 		}
-		break
 	}
 	return removed
 }
 
 func (rq *resultQueue) length() int {
+	rq.lock.RLock()
+	defer rq.lock.RUnlock()
 	return len(*rq.results)
 }
 

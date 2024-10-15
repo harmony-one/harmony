@@ -33,7 +33,7 @@ type receiptDownloadManager struct {
 	received map[uint64]Received
 
 	logger zerolog.Logger
-	lock   sync.Mutex
+	lock   sync.RWMutex
 }
 
 func newReceiptDownloadManager(tx kv.RwTx, chain blockChain, targetBN uint64, logger zerolog.Logger) *receiptDownloadManager {
@@ -123,17 +123,18 @@ func (rdm *receiptDownloadManager) SetDownloadDetails(bns []uint64, streamID stt
 
 // GetDownloadDetails returns the download details for a certain block number
 func (rdm *receiptDownloadManager) GetDownloadDetails(blockNumber uint64) (streamID sttypes.StreamID) {
-	rdm.lock.Lock()
-	defer rdm.lock.Unlock()
+	rdm.lock.RLock()
+	defer rdm.lock.RUnlock()
 
 	return rdm.rdd[blockNumber].streamID
 }
 
 // getBatchFromRetries get the receipt number batch to be requested from retries.
 func (rdm *receiptDownloadManager) getBatchFromRetries(cap int, fromBlockNumber uint64) []uint64 {
-	var (
-		requestBNs []uint64
-	)
+	rdm.lock.RLock()
+	defer rdm.lock.RUnlock()
+
+	var requestBNs []uint64
 	for cnt := 0; cnt < cap; cnt++ {
 		bn := rdm.retries.pop()
 		if bn == 0 {
@@ -149,9 +150,10 @@ func (rdm *receiptDownloadManager) getBatchFromRetries(cap int, fromBlockNumber 
 
 // getBatchFromUnprocessed returns a batch of receipt numbers to be requested from unprocessed.
 func (rdm *receiptDownloadManager) getBatchFromUnprocessed(cap int, curHeight uint64) []uint64 {
-	var (
-		requestBNs []uint64
-	)
+	rdm.lock.RLock()
+	defer rdm.lock.RUnlock()
+
+	var requestBNs []uint64
 	bn := curHeight + 1
 	// TODO: this algorithm can be potentially optimized.
 	for cnt := 0; cnt < cap && bn <= rdm.targetBN; cnt++ {
@@ -170,10 +172,16 @@ func (rdm *receiptDownloadManager) getBatchFromUnprocessed(cap int, curHeight ui
 }
 
 func (rdm *receiptDownloadManager) availableForMoreTasks() bool {
+	rdm.lock.RLock()
+	defer rdm.lock.RUnlock()
+
 	return len(rdm.requesting) < SoftQueueCap
 }
 
 func (rdm *receiptDownloadManager) addBatchToRequesting(bns []uint64) {
+	rdm.lock.Lock()
+	defer rdm.lock.Unlock()
+
 	for _, bn := range bns {
 		rdm.requesting[bn] = struct{}{}
 	}

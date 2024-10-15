@@ -15,7 +15,7 @@ type getBlocksByHashManager struct {
 	results   map[common.Hash]blockResult
 	whitelist []sttypes.StreamID
 
-	lock sync.Mutex
+	lock sync.RWMutex
 }
 
 func newGetBlocksByHashManager(hashes []common.Hash, whitelist []sttypes.StreamID) *getBlocksByHashManager {
@@ -28,8 +28,8 @@ func newGetBlocksByHashManager(hashes []common.Hash, whitelist []sttypes.StreamI
 }
 
 func (m *getBlocksByHashManager) getNextHashes() ([]common.Hash, []sttypes.StreamID, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	num := m.numBlocksPerRequest()
 	hashes := make([]common.Hash, 0, num)
@@ -93,8 +93,8 @@ func (m *getBlocksByHashManager) handleResultError(hashes []common.Hash, stid st
 }
 
 func (m *getBlocksByHashManager) getResults() ([]*types.Block, []sttypes.StreamID, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	blocks := make([]*types.Block, 0, len(m.hashes))
 	stids := make([]sttypes.StreamID, 0, len(m.hashes))
@@ -109,25 +109,21 @@ func (m *getBlocksByHashManager) getResults() ([]*types.Block, []sttypes.StreamI
 }
 
 func (m *getBlocksByHashManager) isDone() bool {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	return len(m.results) == len(m.hashes)
 }
 
 func (m *getBlocksByHashManager) removeStreamID(target sttypes.StreamID) {
-	// O(n^2) complexity. But considering the whitelist size is small, should not
-	// have performance issue.
-loop:
-	for i, stid := range m.whitelist {
-		if stid == target {
-			if i == len(m.whitelist) {
-				m.whitelist = m.whitelist[:i]
-			} else {
-				m.whitelist = append(m.whitelist[:i], m.whitelist[i+1:]...)
-			}
-			goto loop
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	newWhitelist := m.whitelist[:0]
+	for _, stid := range m.whitelist {
+		if stid != target {
+			newWhitelist = append(newWhitelist, stid)
 		}
 	}
-	return
+	m.whitelist = newWhitelist
 }
