@@ -12,7 +12,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	//cmdharmony "github.com/harmony-one/harmony/cmd/harmony"
+	harmonyConfigs "github.com/harmony-one/harmony/cmd/config"
+	nodeConfigs "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	bootnode "github.com/harmony-one/harmony/node/boot"
 	"github.com/harmony-one/harmony/p2p"
 	net "github.com/libp2p/go-libp2p/core/network"
 	ma "github.com/multiformats/go-multiaddr"
@@ -87,8 +91,7 @@ var (
 )
 
 func printVersion(me string) {
-	fmt.Fprintf(os.Stderr, "Harmony (C) 2019. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
-	os.Exit(0)
+	fmt.Fprintf(os.Stderr, "Harmony (C) 2024. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
 }
 
 func main() {
@@ -97,6 +100,8 @@ func main() {
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
+	httpPort := flag.Int("rpc_http_port", 9500, "port of the rpc http")
+	wsPort := flag.Int("rpc_ws_port", 9800, "port of the rpc ws")
 	console := flag.Bool("console_only", false, "Output to console only")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	logMaxSize := flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
@@ -108,11 +113,12 @@ func main() {
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
+	connMgrHighWaterMark := flag.Int("cmg_high_watermark", 900, "connection manager trims excess connections when they pass the high watermark")
 	noTransportSecurity := flag.Bool("no_transport_security", false, "disable TLS encrypted transport")
 	muxer := flag.String("muxer", "mplex, yamux", "protocol muxer to mux per-protocol streams (mplex, yamux)")
 	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
 	noRelay := flag.Bool("no_relay", true, "no relay services, direct connections between peers only")
-
+	networkType := flag.String("network", "mainnet", "network type (mainnet, testnet, pangaea, partner, stressnet, devnet, localnet)")
 	pprof := flag.Bool("pprof", false, "enabled pprof")
 	pprofAddr := flag.String("pprof.addr", "127.0.0.1:6060", "http pprof address")
 	//keyFile := flag.String("pprof.profile.names", "", "the private key file of the bootnode")
@@ -123,12 +129,13 @@ func main() {
 
 	if *versionFlag {
 		printVersion(os.Args[0])
+		os.Exit(0)
 	}
 
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	if *console != true {
+	if !*console {
 		utils.AddLogFile(fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port), *logMaxSize, *logRotateCount, *logRotateMaxAge)
 	}
 
@@ -142,18 +149,19 @@ func main() {
 	selfPeer := p2p.Peer{IP: *ip, Port: *port}
 
 	host, err := p2p.NewHost(p2p.HostConfig{
-		Self:                    &selfPeer,
-		BLSKey:                  privKey,
-		BootNodes:               nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
-		DataStoreFile:           &dataStorePath,
-		MaxConnPerIP:            *maxConnPerIP,
-		ForceReachabilityPublic: *forceReachabilityPublic,
-		NoTransportSecurity:     *noTransportSecurity,
-		NAT:                     true,
-		UserAgent:               *userAgent,
-		DialTimeout:             time.Minute,
-		Muxer:                   *muxer,
-		NoRelay:                 *noRelay,
+		Self:                     &selfPeer,
+		BLSKey:                   privKey,
+		BootNodes:                nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
+		DataStoreFile:            &dataStorePath,
+		MaxConnPerIP:             *maxConnPerIP,
+		ForceReachabilityPublic:  *forceReachabilityPublic,
+		ConnManagerHighWatermark: *connMgrHighWaterMark,
+		NoTransportSecurity:      *noTransportSecurity,
+		NAT:                      true,
+		UserAgent:                *userAgent,
+		DialTimeout:              time.Minute,
+		Muxer:                    *muxer,
+		NoRelay:                  *noRelay,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")
@@ -163,7 +171,18 @@ func main() {
 		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s\n", *ip, *port, host.GetID().String()),
 	)
 
+	nt := nodeConfigs.NetworkType(*networkType)
+	nodeConfigs.SetNetworkType(nt)
+	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, path.Base(os.Args[0]), version, commit, builtBy, builtAt)
+	nodeConfigs.SetVersion(harmonyConfigs.GetHarmonyVersion())
+	nodeConfigs.SetPeerID(host.GetID())
+	hc := harmonyConfigs.GetDefaultConfigCopy()
+
 	host.Start()
+
+	utils.Logger().Info().
+		Interface("network", nt).
+		Msg("boot node host started")
 
 	if *logConn {
 		host.GetP2PHost().Network().Notify(NewConnLogger(utils.GetLogInstance()))
@@ -173,6 +192,32 @@ func main() {
 		fmt.Printf("starting pprof on http://%s/debug/pprof/\n", *pprofAddr)
 		http.ListenAndServe(*pprofAddr, nil)
 	}
+
+	currentBootNode := bootnode.New(host, &hc)
+	rpcConfigs := currentBootNode.GetRPCServerConfig()
+	rpcConfigs.HTTPPort = *httpPort
+	rpcConfigs.WSPort = *wsPort
+
+	// TODO: enable boot services
+	/*
+		if err := currentBootNode.StartServices(); err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			os.Exit(-1)
+		}
+	*/
+
+	if err := currentBootNode.StartRPC(); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msg("StartRPC failed")
+	}
+
+	utils.Logger().Info().
+		Interface("network", nt).
+		Interface("ip", currentBootNode.SelfPeer.IP).
+		Interface("port", currentBootNode.SelfPeer.Port).
+		Interface("PeerID", currentBootNode.SelfPeer.PeerID).
+		Msg("boot node RPC started")
 
 	select {}
 }

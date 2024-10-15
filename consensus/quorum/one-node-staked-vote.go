@@ -163,6 +163,14 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	return (*currentTotalPower).GT(threshold)
 }
 
+func (v *stakedVoteWeight) ComputeTotalPowerByMask(mask *bls_cosi.Mask) numeric.Dec {
+	if mask == nil {
+		return numeric.ZeroDec()
+	}
+	currentTotalPower := v.computeTotalPowerByMask(mask)
+	return *currentTotalPower
+}
+
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	currentTotal := numeric.ZeroDec()

@@ -71,6 +71,14 @@ func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	return true
 }
 
+func (v *uniformVoteWeight) ComputeTotalPowerByMask(mask *bls_cosi.Mask) numeric.Dec {
+	if mask == nil {
+		return numeric.ZeroDec()
+	}
+	currentTotalPower := utils.CountOneBits(mask.Bitmap)
+	return numeric.NewDec(currentTotalPower)
+}
+
 // QuorumThreshold ..
 func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
 	return numeric.NewDec(v.TwoThirdsSignersCount())

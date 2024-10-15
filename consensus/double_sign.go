@@ -71,7 +71,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 									break
 								}
 
-								leaderAddr, err := subComm.AddressForBLSKey(consensus.LeaderPubKey.Bytes)
+								leaderAddr, err := subComm.AddressForBLSKey(consensus.getLeaderPubKey().Bytes)
 								if err != nil {
 									consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 										Msg("could not find address for leader bls key")

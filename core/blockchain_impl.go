@@ -68,6 +68,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
+	goleveldb "github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
@@ -89,7 +90,10 @@ var (
 	blockValidationTimer = metrics.NewRegisteredTimer("chain/validation", nil)
 	blockExecutionTimer  = metrics.NewRegisteredTimer("chain/execution", nil)
 	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
-
+	// ErrCrosslinkNotFound is the error when no crosslink found
+	ErrCrosslinkNotFound = errors.New("crosslink not found")
+	// ErrZeroBytes is the error when it reads empty crosslink
+	ErrZeroBytes = errors.New("crosslink read failed, zero bytes")
 	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis           = errors.New("Genesis not found in chain")
 	ErrEmptyChain          = errors.New("empty chain")
@@ -2366,8 +2370,15 @@ func (bc *BlockChainImpl) DeleteCrossLinks(cls []types.CrossLink) error {
 
 func (bc *BlockChainImpl) ReadCrossLink(shardID uint32, blockNum uint64) (*types.CrossLink, error) {
 	bytes, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum)
-	if err != nil {
+	if err == goleveldb.ErrNotFound {
+		utils.Logger().Debug().Msgf("ReadCrossLink: not found")
+		return nil, ErrCrosslinkNotFound
+	} else if err != nil {
+		utils.Logger().Debug().Err(err).Msgf("ReadCrossLink failed")
 		return nil, err
+	} else if len(bytes) == 0 {
+		utils.Logger().Debug().Err(ErrZeroBytes).Msgf("ReadCrossLink failed")
+		return nil, ErrZeroBytes
 	}
 	crossLink, err := types.DeserializeCrossLink(bytes)
 
@@ -2376,8 +2387,11 @@ func (bc *BlockChainImpl) ReadCrossLink(shardID uint32, blockNum uint64) (*types
 
 func (bc *BlockChainImpl) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardID uint32) error {
 	oldLink, err := bc.ReadShardLastCrossLink(shardID)
-	if oldLink == nil || err != nil {
+	if err != nil {
+		utils.Logger().Debug().Err(err).Msgf("LastContinuousCrossLink failed")
 		return err
+	} else if oldLink == nil {
+		return nil
 	}
 	newLink := oldLink
 	// Starting from last checkpoint, keeping reading immediate next crosslink until there is a gap
@@ -2398,9 +2412,19 @@ func (bc *BlockChainImpl) LastContinuousCrossLink(batch rawdb.DatabaseWriter, sh
 }
 
 func (bc *BlockChainImpl) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error) {
+	if !bc.chainConfig.IsCrossLink(bc.CurrentBlock().Epoch()) {
+		return nil, nil
+	}
 	bytes, err := rawdb.ReadShardLastCrossLink(bc.db, shardID)
-	if err != nil {
+	if err == goleveldb.ErrNotFound {
+		utils.Logger().Debug().Msgf("ReadShardLastCrossLink: not found")
+		return nil, ErrCrosslinkNotFound
+	} else if err != nil {
+		utils.Logger().Debug().Err(err).Msgf("ReadShardLastCrossLink failed")
 		return nil, err
+	} else if len(bytes) == 0 {
+		utils.Logger().Debug().Err(ErrZeroBytes).Msgf("ReadShardLastCrossLink failed")
+		return nil, ErrZeroBytes
 	}
 	return types.DeserializeCrossLink(bytes)
 }
@@ -2435,7 +2459,7 @@ func (bc *BlockChainImpl) ReadPendingSlashingCandidates() slash.Records {
 	return append(bc.pendingSlashes[0:0], bc.pendingSlashes...)
 }
 
-func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
+func (bc *BlockChainImpl) readPendingCrossLinks() ([]types.CrossLink, error) {
 	cls := []types.CrossLink{}
 	bytes := []byte{}
 	if cached, ok := bc.pendingCrossLinksCache.Get(pendingCLCacheKey); ok {
@@ -2443,8 +2467,12 @@ func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 		return cls, nil
 	} else {
 		by, err := rawdb.ReadPendingCrossLinks(bc.db)
-		if err != nil || len(by) == 0 {
+		if err == goleveldb.ErrNotFound {
+			return []types.CrossLink{}, nil
+		} else if err != nil {
 			return nil, err
+		} else if len(by) == 0 {
+			return []types.CrossLink{}, nil
 		}
 		bytes = by
 	}
@@ -2525,11 +2553,19 @@ func (bc *BlockChainImpl) AddPendingSlashingCandidates(
 	return bc.writeSlashes(bc.pendingSlashes)
 }
 
+// ReadPendingCrossLinks returns pending crosslinks
+func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
+	bc.pendingCrossLinksMutex.Lock()
+	defer bc.pendingCrossLinksMutex.Unlock()
+
+	return bc.readPendingCrossLinks()
+}
+
 func (bc *BlockChainImpl) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error) {
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
 
-	cls, err := bc.ReadPendingCrossLinks()
+	cls, err := bc.readPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		err := bc.CachePendingCrossLinks(pendingCLs)
 		return len(pendingCLs), err
@@ -2543,7 +2579,7 @@ func (bc *BlockChainImpl) DeleteFromPendingCrossLinks(crossLinks []types.CrossLi
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
 
-	cls, err := bc.ReadPendingCrossLinks()
+	cls, err := bc.readPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		return 0, err
 	}

@@ -54,6 +54,9 @@ help:
 	@echo "travis_rosetta_checker - run the Travis Rosetta checker script, defaulting the test branch to 'master' unless overridden by TEST_REPO_BRANCH"
 	@echo "debug_external - cleans up environment, rebuilds the binary, and deploys with external nodes"
 	@echo "build_localnet_validator - imports validator keys, funds validator accounts, waits for the epoch, and creates external validators on a local network"
+	@echo "debug-start-log - start a docker compose Promtail->Loki->Grafana stack against localnet logs, needs docker compose and started localnet"
+	@echo "debug-stop-log - stops a docker compose Promtail->Loki->Grafana stack"
+	@echo "debug-restart-log - restart a docker compose Promtail->Loki->Grafana stack"
 
 libs:
 	make -C $(TOP)/mcl -j8
@@ -73,13 +76,23 @@ debug:
 	# uncomment the following lines to enable debug logging for libp2p, it produces a lot of logs, so disabled by default
 	#export GOLOG_LOG_LEVEL=debug
 	#export GOLOG_OUTPUT=stdout
+	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
+	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	bash ./test/debug.sh
 
 debug-kill:
 	bash ./test/kill_node.sh
 
 debug-ext:
-	bash ./test/debug-external.sh
+	# update localnet block per epoch to ensure a stable localnet
+	sed -i 's/localnetBlocksPerEpoch\s*=\s*[0-9]*/localnetBlocksPerEpoch = 64/' internal/configs/sharding/localnet.go
+	sed -i 's/localnetBlocksPerEpochV2\s*=\s*[0-9]*/localnetBlocksPerEpochV2 = 64/' internal/configs/sharding/localnet.go
+	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
+	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
+	bash ./test/debug-external.sh &
+	echo sleep 10s before creating the external validator
+	sleep 10
+	bash ./test/build-localnet-validator.sh
 
 clean:
 	rm -rf ./tmp_log*
@@ -206,3 +219,11 @@ build_localnet_validator:
 
 protofiles:
 	bash ./scripts/gogenerate.sh
+
+debug-start-log:
+	bash ./test/logs_aggregator/start_log_aggregator.sh
+
+debug-stop-log:
+	bash ./test/logs_aggregator/stop_log_aggregator.sh
+
+debug-restart-log: debug-stop-log debug-start-log

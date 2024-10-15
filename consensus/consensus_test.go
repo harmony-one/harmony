@@ -22,7 +22,7 @@ func TestConsensusInitialization(t *testing.T) {
 	assert.NoError(t, err)
 
 	messageSender := &MessageSender{host: host, retryTimes: int(phaseDuration.Seconds()) / RetryIntervalInSec}
-	state := State{mode: Normal}
+	state := NewState(Normal)
 
 	timeouts := createTimeout()
 	expectedTimeouts := make(map[TimeoutType]time.Duration)

@@ -14,7 +14,6 @@ import (
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/consensus"
@@ -356,13 +355,6 @@ func CompareSyncPeerConfigByblockHashes(a *SyncPeerConfig, b *SyncPeerConfig) in
 	return 0
 }
 
-// BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
-// The block is encoded as block + commit signature
-type BlockWithSig struct {
-	Block              *types.Block
-	CommitSigAndBitmap []byte
-}
-
 // GetBlocks gets blocks by calling grpc request to the corresponding peer.
 func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 	response := peerConfig.client.GetBlocksAndSigs(hashes)
@@ -663,7 +655,7 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 
 	for i, blockBytes := range payload {
 		// For forward compatibility at server side, it can be types.block or BlockWithSig
-		blockObj, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
+		blockObj, err := core.RlpDecodeBlockOrBlockWithSig(blockBytes)
 		if err != nil {
 			utils.Logger().Warn().
 				Err(err).
@@ -687,24 +679,6 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 		ss.syncMux.Unlock()
 	}
 	return failedTasks
-}
-
-// RlpDecodeBlockOrBlockWithSig decode payload to types.Block or BlockWithSig.
-// Return the block with commitSig if set.
-func RlpDecodeBlockOrBlockWithSig(payload []byte) (*types.Block, error) {
-	var block *types.Block
-	if err := rlp.DecodeBytes(payload, &block); err == nil {
-		// received payload as *types.Block
-		return block, nil
-	}
-
-	var bws BlockWithSig
-	if err := rlp.DecodeBytes(payload, &bws); err == nil {
-		block := bws.Block
-		block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
-		return block, nil
-	}
-	return nil, errors.New("failed to decode to either types.Block or BlockWithSig")
 }
 
 // downloadTaskQueue is wrapper around Queue with item to be SyncBlockTask

@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -e
 
-#TODO: return back to master
-TEST_REPO_BRANCH="feature/go1.22"
 TEST_REPO_BRANCH=${TEST_REPO_BRANCH:-master}
 # handle for the Travis build run:
+# * uses TRAVIS_PULL_REQUEST_SLUG if PR is done from fork
 # * uses TRAVIS_PULL_REQUEST_BRANCH for RP branch
 # * uses TRAVIS_BRANCH for simple branch builds
+if [[ -z ${TRAVIS_PULL_REQUEST_SLUG} ]]; then
+    MAIN_REPO_ORG='harmony-one'
+else
+    MAIN_REPO_ORG=${TRAVIS_PULL_REQUEST_SLUG%/*}
+    echo "[WARN] - working on the fork - ${MAIN_REPO_ORG}"
+fi
+
 MAIN_REPO_BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-${TRAVIS_BRANCH}}
 # handle for the local run, covers:
 # * branch exist on remote - will use it in the tests
@@ -34,6 +40,7 @@ git fetch origin "${TEST_REPO_BRANCH}"
 git checkout "${TEST_REPO_BRANCH}"
 git pull --rebase=true
 cd localnet
-docker build --build-arg MAIN_REPO_BRANCH="${MAIN_REPO_BRANCH}" -t harmonyone/localnet-test .
+docker build --build-arg MAIN_REPO_BRANCH="${MAIN_REPO_BRANCH}" --progress plain \
+    --build-arg MAIN_REPO_ORG="${MAIN_REPO_ORG}" -t harmonyone/localnet-test .
 # WARN: this is the place where LOCAL repository is provided to the harmony-tests repo
 docker run -v "$DIR/../:/go/src/github.com/harmony-one/harmony" harmonyone/localnet-test -n

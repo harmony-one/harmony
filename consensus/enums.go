@@ -3,7 +3,7 @@ package consensus
 import "fmt"
 
 // Mode is the current
-type Mode byte
+type Mode uint32
 
 const (
 	// Normal ..

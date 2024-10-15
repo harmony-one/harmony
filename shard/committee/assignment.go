@@ -35,6 +35,7 @@ type StakingCandidatesReader interface {
 	) (*staking.ValidatorWrapper, error)
 	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error)
 	ValidatorCandidates() []common.Address
+	Config() *params.ChainConfig
 }
 
 // CandidatesForEPoS ..
@@ -73,7 +74,7 @@ func (p CandidateOrder) MarshalJSON() ([]byte, error) {
 
 // NewEPoSRound runs a fresh computation of EPoS using
 // latest data always
-func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtendedBound bool, slotsLimit, shardCount int) (
+func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, slotsLimit, shardCount int) (
 	*CompletedEPoSRound, error,
 ) {
 	eligibleCandidate, err := prepareOrders(stakedReader, slotsLimit, shardCount)
@@ -84,7 +85,7 @@ func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtend
 		epoch,
 	)
 	median, winners := effective.Apply(
-		eligibleCandidate, maxExternalSlots, isExtendedBound,
+		eligibleCandidate, maxExternalSlots, stakedReader.Config().IsEPoSBound35(epoch),
 	)
 	auctionCandidates := make([]*CandidateOrder, len(eligibleCandidate))
 
@@ -159,7 +160,7 @@ func prepareOrders(
 		if err != nil {
 			return nil, err
 		}
-		if !IsEligibleForEPoSAuction(snapshot, validator) {
+		if !IsEligibleForEPoSAuction(snapshot, validator, stakedReader.Config()) {
 			continue
 		}
 
@@ -208,7 +209,7 @@ func prepareOrders(
 }
 
 // IsEligibleForEPoSAuction ..
-func IsEligibleForEPoSAuction(snapshot *staking.ValidatorSnapshot, validator *staking.ValidatorWrapper) bool {
+func IsEligibleForEPoSAuction(snapshot *staking.ValidatorSnapshot, validator *staking.ValidatorWrapper, config *params.ChainConfig) bool {
 	// This original condition to check whether a validator is in last committee is not stable
 	// because cross-links may arrive after the epoch ends and it still got counted into the
 	// NumBlocksToSign, making this condition to be true when the validator is actually not in committee
@@ -219,7 +220,7 @@ func IsEligibleForEPoSAuction(snapshot *staking.ValidatorSnapshot, validator *st
 		// validator was in last epoch's committee
 		// validator with below-threshold signing activity won't be considered for next epoch
 		// and their status will be turned to inactive in FinalizeNewBlock
-		computed := availability.ComputeCurrentSigning(snapshot.Validator, validator)
+		computed := availability.ComputeCurrentSigning(snapshot.Validator, validator, config.IsHIP32(snapshot.Epoch))
 		if computed.IsBelowThreshold {
 			return false
 		}
@@ -349,7 +350,7 @@ func eposStakedCommittee(
 	}
 
 	// TODO(audit): make sure external validator BLS key are also not duplicate to Harmony's keys
-	completedEPoSRound, err := NewEPoSRound(epoch, stakerReader, stakerReader.Config().IsEPoSBound35(epoch), s.SlotsLimit(), shardCount)
+	completedEPoSRound, err := NewEPoSRound(epoch, stakerReader, s.SlotsLimit(), shardCount)
 
 	if err != nil {
 		return nil, err

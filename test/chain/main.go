@@ -19,7 +19,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/params"
-	pkgworker "github.com/harmony-one/harmony/node/worker"
+	pkgworker "github.com/harmony-one/harmony/node/harmony/worker"
 )
 
 const (
