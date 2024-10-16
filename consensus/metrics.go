@@ -149,6 +149,12 @@ func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum flo
 	consensusCounterVec.With(prometheus.Labels{"consensus": "num_commits"}).Add(numCommits)
 	consensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(numCommits)
 }
+
+func (consensus *Consensus) SignersCountMetrics(signersCount float64, blockNum float64) {
+	consensusCounterVec.With(prometheus.Labels{"consensus": "signers_count"}).Add(signersCount)
+	consensusGaugeVec.With(prometheus.Labels{"consensus": "signers_count"}).Set(signersCount)
+}
+
 func (consensus *Consensus) UpdatePreimageGenerationMetrics(
 	preimageStart uint64,
 	preimageEnd uint64,
