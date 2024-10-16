@@ -308,7 +308,7 @@ var (
 		CrossShardXferPrecompileEpoch:         big.NewInt(1),
 		AllowlistEpoch:                        EpochTBD,
 		LeaderRotationInternalValidatorsEpoch: big.NewInt(5),
-		LeaderRotationExternalValidatorsEpoch: big.NewInt(5),
+		LeaderRotationExternalValidatorsEpoch: big.NewInt(6),
 		FeeCollectEpoch:                       big.NewInt(2),
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            EpochTBD,
@@ -317,8 +317,8 @@ var (
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
-		IsOneSecondEpoch:                      big.NewInt(5),
-		IsRotationEachBlockEpoch:              big.NewInt(5),
+		IsOneSecondEpoch:                      big.NewInt(6),
+		IsRotationEachBlockEpoch:              big.NewInt(6),
 	}
 
 	// AllProtocolChanges ...
