@@ -22,6 +22,10 @@ import (
 var (
 	// ErrStreamAlreadyRemoved is the error that a stream has already been removed
 	ErrStreamAlreadyRemoved = errors.New("stream already removed")
+	// ErrStreamAlreadyExist is the error that a stream has already exist
+	ErrStreamAlreadyExist = errors.New("stream already exist")
+	// ErrTooManyStreams is the error that the number of streams is exceeded the capacity
+	ErrTooManyStreams = errors.New("too many streams")
 )
 
 // streamManager is the implementation of StreamManager. It manages streams on
@@ -75,7 +79,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
 
 	// if it is a beacon node or shard node, print the peer id and proto id
-	if protoSpec.BeaconNode || protoSpec.ShardID != shard.BeaconChainShardID {
+	if protoSpec.IsBeaconValidator || protoSpec.ShardID != shard.BeaconChainShardID {
 		fmt.Println("My peer id: ", host.ID().String())
 		fmt.Println("My proto id: ", pid)
 	}
@@ -163,6 +167,7 @@ func (sm *streamManager) loop() {
 			rmStream.errC <- err
 
 		case stop := <-sm.stopCh:
+			sm.coolDown.Set() // to immediately block discoveries
 			if discCancel != nil {
 				discCancel()
 			}
@@ -232,6 +237,9 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 	if err != nil {
 		return err
 	}
+	if sttypes.StreamID(sm.host.ID()) == st.ID() {
+		return fmt.Errorf("can't connect to itself")
+	}
 	if mySpec.Service != rmSpec.Service {
 		return fmt.Errorf("unexpected service: %v/%v", rmSpec.Service, mySpec.Service)
 	}
@@ -247,10 +255,10 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	id := st.ID()
 	if sm.streams.size() >= sm.config.HiCap {
-		return errors.New("too many streams")
+		return ErrTooManyStreams
 	}
 	if _, ok := sm.streams.get(id); ok {
-		return errors.New("stream already exist")
+		return ErrStreamAlreadyExist
 	}
 
 	sm.streams.addStream(st)
@@ -291,7 +299,8 @@ func (sm *streamManager) removeAllStreamOnClose() {
 			defer wg.Done()
 			err := st.CloseOnExit()
 			if err != nil {
-				sm.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
+				sm.logger.Warn().Err(err).
+					Interface("stream ID", st.ID()).
 					Msg("failed to close stream")
 			}
 		}(st)
@@ -328,7 +337,9 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
 			if err != nil {
 				sm.coolDownCache.Add(pid)
-				sm.logger.Warn().Err(err).Str("peerID", string(pid)).Msg("failed to setup stream with peer")
+				sm.logger.Warn().Err(err).
+					Interface("peerID", pid).
+					Msg("failed to setup stream with peer")
 				return
 			}
 		}(peer.ID)
@@ -337,10 +348,12 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 }
 
 func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrInfo, error) {
+	numStreams := sm.streams.size()
+
 	protoID := sm.targetProtoID()
 	discBatch := sm.config.DiscBatch
-	if sm.config.HiCap-sm.streams.size() < sm.config.DiscBatch {
-		discBatch = sm.config.HiCap - sm.streams.size()
+	if sm.config.HiCap-numStreams < sm.config.DiscBatch {
+		discBatch = sm.config.HiCap - numStreams
 	}
 	if discBatch < 0 {
 		return nil, nil
@@ -357,7 +370,7 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 func (sm *streamManager) targetProtoID() string {
 	targetSpec := sm.myProtoSpec
 	if targetSpec.ShardID == shard.BeaconChainShardID { // for beacon chain, only connect to beacon nodes
-		targetSpec.BeaconNode = true
+		targetSpec.IsBeaconValidator = true
 	}
 	return string(targetSpec.ToProtoID())
 }
@@ -387,106 +400,4 @@ func (sm *streamManager) softHaveEnoughStreams() bool {
 func (sm *streamManager) hardHaveEnoughStream() bool {
 	availStreams := sm.streams.numStreamsWithMinProtoSpec(sm.myProtoSpec)
 	return availStreams >= sm.config.HardLoCap
-}
-
-// streamSet is the concurrency safe stream set.
-type streamSet struct {
-	streams    map[sttypes.StreamID]sttypes.Stream
-	numByProto map[sttypes.ProtoSpec]int
-	lock       sync.RWMutex
-}
-
-func newStreamSet() *streamSet {
-	return &streamSet{
-		streams:    make(map[sttypes.StreamID]sttypes.Stream),
-		numByProto: make(map[sttypes.ProtoSpec]int),
-	}
-}
-
-func (ss *streamSet) Erase() {
-	ss.lock.Lock()
-	defer ss.lock.Unlock()
-
-	ss.streams = make(map[sttypes.StreamID]sttypes.Stream)
-	ss.numByProto = make(map[sttypes.ProtoSpec]int)
-}
-
-func (ss *streamSet) size() int {
-	ss.lock.RLock()
-	defer ss.lock.RUnlock()
-
-	return len(ss.streams)
-}
-
-func (ss *streamSet) get(id sttypes.StreamID) (sttypes.Stream, bool) {
-	ss.lock.RLock()
-	defer ss.lock.RUnlock()
-
-	if id == "" {
-		return nil, false
-	}
-
-	st, ok := ss.streams[id]
-	return st, ok
-}
-
-func (ss *streamSet) addStream(st sttypes.Stream) {
-	ss.lock.Lock()
-	defer ss.lock.Unlock()
-
-	if spec, err := st.ProtoSpec(); err != nil {
-		return
-	} else {
-		ss.streams[st.ID()] = st
-		ss.numByProto[spec]++
-	}
-
-}
-
-func (ss *streamSet) deleteStream(st sttypes.Stream) {
-	ss.lock.Lock()
-	defer ss.lock.Unlock()
-
-	delete(ss.streams, st.ID())
-
-	spec, _ := st.ProtoSpec()
-	ss.numByProto[spec]--
-	if ss.numByProto[spec] == 0 {
-		delete(ss.numByProto, spec)
-	}
-}
-
-func (ss *streamSet) slice() []sttypes.Stream {
-	ss.lock.RLock()
-	defer ss.lock.RUnlock()
-
-	sts := make([]sttypes.Stream, 0, len(ss.streams))
-	for _, st := range ss.streams {
-		sts = append(sts, st)
-	}
-	return sts
-}
-
-func (ss *streamSet) getStreams() []sttypes.Stream {
-	ss.lock.RLock()
-	defer ss.lock.RUnlock()
-
-	res := make([]sttypes.Stream, 0, len(ss.streams))
-	for _, st := range ss.streams {
-		res = append(res, st)
-	}
-	return res
-}
-
-func (ss *streamSet) numStreamsWithMinProtoSpec(minSpec sttypes.ProtoSpec) int {
-	ss.lock.RLock()
-	defer ss.lock.RUnlock()
-
-	var res int
-	for spec, num := range ss.numByProto {
-		if !spec.Version.LessThan(minSpec.Version) {
-			res += num
-		}
-	}
-	return res
 }

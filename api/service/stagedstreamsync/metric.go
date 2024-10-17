@@ -13,8 +13,10 @@ func init() {
 		longRangeSyncedBlockCounterVec,
 		longRangeFailInsertedBlockCounterVec,
 		numShortRangeCounterVec,
+		numEpochSyncCounterVec,
 		numFailedDownloadCounterVec,
 		numBlocksInsertedShortRangeHistogramVec,
+		numBlocksInsertedEpochSyncHistogramVec,
 		numBlocksInsertedBeaconHelperCounter,
 	)
 }
@@ -60,6 +62,16 @@ var (
 		[]string{"ShardID"},
 	)
 
+	numEpochSyncCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "staged_stream_sync",
+			Name:      "num_epoch_sync",
+			Help:      "number of epoch blocks sync is triggered",
+		},
+		[]string{"ShardID"},
+	)
+
 	numFailedDownloadCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
@@ -76,6 +88,18 @@ var (
 			Subsystem: "staged_stream_sync",
 			Name:      "num_blocks_inserted_short_range",
 			Help:      "number of blocks inserted for each short range sync",
+			// Buckets: 0, 1, 2, 4, +INF (capped at 10)
+			Buckets: prometheus.ExponentialBuckets(0.5, 2, 5),
+		},
+		[]string{"ShardID"},
+	)
+
+	numBlocksInsertedEpochSyncHistogramVec = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "hmy",
+			Subsystem: "staged_stream_sync",
+			Name:      "num_blocks_inserted_epoch_sync",
+			Help:      "number of blocks inserted for each epoch sync",
 			// Buckets: 0, 1, 2, 4, +INF (capped at 10)
 			Buckets: prometheus.ExponentialBuckets(0.5, 2, 5),
 		},

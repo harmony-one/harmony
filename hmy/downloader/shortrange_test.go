@@ -132,7 +132,7 @@ func TestSrHelper_getHashChain(t *testing.T) {
 			ctx:          context.Background(),
 			config:       test.config,
 		}
-		hashChain, wl, err := sh.getHashChain(sh.prepareBlockHashNumbers(test.curBN))
+		hashChain, wl, err := sh.getHashChain(sh.prepareBlockHashNumbers(test.curBN), false)
 		if err != nil {
 			t.Error(err)
 		}

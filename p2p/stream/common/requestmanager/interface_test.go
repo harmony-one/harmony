@@ -115,7 +115,7 @@ func (st *testStream) CloseOnExit() error {
 	return nil
 }
 
-func (st *testStream) FailedTimes() int {
+func (st *testStream) Failures() int {
 	return 0
 }
 
@@ -138,14 +138,14 @@ func makeDummyTestStreams(indexes []int) []sttypes.Stream {
 	return sts
 }
 
-func makeDummyStreamSets(indexes []int) map[sttypes.StreamID]*stream {
-	m := make(map[sttypes.StreamID]*stream)
+func makeDummyStreamSets(indexes []int) *sttypes.SafeMap[sttypes.StreamID, *stream] {
+	m := sttypes.NewSafeMap[sttypes.StreamID, *stream]()
 
 	for _, index := range indexes {
 		st := &testStream{
 			id: makeStreamID(index),
 		}
-		m[st.ID()] = &stream{Stream: st}
+		m.Set(st.ID(), &stream{Stream: st})
 	}
 	return m
 }

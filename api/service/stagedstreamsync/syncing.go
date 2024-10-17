@@ -13,8 +13,10 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon-lib/kv/mdbx"
 	"github.com/ledgerwatch/log/v3"
@@ -41,46 +43,58 @@ var Buckets = []string{
 // CreateStagedSync creates an instance of staged sync
 func CreateStagedSync(ctx context.Context,
 	bc core.BlockChain,
+	nodeConfig *nodeconfig.ConfigType,
 	consensus *consensus.Consensus,
 	dbDir string,
-	isBeaconNode bool,
 	protocol syncProtocol,
 	config Config,
+	isBeaconNode bool,
 	logger zerolog.Logger,
 ) (*StagedStreamSync, error) {
 
 	logger.Info().
 		Uint32("shard", bc.ShardID()).
-		Bool("beaconNode", isBeaconNode).
+		Bool("isBeaconNode", isBeaconNode).
 		Bool("memdb", config.UseMemDB).
 		Str("dbDir", dbDir).
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
 		Msg(WrapStagedSyncMsg("creating staged sync"))
 
+	isExplorer := nodeConfig.Role() == nodeconfig.ExplorerNode
+	isValidator := nodeConfig.Role() == nodeconfig.Validator
+	isBeaconShard := bc.ShardID() == shard.BeaconChainShardID
+	isEpochChain := !isBeaconNode && isBeaconShard
+	isBeaconValidator := isBeaconNode && isValidator
+	joinConsensus := false
+	switch nodeConfig.Role() {
+	case nodeconfig.Validator:
+		joinConsensus = true
+	}
+
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
 	if config.UseMemDB {
-		mdbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)
+		mdbPath := getBlockDbPath(bc.ShardID(), isBeaconValidator, -1, dbDir)
 		logger.Info().
 			Str("path", mdbPath).
 			Msg(WrapStagedSyncMsg("creating main db in memory"))
 		mainDB = mdbx.NewMDBX(log.New()).InMem(mdbPath).MustOpen()
 		for i := 0; i < config.Concurrency; i++ {
-			dbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, i, dbDir)
+			dbPath := getBlockDbPath(bc.ShardID(), isBeaconValidator, i, dbDir)
 			logger.Info().
 				Str("path", dbPath).
 				Msg(WrapStagedSyncMsg("creating blocks db in memory"))
 			dbs[i] = mdbx.NewMDBX(log.New()).InMem(dbPath).MustOpen()
 		}
 	} else {
-		mdbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, -1, dbDir)
+		mdbPath := getBlockDbPath(bc.ShardID(), isBeaconValidator, -1, dbDir)
 		logger.Info().
 			Str("path", mdbPath).
 			Msg(WrapStagedSyncMsg("creating main db in disk"))
 		mainDB = mdbx.NewMDBX(log.New()).Path(mdbPath).MustOpen()
 		for i := 0; i < config.Concurrency; i++ {
-			dbPath := getBlockDbPath(bc.ShardID(), isBeaconNode, i, dbDir)
+			dbPath := getBlockDbPath(bc.ShardID(), isBeaconValidator, i, dbDir)
 			logger.Info().
 				Str("path", dbPath).
 				Msg(WrapStagedSyncMsg("creating blocks db in disk"))
@@ -97,11 +111,11 @@ func CreateStagedSync(ctx context.Context,
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
 	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
-	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, extractReceiptHashes, config.LogProgress)
+	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, extractReceiptHashes, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
 	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageFullStateSyncCfg := NewStageFullStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
-	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconNode, config.LogProgress)
+	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, config.LogProgress)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)
 	stageFinishCfg := NewStageFinishCfg(mainDB)
 
@@ -123,9 +137,15 @@ func CreateStagedSync(ctx context.Context,
 
 	logger.Info().
 		Uint32("shard", bc.ShardID()).
-		Bool("beaconNode", isBeaconNode).
+		Bool("isEpochChain", isEpochChain).
+		Bool("isExplorer", isExplorer).
+		Bool("isValidator", isValidator).
+		Bool("isBeaconShard", isBeaconShard).
+		Bool("isBeaconValidator", isBeaconValidator).
+		Bool("joinConsensus", joinConsensus).
 		Bool("memdb", config.UseMemDB).
 		Str("dbDir", dbDir).
+		Str("SyncMode", config.SyncMode.String()).
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
 		Str("dbDir", dbDir).
@@ -136,9 +156,13 @@ func CreateStagedSync(ctx context.Context,
 		consensus,
 		mainDB,
 		defaultStages,
-		isBeaconNode,
+		isEpochChain,
+		isBeaconShard,
 		protocol,
-		isBeaconNode,
+		isBeaconValidator,
+		isExplorer,
+		isValidator,
+		joinConsensus,
 		config,
 		logger,
 	), nil
@@ -337,15 +361,18 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	s.startSyncing()
 	defer s.finishSyncing()
 
+	ctx, cancel := context.WithCancel(downloaderContext)
+	defer cancel()
+
 	for {
-		ctx, cancel := context.WithCancel(downloaderContext)
 
 		n, err := s.doSyncCycle(ctx)
 		if err != nil {
 			utils.Logger().Error().
 				Err(err).
 				Bool("initSync", s.initSync).
-				Bool("isBeacon", s.isBeacon).
+				Bool("isValidator", s.isValidator).
+				Bool("isExplorer", s.isExplorer).
 				Uint32("shard", s.bc.ShardID()).
 				Msg(WrapStagedSyncMsg("sync cycle failed"))
 
@@ -353,15 +380,15 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			pl["error"] = err.Error()
 			numFailedDownloadCounterVec.With(pl).Inc()
 
-			cancel()
+			//cancel()
 			return estimatedHeight, totalInserted + n, err
 		}
-		cancel()
+		//cancel()
 
 		totalInserted += n
 
 		// if it's not long range sync, skip loop
-		if n == 0 || !initSync {
+		if n == 0 { //|| !initSync {
 			break
 		}
 	}
@@ -369,7 +396,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	if totalInserted > 0 {
 		utils.Logger().Info().
 			Bool("initSync", s.initSync).
-			Bool("isBeacon", s.isBeacon).
+			Bool("isBeaconShard", s.isBeaconShard).
 			Uint32("shard", s.bc.ShardID()).
 			Int("blocks", totalInserted).
 			Uint64("startedNumber", startedNumber).
@@ -377,8 +404,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			Msg(WrapStagedSyncMsg("sync cycle blocks inserted successfully"))
 	}
 
-	// add consensus last mile blocks
-	if s.consensus != nil && s.isBeaconNode {
+	if s.consensus != nil {
 		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
@@ -391,8 +417,10 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		if s.isExplorer {
 			s.consensus.UpdateConsensusInformation()
 		}
+		s.purgeLastMileBlocksFromCache()
+
+		s.consensus.BlocksSynchronized()
 	}
-	s.purgeLastMileBlocksFromCache()
 
 	return estimatedHeight, totalInserted, nil
 }
@@ -423,7 +451,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 	if err := s.Run(ctx, s.DB(), tx, initialCycle); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Bool("isBeacon", s.isBeacon).
+			Bool("isBeaconShard", s.isBeaconShard).
 			Uint32("shard", s.bc.ShardID()).
 			Uint64("currentHeight", startHead).
 			Msgf(WrapStagedSyncMsg("sync cycle failed"))
@@ -503,41 +531,70 @@ func (s *StagedStreamSync) stateSyncStage() bool {
 }
 
 // estimateCurrentNumber roughly estimates the current block number.
-// The block number does not need to be exact, but just a temporary target of the iteration
+// The block number does not need to be exact, but just a temporary target of the iteration.
 func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, error) {
 	var (
 		cnResults = make(map[sttypes.StreamID]uint64)
 		lock      sync.Mutex
 		wg        sync.WaitGroup
 	)
+
+	// Create a channel to propagate errors back if needed.
+	errChan := make(chan error, s.config.Concurrency)
 	wg.Add(s.config.Concurrency)
+
 	for i := 0; i != s.config.Concurrency; i++ {
 		go func() {
 			defer wg.Done()
+
 			bn, stid, err := s.doGetCurrentNumberRequest(ctx)
 			if err != nil {
 				s.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("getCurrentNumber request failed"))
-				if !errors.Is(err, context.Canceled) {
+
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					// Mark stream failure if it's not due to context cancelation or deadline
 					s.protocol.StreamFailed(stid, "getCurrentNumber request failed")
 				}
+
+				// Propagate the error for external handling
+				errChan <- err
 				return
 			}
+
+			// Safely update the cnResults map
 			lock.Lock()
 			cnResults[stid] = bn
 			lock.Unlock()
 		}()
 	}
-	wg.Wait()
 
-	if len(cnResults) == 0 {
-		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		default:
+	// Wait for all goroutines to finish
+	wg.Wait()
+	close(errChan) // Close the error channel when done
+
+	// Check if there were any errors
+	for err := range errChan {
+		// If there were errors other than context cancellation, propagate the first one.
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			return 0, err
 		}
+	}
+
+	// Check if the context was canceled and return an error accordingly
+	select {
+	case <-ctx.Done():
+		s.logger.Error().Err(ctx.Err()).Msg(WrapStagedSyncMsg("context canceled or timed out"))
+		return 0, ctx.Err()
+	default:
+	}
+
+	// If no valid block number results were received, return an error
+	if len(cnResults) == 0 {
 		return 0, ErrZeroBlockResponse
 	}
+
+	// Compute block number by majority vote
 	bn := computeBlockNumberByMaxVote(cnResults)
 	return bn, nil
 }
@@ -557,7 +614,7 @@ func (s *StagedStreamSync) queryAllPeersForBlockByNumber(ctx context.Context, bn
 			if err != nil {
 				s.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("getBlockByNumber request failed"))
-				if !errors.Is(err, context.Canceled) {
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 					s.protocol.StreamFailed(stid, "getBlockByNumber request failed")
 				}
 				return

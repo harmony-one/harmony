@@ -71,7 +71,7 @@ func (st *testStream) ReadBytes() ([]byte, error) {
 	return nil, nil
 }
 
-func (st *testStream) FailedTimes() int {
+func (st *testStream) Failures() int {
 	return 0
 }
 
