@@ -199,6 +199,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
+	currentHeader := consensus.Blockchain().CurrentHeader()
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
 		signed := consensus.decider.ReadBallot(quorum.Commit, signer.Bytes)
@@ -298,24 +299,14 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			// only do early commit if it's not epoch block to avoid problems
 			consensus.preCommitAndPropose(blockObj)
 		}
-
-		go func(viewID uint64, isLeader bool) {
+		// is one second
+		if consensus.Blockchain().Config().IsOneSecond(currentHeader.Epoch()) {
+			waitTime := 0 * time.Millisecond
+			go consensus.finalCommit(consensus.isLeader(), viewID, waitTime, consensus.NextBlockDue)
+		} else {
 			waitTime := 1000 * time.Millisecond
-			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
-			if maxWaitTime > waitTime {
-				waitTime = maxWaitTime
-			}
-			consensus.getLogger().Info().Str("waitTime", waitTime.String()).
-				Msg("[OnCommit] Starting Grace Period")
-			time.Sleep(waitTime)
-			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
-
-			consensus.mutex.Lock()
-			defer consensus.mutex.Unlock()
-			if viewID == consensus.getCurBlockViewID() {
-				consensus.finalCommit(isLeader)
-			}
-		}(viewID, consensus.isLeader())
+			go consensus.finalCommit(consensus.isLeader(), viewID, waitTime, consensus.NextBlockDue)
+		}
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
