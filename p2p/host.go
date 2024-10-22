@@ -36,6 +36,7 @@ import (
 	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
 	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/pkg/errors"
@@ -95,6 +96,7 @@ type HostConfig struct {
 	Self                     *Peer
 	BLSKey                   libp2p_crypto.PrivKey
 	BootNodes                []string
+	TrustedNodes             []string
 	DataStoreFile            *string
 	DiscConcurrency          int
 	MaxConnPerIP             int
@@ -328,6 +330,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		pubsub:        pubsub,
 		joined:        map[string]*libp2p_pubsub.Topic{},
 		self:          *self,
+		trustedNodes:  cfg.TrustedNodes,
 		priKey:        key,
 		discovery:     disc,
 		security:      security,
@@ -404,6 +407,7 @@ type HostV2 struct {
 	joined        map[string]*libp2p_pubsub.Topic
 	streamProtos  []sttypes.Protocol
 	self          Peer
+	trustedNodes  []string
 	priKey        libp2p_crypto.PrivKey
 	lock          sync.Mutex
 	discovery     discovery.Discovery
@@ -431,6 +435,9 @@ func (host *HostV2) Start() error {
 	for _, proto := range host.streamProtos {
 		proto.Start()
 	}
+	// add trusted nodes
+	host.AddTrustedNodes()
+	// start discovery
 	return host.discovery.Start()
 }
 
@@ -528,6 +535,49 @@ func (host *HostV2) AddPeer(p *Peer) error {
 	p.Addrs = append(p.Addrs, targetAddr)
 	host.Peerstore().AddAddrs(p.PeerID, p.Addrs, libp2p_peerstore.PermanentAddrTTL)
 	host.logger.Info().Interface("peer", *p).Msg("AddPeer add to libp2p_peerstore")
+	return nil
+}
+
+func (host *HostV2) AddTrustedNodes() {
+	if len(host.trustedNodes) == 0 {
+		return
+	}
+	for _, addr := range host.trustedNodes {
+		if err := host.AddPeerByAddress(addr); err != nil {
+			host.logger.Error().Err(err).Str("addr", addr).Msg("failed to add trusted node")
+		}
+	}
+}
+
+func (host *HostV2) AddPeerByIP(IP string, port string) error {
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s", IP, port)
+	return host.AddPeerByAddress(addr)
+}
+
+// AddPeerByAddress adds a peer by address (ex: /ip4/127.0.0.1/tcp/9000/p2p/QmSomePeerID)
+func (host *HostV2) AddPeerByAddress(addrStr string) error {
+	peerAddr, err := multiaddr.NewMultiaddr(addrStr)
+	if err != nil {
+		host.logger.Error().Err(err).Str("addr", addrStr).Msg("[AddPeerByAddress] invalid multiaddr")
+		return err
+	}
+
+	peerInfo, err := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
+	if err != nil {
+		host.logger.Error().Err(err).Str("addr", addrStr).Msg("[AddPeerByAddress] failed to get peer info")
+		return err
+	}
+
+	// Add the peer's multiaddress to the peerstore
+	host.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, libp2p_peerstore.PermanentAddrTTL)
+
+	// Try connecting to the peer
+	if err := host.h.Connect(host.ctx, *peerInfo); err != nil {
+		host.logger.Error().Err(err).Str("addr", addrStr).Msg("[AddPeerByAddress] failed to connect to peer")
+		return err
+	}
+
+	host.logger.Info().Str("addr", addrStr).Msg("[AddPeerByAddress] connected to peer")
 	return nil
 }
 
