@@ -105,8 +105,9 @@ func GetDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 func GetDefaultNetworkConfig(nt nodeconfig.NetworkType) harmonyconfig.NetworkConfig {
 	bn := nodeconfig.GetDefaultBootNodes(nt)
 	return harmonyconfig.NetworkConfig{
-		NetworkType: string(nt),
-		BootNodes:   bn,
+		NetworkType:  string(nt),
+		BootNodes:    bn,
+		TrustedNodes: []string{},
 	}
 }
 
