@@ -140,6 +140,10 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 
 func (consensus *Consensus) finalCommit(isLeader bool) {
 	numCommits := consensus.decider.SignersCount(quorum.Commit)
+	if consensus.blockHash == [32]byte{} {
+		consensus.getLogger().Warn().Msg("[finalCommit] Block hash is empty")
+		return
+	}
 
 	consensus.getLogger().Info().
 		Int64("NumCommits", numCommits).
