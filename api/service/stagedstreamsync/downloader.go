@@ -214,6 +214,24 @@ func (d *Downloader) loop() {
 	}
 	go trigger()
 
+	go func() {
+		for {
+			select {
+			case <-d.closeC:
+				return
+			case <-time.After(60 * time.Second):
+				h, err := d.stagedSyncInstance.estimateCurrentNumber(context.Background())
+				if err != nil {
+					utils.Logger().Err(err).Msg("failed to estimate current number")
+					return
+				}
+				//TODO: use directly currentCycle var
+				d.stagedSyncInstance.status.setTargetBN(h)
+
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-ticker.C:
