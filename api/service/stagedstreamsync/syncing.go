@@ -308,20 +308,26 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		return 0, 0, err
 	}
 
-	var estimatedHeight uint64
-	if initSync {
-		if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
-			return 0, 0, err
-		} else {
-			estimatedHeight = h
-			//TODO: use directly currentCycle var
-			s.status.setTargetBN(estimatedHeight)
-		}
-		if curBN := s.CurrentBlockNumber(); estimatedHeight <= curBN {
-			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
-				Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
-			return estimatedHeight, 0, nil
-		}
+	var estimatedHeight uint64 = s.status.getTargetBN()
+	//if initSync {
+	//	if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
+	//		return 0, 0, err
+	//	} else {
+	//		estimatedHeight = h
+	//		//TODO: use directly currentCycle var
+	//		s.status.setTargetBN(estimatedHeight)
+	//	}
+	//	if curBN := s.CurrentBlockNumber(); estimatedHeight <= curBN {
+	//		s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
+	//			Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
+	//		return estimatedHeight, 0, nil
+	//	}
+	//}
+
+	if curBN := s.CurrentBlockNumber(); estimatedHeight <= curBN {
+		s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
+			Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
+		return estimatedHeight, 0, nil
 	}
 
 	// We are probably in full sync, but we might have rewound to before the
@@ -531,11 +537,6 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 	wg.Wait()
 
 	if len(cnResults) == 0 {
-		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		default:
-		}
 		return 0, ErrZeroBlockResponse
 	}
 	bn := computeBlockNumberByMaxVote(cnResults)

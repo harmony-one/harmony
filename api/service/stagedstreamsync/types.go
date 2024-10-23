@@ -40,6 +40,13 @@ func (s *status) setTargetBN(val uint64) {
 	s.targetBN = val
 }
 
+func (s *status) getTargetBN() uint64 {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.targetBN
+}
+
 func (s *status) finishSyncing() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
