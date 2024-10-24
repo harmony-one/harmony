@@ -1,6 +1,7 @@
 package sttypes
 
 import (
+	"sort"
 	"sync"
 )
 
@@ -30,6 +31,32 @@ func NewSafeMapWithInitialValues[K comparable, V any](initialValues map[K]V) *Sa
 		}
 	}
 	return m
+}
+
+// Clone creates and returns a deep copy of the SafeMap
+func (m *SafeMap[K, V]) Clone() *SafeMap[K, V] {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	clone := NewSafeMap[K, V]()
+	for k, v := range m.data {
+		clone.data[k] = v
+	}
+
+	return clone
+}
+
+// Snapshot returns a copy of the underlying map
+func (m *SafeMap[K, V]) Snapshot() map[K]V {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Create a copy of the internal map for safe iteration
+	snapshot := make(map[K]V, len(m.data))
+	for k, v := range m.data {
+		snapshot[k] = v
+	}
+	return snapshot
 }
 
 // Set inserts or updates a key-value pair in the map.
@@ -93,4 +120,36 @@ func (m *SafeMap[K, V]) Clear() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.data = make(map[K]V) // Reinitialize the map
+}
+
+// SortKeys returns a sorted clone of SafeMap.
+func (m *SafeMap[K, V]) Sort(less func(i, j K) bool) *SafeMap[K, V] {
+	keys := m.Keys()
+	sort.Slice(keys, func(i, j int) bool {
+		return less(keys[i], keys[j])
+	})
+	// Create a sorted copy of the map
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	sorted := NewSafeMap[K, V]()
+	for _, k := range keys {
+		sorted.data[k] = m.data[k]
+	}
+	return sorted
+}
+
+// SortedSnapshot returns a sorted copy of the underlying map
+func (m *SafeMap[K, V]) SortedSnapshot(less func(i, j K) bool) map[K]V {
+	keys := m.Keys()
+	sort.Slice(keys, func(i, j int) bool {
+		return less(keys[i], keys[j])
+	})
+	// Create a sorted copy of the map
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	sorted := make(map[K]V, len(m.data))
+	for _, k := range keys {
+		sorted[k] = m.data[k]
+	}
+	return sorted
 }
