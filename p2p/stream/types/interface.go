@@ -22,8 +22,8 @@ type Protocol interface {
 
 // Request is the interface of a stream request used for common stream utils.
 type Request interface {
-	ReqID() uint64
-	SetReqID(rid uint64)
+	ID() uint64
+	SetID(rid uint64)
 	String() string
 	IsSupportedByProto(ProtoSpec) bool
 	Encode() ([]byte, error)

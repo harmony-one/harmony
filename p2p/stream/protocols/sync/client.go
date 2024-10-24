@@ -309,11 +309,11 @@ func newGetBlocksByNumberRequest(bns []uint64) *getBlocksByNumberRequest {
 	}
 }
 
-func (req *getBlocksByNumberRequest) ReqID() uint64 {
+func (req *getBlocksByNumberRequest) ID() uint64 {
 	return req.pbReq.GetReqId()
 }
 
-func (req *getBlocksByNumberRequest) SetReqID(val uint64) {
+func (req *getBlocksByNumberRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
@@ -384,11 +384,11 @@ func newGetBlockNumberRequest() *getBlockNumberRequest {
 	}
 }
 
-func (req *getBlockNumberRequest) ReqID() uint64 {
+func (req *getBlockNumberRequest) ID() uint64 {
 	return req.pbReq.GetReqId()
 }
 
-func (req *getBlockNumberRequest) SetReqID(val uint64) {
+func (req *getBlockNumberRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
@@ -433,11 +433,11 @@ func newGetBlockHashesRequest(bns []uint64) *getBlockHashesRequest {
 	}
 }
 
-func (req *getBlockHashesRequest) ReqID() uint64 {
+func (req *getBlockHashesRequest) ID() uint64 {
 	return req.pbReq.ReqId
 }
 
-func (req *getBlockHashesRequest) SetReqID(val uint64) {
+func (req *getBlockHashesRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
@@ -488,11 +488,11 @@ func newGetBlocksByHashesRequest(hashes []common.Hash) *getBlocksByHashesRequest
 	}
 }
 
-func (req *getBlocksByHashesRequest) ReqID() uint64 {
+func (req *getBlocksByHashesRequest) ID() uint64 {
 	return req.pbReq.GetReqId()
 }
 
-func (req *getBlocksByHashesRequest) SetReqID(val uint64) {
+func (req *getBlocksByHashesRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
@@ -562,11 +562,11 @@ func newGetNodeDataRequest(hashes []common.Hash) *getNodeDataRequest {
 	}
 }
 
-func (req *getNodeDataRequest) ReqID() uint64 {
+func (req *getNodeDataRequest) ID() uint64 {
 	return req.pbReq.GetReqId()
 }
 
-func (req *getNodeDataRequest) SetReqID(val uint64) {
+func (req *getNodeDataRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
@@ -626,11 +626,11 @@ func newGetReceiptsRequest(hashes []common.Hash) *getReceiptsRequest {
 	}
 }
 
-func (req *getReceiptsRequest) ReqID() uint64 {
+func (req *getReceiptsRequest) ID() uint64 {
 	return req.pbReq.GetReqId()
 }
 
-func (req *getReceiptsRequest) SetReqID(val uint64) {
+func (req *getReceiptsRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
@@ -706,11 +706,11 @@ func newGetAccountRangeRequest(root common.Hash, origin common.Hash, limit commo
 	}
 }
 
-func (req *getAccountRangeRequest) ReqID() uint64 {
+func (req *getAccountRangeRequest) ID() uint64 {
 	return req.pbReq.GetReqId()
 }
 
-func (req *getAccountRangeRequest) SetReqID(val uint64) {
+func (req *getAccountRangeRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
@@ -783,11 +783,11 @@ func newGetStorageRangesRequest(root common.Hash, accounts []common.Hash, origin
 	}
 }
 
-func (req *getStorageRangesRequest) ReqID() uint64 {
+func (req *getStorageRangesRequest) ID() uint64 {
 	return req.pbReq.GetReqId()
 }
 
-func (req *getStorageRangesRequest) SetReqID(val uint64) {
+func (req *getStorageRangesRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
@@ -858,11 +858,11 @@ func newGetByteCodesRequest(hashes []common.Hash, bytes uint64) *getByteCodesReq
 	}
 }
 
-func (req *getByteCodesRequest) ReqID() uint64 {
+func (req *getByteCodesRequest) ID() uint64 {
 	return req.pbReq.GetReqId()
 }
 
-func (req *getByteCodesRequest) SetReqID(val uint64) {
+func (req *getByteCodesRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
@@ -931,11 +931,11 @@ func newGetTrieNodesRequest(root common.Hash, paths []*message.TrieNodePathSet, 
 	}
 }
 
-func (req *getTrieNodesRequest) ReqID() uint64 {
+func (req *getTrieNodesRequest) ID() uint64 {
 	return req.pbReq.GetReqId()
 }
 
-func (req *getTrieNodesRequest) SetReqID(val uint64) {
+func (req *getTrieNodesRequest) SetID(val uint64) {
 	req.pbReq.ReqId = val
 }
 
