@@ -788,6 +788,10 @@ func (rm *testHostRequestManager) DoRequest(ctx context.Context, request sttypes
 	return resp, stid, nil
 }
 
+func (rm *testHostRequestManager) AvailableCapacity() int    { return 0 }
+func (rm *testHostRequestManager) Streams() []sttypes.Stream { return []sttypes.Stream{} }
+func (rm *testHostRequestManager) NumStreams() int           { return 0 }
+
 func makeTestStreamID(index int) sttypes.StreamID {
 	id := fmt.Sprintf("[test stream %v]", index)
 	return sttypes.StreamID(id)
@@ -842,6 +846,10 @@ func (sm *testStreamManager) GetStreams() []sttypes.Stream {
 
 func (sm *testStreamManager) GetStreamByID(id sttypes.StreamID) (sttypes.Stream, bool) {
 	return nil, false
+}
+
+func (sm *testStreamManager) NumStreams() int {
+	return len(sm.streamIDs)
 }
 
 func assertError(got, expect error) error {

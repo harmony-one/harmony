@@ -212,6 +212,11 @@ func (sm *streamManager) GetStreamByID(id sttypes.StreamID) (sttypes.Stream, boo
 	return sm.streams.get(id)
 }
 
+// NumStreams return the number of connected streams
+func (sm *streamManager) NumStreams() int {
+	return sm.streams.size()
+}
+
 type (
 	addStreamTask struct {
 		st   sttypes.Stream
@@ -254,11 +259,11 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 
 func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	id := st.ID()
-	if sm.streams.size() >= sm.config.HiCap {
-		return ErrTooManyStreams
-	}
 	if _, ok := sm.streams.get(id); ok {
 		return ErrStreamAlreadyExist
+	}
+	if sm.streams.size() >= sm.config.HiCap {
+		return ErrTooManyStreams
 	}
 
 	sm.streams.addStream(st)

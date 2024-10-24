@@ -74,6 +74,13 @@ func (sm *testStreamManager) GetStreamByID(id sttypes.StreamID) (sttypes.Stream,
 	return st, exist
 }
 
+func (sm *testStreamManager) NumStreams() int {
+	sm.lock.Lock()
+	defer sm.lock.Unlock()
+
+	return len(sm.streams)
+}
+
 type testStream struct {
 	id      sttypes.StreamID
 	rm      *requestManager
@@ -138,14 +145,14 @@ func makeDummyTestStreams(indexes []int) []sttypes.Stream {
 	return sts
 }
 
-func makeDummyStreamSets(indexes []int) *sttypes.SafeMap[sttypes.StreamID, *stream] {
-	m := sttypes.NewSafeMap[sttypes.StreamID, *stream]()
+func makeDummyStreamSets(indexes []int) *sttypes.SafeMap[sttypes.StreamID, *WorkerStream] {
+	m := sttypes.NewSafeMap[sttypes.StreamID, *WorkerStream]()
 
 	for _, index := range indexes {
 		st := &testStream{
 			id: makeStreamID(index),
 		}
-		m.Set(st.ID(), &stream{Stream: st})
+		m.Set(st.ID(), &WorkerStream{Stream: st})
 	}
 	return m
 }
@@ -166,11 +173,11 @@ func makeTestRequest(index uint64) *testRequest {
 	}
 }
 
-func (req *testRequest) ReqID() uint64 {
+func (req *testRequest) ID() uint64 {
 	return req.reqID
 }
 
-func (req *testRequest) SetReqID(rid uint64) {
+func (req *testRequest) SetID(rid uint64) {
 	req.reqID = rid
 }
 
@@ -180,10 +187,10 @@ func (req *testRequest) String() string {
 
 func (req *testRequest) Encode() ([]byte, error) {
 	return rlp.EncodeToBytes(struct {
-		ReqID uint64
+		ID    uint64
 		Index uint64
 	}{
-		ReqID: req.reqID,
+		ID:    req.reqID,
 		Index: req.index,
 	})
 }
@@ -204,7 +211,7 @@ func (req *testRequest) checkResponse(rawResp sttypes.Response) error {
 
 func decodeTestRequest(b []byte) (*testRequest, error) {
 	type SerRequest struct {
-		ReqID uint64
+		ID    uint64
 		Index uint64
 	}
 	var sr SerRequest
@@ -212,7 +219,7 @@ func decodeTestRequest(b []byte) (*testRequest, error) {
 		return nil, err
 	}
 	return &testRequest{
-		reqID: sr.ReqID,
+		reqID: sr.ID,
 		index: sr.Index,
 	}, nil
 }

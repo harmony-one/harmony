@@ -77,7 +77,7 @@ func TestRequestManager_NewStream(t *testing.T) {
 
 	time.Sleep(defTestSleep)
 
-	if ts.rm.streams.Length() != 4 || ts.rm.available.Length() != 4 {
+	if ts.rm.streams.Length() != 4 {
 		t.Errorf("unexpected stream size")
 	}
 }
@@ -106,7 +106,7 @@ func TestRequestManager_RemoveStream(t *testing.T) {
 		t.Errorf("unexpected error: %v", errors.New("stream removed when doing request"))
 	}
 
-	if ts.rm.streams.Length() != 2 || ts.rm.available.Length() != 2 {
+	if ts.rm.streams.Length() != 2 {
 		t.Errorf("unexpected stream size")
 	}
 }
@@ -368,7 +368,7 @@ func TestRequestManager_Concurrency(t *testing.T) {
 func TestGenReqID(t *testing.T) {
 	retry := 100000
 	rm := &requestManager{
-		pendings: sttypes.NewSafeMap[uint64, *request](),
+		pendings: sttypes.NewSafeMap[uint64, *WorkerRequest](),
 	}
 
 	for i := 0; i != retry; i++ {
@@ -382,7 +382,7 @@ func TestGenReqID(t *testing.T) {
 
 func TestCheckStreamUpdates(t *testing.T) {
 	tests := []struct {
-		exists            *sttypes.SafeMap[sttypes.StreamID, *stream]
+		exists            *sttypes.SafeMap[sttypes.StreamID, *WorkerStream]
 		targets           []sttypes.Stream
 		expAddedIndexes   []int
 		expRemovedIndexes []int
@@ -453,7 +453,7 @@ func checkStreamIDsEqual(sts []sttypes.Stream, expIndexes []int) error {
 	return nil
 }
 
-func checkStreamIDsEqual2(sts []*stream, expIndexes []int) error {
+func checkStreamIDsEqual2(sts []*WorkerStream, expIndexes []int) error {
 	if len(sts) != len(expIndexes) {
 		return fmt.Errorf("size not equal")
 	}
@@ -518,9 +518,7 @@ func (ts *testSuite) pickOneOccupiedStream() sttypes.StreamID {
 	IDs := ts.rm.pendings.Keys()
 	for _, id := range IDs {
 		req, _ := ts.rm.pendings.Get(id)
-		if req.owner != nil {
-			return req.owner.ID()
-		}
+		return req.OwnerID()
 	}
 	return ""
 }

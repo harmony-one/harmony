@@ -41,6 +41,7 @@ type Subscriber interface {
 type Reader interface {
 	GetStreams() []sttypes.Stream
 	GetStreamByID(id sttypes.StreamID) (sttypes.Stream, bool)
+	NumStreams() int
 }
 
 // host is the adapter interface of the libp2p host implementation.

@@ -187,8 +187,8 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 	p.logger.Info().Str("stream", raw.ID()).Msg("handle new sync stream")
 	st := p.wrapStream(raw)
 	if err := p.sm.NewStream(st); err != nil {
-		// Possibly we have reach the hard limit of the stream
 		if !errors.Is(err, streammanager.ErrStreamAlreadyExist) {
+			// Possibly we have reach the hard limit of the stream
 			p.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
 				Msg("failed to add new stream")
 		}
@@ -309,6 +309,11 @@ func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
 	}
 }
 
+// Streams returns the connected streams
+func (p *Protocol) Streams() []sttypes.Stream {
+	return p.sm.GetStreams()
+}
+
 // NumStreams return the streams with minimum version.
 // Note: nodes with sync version smaller than minVersion is not counted.
 func (p *Protocol) NumStreams() int {
@@ -322,6 +327,11 @@ func (p *Protocol) NumStreams() int {
 		}
 	}
 	return res
+}
+
+// AvailableCapacity returns number of free streams to handle new requests
+func (p *Protocol) AvailableCapacity() int {
+	return p.rm.AvailableCapacity()
 }
 
 // GetStreamManager get the underlying stream manager for upper level stream operations

@@ -120,14 +120,14 @@ func makeTestRequestQueue(sizes []int) requestQueues {
 	return q
 }
 
-func wrapRequestFromRaw(raw *testRequest) *request {
-	return &request{
+func wrapRequestFromRaw(raw *testRequest) *WorkerRequest {
+	return &WorkerRequest{
 		Request: raw,
 	}
 }
 
 func getTestRequestFromElem(elem *list.Element) (*testRequest, error) {
-	req, ok := elem.Value.(*request)
+	req, ok := elem.Value.(*WorkerRequest)
 	if !ok {
 		return nil, errors.New("unexpected type")
 	}

@@ -17,9 +17,16 @@ type Deliverer interface {
 	DeliverResponse(stID sttypes.StreamID, resp sttypes.Response)
 }
 
+type Streams interface {
+	Streams() []sttypes.Stream
+	NumStreams() int
+	AvailableCapacity() int
+}
+
 // RequestManager manages over the requests
 type RequestManager interface {
 	p2ptypes.LifeCycle
 	Requester
 	Deliverer
+	Streams
 }

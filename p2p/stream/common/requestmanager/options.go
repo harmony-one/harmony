@@ -7,12 +7,12 @@ import sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 // 1. WithHighPriority
 // 2. WithBlacklist
 // 3. WithWhitelist
-type RequestOption func(*request)
+type RequestOption func(*WorkerRequest)
 
 // WithHighPriority is the request option to do request with higher priority.
 // High priority requests are done first.
 func WithHighPriority() RequestOption {
-	return func(req *request) {
+	return func(req *WorkerRequest) {
 		req.priority = reqPriorityHigh
 	}
 }
@@ -20,7 +20,7 @@ func WithHighPriority() RequestOption {
 // WithBlacklist is the request option not to assign the request to the blacklisted
 // stream ID.
 func WithBlacklist(blacklist []sttypes.StreamID) RequestOption {
-	return func(req *request) {
+	return func(req *WorkerRequest) {
 		for _, stid := range blacklist {
 			req.addBlacklistedStream(stid)
 		}
@@ -31,7 +31,7 @@ func WithBlacklist(blacklist []sttypes.StreamID) RequestOption {
 // given stream IDs.
 // If a request is not with this option, all streams will be allowed.
 func WithWhitelist(whitelist []sttypes.StreamID) RequestOption {
-	return func(req *request) {
+	return func(req *WorkerRequest) {
 		for _, stid := range whitelist {
 			req.addWhiteListStream(stid)
 		}
