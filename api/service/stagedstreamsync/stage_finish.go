@@ -53,7 +53,7 @@ func (finish *StageFinish) Exec(ctx context.Context, firstCycle bool, invalidBlo
 	return nil
 }
 
-func (finish *StageFinish) clearBucket(ctx context.Context, tx kv.RwTx, isBeacon bool) error {
+func (finish *StageFinish) clearBucket(ctx context.Context, tx kv.RwTx, isBeaconShard bool) error {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error

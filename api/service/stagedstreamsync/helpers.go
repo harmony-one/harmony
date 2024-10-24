@@ -82,6 +82,9 @@ func getBlockByMaxVote(blocks []*types.Block) (*types.Block, error) {
 		if block == nil {
 			continue
 		}
+		if _, exist := hashesVote[block.Header().Hash()]; !exist {
+			hashesVote[block.Header().Hash()] = 0
+		}
 		hashesVote[block.Header().Hash()]++
 		if hashesVote[block.Header().Hash()] > maxVote {
 			maxVote = hashesVote[block.Header().Hash()]
@@ -94,6 +97,8 @@ func getBlockByMaxVote(blocks []*types.Block) (*types.Block, error) {
 	return blocks[maxVotedBlockIndex], nil
 }
 
+// countHashMaxVote counts the votes for each hash in the map, respecting the whitelist.
+// It returns the hash with the most votes and the next whitelist of StreamIDs.
 func countHashMaxVote(m map[sttypes.StreamID]common.Hash, whitelist map[sttypes.StreamID]struct{}) (common.Hash, map[sttypes.StreamID]struct{}) {
 	var (
 		voteM  = make(map[common.Hash]int)
@@ -102,13 +107,14 @@ func countHashMaxVote(m map[sttypes.StreamID]common.Hash, whitelist map[sttypes.
 	)
 
 	for st, h := range m {
+		if h == emptyHash {
+			continue
+		}
+		// If a whitelist is provided, skip StreamIDs not in the whitelist
 		if len(whitelist) != 0 {
 			if _, ok := whitelist[st]; !ok {
 				continue
 			}
-		}
-		if _, ok := voteM[h]; !ok {
-			voteM[h] = 0
 		}
 		voteM[h]++
 		if voteM[h] > maxCnt {
@@ -117,19 +123,18 @@ func countHashMaxVote(m map[sttypes.StreamID]common.Hash, whitelist map[sttypes.
 		}
 	}
 
+	// Build the next whitelist based on the winning hash
 	nextWl := make(map[sttypes.StreamID]struct{})
-	for st, h := range m {
-		if h != res {
-			continue
-		}
-		if len(whitelist) != 0 {
-			if _, ok := whitelist[st]; ok {
-				nextWl[st] = struct{}{}
+	if res != emptyHash {
+		for st, h := range m {
+			if h == res {
+				if len(whitelist) == 0 || (len(whitelist) != 0 && whitelist[st] != struct{}{}) {
+					nextWl[st] = struct{}{}
+				}
 			}
-		} else {
-			nextWl[st] = struct{}{}
 		}
 	}
+
 	return res, nextWl
 }
 

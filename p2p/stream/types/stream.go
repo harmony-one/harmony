@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -22,7 +23,7 @@ type Stream interface {
 	ReadBytes() ([]byte, error)
 	Close() error
 	CloseOnExit() error
-	FailedTimes() int
+	Failures() int
 	AddFailedTimes(faultRecoveryThreshold time.Duration)
 	ResetFailedTimes()
 }
@@ -39,7 +40,7 @@ type BaseStream struct {
 	specErr  error
 	specOnce sync.Once
 
-	failedTimes     int
+	failures        int32
 	lastFailureTime time.Time
 }
 
@@ -47,9 +48,9 @@ type BaseStream struct {
 func NewBaseStream(st libp2p_network.Stream) *BaseStream {
 	reader := bufio.NewReader(st)
 	return &BaseStream{
-		raw:         st,
-		reader:      reader,
-		failedTimes: 0,
+		raw:      st,
+		reader:   reader,
+		failures: 0,
 	}
 }
 
@@ -80,23 +81,16 @@ func (st *BaseStream) Close() error {
 	return st.raw.Reset()
 }
 
-func (st *BaseStream) FailedTimes() int {
-	return st.failedTimes
+func (st *BaseStream) Failures() int {
+	return int(atomic.LoadInt32(&st.failures))
 }
 
 func (st *BaseStream) AddFailedTimes(faultRecoveryThreshold time.Duration) {
-	if st.failedTimes > 0 {
-		durationSinceLastFailure := time.Now().Sub(st.lastFailureTime)
-		if durationSinceLastFailure >= faultRecoveryThreshold {
-			st.ResetFailedTimes()
-		}
-	}
-	st.failedTimes++
-	st.lastFailureTime = time.Now()
+	atomic.AddInt32(&st.failures, 1)
 }
 
 func (st *BaseStream) ResetFailedTimes() {
-	st.failedTimes = 0
+	atomic.StoreInt32(&st.failures, 0)
 }
 
 const (

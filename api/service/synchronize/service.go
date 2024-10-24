@@ -3,6 +3,7 @@ package synchronize
 import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/hmy/downloader"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -12,9 +13,9 @@ type Service struct {
 }
 
 // NewService creates the a new downloader service
-func NewService(host p2p.Host, bcs []core.BlockChain, config downloader.Config) *Service {
+func NewService(host p2p.Host, bcs []core.BlockChain, nodeConfig *nodeconfig.ConfigType, config downloader.Config) *Service {
 	return &Service{
-		Downloaders: downloader.NewDownloaders(host, bcs, config),
+		Downloaders: downloader.NewDownloaders(host, bcs, nodeConfig, config),
 	}
 }
 

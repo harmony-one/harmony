@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 
 	//sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -63,7 +62,7 @@ func (sss *StageFullStateSync) Exec(ctx context.Context, bool, invalidBlockRever
 	}
 
 	// shouldn't execute for epoch chain
-	if sss.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+	if s.state.isEpochChain {
 		return nil
 	}
 

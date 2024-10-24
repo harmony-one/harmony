@@ -60,33 +60,36 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 }
 
 type StagedStreamSync struct {
-	bc              core.BlockChain
-	consensus       *consensus.Consensus
-	isBeacon        bool
-	isExplorer      bool
-	db              kv.RwDB
-	protocol        syncProtocol
-	isBeaconNode    bool
-	gbm             *blockDownloadManager // initialized when finished get block number
-	lastMileBlocks  []*types.Block        // last mile blocks to catch up with the consensus
-	lastMileMux     sync.Mutex
-	inserted        int
-	config          Config
-	logger          zerolog.Logger
-	status          *status //TODO: merge this with currentSyncCycle
-	initSync        bool    // if sets to true, node start long range syncing
-	UseMemDB        bool
-	revertPoint     *uint64 // used to run stages
-	prevRevertPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
-	invalidBlock    InvalidBlock
-	currentStage    uint
-	LogProgress     bool
-	currentCycle    SyncCycle // current cycle
-	stages          []*Stage
-	revertOrder     []*Stage
-	pruningOrder    []*Stage
-	timings         []Timing
-	logPrefixes     []string
+	bc                core.BlockChain
+	consensus         *consensus.Consensus
+	db                kv.RwDB
+	protocol          syncProtocol
+	gbm               *blockDownloadManager // initialized when finished get block number
+	lastMileBlocks    []*types.Block        // last mile blocks to catch up with the consensus
+	lastMileMux       sync.Mutex
+	isEpochChain      bool
+	isBeaconValidator bool
+	isBeaconShard     bool
+	isExplorer        bool
+	isValidator       bool
+	joinConsensus     bool
+	inserted          int
+	config            Config
+	logger            zerolog.Logger
+	status            *status //TODO: merge this with currentSyncCycle
+	initSync          bool    // if sets to true, node start long range syncing
+	UseMemDB          bool
+	revertPoint       *uint64 // used to run stages
+	prevRevertPoint   *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
+	invalidBlock      InvalidBlock
+	currentStage      uint
+	LogProgress       bool
+	currentCycle      SyncCycle // current cycle
+	stages            []*Stage
+	revertOrder       []*Stage
+	pruningOrder      []*Stage
+	timings           []Timing
+	logPrefixes       []string
 
 	evtDownloadFinished           event.Feed // channel for each download task finished
 	evtDownloadFinishedSubscribed bool
@@ -110,7 +113,7 @@ type SyncCycle struct {
 func (s *StagedStreamSync) Len() int                    { return len(s.stages) }
 func (s *StagedStreamSync) Blockchain() core.BlockChain { return s.bc }
 func (s *StagedStreamSync) DB() kv.RwDB                 { return s.db }
-func (s *StagedStreamSync) IsBeacon() bool              { return s.isBeacon }
+func (s *StagedStreamSync) IsBeacon() bool              { return s.isBeaconShard }
 func (s *StagedStreamSync) IsExplorer() bool            { return s.isExplorer }
 func (s *StagedStreamSync) LogPrefix() string {
 	if s == nil {
@@ -129,7 +132,7 @@ func (s *StagedStreamSync) CleanUpStageState(ctx context.Context, id SyncStageID
 	var err error
 
 	if errV := CreateView(ctx, db, tx, func(tx kv.Tx) error {
-		pruneProgress, err = GetStageCleanUpProgress(tx, id, s.isBeacon)
+		pruneProgress, err = GetStageCleanUpProgress(tx, id, s.isBeaconShard)
 		if err != nil {
 			return err
 		}
@@ -225,7 +228,7 @@ func (s *StagedStreamSync) StageState(ctx context.Context, stage SyncStageID, tx
 	var blockNum uint64
 	var err error
 	if errV := CreateView(ctx, db, tx, func(rtx kv.Tx) error {
-		blockNum, err = GetStageProgress(rtx, stage, s.isBeacon)
+		blockNum, err = GetStageProgress(rtx, stage, s.isBeaconShard)
 		if err != nil {
 			return err
 		}
@@ -263,9 +266,13 @@ func New(
 	consensus *consensus.Consensus,
 	db kv.RwDB,
 	stagesList []*Stage,
-	isBeacon bool,
+	isEpochChain bool,
+	isBeaconShard bool,
 	protocol syncProtocol,
-	isBeaconNode bool,
+	isBeaconValidator bool,
+	isExplorer bool,
+	isValidator bool,
+	joinConsensus bool,
 	config Config,
 	logger zerolog.Logger,
 ) *StagedStreamSync {
@@ -308,24 +315,28 @@ func New(
 	status := newStatus()
 
 	return &StagedStreamSync{
-		bc:             bc,
-		consensus:      consensus,
-		isBeacon:       isBeacon,
-		db:             db,
-		protocol:       protocol,
-		isBeaconNode:   isBeaconNode,
-		lastMileBlocks: []*types.Block{},
-		gbm:            nil,
-		status:         &status,
-		inserted:       0,
-		config:         config,
-		logger:         logger,
-		stages:         forwardStages,
-		currentStage:   0,
-		revertOrder:    revertStages,
-		pruningOrder:   pruneStages,
-		logPrefixes:    logPrefixes,
-		UseMemDB:       config.UseMemDB,
+		bc:                bc,
+		consensus:         consensus,
+		isBeaconShard:     isBeaconShard,
+		db:                db,
+		protocol:          protocol,
+		isEpochChain:      isEpochChain,
+		isBeaconValidator: isBeaconValidator,
+		isExplorer:        isExplorer,
+		isValidator:       isValidator,
+		joinConsensus:     joinConsensus,
+		lastMileBlocks:    []*types.Block{},
+		gbm:               nil,
+		status:            &status,
+		inserted:          0,
+		config:            config,
+		logger:            logger,
+		stages:            forwardStages,
+		currentStage:      0,
+		revertOrder:       revertStages,
+		pruningOrder:      pruneStages,
+		logPrefixes:       logPrefixes,
+		UseMemDB:          config.UseMemDB,
 	}
 }
 
@@ -461,16 +472,16 @@ func (s *StagedStreamSync) canExecute(stage *Stage) bool {
 	// check chain execution
 	if stage.ChainExecutionMode != AllChains {
 		shardID := s.bc.ShardID()
-		isBeaconNode := s.isBeaconNode
+		isBeaconValidator := s.isBeaconValidator
 		isShardChain := shardID != shard.BeaconChainShardID
-		isEpochChain := shardID == shard.BeaconChainShardID && !isBeaconNode
+		isEpochChain := s.isEpochChain
 		switch stage.ChainExecutionMode {
 		case AllChainsExceptEpochChain:
 			if isEpochChain {
 				return false
 			}
 		case OnlyBeaconNode:
-			if !isBeaconNode {
+			if !isBeaconValidator {
 				return false
 			}
 		case OnlyShardChain:

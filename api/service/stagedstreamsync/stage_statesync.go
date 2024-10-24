@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -62,7 +61,7 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 	}
 
 	// shouldn't execute for epoch chain
-	if sss.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+	if s.state.isEpochChain {
 		return nil
 	}
 
