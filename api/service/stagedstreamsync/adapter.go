@@ -29,9 +29,10 @@ type syncProtocol interface {
 	RemoveStream(stID sttypes.StreamID) // If a stream delivers invalid data, remove the stream
 	StreamFailed(stID sttypes.StreamID, reason string)
 	SubscribeAddStreamEvent(ch chan<- streammanager.EvtStreamAdded) event.Subscription
+	Streams() []sttypes.Stream
 	NumStreams() int
+	AvailableCapacity() int
 }
-
 type blockChain interface {
 	engine.ChainReader
 	Engine() engine.Engine
