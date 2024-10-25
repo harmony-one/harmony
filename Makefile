@@ -82,11 +82,17 @@ debug:
 
 debug-kill:
 	bash ./test/kill_node.sh
+	# restore the config after external run
+	git restore internal/configs/sharding/localnet.go
 
 debug-ext:
-	# update localnet block per epoch to ensure a stable localnet
-	sed -i 's/localnetBlocksPerEpoch\s*=\s*[0-9]*/localnetBlocksPerEpoch = 64/' internal/configs/sharding/localnet.go
-	sed -i 's/localnetBlocksPerEpochV2\s*=\s*[0-9]*/localnetBlocksPerEpochV2 = 64/' internal/configs/sharding/localnet.go
+	# update localnet block per epoch to ensure a stable localnet,
+	# -i.bak and rm bac are used for the Macos/Linux sed compitability
+	sed -i.bak 's#localnetBlocksPerEpoch[[:space:]]*=[[:space:]]*[0-9]*#localnetBlocksPerEpoch = 64#' \
+		internal/configs/sharding/localnet.go
+	sed -i.bak 's#localnetBlocksPerEpochV2[[:space:]]*=[[:space:]]*[0-9]*#localnetBlocksPerEpochV2 = 64#' \
+		internal/configs/sharding/localnet.go
+	rm internal/configs/sharding/localnet.go.bak
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	bash ./test/debug-external.sh &
