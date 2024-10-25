@@ -341,13 +341,13 @@ func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offse
 // (a) node not in committed: Listening mode
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
-func (consensus *Consensus) UpdateConsensusInformation() Mode {
+func (consensus *Consensus) UpdateConsensusInformation(reason string) Mode {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	return consensus.updateConsensusInformation()
+	return consensus.updateConsensusInformation(reason)
 }
 
-func (consensus *Consensus) updateConsensusInformation() Mode {
+func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 	curHeader := consensus.Blockchain().CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
@@ -399,7 +399,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 		return Syncing
 	}
 
-	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
+	consensus.getLogger().Info().Msgf("[UpdateConsensusInformation] Updating....., reason %s", reason)
 	// genesis block is a special case that will have shard state and needs to skip processing
 	isNotGenesisBlock := curHeader.Number().Cmp(big.NewInt(0)) > 0
 	if curHeader.IsLastBlockInEpoch() && isNotGenesisBlock {

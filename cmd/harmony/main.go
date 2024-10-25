@@ -788,7 +788,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 
 	currentNode.Consensus.Registry().SetNodeConfig(currentNode.NodeConfig)
 	// update consensus information based on the blockchain
-	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
+	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation("setupConsensusAndNode"))
 	currentConsensus.NextBlockDue = time.Now()
 	return currentNode
 }

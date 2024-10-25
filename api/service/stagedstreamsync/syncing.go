@@ -415,7 +415,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		}
 		// TODO: move this to explorer handler code.
 		if s.isExplorer {
-			s.consensus.UpdateConsensusInformation()
+			s.consensus.UpdateConsensusInformation("stream sync is explorer")
 		}
 		s.purgeLastMileBlocksFromCache()
 

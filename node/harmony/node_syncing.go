@@ -325,7 +325,7 @@ func (node *Node) doSync(syncInstance ISync, syncingPeerProvider SyncingPeerProv
 		syncInstance.SyncLoop(bc, isBeacon, consensus, legacysync.LoopMinTime)
 		if willJoinConsensus {
 			node.IsSynchronized.Set()
-			consensus.BlocksSynchronized()
+			consensus.BlocksSynchronized("doSync")
 		}
 	}
 	node.IsSynchronized.Set()
@@ -353,7 +353,7 @@ func (node *Node) NodeSyncing() {
 		node.syncFromTiKVWriter() // this is for both reader and backup writers
 
 		if node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
-			node.Consensus.UpdateConsensusInformation()
+			node.Consensus.UpdateConsensusInformation("tikv role leader")
 		}
 		if node.HarmonyConfig.TiKV.Role == tikv.RoleWriter {
 			node.supportSyncing() // the writer needs to be in sync with it's other peers
