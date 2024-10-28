@@ -2,6 +2,7 @@ package stagedstreamsync
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/harmony-one/harmony/core"
@@ -28,6 +29,8 @@ type (
 		insertC       chan insertTask
 		closeC        chan struct{}
 		logger        zerolog.Logger
+
+		lock sync.RWMutex
 	}
 
 	insertTask struct {
@@ -55,7 +58,15 @@ func (bh *beaconHelper) start() {
 }
 
 func (bh *beaconHelper) close() {
-	close(bh.closeC)
+	bh.lock.Lock()
+	defer bh.lock.Unlock()
+
+	select {
+	case <-bh.closeC:
+		// Already closed, do nothing
+	default:
+		close(bh.closeC)
+	}
 }
 
 func (bh *beaconHelper) loop() {
@@ -73,7 +84,9 @@ func (bh *beaconHelper) loop() {
 			if b == nil {
 				continue
 			}
+			bh.lock.Lock()
 			bh.lastMileCache.push(b)
+			bh.lock.Unlock()
 			bh.insertAsync()
 
 		case it := <-bh.insertC:
@@ -102,6 +115,9 @@ func (bh *beaconHelper) loop() {
 // insertAsync triggers the insert last mile without blocking
 func (bh *beaconHelper) insertAsync() {
 	select {
+	case <-bh.closeC:
+		// Do nothing if closed
+		return
 	case bh.insertC <- insertTask{
 		doneC: make(chan struct{}),
 	}:
@@ -114,11 +130,19 @@ func (bh *beaconHelper) insertSync() {
 	task := insertTask{
 		doneC: make(chan struct{}),
 	}
-	bh.insertC <- task
+	select {
+	case <-bh.closeC:
+		// Do nothing if closed
+		return
+	case bh.insertC <- task:
+	}
 	<-task.doneC
 }
 
 func (bh *beaconHelper) insertLastMileBlocks() (inserted int, bn uint64, err error) {
+	bh.lock.Lock()
+	defer bh.lock.Unlock()
+
 	bn = bh.bc.CurrentBlock().NumberU64() + 1
 	for {
 		b := bh.getNextBlock(bn)

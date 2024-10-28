@@ -105,9 +105,44 @@ type Timing struct {
 }
 
 type SyncCycle struct {
-	Number       uint64
+	BlockNumber  uint64
 	TargetHeight uint64
 	lock         sync.RWMutex
+}
+
+// GetBlockNumber returns the current sync block number.
+func (s *SyncCycle) GetBlockNumber() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.BlockNumber
+}
+
+// SetBlockNumber sets the sync block number
+func (s *SyncCycle) SetBlockNumber(number uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.BlockNumber = number
+}
+
+// AddBlockNumber adds inc to the sync block number
+func (s *SyncCycle) AddBlockNumber(inc uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.BlockNumber += inc
+}
+
+// GetTargetHeight returns the current target height
+func (s *SyncCycle) GetTargetHeight() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.TargetHeight
+}
+
+// SetTargetHeight sets the target height
+func (s *SyncCycle) SetTargetHeight(height uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.TargetHeight = height
 }
 
 func (s *StagedStreamSync) Len() int                    { return len(s.stages) }
@@ -312,7 +347,7 @@ func New(
 		logPrefixes[i] = fmt.Sprintf("%d/%d %s", i+1, len(stagesList), stagesList[i].ID)
 	}
 
-	status := newStatus()
+	status := NewStatus()
 
 	return &StagedStreamSync{
 		bc:                bc,
@@ -327,7 +362,7 @@ func New(
 		joinConsensus:     joinConsensus,
 		lastMileBlocks:    []*types.Block{},
 		gbm:               nil,
-		status:            &status,
+		status:            status,
 		inserted:          0,
 		config:            config,
 		logger:            logger,

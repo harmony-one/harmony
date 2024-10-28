@@ -53,7 +53,7 @@ func NewStageStatesCfg(
 // Exec progresses States stage in the forward direction
 func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 	// only execute this stage in full sync mode
-	if s.state.status.cycleSyncMode != FullSync {
+	if !s.state.status.IsFullSyncCycle() {
 		return nil
 	}
 
@@ -67,13 +67,13 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		return nil
 	}
 
-	maxHeight := s.state.status.targetBN
+	maxHeight := s.state.status.GetTargetBN()
 	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
 	currProgress := currentHead
-	targetHeight := s.state.currentCycle.TargetHeight
+	targetHeight := s.state.currentCycle.GetTargetHeight()
 	if currProgress >= targetHeight {
 		return nil
 	}
