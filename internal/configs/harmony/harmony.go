@@ -108,8 +108,9 @@ type DnsSync struct {
 }
 
 type NetworkConfig struct {
-	NetworkType string
-	BootNodes   []string
+	NetworkType  string
+	BootNodes    []string
+	TrustedNodes []string
 }
 
 type P2pConfig struct {

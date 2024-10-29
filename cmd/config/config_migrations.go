@@ -439,6 +439,15 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.6.2"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("Network.TrustedNodes") == nil {
+			confTree.Set("Network.TrustedNodes", defaultConfig.Network.TrustedNodes)
+		}
+		// upgrade minor version because of `Cache` network introduction
+		confTree.Set("Version", "2.6.3")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {
