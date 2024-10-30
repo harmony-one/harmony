@@ -40,7 +40,7 @@ func (consensus *Consensus) WaitForNewRandomness() {
 	}()
 }
 
-// GetNextRnd returns the oldest available randomness along with the hash of the block there randomness preimage is committed.
+// GetNextRnd returns the oldest available randomness along with the hash of the block where randomness preimage is committed.
 func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error) {
 	if len(consensus.pendingRnds) == 0 {
 		return [vdFAndProofSize]byte{}, [32]byte{}, errors.New("No available randomness")
