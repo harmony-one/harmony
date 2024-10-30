@@ -419,7 +419,9 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		}
 		s.purgeLastMileBlocksFromCache()
 
-		s.consensus.BlocksSynchronized()
+		if totalInserted > 0 {
+			s.consensus.BlocksSynchronized()
+		}
 	}
 
 	return estimatedHeight, totalInserted, nil
