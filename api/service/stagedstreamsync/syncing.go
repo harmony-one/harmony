@@ -345,6 +345,8 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
 				Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
 			return estimatedHeight, 0, nil
+		} else if curBN < estimatedHeight && s.consensus != nil {
+			s.consensus.BlocksNotSynchronized("StagedStreamSync.doSync")
 		}
 	}
 
