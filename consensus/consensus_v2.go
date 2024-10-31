@@ -181,7 +181,8 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 
 	if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writing commit sig")
+		return
 	}
 
 	// Send committed message before block insertion.
@@ -189,13 +190,12 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
+	groupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))
 	if !isLeader || block.IsLastBlockInEpoch() {
 		// send immediately
 		if err := consensus.msgSender.SendWithRetry(
 			block.NumberU64(),
-			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{groupID},
 			p2p.ConstructMessage(msgToSend)); err != nil {
 			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send committed message")
 		} else {
@@ -210,9 +210,7 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 		// delayed send
 		consensus.msgSender.DelayedSendWithRetry(
 			block.NumberU64(),
-			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{groupID},
 			p2p.ConstructMessage(msgToSend))
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
@@ -225,9 +223,10 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 	err = consensus.commitBlock(block, FBFTMsg)
 
 	if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
-		consensus.getLogger().Err(err).
+		consensus.getLogger().Error().Err(err).
 			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
 			Msg("[finalCommit] Leader failed to commit the confirmed block")
+		return
 	}
 
 	if consensus.ShardID == 0 && isLeader && block.IsLastBlockInEpoch() {
@@ -237,7 +236,7 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 		}
 		encodedBlock, err := rlp.EncodeToBytes(blockWithSig)
 		if err != nil {
-			consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
+			consensus.getLogger().Debug().Msg("[finalCommit] Failed encoding block for epoch end")
 			return
 		}
 		err = consensus.host.SendMessageToGroups(
