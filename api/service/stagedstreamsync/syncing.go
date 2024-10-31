@@ -421,7 +421,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		}
 		s.purgeLastMileBlocksFromCache()
 
-		if totalInserted > 0 {
+		if totalInserted > 0 && !s.isEpochChain {
 			s.consensus.BlocksSynchronized()
 		}
 	}
