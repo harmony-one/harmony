@@ -18,6 +18,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+// UpdatePublicKeys updates the PublicKeys for
+// quorum on current subcommittee, protected by a mutex
+func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls.PublicKeyWrapper) int64 {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	return consensus.updatePublicKeys(pubKeys, allowlist)
+}
+
 func TestConstructAnnounceMessage(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
