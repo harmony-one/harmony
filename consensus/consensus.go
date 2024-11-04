@@ -343,11 +343,19 @@ func (consensus *Consensus) Decider() quorum.Decider {
 // InitConsensusWithValidators initialize shard state
 // from latest epoch and update committee pub
 // keys for consensus
-func (consensus *Consensus) InitConsensusWithValidators() (err error) {
-	shardID := consensus.ShardID
-	currentBlock := consensus.Blockchain().CurrentBlock()
-	blockNum := currentBlock.NumberU64()
+func (consensus *Consensus) InitConsensusWithValidators() error {
 	consensus.SetMode(Listening)
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	err := consensus.initConsensusWithValidators(consensus.Blockchain())
+	return err
+}
+
+func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err error) {
+	shardID := consensus.ShardID
+	currentBlock := bc.CurrentBlock()
+	blockNum := currentBlock.NumberU64()
+
 	epoch := currentBlock.Epoch()
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
@@ -385,14 +393,14 @@ func (consensus *Consensus) InitConsensusWithValidators() (err error) {
 	}
 
 	for _, key := range pubKeys {
-		if consensus.GetPublicKeys().Contains(key.Object) {
+		if consensus.getPublicKeys().Contains(key.Object) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
 				Str("mode", consensus.Mode().String()).
 				Msg("[InitConsensusWithValidators] Successfully updated public keys")
-			consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
-			consensus.SetMode(Normal)
+			consensus.updatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
+			consensus.setMode(Normal)
 			return nil
 		}
 	}
