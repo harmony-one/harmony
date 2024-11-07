@@ -823,9 +823,19 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 			prev := consensus.getLeaderPubKey()
 			consensus.setLeaderPubKey(next)
 			if consensus.isLeader() {
-				utils.Logger().Info().Msgf("We are block %d, I am the new leader %s", blk.NumberU64(), next.Bytes.Hex())
+				utils.Logger().Info().
+					Uint64("CurrentHeight", blk.NumberU64()).
+					Uint64("ConsensusBlockNumber", blk.NumberU64()+1).
+					Int64("Epoch", epoch.Int64()).
+					Str("AssignedLeader", next.Bytes.Hex()).
+					Msg("Consensus Setup: I am the new leader for the next block")
 			} else {
-				utils.Logger().Info().Msgf("We are block %d, the leader is %s", blk.NumberU64(), next.Bytes.Hex())
+				utils.Logger().Info().
+					Uint64("CurrentHeight", blk.NumberU64()).
+					Uint64("ConsensusBlockNumber", blk.NumberU64()+1).
+					Int64("Epoch", epoch.Int64()).
+					Str("AssignedLeader", next.Bytes.Hex()).
+					Msg("Consensus Setup: New leader assigned for the next block")
 			}
 			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 				// leader changed
