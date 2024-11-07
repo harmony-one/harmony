@@ -104,7 +104,7 @@ function launch_localnet() {
     elif [[ -f "$bls_key" ]]; then
       args=("${args[@]}" --blskey_file "${ROOT}/${bls_key}")
     elif [[ -d "$bls_key" ]]; then
-      args=("${args[@]}" --blsfolder "${ROOT}/${bls_key}")
+      args=("${args[@]}" "--consensus.aggregate-sig=false" --blsfolder "${ROOT}/${bls_key}")
     else
       echo "skipping unknown node"
       continue
@@ -138,6 +138,7 @@ function launch_localnet() {
     esac
 
     # Start the node
+    echo ${DRYRUN} "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}"
     ${DRYRUN} "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
   done <"${config}"
 }
