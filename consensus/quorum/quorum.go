@@ -101,6 +101,7 @@ type SignatoryTracker interface {
 type SignatureReader interface {
 	SignatoryTracker
 	ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot
+	GetBallotsCount(p Phase, pubkeys []bls.SerializedPublicKey) int64
 	TwoThirdsSignersCount() int64
 	// 96 bytes aggregated signature
 	AggregateVotes(p Phase) *bls_core.Sign
@@ -426,6 +427,28 @@ func (s *cIdentities) ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votep
 		return nil
 	}
 	return payload
+}
+
+func (s *cIdentities) GetBallotsCount(p Phase, pubkeys []bls.SerializedPublicKey) int64 {
+	ballotBox := map[bls.SerializedPublicKey]*votepower.Ballot{}
+
+	switch p {
+	case Prepare:
+		ballotBox = s.prepare.BallotBox
+	case Commit:
+		ballotBox = s.commit.BallotBox
+	case ViewChange:
+		ballotBox = s.viewChange.BallotBox
+	}
+
+	count := int64(0)
+	for _, pubkey := range pubkeys {
+		_, ok := ballotBox[pubkey]
+		if ok {
+			count++
+		}
+	}
+	return count
 }
 
 func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {

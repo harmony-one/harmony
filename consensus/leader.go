@@ -216,6 +216,16 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	quorumWasMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
 
 	signerCount := consensus.decider.SignersCount(quorum.Commit)
+
+	// check if it is first received commit
+	// it may multi bls key validators can achieve quorum on first commit
+	var myPubkeys []bls.SerializedPublicKey
+	for _, key := range consensus.priKey {
+		myPubkeys = append(myPubkeys, key.Pub.Bytes)
+	}
+	mySignsCount := consensus.decider.GetBallotsCount(quorum.Commit, myPubkeys)
+	isFirstReceivedSignature := signerCount == mySignsCount
+
 	//// Read - End
 
 	// Verify the signature on commitPayload is correct
@@ -289,8 +299,10 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 	quorumIsMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
 	//// Read - End
+	quorumAchievedByFirstCommit := isFirstReceivedSignature && quorumWasMet
+	quorumAchievedByThisCommit := !quorumWasMet && quorumIsMet
 
-	if !quorumWasMet && quorumIsMet {
+	if quorumAchievedByFirstCommit || quorumAchievedByThisCommit {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
