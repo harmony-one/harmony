@@ -77,6 +77,7 @@ type ParticipantTracker interface {
 	ParticipantsCount() int64
 	// NthNextValidator returns key for next validator. It assumes external validators and leader rotation.
 	NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
+	NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(instance shardingconfig.Instance, pubkey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
 	UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper)
@@ -217,7 +218,46 @@ func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bl
 	return found, &s.publicKeys[idx]
 }
 
-// NthNextValidator return the Nth next pubkey nodes, but from another validator.
+// NthNextValidatorV2 returns the Nth next pubkey nodes, but from another validator.
+func (s *cIdentities) NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+	if len(s.publicKeys) == 0 || next < 0 {
+		return false, pubKey
+	}
+
+	publicToAddress := make(map[bls.SerializedPublicKey]common.Address, len(slotList))
+	for _, slot := range slotList {
+		publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
+	}
+
+	pubKeyIndex := s.IndexOf(pubKey.Bytes)
+	if pubKeyIndex == -1 {
+		utils.Logger().Error().
+			Str("key", pubKey.Bytes.Hex()).
+			Msg("[NthNextValidator] pubKey not found")
+	}
+
+	if pubKeyIndex == -1 && next == 0 {
+		return true, &s.publicKeys[0]
+	}
+
+	numKeys := len(s.publicKeys)
+	attempts := 0
+
+	for {
+		idx := (pubKeyIndex + attempts + next) % numKeys
+		if attempts > numKeys {
+			utils.Logger().Warn().
+				Str("key", pubKey.Bytes.Hex()).
+				Msg("[NthNextValidator] Could not find a different validator within limit")
+			return false, pubKey
+		}
+		if publicToAddress[s.publicKeys[idx].Bytes] != publicToAddress[pubKey.Bytes] {
+			return true, &s.publicKeys[idx]
+		}
+		attempts++
+	}
+}
+
 func (s *cIdentities) NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
