@@ -700,7 +700,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
-func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicKeyWrapper) *bls.PublicKeyWrapper {
+func (consensus *Consensus) rotateLeader(epoch *big.Int, vrf []byte, defaultKey *bls.PublicKeyWrapper) *bls.PublicKeyWrapper {
 	var (
 		bc        = consensus.Blockchain()
 		leader    = consensus.getLeaderPubKey()
@@ -758,7 +758,9 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 	)
 
 	for i := 0; i < len(committee.Slots); i++ {
-		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
+		if bc.Config().IsLeaderRotationVRF(epoch) {
+			wasFound, next = consensus.decider.NthNextVRF(committee.Slots, leader, vrf)
+		} else if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
 			wasFound, next = consensus.decider.NthNextValidator(committee.Slots, leader, offset)
 		} else {
 			wasFound, next = consensus.decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
@@ -819,7 +821,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 		epoch = blk.Epoch()
 	}
 	if consensus.Blockchain().Config().IsLeaderRotationInternalValidators(epoch) {
-		if next := consensus.rotateLeader(epoch, committedMsg.SenderPubkeys[0]); next != nil {
+		if next := consensus.rotateLeader(epoch, blk.Vrf(), committedMsg.SenderPubkeys[0]); next != nil {
 			prev := consensus.getLeaderPubKey()
 			consensus.setLeaderPubKey(next)
 			if consensus.isLeader() {

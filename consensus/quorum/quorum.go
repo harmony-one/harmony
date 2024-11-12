@@ -5,11 +5,10 @@ import (
 	"math/big"
 	"sync/atomic"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -77,6 +76,9 @@ type ParticipantTracker interface {
 	ParticipantsCount() int64
 	// NthNextValidator returns key for next validator. It assumes external validators and leader rotation.
 	NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
+
+	NthNextVRF(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, vrf []byte) (bool, *bls.PublicKeyWrapper)
+
 	NthNextHmy(instance shardingconfig.Instance, pubkey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
 	UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper)
@@ -249,6 +251,57 @@ func (s *cIdentities) NthNextValidator(slotList shard.SlotList, pubKey *bls.Publ
 			idx++
 			continue
 		}
+		return found, &s.publicKeys[idx]
+	}
+}
+
+func VrfRandomness(vrf []byte) []byte {
+	return vrf[:32]
+}
+
+func (s *cIdentities) NthNextVRF(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, vrf []byte) (bool, *bls.PublicKeyWrapper) {
+
+	if len(s.publicKeys) == 0 {
+		return false, pubKey
+	}
+
+	var (
+		bts = VrfRandomness(vrf)
+		val = new(big.Int).SetBytes(bts)
+		mod = val.Mod(val, big.NewInt(int64(len(s.publicKeys))))
+		// absolute value
+		next  = int(mod.Abs(mod).Int64())
+		found = false
+	)
+	// sanity check to avoid out of bound access
+	if next < 0 {
+		return false, pubKey
+	}
+	fmt.Println("NthNextVRF", next)
+	utils.Logger().Debug().Int("next", next).Msg("NthNextVRF")
+
+	//publicToAddress := make(map[bls.SerializedPublicKey]common.Address)
+	//for _, slot := range slotList {
+	//	publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
+	//}
+
+	idx := s.IndexOf(pubKey.Bytes)
+	if idx != -1 {
+		found = true
+	} else {
+		utils.Logger().Error().
+			Str("key", pubKey.Bytes.Hex()).
+			Msg("[NthNextHmy] pubKey not found")
+
+	}
+	for {
+		numNodes := len(s.publicKeys)
+		idx = (idx + next) % numNodes
+		//if publicToAddress[s.publicKeys[idx].Bytes] == publicToAddress[pubKey.Bytes] {
+		//	// same validator, go next
+		//	idx++
+		//	continue
+		//}
 		return found, &s.publicKeys[idx]
 	}
 }
