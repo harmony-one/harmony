@@ -186,8 +186,6 @@ func (d *Downloader) waitForBootFinish() {
 }
 
 func (d *Downloader) loop() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
 	initSync := true
 	trigger := func() {
 		select {
@@ -199,9 +197,6 @@ func (d *Downloader) loop() {
 
 	for {
 		select {
-		case <-ticker.C:
-			go trigger()
-
 		case <-d.downloadC:
 			addedBN, err := d.doDownload(initSync)
 			if err != nil {
