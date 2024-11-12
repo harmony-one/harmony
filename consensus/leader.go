@@ -219,12 +219,17 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 	// check if it is first received commit
 	// it may multi bls key validators can achieve quorum on first commit
-	var myPubkeys []bls.SerializedPublicKey
-	for _, key := range consensus.priKey {
-		myPubkeys = append(myPubkeys, key.Pub.Bytes)
+	isFirstReceivedSignature := false
+	lenPrvKeys := len(consensus.priKey)
+	hasMultiBlsKey := lenPrvKeys > 0
+	if hasMultiBlsKey {
+		var myPubkeys []bls.SerializedPublicKey
+		for _, key := range consensus.priKey {
+			myPubkeys = append(myPubkeys, key.Pub.Bytes)
+		}
+		mySignsCount := consensus.decider.GetBallotsCount(quorum.Commit, myPubkeys)
+		isFirstReceivedSignature = signerCount == mySignsCount
 	}
-	mySignsCount := consensus.decider.GetBallotsCount(quorum.Commit, myPubkeys)
-	isFirstReceivedSignature := signerCount == mySignsCount
 
 	//// Read - End
 
@@ -299,7 +304,8 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 	quorumIsMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
 	//// Read - End
-	quorumAchievedByFirstCommit := isFirstReceivedSignature && quorumWasMet
+
+	quorumAchievedByFirstCommit := hasMultiBlsKey && isFirstReceivedSignature && quorumWasMet
 	quorumAchievedByThisCommit := !quorumWasMet && quorumIsMet
 
 	if quorumAchievedByFirstCommit || quorumAchievedByThisCommit {
