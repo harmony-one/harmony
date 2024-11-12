@@ -71,6 +71,7 @@ var (
 		AllowlistEpoch:                        EpochTBD,
 		LeaderRotationInternalValidatorsEpoch: big.NewInt(2152), // 2024-10-31 13:02 UTC
 		LeaderRotationExternalValidatorsEpoch: big.NewInt(2152), // 2024-10-31 13:02 UTC
+		LeaderRotationV2Epoch:                 EpochTBD,
 		FeeCollectEpoch:                       big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1535), // 2023-07-20 05:51:07+00:00
 		HIP30Epoch:                            big.NewInt(1673), // 2023-11-02 17:30:00+00:00
@@ -119,6 +120,7 @@ var (
 		AllowlistEpoch:                        big.NewInt(2),
 		LeaderRotationInternalValidatorsEpoch: big.NewInt(3044),
 		LeaderRotationExternalValidatorsEpoch: big.NewInt(3044),
+		LeaderRotationV2Epoch:                 EpochTBD,
 		FeeCollectEpoch:                       big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		ValidatorCodeFixEpoch:                 big.NewInt(1296), // 2023-04-28 07:14:20+00:00
 		HIP30Epoch:                            big.NewInt(2176), // 2023-10-12 10:00:00+00:00
@@ -166,6 +168,7 @@ var (
 		AllowlistEpoch:                        EpochTBD,
 		LeaderRotationInternalValidatorsEpoch: EpochTBD,
 		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		LeaderRotationV2Epoch:                 EpochTBD,
 		FeeCollectEpoch:                       EpochTBD,
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
@@ -214,6 +217,7 @@ var (
 		AllowlistEpoch:                        EpochTBD,
 		LeaderRotationInternalValidatorsEpoch: big.NewInt(144),
 		LeaderRotationExternalValidatorsEpoch: big.NewInt(144),
+		LeaderRotationV2Epoch:                 EpochTBD,
 		FeeCollectEpoch:                       big.NewInt(5),
 		ValidatorCodeFixEpoch:                 big.NewInt(5),
 		HIP30Epoch:                            big.NewInt(7),
@@ -263,6 +267,7 @@ var (
 		FeeCollectEpoch:                       EpochTBD,
 		LeaderRotationInternalValidatorsEpoch: EpochTBD,
 		LeaderRotationExternalValidatorsEpoch: EpochTBD,
+		LeaderRotationV2Epoch:                 EpochTBD,
 		ValidatorCodeFixEpoch:                 EpochTBD,
 		HIP30Epoch:                            EpochTBD,
 		BlockGas30MEpoch:                      big.NewInt(0),
@@ -309,6 +314,7 @@ var (
 		AllowlistEpoch:                        EpochTBD,
 		LeaderRotationInternalValidatorsEpoch: big.NewInt(5),
 		LeaderRotationExternalValidatorsEpoch: big.NewInt(6),
+		LeaderRotationV2Epoch:                 EpochTBD,
 		FeeCollectEpoch:                       big.NewInt(2),
 		ValidatorCodeFixEpoch:                 big.NewInt(2),
 		HIP30Epoch:                            EpochTBD,
@@ -559,6 +565,8 @@ type ChainConfig struct {
 	LeaderRotationInternalValidatorsEpoch *big.Int `json:"leader-rotation-internal-validators,omitempty"`
 
 	LeaderRotationExternalValidatorsEpoch *big.Int `json:"leader-rotation-external-validators,omitempty"`
+
+	LeaderRotationV2Epoch *big.Int `json:"leader-rotation-v2-epoch,omitempty"`
 
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
 	// It should >= StakingEpoch.
@@ -840,6 +848,10 @@ func (c *ChainConfig) IsBlockGas30M(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int) bool {
 	return isForked(c.LeaderRotationExternalValidatorsEpoch, epoch)
+}
+
+func (c *ChainConfig) IsLeaderRotationV2Epoch(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationV2Epoch, epoch)
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.

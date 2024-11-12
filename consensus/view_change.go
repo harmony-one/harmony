@@ -198,7 +198,12 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 	var wasFound bool
 	var next *bls.PublicKeyWrapper
 	if blockchain != nil && blockchain.Config().IsLeaderRotationInternalValidators(epoch) {
-		if blockchain.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
+		if blockchain.Config().IsLeaderRotationV2Epoch(epoch) {
+			wasFound, next = consensus.decider.NthNextValidatorV2(
+				committee.Slots,
+				lastLeaderPubKey,
+				gap)
+		} else if blockchain.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
 			wasFound, next = consensus.decider.NthNextValidator(
 				committee.Slots,
 				lastLeaderPubKey,
