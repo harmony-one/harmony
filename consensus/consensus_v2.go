@@ -236,7 +236,7 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 		}
 		encodedBlock, err := rlp.EncodeToBytes(blockWithSig)
 		if err != nil {
-			consensus.getLogger().Debug().Msg("[finalCommit] Failed encoding block for epoch end")
+			consensus.getLogger().Error().Msg("[finalCommit] Failed encoding block for epoch end")
 			return
 		}
 		err = consensus.host.SendMessageToGroups(
