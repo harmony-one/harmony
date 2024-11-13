@@ -75,14 +75,6 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 	return marshaledMessage, nil
 }
 
-// UpdatePublicKeys updates the PublicKeys for
-// quorum on current subcommittee, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	return consensus.updatePublicKeys(pubKeys, allowlist)
-}
-
 func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
 	consensus.decider.UpdateParticipants(pubKeys, allowlist)
 	consensus.getLogger().Info().Msg("My Committee updated")
