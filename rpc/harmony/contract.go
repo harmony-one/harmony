@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/big"
 	"reflect"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
+	hmyState "github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
@@ -156,8 +158,9 @@ func (s *PublicContractService) GetStorageAt(
 }
 
 // DoEVMCall executes an EVM call
+// TODO (SA): include block overrides
 func DoEVMCall(
-	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash,
+	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverrides,
 	timeout time.Duration,
 ) (core.ExecutionResult, error) {
 	defer func(start time.Time) {
@@ -169,6 +172,12 @@ func DoEVMCall(
 	// Fetch state
 	state, header, err := hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
+		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
+		return core.ExecutionResult{}, err
+	}
+
+	//  apply state overrides
+	if err := overrides.Apply(*state); err != nil {
 		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err
 	}
@@ -220,4 +229,66 @@ func DoEVMCall(
 
 	// Response output is the same for all versions
 	return result, nil
+}
+
+// TODO: MovePrecompileTo
+// https://github.com/ethereum/go-ethereum/blob/df182a742cec68adcc034d4747afa5182fc75ca3/internal/ethapi/api.go#L637
+
+// OverrideAccount indicates the overriding fields of account during the execution
+// of a message call.
+// Note, state and stateDiff can't be specified at the same time. If state is
+// set, message execution will only use the data in the given state. Otherwise
+// if statDiff is set, all diff will be applied first and then execute the call
+// message.
+type OverrideAccount struct {
+	Nonce     *hexutil.Uint64              `json:"nonce"`
+	Code      *hexutil.Bytes               `json:"code"`
+	Balance   **hexutil.Big                `json:"balance"`
+	State     *map[common.Hash]common.Hash `json:"state"`
+	StateDiff *map[common.Hash]common.Hash `json:"stateDiff"`
+}
+
+// StateOverride is the collection of overriden accounts.
+type StateOverrides map[common.Address]OverrideAccount
+
+// Apply overrides the fields of specified accounts into the given state.
+func (diff *StateOverrides) Apply(state hmyState.DB) error {
+	if diff == nil {
+		return nil
+	}
+
+	for addr, account := range *diff {
+		// nonce
+		if account.Nonce != nil {
+			state.SetNonce(addr, uint64(*account.Nonce))
+		}
+
+		// account (contract) code
+		if account.Code != nil {
+			state.SetCode(addr, *account.Code, false) // TODO: isValidatorCode set to false
+		}
+
+		// account balance
+		if account.Balance != nil {
+			state.SetBalance(addr, (*big.Int)(*account.Balance))
+		}
+
+		if account.State != nil && account.StateDiff != nil {
+			return fmt.Errorf("account %s has both 'state' and 'stateDiff'", addr.Hex())
+		}
+
+		// replace entire state if caller requires
+		if account.State != nil {
+			state.SetStorage(addr, *account.State)
+		}
+
+		// apply state diff into specified accounts
+		if account.StateDiff != nil {
+			for k, v := range *account.StateDiff {
+				state.SetState(addr, k, v)
+			}
+		}
+	}
+
+	return nil
 }
