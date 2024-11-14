@@ -465,7 +465,21 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 	// a solution to take care of this case because the coinbase of the latest block doesn't really represent the
 	// the real current leader in case of M1 view change.
 	if !curHeader.IsLastBlockInEpoch() && curHeader.Number().Uint64() != 0 {
-		leaderPubKey, err := chain.GetLeaderPubKeyFromCoinbase(consensus.Blockchain(), curHeader)
+		ss, err := consensus.Blockchain().ReadShardState(curHeader.Epoch())
+		if err != nil {
+			utils.Logger().Err(err).Msg("[UpdateConsensusInformation] failed to read shard state")
+			return Syncing
+		}
+		committee, err := ss.FindCommitteeByID(curHeader.ShardID())
+		if err != nil {
+			utils.Logger().Err(err).Msg("[UpdateConsensusInformation] failed to find committee by ID")
+			return Syncing
+		}
+		leaderPubKey, err := chain.GetLeaderPubKeyFromCoinbase(
+			committee.Slots,
+			curHeader.Coinbase(),
+			consensus.Blockchain().Config().IsStaking(curHeader.Epoch()),
+		)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Error().Err(err).
 				Msg("[UpdateConsensusInformation] Unable to get leaderPubKey from coinbase")
