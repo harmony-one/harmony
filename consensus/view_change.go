@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -144,7 +145,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 // It reads the current leader's pubkey based on the blockchain data and returns
 // the next leader based on the gap of the viewID of the view change and the last
 // know view id of the block.
-func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Committee) *bls.PublicKeyWrapper {
+func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Committee, config *params.ChainConfig, epoch *big.Int) *bls.PublicKeyWrapper {
 	gap := 1
 
 	cur := consensus.getCurBlockViewID()
@@ -154,7 +155,6 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 	var lastLeaderPubKey *bls.PublicKeyWrapper
 	var err error
 	blockchain := consensus.Blockchain()
-	epoch := big.NewInt(0)
 	if blockchain == nil {
 		consensus.getLogger().Error().Msg("[getNextLeaderKey] Blockchain is nil. Use consensus.LeaderPubKey")
 		lastLeaderPubKey = consensus.getLeaderPubKey()
@@ -167,13 +167,16 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
 			gap = int(viewID - stuckBlockViewID)
 			// this is the truth of the leader based on blockchain blocks
-			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(blockchain, curHeader)
+			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(
+				committee.Slots,
+				curHeader.Coinbase(),
+				config.IsStaking(epoch),
+			)
 			if err != nil || lastLeaderPubKey == nil {
 				consensus.getLogger().Error().Err(err).
 					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
 				lastLeaderPubKey = consensus.getLeaderPubKey()
 			}
-			epoch = curHeader.Epoch()
 			// viewchange happened at the first block of new epoch
 			// use the LeaderPubKey as the base of the next leader
 			// as we shouldn't use lastLeader from coinbase as the base.
@@ -204,10 +207,39 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 				lastLeaderPubKey,
 				gap)
 		} else if blockchain.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
-			wasFound, next = consensus.decider.NthNextValidator(
-				committee.Slots,
-				lastLeaderPubKey,
-				gap)
+			if gap > 1 {
+				wasFoundCurrent, current := consensus.decider.NthNextValidator(
+					committee.Slots,
+					lastLeaderPubKey,
+					gap-1)
+				if !wasFoundCurrent {
+					return current
+				}
+
+				publicToAddress := make(map[bls.SerializedPublicKey]common.Address)
+				for _, slot := range committee.Slots {
+					publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
+				}
+
+				for i := 0; ; i++ {
+					gap = gap + i
+					wasFound, next = consensus.decider.NthNextValidator(
+						committee.Slots,
+						lastLeaderPubKey,
+						gap)
+					if !wasFound {
+						return next
+					}
+					if publicToAddress[current.Bytes] != publicToAddress[next.Bytes] {
+						break
+					}
+				}
+			} else {
+				wasFound, next = consensus.decider.NthNextValidator(
+					committee.Slots,
+					lastLeaderPubKey,
+					gap)
+			}
 		} else {
 			wasFound, next = consensus.decider.NthNextHmy(
 				shard.Schedule.InstanceForEpoch(epoch),
@@ -267,7 +299,12 @@ func (consensus *Consensus) startViewChange() {
 	// aganist the consensus.LeaderPubKey variable.
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
-	consensus.setLeaderPubKey(consensus.getNextLeaderKey(nextViewID, committee))
+	consensus.setLeaderPubKey(
+		consensus.getNextLeaderKey(
+			nextViewID,
+			committee,
+			consensus.Blockchain().Config(),
+			epoch))
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).
