@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -87,4 +88,36 @@ func GenerateConsensusForTesting() (p2p.Host, multibls.PrivateKeys, *Consensus, 
 	}
 
 	return host, multiBLSPrivateKey, consensus, decider, nil
+}
+
+func TestCountSigned(t *testing.T) {
+
+	multiBLSPrivateKey := multibls.GetPrivateKeys(bls.RandPrivateKey(), bls.RandPrivateKey(), bls.RandPrivateKey())
+	bitmaps := make([][]byte, 0, 3)
+
+	for i := 0; i < blocksCountAliveness; i++ {
+		mask := bls.NewMask(multiBLSPrivateKey.GetPublicKeys())
+		for _, k := range multiBLSPrivateKey.GetPublicKeys() {
+			ok, err := mask.KeyEnabled(k.Bytes)
+			require.NoError(t, err)
+			require.False(t, ok, "key is not enabled")
+
+			mask.SetKey(k.Bytes, true)
+
+			ok, err = mask.KeyEnabled(k.Bytes)
+			require.NoError(t, err)
+			require.True(t, ok, "key should exist")
+		}
+		bitmaps = append(bitmaps, mask.Mask())
+	}
+	// as we signed all bitmaps, we should achieve 4 sigs
+	cs := CountSigned(bls.NewMask(multiBLSPrivateKey.GetPublicKeys()), bitmaps, multiBLSPrivateKey[0].Pub)
+	require.Equal(t, blocksCountAliveness, cs)
+
+	// check unknown public key
+	unknownKey := multibls.GetPrivateKeys(bls.RandPrivateKey())
+	cs = CountSigned(bls.NewMask(multiBLSPrivateKey.GetPublicKeys()), bitmaps, unknownKey[0].Pub)
+
+	require.Equal(t, 0, cs, "no signature should be counted")
+
 }
