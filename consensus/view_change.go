@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -145,7 +146,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 // It reads the current leader's pubkey based on the blockchain data and returns
 // the next leader based on the gap of the viewID of the view change and the last
 // know view id of the block.
-func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Committee, config *params.ChainConfig, epoch *big.Int) *bls.PublicKeyWrapper {
+func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Committee, blockchain core.BlockChain) *bls.PublicKeyWrapper {
 	gap := 1
 
 	cur := consensus.getCurBlockViewID()
@@ -154,7 +155,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 	}
 	var lastLeaderPubKey *bls.PublicKeyWrapper
 	var err error
-	blockchain := consensus.Blockchain()
+	epoch := big.NewInt(0)
 	if blockchain == nil {
 		consensus.getLogger().Error().Msg("[getNextLeaderKey] Blockchain is nil. Use consensus.LeaderPubKey")
 		lastLeaderPubKey = consensus.getLeaderPubKey()
@@ -170,7 +171,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(
 				committee.Slots,
 				curHeader.Coinbase(),
-				config.IsStaking(epoch),
+				blockchain.Config().IsStaking(curHeader.Epoch()),
 			)
 			if err != nil || lastLeaderPubKey == nil {
 				consensus.getLogger().Error().Err(err).
@@ -185,7 +186,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 			// it can still sync with other validators.
 			if curHeader.IsLastBlockInEpoch() {
 				consensus.getLogger().Info().Msg("[getNextLeaderKey] view change in the first block of new epoch")
-				lastLeaderPubKey = consensus.decider.FirstParticipant(shard.Schedule.InstanceForEpoch(epoch))
+				lastLeaderPubKey = consensus.decider.FirstParticipant(shard.Schedule.InstanceForEpoch(curHeader.Epoch()))
 			}
 		}
 	}
@@ -303,8 +304,7 @@ func (consensus *Consensus) startViewChange() {
 		consensus.getNextLeaderKey(
 			nextViewID,
 			committee,
-			consensus.Blockchain().Config(),
-			epoch))
+			consensus.Blockchain()))
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).
