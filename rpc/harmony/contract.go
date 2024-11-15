@@ -160,7 +160,6 @@ func (s *PublicContractService) GetStorageAt(
 }
 
 // DoEVMCall executes an EVM call
-// TODO (SA): include block overrides
 func DoEVMCall(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash,
 	timeout time.Duration, overrides *StateOverrides, blockOverrides *BlockOverrides,
