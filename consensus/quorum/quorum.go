@@ -79,7 +79,7 @@ type ParticipantTracker interface {
 	NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(instance shardingconfig.Instance, pubkey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
-	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
+	FirstParticipant() *bls.PublicKeyWrapper
 	UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper)
 }
 
@@ -314,7 +314,7 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 }
 
 // FirstParticipant returns the first participant of the shard
-func (s *cIdentities) FirstParticipant(instance shardingconfig.Instance) *bls.PublicKeyWrapper {
+func (s *cIdentities) FirstParticipant() *bls.PublicKeyWrapper {
 	return &s.publicKeys[0]
 }
 
