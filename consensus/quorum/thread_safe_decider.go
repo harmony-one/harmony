@@ -68,10 +68,10 @@ func (a threadSafeDeciderImpl) NthNextHmy(instance shardingconfig.Instance, pubk
 	return a.decider.NthNextHmy(instance, pubkey, next)
 }
 
-func (a threadSafeDeciderImpl) FirstParticipant(instance shardingconfig.Instance) *bls.PublicKeyWrapper {
+func (a threadSafeDeciderImpl) FirstParticipant() *bls.PublicKeyWrapper {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.decider.FirstParticipant(instance)
+	return a.decider.FirstParticipant()
 }
 
 func (a threadSafeDeciderImpl) UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper) {

@@ -1,13 +1,18 @@
 package consensus
 
 import (
+	"math/big"
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
+	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
+	"github.com/harmony-one/harmony/crypto/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBasicViewChanging(t *testing.T) {
@@ -117,4 +122,61 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 	nextKey := consensus.getNextLeaderKey(uint64(1), nil, nil)
 
 	assert.Equal(t, nextKey, &wrappedBLSKeys[1])
+}
+
+func TestGetNextLeader(t *testing.T) {
+	_, _, consensus, _, err := GenerateConsensusForTesting()
+	assert.NoError(t, err)
+
+	assert.Equal(t, int64(0), consensus.Decider().ParticipantsCount())
+
+	blsKeys := []*bls_core.PublicKey{}
+	wrappedBLSKeys := []bls.PublicKeyWrapper{}
+
+	const keyCount = 5
+	for i := 0; i < keyCount; i++ {
+		blsKey := harmony_bls.RandPrivateKey()
+		blsPubKey := blsKey.GetPublicKey()
+		bytes := bls.SerializedPublicKey{}
+		bytes.FromLibBLSPublicKey(blsPubKey)
+		wrapped := bls.PublicKeyWrapper{Object: blsPubKey, Bytes: bytes}
+
+		blsKeys = append(blsKeys, blsPubKey)
+		wrappedBLSKeys = append(wrappedBLSKeys, wrapped)
+	}
+
+	consensus.Decider().UpdateParticipants(wrappedBLSKeys, []bls.PublicKeyWrapper{})
+	assert.EqualValues(t, keyCount, consensus.Decider().ParticipantsCount())
+
+	consensus.setLeaderPubKey(&wrappedBLSKeys[0])
+	nextKey := consensus.getNextLeaderKey(uint64(1), nil, nil)
+
+	assert.Equal(t, nextKey, &wrappedBLSKeys[1])
+
+	t.Run("check_same_address_for_validators", func(t *testing.T) {
+		config := &params.ChainConfig{
+			LeaderRotationExternalValidatorsEpoch: big.NewInt(1),
+			LeaderRotationInternalValidatorsEpoch: big.NewInt(1),
+			StakingEpoch:                          big.NewInt(1),
+		}
+		facroty := blockfactory.NewFactory(config)
+		header := facroty.NewHeader(big.NewInt(2))
+		header.SetCoinbase(common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z3")))
+		header.SetViewID(big.NewInt(1))
+		header.SetNumber(big.NewInt(1))
+		// Slot represents node id (BLS address)
+		slots := []shard.Slot{}
+		for i := 0; i < keyCount; i++ {
+			slot := shard.Slot{
+				EcdsaAddress: common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z3")),
+				BLSPublicKey: wrappedBLSKeys[i].Bytes,
+			}
+			slots = append(slots, slot)
+		}
+		nextKey := consensus.getNextLeaderKey(uint64(2), slots, &nextLeaderParams{
+			config:    config,
+			curHeader: header,
+		})
+		require.Equal(t, wrappedBLSKeys[0].Hex(), nextKey.Hex())
+	})
 }
