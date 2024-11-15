@@ -15,7 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
-	hmyState "github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
@@ -83,6 +84,7 @@ func (s *PublicContractService) wait(limiter *rate.Limiter, ctx context.Context)
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicContractService) Call(
 	ctx context.Context, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash,
+	overrides *StateOverrides, blockOverrides *BlockOverrides,
 ) (hexutil.Bytes, error) {
 	timer := DoMetricRPCRequest(Call)
 	defer DoRPCRequestDuration(Call, timer)
@@ -94,7 +96,7 @@ func (s *PublicContractService) Call(
 	}
 
 	// Execute call
-	result, err := DoEVMCall(ctx, s.hmy, args, blockNrOrHash, s.evmCallTimeout)
+	result, err := DoEVMCall(ctx, s.hmy, args, blockNrOrHash, s.evmCallTimeout, overrides, blockOverrides)
 	if err != nil {
 		return nil, err
 	}
@@ -160,8 +162,8 @@ func (s *PublicContractService) GetStorageAt(
 // DoEVMCall executes an EVM call
 // TODO (SA): include block overrides
 func DoEVMCall(
-	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverrides,
-	timeout time.Duration,
+	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash,
+	timeout time.Duration, overrides *StateOverrides, blockOverrides *BlockOverrides,
 ) (core.ExecutionResult, error) {
 	defer func(start time.Time) {
 		utils.Logger().Debug().
@@ -176,14 +178,26 @@ func DoEVMCall(
 		return core.ExecutionResult{}, err
 	}
 
+	// Create new call message
+	msg := args.ToMessage(hmy.RPCGasCap)
+
+	// Get a new instance of the EVM.
+	evm, err := hmy.GetEVM(ctx, msg, state, header)
+	if err != nil {
+		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
+		return core.ExecutionResult{}, err
+	}
+
+	// apply block overrides
+	if blockOverrides != nil {
+		blockOverrides.Apply(&evm.Context)
+	}
+
 	//  apply state overrides
 	if err := overrides.Apply(*state); err != nil {
 		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err
 	}
-
-	// Create new call message
-	msg := args.ToMessage(hmy.RPCGasCap)
 
 	// Setup context so it may be cancelled the call has completed
 	// or, in case of unmetered gas, setup a context with a timeout.
@@ -197,13 +211,6 @@ func DoEVMCall(
 	// Make sure the context is cancelled when the call has completed
 	// this makes sure resources are cleaned up.
 	defer cancel()
-
-	// Get a new instance of the EVM.
-	evm, err := hmy.GetEVM(ctx, msg, state, header)
-	if err != nil {
-		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
-		return core.ExecutionResult{}, err
-	}
 
 	// Wait for the context to be done and cancel the evm. Even if the
 	// EVM has finished, cancelling may be done (repeatedly)
@@ -252,12 +259,12 @@ type OverrideAccount struct {
 type StateOverrides map[common.Address]OverrideAccount
 
 // Apply overrides the fields of specified accounts into the given state.
-func (diff *StateOverrides) Apply(state hmyState.DB) error {
-	if diff == nil {
+func (s *StateOverrides) Apply(state state.DB) error {
+	if s == nil {
 		return nil
 	}
 
-	for addr, account := range *diff {
+	for addr, account := range *s {
 		// nonce
 		if account.Nonce != nil {
 			state.SetNonce(addr, uint64(*account.Nonce))
@@ -291,4 +298,39 @@ func (diff *StateOverrides) Apply(state hmyState.DB) error {
 	}
 
 	return nil
+}
+
+// BlockOverrides is a set of header fields to override.
+type BlockOverrides struct {
+	Number        *hexutil.Big
+	Difficulty    *hexutil.Big // No-op if we're simulating post-merge calls.
+	Time          *hexutil.Uint64
+	GasLimit      *hexutil.Uint64
+	FeeRecipient  *common.Address
+	PrevRandao    *common.Hash
+	BaseFeePerGas *hexutil.Big // EIP-1559 (not implemented)
+	BlobBaseFee   *hexutil.Big // EIP-4844 (not implemented)
+}
+
+// apply overrides the given header fields into the given block context
+func (b *BlockOverrides) Apply(blockCtx *vm.Context) {
+	if b == nil {
+		return
+	}
+
+	if b.Number != nil {
+		blockCtx.BlockNumber = b.Number.ToInt()
+	}
+	if b.Time != nil {
+		blockCtx.Time = big.NewInt(int64(*b.Time))
+	}
+	if b.GasLimit != nil {
+		blockCtx.GasLimit = uint64(*b.GasLimit)
+	}
+	if b.FeeRecipient != nil {
+		blockCtx.Coinbase = *b.FeeRecipient
+	}
+
+	// difficulty & random not part of vm.Context
+
 }

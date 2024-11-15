@@ -395,7 +395,7 @@ func (c *CallAPIService) call(
 			"message": errors.WithMessage(err, "invalid parameters").Error(),
 		})
 	}
-	data, err := contractAPI.Call(ctx, args.CallArgs, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(args.BlockNum)))
+	data, err := contractAPI.Call(ctx, args.CallArgs, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(args.BlockNum)), nil, nil)
 	if err != nil {
 		return nil, common.NewError(common.ErrCallExecute, map[string]interface{}{
 			"message": errors.WithMessage(err, "call smart contract error").Error(),
