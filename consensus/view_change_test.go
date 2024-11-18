@@ -6,11 +6,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -92,7 +90,7 @@ func TestGetNextLeaderKeyShouldFailForStandardGeneratedConsensus(t *testing.T) {
 
 	// The below results in: "panic: runtime error: integer divide by zero"
 	// This happens because there's no check for if there are any participants or not in https://github.com/harmony-one/harmony/blob/main/consensus/quorum/quorum.go#L188-L197
-	assert.Panics(t, func() { consensus.getNextLeaderKey(uint64(1), nil, nil) })
+	assert.Panics(t, func() { consensus.getNextLeaderKey(uint64(1), nil) })
 }
 
 func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
@@ -120,68 +118,9 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 	assert.Equal(t, keyCount, consensus.Decider().ParticipantsCount())
 
 	consensus.setLeaderPubKey(&wrappedBLSKeys[0])
-	//nextKey := consensus.getNextLeaderKey(uint64(1), nil, nil)
+	nextKey := consensus.getNextLeaderKey(uint64(1), nil)
 
-	//assert.Equal(t, nextKey, &wrappedBLSKeys[1])
-}
-
-func TestGetNextLeader(t *testing.T) {
-	_, _, consensus, _, err := GenerateConsensusForTesting()
-	assert.NoError(t, err)
-
-	assert.Equal(t, int64(0), consensus.Decider().ParticipantsCount())
-
-	blsKeys := []*bls_core.PublicKey{}
-	wrappedBLSKeys := []bls.PublicKeyWrapper{}
-
-	const keyCount = 5
-	for i := 0; i < keyCount; i++ {
-		blsKey := harmony_bls.RandPrivateKey()
-		blsPubKey := blsKey.GetPublicKey()
-		bytes := bls.SerializedPublicKey{}
-		bytes.FromLibBLSPublicKey(blsPubKey)
-		wrapped := bls.PublicKeyWrapper{Object: blsPubKey, Bytes: bytes}
-
-		blsKeys = append(blsKeys, blsPubKey)
-		wrappedBLSKeys = append(wrappedBLSKeys, wrapped)
-	}
-
-	consensus.Decider().UpdateParticipants(wrappedBLSKeys, []bls.PublicKeyWrapper{})
-	assert.EqualValues(t, keyCount, consensus.Decider().ParticipantsCount())
-
-	consensus.setLeaderPubKey(&wrappedBLSKeys[0])
-	//nextKey := consensus.getNextLeaderKey(uint64(1), nil, nil)
-
-	//assert.Equal(t, nextKey, &wrappedBLSKeys[1])
-
-	t.Run("check_same_address_for_validators", func(t *testing.T) {
-		consensus.setCurBlockViewID(2)
-		config := &params.ChainConfig{
-			LeaderRotationExternalValidatorsEpoch: big.NewInt(1),
-			LeaderRotationInternalValidatorsEpoch: big.NewInt(1),
-			StakingEpoch:                          big.NewInt(1),
-		}
-
-		facroty := blockfactory.NewFactory(config)
-		header := facroty.NewHeader(big.NewInt(2))
-		header.SetCoinbase(common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z3")))
-		header.SetViewID(big.NewInt(1))
-		header.SetNumber(big.NewInt(1))
-		// Slot represents node id (BLS address)
-		slots := []shard.Slot{}
-		for i := 0; i < keyCount; i++ {
-			slot := shard.Slot{
-				EcdsaAddress: common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z3")),
-				BLSPublicKey: wrappedBLSKeys[i].Bytes,
-			}
-			slots = append(slots, slot)
-		}
-		nextKey := consensus.getNextLeaderKey(uint64(4), slots, &nextLeaderParams{
-			config:    config,
-			curHeader: header,
-		})
-		require.Equal(t, wrappedBLSKeys[0].Hex(), nextKey.Hex())
-	})
+	assert.Equal(t, nextKey, &wrappedBLSKeys[1])
 }
 
 func TestViewChangeNextValidator(t *testing.T) {
