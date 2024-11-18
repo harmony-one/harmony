@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"math/big"
 	"sync/atomic"
 	"time"
 
@@ -159,7 +160,23 @@ func (a nextLeaderParams) Config() *params.ChainConfig {
 // It reads the current leader's pubkey based on the blockchain data and returns
 // the next leader based on the gap of the viewID of the view change and the last
 // know view id of the block.
-func (consensus *Consensus) getNextLeaderKey(viewID uint64, slots shard.SlotList, blockchain *nextLeaderParams) *bls.PublicKeyWrapper {
+func (consensus *Consensus) getNextLeaderKeySkipSameAddress(viewID uint64, committee *shard.Committee) *bls.PublicKeyWrapper {
+	gap := 1
+
+	cur := consensus.getCurBlockViewID()
+	if viewID > cur {
+		gap = int(viewID - cur)
+	}
+	// use pubkey as default key as well
+	leaderPubKey := consensus.getLeaderPubKey()
+	rs, ok := viewChangeNextValidator(consensus.decider, gap, committee.Slots, leaderPubKey)
+	if !ok {
+		return leaderPubKey
+	}
+	return rs
+}
+
+func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Committee) *bls.PublicKeyWrapper {
 	gap := 1
 
 	cur := consensus.getCurBlockViewID()
@@ -168,33 +185,37 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, slots shard.SlotList
 	}
 	var lastLeaderPubKey *bls.PublicKeyWrapper
 	var err error
+	blockchain := consensus.Blockchain()
+	epoch := big.NewInt(0)
 	if blockchain == nil {
 		consensus.getLogger().Error().Msg("[getNextLeaderKey] Blockchain is nil. Use consensus.LeaderPubKey")
 		lastLeaderPubKey = consensus.getLeaderPubKey()
 	} else {
-		stuckBlockViewID := blockchain.curHeader.ViewID().Uint64() + 1
-		gap = int(viewID - stuckBlockViewID)
-		// this is the truth of the leader based on blockchain blocks
-		lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(
-			slots,
-			blockchain.curHeader.Coinbase(),
-			blockchain.Config().IsStaking(blockchain.curHeader.Epoch()),
-		)
-		if err != nil || lastLeaderPubKey == nil {
-			consensus.getLogger().Error().Err(err).
-				Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
+		curHeader := blockchain.CurrentHeader()
+		if curHeader == nil {
+			consensus.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
 			lastLeaderPubKey = consensus.getLeaderPubKey()
-		}
-
-		// viewchange happened at the first block of new epoch
-		// use the LeaderPubKey as the base of the next leader
-		// as we shouldn't use lastLeader from coinbase as the base.
-		// The LeaderPubKey should be updated to the node of index 0 of the committee
-		// so, when validator joined the view change process later in the epoch block
-		// it can still sync with other validators.
-		if blockchain.curHeader.IsLastBlockInEpoch() {
-			consensus.getLogger().Info().Msg("[getNextLeaderKey] view change in the first block of new epoch")
-			lastLeaderPubKey = consensus.decider.FirstParticipant()
+		} else {
+			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
+			gap = int(viewID - stuckBlockViewID)
+			// this is the truth of the leader based on blockchain blocks
+			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(committee.Slots, curHeader.Coinbase(), blockchain.Config().IsStaking(curHeader.Epoch()))
+			if err != nil || lastLeaderPubKey == nil {
+				consensus.getLogger().Error().Err(err).
+					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
+				lastLeaderPubKey = consensus.getLeaderPubKey()
+			}
+			epoch = curHeader.Epoch()
+			// viewchange happened at the first block of new epoch
+			// use the LeaderPubKey as the base of the next leader
+			// as we shouldn't use lastLeader from coinbase as the base.
+			// The LeaderPubKey should be updated to the node of index 0 of the committee
+			// so, when validator joined the view change process later in the epoch block
+			// it can still sync with other validators.
+			if curHeader.IsLastBlockInEpoch() {
+				consensus.getLogger().Info().Msg("[getNextLeaderKey] view change in the first block of new epoch")
+				lastLeaderPubKey = consensus.decider.FirstParticipant()
+			}
 		}
 	}
 	consensus.getLogger().Info().
@@ -208,20 +229,17 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, slots shard.SlotList
 	// FIXME: rotate leader on harmony nodes only before fully externalization
 	var wasFound bool
 	var next *bls.PublicKeyWrapper
-
-	if blockchain != nil && blockchain.Config().IsLeaderRotationInternalValidators(blockchain.curHeader.Epoch()) {
-		epoch := blockchain.curHeader.Epoch()
-
+	if blockchain != nil && blockchain.Config().IsLeaderRotationInternalValidators(epoch) {
 		if blockchain.Config().IsLeaderRotationV2Epoch(epoch) {
 			wasFound, next = consensus.decider.NthNextValidatorV2(
 				committee.Slots,
 				lastLeaderPubKey,
 				gap)
 		} else if blockchain.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
-			next, ok := viewChangeNextValidator(consensus.decider, gap, slots, lastLeaderPubKey)
-			if ok {
-				return next
-			}
+			wasFound, next = consensus.decider.NthNextValidator(
+				committee.Slots,
+				lastLeaderPubKey,
+				gap)
 		} else {
 			wasFound, next = consensus.decider.NthNextHmy(
 				shard.Schedule.InstanceForEpoch(epoch),
@@ -230,7 +248,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, slots shard.SlotList
 		}
 	} else {
 		wasFound, next = consensus.decider.NthNextHmy(
-			shard.Schedule.InstanceForEpoch(blockchain.curHeader.Epoch()),
+			shard.Schedule.InstanceForEpoch(epoch),
 			lastLeaderPubKey,
 			gap)
 	}
@@ -323,15 +341,12 @@ func (consensus *Consensus) startViewChange() {
 	// aganist the consensus.LeaderPubKey variable.
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
-	blockchain := &nextLeaderParams{
-		config:    consensus.Blockchain().Config(),
-		curHeader: currentHeader,
+	c := consensus.Blockchain().Config()
+	if c.IsViewChangeSkipValidatorsSameAddressEpoch(currentHeader.Epoch()) {
+		consensus.setLeaderPubKey(consensus.getNextLeaderKeySkipSameAddress(nextViewID, committee))
+	} else {
+		consensus.setLeaderPubKey(consensus.getNextLeaderKey(nextViewID, committee))
 	}
-	consensus.setLeaderPubKey(
-		consensus.getNextLeaderKey(
-			nextViewID,
-			committee.Slots,
-			blockchain))
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).
