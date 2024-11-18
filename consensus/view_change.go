@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"math/big"
 	"sync/atomic"
 	"time"
 
@@ -61,6 +60,11 @@ func (pm *State) GetCurBlockViewID() uint64 {
 func (pm *State) SetCurBlockViewID(viewID uint64) uint64 {
 	atomic.StoreUint64(&pm.blockViewID, viewID)
 	return viewID
+}
+
+// SetCurBlockViewID set the current view ID
+func (consensus *Consensus) setCurBlockViewID(viewID uint64) uint64 {
+	return consensus.current.SetCurBlockViewID(viewID)
 }
 
 // GetViewChangingID return the current view changing id
@@ -164,7 +168,6 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, slots shard.SlotList
 	}
 	var lastLeaderPubKey *bls.PublicKeyWrapper
 	var err error
-	epoch := big.NewInt(0)
 	if blockchain == nil {
 		consensus.getLogger().Error().Msg("[getNextLeaderKey] Blockchain is nil. Use consensus.LeaderPubKey")
 		lastLeaderPubKey = consensus.getLeaderPubKey()
@@ -205,45 +208,19 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, slots shard.SlotList
 	// FIXME: rotate leader on harmony nodes only before fully externalization
 	var wasFound bool
 	var next *bls.PublicKeyWrapper
-	if blockchain != nil && blockchain.Config().IsLeaderRotationInternalValidators(epoch) {
+
+	if blockchain != nil && blockchain.Config().IsLeaderRotationInternalValidators(blockchain.curHeader.Epoch()) {
+		epoch := blockchain.curHeader.Epoch()
+
 		if blockchain.Config().IsLeaderRotationV2Epoch(epoch) {
 			wasFound, next = consensus.decider.NthNextValidatorV2(
 				committee.Slots,
 				lastLeaderPubKey,
 				gap)
 		} else if blockchain.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
-			if gap > 1 {
-				wasFoundCurrent, current := consensus.decider.NthNextValidator(
-					slots,
-					lastLeaderPubKey,
-					gap-1)
-				if !wasFoundCurrent {
-					return current
-				}
-
-				publicToAddress := make(map[bls.SerializedPublicKey]common.Address)
-				for _, slot := range slots {
-					publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
-				}
-
-				for i := 0; ; i++ {
-					gap = gap + i
-					wasFound, next = consensus.decider.NthNextValidator(
-						slots,
-						lastLeaderPubKey,
-						gap)
-					if !wasFound {
-						return next
-					}
-					if publicToAddress[current.Bytes] != publicToAddress[next.Bytes] {
-						break
-					}
-				}
-			} else {
-				wasFound, next = consensus.decider.NthNextValidator(
-					slots,
-					lastLeaderPubKey,
-					gap)
+			next, ok := viewChangeNextValidator(consensus.decider, gap, slots, lastLeaderPubKey)
+			if ok {
+				return next
 			}
 		} else {
 			wasFound, next = consensus.decider.NthNextHmy(
@@ -253,7 +230,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, slots shard.SlotList
 		}
 	} else {
 		wasFound, next = consensus.decider.NthNextHmy(
-			shard.Schedule.InstanceForEpoch(epoch),
+			shard.Schedule.InstanceForEpoch(blockchain.curHeader.Epoch()),
 			lastLeaderPubKey,
 			gap)
 	}
@@ -266,6 +243,47 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, slots shard.SlotList
 		Str("nextLeader", next.Bytes.Hex()).
 		Msg("[getNextLeaderKey] next Leader")
 	return next
+}
+
+func viewChangeNextValidator(decider quorum.Decider, gap int, slots shard.SlotList, lastLeaderPubKey *bls.PublicKeyWrapper) (*bls.PublicKeyWrapper, bool) {
+	var wasFound bool
+	var next *bls.PublicKeyWrapper
+	if gap > 1 {
+		wasFoundCurrent, current := decider.NthNextValidator(
+			slots,
+			lastLeaderPubKey,
+			gap-1)
+		if !wasFoundCurrent {
+			return nil, false
+		}
+
+		publicToAddress := make(map[bls.SerializedPublicKey]common.Address)
+		for _, slot := range slots {
+			publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
+		}
+
+		for i := 0; i < len(slots); i++ {
+			gap = gap + i
+			wasFound, next = decider.NthNextValidator(
+				slots,
+				lastLeaderPubKey,
+				gap)
+			if !wasFound {
+				return nil, false
+			}
+
+			if publicToAddress[current.Bytes] != publicToAddress[next.Bytes] {
+				return next, true
+			}
+		}
+	} else {
+		wasFound, next = decider.NthNextValidator(
+			slots,
+			lastLeaderPubKey,
+			gap)
+		return next, wasFound
+	}
+	return nil, false
 }
 
 func createTimeout() map[TimeoutType]*utils.Timeout {
