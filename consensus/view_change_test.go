@@ -138,8 +138,12 @@ func TestViewChangeNextValidator(t *testing.T) {
 	decider.UpdateParticipants(wrappedBLSKeys, []bls.PublicKeyWrapper{})
 	assert.EqualValues(t, keyCount, decider.ParticipantsCount())
 
-	t.Run("check_different_address_for_validators_with_gap_0", func(t *testing.T) {
-		slots := []shard.Slot{}
+	t.Run("check_different_address_for_validators", func(t *testing.T) {
+		var (
+			rs    *bls.PublicKeyWrapper
+			err   error
+			slots []shard.Slot
+		)
 		for i := 0; i < keyCount; i++ {
 			slot := shard.Slot{
 				EcdsaAddress: common.BigToAddress(big.NewInt(int64(i))),
@@ -148,43 +152,32 @@ func TestViewChangeNextValidator(t *testing.T) {
 			slots = append(slots, slot)
 		}
 
-		rs, ok := viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
-		require.True(t, ok)
+		rs, err = viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[0], rs)
+
+		rs, err = viewChangeNextValidator(decider, 1, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
 		require.Equal(t, &wrappedBLSKeys[1], rs)
-	})
-	t.Run("check_different_address_for_validators_with_gap_1", func(t *testing.T) {
-		slots := []shard.Slot{}
-		for i := 0; i < keyCount; i++ {
-			slot := shard.Slot{
-				EcdsaAddress: common.BigToAddress(big.NewInt(int64(i))),
-				BLSPublicKey: wrappedBLSKeys[i].Bytes,
-			}
-			slots = append(slots, slot)
-		}
 
-		rs, ok := viewChangeNextValidator(decider, 1, slots, &wrappedBLSKeys[0])
-		require.True(t, ok)
-		require.Equal(t, &wrappedBLSKeys[1], rs)
-	})
-	t.Run("check_different_address_for_validators_with_gap_2", func(t *testing.T) {
-		slots := []shard.Slot{}
-		for i := 0; i < keyCount; i++ {
-			slot := shard.Slot{
-				EcdsaAddress: common.BigToAddress(big.NewInt(int64(i))),
-				BLSPublicKey: wrappedBLSKeys[i].Bytes,
-			}
-			slots = append(slots, slot)
-		}
-
-		rs, ok := viewChangeNextValidator(decider, 2, slots, &wrappedBLSKeys[0])
-		require.True(t, ok)
+		rs, err = viewChangeNextValidator(decider, 2, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
 		require.Equal(t, &wrappedBLSKeys[2], rs)
+
+		// and no panic or error for future 1k gaps
+		for i := 0; i < 1000; i++ {
+			_, err = viewChangeNextValidator(decider, i, slots, &wrappedBLSKeys[0])
+			require.NoError(t, err)
+		}
 	})
 
 	// we can't find next validator, because all validators have the same address
-	t.Run("check_same_address_for_validators", func(t *testing.T) {
-		// Slot represents node id (BLS address)
-		slots := []shard.Slot{}
+	t.Run("same_address_for_all_validators", func(t *testing.T) {
+		var (
+			rs    *bls.PublicKeyWrapper
+			err   error
+			slots []shard.Slot
+		)
 		for i := 0; i < keyCount; i++ {
 			slot := shard.Slot{
 				EcdsaAddress: common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z3")),
@@ -193,8 +186,23 @@ func TestViewChangeNextValidator(t *testing.T) {
 			slots = append(slots, slot)
 		}
 
-		_, ok := viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
-		require.False(t, ok)
+		rs, err = viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[0], rs)
+
+		rs, err = viewChangeNextValidator(decider, 1, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[1], rs)
+
+		// error because all validators belong same address
+		_, err = viewChangeNextValidator(decider, 2, slots, &wrappedBLSKeys[0])
+		require.Error(t, err)
+
+		// all of them return error, no way to recover
+		for i := 2; i < 1000; i++ {
+			_, err = viewChangeNextValidator(decider, i, slots, &wrappedBLSKeys[0])
+			require.Errorf(t, err, "error because all validators belong same address %d", i)
+		}
 	})
 
 	// we can't find next validator, because all validators have the same address
@@ -203,6 +211,8 @@ func TestViewChangeNextValidator(t *testing.T) {
 		var (
 			addr1 = common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z3"))
 			addr2 = common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z4"))
+			rs    *bls.PublicKeyWrapper
+			err   error
 		)
 		slots := []shard.Slot{
 			{
@@ -226,17 +236,21 @@ func TestViewChangeNextValidator(t *testing.T) {
 				BLSPublicKey: wrappedBLSKeys[4].Bytes,
 			},
 		}
-		rs, ok := viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
-		require.True(t, ok)
+
+		rs, err = viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[0], rs)
+
+		rs, err = viewChangeNextValidator(decider, 1, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[1], rs)
+
+		rs, err = viewChangeNextValidator(decider, 2, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
 		require.Equal(t, &wrappedBLSKeys[2], rs)
 
-		rs, ok = viewChangeNextValidator(decider, 1, slots, &wrappedBLSKeys[0])
-		require.True(t, ok)
-		require.Equal(t, &wrappedBLSKeys[3], rs)
-
-		// TODO
-		//rs, ok = viewChangeNextValidator(decider, 2, slots, &wrappedBLSKeys[0])
-		//require.True(t, ok)
-		//require.Equal(t, &wrappedBLSKeys[0], rs)
+		rs, err = viewChangeNextValidator(decider, 3, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[1], rs)
 	})
 }

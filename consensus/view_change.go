@@ -169,8 +169,9 @@ func (consensus *Consensus) getNextLeaderKeySkipSameAddress(viewID uint64, commi
 	}
 	// use pubkey as default key as well
 	leaderPubKey := consensus.getLeaderPubKey()
-	rs, ok := viewChangeNextValidator(consensus.decider, gap, committee.Slots, leaderPubKey)
-	if !ok {
+	rs, err := viewChangeNextValidator(consensus.decider, gap, committee.Slots, leaderPubKey)
+	if err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[getNextLeaderKeySkipSameAddress] viewChangeNextValidator failed")
 		return leaderPubKey
 	}
 	return rs
@@ -263,16 +264,17 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 	return next
 }
 
-func viewChangeNextValidator(decider quorum.Decider, gap int, slots shard.SlotList, lastLeaderPubKey *bls.PublicKeyWrapper) (*bls.PublicKeyWrapper, bool) {
-	var wasFound bool
-	var next *bls.PublicKeyWrapper
+type nthNext interface {
+	NthNext(pubKey *bls.PublicKeyWrapper, next int) (*bls.PublicKeyWrapper, error)
+}
+
+func viewChangeNextValidator(decider nthNext, gap int, slots shard.SlotList, lastLeaderPubKey *bls.PublicKeyWrapper) (*bls.PublicKeyWrapper, error) {
 	if gap > 1 {
-		wasFoundCurrent, current := decider.NthNextValidator(
-			slots,
+		current, err := decider.NthNext(
 			lastLeaderPubKey,
 			gap-1)
-		if !wasFoundCurrent {
-			return nil, false
+		if err != nil {
+			return nil, errors.WithMessagef(err, "NthNext failed, gap %d", gap)
 		}
 
 		publicToAddress := make(map[bls.SerializedPublicKey]common.Address)
@@ -282,26 +284,24 @@ func viewChangeNextValidator(decider quorum.Decider, gap int, slots shard.SlotLi
 
 		for i := 0; i < len(slots); i++ {
 			gap = gap + i
-			wasFound, next = decider.NthNextValidator(
-				slots,
+			next, err := decider.NthNext(
 				lastLeaderPubKey,
 				gap)
-			if !wasFound {
-				return nil, false
+			if err != nil {
+				return nil, errors.New("current leader not found")
 			}
 
 			if publicToAddress[current.Bytes] != publicToAddress[next.Bytes] {
-				return next, true
+				return next, nil
 			}
 		}
 	} else {
-		wasFound, next = decider.NthNextValidator(
-			slots,
+		next, err := decider.NthNext(
 			lastLeaderPubKey,
 			gap)
-		return next, wasFound
+		return next, errors.WithMessagef(err, "NthNext failed, gap %d", gap)
 	}
-	return nil, false
+	return nil, errors.New("current leader not found")
 }
 
 func createTimeout() map[TimeoutType]*utils.Timeout {

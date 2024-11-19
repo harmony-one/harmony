@@ -79,6 +79,7 @@ type ParticipantTracker interface {
 	NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(instance shardingconfig.Instance, pubkey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
+	NthNext(pubKey *bls.PublicKeyWrapper, next int) (*bls.PublicKeyWrapper, error)
 	FirstParticipant() *bls.PublicKeyWrapper
 	UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper)
 }
@@ -203,12 +204,10 @@ func (s *cIdentities) IndexOf(pubKey bls.SerializedPublicKey) int {
 }
 
 // NthNext return the Nth next pubkey, next can be negative number
-func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
-	found := false
-
+func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (*bls.PublicKeyWrapper, error) {
 	idx := s.IndexOf(pubKey.Bytes)
-	if idx != -1 {
-		found = true
+	if idx == -1 {
+		return nil, errors.Errorf("pubKey not found %x", pubKey.Bytes)
 	}
 	numNodes := int(s.ParticipantsCount())
 	// sanity check to avoid out of bound access
@@ -216,7 +215,7 @@ func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bl
 		numNodes = len(s.publicKeys)
 	}
 	idx = (idx + next) % numNodes
-	return found, &s.publicKeys[idx]
+	return &s.publicKeys[idx], nil
 }
 
 // NthNextValidatorV2 returns the Nth next pubkey nodes, but from another validator.
