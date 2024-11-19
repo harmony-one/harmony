@@ -56,6 +56,12 @@ func (a threadSafeDeciderImpl) NthNextValidator(slotList shard.SlotList, pubKey 
 	return a.decider.NthNextValidator(slotList, pubKey, next)
 }
 
+func (a threadSafeDeciderImpl) NthNext(pubKey *bls.PublicKeyWrapper, next int) (*bls.PublicKeyWrapper, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.decider.NthNext(pubKey, next)
+}
+
 func (a threadSafeDeciderImpl) NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
