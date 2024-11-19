@@ -196,4 +196,47 @@ func TestViewChangeNextValidator(t *testing.T) {
 		_, ok := viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
 		require.False(t, ok)
 	})
+
+	// we can't find next validator, because all validators have the same address
+	t.Run("check_5_validators_2_addrs", func(t *testing.T) {
+		// Slot represents node id (BLS address)
+		var (
+			addr1 = common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z3"))
+			addr2 = common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z4"))
+		)
+		slots := []shard.Slot{
+			{
+				EcdsaAddress: addr1,
+				BLSPublicKey: wrappedBLSKeys[0].Bytes,
+			},
+			{
+				EcdsaAddress: addr1,
+				BLSPublicKey: wrappedBLSKeys[1].Bytes,
+			},
+			{
+				EcdsaAddress: addr2,
+				BLSPublicKey: wrappedBLSKeys[2].Bytes,
+			},
+			{
+				EcdsaAddress: addr2,
+				BLSPublicKey: wrappedBLSKeys[3].Bytes,
+			},
+			{
+				EcdsaAddress: addr2,
+				BLSPublicKey: wrappedBLSKeys[4].Bytes,
+			},
+		}
+		rs, ok := viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
+		require.True(t, ok)
+		require.Equal(t, &wrappedBLSKeys[2], rs)
+
+		rs, ok = viewChangeNextValidator(decider, 1, slots, &wrappedBLSKeys[0])
+		require.True(t, ok)
+		require.Equal(t, &wrappedBLSKeys[3], rs)
+
+		// TODO
+		//rs, ok = viewChangeNextValidator(decider, 2, slots, &wrappedBLSKeys[0])
+		//require.True(t, ok)
+		//require.Equal(t, &wrappedBLSKeys[0], rs)
+	})
 }
