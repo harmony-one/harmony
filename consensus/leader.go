@@ -148,7 +148,6 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 		consensus.getLogger().Debug().
 			Interface("validatorPubKeys", recvMsg.SenderPubkeys).
 			Msg("[OnPrepare] Received Additional Prepare Message")
-		return
 	}
 	//// Read - End
 
