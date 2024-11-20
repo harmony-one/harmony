@@ -364,6 +364,7 @@ var (
 		big.NewInt(0),                      // AllowlistEpoch
 		big.NewInt(1),                      // LeaderRotationExternalNonBeaconLeaders
 		big.NewInt(1),                      // LeaderRotationExternalBeaconLeaders
+		big.NewInt(0),                      // LeaderRotationV2Epoch
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 		big.NewInt(0),                      // BlockGas30M
@@ -414,6 +415,7 @@ var (
 		big.NewInt(0),        // AllowlistEpoch
 		big.NewInt(1),        // LeaderRotationExternalNonBeaconLeaders
 		big.NewInt(1),        // LeaderRotationExternalBeaconLeaders
+		big.NewInt(0),        // LeaderRotationV2Epoch
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 		big.NewInt(0),        // HIP30Epoch
