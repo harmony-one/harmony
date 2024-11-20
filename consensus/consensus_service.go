@@ -498,7 +498,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal(NewProposal(SyncProposal))
+					consensus.ReadySignal(NewProposal(SyncProposal), "updateConsensusInformation", "leader changed and I am the new leader")
 				}()
 			}
 			return Normal

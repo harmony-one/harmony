@@ -162,7 +162,11 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 	return consensus.Blockchain()
 }
 
-func (consensus *Consensus) ReadySignal(p Proposal) {
+func (consensus *Consensus) ReadySignal(p Proposal, signalSource string, signalReason string) {
+	utils.Logger().Info().
+		Str("signalSource", signalSource).
+		Str("signalReason", signalReason).
+		Msg("ReadySignal is called to propose new block")
 	consensus.readySignal <- p
 }
 
