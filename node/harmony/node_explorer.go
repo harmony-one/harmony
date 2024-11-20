@@ -156,7 +156,7 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 
 	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, false); err == nil || errors.Is(err, core.ErrKnownBlock) {
 		if block.IsLastBlockInEpoch() {
-			node.Consensus.UpdateConsensusInformation()
+			node.Consensus.UpdateConsensusInformation("added new block for explorer")
 		}
 		// Clean up the blocks to avoid OOM.
 		node.Consensus.FBFTLog().DeleteBlockByNumber(block.NumberU64())

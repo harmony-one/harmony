@@ -360,12 +360,12 @@ func (consensus *Consensus) StartChannel() {
 	consensus.mutex.Unlock()
 }
 
-func (consensus *Consensus) syncReadyChan() {
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
+func (consensus *Consensus) syncReadyChan(reason string) {
+	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] syncReadyChan %s", reason)
 	if consensus.getBlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
 		consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
 		consensus.setViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
-		mode := consensus.updateConsensusInformation()
+		mode := consensus.updateConsensusInformation(reason)
 		consensus.current.SetMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -374,7 +374,7 @@ func (consensus *Consensus) syncReadyChan() {
 	} else if consensus.mode() == Syncing {
 		// Corner case where sync is triggered before `onCommitted` and there is a race
 		// for block insertion between consensus and downloader.
-		mode := consensus.updateConsensusInformation()
+		mode := consensus.updateConsensusInformation(reason)
 		consensus.setMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -850,7 +850,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if blk.IsLastBlockInEpoch() {
-		consensus.setMode(consensus.updateConsensusInformation())
+		consensus.setMode(consensus.updateConsensusInformation("setupForNewConsensus"))
 	}
 	consensus.fBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.resetState()

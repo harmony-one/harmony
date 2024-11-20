@@ -417,12 +417,12 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 		}
 		// TODO: move this to explorer handler code.
 		if s.isExplorer {
-			s.consensus.UpdateConsensusInformation()
+			s.consensus.UpdateConsensusInformation("stream sync is explorer")
 		}
 		s.purgeLastMileBlocksFromCache()
 
 		if totalInserted > 0 && !s.isEpochChain {
-			s.consensus.BlocksSynchronized()
+			s.consensus.BlocksSynchronized("StagedStreamSync block synchronized")
 		}
 	}
 

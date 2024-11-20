@@ -196,14 +196,14 @@ func (consensus *Consensus) verifyBlock(block *types.Block) error {
 
 // BlocksSynchronized lets the main loop know that block synchronization finished
 // thus the blockchain is likely to be up to date.
-func (consensus *Consensus) BlocksSynchronized() {
+func (consensus *Consensus) BlocksSynchronized(reason string) {
 	err := consensus.AddConsensusLastMile()
 	if err != nil {
 		consensus.GetLogger().Error().Err(err).Msg("add last mile failed")
 	}
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.syncReadyChan()
+	consensus.syncReadyChan(reason)
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
