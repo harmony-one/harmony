@@ -181,7 +181,8 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 
 	if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writing commit sig")
+		return
 	}
 
 	// Send committed message before block insertion.
@@ -189,13 +190,12 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
+	groupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))
 	if !isLeader || block.IsLastBlockInEpoch() {
 		// send immediately
 		if err := consensus.msgSender.SendWithRetry(
 			block.NumberU64(),
-			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{groupID},
 			p2p.ConstructMessage(msgToSend)); err != nil {
 			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send committed message")
 		} else {
@@ -210,9 +210,7 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 		// delayed send
 		consensus.msgSender.DelayedSendWithRetry(
 			block.NumberU64(),
-			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{groupID},
 			p2p.ConstructMessage(msgToSend))
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
@@ -225,9 +223,10 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 	err = consensus.commitBlock(block, FBFTMsg)
 
 	if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
-		consensus.getLogger().Err(err).
+		consensus.getLogger().Error().Err(err).
 			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
 			Msg("[finalCommit] Leader failed to commit the confirmed block")
+		return
 	}
 
 	if consensus.ShardID == 0 && isLeader && block.IsLastBlockInEpoch() {
@@ -237,7 +236,7 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 		}
 		encodedBlock, err := rlp.EncodeToBytes(blockWithSig)
 		if err != nil {
-			consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
+			consensus.getLogger().Error().Msg("[finalCommit] Failed encoding block for epoch end")
 			return
 		}
 		err = consensus.host.SendMessageToGroups(
@@ -279,7 +278,7 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 			// No pipelining
 			go func() {
 				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-				consensus.ReadySignal(NewProposal(SyncProposal))
+				consensus.ReadySignal(NewProposal(SyncProposal), "finalCommit", "I am leader and it's the last block in epoch")
 			}()
 		} else {
 			// pipelining
@@ -355,7 +354,7 @@ func (consensus *Consensus) StartChannel() {
 		consensus.start = true
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(NewProposal(SyncProposal))
+		consensus.ReadySignal(NewProposal(SyncProposal), "StartChannel", "consensus channel is started")
 		return
 	}
 	consensus.mutex.Unlock()
@@ -607,7 +606,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		// Send signal to Node to propose the new block for consensus
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(NewProposal(AsyncProposal))
+		consensus.ReadySignal(NewProposal(AsyncProposal), "preCommitAndPropose", "proposing new block which will wait on the full commit signatures to finish")
 	}()
 
 	return nil
@@ -824,16 +823,26 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 			prev := consensus.getLeaderPubKey()
 			consensus.setLeaderPubKey(next)
 			if consensus.isLeader() {
-				utils.Logger().Info().Msgf("We are block %d, I am the new leader %s", blk.NumberU64(), next.Bytes.Hex())
+				utils.Logger().Info().
+					Uint64("CurrentHeight", blk.NumberU64()).
+					Uint64("ConsensusBlockNumber", blk.NumberU64()+1).
+					Int64("Epoch", epoch.Int64()).
+					Str("AssignedLeader", next.Bytes.Hex()).
+					Msg("Consensus Setup: I am the new leader for the next block")
 			} else {
-				utils.Logger().Info().Msgf("We are block %d, the leader is %s", blk.NumberU64(), next.Bytes.Hex())
+				utils.Logger().Info().
+					Uint64("CurrentHeight", blk.NumberU64()).
+					Uint64("ConsensusBlockNumber", blk.NumberU64()+1).
+					Int64("Epoch", epoch.Int64()).
+					Str("AssignedLeader", next.Bytes.Hex()).
+					Msg("Consensus Setup: New leader assigned for the next block")
 			}
 			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 				// leader changed
 				blockPeriod := consensus.BlockPeriod
 				go func() {
 					<-time.After(blockPeriod)
-					consensus.ReadySignal(NewProposal(SyncProposal))
+					consensus.ReadySignal(NewProposal(SyncProposal), "setupForNewConsensus", "I am the new leader")
 				}()
 			}
 		}

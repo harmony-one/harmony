@@ -322,8 +322,11 @@ func (node *Node) doSync(syncInstance ISync, syncingPeerProvider SyncingPeerProv
 			consensus.BlocksNotSynchronized("node.doSync")
 		}
 		isBeacon := bc.ShardID() == shard.BeaconChainShardID
+		heightBeforeSync := bc.CurrentBlock().NumberU64()
 		syncInstance.SyncLoop(bc, isBeacon, consensus, legacysync.LoopMinTime)
-		if willJoinConsensus {
+		heightAfterSync := bc.CurrentBlock().NumberU64()
+		addedBlocks := heightAfterSync - heightBeforeSync
+		if willJoinConsensus && addedBlocks > 0 {
 			node.IsSynchronized.Set()
 			consensus.BlocksSynchronized("doSync")
 		}

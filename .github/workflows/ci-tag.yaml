@@ -42,7 +42,7 @@ jobs:
     if: needs.check.outputs.tag_annotated == 'true'
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-12, [self-hosted, linux, ARM64]]
+        os: [ubuntu-22.04, macos-13, [self-hosted, linux, ARM64]]
 
     steps:
       - name: Import GPG key
@@ -104,11 +104,15 @@ jobs:
         working-directory: harmony
 
       - name: Build harmony binary and packages for MacOS
-        if: matrix.os == 'macos-12'
+        if: matrix.os == 'macos-13'
         run: |
           brew install bash
           sudo rm -f /usr/local/opt/openssl
           sudo ln -sf /usr/local/opt/openssl@1.1 /usr/local/opt/openssl
+          # hack for older chip (macos)
+          sudo mkdir -p /opt/homebrew/opt
+          sudo ln -sf /usr/local/opt/openssl@1.1 /opt/homebrew/opt/openssl@1.1
+          sudo ln -sf /usr/local/opt/gmp /opt/homebrew/opt/gmp
           make
           cd ./bin && mkdir ./lib && mv ./*.dylib ./lib && rm -f ./bootnode
           gpg --detach-sign harmony

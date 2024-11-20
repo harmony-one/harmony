@@ -40,7 +40,7 @@ func (consensus *Consensus) WaitForNewRandomness() {
 	}()
 }
 
-// GetNextRnd returns the oldest available randomness along with the hash of the block there randomness preimage is committed.
+// GetNextRnd returns the oldest available randomness along with the hash of the block where randomness preimage is committed.
 func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error) {
 	if len(consensus.pendingRnds) == 0 {
 		return [vdFAndProofSize]byte{}, [32]byte{}, errors.New("No available randomness")
@@ -73,14 +73,6 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 		return empty, err
 	}
 	return marshaledMessage, nil
-}
-
-// UpdatePublicKeys updates the PublicKeys for
-// quorum on current subcommittee, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	return consensus.updatePublicKeys(pubKeys, allowlist)
 }
 
 func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
@@ -506,7 +498,7 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal(NewProposal(SyncProposal))
+					consensus.ReadySignal(NewProposal(SyncProposal), "updateConsensusInformation", "leader changed and I am the new leader")
 				}()
 			}
 			return Normal

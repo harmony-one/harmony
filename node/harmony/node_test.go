@@ -1,9 +1,12 @@
 package node
 
 import (
+	"crypto/rand"
 	"errors"
+	"fmt"
 	"testing"
 
+	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -16,19 +19,67 @@ import (
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
+	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
 )
 
 var testDBFactory = &shardchain.MemDBFactory{}
 
-func TestNewNode(t *testing.T) {
+// randomPeerID generates a random Peer ID
+func randomPeerID() libp2p_peer.ID {
+	// Generate a random private key
+	priv, _, err := libp2p_crypto.GenerateKeyPairWithReader(libp2p_crypto.Ed25519, 2048, rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	// Get the peer ID from the private key
+	pid, err := libp2p_peer.IDFromPrivateKey(priv)
+	if err != nil {
+		panic(err)
+	}
+	return pid
+}
+
+// createRandomNode creates a random peer
+func createRandomNode(port string) (string, *ffi_bls.SecretKey, *p2p.Peer) {
 	blsKey := bls.RandPrivateKey()
 	pubKey := blsKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
+	peerID := randomPeerID()
+	p2pPeer := &p2p.Peer{IP: "127.0.0.1", Port: port, ConsensusPubKey: pubKey, PeerID: peerID}
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", "127.0.0.1", port, peerID)
+	peerAddr, _ := multiaddr.NewMultiaddr(addr)
+	return peerAddr.String(), blsKey, p2pPeer
+}
+
+func TestTrustedNodes(t *testing.T) {
+	_, _, leader := createRandomNode("8882")
+	addr1, _, _ := createRandomNode("8884")
+	addr2, _, _ := createRandomNode("8886")
+	addr3, _, _ := createRandomNode("8888")
+	trustedNodes := []string{addr1, addr2, addr3}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
-		Self:   &leader,
+		Self:         leader,
+		BLSKey:       priKey,
+		TrustedNodes: trustedNodes,
+	})
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
+	host.Start()
+
+	connectedPeers := host.GetPeerCount()
+	if connectedPeers != len(trustedNodes)+1 {
+		t.Fatalf("host adding trusted nodes failed, expected:%d, got:%d", len(trustedNodes), connectedPeers)
+	}
+}
+func TestNewNode(t *testing.T) {
+	_, blsKey, leader := createRandomNode("8882")
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2p.NewHost(p2p.HostConfig{
+		Self:   leader,
 		BLSKey: priKey,
 	})
 	if err != nil {
