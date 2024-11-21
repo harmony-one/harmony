@@ -1,6 +1,7 @@
 package quorum
 
 import (
+	"fmt"
 	"math/big"
 	"strings"
 	"testing"
@@ -549,31 +550,49 @@ func TestInvalidAggregateSig(test *testing.T) {
 	}
 }
 
-func TestCIdentities_NthNextValidatorHmy(t *testing.T) {
-	address := []common.Address{
-		common.HexToAddress("0x1"),
-		common.HexToAddress("0x2"),
-		common.HexToAddress("0x3"),
+func createTestCIdentities(numAddresses int, keysPerAddress int) (*cIdentities, shard.SlotList, []harmony_bls.PublicKeyWrapper) {
+	testAddresses := make([]common.Address, 0, numAddresses*numAddresses)
+	for i := int(0); i < numAddresses; i++ {
+		h := fmt.Sprintf("0x%040x", i)
+		addr := common.HexToAddress(h)
+		testAddresses = append(testAddresses, addr)
 	}
 	slots := shard.SlotList{}
 	list := []harmony_bls.PublicKeyWrapper{}
-	for i := 0; i < 3; i++ {
-		for j := 0; j < 3; j++ {
+	// generate slots and public keys
+	for i := 0; i < numAddresses; i++ {
+		for j := 0; j < keysPerAddress; j++ { // keys per address
 			blsKey := harmony_bls.RandPrivateKey()
 			wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
 			wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+
 			slots = append(slots, shard.Slot{
-				EcdsaAddress:   address[i%3],
+				EcdsaAddress:   testAddresses[i],
 				BLSPublicKey:   wrapper.Bytes,
 				EffectiveStake: nil,
 			})
 			list = append(list, wrapper)
 		}
 	}
-
+	// initialize and update cIdentities
 	c := newCIdentities()
 	c.UpdateParticipants(list, []bls.PublicKeyWrapper{})
+	return c, slots, list
+}
+
+func TestCIdentities_NthNextValidatorHmy(t *testing.T) {
+	c, slots, list := createTestCIdentities(3, 3)
+
 	found, key := c.NthNextValidator(slots, &list[0], 1)
+	require.Equal(t, true, found)
+	// because we skip 3 keys of current validator
+	require.Equal(t, 3, c.IndexOf(key.Bytes))
+}
+
+func TestCIdentities_NthNextValidatorV2Hmy(t *testing.T) {
+	c, slots, list := createTestCIdentities(3, 3)
+
+	found, key := c.NthNextValidatorV2(slots, &list[0], 1)
 	require.Equal(t, true, found)
 	// because we skip 3 keys of current validator
 	require.Equal(t, 3, c.IndexOf(key.Bytes))
