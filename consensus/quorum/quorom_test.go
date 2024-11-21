@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
@@ -609,6 +610,28 @@ func TestCIdentities_NthNextValidatorFailedEdgeCase1(t *testing.T) {
 	// Edge Case: Trigger NthNextValidator with next=0, which should cause a panic
 	t.Log("Calling NthNextValidator with next=0 to test panic handling")
 	c.NthNextValidator(slots, &wrapper, 0)
+}
+
+func TestCIdentities_NthNextValidatorFailedEdgeCase2(t *testing.T) {
+	// create test identities and slots
+	c, slots, list := createTestCIdentities(1, 3)
+
+	done := make(chan bool)
+
+	go func() {
+		// possible infinite loop, it will time out
+		c.NthNextValidator(slots, &list[1], 1)
+
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		t.Error("Expected a timeout, but successfully calculated next leader")
+
+	case <-time.After(5 * time.Second):
+		t.Log("Test timed out, possible infinite loop")
+	}
 }
 
 func TestCIdentities_NthNextValidatorV2Hmy(t *testing.T) {
