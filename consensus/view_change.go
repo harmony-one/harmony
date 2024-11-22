@@ -342,7 +342,7 @@ func (consensus *Consensus) startViewChange() {
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
 	c := consensus.Blockchain().Config()
-	if c.IsViewChangeSkipValidatorsSameAddressEpoch(currentHeader.Epoch()) {
+	if c.IsLeaderRotationV2Epoch(currentHeader.Epoch()) {
 		consensus.setLeaderPubKey(consensus.getNextLeaderKeySkipSameAddress(nextViewID, committee))
 	} else {
 		consensus.setLeaderPubKey(consensus.getNextLeaderKey(nextViewID, committee))
