@@ -711,3 +711,23 @@ func TestCIdentities_NthNextValidatorV2EdgeCase1(t *testing.T) {
 	require.Equal(t, true, found)
 	require.Equal(t, 0, c.IndexOf(key.Bytes))
 }
+
+func TestCIdentities_NthNextValidatorV2EdgeCase2(t *testing.T) {
+	// create test identities and slots
+	c, slots, list := createTestCIdentities(1, 3)
+
+	done := make(chan bool)
+
+	go func() {
+		c.NthNextValidatorV2(slots, &list[1], 1)
+
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		t.Log("Test completed successfully ")
+	case <-time.After(5 * time.Second):
+		t.Error("timeout, possible infinite loop")
+	}
+}
