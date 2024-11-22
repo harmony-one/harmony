@@ -694,3 +694,20 @@ func TestCIdentities_NthNextValidatorV2Hmy(t *testing.T) {
 	// because we skip 3 keys of current validator
 	require.Equal(t, 3, c.IndexOf(key.Bytes))
 }
+
+func TestCIdentities_NthNextValidatorV2EdgeCase1(t *testing.T) {
+	// create test identities and slots
+	c, slots, _ := createTestCIdentities(3, 3)
+
+	// create a public key wrapper that doesn't exist in the identities
+	t.Log("creating a random public key wrapper not present in test identities")
+	blsKey := harmony_bls.RandPrivateKey()
+	wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+
+	// Edge Case: Trigger NthNextValidator with next=0, which should cause a panic
+	t.Log("Calling NthNextValidatorV2 with next=0 to test panic handling")
+	found, key := c.NthNextValidatorV2(slots, &wrapper, 0)
+
+	require.Equal(t, true, found)
+	require.Equal(t, 0, c.IndexOf(key.Bytes))
+}
