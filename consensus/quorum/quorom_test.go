@@ -731,3 +731,53 @@ func TestCIdentities_NthNextValidatorV2EdgeCase2(t *testing.T) {
 		t.Error("timeout, possible infinite loop")
 	}
 }
+
+func TestCIdentities_NthNextValidatorV2EdgeCase3(t *testing.T) {
+	// create 3 test addresses
+	testAddresses := make([]common.Address, 0, 3)
+	for i := int(0); i < 3; i++ {
+		h := fmt.Sprintf("0x%040x", i)
+		addr := common.HexToAddress(h)
+		testAddresses = append(testAddresses, addr)
+	}
+	slots := shard.SlotList{}
+	list := []harmony_bls.PublicKeyWrapper{}
+
+	// First add 4 keys for first address
+	for i := 0; i < 4; i++ {
+		blsKey := harmony_bls.RandPrivateKey()
+		wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+
+		slots = append(slots, shard.Slot{
+			EcdsaAddress:   testAddresses[0],
+			BLSPublicKey:   wrapper.Bytes,
+			EffectiveStake: nil,
+		})
+		list = append(list, wrapper)
+	}
+
+	// Then add 1 key for next two addresses
+	for i := 1; i < 3; i++ {
+		blsKey := harmony_bls.RandPrivateKey()
+		wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+
+		slots = append(slots, shard.Slot{
+			EcdsaAddress:   testAddresses[i],
+			BLSPublicKey:   wrapper.Bytes,
+			EffectiveStake: nil,
+		})
+		list = append(list, wrapper)
+	}
+
+	// initialize and update cIdentities
+	c := newCIdentities()
+	c.UpdateParticipants(list, []bls.PublicKeyWrapper{})
+
+	// current key is the first one.
+	found, key := c.NthNextValidatorV2(slots, &list[0], 1)
+	require.Equal(t, true, found)
+	// because we skip 4 keys of first validator, the next validator key index is 4 (starts from 0)
+	require.Equal(t, 4, c.IndexOf(key.Bytes))
+}
