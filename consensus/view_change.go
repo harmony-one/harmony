@@ -156,8 +156,8 @@ func (a nextLeaderParams) Config() *params.ChainConfig {
 	return a.config
 }
 
-// getNextLeaderKey uniquely determine who is the leader for given viewID
-// It reads the current leader's pubkey based on the blockchain data and returns
+// getNextLeaderKeySkipSameAddress uniquely determine who is the leader for given viewID
+// It receives the committee and returns
 // the next leader based on the gap of the viewID of the view change and the last
 // know view id of the block.
 func (consensus *Consensus) getNextLeaderKeySkipSameAddress(viewID uint64, committee *shard.Committee) *bls.PublicKeyWrapper {
