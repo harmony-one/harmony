@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
@@ -156,24 +157,7 @@ func (e *engineImpl) VerifyVRF(
 		return nil
 	}
 
-	ss, err := bc.ReadShardState(header.Epoch())
-	if err != nil {
-		return errors.WithMessagef(
-			err, "[VerifyVRF] failed to read shard state %v", header.Epoch(),
-		)
-	}
-	committee, err := ss.FindCommitteeByID(header.ShardID())
-	if err != nil {
-		return errors.WithMessagef(
-			err, "[VerifyVRF] failed to find committee %d", header.ShardID(),
-		)
-	}
-
-	leaderPubKey, err := GetLeaderPubKeyFromCoinbase(
-		committee.Slots,
-		header.Coinbase(),
-		bc.Config().IsStaking(header.Epoch()),
-	)
+	leaderPubKey, err := GetLeaderPubKeyFromCoinbase(bc, header)
 
 	if leaderPubKey == nil || err != nil {
 		return err
@@ -206,22 +190,35 @@ func (e *engineImpl) VerifyVRF(
 
 // GetLeaderPubKeyFromCoinbase retrieve corresponding blsPublicKey from Coinbase Address
 func GetLeaderPubKeyFromCoinbase(
-	slots shard.SlotList, coinbase common.Address, isStaking bool,
+	blockchain engine.ChainReader, h *block.Header,
 ) (*bls.PublicKeyWrapper, error) {
-	for _, member := range slots {
+	shardState, err := blockchain.ReadShardState(h.Epoch())
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
+			h.Epoch(),
+			h.Coinbase().Hash().Hex(),
+		)
+	}
+
+	committee, err := shardState.FindCommitteeByID(h.ShardID())
+	if err != nil {
+		return nil, err
+	}
+
+	committerKey := new(bls2.PublicKey)
+	isStaking := blockchain.Config().IsStaking(h.Epoch())
+	for _, member := range committee.Slots {
 		if isStaking {
 			// After staking the coinbase address will be the address of bls public key
-			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == coinbase {
-				committerKey, err := bls.BytesToBLSPublicKey(member.BLSPublicKey[:])
-				if err != nil {
+			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == h.Coinbase() {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
 					return nil, err
 				}
 				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
 			}
 		} else {
-			if member.EcdsaAddress == coinbase {
-				committerKey, err := bls.BytesToBLSPublicKey(member.BLSPublicKey[:])
-				if err != nil {
+			if member.EcdsaAddress == h.Coinbase() {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
 					return nil, err
 				}
 				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
@@ -229,7 +226,8 @@ func GetLeaderPubKeyFromCoinbase(
 		}
 	}
 	return nil, errors.Errorf(
-		"cannot find corresponding BLS Public Key coinbase %s", coinbase.Hex(),
+		"cannot find corresponding BLS Public Key coinbase %s",
+		h.Coinbase().Hex(),
 	)
 }
 

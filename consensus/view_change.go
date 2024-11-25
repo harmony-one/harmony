@@ -7,12 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -147,15 +145,6 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 	return nextViewID, viewChangeDuration
 }
 
-type nextLeaderParams struct {
-	config    *params.ChainConfig
-	curHeader *block.Header
-}
-
-func (a nextLeaderParams) Config() *params.ChainConfig {
-	return a.config
-}
-
 // getNextLeaderKeySkipSameAddress uniquely determine who is the leader for given viewID
 // It receives the committee and returns
 // the next leader based on the gap of the viewID of the view change and the last
@@ -200,7 +189,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
 			gap = int(viewID - stuckBlockViewID)
 			// this is the truth of the leader based on blockchain blocks
-			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(committee.Slots, curHeader.Coinbase(), blockchain.Config().IsStaking(curHeader.Epoch()))
+			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(blockchain, curHeader)
 			if err != nil || lastLeaderPubKey == nil {
 				consensus.getLogger().Error().Err(err).
 					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
