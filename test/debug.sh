@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+unset -v configfile
+configfile=$1
+
 ./test/kill_node.sh
 rm -rf tmp_log* 2> /dev/null
 rm *.rlp 2> /dev/null
@@ -14,7 +17,7 @@ else
 fi
 if [ "${VERBOSE}" = "true" ]; then
     echo "[WARN] - running with verbose logs"
-    ./test/deploy.sh -v -B -D 600000 "${SYNC_OPT[@]}" ./test/configs/local-resharding.txt
+    ./test/deploy.sh -v -B -D 600000 "${SYNC_OPT[@]}" "${configfile}"
 else
-    ./test/deploy.sh -B -D 600000 "${SYNC_OPT[@]}" ./test/configs/local-resharding.txt
+    ./test/deploy.sh -B -D 600000 "${SYNC_OPT[@]}" "${configfile}"
 fi
