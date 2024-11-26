@@ -702,16 +702,14 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicKeyWrapper) *bls.PublicKeyWrapper {
 	var (
-		bc        = consensus.Blockchain()
-		leader    = consensus.getLeaderPubKey()
-		curBlock  = bc.CurrentBlock()
-		curNumber = curBlock.NumberU64()
-		curEpoch  = curBlock.Epoch().Uint64()
+		bc       = consensus.Blockchain()
+		leader   = consensus.getLeaderPubKey()
+		curBlock = bc.CurrentBlock()
+		curEpoch = curBlock.Epoch().Uint64()
 	)
 	if epoch.Uint64() != curEpoch {
 		return defaultKey
 	}
-	const blocksCountAliveness = 4
 	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
@@ -733,21 +731,6 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 		utils.Logger().Error().Msg("[Rotating leader] slots count is 0")
 		return defaultKey
 	}
-	numBlocksProducedByLeader := blocksPerEpoch / uint64(slotsCount)
-	const minimumBlocksForLeaderInRow = blocksCountAliveness
-	if numBlocksProducedByLeader < minimumBlocksForLeaderInRow {
-		// mine no less than 3 blocks in a row
-		numBlocksProducedByLeader = minimumBlocksForLeaderInRow
-	}
-	s := bc.LeaderRotationMeta()
-	if !bytes.Equal(leader.Bytes[:], s.Pub) {
-		// Another leader.
-		return defaultKey
-	}
-	if s.Count < numBlocksProducedByLeader {
-		// Not enough blocks produced by the leader, continue producing by the same leader.
-		return defaultKey
-	}
 	// Passed all checks, we can change leader.
 	// NthNext will move the leader to the next leader in the committee.
 	// It does not know anything about external or internal validators.
@@ -757,55 +740,18 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 		offset   = 1
 	)
 
-	for i := 0; i < len(committee.Slots); i++ {
-		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
-			wasFound, next = consensus.decider.NthNextValidator(committee.Slots, leader, offset)
-		} else {
-			wasFound, next = consensus.decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
-		}
-		if !wasFound {
-			utils.Logger().Error().Msg("Failed to get next leader")
-			// Seems like nothing we can do here.
-			return defaultKey
-		}
-		members := consensus.decider.Participants()
-		mask := bls.NewMask(members)
-		skipped := 0
-		for i := 0; i < blocksCountAliveness; i++ {
-			header := bc.GetHeaderByNumber(curNumber - uint64(i))
-			if header == nil {
-				utils.Logger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(i))
-				return defaultKey
-			}
-			// if epoch is different, we should not check this block.
-			if header.Epoch().Uint64() != curEpoch {
-				break
-			}
-			// Populate the mask with the bitmap.
-			err = mask.SetMask(header.LastCommitBitmap())
-			if err != nil {
-				utils.Logger().Err(err).Msg("Failed to set mask")
-				return defaultKey
-			}
-			ok, err := mask.KeyEnabled(next.Bytes)
-			if err != nil {
-				utils.Logger().Err(err).Msg("Failed to get key enabled")
-				return defaultKey
-			}
-			if !ok {
-				skipped++
-			}
-		}
-
-		// no signature from the next leader at all, we should skip it.
-		if skipped >= blocksCountAliveness {
-			// Next leader is not signing blocks, we should skip it.
-			offset++
-			continue
-		}
-		return next
+	if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
+		wasFound, next = consensus.decider.NthNextValidator(committee.Slots, leader, offset)
+	} else {
+		wasFound, next = consensus.decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
 	}
-	return defaultKey
+	if !wasFound {
+		utils.Logger().Error().Msg("Failed to get next leader")
+		// Seems like nothing we can do here.
+		return defaultKey
+	}
+
+	return next
 }
 
 // SetupForNewConsensus sets the state for new consensus
