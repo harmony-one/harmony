@@ -142,6 +142,10 @@ type Consensus struct {
 	// value receives from
 	lastKnownSignPower int64
 	lastKnowViewChange int64
+
+	transitions struct {
+		finalCommit bool
+	}
 }
 
 // Blockchain returns the blockchain.
@@ -203,7 +207,9 @@ func (consensus *Consensus) BlocksSynchronized(reason string) {
 	}
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.syncReadyChan(reason)
+	if !consensus.transitions.finalCommit {
+		consensus.syncReadyChan(reason)
+	}
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized

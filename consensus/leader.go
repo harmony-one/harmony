@@ -298,7 +298,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			// only do early commit if it's not epoch block to avoid problems
 			consensus.preCommitAndPropose(blockObj)
 		}
-
+		consensus.transitions.finalCommit = true
 		go func(viewID uint64, isLeader bool) {
 			waitTime := 1000 * time.Millisecond
 			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
@@ -312,6 +312,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 			consensus.mutex.Lock()
 			defer consensus.mutex.Unlock()
+			consensus.transitions.finalCommit = false
 			if viewID == consensus.getCurBlockViewID() {
 				consensus.finalCommit(isLeader)
 			}
