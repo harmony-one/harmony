@@ -374,7 +374,6 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
-		big.NewInt(0),
 	}
 
 	// TestChainConfig ...
@@ -424,7 +423,6 @@ var (
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
-		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
 	}
@@ -608,8 +606,6 @@ type ChainConfig struct {
 	// vote power feature  https://github.com/harmony-one/harmony/pull/4683
 	// if crosslink are not sent for an entire epoch signed and toSign will be 0 and 0. when that happen, next epoch there will no shard 1 validator elected in the committee.
 	HIP32Epoch *big.Int `json:"hip32-epoch,omitempty"`
-
-	LeaderRotationV2Epoch *big.Int `json:"leader-rotation-v2-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -891,10 +887,6 @@ func (c *ChainConfig) IsMaxRate(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 	return isForked(c.TopMaxRateEpoch, epoch)
-}
-
-func (c *ChainConfig) IsLeaderRotationV2Epoch(epoch *big.Int) bool {
-	return isForked(c.LeaderRotationV2Epoch, epoch)
 }
 
 // During this epoch, shards 2 and 3 will start sending
