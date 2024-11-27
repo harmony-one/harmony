@@ -280,7 +280,7 @@ func (s *cIdentities) NthNextValidator(slotList shard.SlotList, pubKey *bls.Publ
 			Str("key", pubKey.Bytes.Hex()).
 			Msg("[NthNextHmy] pubKey not found")
 	}
-	for i := 0; i < len(slotList); i++ {
+	for {
 		numNodes := len(s.publicKeys)
 		idx = (idx + next) % numNodes
 		if publicToAddress[s.publicKeys[idx].Bytes] == publicToAddress[pubKey.Bytes] {
@@ -290,7 +290,6 @@ func (s *cIdentities) NthNextValidator(slotList shard.SlotList, pubKey *bls.Publ
 		}
 		return found, &s.publicKeys[idx]
 	}
-	return false, pubKey
 }
 
 func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
