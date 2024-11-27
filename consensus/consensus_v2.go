@@ -712,7 +712,11 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 		return defaultKey
 	}
 	const blocksCountAliveness = 4
-	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
+	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v rotation v2: %v",
+		epoch.Uint64(),
+		bc.Config().IsLeaderRotationInternalValidators(epoch),
+		bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch),
+		bc.Config().IsLeaderRotationV2Epoch(epoch))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
@@ -758,7 +762,9 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 	)
 
 	for i := 0; i < len(committee.Slots); i++ {
-		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
+		if bc.Config().IsLeaderRotationV2Epoch(epoch) {
+			wasFound, next = consensus.decider.NthNextValidatorV2(committee.Slots, leader, offset)
+		} else if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
 			wasFound, next = consensus.decider.NthNextValidator(committee.Slots, leader, offset)
 		} else {
 			wasFound, next = consensus.decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
