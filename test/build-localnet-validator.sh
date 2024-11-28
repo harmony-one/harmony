@@ -17,10 +17,9 @@ fi
 if echo "$KEYS_OUTPUT" | grep -q "$FAUCET_ADDRESS"; then
   echo "The faucet account is set"
 else
-  echo "validator creation failed"
-  echo "the faucet address '$FAUCET_ADDRESS' is not found"
+  echo "validator creation failed, the faucet address '$FAUCET_ADDRESS' is not found"
   echo "the keys location is: $(hmy keys location)"
-  echo "Make sure the validator account are imported"
+  echo "Make sure the faucet account are imported"
   exit 1
 fi
 
