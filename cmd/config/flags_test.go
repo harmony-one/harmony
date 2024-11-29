@@ -33,7 +33,8 @@ func TestHarmonyFlags(t *testing.T) {
 				"2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj --ip 8.8.8.8 --port 9000 --network_type=mainn" +
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
-				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5",
+				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5 -" +
+				"-localnet.blocks_per_epoch=64 --localnet.blocks_per_epoch_v2=64",
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
@@ -52,6 +53,10 @@ func TestHarmonyFlags(t *testing.T) {
 						"/ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj",
 					},
 					TrustedNodes: []string{},
+				},
+				Localnet: harmonyconfig.LocalnetConfig{
+					BlocksPerEpoch:   64,
+					BlocksPerEpochV2: 64,
 				},
 				DNSSync: harmonyconfig.DnsSync{
 					Port:       6000,
@@ -210,6 +215,59 @@ func TestHarmonyFlags(t *testing.T) {
 		}
 		if !reflect.DeepEqual(hc, test.expConfig) {
 			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, hc, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
+func TestLocalnetFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig harmonyconfig.LocalnetConfig
+		expErr    error
+	}{
+		{
+			args: []string{},
+			expConfig: harmonyconfig.LocalnetConfig{
+				BlocksPerEpoch:   defaultConfig.Localnet.BlocksPerEpoch,
+				BlocksPerEpochV2: defaultConfig.Localnet.BlocksPerEpochV2,
+			},
+		},
+		{
+			args: []string{"--localnet.blocks_per_epoch", "64"},
+			expConfig: harmonyconfig.LocalnetConfig{
+				BlocksPerEpoch:   64,
+				BlocksPerEpochV2: defaultConfig.Localnet.BlocksPerEpochV2,
+			},
+		},
+		{
+			args: []string{"--localnet.blocks_per_epoch_v2", "64"},
+			expConfig: harmonyconfig.LocalnetConfig{
+				BlocksPerEpoch:   defaultConfig.Localnet.BlocksPerEpoch,
+				BlocksPerEpochV2: 64,
+			},
+		},
+		{
+			args: []string{"--localnet.blocks_per_epoch", "64", "--localnet.blocks_per_epoch_v2", "64"},
+			expConfig: harmonyconfig.LocalnetConfig{
+				BlocksPerEpoch:   64,
+				BlocksPerEpochV2: 64,
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, localnetFlags, applyLocalnetFlags)
+
+		got, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		if !reflect.DeepEqual(got.Localnet, test.expConfig) {
+			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.Localnet, test.expConfig)
 		}
 		ts.tearDown()
 	}

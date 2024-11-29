@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/staking/reward"
 
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 
@@ -135,6 +136,10 @@ func TestQuorumThreshold(t *testing.T) {
 }
 
 func TestEvenNodes(t *testing.T) {
+	// Init localnet configs
+	shardingconfig.InitLocalnetConfig(16, 16)
+	reward.UpdateLocalnetTotalPreStakingNetworkRewards()
+
 	stakedVote, result, _, sKeys := setupBaseCase()
 	// Check HarmonyPercent + StakePercent == 1
 	sum := result.ourPercent.Add(result.theirPercent)

@@ -28,6 +28,7 @@ type HarmonyConfig struct {
 	Pprof      PprofConfig
 	Log        LogConfig
 	Sync       SyncConfig
+	Localnet   LocalnetConfig
 	Sys        *SysConfig        `toml:",omitempty"`
 	Consensus  *ConsensusConfig  `toml:",omitempty"`
 	Devnet     *DevnetConfig     `toml:",omitempty"`
@@ -197,6 +198,11 @@ type GasPriceOracleConfig struct {
 type ConsensusConfig struct {
 	MinPeers     int
 	AggregateSig bool
+}
+
+type LocalnetConfig struct {
+	BlocksPerEpoch   uint64
+	BlocksPerEpochV2 uint64
 }
 
 type BlsConfig struct {

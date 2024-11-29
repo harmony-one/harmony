@@ -118,6 +118,11 @@ const (
 	prometheusHTTPPortOffset = 900
 )
 
+const (
+	DefaultLocalnetBlocksPerEpoch   = 16
+	DefaultLocalnetBlocksPerEpochV2 = 16
+)
+
 // GetDefaultBootNodes get the default bootnode with the given network type
 func GetDefaultBootNodes(networkType NetworkType) []string {
 	switch networkType {
@@ -135,6 +140,14 @@ func GetDefaultBootNodes(networkType NetworkType) []string {
 		return devnetBootNodes
 	}
 	return nil
+}
+
+func GetDefaultLocalnetBlocksPerEpoch() uint64 {
+	return DefaultLocalnetBlocksPerEpoch
+}
+
+func GetDefaultLocalnetBlocksPerEpochV2() uint64 {
+	return DefaultLocalnetBlocksPerEpochV2
 }
 
 // GetDefaultDNSZone get the default DNS zone with the given network type

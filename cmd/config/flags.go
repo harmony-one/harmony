@@ -137,6 +137,12 @@ var (
 		legacyConsensusMinPeersFlag,
 	}
 
+	// localnetFlags are flags to set localnet configs
+	localnetFlags = []cli.Flag{
+		localnetBlocksPerEpochFlag,
+		localnetBlocksPerEpochV2Flag,
+	}
+
 	// consensusInvalidFlags are flags that are no longer effective
 	consensusInvalidFlags = []cli.Flag{
 		legacyDelayCommitFlag,
@@ -375,6 +381,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, configFlag)
 	flags = append(flags, generalFlags...)
 	flags = append(flags, networkFlags...)
+	flags = append(flags, localnetFlags...)
 	flags = append(flags, dnsSyncFlags...)
 	flags = append(flags, p2pFlags...)
 	flags = append(flags, httpFlags...)
@@ -575,6 +582,15 @@ func applyDNSSyncFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, bootNodeFlag) {
 		cfg.Network.BootNodes = cli.GetStringSliceFlagValue(cmd, bootNodeFlag)
+	}
+}
+
+func applyLocalnetFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, localnetBlocksPerEpochFlag) {
+		cfg.Localnet.BlocksPerEpoch = cli.GetUint64FlagValue(cmd, localnetBlocksPerEpochFlag)
+	}
+	if cli.IsFlagChanged(cmd, localnetBlocksPerEpochV2Flag) {
+		cfg.Localnet.BlocksPerEpochV2 = cli.GetUint64FlagValue(cmd, localnetBlocksPerEpochV2Flag)
 	}
 }
 
@@ -1210,6 +1226,20 @@ var (
 		Usage:    "Minimal number of Peers in shard",
 		DefValue: defaultConsensusConfig.MinPeers,
 		Hidden:   true,
+	}
+)
+
+// localnet flags
+var (
+	localnetBlocksPerEpochFlag = cli.Uint64Flag{
+		Name:     "localnet.blocks_per_epoch",
+		Usage:    "the number of blocks per epoch for localnet",
+		DefValue: defaultLocalnetConfig.BlocksPerEpoch,
+	}
+	localnetBlocksPerEpochV2Flag = cli.Uint64Flag{
+		Name:     "localnet.blocks_per_epoch_v2",
+		Usage:    "the number of blocks per epoch for localnet (V2)",
+		DefValue: defaultLocalnetConfig.BlocksPerEpochV2,
 	}
 )
 

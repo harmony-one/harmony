@@ -11,6 +11,20 @@ import (
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
+var (
+	localnetReshardingEpoch = []*big.Int{
+		big.NewInt(0), big.NewInt(localnetV1Epoch), params.LocalnetChainConfig.StakingEpoch, params.LocalnetChainConfig.TwoSecondsEpoch,
+	}
+	// Number of shards, how many slots on each , how many slots owned by Harmony
+	localnetV0   Instance
+	localnetV1   Instance
+	localnetV2   Instance
+	localnetV3   Instance
+	localnetV3_1 Instance
+	localnetV3_2 Instance
+	localnetV4   Instance
+)
+
 // LocalnetSchedule is the local testnet sharding
 // configuration schedule.
 var LocalnetSchedule localnetSchedule
@@ -30,9 +44,7 @@ type localnetSchedule struct{}
 const (
 	localnetV1Epoch = 1
 
-	localnetEpochBlock1      = 5
-	localnetBlocksPerEpoch   = 16
-	localnetBlocksPerEpochV2 = 16
+	localnetEpochBlock1 = 5
 
 	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
 )
@@ -57,11 +69,13 @@ func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (ls localnetSchedule) BlocksPerEpochOld() uint64 {
-	return localnetBlocksPerEpoch
+	localnetConfig := GetLocalnetConfig()
+	return localnetConfig.BlocksPerEpoch
 }
 
 func (ls localnetSchedule) BlocksPerEpoch() uint64 {
-	return localnetBlocksPerEpochV2
+	localnetConfig := GetLocalnetConfig()
+	return localnetConfig.BlocksPerEpochV2
 }
 
 func (ls localnetSchedule) twoSecondsFirstBlock() uint64 {
@@ -162,11 +176,7 @@ func (ls localnetSchedule) RewardFrequency() uint64 {
 	return 16
 }
 
-var (
-	localnetReshardingEpoch = []*big.Int{
-		big.NewInt(0), big.NewInt(localnetV1Epoch), params.LocalnetChainConfig.StakingEpoch, params.LocalnetChainConfig.TwoSecondsEpoch,
-	}
-	// Number of shards, how many slots on each , how many slots owned by Harmony
+func InitLocalnetInstances() {
 	localnetV0 = MustNewInstance(
 		2, 7, 5, 0,
 		numeric.OneDec(), genesis.LocalHarmonyAccounts,
@@ -220,4 +230,4 @@ var (
 		numeric.MustNewDecFromStr("0.25"), hip30CollectionAddressLocalnet,
 		localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch(),
 	)
-)
+}

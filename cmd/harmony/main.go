@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	reward "github.com/harmony-one/harmony/staking/reward"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
@@ -193,6 +195,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeconfig.SetShardingSchedule(shard.Schedule)
 	nodeconfig.SetVersion(harmonyConfigs.GetHarmonyVersion())
 
+	shardingconfig.InitLocalnetConfig(hc.Localnet.BlocksPerEpoch, hc.Localnet.BlocksPerEpochV2)
+
 	if hc.General.NodeType == "validator" {
 		var err error
 		if hc.General.NoStaking {
@@ -231,6 +235,10 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		fmt.Fprintf(os.Stderr, "Use TIKV MUST HAS TIKV CONFIG")
 		os.Exit(1)
 	}
+
+	// Init localnet configs
+	shardingconfig.InitLocalnetConfig(hc.Localnet.BlocksPerEpoch, hc.Localnet.BlocksPerEpochV2)
+	reward.UpdateLocalnetTotalPreStakingNetworkRewards()
 
 	// Update ethereum compatible chain ids
 	params.UpdateEthChainIDByShard(nodeConfig.ShardID)

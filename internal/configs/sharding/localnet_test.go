@@ -8,6 +8,14 @@ import (
 )
 
 func TestLocalnetEpochCalculation(t *testing.T) {
+	InitLocalnetConfig(16, 16)
+
+	//test config init
+	lnConfig := GetLocalnetConfig()
+	localnetBlocksPerEpoch := lnConfig.BlocksPerEpoch
+	localnetBlocksPerEpochV2 := lnConfig.BlocksPerEpochV2
+
+	//test epoch calculations
 	check := func(epoch, expected uint64) {
 		if got := LocalnetSchedule.EpochLastBlock(epoch); got != expected {
 			t.Fatalf("wrong EpochLastBlock at epoch %d. TwoSecondsEpoch: %s. expected: %d got: %d.", epoch, params.LocalnetChainConfig.TwoSecondsEpoch.String(), expected, got)

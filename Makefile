@@ -84,12 +84,7 @@ debug-kill:
 	bash ./test/kill_node.sh
 	pkill -9 -f debug.sh
 
-pre-external:
-	# update localnet block per epoch to ensure a stable localnet
-	sed -i 's/localnetBlocksPerEpoch\s*=\s*[0-9]*/localnetBlocksPerEpoch = 64/' internal/configs/sharding/localnet.go
-	sed -i 's/localnetBlocksPerEpochV2\s*=\s*[0-9]*/localnetBlocksPerEpochV2 = 64/' internal/configs/sharding/localnet.go
-
-debug-ext: pre-external
+debug-ext:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	./test/debug.sh ./test/configs/local-resharding-with-external.txt &
@@ -97,7 +92,7 @@ debug-ext: pre-external
 	sleep 10
 	bash ./test/build-localnet-validator.sh
 
-debug-multi-bls: pre-external
+debug-multi-bls:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	./test/debug.sh ./test/configs/local-multi-bls.txt &
