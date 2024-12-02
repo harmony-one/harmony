@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/harmony-one/harmony/test/helpers"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConsensusInitialization(t *testing.T) {
@@ -87,4 +88,16 @@ func GenerateConsensusForTesting() (p2p.Host, multibls.PrivateKeys, *Consensus, 
 	}
 
 	return host, multiBLSPrivateKey, consensus, decider, nil
+}
+
+func TestFinalCommitDisablesTransition(t *testing.T) {
+	_, _, consensus, _, err := GenerateConsensusForTesting()
+	require.NoError(t, err)
+
+	require.False(t, consensus.transitions.finalCommit)
+
+	// this method should set consensus.transitions.finalCommit to false even it panics.
+	consensus.finalCommit(0, 1, false)
+
+	require.False(t, consensus.transitions.finalCommit)
 }

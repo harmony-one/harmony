@@ -299,24 +299,12 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			consensus.preCommitAndPropose(blockObj)
 		}
 		consensus.transitions.finalCommit = true
-		go func(viewID uint64, isLeader bool) {
-			waitTime := 1000 * time.Millisecond
-			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
-			if maxWaitTime > waitTime {
-				waitTime = maxWaitTime
-			}
-			consensus.getLogger().Info().Str("waitTime", waitTime.String()).
-				Msg("[OnCommit] Starting Grace Period")
-			time.Sleep(waitTime)
-			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
-
-			consensus.mutex.Lock()
-			defer consensus.mutex.Unlock()
-			consensus.transitions.finalCommit = false
-			if viewID == consensus.getCurBlockViewID() {
-				consensus.finalCommit(isLeader)
-			}
-		}(viewID, consensus.isLeader())
+		waitTime := 1000 * time.Millisecond
+		maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
+		if maxWaitTime > waitTime {
+			waitTime = maxWaitTime
+		}
+		go consensus.finalCommit(waitTime, viewID, consensus.isLeader())
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
