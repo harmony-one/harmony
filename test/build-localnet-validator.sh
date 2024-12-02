@@ -1,6 +1,28 @@
 #! /bin/bash
 
-echo "Make sure the validator account are imported"
+# The faucet address
+FAUCET_ADDRESS="one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur"
+
+# Get list of the current keys
+KEYS_OUTPUT=$(hmy keys list)
+
+# Check if the hmy executed successfully
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to execute 'hmy keys list'. Please ensure the hmy tool is installed and configured properly."
+  exit 1
+fi
+
+# Search for the faucet address in the output
+# if the faucet account doesn't exist, show error 
+if echo "$KEYS_OUTPUT" | grep -q "$FAUCET_ADDRESS"; then
+  echo "The faucet account is set"
+else
+  echo "validator creation failed, the faucet address '$FAUCET_ADDRESS' is not found"
+  echo "the keys location is: $(hmy keys location)"
+  echo "Make sure the faucet account are imported"
+  exit 1
+fi
+
 hmy keys import-ks .hmy/extkeystore/one17ughrllgnzx9sfa46p568k8rdmtz7qj85slc6t.key 2> /dev/null
 hmy keys import-ks .hmy/extkeystore/one1auqndgthqu5lznsn7tuma8s5333cq0y07cwc6x.key 2> /dev/null
 hmy keys import-ks .hmy/extkeystore/one19aw2wcr5y4lxeuwt0ajgt5aw3a3qkjdgg67ygj.key 2> /dev/null
@@ -9,12 +31,12 @@ hmy keys import-ks .hmy/extkeystore/one19zzwsxr0uf2fe34y8qkadek2v0eh6h5mg2deg6.k
 hmy keys import-ks .hmy/extkeystore/one1lctumupg2y009pjmnhnmn4nqjk0zf0dspjanf7.key 2> /dev/null
 
 echo "Let's fund all the validator account"
-hmy --node=http://127.0.0.1:9500 transfer     --from one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur --to one17ughrllgnzx9sfa46p568k8rdmtz7qj85slc6t     --from-shard 0 --to-shard 0 --amount 110000 
-hmy --node=http://127.0.0.1:9500 transfer     --from one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur --to one1auqndgthqu5lznsn7tuma8s5333cq0y07cwc6x     --from-shard 0 --to-shard 0 --amount 110000 
-hmy --node=http://127.0.0.1:9500 transfer     --from one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur --to one19aw2wcr5y4lxeuwt0ajgt5aw3a3qkjdgg67ygj     --from-shard 0 --to-shard 0 --amount 110000 
-hmy --node=http://127.0.0.1:9500 transfer     --from one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur --to one1eenp9ujcrmyaq22ef6jrpry2k97tjz4xs6ppcf     --from-shard 0 --to-shard 0 --amount 110000 
-hmy --node=http://127.0.0.1:9500 transfer     --from one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur --to one19zzwsxr0uf2fe34y8qkadek2v0eh6h5mg2deg6     --from-shard 0 --to-shard 0 --amount 110000 
-hmy --node=http://127.0.0.1:9500 transfer     --from one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur --to one1lctumupg2y009pjmnhnmn4nqjk0zf0dspjanf7     --from-shard 0 --to-shard 0 --amount 110000 
+hmy --node=http://127.0.0.1:9500 transfer     --from $FAUCET_ADDRESS --to one17ughrllgnzx9sfa46p568k8rdmtz7qj85slc6t     --from-shard 0 --to-shard 0 --amount 110000 
+hmy --node=http://127.0.0.1:9500 transfer     --from $FAUCET_ADDRESS --to one1auqndgthqu5lznsn7tuma8s5333cq0y07cwc6x     --from-shard 0 --to-shard 0 --amount 110000 
+hmy --node=http://127.0.0.1:9500 transfer     --from $FAUCET_ADDRESS --to one19aw2wcr5y4lxeuwt0ajgt5aw3a3qkjdgg67ygj     --from-shard 0 --to-shard 0 --amount 110000 
+hmy --node=http://127.0.0.1:9500 transfer     --from $FAUCET_ADDRESS --to one1eenp9ujcrmyaq22ef6jrpry2k97tjz4xs6ppcf     --from-shard 0 --to-shard 0 --amount 110000 
+hmy --node=http://127.0.0.1:9500 transfer     --from $FAUCET_ADDRESS --to one19zzwsxr0uf2fe34y8qkadek2v0eh6h5mg2deg6     --from-shard 0 --to-shard 0 --amount 110000 
+hmy --node=http://127.0.0.1:9500 transfer     --from $FAUCET_ADDRESS --to one1lctumupg2y009pjmnhnmn4nqjk0zf0dspjanf7     --from-shard 0 --to-shard 0 --amount 110000 
 
 
 #wait for epoch 2
