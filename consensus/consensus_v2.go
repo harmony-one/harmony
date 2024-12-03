@@ -326,19 +326,6 @@ func (consensus *Consensus) Start(
 	stopChan chan struct{},
 ) {
 	consensus.GetLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
-	go func() {
-		ticker := time.NewTicker(250 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-stopChan:
-				return
-			case <-ticker.C:
-				consensus.Tick()
-			}
-		}
-	}()
-
 	consensus.mutex.Lock()
 	consensus.consensusTimeout[timeoutBootstrap].Start()
 	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
@@ -351,7 +338,16 @@ func (consensus *Consensus) StartChannel() {
 	consensus.mutex.Lock()
 	consensus.isInitialLeader = consensus.isLeader()
 	if consensus.isInitialLeader {
-		consensus.start = true
+		go func() {
+			ticker := time.NewTicker(250 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					consensus.Tick()
+				}
+			}
+		}()
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 		consensus.mutex.Unlock()
 		consensus.ReadySignal(NewProposal(SyncProposal), "StartChannel", "consensus channel is started")
@@ -398,7 +394,7 @@ func (consensus *Consensus) Tick() {
 }
 
 func (consensus *Consensus) tick() {
-	if !consensus.start && consensus.isInitialLeader {
+	if consensus.isInitialLeader {
 		return
 	}
 	for k, v := range consensus.consensusTimeout {

@@ -136,7 +136,6 @@ type Consensus struct {
 	dHelper DownloadAsync
 
 	// Both flags only for initialization state.
-	start           bool
 	isInitialLeader bool
 
 	// value receives from
