@@ -448,6 +448,24 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.6.3"] = func(confTree *toml.Tree) *toml.Tree {
+		defLocalnetConfig := GetDefaultLocalnetConfig()
+
+		if confTree.Get("Localnet") == nil {
+			confTree.Set("Localnet", defLocalnetConfig)
+		}
+
+		if confTree.Get("Localnet.LocalnetBlocksPerEpoch") == nil {
+			confTree.Set("Localnet.LocalnetBlocksPerEpoch", defaultConfig.Localnet.BlocksPerEpoch)
+		}
+		if confTree.Get("Localnet.LocalnetBlocksPerEpochV2") == nil {
+			confTree.Set("Localnet.LocalnetBlocksPerEpochV2", defaultConfig.Localnet.BlocksPerEpochV2)
+		}
+		// upgrade minor version because of `Cache` network introduction
+		confTree.Set("Version", "2.6.4")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {

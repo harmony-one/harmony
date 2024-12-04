@@ -110,13 +110,16 @@ var (
 			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, big.NewInt(999999)),
 			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, big.NewInt(999999)),
 		},
-		shardingconfig.LocalNet: {
-			// Below are all of the placeholders 'last blocks' of pre-staking era for localnet.
-			getPreStakingRewardsFromBlockNumber(shardingconfig.LocalNet, big.NewInt(999999)),
-			getPreStakingRewardsFromBlockNumber(shardingconfig.LocalNet, big.NewInt(999999)),
-		},
 	}
 )
+
+func UpdateLocalnetTotalPreStakingNetworkRewards() {
+	totalPreStakingNetworkRewardsInAtto[shardingconfig.LocalNet] = []*big.Int{
+		// Below are all of the placeholders 'last blocks' of pre-staking era for localnet.
+		getPreStakingRewardsFromBlockNumber(shardingconfig.LocalNet, big.NewInt(999999)),
+		getPreStakingRewardsFromBlockNumber(shardingconfig.LocalNet, big.NewInt(999999)),
+	}
+}
 
 // getTotalPreStakingNetworkRewards in ATTO for given NetworkID
 func getTotalPreStakingNetworkRewards(id shardingconfig.NetworkID) *big.Int {

@@ -73,8 +73,9 @@ function launch_localnet() {
   fi
 
   base_args=(--log_folder "${log_folder}" --min_peers "${MIN}" --bootnodes "${BN_MA}" --p2p.muxer "yamux" \
-    "--network=$NETWORK" --blspass file:"${ROOT}/.hmy/blspass.txt" \
-    "--verbosity=${verbosity}" "--p2p.security.max-conn-per-ip=100")
+    --network "${NETWORK}" --blspass file:"${ROOT}/.hmy/blspass.txt" \
+    --verbosity "${verbosity}" "--p2p.security.max-conn-per-ip=100" \
+    "--localnet.blocks_per_epoch=${BLOCKS_PER_EPOCH}" "--localnet.blocks_per_epoch_v2=${BLOCKS_PER_EPOCH_V2}")
   if [ "${LEGACY_SYNC}" == "true" ]; then
     sync_options=("--dns=true" "--sync=false" "--dns.client=true" "--sync.downloader=false" "--sync.stagedsync=false")
   else
@@ -151,16 +152,18 @@ function usage() {
   echo "
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
-   -h             print this help message
-   -D duration    test run duration (default: $DURATION)
-   -m min_peers   minimal number of peers to start consensus (default: $MIN)
-   -s shards      number of shards (default: $SHARDS)
-   -n             dryrun mode (default: $DRYRUN)
-   -N network     network type (default: $NETWORK)
-   -B             don't build the binary
-   -v             verbosity in log (default: $VERBOSE)
-   -e             expose WS & HTTP ip (default: $EXPOSEAPIS)
-   -L             start localnet in Legace sync mode(default: $LEGACY_SYNC)
+   -h                         print this help message
+   -D duration                test run duration (default: $DURATION)
+   -m min_peers               minimal number of peers to start consensus (default: $MIN)
+   -s shards                  number of shards (default: $SHARDS)
+   -n                         dryrun mode (default: $DRYRUN)
+   -N network                 network type (default: $NETWORK)
+   -K blocks_per_epoch        number of blocks per epoch - old (default: 16)
+   -E blocks_per_epoch_v2     number of blocks per epoch - v2 (default: 16)
+   -B                         don't build the binary
+   -v                         verbosity in log (default: $VERBOSE)
+   -e                         expose WS & HTTP ip (default: $EXPOSEAPIS)
+   -L                         start localnet in Legace sync mode(default: $LEGACY_SYNC)
 
 This script will build all the binaries and start harmony and based on the configuration file.
 
@@ -180,14 +183,18 @@ VERBOSE=false
 NOBUILD=false
 EXPOSEAPIS=false
 LEGACY_SYNC=false
+BLOCKS_PER_EPOCH=16
+BLOCKS_PER_EPOCH_V2=16
 
-while getopts "hD:m:s:nBN:veL:" option; do
+while getopts "hD:m:s:nBN:K:E:veL:" option; do
   case ${option} in
   h) usage ;;
   D) DURATION=$OPTARG ;;
   m) MIN=$OPTARG ;;
   s) SHARDS=$OPTARG ;;
   n) DRYRUN=echo ;;
+  K) BLOCKS_PER_EPOCH=$OPTARG ;;
+  E) BLOCKS_PER_EPOCH_V2=$OPTARG ;;
   B) NOBUILD=true ;;
   N) NETWORK=$OPTARG ;;
   v) VERBOSE=true ;;

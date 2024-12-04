@@ -53,6 +53,9 @@ func TestValidateConsensusKeysForSameShard(t *testing.T) {
 	SetNetworkType(netType)
 	SetShardingSchedule(schedule)
 
+	// Init localnet configs
+	shardingconfig.InitLocalnetConfig(16, 16)
+
 	// import two keys that belong to same shard and test ValidateConsensusKeysForSameShard
 	keyPath1 := "../../../.hmy/65f55eb3052f9e9f632b2923be594ba77c55543f5c58ee1454b9cfd658d25e06373b0f7d42a19c84768139ea294f6204.key"
 	priKey1, err := blsgen.LoadBLSKeyWithPassPhrase(keyPath1, "")
