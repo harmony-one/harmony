@@ -5,8 +5,9 @@ import (
 
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
-	"github.com/harmony-one/harmony/api/service/consensus"
+	srv "github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/explorer"
+	"github.com/harmony-one/harmony/consensus"
 )
 
 // RegisterValidatorServices register the validator services.
@@ -14,12 +15,12 @@ func (node *Node) RegisterValidatorServices() {
 	// Register consensus service.
 	node.serviceManager.Register(
 		service.Consensus,
-		consensus.New(node.Consensus),
+		srv.New(node.Consensus),
 	)
 	// Register new block service.
 	node.serviceManager.Register(
 		service.BlockProposal,
-		blockproposal.New(node.Consensus),
+		blockproposal.New(consensus.NewProposer(node.Consensus)),
 	)
 }
 
