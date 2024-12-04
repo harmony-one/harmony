@@ -848,7 +848,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 				blockPeriod := consensus.BlockPeriod
 				go func() {
 					<-time.After(blockPeriod)
-					consensus.ReadySignal(NewProposal(SyncProposal), "setupForNewConsensus", "I am the new leader")
+					//consensus.ReadySignal(NewProposal(SyncProposal), "setupForNewConsensusY", calledFrom)
 				}()
 			}
 		}
