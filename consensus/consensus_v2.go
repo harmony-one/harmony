@@ -826,7 +826,6 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	}
 	if consensus.Blockchain().Config().IsLeaderRotationInternalValidators(epoch) {
 		if next := consensus.rotateLeader(epoch, committedMsg.SenderPubkeys[0]); next != nil {
-			prev := consensus.getLeaderPubKey()
 			consensus.setLeaderPubKey(next)
 			if consensus.isLeader() {
 				utils.Logger().Info().
@@ -842,14 +841,6 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 					Int64("Epoch", epoch.Int64()).
 					Str("AssignedLeader", next.Bytes.Hex()).
 					Msg("Consensus Setup: New leader assigned for the next block")
-			}
-			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
-				// leader changed
-				blockPeriod := consensus.BlockPeriod
-				go func() {
-					<-time.After(blockPeriod)
-					//consensus.ReadySignal(NewProposal(SyncProposal), "setupForNewConsensusY", calledFrom)
-				}()
 			}
 		}
 	}
