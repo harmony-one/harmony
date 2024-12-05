@@ -104,6 +104,12 @@ func (a threadSafeDeciderImpl) ReadBallot(p Phase, pubkey bls.SerializedPublicKe
 	return a.decider.ReadBallot(p, pubkey)
 }
 
+func (a threadSafeDeciderImpl) GetBallotsCount(p Phase, pubkeys []bls.SerializedPublicKey) int64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.decider.GetBallotsCount(p, pubkeys)
+}
+
 func (a threadSafeDeciderImpl) TwoThirdsSignersCount() int64 {
 	a.mu.Lock()
 	defer a.mu.Unlock()
