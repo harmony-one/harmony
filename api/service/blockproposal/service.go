@@ -30,7 +30,7 @@ func (s *Service) Start() error {
 }
 
 func (s *Service) run() {
-	s.c.WaitForConsensusReadyV2(s.stopChan, s.stoppedChan)
+	s.c.StartCheckingForNewProposals(s.stopChan, s.stoppedChan)
 }
 
 // Stop stops block proposal service.

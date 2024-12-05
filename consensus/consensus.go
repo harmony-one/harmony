@@ -32,25 +32,6 @@ const (
 
 var errLeaderPriKeyNotFound = errors.New("leader private key not found locally")
 
-type Proposal struct {
-	Type   ProposalType
-	Caller string
-}
-
-// NewProposal creates a new proposal
-func NewProposal(t ProposalType) Proposal {
-	return Proposal{Type: t, Caller: utils.GetCallStackInfo(2)}
-}
-
-// ProposalType is to indicate the type of signal for new block proposal
-type ProposalType byte
-
-// Constant of the type of new block proposal
-const (
-	SyncProposal ProposalType = iota
-	AsyncProposal
-)
-
 type DownloadAsync interface {
 	DownloadAsync()
 }
@@ -73,6 +54,8 @@ type Consensus struct {
 	aggregatedCommitSig  *bls_core.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
+
+	proposalManager *ProposalManager
 
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
 
@@ -101,8 +84,6 @@ type Consensus struct {
 	mutex *sync.RWMutex
 	// ViewChange struct
 	vc *viewChange
-	// Signal channel for proposing a new block and start new consensus
-	readySignal chan Proposal
 	// Channel to send full commit signatures to finish new block proposal
 	commitSigChannel chan []byte
 	// verified block to state sync broadcast
@@ -162,16 +143,27 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 	return consensus.Blockchain()
 }
 
-func (consensus *Consensus) ReadySignal(p Proposal, signalSource string, signalReason string) {
-	utils.Logger().Info().
-		Str("signalSource", signalSource).
-		Str("signalReason", signalReason).
-		Msg("ReadySignal is called to propose new block")
-	consensus.readySignal <- p
+func (consensus *Consensus) AddProposal(t ProposalType, source string, reason string) error {
+	bn := consensus.Blockchain().CurrentBlock().NumberU64()
+	v := consensus.GetViewChangingID()
+	p := NewProposal(t, v, bn, source, reason)
+	consensus.proposalManager.AddProposal(p)
+	return nil
 }
 
-func (consensus *Consensus) GetReadySignal() chan Proposal {
-	return consensus.readySignal
+func (consensus *Consensus) ReadySignal(t ProposalType, signalSource string, signalReason string) {
+	if err := consensus.AddProposal(t, signalSource, signalReason); err != nil {
+		utils.Logger().Debug().Err(err).
+			Str("signalSource", signalSource).
+			Str("signalReason", signalReason).
+			Msg("ReadySignal is failed to add a new proposal")
+		return
+	}
+	utils.Logger().Info().
+		Str("ProposalType", t.String()).
+		Str("signalSource", signalSource).
+		Str("signalReason", signalReason).
+		Msg("ReadySignal is called to propose a new block")
 }
 
 func (consensus *Consensus) GetCommitSigChannel() chan []byte {
@@ -287,17 +279,18 @@ func New(
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
 	consensus := Consensus{
-		mutex:        &sync.RWMutex{},
-		ShardID:      shard,
-		fBFTLog:      NewFBFTLog(),
-		phase:        FBFTAnnounce,
-		current:      NewState(Normal),
-		decider:      Decider,
-		registry:     registry,
-		MinPeers:     minPeers,
-		AggregateSig: aggregateSig,
-		host:         host,
-		msgSender:    NewMessageSender(host),
+		mutex:           &sync.RWMutex{},
+		ShardID:         shard,
+		fBFTLog:         NewFBFTLog(),
+		phase:           FBFTAnnounce,
+		current:         NewState(Normal),
+		decider:         Decider,
+		registry:        registry,
+		proposalManager: NewProposalManager(),
+		MinPeers:        minPeers,
+		AggregateSig:    aggregateSig,
+		host:            host,
+		msgSender:       NewMessageSender(host),
 		// FBFT timeout
 		consensusTimeout:  createTimeout(),
 		dHelper:           downloadAsync{},
@@ -318,7 +311,6 @@ func New(
 	// displayed on explorer as Height right now
 	consensus.setCurBlockViewID(0)
 	consensus.SlashChan = make(chan slash.Record)
-	consensus.readySignal = make(chan Proposal)
 	consensus.commitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
