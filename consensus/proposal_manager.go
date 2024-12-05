@@ -20,7 +20,7 @@ const (
 
 	// CreatingNewProposal indicates the consensus is already engaged in creating a new proposal.
 	// During this state, no additional proposals can be initiated until the current one completes.
-	CreatingNewPropsal
+	CreatingNewProposal
 )
 
 func (pt ProposalCreationStatus) String() string {
@@ -29,7 +29,7 @@ func (pt ProposalCreationStatus) String() string {
 		return "Ready"
 	case WaitingForCommitSigs:
 		return "WaitingForCommitSigs"
-	case CreatingNewPropsal:
+	case CreatingNewProposal:
 		return "CreatingNewProposal"
 	default:
 		return "Unknown"
@@ -37,36 +37,39 @@ func (pt ProposalCreationStatus) String() string {
 }
 
 type ProposalManager struct {
-	history    *types.SafeMap[ProposalType, *Proposal]
-	lastHeight uint64
-	status     ProposalCreationStatus
-	lock       *sync.RWMutex
+	history     *types.SafeMap[ProposalType, *Proposal]
+	lasProposal *Proposal
+	status      ProposalCreationStatus
+	lock        *sync.RWMutex
 }
 
 // NewProposalManager initializes a new ProposalManager.
 func NewProposalManager() *ProposalManager {
 	return &ProposalManager{
-		history:    types.NewSafeMap[ProposalType, *Proposal](),
-		lastHeight: 0,
-		status:     Ready,
-		lock:       &sync.RWMutex{},
+		history:     types.NewSafeMap[ProposalType, *Proposal](),
+		lasProposal: nil,
+		status:      Ready,
+		lock:        &sync.RWMutex{},
 	}
 }
 
-// SetLastHeight updates the last processed proposal height.
-func (pm *ProposalManager) SetLastHeight(h uint64) {
+// SetlasProposal updates the last processed proposal height.
+func (pm *ProposalManager) SetlasProposal(p *Proposal) {
+	if p == nil {
+		return
+	}
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
-	if h > pm.lastHeight {
-		pm.lastHeight = h
+	if pm.lasProposal == nil || p.Height > pm.lasProposal.Height {
+		pm.lasProposal = p
 	}
 }
 
-// GetLastHeight retrieves the last processed proposal height.
-func (pm *ProposalManager) GetLastHeight() uint64 {
+// GetlasProposal retrieves the last processed proposal height.
+func (pm *ProposalManager) GetlasProposal() *Proposal {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
-	return pm.lastHeight
+	return pm.lasProposal
 }
 
 // SetStatus sets new proposal creation status.
@@ -94,14 +97,14 @@ func (pm *ProposalManager) IsWaitingForCommitSigs() bool {
 func (pm *ProposalManager) SetToCreatingNewProposalMode() {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
-	pm.status = CreatingNewPropsal
+	pm.status = CreatingNewProposal
 }
 
 // IsCreatingNewProposal returns true if consensus is busy with proposal creation.
 func (pm *ProposalManager) IsCreatingNewProposal() bool {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
-	return pm.status == CreatingNewPropsal
+	return pm.status == CreatingNewProposal
 }
 
 // Done sets status to ready.
@@ -156,7 +159,7 @@ func (pm *ProposalManager) GetNextProposal() (*Proposal, error) {
 		return nil, nil
 	}
 
-	pm.lastHeight = nextProposal.Height
+	pm.lasProposal = nextProposal
 	return nextProposal, nil
 }
 

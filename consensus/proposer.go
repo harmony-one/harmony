@@ -49,7 +49,6 @@ func (p *Proposer) StartCheckingForNewProposals(stopChan chan struct{}, stoppedC
 				if numProposalsInQueue == 0 {
 					continue
 				}
-				// Send signal every 100ms
 				proposal, errNewProposal := consensus.proposalManager.GetNextProposal()
 				if errNewProposal != nil {
 					utils.Logger().Debug().Err(errNewProposal).Msg("[ProposeNewBlock] Cannot get next proposal")
@@ -64,10 +63,6 @@ func (p *Proposer) StartCheckingForNewProposals(stopChan chan struct{}, stoppedC
 						Uint64("ViewID", proposal.ViewID).
 						Msg("[ProposeNewBlock] proposal creation failed")
 				}
-				if !consensus.proposalManager.IsWaitingForCommitSigs() {
-					consensus.proposalManager.Done()
-				}
-
 			}
 		}
 	}()
@@ -83,6 +78,11 @@ func (p *Proposer) CreateProposal(proposal *Proposal) error {
 
 	// set proposal manager status status
 	consensus.proposalManager.SetToCreatingNewProposalMode()
+	defer func() {
+		if !consensus.proposalManager.IsWaitingForCommitSigs() {
+			consensus.proposalManager.Done()
+		}
+	}()
 
 	for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
 		time.Sleep(SleepPeriod)
