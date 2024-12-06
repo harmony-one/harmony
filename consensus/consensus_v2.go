@@ -547,6 +547,10 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		return errors.New("block to pre-commit is nil")
 	}
 
+	if !consensus.proposalManager.IsReady() {
+		return nil
+	}
+
 	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] leader not found")
