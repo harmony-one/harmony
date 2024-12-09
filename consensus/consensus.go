@@ -143,16 +143,16 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 	return consensus.Blockchain()
 }
 
-func (consensus *Consensus) AddProposal(t ProposalType, source string, reason string) error {
+func (consensus *Consensus) AddProposal(leaderPubKey *bls_cosi.PublicKeyWrapper, t ProposalType, source string, reason string) error {
 	bn := consensus.Blockchain().CurrentBlock().NumberU64()
 	v := consensus.GetViewChangingID()
-	p := NewProposal(t, v, bn, source, reason)
+	p := NewProposal(leaderPubKey ,t, v, bn, source, reason)
 	consensus.proposalManager.AddProposal(p)
 	return nil
 }
 
 func (consensus *Consensus) ReadySignal(t ProposalType, signalSource string, signalReason string) {
-	if err := consensus.AddProposal(t, signalSource, signalReason); err != nil {
+	if err := consensus.AddProposal(consensus.getLeaderPubKey(), t, signalSource, signalReason); err != nil {
 		utils.Logger().Debug().Err(err).
 			Str("signalSource", signalSource).
 			Str("signalReason", signalReason).

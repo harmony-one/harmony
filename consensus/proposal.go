@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -25,27 +26,29 @@ func (pt ProposalType) String() string {
 
 // Proposal represents a new block proposal with associated metadata
 type Proposal struct {
-	Type      ProposalType
-	Caller    string
-	Height    uint64
-	ViewID    uint64
-	Source    string
-	Reason    string
-	CreatedAt time.Time
-	lock      *sync.RWMutex
+	leaderPubKey *bls_cosi.PublicKeyWrapper
+	Type         ProposalType
+	Caller       string
+	Height       uint64
+	ViewID       uint64
+	Source       string
+	Reason       string
+	CreatedAt    time.Time
+	lock         *sync.RWMutex
 }
 
 // NewProposal creates a new proposal
-func NewProposal(t ProposalType, viewID uint64, height uint64, source string, reason string) *Proposal {
+func NewProposal(leaderPubKey *bls_cosi.PublicKeyWrapper, t ProposalType, viewID uint64, height uint64, source string, reason string) *Proposal {
 	return &Proposal{
-		Type:      t,
-		Caller:    utils.GetCallStackInfo(2),
-		ViewID:    0,
-		Height:    0,
-		Source:    source,
-		Reason:    reason,
-		CreatedAt: time.Now(),
-		lock:      &sync.RWMutex{},
+		leaderPubKey: leaderPubKey,
+		Type:         t,
+		Caller:       utils.GetCallStackInfo(2),
+		ViewID:       0,
+		Height:       0,
+		Source:       source,
+		Reason:       reason,
+		CreatedAt:    time.Now(),
+		lock:         &sync.RWMutex{},
 	}
 }
 
@@ -58,6 +61,8 @@ func (p *Proposal) Clone() *Proposal {
 		Caller:    p.Caller,
 		ViewID:    p.ViewID,
 		Height:    p.Height,
+		Source:    p.Source,
+		Reason:    p.Reason,
 		CreatedAt: p.CreatedAt,
 		lock:      &sync.RWMutex{},
 	}

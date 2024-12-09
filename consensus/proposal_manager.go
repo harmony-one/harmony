@@ -1,7 +1,9 @@
 package consensus
 
 import (
+	"context"
 	"sync"
+	"time"
 
 	types "github.com/harmony-one/harmony/common/types"
 )
@@ -21,6 +23,9 @@ const (
 	// CreatingNewProposal indicates the consensus is already engaged in creating a new proposal.
 	// During this state, no additional proposals can be initiated until the current one completes.
 	CreatingNewProposal
+
+	// Consensus is busy with doing other process like Updating Information and so on
+	ConsensusBusy
 )
 
 func (pt ProposalCreationStatus) String() string {
@@ -37,39 +42,39 @@ func (pt ProposalCreationStatus) String() string {
 }
 
 type ProposalManager struct {
-	history     *types.SafeMap[ProposalType, *Proposal]
-	lasProposal *Proposal
-	status      ProposalCreationStatus
-	lock        *sync.RWMutex
+	history                   *types.SafeMap[ProposalType, *Proposal]
+	currentProcessingProposal *Proposal
+	status                    ProposalCreationStatus
+	lock                      *sync.RWMutex
 }
 
 // NewProposalManager initializes a new ProposalManager.
 func NewProposalManager() *ProposalManager {
 	return &ProposalManager{
-		history:     types.NewSafeMap[ProposalType, *Proposal](),
-		lasProposal: nil,
-		status:      Ready,
-		lock:        &sync.RWMutex{},
+		history:                   types.NewSafeMap[ProposalType, *Proposal](),
+		currentProcessingProposal: nil,
+		status:                    Ready,
+		lock:                      &sync.RWMutex{},
 	}
 }
 
-// SetlasProposal updates the last processed proposal height.
-func (pm *ProposalManager) SetlasProposal(p *Proposal) {
+// SetCurrentProcessingProposal updates the last processed proposal height.
+func (pm *ProposalManager) SetCurrentProcessingProposal(p *Proposal) {
 	if p == nil {
 		return
 	}
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
-	if pm.lasProposal == nil || p.Height > pm.lasProposal.Height {
-		pm.lasProposal = p
+	if pm.currentProcessingProposal == nil || p.Height > pm.currentProcessingProposal.Height {
+		pm.currentProcessingProposal = p
 	}
 }
 
-// GetlasProposal retrieves the last processed proposal height.
-func (pm *ProposalManager) GetlasProposal() *Proposal {
+// GetCurrentProcessingProposal retrieves the last processed proposal height.
+func (pm *ProposalManager) GetCurrentProcessingProposal() *Proposal {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
-	return pm.lasProposal
+	return pm.currentProcessingProposal
 }
 
 // SetStatus sets new proposal creation status.
@@ -77,6 +82,13 @@ func (pm *ProposalManager) SetStatus(newStatus ProposalCreationStatus) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.status = newStatus
+}
+
+// GetStatus returns proposal manager status.
+func (pm *ProposalManager) GetStatus() ProposalCreationStatus {
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+	return pm.status
 }
 
 // StartWaitingForCommitSigs sets isWaitingForCommitSigs.
@@ -107,10 +119,25 @@ func (pm *ProposalManager) IsCreatingNewProposal() bool {
 	return pm.status == CreatingNewProposal
 }
 
+// SetToConsensusBusyMode sets the status to ConsensusBusy.
+func (pm *ProposalManager) SetToConsensusBusyMode() {
+	pm.lock.Lock()
+	defer pm.lock.Unlock()
+	pm.status = ConsensusBusy
+}
+
+// IsConsensusBusy returns true if consensus is busy with other processes than proposal creation
+func (pm *ProposalManager) IsConsensusBusy() bool {
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+	return pm.status == ConsensusBusy
+}
+
 // Done sets status to ready.
 func (pm *ProposalManager) Done() {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
+	pm.currentProcessingProposal = nil
 	pm.status = Ready
 }
 
@@ -127,6 +154,12 @@ func (pm *ProposalManager) AddProposal(p *Proposal) bool {
 	defer pm.lock.Unlock()
 	existingProposal, exists := pm.history.Get(p.Type)
 	if exists {
+		if p.leaderPubKey.Object.IsEqual(existingProposal.leaderPubKey.Object) {
+			return false
+		}
+		if pm.currentProcessingProposal != nil && p.leaderPubKey.Object.IsEqual(pm.currentProcessingProposal.leaderPubKey.Object) {
+			return false
+		}
 		if p.Height > existingProposal.Height || (p.Height == existingProposal.Height && p.ViewID > existingProposal.ViewID) {
 			pm.history.Set(p.Type, p)
 			return true
@@ -146,12 +179,12 @@ func (pm *ProposalManager) GetNextProposal() (*Proposal, error) {
 	asyncProposal, asyncExist := pm.history.Get(AsyncProposal)
 
 	var nextProposal *Proposal
-	if syncExist {
-		nextProposal = syncProposal.Clone()
-		pm.history.Delete(SyncProposal)
-	} else if asyncExist {
+	if asyncExist {
 		nextProposal = asyncProposal.Clone()
 		pm.history.Delete(AsyncProposal)
+	} else if syncExist {
+		nextProposal = syncProposal.Clone()
+		pm.history.Delete(SyncProposal)
 	}
 
 	if nextProposal == nil {
@@ -159,7 +192,7 @@ func (pm *ProposalManager) GetNextProposal() (*Proposal, error) {
 		return nil, nil
 	}
 
-	pm.lasProposal = nextProposal
+	pm.currentProcessingProposal = nextProposal
 	return nextProposal, nil
 }
 
@@ -175,4 +208,26 @@ func (pm *ProposalManager) Length() int {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	return pm.history.Length()
+}
+
+// WaitToBeReady waits until the ProposalManager is ready for a new proposal.
+// It blocks until the current status is Ready or the provided context is canceled.
+func (pm *ProposalManager) WaitToBeReady(ctx context.Context) error {
+	for {
+		pm.lock.RLock()
+		currentStatus := pm.status
+		pm.lock.RUnlock()
+
+		if currentStatus == Ready {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err() // Return error if the context is canceled or times out
+		default:
+			// Allow other goroutines to execute
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 }
