@@ -843,7 +843,18 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 					Str("AssignedLeader", next.Bytes.Hex()).
 					Msg("Consensus Setup: New leader assigned for the next block")
 			}
-			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
+			// Check if the leader has changed (even if it still belongs to the same node)
+			newLeader := !consensus.getLeaderPubKey().Object.IsEqual(prev.Object)
+			// Check if the previous leader key belongs to the current node (multi-BLS key scenario)
+			wasLeader := consensus.isMyKey(prev)
+			utils.Logger().Debug().
+				Str("PreviousLeaderKey", prev.Bytes.Hex()).
+				Str("NewLeader", consensus.getLeaderPubKey().Bytes.Hex()).
+				Bool("NodeWasPreviousLeader", wasLeader).
+				Bool("LeaderChanged", newLeader).
+				Msg("Leader change evaluation")
+
+			if consensus.isLeader() && newLeader && !wasLeader {
 				// leader changed
 				blockPeriod := consensus.BlockPeriod
 				go func() {
