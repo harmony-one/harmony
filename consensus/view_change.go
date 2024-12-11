@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	types "github.com/harmony-one/harmony/common/types"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -32,11 +33,14 @@ type State struct {
 	// view changing id is used during view change mode
 	// it is the next view id
 	viewChangingID uint64
+
+	quorumAchievedBlock *types.SafeMap[quorum.Phase, uint64]
 }
 
 func NewState(mode Mode) State {
 	return State{
-		mode: uint32(mode),
+		mode:                uint32(mode),
+		quorumAchievedBlock: types.NewSafeMap[quorum.Phase, uint64](),
 	}
 }
 
@@ -71,6 +75,23 @@ func (pm *State) GetViewChangingID() uint64 {
 // It is meaningful during view change mode
 func (pm *State) SetViewChangingID(id uint64) {
 	atomic.StoreUint64(&pm.viewChangingID, id)
+}
+
+// GetLastQuorumAchievedBlock retrieves the block number of the last block
+// that achieved quorum for the specified phase.
+// If no quorum has been achieved for the given phase, it returns 0.
+func (pm *State) GetLastQuorumAchievedBlock(p quorum.Phase) uint64 {
+	lqab, exists := pm.quorumAchievedBlock.Get(p)
+	if !exists {
+		return 0
+	}
+	return lqab
+}
+
+// SetLastQuorumAchievedBlock updates the block number of the last block
+// that achieved quorum for the specified phase.
+func (pm *State) SetLastQuorumAchievedBlock(p quorum.Phase, blockNum uint64) {
+	pm.quorumAchievedBlock.Set(p, blockNum)
 }
 
 // GetViewChangeDuraion return the duration of the current view change
