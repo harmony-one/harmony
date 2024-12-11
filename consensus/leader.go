@@ -135,20 +135,6 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	}
 
 	signerCount := consensus.decider.SignersCount(quorum.Prepare)
-
-	// check if it is first received signatures
-	// it may multi bls key validators can achieve quorum on first signature
-	hasMultiBlsKeys, isFirstReceivedSignature := consensus.checkFirstReceivedSignature(signerCount, quorum.Prepare)
-
-	quorumPreExisting := consensus.decider.IsQuorumAchieved(quorum.Prepare)
-	//// Read - End
-
-	if quorumPreExisting {
-		// already have enough signatures
-		consensus.getLogger().Debug().
-			Interface("validatorPubKeys", recvMsg.SenderPubkeys).
-			Msg("[OnPrepare] Received Additional Prepare Message")
-	}
 	//// Read - End
 
 	consensus.UpdateLeaderMetrics(float64(signerCount), float64(consensus.getBlockNum()))
@@ -203,15 +189,14 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	//// Write - End
 
 	//// Read - Start
-	quorumFromInitialSignature := hasMultiBlsKeys && isFirstReceivedSignature && quorumPreExisting
-	quorumPostNewSignatures := consensus.decider.IsQuorumAchieved(quorum.Prepare)
-	quorumFromNewSignatures := !quorumPreExisting && quorumPostNewSignatures
-
-	if quorumFromInitialSignature || quorumFromNewSignatures {
+	quorumIsMet := consensus.decider.IsQuorumAchieved(quorum.Prepare)
+	lastQuorumAchievedBlock := consensus.current.GetLastQuorumAchievedBlock(quorum.Prepare)
+	if quorumIsMet && recvMsg.BlockNum > lastQuorumAchievedBlock {
 		// NOTE Let it handle its own logs
 		if err := consensus.didReachPrepareQuorum(); err != nil {
 			return
 		}
+		consensus.current.SetLastQuorumAchievedBlock(quorum.Prepare, recvMsg.BlockNum)
 		consensus.switchPhase("onPrepare", FBFTCommit)
 	}
 	//// Read - End
@@ -236,15 +221,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 	commitBitmap := consensus.commitBitmap
 
-	// has to be called before verifying signature
-	quorumWasMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
-
 	signerCount := consensus.decider.SignersCount(quorum.Commit)
-
-	// check if it is first received commit
-	// it may multi bls key validators can achieve quorum on first commit
-	hasMultiBlsKeys, isFirstReceivedSignature := consensus.checkFirstReceivedSignature(signerCount, quorum.Commit)
-
 	//// Read - End
 
 	// Verify the signature on commitPayload is correct
@@ -318,13 +295,11 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 	quorumIsMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
 	//// Read - End
-
-	quorumAchievedByFirstCommit := hasMultiBlsKeys && isFirstReceivedSignature && quorumWasMet
-	quorumAchievedByThisCommit := !quorumWasMet && quorumIsMet
-
-	if quorumAchievedByFirstCommit || quorumAchievedByThisCommit {
+	lastQuorumAchievedBlock := consensus.current.GetLastQuorumAchievedBlock(quorum.Commit)
+	if quorumIsMet && blockObj.NumberU64() > lastQuorumAchievedBlock {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
+		consensus.current.SetLastQuorumAchievedBlock(quorum.Commit, blockObj.NumberU64())
 
 		if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems
