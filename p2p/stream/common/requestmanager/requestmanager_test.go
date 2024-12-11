@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	types "github.com/harmony-one/harmony/common/types"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
 )
@@ -368,7 +369,7 @@ func TestRequestManager_Concurrency(t *testing.T) {
 func TestGenReqID(t *testing.T) {
 	retry := 100000
 	rm := &requestManager{
-		pendings: sttypes.NewSafeMap[uint64, *request](),
+		pendings: types.NewSafeMap[uint64, *request](),
 	}
 
 	for i := 0; i != retry; i++ {
@@ -382,7 +383,7 @@ func TestGenReqID(t *testing.T) {
 
 func TestCheckStreamUpdates(t *testing.T) {
 	tests := []struct {
-		exists            *sttypes.SafeMap[sttypes.StreamID, *stream]
+		exists            *types.SafeMap[sttypes.StreamID, *stream]
 		targets           []sttypes.Stream
 		expAddedIndexes   []int
 		expRemovedIndexes []int
