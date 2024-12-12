@@ -93,19 +93,6 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
-func (consensus *Consensus) checkFirstReceivedSignature(signerCount int64, phase quorum.Phase) (bool, bool) {
-	hasMultiBlsKeys := len(consensus.priKey) > 0
-	if hasMultiBlsKeys {
-		var myPubkeys []bls.SerializedPublicKey
-		for _, key := range consensus.priKey {
-			myPubkeys = append(myPubkeys, key.Pub.Bytes)
-		}
-		mySignsCount := consensus.decider.GetBallotsCount(phase, myPubkeys)
-		return true, signerCount == mySignsCount
-	}
-	return false, false
-}
-
 // this method is called for each validator sent their vote message
 func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
