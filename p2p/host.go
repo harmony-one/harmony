@@ -93,25 +93,28 @@ const (
 
 // HostConfig is the config structure to create a new host
 type HostConfig struct {
-	Self                     *Peer
-	BLSKey                   libp2p_crypto.PrivKey
-	BootNodes                []string
-	TrustedNodes             []string
-	DataStoreFile            *string
-	DiscConcurrency          int
-	MaxConnPerIP             int
-	DisablePrivateIPScan     bool
-	MaxPeers                 int64
-	ConnManagerLowWatermark  int
-	ConnManagerHighWatermark int
-	WaitForEachPeerToConnect bool
-	ForceReachabilityPublic  bool
-	NoTransportSecurity      bool
-	NAT                      bool
-	UserAgent                string
-	DialTimeout              time.Duration
-	Muxer                    string
-	NoRelay                  bool
+	Self                            *Peer
+	BLSKey                          libp2p_crypto.PrivKey
+	BootNodes                       []string
+	TrustedNodes                    []string
+	DataStoreFile                   *string
+	DiscConcurrency                 int
+	MaxConnPerIP                    int
+	DisablePrivateIPScan            bool
+	MaxPeers                        int64
+	ConnManagerLowWatermark         int
+	ConnManagerHighWatermark        int
+	resourceMgrEnabled              bool
+	resourceMgrMemoryLimitBytes     uint64
+	resourceMgrFileDescriptorsLimit uint64
+	WaitForEachPeerToConnect        bool
+	ForceReachabilityPublic         bool
+	NoTransportSecurity             bool
+	NAT                             bool
+	UserAgent                       string
+	DialTimeout                     time.Duration
+	Muxer                           string
+	NoRelay                         bool
 }
 
 func init() {
@@ -162,6 +165,12 @@ func NewHost(cfg HostConfig) (Host, error) {
 		return nil, fmt.Errorf("failed to open connection manager: %w", err)
 	}
 
+	rmgr, err := makeResourceMgr(cfg.resourceMgrEnabled, cfg.resourceMgrMemoryLimitBytes, cfg.resourceMgrFileDescriptorsLimit, cfg.ConnManagerHighWatermark)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to open resource manager: %w", err)
+	}
+
 	// relay
 	var relay libp2p_config.Option
 	if cfg.NoRelay {
@@ -196,6 +205,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 		*/
 		// Connection manager
 		connMngr,
+		// resource manager
+		libp2p.ResourceManager(rmgr),
 		// NAT manager
 		libp2p.NATManager(nat),
 		// Band width Reporter
