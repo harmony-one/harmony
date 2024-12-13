@@ -104,9 +104,9 @@ type HostConfig struct {
 	MaxPeers                        int64
 	ConnManagerLowWatermark         int
 	ConnManagerHighWatermark        int
-	resourceMgrEnabled              bool
-	resourceMgrMemoryLimitBytes     uint64
-	resourceMgrFileDescriptorsLimit uint64
+	ResourceMgrEnabled              bool
+	ResourceMgrMemoryLimitBytes     uint64
+	ResourceMgrFileDescriptorsLimit uint64
 	WaitForEachPeerToConnect        bool
 	ForceReachabilityPublic         bool
 	NoTransportSecurity             bool
@@ -165,7 +165,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		return nil, fmt.Errorf("failed to open connection manager: %w", err)
 	}
 
-	rmgr, err := makeResourceMgr(cfg.resourceMgrEnabled, cfg.resourceMgrMemoryLimitBytes, cfg.resourceMgrFileDescriptorsLimit, cfg.ConnManagerHighWatermark)
+	rmgr, err := makeResourceMgr(cfg.ResourceMgrEnabled, cfg.ResourceMgrMemoryLimitBytes, cfg.ResourceMgrFileDescriptorsLimit, cfg.ConnManagerHighWatermark)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to open resource manager: %w", err)

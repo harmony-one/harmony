@@ -1,6 +1,8 @@
 package p2p
 
 import (
+	"math"
+
 	"github.com/harmony-one/harmony/internal/utils"
 
 	humanize "github.com/dustin/go-humanize"
@@ -9,6 +11,11 @@ import (
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	memory "github.com/pbnjay/memory"
 )
+
+// GetNumFDs returns the File Descriptors as MaxInt.
+func GetNumFDs() uint64 {
+	return uint64(math.MaxUint64)
+}
 
 // mostly copy/pasted from https://github.com/ipfs/rainbow/blob/main/rcmgr.go
 // which is itself copy-pasted from Kubo, because libp2p does not have
@@ -28,7 +35,7 @@ func makeResourceMgr(enabled bool, maxMemory, maxFD uint64, connMgrHighWater int
 		}
 	}
 	if maxFD == 0 {
-		//maxFD = fd.GetNumFDs() / 2
+		maxFD = GetNumFDs() / 2
 	}
 
 	infiniteResourceLimits := rcmgr.InfiniteLimits.ToPartialLimitConfig().System
