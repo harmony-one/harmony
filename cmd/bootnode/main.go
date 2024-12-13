@@ -114,7 +114,7 @@ func main() {
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
 	connMgrHighWaterMark := flag.Int("cmg_high_watermark", 900, "connection manager trims excess connections when they pass the high watermark")
-	resourceManagerEnabled := flag.Bool("resmgr-enabled", false, "enable p2p resource manager")
+	resourceManagerEnabled := flag.Bool("resmgr-enabled", true, "enable p2p resource manager")
 	resourceManagerMemoryLimitBytes := flag.Uint64("resmgr-memory-limit-bytes", 0, "memory limit for p2p resource manager")
 	resourceManagerFileDescriptorsLimit := flag.Uint64("resmgr-file-descriptor-limit", 0, "file descriptor limit for p2p resource manager")
 	noTransportSecurity := flag.Bool("no_transport_security", false, "disable TLS encrypted transport")
