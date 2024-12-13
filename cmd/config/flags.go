@@ -66,6 +66,9 @@ var (
 		maxPeersFlag,
 		connManagerLowWatermarkFlag,
 		connManagerHighWatermarkFlag,
+		resourceManagerEnabledFlag,
+		resourceManagerMemoryLimitBytesFlag,
+		resourceManagerFileDescriptorsLimitFlag,
 		noTransportSecurityFlag,
 		natFlag,
 		userAgentFlag,
@@ -653,6 +656,21 @@ var (
 		Usage:    "highest number of connections that'll be maintained in connection manager. Set both high and low watermarks to zero to disable connection manager",
 		DefValue: defaultConfig.P2P.ConnManagerHighWatermark,
 	}
+	resourceManagerEnabledFlag = cli.BoolFlag{
+		Name:     "p2p.resmgr-enabled",
+		Usage:    "enable p2p resource manager",
+		DefValue: defaultConfig.P2P.ResourceMgrEnabled,
+	}
+	resourceManagerMemoryLimitBytesFlag = cli.Uint64Flag{
+		Name:     "p2p.resmgr-memory-limit-bytes",
+		Usage:    "memory limit for p2p resource manager",
+		DefValue: defaultConfig.P2P.ResourceMgrMemoryLimitBytes,
+	}
+	resourceManagerFileDescriptorsLimitFlag = cli.Uint64Flag{
+		Name:     "p2p.resmgr-file-descriptor-limit",
+		Usage:    "file descriptor limit for p2p resource manager",
+		DefValue: defaultConfig.P2P.ResourceMgrFileDescriptorsLimit,
+	}
 	waitForEachPeerToConnectFlag = cli.BoolFlag{
 		Name:     "p2p.wait-for-connections",
 		Usage:    "node waits for each single peer to connect and it doesn't add them to peers list after timeout",
@@ -730,7 +748,15 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, connManagerHighWatermarkFlag) {
 		config.P2P.ConnManagerHighWatermark = cli.GetIntFlagValue(cmd, connManagerHighWatermarkFlag)
 	}
-
+	if cli.IsFlagChanged(cmd, resourceManagerEnabledFlag) {
+		config.P2P.ResourceMgrEnabled = cli.GetBoolFlagValue(cmd, resourceManagerEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, resourceManagerMemoryLimitBytesFlag) {
+		config.P2P.ResourceMgrMemoryLimitBytes = cli.GetUint64FlagValue(cmd, resourceManagerMemoryLimitBytesFlag)
+	}
+	if cli.IsFlagChanged(cmd, resourceManagerFileDescriptorsLimitFlag) {
+		config.P2P.ResourceMgrFileDescriptorsLimit = cli.GetUint64FlagValue(cmd, resourceManagerFileDescriptorsLimitFlag)
+	}
 	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {
 		config.P2P.DisablePrivateIPScan = cli.GetBoolFlagValue(cmd, p2pDisablePrivateIPScanFlag)
 	}
