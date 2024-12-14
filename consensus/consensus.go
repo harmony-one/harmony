@@ -33,13 +33,18 @@ const (
 var errLeaderPriKeyNotFound = errors.New("leader private key not found locally")
 
 type Proposal struct {
-	Type   ProposalType
-	Caller string
+	Type     ProposalType
+	Caller   string
+	blockNum uint64
 }
 
 // NewProposal creates a new proposal
-func NewProposal(t ProposalType) Proposal {
-	return Proposal{Type: t, Caller: utils.GetCallStackInfo(2)}
+func NewProposal(t ProposalType, blockNum uint64) Proposal {
+	return Proposal{
+		Type:     t,
+		Caller:   utils.GetCallStackInfo(2),
+		blockNum: blockNum,
+	}
 }
 
 // ProposalType is to indicate the type of signal for new block proposal

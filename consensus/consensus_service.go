@@ -498,7 +498,7 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal(NewProposal(SyncProposal), "updateConsensusInformation", "leader changed and I am the new leader")
+					consensus.ReadySignal(NewProposal(SyncProposal, curHeader.NumberU64()+1), "updateConsensusInformation", "leader changed and I am the new leader")
 				}()
 			}
 			return Normal
@@ -523,6 +523,19 @@ func (consensus *Consensus) IsLeader() bool {
 func (consensus *Consensus) isLeader() bool {
 	pub := consensus.getLeaderPubKey()
 	return consensus.isMyKey(pub)
+}
+
+func (consensus *Consensus) isMyKey(pub *bls.PublicKeyWrapper) bool {
+	if pub == nil {
+		return false
+	}
+	obj := pub.Object
+	for _, key := range consensus.priKey {
+		if key.Pub.Object.IsEqual(obj) {
+			return true
+		}
+	}
+	return false
 }
 
 func (consensus *Consensus) isMyKey(pub *bls.PublicKeyWrapper) bool {
