@@ -522,6 +522,10 @@ func (consensus *Consensus) IsLeader() bool {
 // the node with the leader public key. This function assume it runs under lock.
 func (consensus *Consensus) isLeader() bool {
 	pub := consensus.getLeaderPubKey()
+	return consensus.isMyKey(pub)
+}
+
+func (consensus *Consensus) isMyKey(pub *bls.PublicKeyWrapper) bool {
 	if pub == nil {
 		return false
 	}
