@@ -406,7 +406,7 @@ func (consensus *Consensus) finalCommit1s(isLeader bool, viewID uint64, nextBloc
 	}
 
 	block.SetCurrentCommitSig(commitSigAndBitmap)
-	err := consensus.commitBlock1s(block, FBFTMsg)
+	err := consensus.commitBlock(block, FBFTMsg)
 
 	if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
 		consensus.getLogger().Err(err).
