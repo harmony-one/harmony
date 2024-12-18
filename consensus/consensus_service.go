@@ -141,11 +141,8 @@ func (consensus *Consensus) updateBitmaps() {
 	members := consensus.decider.Participants()
 	prepareBitmap := bls_cosi.NewMask(members)
 	commitBitmap := bls_cosi.NewMask(members)
-	multiSigBitmap := bls_cosi.NewMask(members)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
-	consensus.multiSigBitmap = multiSigBitmap
-
 }
 
 func (consensus *Consensus) sendLastSignPower() {

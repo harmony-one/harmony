@@ -74,8 +74,6 @@ type Consensus struct {
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
 
-	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
-
 	pendingCXReceipts map[utils.CXKey]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	// Registry for services.
 	registry *registry.Registry
