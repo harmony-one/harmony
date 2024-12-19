@@ -128,6 +128,11 @@ type P2pConfig struct {
 	// using Connection Manager will be an optional feature.
 	ConnManagerLowWatermark  int
 	ConnManagerHighWatermark int
+	// P2P Resource Manager configs
+	ResourceMgrEnabled              bool
+	ResourceMgrMemoryLimitBytes     uint64
+	ResourceMgrFileDescriptorsLimit uint64
+	// Node waits for each peer to connect before gets connect to next peer
 	WaitForEachPeerToConnect bool
 	// to disable p2p security (tls and noise)
 	NoTransportSecurity bool

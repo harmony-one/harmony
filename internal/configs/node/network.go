@@ -77,6 +77,12 @@ const (
 	// When the peer count exceeds the 'high watermark', as many peers will be pruned (and
 	// their connections terminated) until 'low watermark' peers remain.
 	DefaultConnManagerHighWatermark = 192
+	// DefaultResourceMgrEnabled enables P2P host Resource Manager
+	DefaultResourceMgrEnabled = false
+	// DefaultResourceMgrMemoryLimitBytes sets the default memory limit for p2p host Resource Manager(0=unlimited)
+	DefaultResourceMgrMemoryLimitBytes = 0
+	// DefaultResourceMgrFileDescriptorsLimit sets the default limit for file descriptors in P2P host Resource Manager (0=unlimited)
+	DefaultResourceMgrFileDescriptorsLimit = 0
 	// DefaultWaitForEachPeerToConnect sets the sync configs to connect to neighbor peers one by one and waits for each peer to connect.
 	DefaultWaitForEachPeerToConnect = false
 	// DefaultNoTransportSecurity

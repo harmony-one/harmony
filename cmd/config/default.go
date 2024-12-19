@@ -9,7 +9,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.6.4"
+const tomlConfigVersion = "2.6.5"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -30,22 +30,25 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	Network:  GetDefaultNetworkConfig(defNetworkType),
 	Localnet: GetDefaultLocalnetConfig(),
 	P2P: harmonyconfig.P2pConfig{
-		Port:                     nodeconfig.DefaultP2PPort,
-		IP:                       nodeconfig.DefaultPublicListenIP,
-		KeyFile:                  "./.hmykey",
-		DiscConcurrency:          nodeconfig.DefaultP2PConcurrency,
-		MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
-		DisablePrivateIPScan:     false,
-		MaxPeers:                 nodeconfig.DefaultMaxPeers,
-		ConnManagerLowWatermark:  nodeconfig.DefaultConnManagerLowWatermark,
-		ConnManagerHighWatermark: nodeconfig.DefaultConnManagerHighWatermark,
-		WaitForEachPeerToConnect: nodeconfig.DefaultWaitForEachPeerToConnect,
-		NoTransportSecurity:      nodeconfig.DefaultNoTransportSecurity,
-		NAT:                      nodeconfig.DefaultNAT,
-		UserAgent:                nodeconfig.DefaultUserAgent,
-		DialTimeout:              nodeconfig.DefaultDialTimeout,
-		Muxer:                    nodeconfig.DefaultMuxer,
-		NoRelay:                  nodeconfig.DefaultNoRelay,
+		Port:                            nodeconfig.DefaultP2PPort,
+		IP:                              nodeconfig.DefaultPublicListenIP,
+		KeyFile:                         "./.hmykey",
+		DiscConcurrency:                 nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:                   nodeconfig.DefaultMaxConnPerIP,
+		DisablePrivateIPScan:            false,
+		MaxPeers:                        nodeconfig.DefaultMaxPeers,
+		ConnManagerLowWatermark:         nodeconfig.DefaultConnManagerLowWatermark,
+		ConnManagerHighWatermark:        nodeconfig.DefaultConnManagerHighWatermark,
+		ResourceMgrEnabled:              nodeconfig.DefaultResourceMgrEnabled,
+		ResourceMgrMemoryLimitBytes:     nodeconfig.DefaultResourceMgrMemoryLimitBytes,
+		ResourceMgrFileDescriptorsLimit: nodeconfig.DefaultResourceMgrFileDescriptorsLimit,
+		WaitForEachPeerToConnect:        nodeconfig.DefaultWaitForEachPeerToConnect,
+		NoTransportSecurity:             nodeconfig.DefaultNoTransportSecurity,
+		NAT:                             nodeconfig.DefaultNAT,
+		UserAgent:                       nodeconfig.DefaultUserAgent,
+		DialTimeout:                     nodeconfig.DefaultDialTimeout,
+		Muxer:                           nodeconfig.DefaultMuxer,
+		NoRelay:                         nodeconfig.DefaultNoRelay,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,

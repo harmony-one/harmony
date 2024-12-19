@@ -466,6 +466,20 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.6.4"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.ResourceMgrEnabled") == nil {
+			confTree.Set("P2P.ResourceMgrEnabled", defaultConfig.P2P.ResourceMgrEnabled)
+		}
+		if confTree.Get("P2P.ResourceMgrMemoryLimitBytes") == nil {
+			confTree.Set("P2P.ResourceMgrMemoryLimitBytes", defaultConfig.P2P.ResourceMgrMemoryLimitBytes)
+		}
+		if confTree.Get("Sync.ResourceMgrFileDescriptorsLimit") == nil {
+			confTree.Set("Sync.ResourceMgrFileDescriptorsLimit", defaultConfig.P2P.ResourceMgrFileDescriptorsLimit)
+		}
+		confTree.Set("Version", "2.6.5")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {
