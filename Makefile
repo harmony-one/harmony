@@ -25,6 +25,8 @@ help:
 	@echo "trace-pointer - build the harmony binary & bootnode with pointer analysis"
 	@echo "debug - start a localnet with 2 shards (s0 rpc endpoint = localhost:9700; s1 rpc endpoint = localhost:9800)"
 	@echo "debug-kill - force kill the localnet"
+	@echo "debug-multi-bls - start a localnet with external validators and multi-BLS keys in the background"
+	@echo "debug-multi-bls-with-terminal - start a localnet with external validators and multi-BLS keys using screen, providing real-time logs and automatic cleanup on exit"
 	@echo "debug-ext - start a localnet with 2 shards and external (s0 rpc endpoint = localhost:9598; s1 rpc endpoint = localhost:9596)"
 	@echo "clean - remove node files & logs created by localnet"
 	@echo "distclean - remove node files & logs created by localnet, and all libs"
