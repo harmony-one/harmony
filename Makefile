@@ -105,6 +105,14 @@ debug-multi-bls: pre-external
 	sleep 10
 	bash ./test/build-localnet-validator.sh
 
+debug-multi-bls-multi-ext-node: pre-external
+	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
+	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
+	./test/debug.sh ./test/configs/local-multi-bls-multi-ext-node.txt &
+	echo sleep 10s before creating the external validator
+	sleep 10
+	bash ./test/build-localnet-validator.sh
+
 clean:
 	rm -rf ./tmp_log*
 	rm -rf ./.dht*

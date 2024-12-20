@@ -1,0 +1,27 @@
+# shard 0
+# internal node
+127.0.0.1 9000 validator .hmy/multibls/s0int
+# fn node
+127.0.0.1 9004 validator .hmy/multibls/s0fn
+# external node
+# 127.0.0.1 9008 external .hmy/multibls/s0ext
+# external val 1 node
+127.0.0.1 9008 external .hmy/multibls/s0ext1
+# external val 2 node
+127.0.0.1 9012 external .hmy/multibls/s0ext2
+# explorer node
+127.0.0.1 9120 explorer null 0
+
+# shard 1
+# internal node
+127.0.0.1 9002 validator .hmy/multibls/s1int
+# fn node
+127.0.0.1 9006 validator .hmy/multibls/s1fn
+# external node
+# 127.0.0.1 9010 external .hmy/multibls/s1ext
+# external val 1 node
+127.0.0.1 9010 external .hmy/multibls/s1ext1
+# external val 2 node
+127.0.0.1 9014 external .hmy/multibls/s1ext2
+# explorer node
+127.0.0.1 9122 explorer null 1
