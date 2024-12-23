@@ -43,7 +43,7 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 				for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
-						Uint64("blockNum", consensus.Blockchain().CurrentBlock().NumberU64()+1).
+						Uint64("blockNum", proposal.blockNum).
 						Bool("asyncProposal", proposal.Type == AsyncProposal).
 						Str("called", proposal.Caller).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
