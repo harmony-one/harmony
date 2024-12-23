@@ -292,7 +292,7 @@ func (consensus *Consensus) _finalCommit(isLeader bool) {
 			// No pipelining
 			go func() {
 				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-				consensus.ReadySignal(NewProposal(SyncProposal), "finalCommit", "I am leader and it's the last block in epoch")
+				consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", "I am leader and it's the last block in epoch")
 			}()
 		} else {
 			// pipelining
@@ -368,7 +368,7 @@ func (consensus *Consensus) StartChannel() {
 		consensus.start = true
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(NewProposal(SyncProposal), "StartChannel", "consensus channel is started")
+		consensus.ReadySignal(NewProposal(SyncProposal, consensus.Blockchain().CurrentHeader().NumberU64()+1), "StartChannel", "consensus channel is started")
 		return
 	}
 	consensus.mutex.Unlock()
@@ -620,10 +620,21 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		// Send signal to Node to propose the new block for consensus
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(NewProposal(AsyncProposal), "preCommitAndPropose", "proposing new block which will wait on the full commit signatures to finish")
+		if !consensus.isRotation(blk.Epoch()) {
+			consensus.ReadySignal(NewProposal(AsyncProposal, blk.NumberU64()+1), "preCommitAndPropose, before rotation", "proposing new block which will wait on the full commit signatures to finish")
+		} else {
+			next := consensus.rotateLeader(blk.Epoch(), consensus.getLeaderPubKey())
+			if consensus.isMyKey(next) {
+				consensus.ReadySignal(NewProposal(AsyncProposal, blk.NumberU64()+1), "preCommitAndPropose rotation", "proposing new block which will wait on the full commit signatures to finish")
+			}
+		}
 	}()
 
 	return nil
+}
+
+func (consensus *Consensus) isRotation(epoch *big.Int) bool {
+	return consensus.Blockchain().Config().IsLeaderRotationInternalValidators(epoch)
 }
 
 func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types.Block) error {
@@ -873,7 +884,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 				blockPeriod := consensus.BlockPeriod
 				go func() {
 					<-time.After(blockPeriod)
-					consensus.ReadySignal(NewProposal(SyncProposal), "setupForNewConsensus", "I am the new leader")
+					consensus.ReadySignal(NewProposal(SyncProposal, blk.NumberU64()+1), "setupForNewConsensus", "I am the new leader")
 				}()
 			}
 		}

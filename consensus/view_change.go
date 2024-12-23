@@ -440,7 +440,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 				consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 				return
 			}
-			go consensus.ReadySignal(NewProposal(SyncProposal), "onViewChange", "quorum is achieved by mask and is view change mode and M1 payload is empty")
+			go consensus.ReadySignal(NewProposal(SyncProposal, consensus.Blockchain().CurrentHeader().NumberU64()+1), "onViewChange", "quorum is achieved by mask and is view change mode and M1 payload is empty")
 			return
 		}
 
