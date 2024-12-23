@@ -51,6 +51,8 @@ const (
 
 func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.LocalnetChainConfig.IsOneSecond(epoch):
+		return localnetV4
 	case params.LocalnetChainConfig.IsHIP30(epoch):
 		return localnetV4
 	case params.LocalnetChainConfig.IsFeeCollectEpoch(epoch):
