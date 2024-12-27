@@ -9,56 +9,60 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type BlockDownloadDetails struct {
+type DownloadDetails struct {
 	loopID   int
 	streamID sttypes.StreamID
-	rootHash common.Hash
+	hash     common.Hash
 }
 
-// blockDownloadManager is the helper structure for get blocks request management
-type blockDownloadManager struct {
+// downloadManager is the helper structure for get blocks request management
+type downloadManager struct {
 	chain blockChain
 
 	targetBN   uint64
-	requesting map[uint64]struct{}              // block numbers that have been assigned to workers but not received
-	processing map[uint64]struct{}              // block numbers received requests but not inserted
-	retries    *prioritizedNumbers              // requests where error happens
-	rq         *resultQueue                     // result queue wait to be inserted into blockchain
-	bdd        map[uint64]*BlockDownloadDetails // details about how this block was downloaded
+	requesting map[uint64]struct{}         // block numbers that have been assigned to workers but not received
+	processing map[uint64]struct{}         // block numbers received requests but not inserted
+	retries    *prioritizedNumbers         // requests where error happens
+	rq         *resultQueue                // result queue wait to be inserted into blockchain
+	details    map[uint64]*DownloadDetails // details about how this block was downloaded
 
 	logger zerolog.Logger
 	lock   sync.Mutex
 }
 
-func newBlockDownloadManager(chain blockChain, targetBN uint64, logger zerolog.Logger) *blockDownloadManager {
-	return &blockDownloadManager{
+func newBlockDownloadManager(chain blockChain, targetBN uint64, logger zerolog.Logger) *downloadManager {
+	return &downloadManager{
 		chain:      chain,
 		targetBN:   targetBN,
 		requesting: make(map[uint64]struct{}),
 		processing: make(map[uint64]struct{}),
 		retries:    newPrioritizedNumbers(),
 		rq:         newResultQueue(),
-		bdd:        make(map[uint64]*BlockDownloadDetails),
+		details:    make(map[uint64]*DownloadDetails),
 		logger:     logger,
 	}
 }
 
 // GetNextBatch get the next block numbers batch
-func (gbm *blockDownloadManager) GetNextBatch(curHeight uint64) []uint64 {
-	gbm.lock.Lock()
-	defer gbm.lock.Unlock()
+func (dm *downloadManager) GetNextBatch(curHeight uint64) []uint64 {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
 
 	cap := BlocksPerRequest
 
-	bns := gbm.getBatchFromRetries(cap, curHeight)
+	bns := dm.getBatchFromRetries(cap, curHeight)
 	if len(bns) > 0 {
 		cap -= len(bns)
-		gbm.addBatchToRequesting(bns)
+		dm.addBatchToRequesting(bns)
 	}
 
-	if gbm.availableForMoreTasks() {
-		addBNs := gbm.getBatchFromUnprocessed(cap, curHeight)
-		gbm.addBatchToRequesting(addBNs)
+	if cap <= 0 {
+		return bns
+	}
+
+	if dm.availableForMoreTasks() {
+		addBNs := dm.getBatchFromUnprocessed(cap, curHeight)
+		dm.addBatchToRequesting(addBNs)
 		bns = append(bns, addBNs...)
 	}
 
@@ -66,29 +70,29 @@ func (gbm *blockDownloadManager) GetNextBatch(curHeight uint64) []uint64 {
 }
 
 // HandleRequestError handles the error result
-func (gbm *blockDownloadManager) HandleRequestError(bns []uint64, err error, streamID sttypes.StreamID) {
-	gbm.lock.Lock()
-	defer gbm.lock.Unlock()
+func (dm *downloadManager) HandleRequestError(bns []uint64, err error, streamID sttypes.StreamID) {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
 
 	// add requested block numbers to retries
 	for _, bn := range bns {
-		delete(gbm.requesting, bn)
-		gbm.retries.push(bn)
+		delete(dm.requesting, bn)
+		dm.retries.push(bn)
 	}
 }
 
 // HandleRequestResult handles get blocks result
-func (gbm *blockDownloadManager) HandleRequestResult(bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, streamID sttypes.StreamID) error {
-	gbm.lock.Lock()
-	defer gbm.lock.Unlock()
+func (dm *downloadManager) HandleRequestResult(bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, streamID sttypes.StreamID) error {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
 
 	for i, bn := range bns {
-		delete(gbm.requesting, bn)
+		delete(dm.requesting, bn)
 		if indexExists(blockBytes, i) && len(blockBytes[i]) <= 1 {
-			gbm.retries.push(bn)
+			dm.retries.push(bn)
 		} else {
-			gbm.processing[bn] = struct{}{}
-			gbm.bdd[bn] = &BlockDownloadDetails{
+			dm.processing[bn] = struct{}{}
+			dm.details[bn] = &DownloadDetails{
 				loopID:   loopID,
 				streamID: streamID,
 			}
@@ -102,12 +106,12 @@ func indexExists[T any](slice []T, index int) bool {
 }
 
 // SetDownloadDetails sets the download details for a batch of blocks
-func (gbm *blockDownloadManager) SetDownloadDetails(bns []uint64, loopID int, streamID sttypes.StreamID) error {
-	gbm.lock.Lock()
-	defer gbm.lock.Unlock()
+func (dm *downloadManager) SetDownloadDetails(bns []uint64, loopID int, streamID sttypes.StreamID) error {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
 
 	for _, bn := range bns {
-		gbm.bdd[bn] = &BlockDownloadDetails{
+		dm.details[bn] = &DownloadDetails{
 			loopID:   loopID,
 			streamID: streamID,
 		}
@@ -116,39 +120,39 @@ func (gbm *blockDownloadManager) SetDownloadDetails(bns []uint64, loopID int, st
 }
 
 // GetDownloadDetails returns the download details for a block
-func (gbm *blockDownloadManager) GetDownloadDetails(blockNumber uint64) (loopID int, streamID sttypes.StreamID, err error) {
-	gbm.lock.Lock()
-	defer gbm.lock.Unlock()
+func (dm *downloadManager) GetDownloadDetails(blockNumber uint64) (loopID int, streamID sttypes.StreamID, err error) {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
 
-	if dm, exist := gbm.bdd[blockNumber]; exist {
+	if dm, exist := dm.details[blockNumber]; exist {
 		return dm.loopID, dm.streamID, nil
 	}
 	return 0, sttypes.StreamID(fmt.Sprint(0)), fmt.Errorf("there is no download details for the block number: %d", blockNumber)
 }
 
 // SetRootHash sets the root hash for a specific block
-func (gbm *blockDownloadManager) SetRootHash(blockNumber uint64, root common.Hash) {
-	gbm.lock.Lock()
-	defer gbm.lock.Unlock()
+func (dm *downloadManager) SetRootHash(blockNumber uint64, root common.Hash) {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
 
-	gbm.bdd[blockNumber].rootHash = root
+	dm.details[blockNumber].hash = root
 }
 
 // GetRootHash returns the root hash for a specific block
-func (gbm *blockDownloadManager) GetRootHash(blockNumber uint64) common.Hash {
-	gbm.lock.Lock()
-	defer gbm.lock.Unlock()
+func (dm *downloadManager) GetRootHash(blockNumber uint64) common.Hash {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
 
-	return gbm.bdd[blockNumber].rootHash
+	return dm.details[blockNumber].hash
 }
 
 // getBatchFromRetries get the block number batch to be requested from retries.
-func (gbm *blockDownloadManager) getBatchFromRetries(cap int, fromBlockNumber uint64) []uint64 {
+func (dm *downloadManager) getBatchFromRetries(cap int, fromBlockNumber uint64) []uint64 {
 	var (
 		requestBNs []uint64
 	)
 	for cnt := 0; cnt < cap; cnt++ {
-		bn := gbm.retries.pop()
+		bn := dm.retries.pop()
 		if bn == 0 {
 			break // no more retries
 		}
@@ -161,16 +165,16 @@ func (gbm *blockDownloadManager) getBatchFromRetries(cap int, fromBlockNumber ui
 }
 
 // getBatchFromUnprocessed returns a batch of block numbers to be requested from unprocessed.
-func (gbm *blockDownloadManager) getBatchFromUnprocessed(cap int, curHeight uint64) []uint64 {
+func (dm *downloadManager) getBatchFromUnprocessed(cap int, curHeight uint64) []uint64 {
 	var (
 		requestBNs []uint64
 	)
 	bn := curHeight + 1
 	// TODO: this algorithm can be potentially optimized.
-	for cnt := 0; cnt < cap && bn <= gbm.targetBN; cnt++ {
-		for bn <= gbm.targetBN {
-			_, ok1 := gbm.requesting[bn]
-			_, ok2 := gbm.processing[bn]
+	for cnt := 0; cnt < cap && bn <= dm.targetBN; cnt++ {
+		for bn <= dm.targetBN {
+			_, ok1 := dm.requesting[bn]
+			_, ok2 := dm.processing[bn]
 			if !ok1 && !ok2 {
 				requestBNs = append(requestBNs, bn)
 				bn++
@@ -182,12 +186,12 @@ func (gbm *blockDownloadManager) getBatchFromUnprocessed(cap int, curHeight uint
 	return requestBNs
 }
 
-func (gbm *blockDownloadManager) availableForMoreTasks() bool {
-	return gbm.rq.results.Len() < SoftQueueCap
+func (dm *downloadManager) availableForMoreTasks() bool {
+	return dm.rq.results.Len() < SoftQueueCap
 }
 
-func (gbm *blockDownloadManager) addBatchToRequesting(bns []uint64) {
+func (dm *downloadManager) addBatchToRequesting(bns []uint64) {
 	for _, bn := range bns {
-		gbm.requesting[bn] = struct{}{}
+		dm.requesting[bn] = struct{}{}
 	}
 }
