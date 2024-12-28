@@ -38,10 +38,17 @@ type Proposal struct {
 }
 
 // NewProposal creates a new proposal
-func NewProposal(t ProposalType, blockNum uint64) Proposal {
+func NewProposal(t ProposalType, blockNum uint64, stackTrace ...string) Proposal {
+	if len(stackTrace) > 0 {
+		return Proposal{
+			Type:     t,
+			Caller:   stackTrace[0],
+			blockNum: blockNum,
+		}
+	}
 	return Proposal{
 		Type:     t,
-		Caller:   utils.GetCallStackInfo(2),
+		Caller:   utils.GetStackTrace(2),
 		blockNum: blockNum,
 	}
 }

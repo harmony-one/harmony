@@ -277,3 +277,19 @@ func FatalError(err error) {
 func FatalErrMsg(err error, format string, args ...interface{}) {
 	FatalError(errors.WithMessagef(err, format, args...))
 }
+
+func GetStackTrace(i int) string {
+	stackBuf := strings.Builder{}
+
+	for ; ; i++ {
+		_, file, line, ok := runtime.Caller(i)
+		if !ok {
+			break
+		}
+		stackBuf.WriteString(file)
+		stackBuf.WriteString(":")
+		stackBuf.WriteString(fmt.Sprint(line))
+		stackBuf.WriteString(" ")
+	}
+	return stackBuf.String()
+}

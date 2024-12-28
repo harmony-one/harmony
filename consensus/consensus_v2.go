@@ -233,6 +233,7 @@ func (consensus *Consensus) _finalCommit(isLeader bool) {
 	}
 
 	block.SetCurrentCommitSig(commitSigAndBitmap)
+	// commitBlock internally calls setupForNewConsensus, which updates leader key
 	err = consensus.commitBlock(block, FBFTMsg)
 
 	if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
@@ -289,10 +290,11 @@ func (consensus *Consensus) _finalCommit(isLeader bool) {
 	if isLeader {
 		if block.IsLastBlockInEpoch() {
 			// No pipelining
-			if !consensus.isRotation(block.Epoch()) {
+			trace := utils.GetStackTrace(1)
+			if consensus.isMyKey(consensus.getLeaderPubKey()) && !consensus.isRotation(block.Epoch()) {
 				go func() {
 					consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-					consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", "I am leader and it's the last block in epoch")
+					consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1, trace), "finalCommit", "I am leader and it's the last block in epoch")
 				}()
 			}
 		} else {
@@ -727,6 +729,9 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicKeyWrapper) *bls.PublicKeyWrapper {
+	if !consensus.isRotation(epoch) {
+		return defaultKey
+	}
 	var (
 		bc        = consensus.Blockchain()
 		leader    = consensus.getLeaderPubKey()
@@ -883,9 +888,10 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 			if consensus.isLeader() && newLeader && !wasLeader {
 				// leader changed
 				blockPeriod := consensus.BlockPeriod
+				trace := utils.GetStackTrace(1)
 				go func() {
 					<-time.After(blockPeriod)
-					consensus.ReadySignal(NewProposal(SyncProposal, blk.NumberU64()+1), "setupForNewConsensus", "I am the new leader")
+					consensus.ReadySignal(NewProposal(SyncProposal, blk.NumberU64()+1, trace), "setupForNewConsensus", "I am the new leader")
 				}()
 			}
 		}
