@@ -130,3 +130,10 @@ func TestIsPrivateIP(t *testing.T) {
 		}
 	}
 }
+
+func TestGetStackTrace(t *testing.T) {
+	stack := GetStackTrace()
+	if len(stack) == 0 {
+		t.Errorf("GetStackTrace failed")
+	}
+}
