@@ -11,6 +11,7 @@ const (
 	Heads         SyncStageID = "Heads"         // Heads are downloaded
 	ShortRange    SyncStageID = "ShortRange"    // short range
 	SyncEpoch     SyncStageID = "SyncEpoch"     // epoch sync
+	BlockHashes   SyncStageID = "BlockHashes"   // block hashes
 	BlockBodies   SyncStageID = "BlockBodies"   // Block bodies are downloaded, TxHash and UncleHash are getting verified
 	States        SyncStageID = "States"        // will construct most recent state from downloaded blocks
 	StateSync     SyncStageID = "StateSync"     // State sync
