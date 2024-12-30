@@ -26,6 +26,7 @@ import (
 
 const (
 	BlocksBucket          = "BlockBodies"
+	BlockHashesBucket     = "BlockHashes"
 	BlockSignaturesBucket = "BlockSignatures"
 	StageProgressBucket   = "StageProgress"
 
@@ -36,6 +37,7 @@ const (
 
 var Buckets = []string{
 	BlocksBucket,
+	BlockHashesBucket,
 	BlockSignaturesBucket,
 	StageProgressBucket,
 }
@@ -112,6 +114,7 @@ func CreateStagedSync(ctx context.Context,
 	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
 	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, extractReceiptHashes, config.LogProgress)
+	stageHashesCfg := NewStageBlockHashesCfg(bc, mainDB, config.Concurrency, protocol, isBeaconValidator, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
 	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageFullStateSyncCfg := NewStageFullStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
@@ -126,6 +129,7 @@ func CreateStagedSync(ctx context.Context,
 		stageHeadsCfg,
 		stageSyncEpochCfg,
 		stageShortRangeCfg,
+		stageHashesCfg,
 		stageBodiesCfg,
 		stageStateSyncCfg,
 		stageFullStateSyncCfg,
