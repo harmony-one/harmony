@@ -22,6 +22,7 @@ var (
 	ErrEmptyWhitelist                = WrapStagedSyncError("empty white list")
 	ErrWrongGetBlockNumberType       = WrapStagedSyncError("wrong type of getBlockNumber interface")
 	ErrSaveBlocksToDbFailed          = WrapStagedSyncError("saving downloaded blocks to db failed")
+	ErrSaveBlockHashesToDbFailed     = WrapStagedSyncError("saving downloaded block hashes to db failed")
 )
 
 // WrapStagedSyncError wraps errors for staged sync and returns error object
