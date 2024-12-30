@@ -14,6 +14,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Hash frequency and stream tracking
+type HashStats struct {
+	Count     int
+	StreamIDs map[sttypes.StreamID]struct{}
+}
+
 type StageBlockHashes struct {
 	configs StageBlockHashesCfg
 }
@@ -90,24 +96,15 @@ func (bh *StageBlockHashes) Exec(ctx context.Context, firstCycle bool, invalidBl
 		return errV
 	}
 
-	if currProgress <= currentHead {
+	if currProgress < currentHead {
 		if err := bh.clearBlockHashesBucket(tx); err != nil {
 			return err
 		}
 		currProgress = currentHead
 	} else if currProgress >= targetHeight {
-		//TODO: make sure hashes (from currentHead to targetHeight) also exist
+		//TODO: validate hashes (from currentHead+1 to targetHeight)
 		return nil
-	}
-
-	startTime := time.Now()
-
-	// startBlock := currProgress
-	if bh.configs.logProgress {
-		fmt.Print("\033[s") // save the cursor position
-	}
-
-	if currProgress > currentHead && currProgress < targetHeight {
+	} else if currProgress > currentHead && currProgress < targetHeight {
 		// TODO: validate hashes (from currentHead to currProgress)
 
 		// key := strconv.FormatUint(currProgress, 10)
@@ -120,11 +117,18 @@ func (bh *StageBlockHashes) Exec(ctx context.Context, firstCycle bool, invalidBl
 		// startHash.SetBytes(currHash[:])
 	}
 
+	startTime := time.Now()
+
+	// startBlock := currProgress
+	if bh.configs.logProgress {
+		fmt.Print("\033[s") // save the cursor position
+	}
+
 	// create download manager instant
-	hbm := newDownloadManager(bh.configs.bc, targetHeight, BlockHashesPerRequest, s.state.logger)
+	hdm := newDownloadManager(bh.configs.bc, targetHeight, BlockHashesPerRequest, s.state.logger)
 
 	// Fetch block hashes from neighbors
-	if err := bh.runBlockHashWorkerLoop(ctx, tx, hbm, s, startTime, currentHead, targetHeight); err != nil {
+	if err := bh.runBlockHashWorkerLoop(ctx, tx, hdm, s, startTime, currentHead, targetHeight); err != nil {
 		return nil
 	}
 
@@ -159,7 +163,7 @@ func (bh *StageBlockHashes) downloadBlockHashes(ctx context.Context, bns []uint6
 // runBlockhashWorkerLoop downloads block hashes
 func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 	tx kv.RwTx,
-	hbm *downloadManager,
+	hdm *downloadManager,
 	s *StageState,
 	startTime time.Time,
 	startHeight uint64,
@@ -187,7 +191,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		}
 
 		// Fetch the next batch of block numbers
-		batch := hbm.GetNextBatch(currProgress)
+		batch := hdm.GetNextBatch(currProgress)
 		if len(batch) == 0 {
 			break
 		}
@@ -217,14 +221,18 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		wg.Wait()
 
 		// Calculate the final block hashes for the batch
-		finalBlockHashes := bh.calculateFinalBlockHashes(peerHashes, batch)
+		finalBlockHashes, _, errFinalHashCaclulations := bh.calculateFinalBlockHashes(peerHashes, batch)
+		if errFinalHashCaclulations != nil {
+			panic(ErrFinalBlockHashesCalculationFailed)
+		}
 
+		// save block hashes in db
 		if err := bh.saveBlockHashes(ctx, tx, finalBlockHashes); err != nil {
 			panic(ErrSaveBlockHashesToDbFailed)
 		}
-		hbm.HandleHashesRequestResult(batch)
+		hdm.HandleHashesRequestResult(batch)
 
-		// Update progress
+		// update stage progress
 		currProgress = batch[len(batch)-1]
 
 		// save progress
@@ -258,39 +266,62 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 	return nil
 }
 
-func (bh *StageBlockHashes) calculateFinalBlockHashes(peerHashes *sttypes.SafeMap[sttypes.StreamID, []common.Hash], batch []uint64) map[uint64]common.Hash {
-	hashFrequency := make(map[uint64]map[common.Hash]int)
+// calculateFinalBlockHashes Calculates the most frequent block hashes for a given batch and removes streams with invalid hashes.
+func (bh *StageBlockHashes) calculateFinalBlockHashes(
+	peerHashes *sttypes.SafeMap[sttypes.StreamID, []common.Hash],
+	batch []uint64,
+) (map[uint64]common.Hash, map[sttypes.StreamID]struct{}, error) {
 
-	// Initialize the frequency map for each block number
-	for _, blockNumber := range batch {
-		hashFrequency[blockNumber] = make(map[common.Hash]int)
+	if len(batch) == 0 {
+		return nil, nil, errors.New("batch is empty")
 	}
 
+	hashFrequency := make(map[uint64]map[common.Hash]*HashStats)
+	finalHashes := make(map[uint64]common.Hash)
+	invalidStreams := make(map[sttypes.StreamID]struct{})
+
 	// Iterate over peerHashes to populate frequencies
-	peerHashes.Iterate(func(key sttypes.StreamID, hashes []common.Hash) {
+	peerHashes.Iterate(func(stid sttypes.StreamID, hashes []common.Hash) {
 		for i, blockNumber := range batch {
-			if i < len(hashes) {
-				hash := hashes[i]
-				hashFrequency[blockNumber][hash]++
+			if i >= len(hashes) {
+				continue // Skip if the peer returned fewer hashes
+			}
+
+			hash := hashes[i]
+			if _, ok := hashFrequency[blockNumber]; !ok {
+				hashFrequency[blockNumber] = make(map[common.Hash]*HashStats)
+			}
+
+			if _, ok := hashFrequency[blockNumber][hash]; !ok {
+				hashFrequency[blockNumber][hash] = &HashStats{
+					Count:     0,
+					StreamIDs: make(map[sttypes.StreamID]struct{}),
+				}
+			}
+
+			details := hashFrequency[blockNumber][hash]
+			details.Count++
+			details.StreamIDs[stid] = struct{}{}
+
+			// Update the final hash for the block if this hash has higher frequency
+			if details.Count > len(hashFrequency[blockNumber][finalHashes[blockNumber]].StreamIDs) {
+				finalHashes[blockNumber] = hash
 			}
 		}
 	})
 
-	// Determine the most frequent hash for each block number
-	finalHashes := make(map[uint64]common.Hash)
-	for _, blockNumber := range batch {
-		var maxCount int
-		var selectedHash common.Hash
-		for hash, count := range hashFrequency[blockNumber] {
-			if count > maxCount {
-				maxCount = count
-				selectedHash = hash
+	// Identify invalid streams
+	peerHashes.Iterate(func(stid sttypes.StreamID, hashes []common.Hash) {
+		for i, blockNumber := range batch {
+			if i >= len(hashes) || finalHashes[blockNumber] != hashes[i] {
+				invalidStreams[stid] = struct{}{}
+				bh.configs.protocol.RemoveStream(stid)
+				break
 			}
 		}
-		finalHashes[blockNumber] = selectedHash
-	}
+	})
 
-	return finalHashes
+	return finalHashes, invalidStreams, nil
 }
 
 // saveBlocks saves the blocks into db
