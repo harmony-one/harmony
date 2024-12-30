@@ -112,7 +112,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	}
 
 	// Fetch blocks from neighbors
-	s.state.gbm = newBlockDownloadManager(b.configs.bc, targetHeight, s.state.logger)
+	s.state.gbm = newDownloadManager(b.configs.bc, targetHeight, BlocksPerRequest, s.state.logger)
 
 	// Setup workers to fetch blocks from remote node
 	var wg sync.WaitGroup
@@ -134,7 +134,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 }
 
 // runBlockWorkerLoop creates a work loop for download blocks
-func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, startTime time.Time) {
+func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *downloadManager, wg *sync.WaitGroup, loopID int, s *StageState, startTime time.Time) {
 
 	currentBlock := int(s.state.CurrentBlockNumber())
 
@@ -192,15 +192,17 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 			gbm.HandleRequestResult(batch, blockBytes, sigBytes, loopID, stid)
 			if b.configs.logProgress {
 				//calculating block download speed
-				dt := time.Now().Sub(startTime).Seconds()
+				dt := time.Since(startTime).Seconds()
 				speed := float64(0)
+				numBlocks := len(gbm.details)
+
 				if dt > 0 {
-					speed = float64(len(gbm.bdd)) / dt
+					speed = float64(numBlocks) / dt
 				}
 				blockSpeed := fmt.Sprintf("%.2f", speed)
 
 				fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-				fmt.Println("downloaded blocks:", currentBlock+len(gbm.bdd), "/", int(gbm.targetBN), "(", blockSpeed, "blocks/s", ")")
+				fmt.Println("downloaded blocks:", currentBlock+numBlocks, "/", int(gbm.targetBN), "(", blockSpeed, "blocks/s", ")")
 			}
 		}
 	}
