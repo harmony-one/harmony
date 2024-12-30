@@ -17,20 +17,19 @@ type DownloadDetails struct {
 
 // downloadManager is the helper structure for get blocks request management
 type downloadManager struct {
-	chain blockChain
-
+	chain      blockChain
 	targetBN   uint64
 	requesting map[uint64]struct{}         // block numbers that have been assigned to workers but not received
 	processing map[uint64]struct{}         // block numbers received requests but not inserted
 	retries    *prioritizedNumbers         // requests where error happens
 	rq         *resultQueue                // result queue wait to be inserted into blockchain
 	details    map[uint64]*DownloadDetails // details about how this block was downloaded
-
-	logger zerolog.Logger
-	lock   sync.Mutex
+	batchSize  int
+	logger     zerolog.Logger
+	lock       sync.Mutex
 }
 
-func newBlockDownloadManager(chain blockChain, targetBN uint64, logger zerolog.Logger) *downloadManager {
+func newDownloadManager(chain blockChain, targetBN uint64, batchSize int, logger zerolog.Logger) *downloadManager {
 	return &downloadManager{
 		chain:      chain,
 		targetBN:   targetBN,
@@ -39,6 +38,7 @@ func newBlockDownloadManager(chain blockChain, targetBN uint64, logger zerolog.L
 		retries:    newPrioritizedNumbers(),
 		rq:         newResultQueue(),
 		details:    make(map[uint64]*DownloadDetails),
+		batchSize:  batchSize,
 		logger:     logger,
 	}
 }
@@ -48,7 +48,7 @@ func (dm *downloadManager) GetNextBatch(curHeight uint64) []uint64 {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
-	cap := BlocksPerRequest
+	cap := dm.batchSize
 
 	bns := dm.getBatchFromRetries(cap, curHeight)
 	if len(bns) > 0 {
@@ -97,6 +97,19 @@ func (dm *downloadManager) HandleRequestResult(bns []uint64, blockBytes [][]byte
 				streamID: streamID,
 			}
 		}
+	}
+	return nil
+}
+
+// HandleRequestResult handles get blocks result
+func (dm *downloadManager) HandleHashesRequestResult(bns []uint64) error {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+
+	for _, bn := range bns {
+		delete(dm.requesting, bn)
+		dm.processing[bn] = struct{}{}
+		dm.details[bn] = &DownloadDetails{}
 	}
 	return nil
 }
