@@ -418,7 +418,7 @@ func (sss *StageFullStateSync) downloadByteCodes(ctx context.Context, sdm *FullS
 // 	return data, stid, nil
 // }
 
-func (stg *StageFullStateSync) insertChain(gbm *blockDownloadManager,
+func (stg *StageFullStateSync) insertChain(gbm *downloadManager,
 	protocol syncProtocol,
 	lbls prometheus.Labels,
 	targetBN uint64) {

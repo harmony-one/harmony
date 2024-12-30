@@ -240,7 +240,7 @@ func validateGetNodeDataResult(requested []common.Hash, result [][]byte) error {
 	return nil
 }
 
-func (stg *StageStateSync) insertChain(gbm *blockDownloadManager,
+func (stg *StageStateSync) insertChain(gbm *downloadManager,
 	protocol syncProtocol,
 	lbls prometheus.Labels,
 	targetBN uint64) {
