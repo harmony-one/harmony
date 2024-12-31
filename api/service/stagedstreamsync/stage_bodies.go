@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -54,10 +55,6 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 
 	useInternalTx := tx == nil
 
-	if invalidBlockRevert {
-		return b.redownloadBadBlock(ctx, s)
-	}
-
 	// for short range sync, skip this stage
 	if !s.state.initSync {
 		return nil
@@ -68,14 +65,6 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return nil
 	}
 
-	maxHeight := s.state.status.GetTargetBN()
-	currentHead := s.state.CurrentBlockNumber()
-	if currentHead >= maxHeight {
-		return nil
-	}
-	currProgress := uint64(0)
-	targetHeight := s.state.currentCycle.GetTargetHeight()
-
 	if useInternalTx {
 		var err error
 		tx, err = b.configs.db.BeginRw(ctx)
@@ -84,6 +73,18 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		}
 		defer tx.Rollback()
 	}
+
+	if invalidBlockRevert {
+		return b.redownloadBadBlock(ctx, tx, s)
+	}
+
+	maxHeight := s.state.status.GetTargetBN()
+	currentHead := s.state.CurrentBlockNumber()
+	if currentHead >= maxHeight {
+		return nil
+	}
+	currProgress := uint64(0)
+	targetHeight := s.state.currentCycle.GetTargetHeight()
 
 	if errV := CreateView(ctx, b.configs.db, tx, func(etx kv.Tx) error {
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
@@ -119,7 +120,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 
 	for i := 0; i != s.state.config.Concurrency; i++ {
 		wg.Add(1)
-		go b.runBlockWorkerLoop(ctx, s.state.gbm, &wg, i, s, startTime)
+		go b.runBlockWorkerLoop(ctx, tx, s.state.gbm, &wg, i, s, startTime)
 	}
 
 	wg.Wait()
@@ -134,7 +135,13 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 }
 
 // runBlockWorkerLoop creates a work loop for download blocks
-func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *downloadManager, wg *sync.WaitGroup, loopID int, s *StageState, startTime time.Time) {
+func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
+	tx kv.RwTx,
+	gbm *downloadManager,
+	wg *sync.WaitGroup,
+	loopID int,
+	s *StageState,
+	startTime time.Time) {
 
 	currentBlock := int(s.state.CurrentBlockNumber())
 
@@ -157,7 +164,7 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *downloadManag
 			}
 		}
 
-		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
+		blockBytes, sigBytes, stid, err := b.downloadRawBlocksByHashes(ctx, tx, batch)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
@@ -237,7 +244,7 @@ func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte
 }
 
 // redownloadBadBlock tries to redownload the bad block from other streams
-func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) error {
+func (b *StageBodies) redownloadBadBlock(ctx context.Context, tx kv.RwTx, s *StageState) error {
 
 	batch := []uint64{s.state.invalidBlock.Number}
 
@@ -297,6 +304,39 @@ func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]
 	defer cancel()
 
 	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
+}
+
+func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if len(bns) == 0 {
+		return nil, nil, "", errors.New("empty batch of block numbers")
+	}
+
+	hashes := make([]common.Hash, 0, len(bns))
+
+	if err := CreateView(ctx, b.configs.db, tx, func(etx kv.Tx) error {
+		for _, bn := range bns {
+			blkKey := marshalData(bn)
+			hashBytes, err := etx.GetOne(BlockHashesBucket, blkKey)
+			if err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Uint64("block number", bn).
+					Msg("[STAGED_STREAM_SYNC] fetching block hash from db failed")
+				return err
+			}
+			var h common.Hash
+			h.SetBytes(hashBytes)
+			hashes = append(hashes, h)
+		}
+		return nil
+	}); err != nil {
+		return nil, nil, "", err
+	}
+
+	return b.configs.protocol.GetRawBlocksByHashes(ctx, hashes)
 }
 
 func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
