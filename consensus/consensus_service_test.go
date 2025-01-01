@@ -34,7 +34,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	consensus.SetCurBlockViewID(2)
-	consensus.blockHash = [32]byte{}
+	consensus.current.blockHash = [32]byte{}
 
 	msg := &msg_pb.Message{}
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg, blsPriKey)
