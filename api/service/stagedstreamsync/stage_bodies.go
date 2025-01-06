@@ -341,9 +341,11 @@ func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx,
 		return nil, nil, "", err
 	}
 
+	// TODO: check the returned blocks are sorted
 	return b.configs.protocol.GetRawBlocksByHashes(ctx, hashes)
 }
 
+// TODO: validate block results
 func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 	if len(result) != len(requested) {
 		return fmt.Errorf("unexpected number of blocks delivered: %v / %v", len(result), len(requested))
@@ -367,7 +369,7 @@ func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, 
 		}
 		defer tx.Rollback()
 	}
-
+	// The blocks array is sorted by block number
 	for i := uint64(0); i < uint64(len(blockBytes)); i++ {
 		block := blockBytes[i]
 		sig := sigBytes[i]
