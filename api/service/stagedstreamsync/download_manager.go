@@ -50,7 +50,7 @@ func (dm *downloadManager) GetNextBatch(curHeight uint64) []uint64 {
 
 	cap := dm.batchSize
 
-	bns := dm.getBatchFromRetries(cap, curHeight)
+	bns := dm.getBatchFromRetries(cap)
 	if len(bns) > 0 {
 		cap -= len(bns)
 		dm.addBatchToRequesting(bns)
@@ -160,7 +160,7 @@ func (dm *downloadManager) GetRootHash(blockNumber uint64) common.Hash {
 }
 
 // getBatchFromRetries get the block number batch to be requested from retries.
-func (dm *downloadManager) getBatchFromRetries(cap int, fromBlockNumber uint64) []uint64 {
+func (dm *downloadManager) getBatchFromRetries(cap int) []uint64 {
 	var (
 		requestBNs []uint64
 	)
@@ -168,9 +168,6 @@ func (dm *downloadManager) getBatchFromRetries(cap int, fromBlockNumber uint64) 
 		bn := dm.retries.pop()
 		if bn == 0 {
 			break // no more retries
-		}
-		if bn <= fromBlockNumber {
-			continue
 		}
 		requestBNs = append(requestBNs, bn)
 	}

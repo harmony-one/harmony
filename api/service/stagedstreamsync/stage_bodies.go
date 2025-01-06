@@ -143,7 +143,7 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
 	s *StageState,
 	startTime time.Time) {
 
-	currentBlock := int(s.state.CurrentBlockNumber())
+	currentBlock := s.state.CurrentBlockNumber()
 
 	defer wg.Done()
 
@@ -153,8 +153,8 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
 			return
 		default:
 		}
-		curHeight := s.state.CurrentBlockNumber()
-		batch := gbm.GetNextBatch(curHeight)
+		batch := gbm.GetNextBatch(currentBlock)
+
 		if len(batch) == 0 {
 			select {
 			case <-ctx.Done():
@@ -197,11 +197,16 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
 				panic(ErrSaveBlocksToDbFailed)
 			}
 			gbm.HandleRequestResult(batch, blockBytes, sigBytes, loopID, stid)
+			// adjust current block
+			lastBlockInBatch := batch[len(batch)-1]
+			if lastBlockInBatch > currentBlock {
+				currentBlock = lastBlockInBatch
+			}
 			if b.configs.logProgress {
 				//calculating block download speed
 				dt := time.Since(startTime).Seconds()
 				speed := float64(0)
-				numBlocks := len(gbm.details)
+				numBlocks := uint64(len(gbm.details))
 
 				if dt > 0 {
 					speed = float64(numBlocks) / dt
