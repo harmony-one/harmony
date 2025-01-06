@@ -233,7 +233,10 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		hdm.HandleHashesRequestResult(batch)
 
 		// update stage progress
-		currProgress = batch[len(batch)-1]
+		lastBlockInBatch := batch[len(batch)-1]
+		if lastBlockInBatch > currProgress {
+			currProgress = lastBlockInBatch
+		}
 
 		// save progress
 		if err := s.Update(tx, currProgress); err != nil {
