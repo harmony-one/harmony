@@ -168,7 +168,7 @@ func TestStreamManager_ReservedStreams(t *testing.T) {
 		t.Errorf("unexpected stream size: %v / %v", sm.streams.size(), defHiCap)
 	}
 	if sm.reservedStreams.size() != 0 {
-		t.Errorf("unexpected reserved stream size after getting to hi cap: %v / %v", sm.reservedStreams.size(), 0)
+		t.Errorf("unexpected reserved stream size after reaching the high capacity limit: %v / %v", sm.reservedStreams.size(), 0)
 	}
 
 	// Add more streams to fill up reserved list
@@ -182,7 +182,7 @@ func TestStreamManager_ReservedStreams(t *testing.T) {
 		t.Errorf("unexpected stream size: %v / %v", sm.streams.size(), defHiCap)
 	}
 	if sm.reservedStreams.size() != MaxReservedStreams {
-		t.Errorf("unexpected reserved stream size after getting to hi cap: %v / %v", sm.reservedStreams.size(), MaxReservedStreams)
+		t.Errorf("unexpected reserved stream size after retrieving the maximum allowed reserved streams: %v / %v", sm.reservedStreams.size(), MaxReservedStreams)
 	}
 
 	// try to add one more stream, it should be rejected
@@ -195,7 +195,7 @@ func TestStreamManager_ReservedStreams(t *testing.T) {
 		t.Errorf("unexpected stream size: %v / %v", sm.streams.size(), defHiCap)
 	}
 	if sm.reservedStreams.size() != MaxReservedStreams {
-		t.Errorf("unexpected reserved stream size after getting to hi cap: %v / %v", sm.reservedStreams.size(), MaxReservedStreams)
+		t.Errorf("unexpected reserved stream size after attempting to add a stream beyond the allowed limit: %v / %v", sm.reservedStreams.size(), MaxReservedStreams)
 	}
 
 }
