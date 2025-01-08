@@ -34,8 +34,8 @@ func TestNewWorker(t *testing.T) {
 	var (
 		database = rawdb.NewMemoryDatabase()
 		gspec    = core.Genesis{
-			Config:  chainConfig,
-			Factory: blockFactory,
+			Config: chainConfig,
+			//Factory: blockFactory,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 10,
 		}
@@ -63,8 +63,8 @@ func TestCommitTransactions(t *testing.T) {
 	var (
 		database = rawdb.NewMemoryDatabase()
 		gspec    = core.Genesis{
-			Config:  chainConfig,
-			Factory: blockFactory,
+			Config: chainConfig,
+			//Factory: blockFactory,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 0,
 		}

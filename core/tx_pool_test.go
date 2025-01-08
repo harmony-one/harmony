@@ -146,8 +146,8 @@ func pricedTransaction(shardID uint32, nonce uint64, gaslimit uint64, gasprice *
 func createBlockChain() *BlockChainImpl {
 	key, _ := crypto.GenerateKey()
 	gspec := Genesis{
-		Config:  params.TestChainConfig,
-		Factory: blockfactory.ForTest,
+		Config: params.TestChainConfig,
+		//Factory: blockfactory.ForTest,
 		Alloc: GenesisAlloc{
 			crypto.PubkeyToAddress(key.PublicKey): {
 				Balance: big.NewInt(8e18),

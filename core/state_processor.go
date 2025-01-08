@@ -456,20 +456,20 @@ func ApplyIncomingReceipt(
 // put it here to avoid cyclic import
 func StakingToMessage(
 	tx *staking.StakingTransaction, blockNum *big.Int,
-) (types.Message, error) {
+) (*types.Message, error) {
 	payload, err := tx.RLPEncodeStakeMsg()
 	if err != nil {
-		return types.Message{}, err
+		return &types.Message{}, err
 	}
 	from, err := tx.SenderAddress()
 	if err != nil {
-		return types.Message{}, err
+		return &types.Message{}, err
 	}
 
 	msg := types.NewStakingMessage(from, tx.Nonce(), tx.GasLimit(), tx.GasPrice(), payload, blockNum)
 	stkType := tx.StakingType()
 	if _, ok := types.StakingTypeMap[stkType]; !ok {
-		return types.Message{}, staking.ErrInvalidStakingKind
+		return &types.Message{}, staking.ErrInvalidStakingKind
 	}
 	msg.SetType(types.StakingTypeMap[stkType])
 	return msg, nil

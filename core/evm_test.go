@@ -36,8 +36,8 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChainImpl, *state.D
 		blockFactory    = blockfactory.ForTest
 		database        = rawdb.NewMemoryDatabase()
 		gspec           = Genesis{
-			Config:  chainConfig,
-			Factory: blockFactory,
+			Config: chainConfig,
+			//Factory: blockFactory,
 			Alloc:   GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 0,
 		}

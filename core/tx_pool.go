@@ -102,6 +102,8 @@ var (
 	ErrBlacklistTo = errors.New("`to` address of transaction in blacklist")
 
 	ErrAllowedTxs = errors.New("transaction allowed whitelist check failed.")
+
+	ErrSenderNoEOA = errors.New("sender is not an EOA")
 )
 
 var (

@@ -38,7 +38,7 @@ type CallArgs struct {
 
 // ToMessage converts CallArgs to the Message type used by the core evm
 // Adapted from go-ethereum/internal/ethapi/api.go
-func (args *CallArgs) ToMessage(globalGasCap *big.Int) types.Message {
+func (args *CallArgs) ToMessage(globalGasCap *big.Int) *types.Message {
 	// Set sender address or use zero address if none specified.
 	var addr common.Address
 	if args.From != nil {

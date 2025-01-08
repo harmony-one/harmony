@@ -68,7 +68,7 @@ The state transitioning model does all the necessary work to work out a valid ne
 */
 type StateTransition struct {
 	gp         *GasPool
-	msg        Message
+	msg        *types.Message
 	gas        uint64
 	gasPrice   *big.Int
 	initialGas uint64
@@ -79,21 +79,22 @@ type StateTransition struct {
 }
 
 // Message represents a message sent to a contract.
-type Message interface {
-	From() common.Address
-	//FromFrontier() (common.Address, error)
-	To() *common.Address
-
-	GasPrice() *big.Int
-	Gas() uint64
-	Value() *big.Int
-
-	Nonce() uint64
-	CheckNonce() bool
-	Data() []byte
-	Type() types.TransactionType
-	BlockNum() *big.Int
-}
+//type Message interface {
+//	From() common.Address
+//	//FromFrontier() (common.Address, error)
+//	To() *common.Address
+//
+//	GasPrice() *big.Int
+//	Gas() uint64
+//	Value() *big.Int
+//
+//	Nonce() uint64
+//	CheckNonce() bool
+//	CheckEOA() bool
+//	Data() []byte
+//	Type() types.TransactionType
+//	BlockNum() *big.Int
+//}
 
 // ExecutionResult is the return value from a transaction committed to the DB
 type ExecutionResult struct {
@@ -130,7 +131,7 @@ func (result *ExecutionResult) Revert() []byte {
 }
 
 // NewStateTransition initialises and returns a new state transition object.
-func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
+func NewStateTransition(evm *vm.EVM, msg *types.Message, gp *GasPool) *StateTransition {
 	return &StateTransition{
 		gp:       gp,
 		evm:      evm,
@@ -149,12 +150,12 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (ExecutionResult, error) {
+func ApplyMessage(evm *vm.EVM, msg *types.Message, gp *GasPool) (ExecutionResult, error) {
 	return NewStateTransition(evm, msg, gp).TransitionDb()
 }
 
 // ApplyStakingMessage computes the new state for staking message
-func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool) (uint64, error) {
+func ApplyStakingMessage(evm *vm.EVM, msg *types.Message, gp *GasPool) (uint64, error) {
 	return NewStateTransition(evm, msg, gp).StakingTransitionDb()
 }
 
@@ -202,6 +203,13 @@ func (st *StateTransition) preCheck() error {
 			return ErrNonceTooHigh
 		} else if nonce > st.msg.Nonce() {
 			return ErrNonceTooLow
+		}
+	}
+	if st.msg.CheckEOA() {
+		code := st.state.GetCode(st.msg.From())
+		_, delegated := types.ParseDelegation(code)
+		if len(code) > 0 && !delegated {
+			return fmt.Errorf("%w: address %v, len(code): %d", ErrSenderNoEOA, st.msg.From().Hex(), len(code))
 		}
 	}
 	return st.buyGas()

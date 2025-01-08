@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
@@ -91,8 +90,7 @@ func createValidator() *staking.CreateValidator {
 func main() {
 	key, _ := crypto.GenerateKey()
 	gspec := core.Genesis{
-		Config:  params.TestChainConfig,
-		Factory: blockfactory.ForTest,
+		Config: params.TestChainConfig,
 		Alloc: core.GenesisAlloc{
 			crypto.PubkeyToAddress(key.PublicKey): {
 				Balance: big.NewInt(8000000000000000000),

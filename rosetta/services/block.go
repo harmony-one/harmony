@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy/tracers"
 
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	coreTypes "github.com/harmony-one/harmony/core/types"
 
@@ -318,7 +317,7 @@ func (s *BlockAPI) getTransactionTrace(
 	var blockError *types.Error
 	var foundResult []*tracers.RosettaLogItem
 	var tracer = "RosettaBlockTracer"
-	err := s.hmy.ComputeTxEnvEachBlockWithoutApply(blk, defaultTraceReExec, func(txIndex int, tx *coreTypes.Transaction, msg core.Message, vmctx vm.Context, statedb *state.DB) bool {
+	err := s.hmy.ComputeTxEnvEachBlockWithoutApply(blk, defaultTraceReExec, func(txIndex int, tx *coreTypes.Transaction, msg *coreTypes.Message, vmctx vm.Context, statedb *state.DB) bool {
 		execResultInterface, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, &hmy.TraceConfig{
 			Tracer: &tracer,
 			LogConfig: &vm.LogConfig{

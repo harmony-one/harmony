@@ -43,7 +43,6 @@ var (
 	database   = rawdb.NewMemoryDatabase()
 	gspec      = core.Genesis{
 		Config:  chainConfig,
-		Factory: blockFactory,
 		Alloc:   core.GenesisAlloc{FaucetAddress: {Balance: FaucetInitFunds}},
 		ShardID: 0,
 	}

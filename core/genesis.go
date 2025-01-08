@@ -33,18 +33,17 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
-	"github.com/harmony-one/harmony/core/genesis"
-	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/staking/slash"
-
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/core/genesis"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 )
 
 // no go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
@@ -71,18 +70,17 @@ var (
 // Genesis specifies the header fields, state of a genesis block. It also defines hard
 // fork switch-over blocks through the chain configuration.
 type Genesis struct {
-	Config         *params.ChainConfig  `json:"config"`
-	Factory        blockfactory.Factory `json:"-"`
-	Nonce          uint64               `json:"nonce"`
-	ShardID        uint32               `json:"shardID"`
-	Timestamp      uint64               `json:"timestamp"`
-	ExtraData      []byte               `json:"extraData"`
-	GasLimit       uint64               `json:"gasLimit"       gencodec:"required"`
-	Mixhash        common.Hash          `json:"mixHash"`
-	Coinbase       common.Address       `json:"coinbase"`
-	Alloc          GenesisAlloc         `json:"alloc"          gencodec:"required"`
-	ShardStateHash common.Hash          `json:"shardStateHash" gencodec:"required"`
-	ShardState     shard.State          `json:"shardState"     gencodec:"required"`
+	Config         *params.ChainConfig `json:"config"`
+	Nonce          uint64              `json:"nonce"`
+	ShardID        uint32              `json:"shardID"`
+	Timestamp      uint64              `json:"timestamp"`
+	ExtraData      []byte              `json:"extraData"`
+	GasLimit       uint64              `json:"gasLimit"       gencodec:"required"`
+	Mixhash        common.Hash         `json:"mixHash"`
+	Coinbase       common.Address      `json:"coinbase"`
+	Alloc          GenesisAlloc        `json:"alloc"          gencodec:"required"`
+	ShardStateHash common.Hash         `json:"shardStateHash" gencodec:"required"`
+	ShardState     shard.State         `json:"shardState"     gencodec:"required"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
@@ -140,8 +138,8 @@ func NewGenesisSpec(netType nodeconfig.NetworkType, shardID uint32) *Genesis {
 	}
 
 	return &Genesis{
-		Config:    &chainConfig,
-		Factory:   blockfactory.NewFactory(&chainConfig),
+		Config: &chainConfig,
+		//Factory:   blockfactory.NewFactory(&chainConfig),
 		Alloc:     genesisAlloc,
 		ShardID:   shardID,
 		GasLimit:  gasLimit,
@@ -151,7 +149,7 @@ func NewGenesisSpec(netType nodeconfig.NetworkType, shardID uint32) *Genesis {
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.
-type GenesisAlloc map[common.Address]GenesisAccount
+type GenesisAlloc map[ethCommon.Address]GenesisAccount
 
 // UnmarshalJSON is to deserialize the data into GenesisAlloc.
 func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
@@ -161,7 +159,7 @@ func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
 	}
 	*ga = make(GenesisAlloc)
 	for addr, a := range m {
-		(*ga)[common.Address(addr)] = a
+		(*ga)[ethCommon.Address(addr)] = a
 	}
 	return nil
 }
@@ -264,7 +262,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		utils.Logger().Error().Err(err).Msg("failed to rlp-serialize genesis shard state")
 		os.Exit(1)
 	}
-	head := g.Factory.NewHeader(common.Big0).With().
+	head := blockfactory.NewFactory(g.Config).NewHeader(common.Big0).With().
 		Number(new(big.Int).SetUint64(g.Number)).
 		ShardID(g.ShardID).
 		Time(new(big.Int).SetUint64(g.Timestamp)).

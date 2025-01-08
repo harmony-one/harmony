@@ -60,7 +60,7 @@ type ChainContext interface {
 }
 
 // NewEVMContext creates a new context for use in the EVM.
-func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author *common.Address) vm.Context {
+func NewEVMContext(msg *types.Message, header *block.Header, chain ChainContext, author *common.Address) vm.Context {
 	// If we don't have an explicit author (i.e. not mining), extract from the header
 	var beneficiary common.Address
 	if author == nil {

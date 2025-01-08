@@ -54,6 +54,28 @@ func MakeSigner(config *params.ChainConfig, epochNumber *big.Int) Signer {
 	return signer
 }
 
+// LatestSigner returns the 'most permissive' Signer available for the given chain
+// configuration. Specifically, this enables support of all types of transactions
+// when their respective forks are scheduled to occur at any block number (or time)
+// in the chain config.
+//
+// Use this in transaction-handling code where the current block number is unknown. If you
+// have the current block number available, use MakeSigner instead.
+func LatestSigner(config *params.ChainConfig) Signer {
+	var signer Signer
+	if config.ChainID != nil {
+		switch {
+		case config.EIP155Epoch != nil:
+			signer = NewEIP155Signer(config.ChainID)
+		default:
+			signer = HomesteadSigner{}
+		}
+	} else {
+		signer = HomesteadSigner{}
+	}
+	return signer
+}
+
 // SignTx signs the transaction using the given signer and private key
 func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
 	h := s.Hash(tx)

@@ -708,7 +708,7 @@ func (hmy *Harmony) ComputeStateDB(block *types.Block, reexec uint64) (*state.DB
 // executes the given message in the provided environment. The return value will
 // be tracer dependent.
 // NOTE: Only support default StructLogger tracer
-func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.Context, statedb *state.DB, config *TraceConfig) (interface{}, error) {
+func (hmy *Harmony) TraceTx(ctx context.Context, message *types.Message, vmctx vm.Context, statedb *state.DB, config *TraceConfig) (interface{}, error) {
 	// Assemble the structured logger or the JavaScript tracer
 	var (
 		tracer vm.Tracer
@@ -778,7 +778,7 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 }
 
 // ComputeTxEnv returns the execution environment of a certain transaction.
-func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64) (core.Message, vm.Context, *state.DB, error) {
+func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64) (*types.Message, vm.Context, *state.DB, error) {
 	// Create the parent state database
 	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
@@ -821,7 +821,7 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 }
 
 // ComputeTxEnvEachBlockWithoutApply returns the execution environment of a certain transaction.
-func (hmy *Harmony) ComputeTxEnvEachBlockWithoutApply(block *types.Block, reexec uint64, cb func(int, *types.Transaction, core.Message, vm.Context, *state.DB) bool) error {
+func (hmy *Harmony) ComputeTxEnvEachBlockWithoutApply(block *types.Block, reexec uint64, cb func(int, *types.Transaction, *types.Message, vm.Context, *state.DB) bool) error {
 	// Create the parent state database
 	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {

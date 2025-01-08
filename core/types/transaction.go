@@ -74,7 +74,7 @@ type InternalTransaction interface {
 	S() *big.Int
 
 	IsEthCompatible() bool
-	AsMessage(s Signer) (Message, error)
+	AsMessage(s Signer) (*Message, error)
 }
 
 // CoreTransaction defines the core funcs of any transactions
@@ -283,8 +283,14 @@ func (tx *Transaction) Value() *big.Int {
 	return tx.data.Amount
 }
 
-// GasLimit of the transcation
+// GasLimit of the transaction
+// Deprecated: use Gas instead
 func (tx *Transaction) GasLimit() uint64 {
+	return tx.data.GasLimit
+}
+
+// Gas is the gas limit of the transaction. Method introduced to satisfy ethereum.
+func (tx *Transaction) Gas() uint64 {
 	return tx.data.GasLimit
 }
 
@@ -468,8 +474,8 @@ func (tx *Transaction) ConvertToEth() *EthTransaction {
 // AsMessage requires a signer to derive the sender.
 //
 // XXX Rename message to something less arbitrary?
-func (tx *Transaction) AsMessage(s Signer) (Message, error) {
-	msg := Message{
+func (tx *Transaction) AsMessage(s Signer) (*Message, error) {
+	msg := &Message{
 		nonce:      tx.data.AccountNonce,
 		gasLimit:   tx.data.GasLimit,
 		gasPrice:   new(big.Int).Set(tx.data.Price),
@@ -680,13 +686,14 @@ type Message struct {
 	gasPrice   *big.Int
 	data       []byte
 	checkNonce bool
+	checkEOA   bool
 	blockNum   *big.Int
 	txType     TransactionType
 }
 
 // NewMessage returns new message.
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) Message {
-	return Message{
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) *Message {
+	return &Message{
 		from:       from,
 		to:         to,
 		nonce:      nonce,
@@ -700,8 +707,8 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 
 // NewStakingMessage returns new message of staking type
 // always need checkNonce
-func NewStakingMessage(from common.Address, nonce uint64, gasLimit uint64, gasPrice *big.Int, data []byte, blockNum *big.Int) Message {
-	return Message{
+func NewStakingMessage(from common.Address, nonce uint64, gasLimit uint64, gasPrice *big.Int, data []byte, blockNum *big.Int) *Message {
+	return &Message{
 		from:       from,
 		nonce:      nonce,
 		gasLimit:   gasLimit,
@@ -750,6 +757,11 @@ func (m Message) Data() []byte {
 // CheckNonce returns checkNonce of Message.
 func (m Message) CheckNonce() bool {
 	return m.checkNonce
+}
+
+// CheckEOA returns false, the message sender is not checked to be an EOA.
+func (m Message) CheckEOA() bool {
+	return m.checkEOA
 }
 
 // Type returns the type of message

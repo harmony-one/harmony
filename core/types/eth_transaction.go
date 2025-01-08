@@ -90,11 +90,11 @@ type ethTxdataMarshaling struct {
 	S            *hexutil.Big
 }
 
-// NewEthTransaction returns new ethereum-compatible transaction, which works as a intra-shard transaction
-func NewEthTransaction(nonce uint64, to common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *EthTransaction {
-	return newEthTransaction(nonce, &to, amount, gasLimit, gasPrice, data)
-}
-
+//// NewEthTransaction returns new ethereum-compatible transaction, which works as a intra-shard transaction
+//func NewEthTransaction(nonce uint64, to common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *EthTransaction {
+//	return newEthTransaction(nonce, &to, amount, gasLimit, gasPrice, data)
+//}
+/*
 func newEthTransaction(nonce uint64, to *common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *EthTransaction {
 	if len(data) > 0 {
 		data = common.CopyBytes(data)
@@ -119,7 +119,7 @@ func newEthTransaction(nonce uint64, to *common.Address, amount *big.Int, gasLim
 
 	return &EthTransaction{data: d, time: time.Now()}
 }
-
+*/
 // From returns the sender address of the transaction
 func (tx *EthTransaction) From() *atomic.Value {
 	return &tx.from
@@ -356,8 +356,8 @@ func (tx *EthTransaction) IsEthCompatible() bool {
 // AsMessage requires a signer to derive the sender.
 //
 // XXX Rename message to something less arbitrary?
-func (tx *EthTransaction) AsMessage(s Signer) (Message, error) {
-	msg := Message{
+func (tx *EthTransaction) AsMessage(s Signer) (*Message, error) {
+	msg := &Message{
 		nonce:      tx.data.AccountNonce,
 		gasLimit:   tx.data.GasLimit,
 		gasPrice:   new(big.Int).Set(tx.data.Price),
