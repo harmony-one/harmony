@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/pkg/errors"
 )
 
 // streamSet is the concurrency safe stream set.
@@ -93,6 +94,20 @@ func (ss *streamSet) getStreams() []sttypes.Stream {
 		res = append(res, st)
 	}
 	return res
+}
+
+func (ss *streamSet) popStream() (sttypes.Stream, error) {
+	ss.lock.RLock()
+	defer ss.lock.RUnlock()
+
+	if len(ss.streams) == 0 {
+		return nil, errors.New("no available stream")
+	}
+	for id, stream := range ss.streams {
+		delete(ss.streams, id)
+		return stream, nil
+	}
+	return nil, errors.New("pop stream failed")
 }
 
 func (ss *streamSet) numStreamsWithMinProtoSpec(minSpec sttypes.ProtoSpec) int {
