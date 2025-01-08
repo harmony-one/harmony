@@ -271,15 +271,13 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	if _, ok := sm.streams.get(id); ok {
 		return ErrStreamAlreadyExist
 	}
-	if _, ok := sm.reservedStreams.get(id); ok {
-		return ErrStreamAlreadyExist
-	}
+
+	// If the stream list has sufficient capacity, the stream can be added to the reserved list
 	if sm.streams.size() >= sm.config.HiCap {
 		if sm.reservedStreams.size() < MaxReservedStreams {
-			if _, ok := sm.reservedStreams.get(id); ok {
-				return nil
+			if _, ok := sm.reservedStreams.get(id); !ok {
+				sm.reservedStreams.addStream(st)
 			}
-			sm.reservedStreams.addStream(st)
 			return nil
 		}
 		return ErrTooManyStreams
