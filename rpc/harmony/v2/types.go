@@ -236,6 +236,7 @@ type StakingTxReceipt struct {
 	Type              staking.Directive `json:"type"`
 	Root              hexutil.Bytes     `json:"root"`
 	Status            uint              `json:"status"`
+	EffectiveGasPrice hexutil.Big       `json:"effectiveGasPrice"`
 }
 
 // CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
@@ -439,6 +440,7 @@ func NewStakingTxReceipt(
 		Type:              tx.StakingType(),
 		Root:              receipt.PostState,
 		Status:            uint(receipt.Status),
+		EffectiveGasPrice: hexutil.Big(*receipt.EffectiveGasPrice),
 	}
 
 	// Set empty array for empty logs

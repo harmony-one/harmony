@@ -416,6 +416,7 @@ func ApplyStakingTransaction(
 	receipt = types.NewReceipt(root, false, *usedGas)
 	receipt.TxHash = tx.Hash()
 	receipt.GasUsed = gas
+	receipt.EffectiveGasPrice = tx.EffectiveGasPrice(big.NewInt(0), nil)
 
 	if config.IsReceiptLog(header.Epoch()) {
 		receipt.Logs = statedb.GetLogs(tx.Hash(), header.Number().Uint64(), header.Hash())
