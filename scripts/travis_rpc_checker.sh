@@ -29,15 +29,15 @@ if [[ -z "$MAIN_REPO_BRANCH" ]]; then
     fi
 fi
 
-echo "[harmony-test repo] - working on '${TEST_REPO_BRANCH}' branch"
+echo "[harmony-test repo] - working on '${TRAVIS_PULL_REQUEST_BRANCH}' branch"
 echo "[harmony repo] - working on '${MAIN_REPO_BRANCH}' branch"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 echo "Working dir is ${DIR}"
 echo "GOPATH is ${GOPATH}"
 cd "${GOPATH}/src/github.com/harmony-one/harmony-test"
 # cover possible force pushes to remote branches - just rebase local on top of origin
-git fetch origin "${TEST_REPO_BRANCH}"
-git checkout "${TEST_REPO_BRANCH}"
+git fetch origin "${TRAVIS_PULL_REQUEST_BRANCH}"
+git checkout "${TRAVIS_PULL_REQUEST_BRANCH}"
 git pull --rebase=true
 cd localnet
 docker build --build-arg MAIN_REPO_BRANCH="${MAIN_REPO_BRANCH}" --progress plain \
