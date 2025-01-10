@@ -299,6 +299,15 @@ func (pbs *prioritizedNumbers) length() int {
 	return len(*pbs.q)
 }
 
+func (pbs *prioritizedNumbers) contains(bn uint64) bool {
+	for _, item := range *pbs.q {
+		if item.getBlockNumber() == bn {
+			return true
+		}
+	}
+	return false
+}
+
 type (
 	blockByNumber types.Block
 
