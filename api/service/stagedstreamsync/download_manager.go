@@ -148,6 +148,9 @@ func (dm *downloadManager) SetRootHash(blockNumber uint64, root common.Hash) {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
+	if _, exist := dm.details[blockNumber]; !exist {
+		return
+	}
 	dm.details[blockNumber].hash = root
 }
 
@@ -155,6 +158,10 @@ func (dm *downloadManager) SetRootHash(blockNumber uint64, root common.Hash) {
 func (dm *downloadManager) GetRootHash(blockNumber uint64) common.Hash {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
+
+	if _, exist := dm.details[blockNumber]; !exist {
+		return common.Hash{}
+	}
 
 	return dm.details[blockNumber].hash
 }
