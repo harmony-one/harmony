@@ -89,7 +89,7 @@ type Message interface {
 	Value() *big.Int
 
 	Nonce() uint64
-	CheckNonce() bool
+	SkipNonceChecks() bool
 	Data() []byte
 	Type() types.TransactionType
 	BlockNum() *big.Int
@@ -195,7 +195,7 @@ func (st *StateTransition) buyGas() error {
 
 func (st *StateTransition) preCheck() error {
 	// Make sure this transaction's nonce is correct.
-	if st.msg.CheckNonce() {
+	if !st.msg.SkipNonceChecks() {
 		nonce := st.state.GetNonce(st.msg.From())
 
 		if nonce < st.msg.Nonce() {
