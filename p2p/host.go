@@ -165,12 +165,6 @@ func NewHost(cfg HostConfig) (Host, error) {
 		return nil, fmt.Errorf("failed to open connection manager: %w", err)
 	}
 
-	rmgr, err := makeResourceMgr(cfg.ResourceMgrEnabled, cfg.ResourceMgrMemoryLimitBytes, cfg.ResourceMgrFileDescriptorsLimit, cfg.ConnManagerHighWatermark)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to open resource manager: %w", err)
-	}
-
 	// relay
 	var relay libp2p_config.Option
 	if cfg.NoRelay {
@@ -205,8 +199,6 @@ func NewHost(cfg HostConfig) (Host, error) {
 		*/
 		// Connection manager
 		connMngr,
-		// resource manager
-		libp2p.ResourceManager(rmgr),
 		// NAT manager
 		libp2p.NATManager(nat),
 		// Band width Reporter
@@ -219,6 +211,15 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.EnableNATService(),
 		// NAT Rate Limiter
 		libp2p.AutoNATServiceRateLimit(10, 5, time.Second*60),
+	}
+
+	if cfg.ResourceMgrEnabled {
+		rmgr, err := makeResourceMgr(cfg.ResourceMgrEnabled, cfg.ResourceMgrMemoryLimitBytes, cfg.ResourceMgrFileDescriptorsLimit, cfg.ConnManagerHighWatermark)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to open resource manager: %w", err)
+		}
+		p2pHostConfig = append(p2pHostConfig, libp2p.ResourceManager(rmgr))
 	}
 
 	// Set host security
