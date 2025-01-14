@@ -6,12 +6,13 @@ services:
       - 3100:3100
     volumes:
       - ./loki-config.yml:/etc/loki/loki-config.yaml
+      - loki_data:/loki
   promtail:
     container_name: promtail
     image: grafana/promtail:latest
     volumes:
-      - ./promtail-config.yml:/etc/promtail/promtail-config.yaml
-      - ${CURRENT_SESSION_LOGS}:/var/log/
+      - ./promtail-config.yml:/etc/promtail/config.yml
+      - ${LOG_FOLDER}:/var/log/
   grafana:
     container_name: grafana
     image: grafana/grafana
@@ -23,3 +24,11 @@ services:
       - 3000:3000
     volumes:
       - ./loki-datasource.yaml:/etc/grafana/provisioning/datasources/loki-datasource.yaml
+
+volumes:
+  loki_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOKI_FOLDER}
