@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-TEST_REPO_BRANCH=${TEST_REPO_BRANCH:-master}
 # handle for the Travis build run:
 # * uses TRAVIS_PULL_REQUEST_SLUG if PR is done from fork
 # * uses TRAVIS_PULL_REQUEST_BRANCH for RP branch
@@ -29,12 +28,18 @@ if [[ -z "$MAIN_REPO_BRANCH" ]]; then
     fi
 fi
 
-echo "[harmony-test repo] - working on '${TEST_REPO_BRANCH}' branch"
 echo "[harmony repo] - working on '${MAIN_REPO_BRANCH}' branch"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 echo "Working dir is ${DIR}"
 echo "GOPATH is ${GOPATH}"
 cd "${GOPATH}/src/github.com/harmony-one/harmony-test"
+# fallback to master if branch is not on remote
+# Current solution expects that your harmony-test repo branch with the same name exists
+# or it will use master by default
+TEST_REPO_BRANCH=${MAIN_REPO_BRANCH}
+TEST_REPO_BRANCH=$(git ls-remote --exit-code --heads origin "${TEST_REPO_BRANCH}" >/dev/null 2>&1 \
+    && echo "${TEST_REPO_BRANCH}" || echo "master")
+echo "[harmony-test repo] - working on '${TEST_REPO_BRANCH}' branch"
 # cover possible force pushes to remote branches - just rebase local on top of origin
 git fetch origin "${TEST_REPO_BRANCH}"
 git checkout "${TEST_REPO_BRANCH}"
