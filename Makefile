@@ -235,9 +235,6 @@ travis_rpc_checker:
 travis_rosetta_checker:
 	bash ./scripts/travis_rosetta_checker.sh
 
-debug_external:
-	bash test/debug-external.sh
-
 build_localnet_validator:
 	bash test/build-localnet-validator.sh
 
