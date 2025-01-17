@@ -28,6 +28,7 @@ type HarmonyConfig struct {
 	Pprof      PprofConfig
 	Log        LogConfig
 	Sync       SyncConfig
+	Localnet   LocalnetConfig
 	Sys        *SysConfig        `toml:",omitempty"`
 	Consensus  *ConsensusConfig  `toml:",omitempty"`
 	Devnet     *DevnetConfig     `toml:",omitempty"`
@@ -108,8 +109,9 @@ type DnsSync struct {
 }
 
 type NetworkConfig struct {
-	NetworkType string
-	BootNodes   []string
+	NetworkType  string
+	BootNodes    []string
+	TrustedNodes []string
 }
 
 type P2pConfig struct {
@@ -126,6 +128,11 @@ type P2pConfig struct {
 	// using Connection Manager will be an optional feature.
 	ConnManagerLowWatermark  int
 	ConnManagerHighWatermark int
+	// P2P Resource Manager configs
+	ResourceMgrEnabled              bool
+	ResourceMgrMemoryLimitBytes     uint64
+	ResourceMgrFileDescriptorsLimit uint64
+	// Node waits for each peer to connect before gets connect to next peer
 	WaitForEachPeerToConnect bool
 	// to disable p2p security (tls and noise)
 	NoTransportSecurity bool
@@ -196,6 +203,11 @@ type GasPriceOracleConfig struct {
 type ConsensusConfig struct {
 	MinPeers     int
 	AggregateSig bool
+}
+
+type LocalnetConfig struct {
+	BlocksPerEpoch   uint64
+	BlocksPerEpochV2 uint64
 }
 
 type BlsConfig struct {

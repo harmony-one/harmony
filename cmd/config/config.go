@@ -102,11 +102,20 @@ func GetDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 	return dnsSync
 }
 
+func GetDefaultLocalnetConfig() harmonyconfig.LocalnetConfig {
+	localnetConfig := harmonyconfig.LocalnetConfig{
+		BlocksPerEpoch:   nodeconfig.GetDefaultLocalnetBlocksPerEpoch(),
+		BlocksPerEpochV2: nodeconfig.GetDefaultLocalnetBlocksPerEpochV2(),
+	}
+	return localnetConfig
+}
+
 func GetDefaultNetworkConfig(nt nodeconfig.NetworkType) harmonyconfig.NetworkConfig {
 	bn := nodeconfig.GetDefaultBootNodes(nt)
 	return harmonyconfig.NetworkConfig{
-		NetworkType: string(nt),
-		BootNodes:   bn,
+		NetworkType:  string(nt),
+		BootNodes:    bn,
+		TrustedNodes: []string{},
 	}
 }
 
@@ -311,6 +320,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applyLegacyMiscFlags(cmd, config)
 	applyGeneralFlags(cmd, config)
 	applyNetworkFlags(cmd, config)
+	applyLocalnetFlags(cmd, config)
 	applyDNSSyncFlags(cmd, config)
 	applyP2PFlags(cmd, config)
 	applyHTTPFlags(cmd, config)

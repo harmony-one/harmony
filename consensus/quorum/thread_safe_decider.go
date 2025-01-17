@@ -56,6 +56,12 @@ func (a threadSafeDeciderImpl) NthNextValidator(slotList shard.SlotList, pubKey 
 	return a.decider.NthNextValidator(slotList, pubKey, next)
 }
 
+func (a threadSafeDeciderImpl) NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.decider.NthNextValidator(slotList, pubKey, next)
+}
+
 func (a threadSafeDeciderImpl) NthNextHmy(instance shardingconfig.Instance, pubkey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -96,6 +102,12 @@ func (a threadSafeDeciderImpl) ReadBallot(p Phase, pubkey bls.SerializedPublicKe
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.decider.ReadBallot(p, pubkey)
+}
+
+func (a threadSafeDeciderImpl) GetBallotsCount(p Phase, pubkeys []bls.SerializedPublicKey) int64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.decider.GetBallotsCount(p, pubkeys)
 }
 
 func (a threadSafeDeciderImpl) TwoThirdsSignersCount() int64 {

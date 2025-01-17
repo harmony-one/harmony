@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/rs/zerolog"
 )
@@ -54,7 +53,7 @@ func NewStageStatesCfg(
 // Exec progresses States stage in the forward direction
 func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 	// only execute this stage in full sync mode
-	if s.state.status.cycleSyncMode != FullSync {
+	if !s.state.status.IsFullSyncCycle() {
 		return nil
 	}
 
@@ -64,17 +63,17 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	}
 
 	// shouldn't execute for epoch chain
-	if stg.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+	if s.state.isEpochChain {
 		return nil
 	}
 
-	maxHeight := s.state.status.targetBN
+	maxHeight := s.state.status.GetTargetBN()
 	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
 	currProgress := currentHead
-	targetHeight := s.state.currentCycle.TargetHeight
+	targetHeight := s.state.currentCycle.GetTargetHeight()
 	if currProgress >= targetHeight {
 		return nil
 	}

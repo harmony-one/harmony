@@ -138,7 +138,21 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	return nil
 }
 
-func (consensus *Consensus) finalCommit(isLeader bool) {
+func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64, isLeader bool) {
+	consensus.getLogger().Info().Str("waitTime", waitTime.String()).
+		Msg("[OnCommit] Starting Grace Period")
+	time.Sleep(waitTime)
+	utils.Logger().Info().Msg("[OnCommit] Commit Grace Period Ended")
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.transitions.finalCommit = false
+	if viewID == consensus.getCurBlockViewID() {
+		consensus._finalCommit(isLeader)
+	}
+}
+
+func (consensus *Consensus) _finalCommit(isLeader bool) {
 	numCommits := consensus.decider.SignersCount(quorum.Commit)
 
 	consensus.getLogger().Info().
@@ -181,7 +195,8 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 
 	if err := consensus.Blockchain().WriteCommitSig(block.NumberU64(), commitSigAndBitmap); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writting commit sig")
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed writing commit sig")
+		return
 	}
 
 	// Send committed message before block insertion.
@@ -189,13 +204,12 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
+	groupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))
 	if !isLeader || block.IsLastBlockInEpoch() {
 		// send immediately
 		if err := consensus.msgSender.SendWithRetry(
 			block.NumberU64(),
-			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{groupID},
 			p2p.ConstructMessage(msgToSend)); err != nil {
 			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send committed message")
 		} else {
@@ -210,9 +224,7 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 		// delayed send
 		consensus.msgSender.DelayedSendWithRetry(
 			block.NumberU64(),
-			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{groupID},
 			p2p.ConstructMessage(msgToSend))
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
@@ -225,9 +237,10 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 	err = consensus.commitBlock(block, FBFTMsg)
 
 	if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
-		consensus.getLogger().Err(err).
+		consensus.getLogger().Error().Err(err).
 			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
 			Msg("[finalCommit] Leader failed to commit the confirmed block")
+		return
 	}
 
 	if consensus.ShardID == 0 && isLeader && block.IsLastBlockInEpoch() {
@@ -237,7 +250,7 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 		}
 		encodedBlock, err := rlp.EncodeToBytes(blockWithSig)
 		if err != nil {
-			consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
+			consensus.getLogger().Error().Msg("[finalCommit] Failed encoding block for epoch end")
 			return
 		}
 		err = consensus.host.SendMessageToGroups(
@@ -279,7 +292,7 @@ func (consensus *Consensus) finalCommit(isLeader bool) {
 			// No pipelining
 			go func() {
 				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-				consensus.ReadySignal(NewProposal(SyncProposal))
+				consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", "I am leader and it's the last block in epoch")
 			}()
 		} else {
 			// pipelining
@@ -355,18 +368,18 @@ func (consensus *Consensus) StartChannel() {
 		consensus.start = true
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(NewProposal(SyncProposal))
+		consensus.ReadySignal(NewProposal(SyncProposal, consensus.Blockchain().CurrentHeader().NumberU64()+1), "StartChannel", "consensus channel is started")
 		return
 	}
 	consensus.mutex.Unlock()
 }
 
-func (consensus *Consensus) syncReadyChan() {
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
+func (consensus *Consensus) syncReadyChan(reason string) {
+	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] syncReadyChan %s", reason)
 	if consensus.getBlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
 		consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
 		consensus.setViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
-		mode := consensus.updateConsensusInformation()
+		mode := consensus.updateConsensusInformation(reason)
 		consensus.current.SetMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -375,7 +388,7 @@ func (consensus *Consensus) syncReadyChan() {
 	} else if consensus.mode() == Syncing {
 		// Corner case where sync is triggered before `onCommitted` and there is a race
 		// for block insertion between consensus and downloader.
-		mode := consensus.updateConsensusInformation()
+		mode := consensus.updateConsensusInformation(reason)
 		consensus.setMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -607,10 +620,21 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		// Send signal to Node to propose the new block for consensus
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
 		consensus.mutex.Unlock()
-		consensus.ReadySignal(NewProposal(AsyncProposal))
+		if !consensus.isRotation(blk.Epoch()) {
+			consensus.ReadySignal(NewProposal(AsyncProposal, blk.NumberU64()+1), "preCommitAndPropose, before rotation", "proposing new block which will wait on the full commit signatures to finish")
+		} else {
+			next := consensus.rotateLeader(blk.Epoch(), consensus.getLeaderPubKey())
+			if consensus.isMyKey(next) {
+				consensus.ReadySignal(NewProposal(AsyncProposal, blk.NumberU64()+1), "preCommitAndPropose rotation", "proposing new block which will wait on the full commit signatures to finish")
+			}
+		}
 	}()
 
 	return nil
+}
+
+func (consensus *Consensus) isRotation(epoch *big.Int) bool {
+	return consensus.Blockchain().Config().IsLeaderRotationInternalValidators(epoch)
 }
 
 func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types.Block) error {
@@ -713,7 +737,11 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 		return defaultKey
 	}
 	const blocksCountAliveness = 4
-	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v", epoch.Uint64(), bc.Config().IsLeaderRotationInternalValidators(epoch), bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch))
+	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v rotation v2: %v",
+		epoch.Uint64(),
+		bc.Config().IsLeaderRotationInternalValidators(epoch),
+		bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch),
+		bc.Config().IsLeaderRotationV2Epoch(epoch))
 	ss, err := bc.ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
@@ -759,7 +787,9 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 	)
 
 	for i := 0; i < len(committee.Slots); i++ {
-		if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
+		if bc.Config().IsLeaderRotationV2Epoch(epoch) {
+			wasFound, next = consensus.decider.NthNextValidatorV2(committee.Slots, leader, offset)
+		} else if bc.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
 			wasFound, next = consensus.decider.NthNextValidator(committee.Slots, leader, offset)
 		} else {
 			wasFound, next = consensus.decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, offset)
@@ -824,16 +854,37 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 			prev := consensus.getLeaderPubKey()
 			consensus.setLeaderPubKey(next)
 			if consensus.isLeader() {
-				utils.Logger().Info().Msgf("We are block %d, I am the new leader %s", blk.NumberU64(), next.Bytes.Hex())
+				utils.Logger().Info().
+					Uint64("CurrentHeight", blk.NumberU64()).
+					Uint64("ConsensusBlockNumber", blk.NumberU64()+1).
+					Int64("Epoch", epoch.Int64()).
+					Str("AssignedLeader", next.Bytes.Hex()).
+					Msg("Consensus Setup: I am the new leader for the next block")
 			} else {
-				utils.Logger().Info().Msgf("We are block %d, the leader is %s", blk.NumberU64(), next.Bytes.Hex())
+				utils.Logger().Info().
+					Uint64("CurrentHeight", blk.NumberU64()).
+					Uint64("ConsensusBlockNumber", blk.NumberU64()+1).
+					Int64("Epoch", epoch.Int64()).
+					Str("AssignedLeader", next.Bytes.Hex()).
+					Msg("Consensus Setup: New leader assigned for the next block")
 			}
-			if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
+			// Check if the leader has changed (even if it still belongs to the same node)
+			newLeader := !consensus.getLeaderPubKey().Object.IsEqual(prev.Object)
+			// Check if the previous leader key belongs to the current node (multi-BLS key scenario)
+			wasLeader := consensus.isMyKey(prev)
+			utils.Logger().Debug().
+				Str("PreviousLeaderKey", prev.Bytes.Hex()).
+				Str("NewLeader", consensus.getLeaderPubKey().Bytes.Hex()).
+				Bool("NodeWasPreviousLeader", wasLeader).
+				Bool("LeaderChanged", newLeader).
+				Msg("Leader change evaluation")
+
+			if consensus.isLeader() && newLeader && !wasLeader {
 				// leader changed
 				blockPeriod := consensus.BlockPeriod
 				go func() {
 					<-time.After(blockPeriod)
-					consensus.ReadySignal(NewProposal(SyncProposal))
+					consensus.ReadySignal(NewProposal(SyncProposal, blk.NumberU64()+1), "setupForNewConsensus", "I am the new leader")
 				}()
 			}
 		}
@@ -841,7 +892,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if blk.IsLastBlockInEpoch() {
-		consensus.setMode(consensus.updateConsensusInformation())
+		consensus.setMode(consensus.updateConsensusInformation("setupForNewConsensus"))
 	}
 	consensus.fBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.resetState()

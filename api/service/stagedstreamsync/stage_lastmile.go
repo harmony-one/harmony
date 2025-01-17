@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
 
@@ -41,7 +40,11 @@ func (lm *StageLastMile) Exec(ctx context.Context, firstCycle bool, invalidBlock
 	}
 
 	// shouldn't execute for epoch chain
-	if lm.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+	if s.state.isEpochChain {
+		return nil
+	}
+
+	if s.state.consensus == nil {
 		return nil
 	}
 

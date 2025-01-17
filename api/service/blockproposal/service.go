@@ -10,14 +10,14 @@ import (
 type Service struct {
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
-	c           *consensus.Consensus
+	c           *consensus.Proposer
 	messageChan chan *msg_pb.Message
 }
 
 // New returns a block proposal service.
-func New(c *consensus.Consensus) *Service {
+func New(proposer *consensus.Proposer) *Service {
 	return &Service{
-		c:           c,
+		c:           proposer,
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
 	}

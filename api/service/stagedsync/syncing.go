@@ -272,7 +272,7 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, isBeacon bool, consensus *cons
 		}
 		// TODO: move this to explorer handler code.
 		if s.isExplorer {
-			consensus.UpdateConsensusInformation()
+			consensus.UpdateConsensusInformation("stage sync is explorer")
 		}
 	}
 	s.purgeAllBlocksFromCache()

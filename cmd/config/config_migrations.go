@@ -439,6 +439,47 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.6.2"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("Network.TrustedNodes") == nil {
+			confTree.Set("Network.TrustedNodes", defaultConfig.Network.TrustedNodes)
+		}
+		// upgrade minor version because of `Cache` network introduction
+		confTree.Set("Version", "2.6.3")
+		return confTree
+	}
+
+	migrations["2.6.3"] = func(confTree *toml.Tree) *toml.Tree {
+		defLocalnetConfig := GetDefaultLocalnetConfig()
+
+		if confTree.Get("Localnet") == nil {
+			confTree.Set("Localnet", defLocalnetConfig)
+		}
+
+		if confTree.Get("Localnet.LocalnetBlocksPerEpoch") == nil {
+			confTree.Set("Localnet.LocalnetBlocksPerEpoch", defaultConfig.Localnet.BlocksPerEpoch)
+		}
+		if confTree.Get("Localnet.LocalnetBlocksPerEpochV2") == nil {
+			confTree.Set("Localnet.LocalnetBlocksPerEpochV2", defaultConfig.Localnet.BlocksPerEpochV2)
+		}
+		// upgrade minor version because of `Cache` network introduction
+		confTree.Set("Version", "2.6.4")
+		return confTree
+	}
+
+	migrations["2.6.4"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.ResourceMgrEnabled") == nil {
+			confTree.Set("P2P.ResourceMgrEnabled", defaultConfig.P2P.ResourceMgrEnabled)
+		}
+		if confTree.Get("P2P.ResourceMgrMemoryLimitBytes") == nil {
+			confTree.Set("P2P.ResourceMgrMemoryLimitBytes", defaultConfig.P2P.ResourceMgrMemoryLimitBytes)
+		}
+		if confTree.Get("Sync.ResourceMgrFileDescriptorsLimit") == nil {
+			confTree.Set("Sync.ResourceMgrFileDescriptorsLimit", defaultConfig.P2P.ResourceMgrFileDescriptorsLimit)
+		}
+		confTree.Set("Version", "2.6.5")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {

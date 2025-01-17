@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 )
@@ -26,7 +25,7 @@ type StageBodiesCfg struct {
 	blockDBs             []kv.RwDB
 	concurrency          int
 	protocol             syncProtocol
-	isBeacon             bool
+	isBeaconShard        bool
 	extractReceiptHashes bool
 	logProgress          bool
 }
@@ -37,14 +36,14 @@ func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
 	}
 }
 
-func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeacon bool, extractReceiptHashes bool, logProgress bool) StageBodiesCfg {
+func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, extractReceiptHashes bool, logProgress bool) StageBodiesCfg {
 	return StageBodiesCfg{
 		bc:                   bc,
 		db:                   db,
 		blockDBs:             blockDBs,
 		concurrency:          concurrency,
 		protocol:             protocol,
-		isBeacon:             isBeacon,
+		isBeaconShard:        isBeaconShard,
 		extractReceiptHashes: extractReceiptHashes,
 		logProgress:          logProgress,
 	}
@@ -65,17 +64,17 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	}
 
 	// shouldn't execute for epoch chain
-	if b.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+	if s.state.isEpochChain {
 		return nil
 	}
 
-	maxHeight := s.state.status.targetBN
+	maxHeight := s.state.status.GetTargetBN()
 	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
 	currProgress := uint64(0)
-	targetHeight := s.state.currentCycle.TargetHeight
+	targetHeight := s.state.currentCycle.GetTargetHeight()
 
 	if useInternalTx {
 		var err error
@@ -160,7 +159,7 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 
 		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) {
+			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
 			}
 			utils.Logger().Error().
@@ -248,7 +247,7 @@ badBlockDownloadLoop:
 		}
 		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) {
+			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				b.configs.protocol.StreamFailed(stid, "tried to re-download bad block from this stream, but downloadRawBlocks failed")
 			}
 			continue

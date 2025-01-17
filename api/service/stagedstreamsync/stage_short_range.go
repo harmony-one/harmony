@@ -6,7 +6,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 )
@@ -45,7 +44,7 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 	}
 
 	// shouldn't execute for epoch chain
-	if sr.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+	if s.state.isEpochChain {
 		return nil
 	}
 
@@ -57,7 +56,7 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 		return err
 	}
 	if n > 0 {
-		utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("short range blocks inserted successfully")
+		utils.Logger().Info().Int("blocks inserted", n).Msg("short range blocks inserted successfully")
 	}
 
 	useInternalTx := tx == nil
@@ -125,7 +124,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 		Interface("hashChain", hashChain).
 		Msg("short range start syncing")
 
-	s.state.status.setTargetBN(expEndBN)
+	s.state.status.SetTargetBN(expEndBN)
 
 	blocks, stids, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
