@@ -170,17 +170,17 @@ func DoEVMCall(
 			Msg("Executing EVM call finished")
 	}(time.Now())
 
-	// Fetch state
+	// fetch state
 	state, header, err := hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
 		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err
 	}
 
-	// Create new call message
+	// create new call message
 	msg := args.ToMessage(hmy.RPCGasCap)
 
-	// Get a new instance of the EVM.
+	// get a new instance of the EVM.
 	evm, err := hmy.GetEVM(ctx, msg, state, header)
 	if err != nil {
 		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
@@ -192,7 +192,7 @@ func DoEVMCall(
 		blockOverrides.Apply(&evm.Context)
 	}
 
-	//  apply state overrides
+	// apply state overrides
 	if err := overrides.Apply(*state); err != nil {
 		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err
@@ -237,15 +237,12 @@ func DoEVMCall(
 	return result, nil
 }
 
-// TODO: MovePrecompileTo
-// https://github.com/ethereum/go-ethereum/blob/df182a742cec68adcc034d4747afa5182fc75ca3/internal/ethapi/api.go#L637
-
-// OverrideAccount indicates the overriding fields of account during the execution
+// OverrideAccount specifies the fields of an account to override during the execution
 // of a message call.
-// Note, state and stateDiff can't be specified at the same time. If state is
-// set, message execution will only use the data in the given state. Otherwise
-// if statDiff is set, all diff will be applied first and then execute the call
-// message.
+// The fields `state` and `stateDiff` cannot be specified simultaneously. If `state` is set,
+// the message execution will use only the data provided in the given state. Conversely,
+// if `stateDiff` is set, all the diffs will be applied first, and then the message call
+// will be executed.
 type OverrideAccount struct {
 	Nonce     *hexutil.Uint64              `json:"nonce"`
 	Code      *hexutil.Bytes               `json:"code"`
@@ -312,6 +309,7 @@ type BlockOverrides struct {
 }
 
 // apply overrides the given header fields into the given block context
+// difficulty & random not part of vm.Context
 func (b *BlockOverrides) Apply(blockCtx *vm.Context) {
 	if b == nil {
 		return
@@ -329,7 +327,4 @@ func (b *BlockOverrides) Apply(blockCtx *vm.Context) {
 	if b.FeeRecipient != nil {
 		blockCtx.Coinbase = *b.FeeRecipient
 	}
-
-	// difficulty & random not part of vm.Context
-
 }
