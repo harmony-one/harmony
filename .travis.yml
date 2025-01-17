@@ -23,11 +23,9 @@ install:
   # default working directory with source code is automatically set to
   #   /home/travis/gopath/src/github.com/harmony-one/harmony
   # https://docs.travis-ci.com/user/languages/go/#go-import-path
-  - echo $TRAVIS_PULL_REQUEST_BRANCH
-  - TEST_REPO_BRANCH="feature/effective-gas-price"
   - git clone https://github.com/harmony-one/mcl.git $GOPATH/src/github.com/harmony-one/mcl
   - git clone https://github.com/harmony-one/bls.git $GOPATH/src/github.com/harmony-one/bls
-  - git clone --branch $TEST_REPO_BRANCH https://github.com/harmony-one/harmony-test.git $GOPATH/src/github.com/harmony-one/harmony-test
+  - git clone https://github.com/harmony-one/harmony-test.git $GOPATH/src/github.com/harmony-one/harmony-test
   - (cd $GOPATH/src/github.com/harmony-one/mcl; make -j4)
   - (cd $GOPATH/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
 #  - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.41.1
