@@ -91,7 +91,8 @@ var (
 )
 
 func printVersion(me string) {
-	fmt.Fprintf(os.Stderr, "Harmony (C) 2024. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
+	currentYear := time.Now().Year()
+	fmt.Fprintf(os.Stderr, "Harmony (C) %d. %v, version %v-%v (%v %v)\n", currentYear, path.Base(me), version, commit, builtBy, builtAt)
 }
 
 func main() {

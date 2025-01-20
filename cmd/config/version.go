@@ -3,13 +3,10 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/spf13/cobra"
-)
-
-const (
-	versionFormat = "Harmony (C) 2023. %v, version %v-%v (%v %v)"
 )
 
 var VersionMetaData []interface{}
@@ -36,6 +33,8 @@ func VersionFlag() cli.BoolFlag {
 }
 
 func GetHarmonyVersion() string {
+	currentYear := time.Now().Year()
+	versionFormat := fmt.Sprintf("Harmony (C) %d. %%v, version %%v-%%v (%%v %%v)", currentYear)
 	return fmt.Sprintf(versionFormat, VersionMetaData[:5]...) // "harmony", version, commit, builtBy, builtAt
 }
 
