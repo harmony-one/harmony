@@ -33,6 +33,7 @@ const (
 	pangaeaDNSZone   = "os.hmny.io"
 	partnerDNSZone   = "ps.hmny.io"
 	stressnetDNSZone = "stn.hmny.io"
+	localnetDNSZone  = "127.0.0.1"
 )
 
 const (
@@ -169,13 +170,22 @@ func GetDefaultDNSZone(networkType NetworkType) string {
 		return partnerDNSZone
 	case Stressnet:
 		return stressnetDNSZone
+	case Localnet:
+		return localnetDNSZone
 	}
 	return ""
 }
 
 // GetDefaultDNSPort get the default DNS port for the given network type
-func GetDefaultDNSPort(NetworkType) int {
-	return DefaultDNSPort
+func GetDefaultDNSPort(n NetworkType) int {
+	switch n {
+	case Localnet:
+		// port could be found in ./tmp_log/log-.../bootnode.log
+		// looks like `bootnode BN_MA=/ip4/127.0.0.1/tcp/19876/p2p/Qmc1V6W7BwX8Ugb42Ti8RnXF1rY5PF7nnZ6bKBryCgi6cv`
+		return 19876
+	default:
+		return DefaultDNSPort
+	}
 }
 
 // GetRPCHTTPPortFromBase return the rpc HTTP port from base port

@@ -759,11 +759,8 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	}
 
 	// Syncing provider is provided by following rules:
-	//   1. If starting with a localnet or offline, use local sync peers.
-	//   2. If specified with --dns=false, use legacy syncing which is syncing through self-
-	//      discover peers.
-	//   3. Else, use the dns for syncing.
-	if hc.Network.NetworkType == nodeconfig.Localnet || hc.General.IsOffline {
+	// If starting with offline, use local sync peers.
+	if hc.General.IsOffline {
 		epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
 		selfPort := hc.P2P.Port
 		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
