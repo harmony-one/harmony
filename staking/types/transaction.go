@@ -57,6 +57,10 @@ func (d *txdata) CopyFrom(d2 *txdata) {
 	d.Hash = copyHash(d2.Hash)
 }
 
+func (d *txdata) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
+	return dst.Set(d.Price)
+}
+
 func copyHash(hash *common.Hash) *common.Hash {
 	if hash == nil {
 		return nil
@@ -261,6 +265,11 @@ func (tx *StakingTransaction) Size() common.StorageSize {
 // IsEthCompatible returns whether the txn is ethereum compatible
 func (tx *StakingTransaction) IsEthCompatible() bool {
 	return false
+}
+
+// EffectiveGasPrice returns the effective gas price of the transaction.
+func (tx *StakingTransaction) EffectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
+	return tx.data.effectiveGasPrice(dst, baseFee)
 }
 
 type writeCounter common.StorageSize
