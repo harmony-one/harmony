@@ -47,7 +47,11 @@ func (pm *State) Mode() Mode {
 
 // SetMode set the node mode as required
 func (pm *State) SetMode(s Mode) {
+	m := pm.Mode()
 	atomic.StoreUint32(&pm.mode, uint32(s))
+	if m == Normal && s == Listening {
+		utils.Logger().Debug().Caller(2).Msg("Node is now in Listening mode from Normal")
+	}
 }
 
 // GetCurBlockViewID return the current view id

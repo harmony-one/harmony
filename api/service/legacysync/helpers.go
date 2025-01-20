@@ -37,7 +37,7 @@ func getMaxPeerHeight(syncConfig *SyncConfig) (uint64, error) {
 			if response != nil {
 				lock.Lock()
 				utils.Logger().Info().
-					Str("peerIP", peerConfig.peer.IP).
+					Str("peerIP", fmt.Sprintf("%s:%s", peerConfig.peer.IP, peerConfig.peer.Port)).
 					Uint64("blockHeight", response.BlockHeight).
 					Msg("[SYNC] getMaxPeerHeight")
 				if response.BlockHeight < math.MaxUint32 { // That's enough for decades.

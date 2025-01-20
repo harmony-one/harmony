@@ -45,7 +45,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.getLogger().Info().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Msg("[OnAnnounce] Announce message Added")
+		Msgf("[OnAnnounce] Announce message Added %s", recvMsg.BlockHash.Hex())
 	consensus.fBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.blockHash = recvMsg.BlockHash
 	// we have already added message and block, skip check viewID

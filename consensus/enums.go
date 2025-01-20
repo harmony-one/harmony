@@ -12,7 +12,7 @@ const (
 	ViewChanging
 	// Syncing ..
 	Syncing
-	// Listening ..
+	// Listening means not in committee
 	Listening
 )
 

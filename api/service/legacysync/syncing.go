@@ -1317,6 +1317,7 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 			Uint64("lastHeight", lastHeight).
 			Uint64("heightDiff", heightDiff).
 			Bool("wasOutOfSync", wasOutOfSync).
+			Str("called", utils.GetCallStackInfo(2)).
 			Msg("[SYNC] Checking sync status")
 		return SyncCheckResult{
 			IsSynchronized: !wasOutOfSync,
@@ -1340,6 +1341,9 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 		Uint64("lastHeight", lastHeight).
 		Uint64("currentHeight", currentHeight).
 		Bool("isOutOfSync", isOutOfSync).
+		//Caller(1).
+		Caller(1).
+		Str("called", utils.GetCallStackInfo(2)).
 		Msg("[SYNC] Double checking sync status")
 	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
 	heightDiff := otherHeight2 - lastHeight
