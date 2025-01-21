@@ -60,10 +60,11 @@ import (
 
 // Version string variables
 var (
-	version string
-	builtBy string
-	builtAt string
-	commit  string
+	version  string
+	builtBy  string
+	builtAt  string
+	commit   string
+	commitAt string
 )
 
 // Host
@@ -98,7 +99,7 @@ Examples usage:
 }
 
 func init() {
-	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, "harmony", version, commit, builtBy, builtAt)
+	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, "harmony", version, commit, commitAt, builtBy, builtAt)
 	harmonyConfigs.Init(rootCmd)
 }
 
