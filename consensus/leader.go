@@ -93,6 +93,19 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
+func (consensus *Consensus) checkFirstReceivedSignature(signerCount int64, phase quorum.Phase) (bool, bool) {
+	hasMultiBlsKeys := len(consensus.priKey) > 0
+	if hasMultiBlsKeys {
+		var myPubkeys []bls.SerializedPublicKey
+		for _, key := range consensus.priKey {
+			myPubkeys = append(myPubkeys, key.Pub.Bytes)
+		}
+		mySignsCount := consensus.decider.GetBallotsCount(phase, myPubkeys)
+		return true, signerCount == mySignsCount
+	}
+	return false, false
+}
+
 // this method is called for each validator sent their vote message
 func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
@@ -121,14 +134,21 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 		}
 	}
 
-	if consensus.decider.IsQuorumAchieved(quorum.Prepare) {
+	signerCount := consensus.decider.SignersCount(quorum.Prepare)
+
+	// check if it is first received signatures
+	// it may multi bls key validators can achieve quorum on first signature
+	hasMultiBlsKeys, isFirstReceivedSignature := consensus.checkFirstReceivedSignature(signerCount, quorum.Prepare)
+
+	quorumPreExisting := consensus.decider.IsQuorumAchieved(quorum.Prepare)
+	//// Read - End
+
+	if quorumPreExisting {
 		// already have enough signatures
 		consensus.getLogger().Debug().
 			Interface("validatorPubKeys", recvMsg.SenderPubkeys).
 			Msg("[OnPrepare] Received Additional Prepare Message")
-		return
 	}
-	signerCount := consensus.decider.SignersCount(quorum.Prepare)
 	//// Read - End
 
 	consensus.UpdateLeaderMetrics(float64(signerCount), float64(consensus.getBlockNum()))
@@ -183,7 +203,11 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	//// Write - End
 
 	//// Read - Start
-	if consensus.decider.IsQuorumAchieved(quorum.Prepare) {
+	quorumFromInitialSignature := hasMultiBlsKeys && isFirstReceivedSignature && quorumPreExisting
+	quorumPostNewSignatures := consensus.decider.IsQuorumAchieved(quorum.Prepare)
+	quorumFromNewSignatures := !quorumPreExisting && quorumPostNewSignatures
+
+	if quorumFromInitialSignature || quorumFromNewSignatures {
 		// NOTE Let it handle its own logs
 		if err := consensus.didReachPrepareQuorum(); err != nil {
 			return
@@ -216,6 +240,11 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	quorumWasMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
 
 	signerCount := consensus.decider.SignersCount(quorum.Commit)
+
+	// check if it is first received commit
+	// it may multi bls key validators can achieve quorum on first commit
+	hasMultiBlsKeys, isFirstReceivedSignature := consensus.checkFirstReceivedSignature(signerCount, quorum.Commit)
+
 	//// Read - End
 
 	// Verify the signature on commitPayload is correct
@@ -290,7 +319,10 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	quorumIsMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
 	//// Read - End
 
-	if !quorumWasMet && quorumIsMet {
+	quorumAchievedByFirstCommit := hasMultiBlsKeys && isFirstReceivedSignature && quorumWasMet
+	quorumAchievedByThisCommit := !quorumWasMet && quorumIsMet
+
+	if quorumAchievedByFirstCommit || quorumAchievedByThisCommit {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
@@ -299,23 +331,13 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			consensus.preCommitAndPropose(blockObj)
 		}
 
-		go func(viewID uint64, isLeader bool) {
-			waitTime := 1000 * time.Millisecond
-			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
-			if maxWaitTime > waitTime {
-				waitTime = maxWaitTime
-			}
-			consensus.getLogger().Info().Str("waitTime", waitTime.String()).
-				Msg("[OnCommit] Starting Grace Period")
-			time.Sleep(waitTime)
-			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
-
-			consensus.mutex.Lock()
-			defer consensus.mutex.Unlock()
-			if viewID == consensus.getCurBlockViewID() {
-				consensus.finalCommit(isLeader)
-			}
-		}(viewID, consensus.isLeader())
+		consensus.transitions.finalCommit = true
+		waitTime := 1000 * time.Millisecond
+		maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
+		if maxWaitTime > waitTime {
+			waitTime = maxWaitTime
+		}
+		go consensus.finalCommit(waitTime, viewID, consensus.isLeader())
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}

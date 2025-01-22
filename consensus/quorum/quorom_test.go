@@ -1,9 +1,11 @@
 package quorum
 
 import (
+	"fmt"
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
@@ -549,32 +551,233 @@ func TestInvalidAggregateSig(test *testing.T) {
 	}
 }
 
-func TestCIdentities_NthNextValidatorHmy(t *testing.T) {
-	address := []common.Address{
-		common.HexToAddress("0x1"),
-		common.HexToAddress("0x2"),
-		common.HexToAddress("0x3"),
+func createTestCIdentities(numAddresses int, keysPerAddress int) (*cIdentities, shard.SlotList, []harmony_bls.PublicKeyWrapper) {
+	testAddresses := make([]common.Address, 0, numAddresses*numAddresses)
+	for i := int(0); i < numAddresses; i++ {
+		h := fmt.Sprintf("0x%040x", i)
+		addr := common.HexToAddress(h)
+		testAddresses = append(testAddresses, addr)
 	}
 	slots := shard.SlotList{}
 	list := []harmony_bls.PublicKeyWrapper{}
-	for i := 0; i < 3; i++ {
-		for j := 0; j < 3; j++ {
+	// generate slots and public keys
+	for i := 0; i < numAddresses; i++ {
+		for j := 0; j < keysPerAddress; j++ { // keys per address
 			blsKey := harmony_bls.RandPrivateKey()
 			wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
 			wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+
 			slots = append(slots, shard.Slot{
-				EcdsaAddress:   address[i%3],
+				EcdsaAddress:   testAddresses[i],
 				BLSPublicKey:   wrapper.Bytes,
 				EffectiveStake: nil,
 			})
 			list = append(list, wrapper)
 		}
 	}
-
+	// initialize and update cIdentities
 	c := newCIdentities()
 	c.UpdateParticipants(list, []bls.PublicKeyWrapper{})
+	return c, slots, list
+}
+
+func TestCIdentities_NthNextValidatorHmy(t *testing.T) {
+	c, slots, list := createTestCIdentities(3, 3)
+
 	found, key := c.NthNextValidator(slots, &list[0], 1)
 	require.Equal(t, true, found)
 	// because we skip 3 keys of current validator
 	require.Equal(t, 3, c.IndexOf(key.Bytes))
+}
+
+func TestCIdentities_NthNextValidatorFailedEdgeCase1(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Logf("Recovered from panic as expected: %v", r)
+		} else {
+			t.Errorf("Expected a panic when next is 0, but no panic occurred")
+		}
+	}()
+
+	// create test identities and slots
+	c, slots, _ := createTestCIdentities(3, 3)
+
+	// create a public key wrapper that doesn't exist in the identities
+	t.Log("creating a random public key wrapper not present in test identities")
+	blsKey := harmony_bls.RandPrivateKey()
+	wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+
+	// Edge Case: Trigger NthNextValidator with next=0, which should cause a panic
+	t.Log("Calling NthNextValidator with next=0 to test panic handling")
+	c.NthNextValidator(slots, &wrapper, 0)
+}
+
+func TestCIdentities_NthNextValidatorFailedEdgeCase2(t *testing.T) {
+	// create test identities and slots
+	c, slots, list := createTestCIdentities(1, 3)
+
+	done := make(chan bool)
+
+	go func() {
+		// possible infinite loop, it will time out
+		c.NthNextValidator(slots, &list[1], 1)
+
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		t.Error("Expected a timeout, but successfully calculated next leader")
+
+	case <-time.After(5 * time.Second):
+		t.Log("Test timed out, possible infinite loop")
+	}
+}
+
+func TestCIdentities_NthNextValidatorFailedEdgeCase3(t *testing.T) {
+	// create 3 test addresses
+	testAddresses := make([]common.Address, 0, 3)
+	for i := int(0); i < 3; i++ {
+		h := fmt.Sprintf("0x%040x", i)
+		addr := common.HexToAddress(h)
+		testAddresses = append(testAddresses, addr)
+	}
+	slots := shard.SlotList{}
+	list := []harmony_bls.PublicKeyWrapper{}
+
+	// First add 4 keys for first address
+	for i := 0; i < 4; i++ {
+		blsKey := harmony_bls.RandPrivateKey()
+		wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+
+		slots = append(slots, shard.Slot{
+			EcdsaAddress:   testAddresses[0],
+			BLSPublicKey:   wrapper.Bytes,
+			EffectiveStake: nil,
+		})
+		list = append(list, wrapper)
+	}
+
+	// Then add 1 key for next two addresses
+	for i := 1; i < 3; i++ {
+		blsKey := harmony_bls.RandPrivateKey()
+		wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+
+		slots = append(slots, shard.Slot{
+			EcdsaAddress:   testAddresses[i],
+			BLSPublicKey:   wrapper.Bytes,
+			EffectiveStake: nil,
+		})
+		list = append(list, wrapper)
+	}
+
+	// initialize and update cIdentities
+	c := newCIdentities()
+	c.UpdateParticipants(list, []bls.PublicKeyWrapper{})
+
+	// current key is the first one.
+	found, key := c.NthNextValidator(slots, &list[0], 1)
+	require.Equal(t, true, found)
+	// because we skip 4 keys of first validator, the next validator key index is 4 (starts from 0)
+	// but it returns 5 and skips second validator (key index: 4)
+	require.Equal(t, 5, c.IndexOf(key.Bytes))
+	t.Log("second validator were skipped")
+}
+
+func TestCIdentities_NthNextValidatorV2Hmy(t *testing.T) {
+	c, slots, list := createTestCIdentities(3, 3)
+
+	found, key := c.NthNextValidatorV2(slots, &list[0], 1)
+	require.Equal(t, true, found)
+	// because we skip 3 keys of current validator
+	require.Equal(t, 3, c.IndexOf(key.Bytes))
+}
+
+func TestCIdentities_NthNextValidatorV2EdgeCase1(t *testing.T) {
+	// create test identities and slots
+	c, slots, _ := createTestCIdentities(3, 3)
+
+	// create a public key wrapper that doesn't exist in the identities
+	t.Log("creating a random public key wrapper not present in test identities")
+	blsKey := harmony_bls.RandPrivateKey()
+	wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+
+	// Edge Case: Trigger NthNextValidator with next=0, which should cause a panic
+	t.Log("Calling NthNextValidatorV2 with next=0 to test panic handling")
+	found, key := c.NthNextValidatorV2(slots, &wrapper, 0)
+
+	require.Equal(t, true, found)
+	require.Equal(t, 0, c.IndexOf(key.Bytes))
+}
+
+func TestCIdentities_NthNextValidatorV2EdgeCase2(t *testing.T) {
+	// create test identities and slots
+	c, slots, list := createTestCIdentities(1, 3)
+
+	done := make(chan bool)
+
+	go func() {
+		c.NthNextValidatorV2(slots, &list[1], 1)
+
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		t.Log("Test completed successfully ")
+	case <-time.After(5 * time.Second):
+		t.Error("timeout, possible infinite loop")
+	}
+}
+
+func TestCIdentities_NthNextValidatorV2EdgeCase3(t *testing.T) {
+	// create 3 test addresses
+	testAddresses := make([]common.Address, 0, 3)
+	for i := int(0); i < 3; i++ {
+		h := fmt.Sprintf("0x%040x", i)
+		addr := common.HexToAddress(h)
+		testAddresses = append(testAddresses, addr)
+	}
+	slots := shard.SlotList{}
+	list := []harmony_bls.PublicKeyWrapper{}
+
+	// First add 4 keys for first address
+	for i := 0; i < 4; i++ {
+		blsKey := harmony_bls.RandPrivateKey()
+		wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+
+		slots = append(slots, shard.Slot{
+			EcdsaAddress:   testAddresses[0],
+			BLSPublicKey:   wrapper.Bytes,
+			EffectiveStake: nil,
+		})
+		list = append(list, wrapper)
+	}
+
+	// Then add 1 key for next two addresses
+	for i := 1; i < 3; i++ {
+		blsKey := harmony_bls.RandPrivateKey()
+		wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+
+		slots = append(slots, shard.Slot{
+			EcdsaAddress:   testAddresses[i],
+			BLSPublicKey:   wrapper.Bytes,
+			EffectiveStake: nil,
+		})
+		list = append(list, wrapper)
+	}
+
+	// initialize and update cIdentities
+	c := newCIdentities()
+	c.UpdateParticipants(list, []bls.PublicKeyWrapper{})
+
+	// current key is the first one.
+	found, key := c.NthNextValidatorV2(slots, &list[0], 1)
+	require.Equal(t, true, found)
+	// because we skip 4 keys of first validator, the next validator key index is 4 (starts from 0)
+	require.Equal(t, 4, c.IndexOf(key.Bytes))
 }

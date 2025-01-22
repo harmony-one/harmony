@@ -40,7 +40,7 @@ func (consensus *Consensus) PostConsensusProcessing(newBlock *types.Block) error
 				Str("mode", mode.String()).
 				Msg("BINGO !!! Reached Consensus")
 			if consensus.mode() == Syncing {
-				mode = consensus.updateConsensusInformation()
+				mode = consensus.updateConsensusInformation("consensus.mode() == Syncing")
 				utils.Logger().Info().Msgf("Switching to mode %s", mode)
 				consensus.setMode(mode)
 			}

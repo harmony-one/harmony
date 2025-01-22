@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 )
@@ -22,13 +21,13 @@ type StageReceipts struct {
 }
 
 type StageReceiptsCfg struct {
-	bc          core.BlockChain
-	db          kv.RwDB
-	blockDBs    []kv.RwDB
-	concurrency int
-	protocol    syncProtocol
-	isBeacon    bool
-	logProgress bool
+	bc            core.BlockChain
+	db            kv.RwDB
+	blockDBs      []kv.RwDB
+	concurrency   int
+	protocol      syncProtocol
+	isBeaconShard bool
+	logProgress   bool
 }
 
 func NewStageReceipts(cfg StageReceiptsCfg) *StageReceipts {
@@ -37,15 +36,15 @@ func NewStageReceipts(cfg StageReceiptsCfg) *StageReceipts {
 	}
 }
 
-func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeacon bool, logProgress bool) StageReceiptsCfg {
+func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, logProgress bool) StageReceiptsCfg {
 	return StageReceiptsCfg{
-		bc:          bc,
-		db:          db,
-		blockDBs:    blockDBs,
-		concurrency: concurrency,
-		protocol:    protocol,
-		isBeacon:    isBeacon,
-		logProgress: logProgress,
+		bc:            bc,
+		db:            db,
+		blockDBs:      blockDBs,
+		concurrency:   concurrency,
+		protocol:      protocol,
+		isBeaconShard: isBeaconShard,
+		logProgress:   logProgress,
 	}
 }
 
@@ -53,12 +52,12 @@ func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, con
 func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	// only execute this stage in fast/snap sync mode
-	if s.state.status.cycleSyncMode == FullSync {
+	if s.state.status.IsFullSyncCycle() {
 		return nil
 	}
 
 	// shouldn't execute for epoch chain
-	if r.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+	if s.state.isEpochChain {
 		return nil
 	}
 
@@ -73,13 +72,13 @@ func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		return nil
 	}
 
-	maxHeight := s.state.status.targetBN
+	maxHeight := s.state.status.GetTargetBN()
 	currentHead := s.state.CurrentBlockNumber()
 	if currentHead >= maxHeight {
 		return nil
 	}
 	currProgress := uint64(0)
-	targetHeight := s.state.currentCycle.TargetHeight
+	targetHeight := s.state.currentCycle.GetTargetHeight()
 
 	if errV := CreateView(ctx, r.configs.db, tx, func(etx kv.Tx) error {
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
@@ -286,7 +285,7 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 		// download receipts
 		receipts, stid, err := r.downloadReceipts(ctx, hashes)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) {
+			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				r.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
 			}
 			utils.Logger().Error().

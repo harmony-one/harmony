@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	reward "github.com/harmony-one/harmony/staking/reward"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
@@ -58,10 +60,11 @@ import (
 
 // Version string variables
 var (
-	version string
-	builtBy string
-	builtAt string
-	commit  string
+	version  string
+	builtBy  string
+	builtAt  string
+	commit   string
+	commitAt string
 )
 
 // Host
@@ -96,7 +99,7 @@ Examples usage:
 }
 
 func init() {
-	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, "harmony", version, commit, builtBy, builtAt)
+	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, "harmony", version, commit, commitAt, builtBy, builtAt)
 	harmonyConfigs.Init(rootCmd)
 }
 
@@ -193,6 +196,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeconfig.SetShardingSchedule(shard.Schedule)
 	nodeconfig.SetVersion(harmonyConfigs.GetHarmonyVersion())
 
+	shardingconfig.InitLocalnetConfig(hc.Localnet.BlocksPerEpoch, hc.Localnet.BlocksPerEpochV2)
+
 	if hc.General.NodeType == "validator" {
 		var err error
 		if hc.General.NoStaking {
@@ -231,6 +236,10 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		fmt.Fprintf(os.Stderr, "Use TIKV MUST HAS TIKV CONFIG")
 		os.Exit(1)
 	}
+
+	// Init localnet configs
+	shardingconfig.InitLocalnetConfig(hc.Localnet.BlocksPerEpoch, hc.Localnet.BlocksPerEpochV2)
+	reward.UpdateLocalnetTotalPreStakingNetworkRewards()
 
 	// Update ethereum compatible chain ids
 	params.UpdateEthChainIDByShard(nodeConfig.ShardID)
@@ -591,24 +600,28 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	}
 
 	myHost, err = p2p.NewHost(p2p.HostConfig{
-		Self:                     &selfPeer,
-		BLSKey:                   nodeConfig.P2PPriKey,
-		BootNodes:                hc.Network.BootNodes,
-		DataStoreFile:            hc.P2P.DHTDataStore,
-		DiscConcurrency:          hc.P2P.DiscConcurrency,
-		MaxConnPerIP:             hc.P2P.MaxConnsPerIP,
-		DisablePrivateIPScan:     hc.P2P.DisablePrivateIPScan,
-		MaxPeers:                 hc.P2P.MaxPeers,
-		ConnManagerLowWatermark:  hc.P2P.ConnManagerLowWatermark,
-		ConnManagerHighWatermark: hc.P2P.ConnManagerHighWatermark,
-		WaitForEachPeerToConnect: hc.P2P.WaitForEachPeerToConnect,
-		ForceReachabilityPublic:  forceReachabilityPublic,
-		NoTransportSecurity:      hc.P2P.NoTransportSecurity,
-		NAT:                      hc.P2P.NAT,
-		UserAgent:                hc.P2P.UserAgent,
-		DialTimeout:              hc.P2P.DialTimeout,
-		Muxer:                    hc.P2P.Muxer,
-		NoRelay:                  hc.P2P.NoRelay,
+		Self:                            &selfPeer,
+		BLSKey:                          nodeConfig.P2PPriKey,
+		BootNodes:                       hc.Network.BootNodes,
+		TrustedNodes:                    hc.Network.TrustedNodes,
+		DataStoreFile:                   hc.P2P.DHTDataStore,
+		DiscConcurrency:                 hc.P2P.DiscConcurrency,
+		MaxConnPerIP:                    hc.P2P.MaxConnsPerIP,
+		DisablePrivateIPScan:            hc.P2P.DisablePrivateIPScan,
+		MaxPeers:                        hc.P2P.MaxPeers,
+		ConnManagerLowWatermark:         hc.P2P.ConnManagerLowWatermark,
+		ConnManagerHighWatermark:        hc.P2P.ConnManagerHighWatermark,
+		ResourceMgrEnabled:              hc.P2P.ResourceMgrEnabled,
+		ResourceMgrMemoryLimitBytes:     hc.P2P.ResourceMgrMemoryLimitBytes,
+		ResourceMgrFileDescriptorsLimit: hc.P2P.ResourceMgrFileDescriptorsLimit,
+		WaitForEachPeerToConnect:        hc.P2P.WaitForEachPeerToConnect,
+		ForceReachabilityPublic:         forceReachabilityPublic,
+		NoTransportSecurity:             hc.P2P.NoTransportSecurity,
+		NAT:                             hc.P2P.NAT,
+		UserAgent:                       hc.P2P.UserAgent,
+		DialTimeout:                     hc.P2P.DialTimeout,
+		Muxer:                           hc.P2P.Muxer,
+		NoRelay:                         hc.P2P.NoRelay,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
@@ -788,7 +801,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 
 	currentNode.Consensus.Registry().SetNodeConfig(currentNode.NodeConfig)
 	// update consensus information based on the blockchain
-	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
+	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation("setupConsensusAndNode"))
 	currentConsensus.NextBlockDue = time.Now()
 	return currentNode
 }
@@ -897,7 +910,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 			InsertHook: node.BeaconSyncHook,
 		}
 	}
-	s := synchronize.NewService(host, blockchains, dConfig)
+	s := synchronize.NewService(host, blockchains, node.NodeConfig, dConfig)
 
 	node.RegisterService(service.Synchronize, s)
 
@@ -939,7 +952,7 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 		}
 	}
 	//Setup stream sync service
-	s := stagedstreamsync.NewService(host, blockchains, node.Consensus, sConfig, hc.General.DataDir)
+	s := stagedstreamsync.NewService(host, blockchains, node.NodeConfig, node.Consensus, sConfig, hc.General.DataDir)
 
 	node.RegisterService(service.StagedStreamSync, s)
 

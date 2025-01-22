@@ -33,18 +33,18 @@ const (
 // 2. NetworkType - mainnet, testnet, stn, e.t.c.
 // 3. ShardID - shard ID of the current protocol.
 // 4. Version - Stream protocol version for backward compatibility.
-// 5. BeaconNode - whether stream is from a beacon chain node or shard chain node
+// 5. IsBeaconValidator - whether stream is from a beacon chain node or shard chain node
 type ProtoID libp2p_proto.ID
 
 // ProtoSpec is the un-serialized stream proto id specification
 // TODO: move this to service wise module since different protocol might have different
 // protoID information
 type ProtoSpec struct {
-	Service     string
-	NetworkType nodeconfig.NetworkType
-	ShardID     nodeconfig.ShardID
-	Version     *version.Version
-	BeaconNode  bool
+	Service           string
+	NetworkType       nodeconfig.NetworkType
+	ShardID           nodeconfig.ShardID
+	Version           *version.Version
+	IsBeaconValidator bool
 }
 
 // ToProtoID convert a ProtoSpec to ProtoID.
@@ -54,7 +54,7 @@ func (spec ProtoSpec) ToProtoID() ProtoID {
 		versionStr = spec.Version.String()
 	}
 	s := fmt.Sprintf(ProtoIDFormat, ProtoIDCommonPrefix, spec.Service,
-		spec.NetworkType, spec.ShardID, versionStr, bool2int(spec.BeaconNode))
+		spec.NetworkType, spec.ShardID, versionStr, bool2int(spec.IsBeaconValidator))
 	return ProtoID(s)
 }
 
@@ -88,11 +88,11 @@ func ProtoIDToProtoSpec(id ProtoID) (ProtoSpec, error) {
 		return ProtoSpec{}, errors.Wrap(err, "invalid beacon node flag")
 	}
 	return ProtoSpec{
-		Service:     service,
-		NetworkType: nodeconfig.NetworkType(networkType),
-		ShardID:     nodeconfig.ShardID(uint32(shardID)),
-		Version:     version,
-		BeaconNode:  int2bool(isBeaconNode),
+		Service:           service,
+		NetworkType:       nodeconfig.NetworkType(networkType),
+		ShardID:           nodeconfig.ShardID(uint32(shardID)),
+		Version:           version,
+		IsBeaconValidator: int2bool(isBeaconNode),
 	}, nil
 }
 

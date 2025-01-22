@@ -66,6 +66,9 @@ var (
 		maxPeersFlag,
 		connManagerLowWatermarkFlag,
 		connManagerHighWatermarkFlag,
+		resourceManagerEnabledFlag,
+		resourceManagerMemoryLimitBytesFlag,
+		resourceManagerFileDescriptorsLimitFlag,
 		noTransportSecurityFlag,
 		natFlag,
 		userAgentFlag,
@@ -135,6 +138,12 @@ var (
 		consensusMinPeersFlag,
 		consensusAggregateSigFlag,
 		legacyConsensusMinPeersFlag,
+	}
+
+	// localnetFlags are flags to set localnet configs
+	localnetFlags = []cli.Flag{
+		localnetBlocksPerEpochFlag,
+		localnetBlocksPerEpochV2Flag,
 	}
 
 	// consensusInvalidFlags are flags that are no longer effective
@@ -375,6 +384,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, configFlag)
 	flags = append(flags, generalFlags...)
 	flags = append(flags, networkFlags...)
+	flags = append(flags, localnetFlags...)
 	flags = append(flags, dnsSyncFlags...)
 	flags = append(flags, p2pFlags...)
 	flags = append(flags, httpFlags...)
@@ -578,6 +588,15 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	}
 }
 
+func applyLocalnetFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, localnetBlocksPerEpochFlag) {
+		cfg.Localnet.BlocksPerEpoch = cli.GetUint64FlagValue(cmd, localnetBlocksPerEpochFlag)
+	}
+	if cli.IsFlagChanged(cmd, localnetBlocksPerEpochV2Flag) {
+		cfg.Localnet.BlocksPerEpochV2 = cli.GetUint64FlagValue(cmd, localnetBlocksPerEpochV2Flag)
+	}
+}
+
 // p2p flags
 var (
 	p2pPortFlag = cli.IntFlag{
@@ -636,6 +655,21 @@ var (
 		Name:     "p2p.connmgr-high",
 		Usage:    "highest number of connections that'll be maintained in connection manager. Set both high and low watermarks to zero to disable connection manager",
 		DefValue: defaultConfig.P2P.ConnManagerHighWatermark,
+	}
+	resourceManagerEnabledFlag = cli.BoolFlag{
+		Name:     "p2p.resmgr-enabled",
+		Usage:    "enable p2p resource manager",
+		DefValue: defaultConfig.P2P.ResourceMgrEnabled,
+	}
+	resourceManagerMemoryLimitBytesFlag = cli.Uint64Flag{
+		Name:     "p2p.resmgr-memory-limit-bytes",
+		Usage:    "memory limit for p2p resource manager",
+		DefValue: defaultConfig.P2P.ResourceMgrMemoryLimitBytes,
+	}
+	resourceManagerFileDescriptorsLimitFlag = cli.Uint64Flag{
+		Name:     "p2p.resmgr-file-descriptor-limit",
+		Usage:    "file descriptor limit for p2p resource manager",
+		DefValue: defaultConfig.P2P.ResourceMgrFileDescriptorsLimit,
 	}
 	waitForEachPeerToConnectFlag = cli.BoolFlag{
 		Name:     "p2p.wait-for-connections",
@@ -714,7 +748,15 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, connManagerHighWatermarkFlag) {
 		config.P2P.ConnManagerHighWatermark = cli.GetIntFlagValue(cmd, connManagerHighWatermarkFlag)
 	}
-
+	if cli.IsFlagChanged(cmd, resourceManagerEnabledFlag) {
+		config.P2P.ResourceMgrEnabled = cli.GetBoolFlagValue(cmd, resourceManagerEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, resourceManagerMemoryLimitBytesFlag) {
+		config.P2P.ResourceMgrMemoryLimitBytes = cli.GetUint64FlagValue(cmd, resourceManagerMemoryLimitBytesFlag)
+	}
+	if cli.IsFlagChanged(cmd, resourceManagerFileDescriptorsLimitFlag) {
+		config.P2P.ResourceMgrFileDescriptorsLimit = cli.GetUint64FlagValue(cmd, resourceManagerFileDescriptorsLimitFlag)
+	}
 	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {
 		config.P2P.DisablePrivateIPScan = cli.GetBoolFlagValue(cmd, p2pDisablePrivateIPScanFlag)
 	}
@@ -1210,6 +1252,20 @@ var (
 		Usage:    "Minimal number of Peers in shard",
 		DefValue: defaultConsensusConfig.MinPeers,
 		Hidden:   true,
+	}
+)
+
+// localnet flags
+var (
+	localnetBlocksPerEpochFlag = cli.Uint64Flag{
+		Name:     "localnet.blocks_per_epoch",
+		Usage:    "the number of blocks per epoch for localnet",
+		DefValue: defaultLocalnetConfig.BlocksPerEpoch,
+	}
+	localnetBlocksPerEpochV2Flag = cli.Uint64Flag{
+		Name:     "localnet.blocks_per_epoch_v2",
+		Usage:    "the number of blocks per epoch for localnet (V2)",
+		DefValue: defaultLocalnetConfig.BlocksPerEpochV2,
 	}
 )
 

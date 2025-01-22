@@ -27,7 +27,6 @@ func TestProtocol_Match(t *testing.T) {
 
 	for i, test := range tests {
 		p := &Protocol{
-			beaconNode: true,
 			config: Config{
 				Network: "unitest",
 				ShardID: 0,

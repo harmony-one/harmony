@@ -33,13 +33,18 @@ const (
 var errLeaderPriKeyNotFound = errors.New("leader private key not found locally")
 
 type Proposal struct {
-	Type   ProposalType
-	Caller string
+	Type     ProposalType
+	Caller   string
+	blockNum uint64
 }
 
 // NewProposal creates a new proposal
-func NewProposal(t ProposalType) Proposal {
-	return Proposal{Type: t, Caller: utils.GetCallStackInfo(2)}
+func NewProposal(t ProposalType, blockNum uint64) Proposal {
+	return Proposal{
+		Type:     t,
+		Caller:   utils.GetCallStackInfo(2),
+		blockNum: blockNum,
+	}
 }
 
 // ProposalType is to indicate the type of signal for new block proposal
@@ -142,6 +147,10 @@ type Consensus struct {
 	// value receives from
 	lastKnownSignPower int64
 	lastKnowViewChange int64
+
+	transitions struct {
+		finalCommit bool
+	}
 }
 
 // Blockchain returns the blockchain.
@@ -162,7 +171,11 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 	return consensus.Blockchain()
 }
 
-func (consensus *Consensus) ReadySignal(p Proposal) {
+func (consensus *Consensus) ReadySignal(p Proposal, signalSource string, signalReason string) {
+	utils.Logger().Info().
+		Str("signalSource", signalSource).
+		Str("signalReason", signalReason).
+		Msg("ReadySignal is called to propose new block")
 	consensus.readySignal <- p
 }
 
@@ -192,14 +205,16 @@ func (consensus *Consensus) verifyBlock(block *types.Block) error {
 
 // BlocksSynchronized lets the main loop know that block synchronization finished
 // thus the blockchain is likely to be up to date.
-func (consensus *Consensus) BlocksSynchronized() {
+func (consensus *Consensus) BlocksSynchronized(reason string) {
 	err := consensus.AddConsensusLastMile()
 	if err != nil {
 		consensus.GetLogger().Error().Err(err).Msg("add last mile failed")
 	}
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.syncReadyChan()
+	if !consensus.transitions.finalCommit {
+		consensus.syncReadyChan(reason)
+	}
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
@@ -343,11 +358,19 @@ func (consensus *Consensus) Decider() quorum.Decider {
 // InitConsensusWithValidators initialize shard state
 // from latest epoch and update committee pub
 // keys for consensus
-func (consensus *Consensus) InitConsensusWithValidators() (err error) {
-	shardID := consensus.ShardID
-	currentBlock := consensus.Blockchain().CurrentBlock()
-	blockNum := currentBlock.NumberU64()
+func (consensus *Consensus) InitConsensusWithValidators() error {
 	consensus.SetMode(Listening)
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	err := consensus.initConsensusWithValidators(consensus.Blockchain())
+	return err
+}
+
+func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err error) {
+	shardID := consensus.ShardID
+	currentBlock := bc.CurrentBlock()
+	blockNum := currentBlock.NumberU64()
+
 	epoch := currentBlock.Epoch()
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
@@ -385,14 +408,14 @@ func (consensus *Consensus) InitConsensusWithValidators() (err error) {
 	}
 
 	for _, key := range pubKeys {
-		if consensus.GetPublicKeys().Contains(key.Object) {
+		if consensus.getPublicKeys().Contains(key.Object) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
 				Str("mode", consensus.Mode().String()).
 				Msg("[InitConsensusWithValidators] Successfully updated public keys")
-			consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
-			consensus.SetMode(Normal)
+			consensus.updatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
+			consensus.setMode(Normal)
 			return nil
 		}
 	}

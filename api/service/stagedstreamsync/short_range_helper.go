@@ -23,14 +23,19 @@ type srHelper struct {
 func (sh *srHelper) getHashChain(ctx context.Context, bns []uint64) ([]common.Hash, []sttypes.StreamID, error) {
 	results := newBlockHashResults(bns)
 
-	var wg sync.WaitGroup
-	wg.Add(sh.config.Concurrency)
+	concurrency := sh.config.Concurrency
+	if concurrency > sh.syncProtocol.NumStreams() {
+		concurrency = sh.syncProtocol.NumStreams()
+	}
 
-	for i := 0; i != sh.config.Concurrency; i++ {
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+
+	for i := 0; i != concurrency; i++ {
 		go func(index int) {
 			defer wg.Done()
 
-			hashes, stid, err := sh.doGetBlockHashesRequest(ctx, bns)
+			hashes, stid, err := sh.doGetBlockHashesRequest(ctx, bns, false)
 			if err != nil {
 				sh.logger.Warn().Err(err).Str("StreamID", string(stid)).
 					Msg(WrapStagedSyncMsg("doGetBlockHashes return error"))
@@ -70,8 +75,8 @@ func (sh *srHelper) getBlocksByHashes(ctx context.Context, hashes []common.Hash,
 	)
 
 	concurrency := sh.config.Concurrency
-	if concurrency > m.numRequests() {
-		concurrency = m.numRequests()
+	if concurrency > sh.syncProtocol.NumStreams() {
+		concurrency = sh.syncProtocol.NumStreams()
 	}
 
 	wg.Add(concurrency)
@@ -152,7 +157,7 @@ func (sh *srHelper) prepareBlockHashNumbers(curNumber uint64) []uint64 {
 	return res
 }
 
-func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64) ([]common.Hash, sttypes.StreamID, error) {
+func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64, acceptPartially bool) ([]common.Hash, sttypes.StreamID, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -164,7 +169,7 @@ func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64) (
 			Msg(WrapStagedSyncMsg("failed to doGetBlockHashesRequest"))
 		return nil, stid, err
 	}
-	if len(hashes) != len(bns) {
+	if !acceptPartially && len(hashes) != len(bns) {
 		sh.logger.Warn().Err(ErrUnexpectedBlockHashes).
 			Str("stream", string(stid)).
 			Msg(WrapStagedSyncMsg("failed to doGetBlockHashesRequest"))
@@ -192,15 +197,16 @@ func (sh *srHelper) doGetBlocksByHashesRequest(ctx context.Context, hashes []com
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	blocks, stid, err := sh.syncProtocol.GetBlocksByHashes(ctx, hashes,
-		syncProto.WithWhitelist(wl))
+	blocks, stid, err := sh.syncProtocol.GetBlocksByHashes(ctx, hashes, syncProto.WithWhitelist(wl))
 	if err != nil {
 		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg("failed to getBlockByHashes")
 		return nil, stid, err
 	}
 	if err := checkGetBlockByHashesResult(blocks, hashes); err != nil {
 		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg(WrapStagedSyncMsg("failed to getBlockByHashes"))
-		sh.syncProtocol.StreamFailed(stid, "failed to getBlockByHashes")
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			sh.syncProtocol.StreamFailed(stid, "failed to getBlockByHashes")
+		}
 		return nil, stid, err
 	}
 	return blocks, stid, nil

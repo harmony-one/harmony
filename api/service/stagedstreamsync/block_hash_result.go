@@ -12,14 +12,14 @@ type (
 		bns     []uint64
 		results []map[sttypes.StreamID]common.Hash
 
-		lock sync.Mutex
+		lock sync.RWMutex
 	}
 )
 
 func newBlockHashResults(bns []uint64) *blockHashResults {
-	results := make([]map[sttypes.StreamID]common.Hash, 0, len(bns))
-	for range bns {
-		results = append(results, make(map[sttypes.StreamID]common.Hash))
+	results := make([]map[sttypes.StreamID]common.Hash, len(bns))
+	for i := range bns {
+		results[i] = make(map[sttypes.StreamID]common.Hash)
 	}
 	return &blockHashResults{
 		bns:     bns,
@@ -37,24 +37,33 @@ func (res *blockHashResults) addResult(hashes []common.Hash, stid sttypes.Stream
 		}
 		res.results[i][stid] = h
 	}
-	return
 }
 
 func (res *blockHashResults) computeLongestHashChain() ([]common.Hash, []sttypes.StreamID) {
+	res.lock.RLock()
+	defer res.lock.RUnlock()
+
 	var (
 		whitelist map[sttypes.StreamID]struct{}
 		hashChain []common.Hash
 	)
+
 	for _, result := range res.results {
 		hash, nextWl := countHashMaxVote(result, whitelist)
 		if hash == emptyHash {
-			break
+			break // Exit if emptyHash is encountered
 		}
 		hashChain = append(hashChain, hash)
-		whitelist = nextWl
+		// add nextWl stream IDs to whitelist
+		if len(nextWl) > 0 {
+			whitelist = make(map[sttypes.StreamID]struct{}, len(nextWl))
+			for st := range nextWl {
+				whitelist[st] = struct{}{}
+			}
+		}
 	}
 
-	sts := make([]sttypes.StreamID, 0, len(whitelist))
+	sts := make([]sttypes.StreamID, 0)
 	for st := range whitelist {
 		sts = append(sts, st)
 	}
@@ -62,8 +71,8 @@ func (res *blockHashResults) computeLongestHashChain() ([]common.Hash, []sttypes
 }
 
 func (res *blockHashResults) numBlocksWithResults() int {
-	res.lock.Lock()
-	defer res.lock.Unlock()
+	res.lock.RLock()
+	defer res.lock.RUnlock()
 
 	cnt := 0
 	for _, result := range res.results {

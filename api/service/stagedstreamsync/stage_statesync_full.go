@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 
 	//sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -63,19 +62,19 @@ func (sss *StageFullStateSync) Exec(ctx context.Context, bool, invalidBlockRever
 	}
 
 	// shouldn't execute for epoch chain
-	if sss.configs.bc.ShardID() == shard.BeaconChainShardID && !s.state.isBeaconNode {
+	if s.state.isEpochChain {
 		return nil
 	}
 
 	// if states are already synced, don't execute this stage
-	if s.state.status.statesSynced {
+	if s.state.status.IsStatesSynced() {
 		return
 	}
 
 	// only execute this stage in fast/snap sync mode and once we reach to pivot
-	if s.state.status.pivotBlock == nil ||
-		s.state.CurrentBlockNumber() != s.state.status.pivotBlock.NumberU64() ||
-		s.state.status.statesSynced {
+	if s.state.status.GetPivotBlock() == nil ||
+		s.state.CurrentBlockNumber() != s.state.status.GetPivotBlockNumber() ||
+		s.state.status.IsStatesSynced() {
 		return nil
 	}
 
@@ -95,7 +94,7 @@ func (sss *StageFullStateSync) Exec(ctx context.Context, bool, invalidBlockRever
 	}); errV != nil {
 		return errV
 	}
-	if currProgress >= s.state.status.pivotBlock.NumberU64() {
+	if currProgress >= s.state.status.GetPivotBlockNumber() {
 		return nil
 	}
 
@@ -131,20 +130,20 @@ func (sss *StageFullStateSync) Exec(ctx context.Context, bool, invalidBlockRever
 	wg.Wait()
 
 	// insert block
-	if err := sss.configs.bc.WriteHeadBlock(s.state.status.pivotBlock); err != nil {
+	if err := sss.configs.bc.WriteHeadBlock(s.state.status.GetPivotBlock()); err != nil {
 		sss.configs.logger.Warn().Err(err).
-			Uint64("pivot block number", s.state.status.pivotBlock.NumberU64()).
+			Uint64("pivot block number", s.state.status.GetPivotBlockNumber()).
 			Msg(WrapStagedSyncMsg("insert pivot block failed"))
 		// TODO: panic("pivot block is failed to insert in chain.")
 		return err
 	}
 
 	// states should be fully synced in this stage
-	s.state.status.statesSynced = true
+	s.state.status.SetStatesSynced(true)
 
 	if err := sss.saveProgress(s, tx); err != nil {
 		sss.configs.logger.Warn().Err(err).
-			Uint64("pivot block number", s.state.status.pivotBlock.NumberU64()).
+			Uint64("pivot block number", s.state.status.GetPivotBlockNumber()).
 			Msg(WrapStagedSyncMsg("save progress for statesync stage failed"))
 	}
 
@@ -439,7 +438,7 @@ func (stg *StageFullStateSync) saveProgress(s *StageState, tx kv.RwTx) (err erro
 	}
 
 	// save progress
-	if err = s.Update(tx, s.state.status.pivotBlock.NumberU64()); err != nil {
+	if err = s.Update(tx, s.state.status.GetPivotBlockNumber()); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msgf("[STAGED_SYNC] saving progress for block States stage failed")

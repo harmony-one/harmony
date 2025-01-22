@@ -198,7 +198,12 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 	var wasFound bool
 	var next *bls.PublicKeyWrapper
 	if blockchain != nil && blockchain.Config().IsLeaderRotationInternalValidators(epoch) {
-		if blockchain.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
+		if blockchain.Config().IsLeaderRotationV2Epoch(epoch) {
+			wasFound, next = consensus.decider.NthNextValidatorV2(
+				committee.Slots,
+				lastLeaderPubKey,
+				gap)
+		} else if blockchain.Config().IsLeaderRotationExternalValidatorsAllowed(epoch) {
 			wasFound, next = consensus.decider.NthNextValidator(
 				committee.Slots,
 				lastLeaderPubKey,
@@ -435,7 +440,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 				consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 				return
 			}
-			go consensus.ReadySignal(NewProposal(SyncProposal))
+			go consensus.ReadySignal(NewProposal(SyncProposal, consensus.Blockchain().CurrentHeader().NumberU64()+1), "onViewChange", "quorum is achieved by mask and is view change mode and M1 payload is empty")
 			return
 		}
 

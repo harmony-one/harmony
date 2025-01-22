@@ -77,6 +77,7 @@ type ParticipantTracker interface {
 	ParticipantsCount() int64
 	// NthNextValidator returns key for next validator. It assumes external validators and leader rotation.
 	NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
+	NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(instance shardingconfig.Instance, pubkey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper)
 	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
 	UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper)
@@ -100,6 +101,7 @@ type SignatoryTracker interface {
 type SignatureReader interface {
 	SignatoryTracker
 	ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot
+	GetBallotsCount(p Phase, pubkeys []bls.SerializedPublicKey) int64
 	TwoThirdsSignersCount() int64
 	// 96 bytes aggregated signature
 	AggregateVotes(p Phase) *bls_core.Sign
@@ -217,7 +219,46 @@ func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bl
 	return found, &s.publicKeys[idx]
 }
 
-// NthNextValidator return the Nth next pubkey nodes, but from another validator.
+// NthNextValidatorV2 returns the Nth next pubkey nodes, but from another validator.
+func (s *cIdentities) NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+	if len(s.publicKeys) == 0 || next < 0 {
+		return false, pubKey
+	}
+
+	publicToAddress := make(map[bls.SerializedPublicKey]common.Address, len(slotList))
+	for _, slot := range slotList {
+		publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
+	}
+
+	pubKeyIndex := s.IndexOf(pubKey.Bytes)
+	if pubKeyIndex == -1 {
+		utils.Logger().Error().
+			Str("key", pubKey.Bytes.Hex()).
+			Msg("[NthNextValidator] pubKey not found")
+	}
+
+	if pubKeyIndex == -1 && next == 0 {
+		return true, &s.publicKeys[0]
+	}
+
+	numKeys := len(s.publicKeys)
+	attempts := 0
+
+	for {
+		idx := (pubKeyIndex + attempts + next) % numKeys
+		if attempts > numKeys {
+			utils.Logger().Warn().
+				Str("key", pubKey.Bytes.Hex()).
+				Msg("[NthNextValidator] Could not find a different validator within limit")
+			return false, pubKey
+		}
+		if publicToAddress[s.publicKeys[idx].Bytes] != publicToAddress[pubKey.Bytes] {
+			return true, &s.publicKeys[idx]
+		}
+		attempts++
+	}
+}
+
 func (s *cIdentities) NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
@@ -386,6 +427,28 @@ func (s *cIdentities) ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votep
 		return nil
 	}
 	return payload
+}
+
+func (s *cIdentities) GetBallotsCount(p Phase, pubkeys []bls.SerializedPublicKey) int64 {
+	ballotBox := map[bls.SerializedPublicKey]*votepower.Ballot{}
+
+	switch p {
+	case Prepare:
+		ballotBox = s.prepare.BallotBox
+	case Commit:
+		ballotBox = s.commit.BallotBox
+	case ViewChange:
+		ballotBox = s.viewChange.BallotBox
+	}
+
+	count := int64(0)
+	for _, pubkey := range pubkeys {
+		_, ok := ballotBox[pubkey]
+		if ok {
+			count++
+		}
+	}
+	return count
 }
 
 func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {

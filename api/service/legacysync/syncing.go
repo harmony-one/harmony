@@ -1131,7 +1131,7 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, isBeacon bool, consensus *cons
 		}
 		// TODO: move this to explorer handler code.
 		if ss.isExplorer {
-			consensus.UpdateConsensusInformation()
+			consensus.UpdateConsensusInformation("handle explorer")
 		}
 	}
 	utils.Logger().Info().Msgf("legacy sync is executed")

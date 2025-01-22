@@ -74,7 +74,7 @@ func (dh *downloadHelper) downloadFinishedLoop(c *Consensus) {
 	for {
 		select {
 		case <-dh.finishedCh:
-			c.BlocksSynchronized()
+			c.BlocksSynchronized("downloadFinishedLoop")
 
 		case err := <-dh.finishedSub.Err():
 			c.GetLogger().Info().Err(err).Msg("consensus download finished loop closed")

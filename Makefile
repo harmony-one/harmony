@@ -25,6 +25,8 @@ help:
 	@echo "trace-pointer - build the harmony binary & bootnode with pointer analysis"
 	@echo "debug - start a localnet with 2 shards (s0 rpc endpoint = localhost:9700; s1 rpc endpoint = localhost:9800)"
 	@echo "debug-kill - force kill the localnet"
+	@echo "debug-multi-bls - start a localnet with external validators and multi-BLS keys in the background"
+	@echo "debug-multi-bls-with-terminal - start a localnet with external validators and multi-BLS keys using screen, providing real-time logs and automatic cleanup on exit"
 	@echo "debug-ext - start a localnet with 2 shards and external (s0 rpc endpoint = localhost:9598; s1 rpc endpoint = localhost:9596)"
 	@echo "clean - remove node files & logs created by localnet"
 	@echo "distclean - remove node files & logs created by localnet, and all libs"
@@ -78,18 +80,41 @@ debug:
 	#export GOLOG_OUTPUT=stdout
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
-	bash ./test/debug.sh
+	bash ./test/debug.sh ./test/configs/local-resharding.txt
 
 debug-kill:
 	bash ./test/kill_node.sh
+	pkill -9 -f debug.sh
 
 debug-ext:
-	# update localnet block per epoch to ensure a stable localnet
-	sed -i 's/localnetBlocksPerEpoch\s*=\s*[0-9]*/localnetBlocksPerEpoch = 64/' internal/configs/sharding/localnet.go
-	sed -i 's/localnetBlocksPerEpochV2\s*=\s*[0-9]*/localnetBlocksPerEpochV2 = 64/' internal/configs/sharding/localnet.go
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
-	bash ./test/debug-external.sh &
+	./test/debug.sh ./test/configs/local-resharding-with-external.txt 64 64 &
+	echo sleep 10s before creating the external validator
+	sleep 10
+	bash ./test/build-localnet-validator.sh
+
+debug-multi-bls:
+	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
+	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
+	./test/debug.sh ./test/configs/local-multi-bls.txt 64 64 &
+	echo sleep 10s before creating the external validator
+	sleep 10
+	bash ./test/build-localnet-validator.sh
+	
+debug-multi-bls-with-terminal:
+	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
+	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
+	screen -L -Logfile ./tmp_log/localnet_terminal.log -dmS localnet bash -c './test/debug.sh ./test/configs/local-multi-bls.txt 64 64; echo "Press any key to exit..."; read -n 1'
+	echo sleep 10s before creating the external validator
+	sleep 10
+	bash ./test/build-localnet-validator.sh
+	screen -r localnet
+
+debug-multi-bls-multi-ext-node: pre-external
+	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
+	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
+	./test/debug.sh ./test/configs/local-multi-bls-multi-ext-node.txt &
 	echo sleep 10s before creating the external validator
 	sleep 10
 	bash ./test/build-localnet-validator.sh
@@ -202,13 +227,9 @@ travis_go_checker:
 	bash ./scripts/travis_go_checker.sh
 
 travis_rpc_checker:
-	# value from command line will override this value, use point test to non-default
-	TEST_REPO_BRANCH='master'
 	bash ./scripts/travis_rpc_checker.sh
 
 travis_rosetta_checker:
-	# value from command line will override this value, use point test to non-default
-	TEST_REPO_BRANCH='master'
 	bash ./scripts/travis_rosetta_checker.sh
 
 debug_external: clean

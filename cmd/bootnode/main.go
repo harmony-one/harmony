@@ -84,14 +84,21 @@ func NewConnLogger(l log.Logger) *ConnLogger {
 }
 
 var (
-	version string
-	builtBy string
-	builtAt string
-	commit  string
+	version  string
+	builtBy  string
+	builtAt  string
+	commit   string
+	commitAt string
 )
 
 func printVersion(me string) {
-	fmt.Fprintf(os.Stderr, "Harmony (C) 2024. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
+	commitYear, err := time.Parse("2006-01-02T15:04:05-0700", commitAt)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing commit date: %v\n", err)
+		os.Exit(1)
+	}
+	var currentYear = commitYear.Year()
+	fmt.Fprintf(os.Stderr, "Harmony (C) %d. %v, version %v-%v (%v %v)\n", currentYear, path.Base(me), version, commit, builtBy, builtAt)
 }
 
 func main() {
@@ -114,6 +121,9 @@ func main() {
 	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 	forceReachabilityPublic := flag.Bool("force_public", false, "forcing the local node to believe it is reachable externally")
 	connMgrHighWaterMark := flag.Int("cmg_high_watermark", 900, "connection manager trims excess connections when they pass the high watermark")
+	resourceManagerEnabled := flag.Bool("resmgr-enabled", true, "enable p2p resource manager")
+	resourceManagerMemoryLimitBytes := flag.Uint64("resmgr-memory-limit-bytes", 0, "memory limit for p2p resource manager")
+	resourceManagerFileDescriptorsLimit := flag.Uint64("resmgr-file-descriptor-limit", 0, "file descriptor limit for p2p resource manager")
 	noTransportSecurity := flag.Bool("no_transport_security", false, "disable TLS encrypted transport")
 	muxer := flag.String("muxer", "mplex, yamux", "protocol muxer to mux per-protocol streams (mplex, yamux)")
 	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
@@ -149,19 +159,23 @@ func main() {
 	selfPeer := p2p.Peer{IP: *ip, Port: *port}
 
 	host, err := p2p.NewHost(p2p.HostConfig{
-		Self:                     &selfPeer,
-		BLSKey:                   privKey,
-		BootNodes:                nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
-		DataStoreFile:            &dataStorePath,
-		MaxConnPerIP:             *maxConnPerIP,
-		ForceReachabilityPublic:  *forceReachabilityPublic,
-		ConnManagerHighWatermark: *connMgrHighWaterMark,
-		NoTransportSecurity:      *noTransportSecurity,
-		NAT:                      true,
-		UserAgent:                *userAgent,
-		DialTimeout:              time.Minute,
-		Muxer:                    *muxer,
-		NoRelay:                  *noRelay,
+		Self:                            &selfPeer,
+		BLSKey:                          privKey,
+		BootNodes:                       nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
+		TrustedNodes:                    nil,
+		DataStoreFile:                   &dataStorePath,
+		MaxConnPerIP:                    *maxConnPerIP,
+		ForceReachabilityPublic:         *forceReachabilityPublic,
+		ConnManagerHighWatermark:        *connMgrHighWaterMark,
+		ResourceMgrEnabled:              *resourceManagerEnabled,
+		ResourceMgrMemoryLimitBytes:     *resourceManagerMemoryLimitBytes,
+		ResourceMgrFileDescriptorsLimit: *resourceManagerFileDescriptorsLimit,
+		NoTransportSecurity:             *noTransportSecurity,
+		NAT:                             true,
+		UserAgent:                       *userAgent,
+		DialTimeout:                     time.Minute,
+		Muxer:                           *muxer,
+		NoRelay:                         *noRelay,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")
@@ -173,7 +187,7 @@ func main() {
 
 	nt := nodeConfigs.NetworkType(*networkType)
 	nodeConfigs.SetNetworkType(nt)
-	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, path.Base(os.Args[0]), version, commit, builtBy, builtAt)
+	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, path.Base(os.Args[0]), version, commit, commitAt, builtBy, builtAt)
 	nodeConfigs.SetVersion(harmonyConfigs.GetHarmonyVersion())
 	nodeConfigs.SetPeerID(host.GetID())
 	hc := harmonyConfigs.GetDefaultConfigCopy()

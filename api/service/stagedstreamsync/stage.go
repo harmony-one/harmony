@@ -77,19 +77,19 @@ type StageState struct {
 func (s *StageState) LogPrefix() string { return s.state.LogPrefix() }
 
 func (s *StageState) CurrentStageProgress(db kv.Getter) (uint64, error) {
-	return GetStageProgress(db, s.ID, s.state.isBeacon)
+	return GetStageProgress(db, s.ID, s.state.isBeaconShard)
 }
 
 func (s *StageState) StageProgress(db kv.Getter, id SyncStageID) (uint64, error) {
-	return GetStageProgress(db, id, s.state.isBeacon)
+	return GetStageProgress(db, id, s.state.isBeaconShard)
 }
 
 // Update updates the stage state (current block number) in the database. Can be called multiple times during stage execution.
 func (s *StageState) Update(db kv.Putter, newBlockNum uint64) error {
-	return SaveStageProgress(db, s.ID, s.state.isBeacon, newBlockNum)
+	return SaveStageProgress(db, s.ID, s.state.isBeaconShard, newBlockNum)
 }
 func (s *StageState) UpdateCleanUp(db kv.Putter, blockNum uint64) error {
-	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeacon, blockNum)
+	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeaconShard, blockNum)
 }
 
 // Reverter allows the stage to cause an revert.
@@ -109,7 +109,7 @@ func (u *RevertState) LogPrefix() string { return u.state.LogPrefix() }
 
 // Done updates the DB state of the stage.
 func (u *RevertState) Done(db kv.Putter) error {
-	return SaveStageProgress(db, u.ID, u.state.isBeacon, u.RevertPoint)
+	return SaveStageProgress(db, u.ID, u.state.isBeaconShard, u.RevertPoint)
 }
 
 // CleanUpState contains states of cleanup process for a specific stage
@@ -122,8 +122,8 @@ type CleanUpState struct {
 
 func (s *CleanUpState) LogPrefix() string { return s.state.LogPrefix() + " CleanUp" }
 func (s *CleanUpState) Done(db kv.Putter) error {
-	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeacon, s.ForwardProgress)
+	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeaconShard, s.ForwardProgress)
 }
 func (s *CleanUpState) DoneAt(db kv.Putter, blockNum uint64) error {
-	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeacon, blockNum)
+	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeaconShard, blockNum)
 }
