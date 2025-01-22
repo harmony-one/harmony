@@ -105,7 +105,7 @@ function build_only
 
    VERSION=$(git rev-list --count HEAD)
    COMMIT=$(git describe --always --long --dirty)
-   COMMITAT=$( git show -s --format=%cd --date=format:%Y-%m-%dT%H:%M:%S%z HEAD)
+   COMMITAT=$(git show -s --format=%cd --date=format:%Y-%m-%dT%H:%M:%S%z HEAD)
    BUILTAT=$(date +%FT%T%z)
    BUILTBY=${USER}@
    local build=$1
