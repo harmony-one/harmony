@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -289,11 +290,17 @@ func (consensus *Consensus) _finalCommit(isLeader bool) {
 	// else, the block proposal will timeout by itself.
 	if isLeader {
 		if block.IsLastBlockInEpoch() {
+			lpk := consensus.getLeaderPubKey()
 			// No pipelining
-			go func() {
-				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-				consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", "I am leader and it's the last block in epoch")
-			}()
+			if !consensus.isRotation(block.Epoch()) {
+				go func() {
+					consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
+					next := consensus.rotateLeader(block.Epoch(), lpk)
+					consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", fmt.Sprintf("-, %d hex: %s, next: %s, my: %q", block.NumberU64(), block.Hash().Hex(), next.Hex(), consensus.isMyKey(lpk)))
+
+					//consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", fmt.Sprintf("I am leader and it's the last block in epoch, %d %s", block.NumberU64(), block.Hash().Hex()))
+				}()
+			}
 		} else {
 			// pipelining
 			go func() {

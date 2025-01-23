@@ -125,15 +125,15 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 	if node.IsRunningBeaconChain() {
 		pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
 		if err == nil && len(pendingCLs) >= maxPendingCrossLinkSize {
-			utils.Logger().Debug().
-				Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
+			//utils.Logger().Debug().
+			//	Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
 			return
 		}
 		if err != nil {
-			utils.Logger().Debug().
-				Err(err).
-				Int("num crosslinks", len(pendingCLs)).
-				Msg("[ProcessingCrossLink] Read Pending Crosslink failed")
+			//utils.Logger().Debug().
+			//	Err(err).
+			//	Int("num crosslinks", len(pendingCLs)).
+			//	Msg("[ProcessingCrossLink] Read Pending Crosslink failed")
 		}
 
 		existingCLs := map[common2.Hash]struct{}{}
@@ -143,15 +143,15 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 
 		var crosslinks []types.CrossLink
 		if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
-			utils.Logger().Error().
-				Err(err).
-				Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
+			//utils.Logger().Error().
+			//	Err(err).
+			//	Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
 			return
 		}
 
 		var candidates []types.CrossLink
-		utils.Logger().Debug().
-			Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks))
+		//utils.Logger().Debug().
+		//	Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks))
 
 		for i, cl := range crosslinks {
 			if i > crossLinkBatchSize*2 { // A sanity check to prevent spamming
@@ -160,9 +160,9 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 
 			if _, ok := existingCLs[cl.Hash()]; ok {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
-				utils.Logger().Debug().Err(err).
-					Msgf("[ProcessingCrossLink] Cross Link already exists in pending queue, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d",
-						node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
+				//utils.Logger().Debug().Err(err).
+				//	Msgf("[ProcessingCrossLink] Cross Link already exists in pending queue, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d",
+				//		node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
 				continue
 			}
 
@@ -170,8 +170,8 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
-				utils.Logger().Debug().Err(err).
-					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d", node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
+				//utils.Logger().Debug().Err(err).
+				//	Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d", node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
 				continue
 			}
 

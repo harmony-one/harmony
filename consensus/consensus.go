@@ -33,9 +33,10 @@ const (
 var errLeaderPriKeyNotFound = errors.New("leader private key not found locally")
 
 type Proposal struct {
-	Type     ProposalType
-	Caller   string
-	blockNum uint64
+	Type       ProposalType
+	Caller     string
+	blockNum   uint64
+	Additional string
 }
 
 // NewProposal creates a new proposal
@@ -176,6 +177,7 @@ func (consensus *Consensus) ReadySignal(p Proposal, signalSource string, signalR
 		Str("signalSource", signalSource).
 		Str("signalReason", signalReason).
 		Msg("ReadySignal is called to propose new block")
+	p.Additional = signalReason
 	consensus.readySignal <- p
 }
 

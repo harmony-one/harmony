@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -41,6 +42,9 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 				return
 			case proposal := <-consensus.GetReadySignal():
 				for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
+					if consensus.ShardID == 0 {
+						fmt.Println("propose", utils.GetPort(), proposal.blockNum, proposal.Caller, proposal.Additional)
+					}
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
 						Uint64("blockNum", proposal.blockNum).

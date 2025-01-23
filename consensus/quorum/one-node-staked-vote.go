@@ -94,6 +94,7 @@ func (v *stakedVoteWeight) AddNewVote(
 		utils.Logger().Debug().
 			Str("signer", pubKeyBytes.Hex()).
 			Str("votingPower", votingPower.String()).
+			Str("vcalled", utils.GetCallStackInfo(2)).
 			Msg("Signer vote counted")
 		additionalVotePower = additionalVotePower.Add(votingPower)
 	}

@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -491,6 +492,7 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 				return Syncing
 			}
 
+			lpk := consensus.getLeaderPubKey()
 			// If the leader changed and I myself become the leader
 			if (oldLeader != nil && consensus.getLeaderPubKey() != nil &&
 				!consensus.getLeaderPubKey().Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
@@ -498,7 +500,8 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal(NewProposal(SyncProposal, curHeader.NumberU64()+1), "updateConsensusInformation", "leader changed and I am the new leader")
+					next := consensus.rotateLeader(curHeader.Epoch(), lpk)
+					consensus.ReadySignal(NewProposal(SyncProposal, curHeader.NumberU64()+1), "updateConsensusInformation", fmt.Sprintf("- %d hex: %s, next: %s", curHeader.NumberU64(), curHeader.Hash().Hex(), next.Hex()))
 				}()
 			}
 			return Normal

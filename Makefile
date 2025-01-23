@@ -85,19 +85,20 @@ debug:
 debug-kill:
 	bash ./test/kill_node.sh
 	pkill -9 -f debug.sh
+	ps aux | grep './test/deploy.sh' | grep -v grep | awk '{print $2}' | xargs kill -9
 
 debug-ext:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	./test/debug.sh ./test/configs/local-resharding-with-external.txt 64 64 &
 	echo sleep 10s before creating the external validator
-	sleep 10
+	sleep 15
 	bash ./test/build-localnet-validator.sh
 
 debug-multi-bls:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
-	./test/debug.sh ./test/configs/local-multi-bls.txt 64 64 &
+	./test/debug.sh ./test/configs/local-multi-bls.txt 16 16 &
 	echo sleep 10s before creating the external validator
 	sleep 10
 	bash ./test/build-localnet-validator.sh
