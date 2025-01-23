@@ -239,7 +239,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		}
 
 		// save progress
-		if err := s.Update(tx, currProgress); err != nil {
+		if err := bh.saveProgress(ctx, s, currProgress, tx); err != nil {
 			utils.Logger().Error().
 				Err(err).
 				Msgf("[STAGED_STREAM_SYNC] saving progress for block hashes stage failed")
@@ -327,12 +327,12 @@ func (bh *StageBlockHashes) calculateFinalBlockHashes(
 	return finalHashes, invalidStreams, nil
 }
 
-// saveBlocks saves the blocks into db
-func (b *StageBlockHashes) saveBlockHashes(ctx context.Context, tx kv.RwTx, hashes map[uint64]common.Hash) error {
-
-	if tx == nil {
+// saveBlockHashes saves the block hashes into db
+func (bh *StageBlockHashes) saveBlockHashes(ctx context.Context, tx kv.RwTx, hashes map[uint64]common.Hash) error {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
-		tx, err = b.configs.db.BeginRw(ctx)
+		tx, err = bh.configs.db.BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -355,10 +355,39 @@ func (b *StageBlockHashes) saveBlockHashes(ctx context.Context, tx kv.RwTx, hash
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
+	if useInternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 	}
 
+	return nil
+}
+
+func (bh *StageBlockHashes) saveProgress(ctx context.Context, s *StageState, progress uint64, tx kv.RwTx) (err error) {
+	useInternalTx := tx == nil
+	if useInternalTx {
+		var err error
+		tx, err = bh.configs.db.BeginRw(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+
+	// save progress
+	if err = s.Update(tx, progress); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving progress for block hashes stage failed")
+		return ErrSavingHashesProgressFail
+	}
+
+	if useInternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

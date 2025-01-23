@@ -7,6 +7,7 @@ import (
 // Errors ...
 var (
 	ErrSavingBodiesProgressFail          = WrapStagedSyncError("saving progress for block bodies stage failed")
+	ErrSavingHashesProgressFail          = WrapStagedSyncError("saving progress for block hashes stage failed")
 	ErrSaveStateProgressFail             = WrapStagedSyncError("saving progress for block States stage failed")
 	ErrInvalidBlockNumber                = WrapStagedSyncError("invalid block number")
 	ErrInvalidBlockBytes                 = WrapStagedSyncError("invalid block bytes to insert into chain")
