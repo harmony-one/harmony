@@ -360,8 +360,8 @@ func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 
 // saveBlocks saves the blocks into db
 func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, stid sttypes.StreamID) error {
-
-	if tx == nil {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = b.configs.blockDBs[loopID].BeginRw(ctx)
 		if err != nil {
@@ -396,8 +396,10 @@ func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, 
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
+	if useInternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 	}
 
 	return nil
