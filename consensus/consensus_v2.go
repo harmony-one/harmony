@@ -290,10 +290,12 @@ func (consensus *Consensus) _finalCommit(isLeader bool) {
 	if isLeader {
 		if block.IsLastBlockInEpoch() {
 			// No pipelining
-			go func() {
-				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-				consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", "I am leader and it's the last block in epoch")
-			}()
+			if !consensus.isRotation(block.Epoch()) {
+				go func() {
+					consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
+					consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", "I am leader and it's the last block in epoch")
+				}()
+			}
 		} else {
 			// pipelining
 			go func() {
