@@ -85,6 +85,7 @@ debug:
 debug-kill:
 	bash ./test/kill_node.sh
 	pkill -9 -f debug.sh
+	ps aux | grep './test/deploy.sh' | grep -v grep | awk '{print $2}' | xargs kill -9
 
 debug-ext:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
