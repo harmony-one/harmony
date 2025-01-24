@@ -206,10 +206,17 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 				)
 		}
 
+		if err := stg.saveProgress(ctx, s, tx); err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Uint64("currProgress", currProgress).
+				Msg(WrapStagedSyncMsg("save progress of stage states failed"))
+		}
+
 		// log the stage progress in console
 		if stg.configs.logProgress {
 			//calculating block speed
-			dt := time.Now().Sub(startTime).Seconds()
+			dt := time.Since(startTime).Seconds()
 			speed := float64(0)
 			if dt > 0 {
 				speed = float64(currProgress-startBlock) / dt
