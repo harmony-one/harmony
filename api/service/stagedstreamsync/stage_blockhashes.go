@@ -379,7 +379,7 @@ func (bh *StageBlockHashes) saveProgress(ctx context.Context, s *StageState, pro
 	if err = s.Update(tx, progress); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block hashes stage failed")
+			Msgf("[STAGED_STREAM_SYNC] saving progress for block hashes stage failed")
 		return ErrSavingHashesProgressFail
 	}
 
@@ -452,7 +452,7 @@ func (bh *StageBlockHashes) Revert(ctx context.Context, firstCycle bool, u *Reve
 	if err = tx.ClearBucket(BlockHashesBucket); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] clear block hashes bucket after revert failed")
+			Msgf("[STAGED_STREAM_SYNC] clear block hashes bucket after revert failed")
 		return err
 	}
 
@@ -460,7 +460,7 @@ func (bh *StageBlockHashes) Revert(ctx context.Context, firstCycle bool, u *Reve
 	if err := bh.clearCache(); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] clear block hashes cache failed")
+			Msgf("[STAGED_STREAM_SYNC] clear block hashes cache failed")
 		return err
 	}
 
@@ -469,14 +469,14 @@ func (bh *StageBlockHashes) Revert(ctx context.Context, firstCycle bool, u *Reve
 	if err = s.Update(tx, currentHead); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block hashes stage after revert failed")
+			Msgf("[STAGED_STREAM_SYNC] saving progress for block hashes stage after revert failed")
 		return err
 	}
 
 	if err = u.Done(tx); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] reset after revert failed")
+			Msgf("[STAGED_STREAM_SYNC] reset after revert failed")
 		return err
 	}
 
