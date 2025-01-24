@@ -122,8 +122,14 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		wg.Add(1)
 		go b.runBlockWorkerLoop(ctx, tx, s.state.gbm, &wg, i, s, startTime)
 	}
-
 	wg.Wait()
+
+	if err := b.saveProgress(ctx, s, targetHeight, tx); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint64("targetHeight", targetHeight).
+			Msg(WrapStagedSyncMsg("save progress failed"))
+	}
 
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
