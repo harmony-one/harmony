@@ -5,7 +5,7 @@ services:
     ports:
       - 3100:3100
     volumes:
-      - ./loki-config.yml:/etc/loki/loki-config.yaml
+      - ./loki-config.yml:/etc/loki/local-config.yaml
       - loki_data:/loki
   promtail:
     container_name: promtail
