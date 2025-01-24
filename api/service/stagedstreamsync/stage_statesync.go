@@ -263,7 +263,7 @@ func (stg *StageStateSync) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 	if err = s.Update(tx, s.state.CurrentBlockNumber()); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block States stage failed")
+			Msgf("[STAGED_STREAM_SYNC] saving progress for block States stage failed")
 		return ErrSaveStateProgressFail
 	}
 
