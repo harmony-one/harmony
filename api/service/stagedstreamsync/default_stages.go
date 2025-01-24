@@ -30,6 +30,7 @@ func initFullSyncStagesOrder() {
 		Heads,
 		SyncEpoch,
 		ShortRange,
+		BlockHashes,
 		BlockBodies,
 		States,
 		LastMile,
@@ -41,6 +42,7 @@ func initFullSyncStagesOrder() {
 		LastMile,
 		States,
 		BlockBodies,
+		BlockHashes,
 		ShortRange,
 		SyncEpoch,
 		Heads,
@@ -51,6 +53,7 @@ func initFullSyncStagesOrder() {
 		LastMile,
 		States,
 		BlockBodies,
+		BlockHashes,
 		ShortRange,
 		SyncEpoch,
 		Heads,
@@ -99,6 +102,7 @@ func DefaultStages(ctx context.Context,
 	headsCfg StageHeadsCfg,
 	seCfg StageEpochCfg,
 	srCfg StageShortRangeCfg,
+	hashesCfg StageBlockHashesCfg,
 	bodiesCfg StageBodiesCfg,
 	stateSyncCfg StageStateSyncCfg,
 	fullStateSyncCfg StageFullStateSyncCfg,
@@ -111,6 +115,7 @@ func DefaultStages(ctx context.Context,
 	handlerStageHeads := NewStageHeads(headsCfg)
 	handlerStageShortRange := NewStageShortRange(srCfg)
 	handlerStageEpochSync := NewStageEpoch(seCfg)
+	handlerStageHashes := NewStageBlockHashes(hashesCfg)
 	handlerStageBodies := NewStageBodies(bodiesCfg)
 	handlerStageStates := NewStageStates(statesCfg)
 	handlerStageStateSync := NewStageStateSync(stateSyncCfg)
@@ -139,6 +144,13 @@ func DefaultStages(ctx context.Context,
 			Description:        "Short Range Sync",
 			Handler:            handlerStageShortRange,
 			RangeMode:          OnlyShortRange,
+			ChainExecutionMode: AllChainsExceptEpochChain,
+		},
+		{
+			ID:                 BlockHashes,
+			Description:        "Retrieve Block Hashes",
+			Handler:            handlerStageHashes,
+			RangeMode:          OnlyLongRange,
 			ChainExecutionMode: AllChainsExceptEpochChain,
 		},
 		{
