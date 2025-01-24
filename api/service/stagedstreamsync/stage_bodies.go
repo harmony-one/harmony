@@ -257,11 +257,17 @@ badBlockDownloadLoop:
 
 	for {
 		if b.configs.protocol.NumStreams() == 0 {
-			return errors.Errorf("re-download bad block from all streams failed")
+			utils.Logger().Error().
+				Uint64("bad block number", s.state.invalidBlock.Number).
+				Msg("[STAGED_STREAM_SYNC] not enough streams to re-download bad block")
+			return errors.Errorf("not enough streams to re-download bad block")
 		}
 		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				utils.Logger().Error().
+					Uint64("bad block number", s.state.invalidBlock.Number).
+					Msg("[STAGED_STREAM_SYNC] tried to re-download bad block from this stream, but downloadRawBlocks failed")
 				b.configs.protocol.StreamFailed(stid, "tried to re-download bad block from this stream, but downloadRawBlocks failed")
 			}
 			continue
@@ -274,9 +280,10 @@ badBlockDownloadLoop:
 			}
 		}
 		s.state.gbm.SetDownloadDetails(batch, 0, stid)
-		if errU := b.configs.blockDBs[0].Update(ctx, func(tx kv.RwTx) error {
+		if errU := b.configs.blockDBs[0].Update(ctx, func(_tx kv.RwTx) error {
 			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, 0, stid); err != nil {
 				utils.Logger().Error().
+					Uint64("bad block number", s.state.invalidBlock.Number).
 					Err(err).
 					Msg("[STAGED_STREAM_SYNC] saving re-downloaded bad block to db failed")
 				return errors.Errorf("%s: %s", ErrSaveBlocksToDbFailed.Error(), err.Error())
@@ -302,6 +309,19 @@ func (b *StageBodies) downloadBlocks(ctx context.Context, bns []uint64) ([]*type
 		return nil, stid, err
 	}
 	return blocks, stid, nil
+}
+
+// TODO: validate block results
+func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
+	if len(result) != len(requested) {
+		return fmt.Errorf("unexpected number of blocks delivered: %v / %v", len(result), len(requested))
+	}
+	for i, block := range result {
+		if block != nil && block.NumberU64() != requested[i] {
+			return fmt.Errorf("block with unexpected number delivered: %v / %v", block.NumberU64(), requested[i])
+		}
+	}
+	return nil
 }
 
 func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
@@ -343,19 +363,6 @@ func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx,
 
 	// TODO: check the returned blocks are sorted
 	return b.configs.protocol.GetRawBlocksByHashes(ctx, hashes)
-}
-
-// TODO: validate block results
-func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
-	if len(result) != len(requested) {
-		return fmt.Errorf("unexpected number of blocks delivered: %v / %v", len(result), len(requested))
-	}
-	for i, block := range result {
-		if block != nil && block.NumberU64() != requested[i] {
-			return fmt.Errorf("block with unexpected number delivered: %v / %v", block.NumberU64(), requested[i])
-		}
-	}
-	return nil
 }
 
 // saveBlocks saves the blocks into db
@@ -420,7 +427,7 @@ func (b *StageBodies) saveProgress(ctx context.Context, s *StageState, progress 
 	if err = s.Update(tx, progress); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed")
+			Msgf("[STAGED_STREAM_SYNC] saving progress for block bodies stage failed")
 		return ErrSavingBodiesProgressFail
 	}
 
@@ -491,7 +498,7 @@ func (b *StageBodies) Revert(ctx context.Context, firstCycle bool, u *RevertStat
 	if err = s.Update(tx, currentHead); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block bodies stage after revert failed")
+			Msgf("[STAGED_STREAM_SYNC] saving progress for block bodies stage after revert failed")
 		return err
 	}
 
