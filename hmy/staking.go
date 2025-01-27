@@ -96,7 +96,7 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 	rawStakes := []effective.SlotPurchase{}
 	validatorSpreads := map[common.Address]numeric.Dec{}
 	for _, comm := range prevCommittee.Shards {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID, false)
 		// before staking skip computing
 		if hmy.BlockChain.Config().IsStaking(prevCommittee.Epoch) {
 			if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
@@ -111,7 +111,7 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 	rawStakes = []effective.SlotPurchase{}
 	validatorSpreads = map[common.Address]numeric.Dec{}
 	for _, comm := range nowCommittee.Shards {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID, false)
 		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch); err != nil {
 			return nil, errors.Wrapf(
 				err,

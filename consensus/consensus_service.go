@@ -373,7 +373,8 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
+		useGT := consensus.Blockchain().Config().IsLeaderRotationV2Epoch(consensus.Blockchain().CurrentBlock().Epoch())
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID, useGT)
 		consensus.decider = decider
 	}
 

@@ -705,7 +705,8 @@ func setupChain(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigTyp
 }
 
 func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType, registry *registry.Registry) *node.Node {
-	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(hc.General.ShardID))
+	useGT := registry.GetBlockchain().Config().IsLeaderRotationV2Epoch(registry.GetBlockchain().CurrentBlock().Epoch())
+	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(hc.General.ShardID), useGT)
 
 	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
