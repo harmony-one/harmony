@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -54,10 +55,6 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 
 	useInternalTx := tx == nil
 
-	if invalidBlockRevert {
-		return b.redownloadBadBlock(ctx, s)
-	}
-
 	// for short range sync, skip this stage
 	if !s.state.initSync {
 		return nil
@@ -68,14 +65,6 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return nil
 	}
 
-	maxHeight := s.state.status.GetTargetBN()
-	currentHead := s.state.CurrentBlockNumber()
-	if currentHead >= maxHeight {
-		return nil
-	}
-	currProgress := uint64(0)
-	targetHeight := s.state.currentCycle.GetTargetHeight()
-
 	if useInternalTx {
 		var err error
 		tx, err = b.configs.db.BeginRw(ctx)
@@ -84,6 +73,18 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		}
 		defer tx.Rollback()
 	}
+
+	if invalidBlockRevert {
+		return b.redownloadBadBlock(ctx, tx, s)
+	}
+
+	maxHeight := s.state.status.GetTargetBN()
+	currentHead := s.state.CurrentBlockNumber()
+	if currentHead >= maxHeight {
+		return nil
+	}
+	currProgress := uint64(0)
+	targetHeight := s.state.currentCycle.GetTargetHeight()
 
 	if errV := CreateView(ctx, b.configs.db, tx, func(etx kv.Tx) error {
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
@@ -112,17 +113,23 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	}
 
 	// Fetch blocks from neighbors
-	s.state.gbm = newBlockDownloadManager(b.configs.bc, targetHeight, s.state.logger)
+	s.state.gbm = newDownloadManager(b.configs.bc, targetHeight, BlocksPerRequest, s.state.logger)
 
 	// Setup workers to fetch blocks from remote node
 	var wg sync.WaitGroup
 
 	for i := 0; i != s.state.config.Concurrency; i++ {
 		wg.Add(1)
-		go b.runBlockWorkerLoop(ctx, s.state.gbm, &wg, i, s, startTime)
+		go b.runBlockWorkerLoop(ctx, tx, s.state.gbm, &wg, i, s, startTime)
 	}
-
 	wg.Wait()
+
+	if err := b.saveProgress(ctx, s, targetHeight, tx); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint64("targetHeight", targetHeight).
+			Msg(WrapStagedSyncMsg("save progress failed"))
+	}
 
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
@@ -134,9 +141,15 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 }
 
 // runBlockWorkerLoop creates a work loop for download blocks
-func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownloadManager, wg *sync.WaitGroup, loopID int, s *StageState, startTime time.Time) {
+func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
+	tx kv.RwTx,
+	gbm *downloadManager,
+	wg *sync.WaitGroup,
+	loopID int,
+	s *StageState,
+	startTime time.Time) {
 
-	currentBlock := int(s.state.CurrentBlockNumber())
+	currentBlock := s.state.CurrentBlockNumber()
 
 	defer wg.Done()
 
@@ -146,8 +159,8 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 			return
 		default:
 		}
-		curHeight := s.state.CurrentBlockNumber()
-		batch := gbm.GetNextBatch(curHeight)
+		batch := gbm.GetNextBatch(currentBlock)
+
 		if len(batch) == 0 {
 			select {
 			case <-ctx.Done():
@@ -157,7 +170,7 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 			}
 		}
 
-		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
+		blockBytes, sigBytes, stid, err := b.downloadRawBlocksByHashes(ctx, tx, batch)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
@@ -190,17 +203,24 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context, gbm *blockDownload
 				panic(ErrSaveBlocksToDbFailed)
 			}
 			gbm.HandleRequestResult(batch, blockBytes, sigBytes, loopID, stid)
+			// adjust current block
+			lastBlockInBatch := batch[len(batch)-1]
+			if lastBlockInBatch > currentBlock {
+				currentBlock = lastBlockInBatch
+			}
 			if b.configs.logProgress {
 				//calculating block download speed
-				dt := time.Now().Sub(startTime).Seconds()
+				dt := time.Since(startTime).Seconds()
 				speed := float64(0)
+				numBlocks := uint64(len(gbm.details))
+
 				if dt > 0 {
-					speed = float64(len(gbm.bdd)) / dt
+					speed = float64(numBlocks) / dt
 				}
 				blockSpeed := fmt.Sprintf("%.2f", speed)
 
 				fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-				fmt.Println("downloaded blocks:", currentBlock+len(gbm.bdd), "/", int(gbm.targetBN), "(", blockSpeed, "blocks/s", ")")
+				fmt.Println("downloaded blocks:", currentBlock+numBlocks, "/", int(gbm.targetBN), "(", blockSpeed, "blocks/s", ")")
 			}
 		}
 	}
@@ -235,7 +255,7 @@ func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte
 }
 
 // redownloadBadBlock tries to redownload the bad block from other streams
-func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) error {
+func (b *StageBodies) redownloadBadBlock(ctx context.Context, tx kv.RwTx, s *StageState) error {
 
 	batch := []uint64{s.state.invalidBlock.Number}
 
@@ -243,11 +263,17 @@ badBlockDownloadLoop:
 
 	for {
 		if b.configs.protocol.NumStreams() == 0 {
-			return errors.Errorf("re-download bad block from all streams failed")
+			utils.Logger().Error().
+				Uint64("bad block number", s.state.invalidBlock.Number).
+				Msg("[STAGED_STREAM_SYNC] not enough streams to re-download bad block")
+			return errors.Errorf("not enough streams to re-download bad block")
 		}
 		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				utils.Logger().Error().
+					Uint64("bad block number", s.state.invalidBlock.Number).
+					Msg("[STAGED_STREAM_SYNC] tried to re-download bad block from this stream, but downloadRawBlocks failed")
 				b.configs.protocol.StreamFailed(stid, "tried to re-download bad block from this stream, but downloadRawBlocks failed")
 			}
 			continue
@@ -260,9 +286,10 @@ badBlockDownloadLoop:
 			}
 		}
 		s.state.gbm.SetDownloadDetails(batch, 0, stid)
-		if errU := b.configs.blockDBs[0].Update(ctx, func(tx kv.RwTx) error {
+		if errU := b.configs.blockDBs[0].Update(ctx, func(_tx kv.RwTx) error {
 			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, 0, stid); err != nil {
 				utils.Logger().Error().
+					Uint64("bad block number", s.state.invalidBlock.Number).
 					Err(err).
 					Msg("[STAGED_STREAM_SYNC] saving re-downloaded bad block to db failed")
 				return errors.Errorf("%s: %s", ErrSaveBlocksToDbFailed.Error(), err.Error())
@@ -290,13 +317,7 @@ func (b *StageBodies) downloadBlocks(ctx context.Context, bns []uint64) ([]*type
 	return blocks, stid, nil
 }
 
-func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
-}
-
+// TODO: validate block results
 func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 	if len(result) != len(requested) {
 		return fmt.Errorf("unexpected number of blocks delivered: %v / %v", len(result), len(requested))
@@ -309,10 +330,51 @@ func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 	return nil
 }
 
+func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
+}
+
+func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if len(bns) == 0 {
+		return nil, nil, "", errors.New("empty batch of block numbers")
+	}
+
+	hashes := make([]common.Hash, 0, len(bns))
+
+	if err := CreateView(ctx, b.configs.db, tx, func(etx kv.Tx) error {
+		for _, bn := range bns {
+			blkKey := marshalData(bn)
+			hashBytes, err := etx.GetOne(BlockHashesBucket, blkKey)
+			if err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Uint64("block number", bn).
+					Msg("[STAGED_STREAM_SYNC] fetching block hash from db failed")
+				return err
+			}
+			var h common.Hash
+			h.SetBytes(hashBytes)
+			hashes = append(hashes, h)
+		}
+		return nil
+	}); err != nil {
+		return nil, nil, "", err
+	}
+
+	// TODO: check the returned blocks are sorted
+	return b.configs.protocol.GetRawBlocksByHashes(ctx, hashes)
+}
+
 // saveBlocks saves the blocks into db
 func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, stid sttypes.StreamID) error {
-
-	if tx == nil {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = b.configs.blockDBs[loopID].BeginRw(ctx)
 		if err != nil {
@@ -320,7 +382,7 @@ func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, 
 		}
 		defer tx.Rollback()
 	}
-
+	// The blocks array is sorted by block number
 	for i := uint64(0); i < uint64(len(blockBytes)); i++ {
 		block := blockBytes[i]
 		sig := sigBytes[i]
@@ -347,8 +409,10 @@ func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, 
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
+	if useInternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -369,7 +433,7 @@ func (b *StageBodies) saveProgress(ctx context.Context, s *StageState, progress 
 	if err = s.Update(tx, progress); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed")
+			Msgf("[STAGED_STREAM_SYNC] saving progress for block bodies stage failed")
 		return ErrSavingBodiesProgressFail
 	}
 
@@ -440,7 +504,7 @@ func (b *StageBodies) Revert(ctx context.Context, firstCycle bool, u *RevertStat
 	if err = s.Update(tx, currentHead); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block bodies stage after revert failed")
+			Msgf("[STAGED_STREAM_SYNC] saving progress for block bodies stage after revert failed")
 		return err
 	}
 

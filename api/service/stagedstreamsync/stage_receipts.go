@@ -350,7 +350,7 @@ func (r *StageReceipts) saveProgress(ctx context.Context, s *StageState, progres
 	if err = s.Update(tx, progress); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for receipt stage failed")
+			Msgf("[STAGED_STREAM_SYNC] saving progress for receipt stage failed")
 		return ErrSavingBodiesProgressFail
 	}
 
