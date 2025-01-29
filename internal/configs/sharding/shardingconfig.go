@@ -92,7 +92,7 @@ type Instance interface {
 	// ExternalAllowlistLimit returns the maximum number of external leader keys on each shard(HIP18)
 	ExternalAllowlistLimit() int
 
-	// FeeCollector returns a mapping of address to decimal % of fee
+	// FeeCollectors returns a mapping of address to decimal % of fee
 	FeeCollectors() FeeCollectors
 
 	// HIP30RecoveryAddress returns the address to which
