@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/ethereum/go-ethereum/event"
+	types "github.com/harmony-one/harmony/common/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -20,10 +21,10 @@ import (
 // TODO: each peer is able to have a queue of requests instead of one request at a time.
 // TODO: add QoS evaluation for each stream
 type requestManager struct {
-	streams   *sttypes.SafeMap[sttypes.StreamID, *stream]  // All streams
-	available *sttypes.SafeMap[sttypes.StreamID, struct{}] // Streams that are available for request
-	pendings  *sttypes.SafeMap[uint64, *request]           // requests that are sent but not received response
-	waitings  requestQueues                                // double linked list of requests that are on the waiting list
+	streams   *types.SafeMap[sttypes.StreamID, *stream]  // All streams
+	available *types.SafeMap[sttypes.StreamID, struct{}] // Streams that are available for request
+	pendings  *types.SafeMap[uint64, *request]           // requests that are sent but not received response
+	waitings  requestQueues                              // double linked list of requests that are on the waiting list
 
 	// Stream events
 	sm         streammanager.Reader
@@ -56,9 +57,9 @@ func newRequestManager(sm streammanager.ReaderSubscriber) *requestManager {
 	logger := utils.Logger().With().Str("module", "request manager").Logger()
 
 	return &requestManager{
-		streams:   sttypes.NewSafeMap[sttypes.StreamID, *stream](),
-		available: sttypes.NewSafeMap[sttypes.StreamID, struct{}](),
-		pendings:  sttypes.NewSafeMap[uint64, *request](),
+		streams:   types.NewSafeMap[sttypes.StreamID, *stream](),
+		available: types.NewSafeMap[sttypes.StreamID, struct{}](),
+		pendings:  types.NewSafeMap[uint64, *request](),
 		waitings:  newRequestQueues(),
 
 		sm:          sm,
@@ -355,7 +356,7 @@ func (rm *requestManager) refreshStreams() {
 	}
 }
 
-func checkStreamUpdates(exists *sttypes.SafeMap[sttypes.StreamID, *stream], targets []sttypes.Stream) (added []sttypes.Stream, removed []*stream) {
+func checkStreamUpdates(exists *types.SafeMap[sttypes.StreamID, *stream], targets []sttypes.Stream) (added []sttypes.Stream, removed []*stream) {
 	targetM := make(map[sttypes.StreamID]sttypes.Stream)
 
 	for _, target := range targets {
@@ -401,9 +402,9 @@ func (rm *requestManager) close() {
 	rm.pendings.Iterate(func(key uint64, req *request) {
 		req.doneWithResponse(responseData{err: ErrClosed})
 	})
-	rm.streams = sttypes.NewSafeMap[sttypes.StreamID, *stream]()
-	rm.available = sttypes.NewSafeMap[sttypes.StreamID, struct{}]()
-	rm.pendings = sttypes.NewSafeMap[uint64, *request]()
+	rm.streams = types.NewSafeMap[sttypes.StreamID, *stream]()
+	rm.available = types.NewSafeMap[sttypes.StreamID, struct{}]()
+	rm.pendings = types.NewSafeMap[uint64, *request]()
 	rm.waitings = newRequestQueues()
 	close(rm.stopC)
 }
