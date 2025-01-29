@@ -35,7 +35,7 @@ func MakeGetBlocksByNumRequest(bns []uint64) *Request {
 	}
 }
 
-// MakeGetBlockByHashesRequest makes the GetBlocksByHashes request
+// MakeGetBlocksByHashesRequest makes the GetBlocksByHashes request
 func MakeGetBlocksByHashesRequest(hashes []common.Hash) *Request {
 	return &Request{
 		Request: &Request_GetBlocksByHashesRequest{
@@ -182,7 +182,7 @@ func MakeGetBlocksByNumResponseMessage(rid uint64, blocksBytes, sigs [][]byte) *
 	return makeMessageFromResponse(resp)
 }
 
-// MakeGetBlocksByNumResponseMessage make the GetBlocksByNumResponse of Response type
+// MakeGetBlocksByNumResponse make the GetBlocksByNumResponse of Response type
 func MakeGetBlocksByNumResponse(rid uint64, blocksBytes, sigs [][]byte) *Response {
 	return &Response{
 		ReqId: rid,
