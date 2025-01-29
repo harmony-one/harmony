@@ -3,6 +3,7 @@ package nodeconfig
 import (
 	"testing"
 
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/harmony-one/harmony/internal/blsgen"
@@ -92,5 +93,61 @@ func TestValidateConsensusKeysForSameShard(t *testing.T) {
 	if err := GetDefaultConfig().ValidateConsensusKeysForSameShard(keys, 0); err == nil {
 		e := errors.New("bls keys do not belong to the same shard")
 		t.Error("expected", e, "got", nil)
+	}
+}
+func TestShardIDFromKey(t *testing.T) {
+	// set mainnet config
+	networkType := "mainnet"
+	schedule := shardingconfig.MainnetSchedule
+	netType := NetworkType(networkType)
+	SetNetworkType(netType)
+	SetShardingSchedule(schedule)
+
+	// define a static public key that should belong to shard 0 after mainnet HIP30
+	pubKeyHex := "ee2474f93cba9241562efc7475ac2721ab0899edf8f7f115a656c0c1f9ef8203add678064878d174bb478fa2e6630502"
+	pubKey := &bls_core.PublicKey{}
+	err := pubKey.DeserializeHexStr(pubKeyHex)
+	if err != nil {
+		t.Error(err)
+	}
+
+	shardID, err := GetDefaultConfig().ShardIDFromKey(pubKey)
+	if err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+	expectedShardID := uint32(0)
+	if shardID != expectedShardID {
+		t.Errorf("expected shard ID %d, got %d", expectedShardID, shardID)
+	}
+
+	// define 2 static public key that should be equal
+	// and belongs to shard 1 after mainnet HIP30
+	pubKeyHex1 := "76e43d5a0593235d883ed8b1a834a08107da29c64ac5388958351694dce8f183690f29672939e37548753236105ee715"
+	pubKey1 := &bls_core.PublicKey{}
+	err = pubKey1.DeserializeHexStr(pubKeyHex1)
+	if err != nil {
+		t.Error(err)
+	}
+	pubKeyHex2 := "c54958e723531fba4665007b74e48c5feae8f73485f97120f0aa0e4879c4677032179d6af216fd07d9786d74c92ff40f"
+	pubKey2 := &bls_core.PublicKey{}
+	err = pubKey2.DeserializeHexStr(pubKeyHex2)
+	if err != nil {
+		t.Error(err)
+	}
+	shardID_1, err := GetDefaultConfig().ShardIDFromKey(pubKey1)
+	if err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+
+	shardID_2, err := GetDefaultConfig().ShardIDFromKey(pubKey2)
+	if err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+
+	if shardID_1 != shardID_2 {
+		t.Errorf("expected same shard ID, got %d and %d", shardID_1, shardID_2)
+	}
+	if shardID_2 != 1 {
+		t.Errorf("expected shard ID 1, got %d", shardID_2)
 	}
 }
