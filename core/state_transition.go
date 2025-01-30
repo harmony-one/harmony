@@ -91,6 +91,8 @@ type Message interface {
 
 	Nonce() uint64
 	SkipNonceChecks() bool
+	SkipFromEOACheck() bool
+
 	Data() []byte
 	Type() types.TransactionType
 	BlockNum() *big.Int
@@ -207,8 +209,10 @@ func (st *StateTransition) preCheck() error {
 	}
 
 	// Ensure that the sender is an EOA (EIP-3607)
-	if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != state.EmptyCodeHash {
-		return ErrSenderNotEOA
+	if !st.msg.SkipFromEOACheck() {
+		if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != state.EmptyCodeHash {
+			return ErrSenderNotEOA
+		}
 	}
 
 	return st.buyGas()

@@ -699,30 +699,6 @@ type Message struct {
 	txType   TransactionType
 }
 
-//type Message struct {
-//	To                    *common.Address
-//	From                  common.Address
-//	Nonce                 uint64
-//	Value                 *big.Int
-//	GasLimit              uint64
-//	GasPrice              *big.Int
-//	GasFeeCap             *big.Int
-//	GasTipCap             *big.Int
-//	Data                  []byte
-//	AccessList            types.AccessList
-//	BlobGasFeeCap         *big.Int
-//	BlobHashes            []common.Hash
-//	SetCodeAuthorizations []types.SetCodeAuthorization
-//
-//	// When SkipNonceChecks is true, the message nonce is not checked against the
-//	// account nonce in state.
-//	// This field will be set to true for operations like RPC eth_call.
-//	SkipNonceChecks bool
-//
-//	// When SkipFromEOACheck is true, the message sender is not checked to be an EOA.
-//	SkipFromEOACheck bool
-//}
-
 // NewMessage returns new message.
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, skipNonceChecks bool) Message {
 	return Message{
@@ -789,6 +765,11 @@ func (m Message) Data() []byte {
 // CheckNonce returns checkNonce of Message.
 func (m Message) SkipNonceChecks() bool {
 	return m.skipNonceChecks
+}
+
+// SkipFromEOACheck returns skipFromEOACheck of Message.
+func (m Message) SkipFromEOACheck() bool {
+	return m.skipFromEOACheck
 }
 
 // Type returns the type of message
