@@ -470,13 +470,14 @@ func (tx *Transaction) ConvertToEth() *EthTransaction {
 // XXX Rename message to something less arbitrary?
 func (tx *Transaction) AsMessage(s Signer) (Message, error) {
 	msg := Message{
-		nonce:           tx.data.AccountNonce,
-		gasLimit:        tx.data.GasLimit,
-		gasPrice:        new(big.Int).Set(tx.data.Price),
-		to:              tx.data.Recipient,
-		value:           tx.data.Amount,
-		data:            tx.data.Payload,
-		skipNonceChecks: false,
+		nonce:            tx.data.AccountNonce,
+		gasLimit:         tx.data.GasLimit,
+		gasPrice:         new(big.Int).Set(tx.data.Price),
+		to:               tx.data.Recipient,
+		value:            tx.data.Amount,
+		data:             tx.data.Payload,
+		skipNonceChecks:  false,
+		skipFromEOACheck: false,
 	}
 
 	var err error
@@ -700,16 +701,17 @@ type Message struct {
 }
 
 // NewMessage returns new message.
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, skipNonceChecks bool) Message {
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, skipNonceChecks, skipFromEOACheck bool) Message {
 	return Message{
-		from:            from,
-		to:              to,
-		nonce:           nonce,
-		value:           amount,
-		gasLimit:        gasLimit,
-		gasPrice:        gasPrice,
-		data:            data,
-		skipNonceChecks: skipNonceChecks,
+		from:             from,
+		to:               to,
+		nonce:            nonce,
+		value:            amount,
+		gasLimit:         gasLimit,
+		gasPrice:         gasPrice,
+		data:             data,
+		skipNonceChecks:  skipNonceChecks,
+		skipFromEOACheck: skipFromEOACheck,
 	}
 }
 
@@ -717,13 +719,14 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 // always need checkNonce
 func NewStakingMessage(from common.Address, nonce uint64, gasLimit uint64, gasPrice *big.Int, data []byte, blockNum *big.Int) Message {
 	return Message{
-		from:            from,
-		nonce:           nonce,
-		gasLimit:        gasLimit,
-		gasPrice:        new(big.Int).Set(gasPrice),
-		data:            data,
-		skipNonceChecks: false,
-		blockNum:        blockNum,
+		from:             from,
+		nonce:            nonce,
+		gasLimit:         gasLimit,
+		gasPrice:         new(big.Int).Set(gasPrice),
+		data:             data,
+		blockNum:         blockNum,
+		skipNonceChecks:  false,
+		skipFromEOACheck: false,
 	}
 }
 
