@@ -22,6 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -204,6 +205,12 @@ func (st *StateTransition) preCheck() error {
 			return ErrNonceTooLow
 		}
 	}
+
+	// Ensure that the sender is an EOA (EIP-3607)
+	if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != state.EmptyCodeHash {
+		return ErrSenderNotEOA
+	}
+
 	return st.buyGas()
 }
 
