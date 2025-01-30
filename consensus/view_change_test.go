@@ -1,13 +1,17 @@
 package consensus
 
 import (
+	"math/big"
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
+	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/crypto/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBasicViewChanging(t *testing.T) {
@@ -117,4 +121,136 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 	nextKey := consensus.getNextLeaderKey(uint64(1), nil)
 
 	assert.Equal(t, nextKey, &wrappedBLSKeys[1])
+}
+
+func TestViewChangeNextValidator(t *testing.T) {
+	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
+	assert.Equal(t, int64(0), decider.ParticipantsCount())
+	wrappedBLSKeys := []bls.PublicKeyWrapper{}
+
+	const keyCount = 5
+	for i := 0; i < keyCount; i++ {
+		blsKey := harmony_bls.RandPrivateKey()
+		blsPubKey := harmony_bls.WrapperFromPrivateKey(blsKey)
+		wrappedBLSKeys = append(wrappedBLSKeys, *blsPubKey.Pub)
+	}
+
+	decider.UpdateParticipants(wrappedBLSKeys, []bls.PublicKeyWrapper{})
+	assert.EqualValues(t, keyCount, decider.ParticipantsCount())
+
+	t.Run("check_different_address_for_validators", func(t *testing.T) {
+		var (
+			rs    *bls.PublicKeyWrapper
+			err   error
+			slots []shard.Slot
+		)
+		for i := 0; i < keyCount; i++ {
+			slot := shard.Slot{
+				EcdsaAddress: common.BigToAddress(big.NewInt(int64(i))),
+				BLSPublicKey: wrappedBLSKeys[i].Bytes,
+			}
+			slots = append(slots, slot)
+		}
+
+		rs, err = viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[0], rs)
+
+		rs, err = viewChangeNextValidator(decider, 1, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[1], rs)
+
+		rs, err = viewChangeNextValidator(decider, 2, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[2], rs)
+
+		// and no panic or error for future 1k gaps
+		for i := 0; i < 1000; i++ {
+			_, err = viewChangeNextValidator(decider, i, slots, &wrappedBLSKeys[0])
+			require.NoError(t, err)
+		}
+	})
+
+	// we can't find next validator, because all validators have the same address
+	t.Run("same_address_for_all_validators", func(t *testing.T) {
+		var (
+			rs    *bls.PublicKeyWrapper
+			err   error
+			slots []shard.Slot
+		)
+		for i := 0; i < keyCount; i++ {
+			slot := shard.Slot{
+				EcdsaAddress: common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z3")),
+				BLSPublicKey: wrappedBLSKeys[i].Bytes,
+			}
+			slots = append(slots, slot)
+		}
+
+		rs, err = viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[0], rs)
+
+		rs, err = viewChangeNextValidator(decider, 1, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[1], rs)
+
+		// error because all validators belong same address
+		_, err = viewChangeNextValidator(decider, 2, slots, &wrappedBLSKeys[0])
+		require.Error(t, err)
+
+		// all of them return error, no way to recover
+		for i := 2; i < 1000; i++ {
+			_, err = viewChangeNextValidator(decider, i, slots, &wrappedBLSKeys[0])
+			require.Errorf(t, err, "error because all validators belong same address %d", i)
+		}
+	})
+
+	// we can't find next validator, because all validators have the same address
+	t.Run("check_5_validators_2_addrs", func(t *testing.T) {
+		// Slot represents node id (BLS address)
+		var (
+			addr1 = common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z3"))
+			addr2 = common.BytesToAddress([]byte("one1ay37rp2pc3kjarg7a322vu3sa8j9puahg679z4"))
+			rs    *bls.PublicKeyWrapper
+			err   error
+		)
+		slots := []shard.Slot{
+			{
+				EcdsaAddress: addr1,
+				BLSPublicKey: wrappedBLSKeys[0].Bytes,
+			},
+			{
+				EcdsaAddress: addr1,
+				BLSPublicKey: wrappedBLSKeys[1].Bytes,
+			},
+			{
+				EcdsaAddress: addr2,
+				BLSPublicKey: wrappedBLSKeys[2].Bytes,
+			},
+			{
+				EcdsaAddress: addr2,
+				BLSPublicKey: wrappedBLSKeys[3].Bytes,
+			},
+			{
+				EcdsaAddress: addr2,
+				BLSPublicKey: wrappedBLSKeys[4].Bytes,
+			},
+		}
+
+		rs, err = viewChangeNextValidator(decider, 0, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[0], rs)
+
+		rs, err = viewChangeNextValidator(decider, 1, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[1], rs)
+
+		rs, err = viewChangeNextValidator(decider, 2, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[2], rs)
+
+		rs, err = viewChangeNextValidator(decider, 3, slots, &wrappedBLSKeys[0])
+		require.NoError(t, err)
+		require.Equal(t, &wrappedBLSKeys[1], rs)
+	})
 }

@@ -61,6 +61,11 @@ func (pm *State) SetCurBlockViewID(viewID uint64) uint64 {
 	return viewID
 }
 
+// SetCurBlockViewID set the current view ID
+func (consensus *Consensus) setCurBlockViewID(viewID uint64) uint64 {
+	return consensus.current.SetCurBlockViewID(viewID)
+}
+
 // GetViewChangingID return the current view changing id
 // It is meaningful during view change mode
 func (pm *State) GetViewChangingID() uint64 {
@@ -140,10 +145,27 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 	return nextViewID, viewChangeDuration
 }
 
-// getNextLeaderKey uniquely determine who is the leader for given viewID
-// It reads the current leader's pubkey based on the blockchain data and returns
+// getNextLeaderKeySkipSameAddress uniquely determine who is the leader for given viewID
+// It receives the committee and returns
 // the next leader based on the gap of the viewID of the view change and the last
 // know view id of the block.
+func (consensus *Consensus) getNextLeaderKeySkipSameAddress(viewID uint64, committee *shard.Committee) *bls.PublicKeyWrapper {
+	gap := 1
+
+	cur := consensus.getCurBlockViewID()
+	if viewID > cur {
+		gap = int(viewID - cur)
+	}
+	// use pubkey as default key as well
+	leaderPubKey := consensus.getLeaderPubKey()
+	rs, err := viewChangeNextValidator(consensus.decider, gap, committee.Slots, leaderPubKey)
+	if err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[getNextLeaderKeySkipSameAddress] viewChangeNextValidator failed")
+		return leaderPubKey
+	}
+	return rs
+}
+
 func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Committee) *bls.PublicKeyWrapper {
 	gap := 1
 
@@ -182,7 +204,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 			// it can still sync with other validators.
 			if curHeader.IsLastBlockInEpoch() {
 				consensus.getLogger().Info().Msg("[getNextLeaderKey] view change in the first block of new epoch")
-				lastLeaderPubKey = consensus.decider.FirstParticipant(shard.Schedule.InstanceForEpoch(epoch))
+				lastLeaderPubKey = consensus.decider.FirstParticipant()
 			}
 		}
 	}
@@ -231,6 +253,46 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64, committee *shard.Com
 	return next
 }
 
+type nthNext interface {
+	NthNext(pubKey *bls.PublicKeyWrapper, next int) (*bls.PublicKeyWrapper, error)
+}
+
+func viewChangeNextValidator(decider nthNext, gap int, slots shard.SlotList, lastLeaderPubKey *bls.PublicKeyWrapper) (*bls.PublicKeyWrapper, error) {
+	if gap > 1 {
+		current, err := decider.NthNext(
+			lastLeaderPubKey,
+			gap-1)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "NthNext failed, gap %d", gap)
+		}
+
+		publicToAddress := make(map[bls.SerializedPublicKey]common.Address)
+		for _, slot := range slots {
+			publicToAddress[slot.BLSPublicKey] = slot.EcdsaAddress
+		}
+
+		for i := 0; i < len(slots); i++ {
+			gap = gap + i
+			next, err := decider.NthNext(
+				lastLeaderPubKey,
+				gap)
+			if err != nil {
+				return nil, errors.New("current leader not found")
+			}
+
+			if publicToAddress[current.Bytes] != publicToAddress[next.Bytes] {
+				return next, nil
+			}
+		}
+	} else {
+		next, err := decider.NthNext(
+			lastLeaderPubKey,
+			gap)
+		return next, errors.WithMessagef(err, "NthNext failed, gap %d", gap)
+	}
+	return nil, errors.New("current leader not found")
+}
+
 func createTimeout() map[TimeoutType]*utils.Timeout {
 	timeouts := make(map[TimeoutType]*utils.Timeout)
 	timeouts[timeoutConsensus] = utils.NewTimeout(phaseDuration)
@@ -250,7 +312,8 @@ func (consensus *Consensus) startViewChange() {
 	consensus.current.SetMode(ViewChanging)
 	nextViewID, duration := consensus.getNextViewID()
 	consensus.setViewChangingID(nextViewID)
-	epoch := consensus.Blockchain().CurrentHeader().Epoch()
+	currentHeader := consensus.Blockchain().CurrentHeader()
+	epoch := currentHeader.Epoch()
 	ss, err := consensus.Blockchain().ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
@@ -267,7 +330,12 @@ func (consensus *Consensus) startViewChange() {
 	// aganist the consensus.LeaderPubKey variable.
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
-	consensus.setLeaderPubKey(consensus.getNextLeaderKey(nextViewID, committee))
+	c := consensus.Blockchain().Config()
+	if c.IsLeaderRotationV2Epoch(currentHeader.Epoch()) {
+		consensus.setLeaderPubKey(consensus.getNextLeaderKeySkipSameAddress(nextViewID, committee))
+	} else {
+		consensus.setLeaderPubKey(consensus.getNextLeaderKey(nextViewID, committee))
+	}
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).

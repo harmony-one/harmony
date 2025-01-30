@@ -6,11 +6,11 @@ import (
 	"sort"
 	"time"
 
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 
-	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
 
 	"github.com/ethereum/go-ethereum/common"

@@ -629,7 +629,7 @@ func TestCIdentities_NthNextValidatorFailedEdgeCase2(t *testing.T) {
 	case <-done:
 		t.Error("Expected a timeout, but successfully calculated next leader")
 
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		t.Log("Test timed out, possible infinite loop")
 	}
 }

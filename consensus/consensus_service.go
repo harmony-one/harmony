@@ -560,11 +560,6 @@ func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
 	return consensus.setCurBlockViewID(viewID)
 }
 
-// SetCurBlockViewID set the current view ID
-func (consensus *Consensus) setCurBlockViewID(viewID uint64) uint64 {
-	return consensus.current.SetCurBlockViewID(viewID)
-}
-
 // SetViewChangingID set the current view change ID
 func (consensus *Consensus) SetViewChangingID(viewID uint64) {
 	consensus.current.SetViewChangingID(viewID)
