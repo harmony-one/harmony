@@ -145,6 +145,61 @@ func TestStreamManager_HandleNewStream(t *testing.T) {
 	}
 }
 
+func TestStreamManager_ReservedStreams(t *testing.T) {
+	sm := newTestStreamManager()
+	sm.Start()
+	time.Sleep(defTestWait)
+
+	if sm.streams.size() != defHardLoCap {
+		t.Errorf("unexpected stream size: %v / %v", sm.streams.size(), defHardLoCap)
+	}
+	if sm.reservedStreams.size() != 0 {
+		t.Errorf("unexpected reserved stream size: %v / %v", sm.reservedStreams.size(), 0)
+	}
+
+	// Add more streams to get to Hi Cap
+	for i := sm.streams.size() + 1; i <= defHiCap; i++ {
+		stream := newTestStream(makeStreamID(i), testProtoID)
+		if err := sm.NewStream(stream); err != nil {
+			t.Errorf("unexpected add stream error: %v", err)
+		}
+	}
+	if sm.streams.size() != defHiCap {
+		t.Errorf("unexpected stream size: %v / %v", sm.streams.size(), defHiCap)
+	}
+	if sm.reservedStreams.size() != 0 {
+		t.Errorf("unexpected reserved stream size after reaching the high capacity limit: %v / %v", sm.reservedStreams.size(), 0)
+	}
+
+	// Add more streams to fill up reserved list
+	for i := sm.streams.size() + 1; i <= MaxReservedStreams+defHiCap; i++ {
+		stream := newTestStream(makeStreamID(i), testProtoID)
+		if err := sm.NewStream(stream); err != nil {
+			t.Errorf("unexpected add stream error: %v", err)
+		}
+	}
+	if sm.streams.size() != defHiCap {
+		t.Errorf("unexpected stream size: %v / %v", sm.streams.size(), defHiCap)
+	}
+	if sm.reservedStreams.size() != MaxReservedStreams {
+		t.Errorf("unexpected reserved stream size after retrieving the maximum allowed reserved streams: %v / %v", sm.reservedStreams.size(), MaxReservedStreams)
+	}
+
+	// try to add one more stream, it should be rejected
+	stream := newTestStream(makeStreamID(1234), testProtoID)
+	err := sm.NewStream(stream)
+	if assErr := assertError(err, ErrTooManyStreams); assErr != nil {
+		t.Errorf("unexpected add stream error: %v", err)
+	}
+	if sm.streams.size() != defHiCap {
+		t.Errorf("unexpected stream size: %v / %v", sm.streams.size(), defHiCap)
+	}
+	if sm.reservedStreams.size() != MaxReservedStreams {
+		t.Errorf("unexpected reserved stream size after attempting to add a stream beyond the allowed limit: %v / %v", sm.reservedStreams.size(), MaxReservedStreams)
+	}
+
+}
+
 func TestStreamManager_HandleRemoveStream(t *testing.T) {
 	tests := []struct {
 		id      sttypes.StreamID

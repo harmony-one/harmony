@@ -44,6 +44,8 @@ type streamManager struct {
 	// Note that it could happen that remote node does not share exactly the same
 	// protocol ID (e.g. different version)
 	streams *streamSet
+	// reserved streams
+	reservedStreams *streamSet
 	// libp2p utilities
 	host         host
 	pf           peerFinder
@@ -85,22 +87,23 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 	}
 
 	return &streamManager{
-		myProtoID:     pid,
-		myProtoSpec:   protoSpec,
-		config:        c,
-		streams:       newStreamSet(),
-		host:          host,
-		pf:            pf,
-		handleStream:  handleStream,
-		addStreamCh:   make(chan addStreamTask),
-		rmStreamCh:    make(chan rmStreamTask),
-		stopCh:        make(chan stopTask),
-		discCh:        make(chan discTask, 1), // discCh is a buffered channel to avoid overuse of goroutine
-		coolDown:      abool.New(),
-		coolDownCache: newCoolDownCache(),
-		logger:        logger,
-		ctx:           ctx,
-		cancel:        cancel,
+		myProtoID:       pid,
+		myProtoSpec:     protoSpec,
+		config:          c,
+		streams:         newStreamSet(),
+		reservedStreams: newStreamSet(),
+		host:            host,
+		pf:              pf,
+		handleStream:    handleStream,
+		addStreamCh:     make(chan addStreamTask),
+		rmStreamCh:      make(chan rmStreamTask),
+		stopCh:          make(chan stopTask),
+		discCh:          make(chan discTask, 1), // discCh is a buffered channel to avoid overuse of goroutine
+		coolDown:        abool.New(),
+		coolDownCache:   newCoolDownCache(),
+		logger:          logger,
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 }
 
@@ -212,6 +215,16 @@ func (sm *streamManager) GetStreamByID(id sttypes.StreamID) (sttypes.Stream, boo
 	return sm.streams.get(id)
 }
 
+// GetReservedStreams return the reserved streams.
+func (sm *streamManager) GetReservedStreams() []sttypes.Stream {
+	return sm.reservedStreams.getStreams()
+}
+
+// NumReservedStreams return the number of reserved streams.
+func (sm *streamManager) NumReservedStreams() int {
+	return sm.reservedStreams.size()
+}
+
 type (
 	addStreamTask struct {
 		st   sttypes.Stream
@@ -254,11 +267,20 @@ func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
 
 func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	id := st.ID()
-	if sm.streams.size() >= sm.config.HiCap {
-		return ErrTooManyStreams
-	}
+	// check if stream exists
 	if _, ok := sm.streams.get(id); ok {
 		return ErrStreamAlreadyExist
+	}
+
+	// If the stream list has sufficient capacity, the stream can be added to the reserved list
+	if sm.streams.size() >= sm.config.HiCap {
+		if sm.reservedStreams.size() < MaxReservedStreams {
+			if _, ok := sm.reservedStreams.get(id); !ok {
+				sm.reservedStreams.addStream(st)
+			}
+			return nil
+		}
+		return ErrTooManyStreams
 	}
 
 	sm.streams.addStream(st)
@@ -269,6 +291,22 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	return nil
 }
 
+func (sm *streamManager) addStreamFromReserved(count int) (int, error) {
+	if sm.reservedStreams.size() == 0 {
+		return 0, errors.New("reserved streams list is empty")
+	}
+	added := 0
+	for added < count && sm.reservedStreams.size() > 0 {
+		st, err := sm.reservedStreams.popStream()
+		if err != nil {
+			return added, err
+		}
+		sm.streams.addStream(st)
+		added++
+	}
+	return added, nil
+}
+
 func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
 	st, ok := sm.streams.get(id)
 	if !ok {
@@ -276,6 +314,17 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
 	}
 
 	sm.streams.deleteStream(st)
+
+	// try to replace removed streams from reserved list
+	requiredStreams := sm.hardRequiredStreams()
+	if added, err := sm.addStreamFromReserved(requiredStreams); added > 0 {
+		sm.logger.Info().
+			Err(err). // in case if some new streams added and others failed
+			Int("requiredStreams", requiredStreams).
+			Int("added", added).
+			Msg("added new streams from reserved list")
+	}
+
 	// if stream number is smaller than HardLoCap, spin up the discover
 	if !sm.hardHaveEnoughStream() {
 		select {
@@ -328,6 +377,9 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			continue
 		}
 		if _, ok := sm.streams.get(sttypes.StreamID(peer.ID)); ok {
+			continue
+		}
+		if _, ok := sm.reservedStreams.get(sttypes.StreamID(peer.ID)); ok {
 			continue
 		}
 		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
@@ -400,4 +452,12 @@ func (sm *streamManager) softHaveEnoughStreams() bool {
 func (sm *streamManager) hardHaveEnoughStream() bool {
 	availStreams := sm.streams.numStreamsWithMinProtoSpec(sm.myProtoSpec)
 	return availStreams >= sm.config.HardLoCap
+}
+
+func (sm *streamManager) hardRequiredStreams() int {
+	availStreams := sm.streams.numStreamsWithMinProtoSpec(sm.myProtoSpec)
+	if availStreams >= sm.config.HardLoCap {
+		return 0
+	}
+	return sm.config.HardLoCap - availStreams
 }
