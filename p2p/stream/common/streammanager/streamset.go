@@ -97,8 +97,8 @@ func (ss *streamSet) getStreams() []sttypes.Stream {
 }
 
 func (ss *streamSet) popStream() (sttypes.Stream, error) {
-	ss.lock.RLock()
-	defer ss.lock.RUnlock()
+	ss.lock.Lock()
+	defer ss.lock.Unlock()
 
 	if len(ss.streams) == 0 {
 		return nil, errors.New("no available stream")
