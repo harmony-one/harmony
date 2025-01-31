@@ -178,6 +178,10 @@ func (d *txdata) CopyFrom(d2 *txdata) {
 	d.Hash = copyHash(d2.Hash)
 }
 
+func (d *txdata) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
+	return dst.Set(d.Price)
+}
+
 type txdataMarshaling struct {
 	AccountNonce hexutil.Uint64
 	Price        *hexutil.Big
@@ -531,6 +535,11 @@ func (tx *Transaction) SenderAddress() (common.Address, error) {
 		return common.Address{}, err
 	}
 	return addr, nil
+}
+
+// EffectiveGasPrice returns the effective gas price of the transaction.
+func (tx *Transaction) EffectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
+	return tx.data.effectiveGasPrice(dst, baseFee)
 }
 
 // TxByNonce implements the sort interface to allow sorting a list of transactions

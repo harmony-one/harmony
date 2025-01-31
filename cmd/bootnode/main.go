@@ -84,14 +84,21 @@ func NewConnLogger(l log.Logger) *ConnLogger {
 }
 
 var (
-	version string
-	builtBy string
-	builtAt string
-	commit  string
+	version  string
+	builtBy  string
+	builtAt  string
+	commit   string
+	commitAt string
 )
 
 func printVersion(me string) {
-	fmt.Fprintf(os.Stderr, "Harmony (C) 2024. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
+	commitYear, err := time.Parse("2006-01-02T15:04:05-0700", commitAt)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing commit date: %v\n", err)
+		os.Exit(1)
+	}
+	var currentYear = commitYear.Year()
+	fmt.Fprintf(os.Stderr, "Harmony (C) %d. %v, version %v-%v (%v %v)\n", currentYear, path.Base(me), version, commit, builtBy, builtAt)
 }
 
 func main() {
@@ -180,7 +187,7 @@ func main() {
 
 	nt := nodeConfigs.NetworkType(*networkType)
 	nodeConfigs.SetNetworkType(nt)
-	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, path.Base(os.Args[0]), version, commit, builtBy, builtAt)
+	harmonyConfigs.VersionMetaData = append(harmonyConfigs.VersionMetaData, path.Base(os.Args[0]), version, commit, commitAt, builtBy, builtAt)
 	nodeConfigs.SetVersion(harmonyConfigs.GetHarmonyVersion())
 	nodeConfigs.SetPeerID(host.GetID())
 	hc := harmonyConfigs.GetDefaultConfigCopy()
