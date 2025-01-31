@@ -215,3 +215,136 @@ func TestCollectGasRounding(t *testing.T) {
 		}
 	}
 }
+
+func TestPreCheck(t *testing.T) {
+	tests := []struct {
+		name          string
+		msg           types.Message
+		expectedError error
+	}{
+		{
+			name: "NonceTooHigh",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				2,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				false,
+			),
+			expectedError: ErrNonceTooHigh,
+		},
+		{
+			name: "NonceTooLow",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				0,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				false,
+			),
+			expectedError: ErrNonceTooLow,
+		},
+		{
+			name: "SenderNotEOA",
+			msg: types.NewMessage(
+				common.HexToAddress("0x0000000000000000000000000000000000000001"),
+				nil,
+				1,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				false,
+			),
+			expectedError: ErrSenderNotEOA,
+		},
+		{
+			name: "SuccessfulPreCheck",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				1,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				false,
+			),
+			expectedError: nil,
+		},
+		{
+			name: "SkipNonceChecks",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				2,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				true,
+				false,
+			),
+			expectedError: nil,
+		},
+		{
+			name: "SkipFromEOACheck",
+			msg: types.NewMessage(
+				common.HexToAddress("0x0000000000000000000000000000000000000001"),
+				nil,
+				1,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				true,
+			),
+			expectedError: nil,
+		},
+		{
+			name: "SkipBothChecks",
+			msg: types.NewMessage(
+				common.HexToAddress("0x0000000000000000000000000000000000000001"),
+				nil,
+				2,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				true,
+				true,
+			),
+			expectedError: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// make evm
+			key, _ := crypto.GenerateKey()
+			chain, db, header, _ := getTestEnvironment(*key)
+			gp := new(GasPool).AddGas(math.MaxUint64)
+			ctx := NewEVMContext(tt.msg, header, chain, nil /* coinbase is nil, no block reward */)
+			ctx.TxType = types.SameShardTx
+			vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+
+			// call preCheck and check for expected error
+			st := NewStateTransition(vmenv, tt.msg, gp)
+			err := st.preCheck()
+			if err != tt.expectedError {
+				t.Errorf("expected error %v, got %v", tt.expectedError, err)
+			}
+		})
+	}
+}
