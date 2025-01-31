@@ -126,7 +126,7 @@ func WhatPercentStakedNow(
 		)
 	}
 	percentage := stakedNow.Quo(stakingReward.TotalInitialTokens.Mul(
-		reward.PercentageForTimeStamp(timestamp),
+		reward.PercentageForTimeStamp(shard.Schedule, timestamp),
 	).Add(dole))
 	utils.Logger().Info().
 		Str("so-far-doled-out", dole.String()).
