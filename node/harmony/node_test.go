@@ -2,15 +2,16 @@ package node
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"log"
 	"testing"
 
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/registry"
@@ -22,35 +23,65 @@ import (
 	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	multihash "github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/assert"
 )
 
 var testDBFactory = &shardchain.MemDBFactory{}
 
-// randomPeerID generates a random Peer ID
-func randomPeerID() libp2p_peer.ID {
+// randomPeer generates a random Peer
+func randomPeer() (libp2p_crypto.PrivKey, libp2p_crypto.PubKey, libp2p_peer.ID) {
 	// Generate a random private key
 	priv, _, err := libp2p_crypto.GenerateKeyPairWithReader(libp2p_crypto.Ed25519, 2048, rand.Reader)
 	if err != nil {
 		panic(err)
 	}
+	pub := priv.GetPublic()
 	// Get the peer ID from the private key
 	pid, err := libp2p_peer.IDFromPrivateKey(priv)
 	if err != nil {
 		panic(err)
 	}
-	return pid
+	return priv, pub, pid
 }
 
 // createRandomNode creates a random peer
 func createRandomNode(port string) (string, *ffi_bls.SecretKey, *p2p.Peer) {
-	blsKey := bls.RandPrivateKey()
+	var blsKey ffi_bls.SecretKey
+	blsKey.SetByCSPRNG() // Secure random private key
 	pubKey := blsKey.GetPublicKey()
-	peerID := randomPeerID()
-	p2pPeer := &p2p.Peer{IP: "127.0.0.1", Port: port, ConsensusPubKey: pubKey, PeerID: peerID}
+
+	// Convert BLS public key to bytes
+	blsPubKeyBytes := pubKey.Serialize()
+
+	// Hash BLS public key using SHA-256
+	hash := sha256.Sum256(blsPubKeyBytes)
+
+	// Encode hash into Multihash format
+	mh, err := multihash.EncodeName(hash[:], "sha2-256")
+	if err != nil {
+		log.Fatalf("Failed to encode multihash: %v", err)
+	}
+
+	// Generate a Peer ID using the Multihash
+	peerID, err := libp2p_peer.IDFromBytes(mh)
+	if err != nil {
+		log.Fatalf("Failed to generate Peer ID: %v", err)
+	}
+
+	// Create P2P Peer struct
+	p2pPeer := &p2p.Peer{
+		IP:              "127.0.0.1",
+		Port:            port,
+		ConsensusPubKey: pubKey,
+		PeerID:          peerID,
+	}
+
+	// Create a multiaddress
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", "127.0.0.1", port, peerID)
 	peerAddr, _ := multiaddr.NewMultiaddr(addr)
-	return peerAddr.String(), blsKey, p2pPeer
+
+	return peerAddr.String(), &blsKey, p2pPeer
 }
 
 func TestTrustedNodes(t *testing.T) {
