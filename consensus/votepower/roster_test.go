@@ -149,3 +149,11 @@ func compareStakedVoter(a, b *AccommodateHarmonyVote) bool {
 		a.OverallPercent.Equal(b.OverallPercent) &&
 		a.EffectiveStake.Equal(b.EffectiveStake)
 }
+
+func TestNewRound(t *testing.T) {
+	// Test NewRound
+	round := NewRound()
+	if round == nil {
+		t.Error("NewRound failed")
+	}
+}
