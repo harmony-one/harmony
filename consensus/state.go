@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// State contains current mode and current viewID
+// State contains current(inserted block + 1) fields, or in other words, the state of consensus.
 type State struct {
 	mode uint32
 
@@ -33,8 +33,10 @@ type State struct {
 	// Block to run consensus on
 	block []byte
 
+	// FBFT phase: Announce, Prepare, Commit
 	phase FBFTPhase
 
+	// ShardID of the consensus
 	ShardID uint32
 }
 
@@ -59,6 +61,7 @@ func (pm *State) SetBlockNum(blockNum uint64) {
 	pm.setBlockNum(blockNum)
 }
 
+// GetBlockNum returns the block number
 func (pm *State) GetBlockNum() uint64 {
 	return pm.getBlockNum()
 }
