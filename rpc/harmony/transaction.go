@@ -909,7 +909,7 @@ func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOr
 	executable := func(gas uint64) (bool, *core.ExecutionResult, error) {
 		args.Gas = (*hexutil.Uint64)(&gas)
 
-		result, err := DoEVMCall(ctx, hmy, args, blockNrOrHash, 0)
+		result, err := DoEVMCall(ctx, hmy, args, blockNrOrHash, 0, nil, nil)
 		if err != nil {
 			if errors.Is(err, core.ErrIntrinsicGas) {
 				return true, nil, nil // Special case, raise gas limit
