@@ -323,6 +323,8 @@ var (
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		IsOneSecondEpoch:                      big.NewInt(6),
+		IsRotationEachBlockEpoch:              big.NewInt(6),
 	}
 
 	// AllProtocolChanges ...
@@ -371,6 +373,8 @@ var (
 		big.NewInt(0),                      // BlockGas30M
 		big.NewInt(0),                      // MaxRateEpoch
 		big.NewInt(0),                      // MaxRateEpoch
+		big.NewInt(0),
+		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
@@ -423,6 +427,8 @@ var (
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
 		big.NewInt(0),        // MaxRateEpoch
+		big.NewInt(0),
+		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
 	}
@@ -606,6 +612,10 @@ type ChainConfig struct {
 	// vote power feature  https://github.com/harmony-one/harmony/pull/4683
 	// if crosslink are not sent for an entire epoch signed and toSign will be 0 and 0. when that happen, next epoch there will no shard 1 validator elected in the committee.
 	HIP32Epoch *big.Int `json:"hip32-epoch,omitempty"`
+
+	IsOneSecondEpoch *big.Int `json:"is-one-second-epoch,omitempty"`
+
+	IsRotationEachBlockEpoch *big.Int `json:"is-rotation-each-block-epoch"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -729,6 +739,10 @@ func (c *ChainConfig) IsFiveSeconds(epoch *big.Int) bool {
 // IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
 func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
 	return isForked(c.TwoSecondsEpoch, epoch)
+}
+
+func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
+	return isForked(c.IsOneSecondEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%
@@ -893,6 +907,10 @@ func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 // their balances over to shard 0 or 1.
 func (c *ChainConfig) IsOneEpochBeforeHIP30(epoch *big.Int) bool {
 	return new(big.Int).Sub(c.HIP30Epoch, epoch).Cmp(common.Big1) == 0
+}
+
+func (c *ChainConfig) IsRotationEachBlock(epoch *big.Int) bool {
+	return isForked(c.IsRotationEachBlockEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.

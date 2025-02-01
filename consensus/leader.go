@@ -223,6 +223,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
+	currentHeader := consensus.Blockchain().CurrentHeader()
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
 		signed := consensus.decider.ReadBallot(quorum.Commit, signer.Bytes)
@@ -328,7 +329,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 		if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems
-			consensus.preCommitAndPropose(blockObj)
+			consensus.preCommitAndPropose1s(blockObj)
 		}
 
 		consensus.transitions.finalCommit = true
