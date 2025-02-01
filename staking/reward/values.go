@@ -39,6 +39,11 @@ var (
 		big.NewInt(14*denominations.Nano), big.NewInt(denominations.Nano),
 	))
 
+	// OneSecStakedBlock is half of HIP30
+	OneSecStakedBlock = numeric.NewDecFromBigInt(new(big.Int).Mul(
+		big.NewInt(7*denominations.Nano), big.NewInt(denominations.Nano),
+	))
+
 	// TotalInitialTokens is the total amount of tokens (in ONE) at block 0 of the network.
 	// This should be set/change on the node's init according to the core.GenesisSpec.
 	TotalInitialTokens = numeric.Dec{Int: big.NewInt(0)}
