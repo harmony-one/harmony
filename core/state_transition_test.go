@@ -246,7 +246,7 @@ func TestPreCheck(t *testing.T) {
 			msg: types.NewMessage(
 				crypto.PubkeyToAddress(key.PublicKey),
 				nil,
-				0, // TODO: nonce is 0 but cannot be a negative number
+				0,
 				big.NewInt(0),
 				21000,
 				big.NewInt(1),
@@ -262,7 +262,7 @@ func TestPreCheck(t *testing.T) {
 		{
 			name: "SenderNotEOA",
 			msg: types.NewMessage(
-				crypto.PubkeyToAddress(key.PublicKey), // TODO: sender is an EOA
+				crypto.PubkeyToAddress(key.PublicKey),
 				nil,
 				0,
 				big.NewInt(0),

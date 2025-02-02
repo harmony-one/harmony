@@ -210,7 +210,7 @@ func (st *StateTransition) preCheck() error {
 
 	// Ensure that the sender is an EOA (EIP-3607)
 	if !st.msg.SkipFromEOACheck() {
-		if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != state.EmptyCodeHash && codeHash != (common.Hash{}) {
+		if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != state.EmptyCodeHash && codeHash != (common.Hash{}) { // getCodeHash returns EmptyCodeHash for unused accounts
 			return ErrSenderNotEOA
 		}
 	}
