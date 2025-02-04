@@ -114,7 +114,7 @@ type BlockOverrides struct {
 	Time          *hexutil.Uint64
 	GasLimit      *hexutil.Uint64
 	FeeRecipient  *common.Address
-	PrevRandao    *common.Hash // no-op; synonymous to VRF but not used by account abstraction bundlers
+	PrevRandao    *common.Hash // no-op
 	BaseFeePerGas *hexutil.Big // EIP-1559 (not implemented)
 	BlobBaseFee   *hexutil.Big // EIP-4844 (not implemented)
 }
@@ -138,7 +138,4 @@ func (b *BlockOverrides) Apply(blockCtx *vm.Context) {
 	if b.FeeRecipient != nil {
 		blockCtx.Coinbase = *b.FeeRecipient
 	}
-	// if b.PrevRandao != nil {
-	// 	blockCtx.VRF = *b.PrevRandao
-	// }
 }
