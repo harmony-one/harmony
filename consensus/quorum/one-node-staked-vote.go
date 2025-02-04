@@ -147,6 +147,20 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 	}
 }
 
+func (v *stakedVoteWeight) VoteTally(p Phase) numeric.Dec {
+	switch p {
+	case Prepare:
+		return v.voteTally.Prepare.tally
+	case Commit:
+		return v.voteTally.Commit.tally
+	case ViewChange:
+		return v.voteTally.ViewChange.tally
+	default:
+		// Should not happen
+		return numeric.ZeroDec()
+	}
+}
+
 // IsQuorumAchivedByMask ..
 func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	threshold := v.QuorumThreshold()

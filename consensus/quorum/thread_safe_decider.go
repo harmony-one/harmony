@@ -187,3 +187,9 @@ func (a threadSafeDeciderImpl) ComputeTotalPowerByMask(mask *bls.Mask) numeric.D
 	defer a.mu.Unlock()
 	return a.decider.ComputeTotalPowerByMask(mask)
 }
+
+func (a threadSafeDeciderImpl) VoteTally(p Phase) numeric.Dec {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.decider.VoteTally(p)
+}

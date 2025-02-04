@@ -126,6 +126,7 @@ type Decider interface {
 	ResetPrepareAndCommitVotes()
 	ResetViewChangeVotes()
 	CurrentTotalPower(p Phase) (*numeric.Dec, error)
+	VoteTally(p Phase) numeric.Dec
 }
 
 // Registry ..

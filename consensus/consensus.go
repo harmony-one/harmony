@@ -140,6 +140,9 @@ type Consensus struct {
 	transitions struct {
 		finalCommit bool
 	}
+
+	didReachPrepareQ   uint64
+	didReachPreCommitQ uint64
 }
 
 // Blockchain returns the blockchain.

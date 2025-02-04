@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -137,7 +138,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	return nil
 }
 
-func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64, isLeader bool) {
+func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64, isLeader bool, from string) {
 	consensus.getLogger().Info().Str("waitTime", waitTime.String()).
 		Msg("[OnCommit] Starting Grace Period")
 	time.Sleep(waitTime)
@@ -145,6 +146,13 @@ func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64, i
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
+	if consensus.didReachPreCommitQ == viewID {
+		return // already committed
+	}
+	defer func() {
+		consensus.didReachPreCommitQ = viewID
+	}()
+	fmt.Println("faired finalCommit", from)
 	consensus.transitions.finalCommit = false
 	if viewID == consensus.getCurBlockViewID() {
 		consensus._finalCommit(isLeader)

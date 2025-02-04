@@ -1,6 +1,9 @@
 package consensus
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -12,7 +15,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-func (consensus *Consensus) didReachPrepareQuorum() error {
+func (consensus *Consensus) didReachPrepareQuorum(from string) error {
+
 	logger := utils.Logger()
 	logger.Info().Msg("[OnPrepare] Received Enough Prepare Signatures")
 	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
@@ -35,9 +39,6 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		networkMessage.FBFTMsg,
 		networkMessage.OptionalAggregateSignature
 
-	consensus.aggregatedPrepareSig = aggSig
-	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
-	// Leader add commit phase signature
 	var blockObj types.Block
 	if err := rlp.DecodeBytes(consensus.current.block, &blockObj); err != nil {
 		consensus.getLogger().Warn().
@@ -46,8 +47,23 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			Msg("[didReachPrepareQuorum] Unparseable block data")
 		return err
 	}
+	if blockObj.NumberU64() == consensus.didReachPrepareQ {
+		return nil
+	}
+	if consensus.ShardID == 0 {
+		fmt.Println("faired didReachPrepareQuorum", from)
+	}
+
+	consensus.aggregatedPrepareSig = aggSig
+	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
+	// Leader add commit phase signature
+
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain().Config(),
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
+
+	defer func() {
+		consensus.didReachPrepareQ = blockObj.NumberU64()
+	}()
 
 	// so by this point, everyone has committed to the blockhash of this block
 	// in prepare and so this is the actual block.
@@ -68,6 +84,16 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			return err
 		}
 	}
+	viewID := consensus.getCurBlockViewID()
+	go func() {
+		consensus.transitions.finalCommit = true
+		waitTime := 1000 * time.Millisecond
+		maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
+		if maxWaitTime > waitTime {
+			waitTime = maxWaitTime
+		}
+		go consensus.finalCommit(waitTime, viewID, consensus.isLeader(), "hack final commit")
+	}()
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.BlockNum(),
 		msg_pb.MessageType_PREPARED, []nodeconfig.GroupID{

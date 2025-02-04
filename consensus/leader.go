@@ -1,12 +1,14 @@
 package consensus
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -73,6 +75,22 @@ func (consensus *Consensus) announce(block *types.Block) {
 			return
 		}
 	}
+	quorumPostNewSignatures := consensus.decider.IsQuorumAchieved(quorum.Prepare)
+	tally := consensus.decider.VoteTally(quorum.Prepare)
+	threshold := consensus.decider.QuorumThreshold()
+
+	if quorumPostNewSignatures {
+		time.AfterFunc(2*time.Second, func() {
+
+			consensus.mutex.Lock()
+			defer consensus.mutex.Unlock()
+			if err := consensus.didReachPrepareQuorum(fmt.Sprintf("announce hack %d", block.NumberU64())); err != nil {
+				fmt.Println("err", err)
+			}
+		})
+	}
+
+	fmt.Println("announce", utils.GetPort(), quorumPostNewSignatures, tally.String(), threshold.String(), tally.GTE(threshold))
 	// Construct broadcast p2p message
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.getBlockNum(), msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
@@ -209,7 +227,7 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 
 	if quorumFromInitialSignature || quorumFromNewSignatures {
 		// NOTE Let it handle its own logs
-		if err := consensus.didReachPrepareQuorum(); err != nil {
+		if err := consensus.didReachPrepareQuorum("onPrepare"); err != nil {
 			return
 		}
 		consensus.switchPhase("onPrepare", FBFTCommit)
@@ -337,7 +355,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		if maxWaitTime > waitTime {
 			waitTime = maxWaitTime
 		}
-		go consensus.finalCommit(waitTime, viewID, consensus.isLeader())
+		go consensus.finalCommit(waitTime, viewID, consensus.isLeader(), fmt.Sprintf("onCommit correct %d", blockObj.NumberU64()))
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
