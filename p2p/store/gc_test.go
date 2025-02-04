@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/common/clock"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +18,6 @@ func TestScheduleGcPeriodically(t *testing.T) {
 		// Wait for the gc background process to complete after cancelling the context
 		bgTasks.Wait()
 	}()
-	logger := log.New()
 	clock := clock.NewDeterministicClock(time.UnixMilli(5000))
 
 	called := make(chan struct{}, 10)
@@ -37,7 +35,7 @@ func TestScheduleGcPeriodically(t *testing.T) {
 			require.Len(t, called, 0, "should only run once after gc period")
 		}
 	}
-	startGc(ctx, logger, clock, &bgTasks, action)
+	startGc(ctx, clock, &bgTasks, action)
 	timeout, tCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer tCancel()
 	require.True(t, clock.WaitForNewPendingTask(timeout), "did not schedule pending GC")

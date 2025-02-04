@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/common/clock"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
@@ -32,9 +31,8 @@ func TestRoundTripPeerBan(t *testing.T) {
 
 func createMemoryPeerBanBook(t *testing.T) *peerBanBook {
 	store := sync.MutexWrap(ds.NewMapDatastore())
-	logger := log.New()
 	c := clock.NewDeterministicClock(time.UnixMilli(100))
-	book, err := newPeerBanBook(context.Background(), logger, c, store)
+	book, err := newPeerBanBook(context.Background(), c, store)
 	require.NoError(t, err)
 	return book
 }

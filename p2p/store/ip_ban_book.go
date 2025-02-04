@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/common/clock"
 	ds "github.com/ipfs/go-datastore"
 )
@@ -55,8 +54,8 @@ func ipKey(ip string) ds.Key {
 	return ds.NewKey(ip)
 }
 
-func newIPBanBook(ctx context.Context, logger log.Logger, clock clock.Clock, store ds.Batching) (*ipBanBook, error) {
-	book, err := newRecordsBook[string, *ipBanRecord](ctx, logger, clock, store, ipBanCacheSize, ipBanRecordExpiration, ipBanExpirationsBase, genNew, ipKey)
+func newIPBanBook(ctx context.Context, clock clock.Clock, store ds.Batching) (*ipBanBook, error) {
+	book, err := newRecordsBook[string, *ipBanRecord](ctx, clock, store, ipBanCacheSize, ipBanRecordExpiration, ipBanExpirationsBase, genNew, ipKey)
 	if err != nil {
 		return nil, err
 	}

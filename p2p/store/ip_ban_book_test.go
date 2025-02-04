@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/common/clock"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
@@ -34,9 +33,8 @@ func TestRoundTripIPBan(t *testing.T) {
 
 func createMemoryIPBanBook(t *testing.T) *ipBanBook {
 	store := sync.MutexWrap(ds.NewMapDatastore())
-	logger := log.New()
 	c := clock.NewDeterministicClock(time.UnixMilli(100))
-	book, err := newIPBanBook(context.Background(), logger, c, store)
+	book, err := newIPBanBook(context.Background(), c, store)
 	require.NoError(t, err)
 	return book
 }

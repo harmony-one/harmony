@@ -53,7 +53,7 @@ type recordsBook[K ~string, V record] struct {
 	recordExpiry time.Duration // pruning is disabled if this is 0
 }
 
-func newRecordsBook[K ~string, V record](ctx context.Context, logger log.Logger, clock clock.Clock, store ds.Batching, cacheSize int, recordExpiry time.Duration,
+func newRecordsBook[K ~string, V record](ctx context.Context, clock clock.Clock, store ds.Batching, cacheSize int, recordExpiry time.Duration,
 	dsBaseKey ds.Key, newRecord func() V, dsEntryKey func(K) ds.Key) (*recordsBook[K, V], error) {
 	cache, err := lru.New[K, V](cacheSize)
 	if err != nil {
@@ -65,7 +65,6 @@ func newRecordsBook[K ~string, V record](ctx context.Context, logger log.Logger,
 		ctx:          ctx,
 		cancelFn:     cancelFn,
 		clock:        clock,
-		log:          logger,
 		store:        store,
 		cache:        cache,
 		newRecord:    newRecord,
@@ -80,7 +79,7 @@ func (d *recordsBook[K, V]) startGC() {
 	if d.recordExpiry == 0 {
 		return
 	}
-	startGc(d.ctx, d.log, d.clock, &d.bgTasks, d.prune)
+	startGc(d.ctx, d.clock, &d.bgTasks, d.prune)
 }
 
 func (d *recordsBook[K, V]) dsKey(key K) ds.Key {
