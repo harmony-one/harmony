@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
@@ -78,13 +77,10 @@ func (s *PublicContractService) wait(limiter *rate.Limiter, ctx context.Context)
 	return nil
 }
 
-// TODO(sun): geth uses a new struct within gethclient.go instead of the overrides.go
-// TODO(sun): look into the cause
 // Call executes the given transaction on the state for the given block number.
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicContractService) Call(
 	ctx context.Context, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash,
-	overrides *StateOverrides, blockOverrides *BlockOverrides,
 ) (hexutil.Bytes, error) {
 	timer := DoMetricRPCRequest(Call)
 	defer DoRPCRequestDuration(Call, timer)
@@ -96,7 +92,7 @@ func (s *PublicContractService) Call(
 	}
 
 	// Execute call
-	result, err := DoEVMCall(ctx, s.hmy, args, blockNrOrHash, s.evmCallTimeout, overrides, blockOverrides)
+	result, err := DoEVMCall(ctx, s.hmy, args, blockNrOrHash, s.evmCallTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -161,43 +157,22 @@ func (s *PublicContractService) GetStorageAt(
 
 // DoEVMCall executes an EVM call
 func DoEVMCall(
-	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash,
-	timeout time.Duration, overrides *StateOverrides, blockOverrides *BlockOverrides,
-) (core.ExecutionResult, error) {
+	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, timeout time.Duration) (core.ExecutionResult, error) {
 	defer func(start time.Time) {
 		utils.Logger().Debug().
 			Dur("runtime", time.Since(start)).
 			Msg("Executing EVM call finished")
 	}(time.Now())
 
-	// fetch state
+	// Fetch state
 	state, header, err := hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
 		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err
 	}
 
-	// create new call message
+	// Create new call message
 	msg := args.ToMessage(hmy.RPCGasCap)
-
-	// get a new instance of the EVM.
-	evm, err := hmy.GetEVM(ctx, msg, state, header)
-	if err != nil {
-		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
-		return core.ExecutionResult{}, err
-	}
-
-	// apply block overrides
-	if blockOverrides != nil {
-		blockOverrides.Apply(&evm.Context)
-	}
-
-	// apply state overrides
-	precompiles := vm.PrecompiledContractsStaking
-	if err := overrides.Apply(*state, precompiles); err != nil {
-		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
-		return core.ExecutionResult{}, err
-	}
 
 	// Setup context so it may be cancelled the call has completed
 	// or, in case of unmetered gas, setup a context with a timeout.
@@ -211,6 +186,13 @@ func DoEVMCall(
 	// Make sure the context is cancelled when the call has completed
 	// this makes sure resources are cleaned up.
 	defer cancel()
+
+	// Get a new instance of the EVM.
+	evm, err := hmy.GetEVM(ctx, msg, state, header)
+	if err != nil {
+		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
+		return core.ExecutionResult{}, err
+	}
 
 	// Wait for the context to be done and cancel the evm. Even if the
 	// EVM has finished, cancelling may be done (repeatedly)

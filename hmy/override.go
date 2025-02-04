@@ -1,4 +1,4 @@
-package rpc
+package hmy
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ func (s *StateOverrides) has(address common.Address) bool {
 }
 
 // Apply overrides the fields of specified accounts into the given state.
-func (s *StateOverrides) Apply(state state.DB, precompiles map[common.Address]vm.PrecompiledContract) error {
+func (s *StateOverrides) Apply(state *state.DB, precompiles map[common.Address]vm.PrecompiledContract) error {
 	if s == nil {
 		return nil
 	}
@@ -48,7 +48,6 @@ func (s *StateOverrides) Apply(state state.DB, precompiles map[common.Address]vm
 		}
 
 		p, isPrecompile := precompiles[addr]
-		// MovePrecompileTo allows to move a precompile to a different address
 		// if the target adddress is another precompile, the target code is lost for this session
 		if account.MovePrecompileTo != nil {
 			if !isPrecompile {
@@ -111,11 +110,11 @@ func (s *StateOverrides) Apply(state state.DB, precompiles map[common.Address]vm
 // BlockOverrides is a set of header fields to override.
 type BlockOverrides struct {
 	Number        *hexutil.Big
-	Difficulty    *hexutil.Big // No-op if we're simulating post-merge calls.
+	Difficulty    *hexutil.Big // no-op
 	Time          *hexutil.Uint64
 	GasLimit      *hexutil.Uint64
 	FeeRecipient  *common.Address
-	PrevRandao    *common.Hash
+	PrevRandao    *common.Hash // no-op; synonymous to VRF but not used by account abstraction bundlers
 	BaseFeePerGas *hexutil.Big // EIP-1559 (not implemented)
 	BlobBaseFee   *hexutil.Big // EIP-4844 (not implemented)
 }
@@ -139,4 +138,7 @@ func (b *BlockOverrides) Apply(blockCtx *vm.Context) {
 	if b.FeeRecipient != nil {
 		blockCtx.Coinbase = *b.FeeRecipient
 	}
+	// if b.PrevRandao != nil {
+	// 	blockCtx.VRF = *b.PrevRandao
+	// }
 }

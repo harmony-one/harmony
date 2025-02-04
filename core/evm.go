@@ -418,6 +418,10 @@ func GetHashFn(ref *block.Header, chain ChainContext) func(n uint64) common.Hash
 	var cache map[uint64]common.Hash
 
 	return func(n uint64) common.Hash {
+		if ref.Number().Uint64() <= n {
+			// This situation can happen if we're doing tracing and using block overrides.
+			return common.Hash{}
+		}
 		// If there's no hash cache yet, make one
 		if cache == nil {
 			cache = map[uint64]common.Hash{
