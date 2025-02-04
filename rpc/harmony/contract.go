@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"math/big"
 	"reflect"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
@@ -80,6 +78,8 @@ func (s *PublicContractService) wait(limiter *rate.Limiter, ctx context.Context)
 	return nil
 }
 
+// TODO(sun): geth uses a new struct within gethclient.go instead of the overrides.go
+// TODO(sun): look into the cause
 // Call executes the given transaction on the state for the given block number.
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicContractService) Call(
@@ -193,7 +193,8 @@ func DoEVMCall(
 	}
 
 	// apply state overrides
-	if err := overrides.Apply(*state); err != nil {
+	precompiles := vm.PrecompiledContractsStaking
+	if err := overrides.Apply(*state, precompiles); err != nil {
 		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err
 	}
@@ -235,96 +236,4 @@ func DoEVMCall(
 
 	// Response output is the same for all versions
 	return result, nil
-}
-
-// OverrideAccount specifies the fields of an account to override during the execution
-// of a message call.
-// The fields `state` and `stateDiff` cannot be specified simultaneously. If `state` is set,
-// the message execution will use only the data provided in the given state. Conversely,
-// if `stateDiff` is set, all the diffs will be applied first, and then the message call
-// will be executed.
-type OverrideAccount struct {
-	Nonce     *hexutil.Uint64              `json:"nonce"`
-	Code      *hexutil.Bytes               `json:"code"`
-	Balance   **hexutil.Big                `json:"balance"`
-	State     *map[common.Hash]common.Hash `json:"state"`
-	StateDiff *map[common.Hash]common.Hash `json:"stateDiff"`
-}
-
-// StateOverride is the collection of overriden accounts.
-type StateOverrides map[common.Address]OverrideAccount
-
-// Apply overrides the fields of specified accounts into the given state.
-func (s *StateOverrides) Apply(state state.DB) error {
-	if s == nil {
-		return nil
-	}
-
-	for addr, account := range *s {
-		// nonce
-		if account.Nonce != nil {
-			state.SetNonce(addr, uint64(*account.Nonce))
-		}
-
-		// account (contract) code
-		if account.Code != nil {
-			state.SetCode(addr, *account.Code, false) // TODO: isValidatorCode set to false
-		}
-
-		// account balance
-		if account.Balance != nil {
-			state.SetBalance(addr, (*big.Int)(*account.Balance))
-		}
-
-		if account.State != nil && account.StateDiff != nil {
-			return fmt.Errorf("account %s has both 'state' and 'stateDiff'", addr.Hex())
-		}
-
-		// replace entire state if caller requires
-		if account.State != nil {
-			state.SetStorage(addr, *account.State)
-		}
-
-		// apply state diff into specified accounts
-		if account.StateDiff != nil {
-			for k, v := range *account.StateDiff {
-				state.SetState(addr, k, v)
-			}
-		}
-	}
-
-	return nil
-}
-
-// BlockOverrides is a set of header fields to override.
-type BlockOverrides struct {
-	Number        *hexutil.Big
-	Difficulty    *hexutil.Big // No-op if we're simulating post-merge calls.
-	Time          *hexutil.Uint64
-	GasLimit      *hexutil.Uint64
-	FeeRecipient  *common.Address
-	PrevRandao    *common.Hash
-	BaseFeePerGas *hexutil.Big // EIP-1559 (not implemented)
-	BlobBaseFee   *hexutil.Big // EIP-4844 (not implemented)
-}
-
-// apply overrides the given header fields into the given block context
-// difficulty & random not part of vm.Context
-func (b *BlockOverrides) Apply(blockCtx *vm.Context) {
-	if b == nil {
-		return
-	}
-
-	if b.Number != nil {
-		blockCtx.BlockNumber = b.Number.ToInt()
-	}
-	if b.Time != nil {
-		blockCtx.Time = big.NewInt(int64(*b.Time))
-	}
-	if b.GasLimit != nil {
-		blockCtx.GasLimit = uint64(*b.GasLimit)
-	}
-	if b.FeeRecipient != nil {
-		blockCtx.Coinbase = *b.FeeRecipient
-	}
 }

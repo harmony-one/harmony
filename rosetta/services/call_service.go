@@ -395,6 +395,7 @@ func (c *CallAPIService) call(
 			"message": errors.WithMessage(err, "invalid parameters").Error(),
 		})
 	}
+	// TODO(sun): last two arguments nil -> actual overrides configs
 	data, err := contractAPI.Call(ctx, args.CallArgs, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(args.BlockNum)), nil, nil)
 	if err != nil {
 		return nil, common.NewError(common.ErrCallExecute, map[string]interface{}{

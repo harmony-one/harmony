@@ -202,6 +202,8 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 		}
 	}
 
+	// TODO(sun): apply block overrides and state overrides
+
 	// Execute the trace
 	msg := args.ToMessage(s.hmy.RPCGasCap)
 	vmctx := core.NewEVMContext(msg, header, s.hmy.BlockChain, nil)

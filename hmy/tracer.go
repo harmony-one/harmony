@@ -60,6 +60,7 @@ type TraceConfig struct {
 	Tracer  *string
 	Timeout *string
 	Reexec  *uint64
+	// TODO(sun): add block overrides and state overrides
 }
 
 // StdTraceConfig holds extra parameters to standard-json trace functions.
