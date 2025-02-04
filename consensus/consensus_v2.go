@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"math/big"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -179,7 +178,7 @@ func (consensus *Consensus) _finalCommit(isLeader bool) {
 	)
 	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
 	// find correct block content
-	curBlockHash := consensus.blockHash
+	curBlockHash := consensus.current.blockHash
 	block := consensus.fBFTLog.GetBlockByHash(curBlockHash)
 	if block == nil {
 		consensus.getLogger().Warn().
@@ -290,10 +289,12 @@ func (consensus *Consensus) _finalCommit(isLeader bool) {
 	if isLeader {
 		if block.IsLastBlockInEpoch() {
 			// No pipelining
-			go func() {
-				consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
-				consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", "I am leader and it's the last block in epoch")
-			}()
+			if !consensus.isRotation(block.Epoch()) {
+				go func() {
+					consensus.getLogger().Info().Msg("[finalCommit] sending block proposal signal")
+					consensus.ReadySignal(NewProposal(SyncProposal, block.NumberU64()+1), "finalCommit", "I am leader and it's the last block in epoch")
+				}()
+			}
 		} else {
 			// pipelining
 			go func() {
@@ -841,7 +842,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 
 // SetupForNewConsensus sets the state for new consensus
 func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
-	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
+	consensus.setBlockNum(blk.NumberU64() + 1)
 	consensus.setCurBlockViewID(committedMsg.ViewID + 1)
 	var epoch *big.Int
 	if blk.IsLastBlockInEpoch() {

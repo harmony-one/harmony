@@ -9,7 +9,7 @@ func (consensus *Consensus) GetConsensusPhase() string {
 
 // GetConsensusPhase returns the current phase of the consensus.
 func (consensus *Consensus) getConsensusPhase() string {
-	return consensus.phase.String()
+	return consensus.current.phase.String()
 }
 
 // GetConsensusMode returns the current mode of the consensus

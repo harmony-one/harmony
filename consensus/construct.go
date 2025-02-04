@@ -24,32 +24,32 @@ type NetworkMessage struct {
 }
 
 // Populates the common basic fields for all consensus message.
-func (consensus *Consensus) populateMessageFields(
+func (pm *State) populateMessageFields(
 	request *msg_pb.ConsensusRequest, blockHash []byte,
 ) *msg_pb.ConsensusRequest {
-	request.ViewId = consensus.getCurBlockViewID()
-	request.BlockNum = consensus.getBlockNum()
-	request.ShardId = consensus.ShardID
+	request.ViewId = pm.getCurBlockViewID()
+	request.BlockNum = pm.getBlockNum()
+	request.ShardId = pm.ShardID
 	// 32 byte block hash
 	request.BlockHash = blockHash
 	return request
 }
 
 // Populates the common basic fields for the consensus message and senders bitmap.
-func (consensus *Consensus) populateMessageFieldsAndSendersBitmap(
+func (pm *State) populateMessageFieldsAndSendersBitmap(
 	request *msg_pb.ConsensusRequest, blockHash []byte, bitmap []byte,
 ) *msg_pb.ConsensusRequest {
-	consensus.populateMessageFields(request, blockHash)
+	pm.populateMessageFields(request, blockHash)
 	// sender address
 	request.SenderPubkeyBitmap = bitmap
 	return request
 }
 
 // Populates the common basic fields for the consensus message and single sender.
-func (consensus *Consensus) populateMessageFieldsAndSender(
+func (pm *State) populateMessageFieldsAndSender(
 	request *msg_pb.ConsensusRequest, blockHash []byte, pubKey bls.SerializedPublicKey,
 ) *msg_pb.ConsensusRequest {
-	consensus.populateMessageFields(request, blockHash)
+	pm.populateMessageFields(request, blockHash)
 	// sender address
 	request.SenderPubkey = pubKey[:]
 	return request
@@ -75,8 +75,8 @@ func (consensus *Consensus) construct(
 	)
 
 	if len(priKeys) == 1 {
-		consensusMsg = consensus.populateMessageFieldsAndSender(
-			message.GetConsensus(), consensus.blockHash[:], priKeys[0].Pub.Bytes,
+		consensusMsg = consensus.current.populateMessageFieldsAndSender(
+			message.GetConsensus(), consensus.current.blockHash[:], priKeys[0].Pub.Bytes,
 		)
 	} else {
 		// TODO: use a persistent bitmap to report bitmap
@@ -84,8 +84,8 @@ func (consensus *Consensus) construct(
 		for _, key := range priKeys {
 			mask.SetKey(key.Pub.Bytes, true)
 		}
-		consensusMsg = consensus.populateMessageFieldsAndSendersBitmap(
-			message.GetConsensus(), consensus.blockHash[:], mask.Bitmap,
+		consensusMsg = consensus.current.populateMessageFieldsAndSendersBitmap(
+			message.GetConsensus(), consensus.current.blockHash[:], mask.Bitmap,
 		)
 	}
 
@@ -93,8 +93,8 @@ func (consensus *Consensus) construct(
 	needMsgSig := true
 	switch p {
 	case msg_pb.MessageType_ANNOUNCE:
-		consensusMsg.Block = consensus.block
-		consensusMsg.Payload = consensus.blockHash[:]
+		consensusMsg.Block = consensus.current.block
+		consensusMsg.Payload = consensus.current.blockHash[:]
 	case msg_pb.MessageType_PREPARE:
 		needMsgSig = false
 		sig := bls_core.Sign{}
@@ -114,7 +114,7 @@ func (consensus *Consensus) construct(
 		}
 		consensusMsg.Payload = sig.Serialize()
 	case msg_pb.MessageType_PREPARED:
-		consensusMsg.Block = consensus.block
+		consensusMsg.Block = consensus.current.block
 		consensusMsg.Payload = consensus.constructQuorumSigAndBitmap(quorum.Prepare)
 	case msg_pb.MessageType_COMMITTED:
 		consensusMsg.Payload = consensus.constructQuorumSigAndBitmap(quorum.Commit)

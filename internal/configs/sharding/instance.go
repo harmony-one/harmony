@@ -184,7 +184,7 @@ func (sc instance) SlotsLimit() int {
 	return sc.slotsLimit
 }
 
-// FeeCollector returns a mapping of address to decimal % of fee
+// FeeCollectors returns a mapping of address to decimal % of fee
 func (sc instance) FeeCollectors() FeeCollectors {
 	return sc.feeCollectors
 }

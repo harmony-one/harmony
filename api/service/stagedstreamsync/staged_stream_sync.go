@@ -64,8 +64,8 @@ type StagedStreamSync struct {
 	consensus         *consensus.Consensus
 	db                kv.RwDB
 	protocol          syncProtocol
-	gbm               *blockDownloadManager // initialized when finished get block number
-	lastMileBlocks    []*types.Block        // last mile blocks to catch up with the consensus
+	gbm               *downloadManager // initialized when finished get block number
+	lastMileBlocks    []*types.Block   // last mile blocks to catch up with the consensus
 	lastMileMux       sync.Mutex
 	isEpochChain      bool
 	isBeaconValidator bool

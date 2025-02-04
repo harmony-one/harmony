@@ -136,6 +136,37 @@ func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts
 	return
 }
 
+// GetRawBlocksByHashes do getBlocksByHashesRequest through sync stream protocol.
+func (p *Protocol) GetRawBlocksByHashes(ctx context.Context, hs []common.Hash, opts ...Option) (blockBytes [][]byte, sigBytes [][]byte, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getBlocksByHashes")
+	defer p.doMetricPostClientRequest("getBlocksByHashes", err, timer)
+
+	if len(hs) == 0 {
+		err = fmt.Errorf("empty block hashes requested")
+		return
+	}
+	if len(hs) > GetBlocksByHashesAmountCap {
+		err = fmt.Errorf("number of blocks exceed cap of %v", GetBlocksByHashesAmountCap)
+		return
+	}
+	req := newGetBlocksByHashesRequest(hs)
+	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
+	if err != nil {
+		// At this point, error can be context canceled, context timed out, or waiting queue
+		// is already full.
+		return
+	}
+
+	// Parse and return blocks
+	sResp, ok := resp.(*syncResponse)
+	if !ok || sResp == nil {
+		err = errors.New("not sync response")
+		return
+	}
+	blockBytes, sigBytes, err = req.parseBlockBytesAndSigs(sResp)
+	return
+}
+
 // GetReceipts do getReceiptsRequest through sync stream protocol.
 // Return the receipts as result, target stream id, and error
 func (p *Protocol) GetReceipts(ctx context.Context, hs []common.Hash, opts ...Option) (receipts []types.Receipts, stid sttypes.StreamID, err error) {
@@ -545,6 +576,21 @@ func (req *getBlocksByHashesRequest) getBlocksFromResponse(resp sttypes.Response
 		blocks = append(blocks, block)
 	}
 	return blocks, nil
+}
+
+func (req *getBlocksByHashesRequest) parseBlockBytesAndSigs(resp *syncResponse) ([][]byte, [][]byte, error) {
+	if errResp := resp.pb.GetErrorResponse(); errResp != nil {
+		return nil, nil, errors.New(errResp.Error)
+	}
+	gbResp := resp.pb.GetGetBlocksByHashesResponse()
+	if gbResp == nil {
+		return nil, nil, errors.New("response not GetBlockByHashes")
+	}
+	if len(gbResp.BlocksBytes) != len(gbResp.CommitSig) {
+		return nil, nil, fmt.Errorf("commit sigs size not expected: %v / %v",
+			len(gbResp.CommitSig), len(gbResp.BlocksBytes))
+	}
+	return gbResp.BlocksBytes, gbResp.CommitSig, nil
 }
 
 // getNodeDataRequest is the request for get node data which implements

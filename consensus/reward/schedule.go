@@ -7,7 +7,6 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 )
 
 type pair struct {
@@ -124,8 +123,8 @@ func mustParse(ts string) int64 {
 }
 
 // PercentageForTimeStamp ..
-func PercentageForTimeStamp(ts int64) numeric.Dec {
-	if shard.Schedule.GetNetworkID() != shardingconfig.MainNet {
+func PercentageForTimeStamp(schedule shardingconfig.Schedule, ts int64) numeric.Dec {
+	if schedule.GetNetworkID() != shardingconfig.MainNet {
 		return numeric.MustNewDecFromStr("1")
 	}
 

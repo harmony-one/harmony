@@ -39,7 +39,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
 	// Leader add commit phase signature
 	var blockObj types.Block
-	if err := rlp.DecodeBytes(consensus.block, &blockObj); err != nil {
+	if err := rlp.DecodeBytes(consensus.current.block, &blockObj); err != nil {
 		consensus.getLogger().Warn().
 			Err(err).
 			Uint64("BlockNum", consensus.BlockNum()).
@@ -78,7 +78,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 	} else {
 		consensus.getLogger().Info().
-			Hex("blockHash", consensus.blockHash[:]).
+			Hex("blockHash", consensus.current.blockHash[:]).
 			Uint64("blockNum", consensus.BlockNum()).
 			Msg("[OnPrepare] Sent Prepared Message!!")
 	}
@@ -87,7 +87,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.msgSender.StopRetry(msg_pb.MessageType_COMMITTED)
 
 	consensus.getLogger().Debug().
-		Str("From", consensus.phase.String()).
+		Str("From", consensus.current.phase.String()).
 		Str("To", FBFTCommit.String()).
 		Msg("[OnPrepare] Switching phase")
 
