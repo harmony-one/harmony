@@ -220,6 +220,11 @@ func TestCollectGasRounding(t *testing.T) {
 func TestPreCheck(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 
+	setCode := func(db *state.DB, addr common.Address) {
+		code := []byte("code")
+		db.SetCode(addr, code, false)
+	}
+
 	tests := []struct {
 		name          string
 		msg           types.Message
@@ -273,10 +278,7 @@ func TestPreCheck(t *testing.T) {
 				false,
 			),
 			expectedError: ErrSenderNotEOA,
-			setup: func(db *state.DB, addr common.Address) {
-				code := []byte("code")
-				db.SetCode(addr, code, false)
-			},
+			setup:         setCode,
 		},
 		{
 			name: "SuccessfulPreCheck",
@@ -322,6 +324,7 @@ func TestPreCheck(t *testing.T) {
 				true,
 			),
 			expectedError: nil,
+			setup:         setCode,
 		},
 		{
 			name: "SkipBothChecks",
@@ -337,6 +340,7 @@ func TestPreCheck(t *testing.T) {
 				true,
 			),
 			expectedError: nil,
+			setup:         setCode,
 		},
 	}
 
