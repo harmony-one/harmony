@@ -19,7 +19,6 @@ import (
 // 	RecordIPUnban()
 // }
 
-//go:generate mockery --name ExpiryStore --output mocks/ --with-expecter=true
 type ExpiryStore interface {
 	store.IPBanStore
 	store.PeerBanStore
