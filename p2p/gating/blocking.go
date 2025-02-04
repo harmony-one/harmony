@@ -9,7 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/conngater"
 )
 
-//go:generate mockery --name BlockingConnectionGater --output mocks/ --with-expecter=true
+//TODO: go:generate mockery --name BlockingConnectionGater --output mocks/ --with-expecter=true
 type BlockingConnectionGater interface {
 	connmgr.ConnectionGater
 
