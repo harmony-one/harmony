@@ -26,22 +26,22 @@ func NewExtendedPeerstore(ctx context.Context, logger log.Logger, clock clock.Cl
 	if !ok {
 		return nil, errors.New("peerstore should also be a certified address book")
 	}
-	sb, err := newScoreBook(ctx, logger, clock, store, scoreRetention)
+	sb, err := newScoreBook(ctx, clock, store, scoreRetention)
 	if err != nil {
 		return nil, fmt.Errorf("create scorebook: %w", err)
 	}
 	sb.startGC()
-	pb, err := newPeerBanBook(ctx, logger, clock, store)
+	pb, err := newPeerBanBook(ctx, clock, store)
 	if err != nil {
 		return nil, fmt.Errorf("create peer ban book: %w", err)
 	}
 	pb.startGC()
-	ib, err := newIPBanBook(ctx, logger, clock, store)
+	ib, err := newIPBanBook(ctx, clock, store)
 	if err != nil {
 		return nil, fmt.Errorf("create IP ban book: %w", err)
 	}
 	ib.startGC()
-	md, err := newMetadataBook(ctx, logger, clock, store)
+	md, err := newMetadataBook(ctx, clock, store)
 	if err != nil {
 		return nil, fmt.Errorf("create metadata book: %w", err)
 	}

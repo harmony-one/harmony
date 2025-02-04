@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/common/clock"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -56,8 +55,8 @@ func newMetadataRecord() *metadataRecord {
 	return new(metadataRecord)
 }
 
-func newMetadataBook(ctx context.Context, logger log.Logger, clock clock.Clock, store ds.Batching) (*metadataBook, error) {
-	book, err := newRecordsBook[peer.ID, *metadataRecord](ctx, logger, clock, store, mdCacheSize, mdRecordExpiration, metadataBase, genNew, peerIDKey)
+func newMetadataBook(ctx context.Context, clock clock.Clock, store ds.Batching) (*metadataBook, error) {
+	book, err := newRecordsBook[peer.ID, *metadataRecord](ctx, clock, store, mdCacheSize, mdRecordExpiration, metadataBase, genNew, peerIDKey)
 	if err != nil {
 		return nil, err
 	}

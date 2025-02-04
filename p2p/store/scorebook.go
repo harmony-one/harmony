@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/common/clock"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -56,8 +55,8 @@ func peerIDKey(id peer.ID) ds.Key {
 	return ds.NewKey(base32.RawStdEncoding.EncodeToString([]byte(id)))
 }
 
-func newScoreBook(ctx context.Context, logger log.Logger, clock clock.Clock, store ds.Batching, retain time.Duration) (*scoreBook, error) {
-	book, err := newRecordsBook[peer.ID, *scoreRecord](ctx, logger, clock, store, scoreCacheSize, retain, scoresBase, genNew, peerIDKey)
+func newScoreBook(ctx context.Context, clock clock.Clock, store ds.Batching, retain time.Duration) (*scoreBook, error) {
+	book, err := newRecordsBook[peer.ID, *scoreRecord](ctx, clock, store, scoreCacheSize, retain, scoresBase, genNew, peerIDKey)
 	if err != nil {
 		return nil, err
 	}

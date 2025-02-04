@@ -164,10 +164,9 @@ func TestCloseCompletes(t *testing.T) {
 func TestPrune(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	logger := log.New()
 	store := sync.MutexWrap(ds.NewMapDatastore())
 	clock := clock.NewDeterministicClock(time.UnixMilli(1000))
-	book, err := newScoreBook(ctx, logger, clock, store, 24*time.Hour)
+	book, err := newScoreBook(ctx, clock, store, 24*time.Hour)
 	require.NoError(t, err)
 
 	hasScoreRecorded := func(id peer.ID) bool {
@@ -219,9 +218,8 @@ func TestPrune(t *testing.T) {
 func TestPruneMultipleBatches(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	logger := log.New()
 	clock := clock.NewDeterministicClock(time.UnixMilli(1000))
-	book, err := newScoreBook(ctx, logger, clock, sync.MutexWrap(ds.NewMapDatastore()), 24*time.Hour)
+	book, err := newScoreBook(ctx, clock, sync.MutexWrap(ds.NewMapDatastore()), 24*time.Hour)
 	require.NoError(t, err)
 
 	hasScoreRecorded := func(id peer.ID) bool {
@@ -249,10 +247,9 @@ func TestPruneMultipleBatches(t *testing.T) {
 func TestIgnoreOutdatedScores(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	logger := log.New()
 	clock := clock.NewDeterministicClock(time.UnixMilli(1000))
 	retentionPeriod := 24 * time.Hour
-	book, err := newScoreBook(ctx, logger, clock, sync.MutexWrap(ds.NewMapDatastore()), retentionPeriod)
+	book, err := newScoreBook(ctx, clock, sync.MutexWrap(ds.NewMapDatastore()), retentionPeriod)
 	require.NoError(t, err)
 
 	setScoreRequired(t, book, "a", &GossipScores{Total: 123.45})

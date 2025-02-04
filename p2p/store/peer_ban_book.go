@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/common/clock"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -51,8 +50,8 @@ type peerBanBook struct {
 	book *recordsBook[peer.ID, *peerBanRecord]
 }
 
-func newPeerBanBook(ctx context.Context, logger log.Logger, clock clock.Clock, store ds.Batching) (*peerBanBook, error) {
-	book, err := newRecordsBook[peer.ID, *peerBanRecord](ctx, logger, clock, store, peerBanCacheSize, peerBanRecordExpiration, peerBanExpirationsBase, genNew, peerIDKey)
+func newPeerBanBook(ctx context.Context, clock clock.Clock, store ds.Batching) (*peerBanBook, error) {
+	book, err := newRecordsBook[peer.ID, *peerBanRecord](ctx, clock, store, peerBanCacheSize, peerBanRecordExpiration, peerBanExpirationsBase, genNew, peerIDKey)
 	if err != nil {
 		return nil, err
 	}
