@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/common/clock"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 
 type gcAction func() error
 
-func startGc(ctx context.Context, logger log.Logger, clock clock.Clock, bgTasks *sync.WaitGroup, action gcAction) {
+func startGc(ctx context.Context, clock clock.Clock, bgTasks *sync.WaitGroup, action gcAction) {
 	bgTasks.Add(1)
 	go func() {
 		defer bgTasks.Done()
@@ -27,7 +27,7 @@ func startGc(ctx context.Context, logger log.Logger, clock clock.Clock, bgTasks 
 			select {
 			case <-gcTimer.Ch():
 				if err := action(); err != nil {
-					logger.Warn("GC failed", "err", err)
+					utils.Logger().Warn().Err(err).Msg("GC failed")
 				}
 
 			case <-ctx.Done():
