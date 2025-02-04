@@ -7,7 +7,6 @@ import (
 
 	"github.com/harmony-one/harmony/p2p/store"
 
-	ethLog "github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/common/clock"
 	"github.com/harmony-one/harmony/p2p/gating/mocks"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -18,10 +17,9 @@ import (
 
 func expiryTestSetup(t *testing.T) (*clock.DeterministicClock, *mocks.ExpiryStore, *mocks.BlockingConnectionGater, *ExpiryConnectionGater) {
 	mockGater := mocks.NewBlockingConnectionGater(t)
-	log := ethLog.New()
 	cl := clock.NewDeterministicClock(time.Now())
 	mockExpiryStore := mocks.NewExpiryStore(t)
-	gater := AddBanExpiry(mockGater, mockExpiryStore, log, cl)
+	gater := AddBanExpiry(mockGater, mockExpiryStore, cl)
 	return cl, mockExpiryStore, mockGater, gater
 }
 

@@ -186,7 +186,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open connection gater: %w", err)
 	}
-	connGtr = gating.AddBanExpiry(connGtr, ps, logger, clock.SystemClock)
+	connGtr = gating.AddBanExpiry(connGtr, ps, clock.SystemClock)
 	connGtr = gating.AddMetering(connGtr)
 
 	// transporters

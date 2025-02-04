@@ -1,7 +1,7 @@
 package gating
 
 import (
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -26,6 +26,7 @@ func AddScoring(gater BlockingConnectionGater, scores Scores, minScore float64) 
 func (g *ScoringConnectionGater) checkScore(p peer.ID) (allow bool, score float64) {
 	score, err := g.scores.GetPeerScore(p)
 	if err != nil {
+		utils.Logger().Warn().Err(err).Str("peer_id", p.String()).Msg("failed to get peer score")
 		return false, score
 	}
 	return score >= g.minScore, score
@@ -37,7 +38,7 @@ func (g *ScoringConnectionGater) InterceptPeerDial(p peer.ID) (allow bool) {
 	}
 	check, score := g.checkScore(p)
 	if !check {
-		log.Warn("peer has failed checkScore", "peer_id", p, "score", score, "min_score", g.minScore)
+		utils.Logger().Warn().Str("peer_id", p.String()).Float64("score", score).Float64("min_score", g.minScore).Msg("peer has failed checkScore")
 	}
 	return check
 }
@@ -48,7 +49,7 @@ func (g *ScoringConnectionGater) InterceptAddrDial(id peer.ID, ma multiaddr.Mult
 	}
 	check, score := g.checkScore(id)
 	if !check {
-		log.Warn("peer has failed checkScore", "peer_id", id, "score", score, "min_score", g.minScore)
+		utils.Logger().Warn().Str("peer_id", id.String()).Float64("score", score).Float64("min_score", g.minScore).Msg("peer has failed checkScore")
 	}
 	return check
 }
@@ -59,7 +60,15 @@ func (g *ScoringConnectionGater) InterceptSecured(dir network.Direction, id peer
 	}
 	check, score := g.checkScore(id)
 	if !check {
-		log.Warn("peer has failed checkScore", "peer_id", id, "score", score, "min_score", g.minScore)
+		utils.Logger().Warn().Str("peer_id", id.String()).Float64("score", score).Float64("min_score", g.minScore).Msg("peer has failed checkScore")
 	}
 	return check
+}
+
+func (g *ScoringConnectionGater) InterceptAccept(mas network.ConnMultiaddrs) (allow bool) {
+	if !g.BlockingConnectionGater.InterceptAccept(mas) {
+		return false
+	}
+	utils.Logger().Info().Str("multi_addr", mas.RemoteMultiaddr().String()).Msg("connection accepted")
+	return true
 }
