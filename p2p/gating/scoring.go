@@ -7,7 +7,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-//go:generate mockery --name Scores --output mocks/ --with-expecter=true
 type Scores interface {
 	GetPeerScore(id peer.ID) (float64, error)
 }
