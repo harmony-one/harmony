@@ -22,10 +22,10 @@ var (
 )
 
 const (
-	defHardLoCap = 16  // discovery trigger immediately when size smaller than this number
-	defSoftLoCap = 32  // discovery trigger for routine check
-	defHiCap     = 128 // Hard cap of the stream number
-	defDiscBatch = 16  // batch size for discovery
+	defHardLoCap = 16 // discovery trigger immediately when size smaller than this number
+	defSoftLoCap = 32 // discovery trigger for routine check
+	defHiCap     = 64 // Hard cap of the stream number
+	defDiscBatch = 16 // batch size for discovery
 )
 
 var defConfig = Config{

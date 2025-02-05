@@ -27,8 +27,8 @@ func (consensus *Consensus) announce(block *types.Block) {
 		return
 	}
 
-	copy(consensus.blockHash[:], blockHash[:])
-	consensus.block = encodedBlock // Must set block bytes before consensus.construct()
+	copy(consensus.current.blockHash[:], blockHash[:])
+	consensus.current.block = encodedBlock // Must set block bytes before consensus.construct()
 
 	key, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
@@ -65,7 +65,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 		if _, err := consensus.decider.AddNewVote(
 			quorum.Prepare,
 			[]*bls.PublicKeyWrapper{key.Pub},
-			key.Pri.SignHash(consensus.blockHash[:]),
+			key.Pri.SignHash(consensus.current.blockHash[:]),
 			block.Hash(),
 			block.NumberU64(),
 			block.Header().ViewID().Uint64(),
@@ -121,7 +121,7 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 		return
 	}
 
-	blockHash := consensus.blockHash[:]
+	blockHash := consensus.current.blockHash[:]
 	prepareBitmap := consensus.prepareBitmap
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {

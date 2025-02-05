@@ -344,7 +344,7 @@ func (conf *ConfigType) ShardIDFromKey(key *bls_core.PublicKey) (uint32, error) 
 			"cannot convert libbls public key %s to internal form",
 			key.SerializeToHexStr())
 	}
-	epoch := conf.networkType.ChainConfig().StakingEpoch
+	epoch := conf.networkType.ChainConfig().HIP30Epoch
 	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
 	shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
 	return uint32(shardID.Uint64()), nil
