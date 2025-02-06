@@ -140,6 +140,11 @@ func NewReceipt(senderAddr common.Address, tx *types.EthTransaction, blockHash c
 		receipt.Logs[i].TxHash = ethTxHash
 	}
 
+	effectiveGasPrice := *big.NewInt(0)
+	if receipt.EffectiveGasPrice != nil {
+		effectiveGasPrice = *receipt.EffectiveGasPrice
+	}
+
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
 		"blockNumber":       hexutil.Uint64(blockNumber),
@@ -152,7 +157,7 @@ func NewReceipt(senderAddr common.Address, tx *types.EthTransaction, blockHash c
 		"contractAddress":   nil,
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
-		"effectiveGasPrice": hexutil.Big(*receipt.EffectiveGasPrice),
+		"effectiveGasPrice": hexutil.Big(effectiveGasPrice),
 	}
 
 	// Assign receipt status or post state.

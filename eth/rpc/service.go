@@ -18,11 +18,15 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"unicode"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
@@ -197,7 +201,7 @@ func (c *callback) call(ctx context.Context, method string, args []reflect.Value
 	fullargs = append(fullargs, args...)
 
 	// Catch panic while running the callback.
-	/*defer func() {
+	defer func() {
 		if err := recover(); err != nil {
 			const size = 64 << 10
 			buf := make([]byte, size)
@@ -205,7 +209,7 @@ func (c *callback) call(ctx context.Context, method string, args []reflect.Value
 			log.Error("RPC method " + method + " crashed: " + fmt.Sprintf("%v\n%s", err, buf))
 			errRes = errors.New("method handler crashed")
 		}
-	}()*/
+	}()
 	// Run the callback.
 	results := c.fn.Call(fullargs)
 	if len(results) == 0 {

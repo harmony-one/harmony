@@ -346,6 +346,11 @@ func NewTxReceipt(
 		}
 	}
 
+	effectiveGasPrice := *big.NewInt(0)
+	if receipt.EffectiveGasPrice != nil {
+		effectiveGasPrice = *receipt.EffectiveGasPrice
+	}
+
 	// Declare receipt
 	txReceipt := &TxReceipt{
 		BlockHash:         blockHash,
@@ -361,7 +366,7 @@ func NewTxReceipt(
 		To:                receiver,
 		Root:              receipt.PostState,
 		Status:            hexutil.Uint(receipt.Status),
-		EffectiveGasPrice: hexutil.Big(*receipt.EffectiveGasPrice),
+		EffectiveGasPrice: hexutil.Big(effectiveGasPrice),
 	}
 
 	// Set empty array for empty logs
@@ -390,6 +395,11 @@ func NewStakingTxReceipt(
 		return nil, err
 	}
 
+	effectiveGasPrice := *big.NewInt(0)
+	if receipt.EffectiveGasPrice != nil {
+		effectiveGasPrice = *receipt.EffectiveGasPrice
+	}
+
 	// Declare receipt
 	txReceipt := &StakingTxReceipt{
 		BlockHash:         blockHash,
@@ -404,7 +414,7 @@ func NewStakingTxReceipt(
 		Type:              hexutil.Uint64(tx.StakingType()),
 		Root:              receipt.PostState,
 		Status:            hexutil.Uint(receipt.Status),
-		EffectiveGasPrice: hexutil.Big(*receipt.EffectiveGasPrice),
+		EffectiveGasPrice: hexutil.Big(effectiveGasPrice),
 	}
 
 	// Set empty array for empty logs
