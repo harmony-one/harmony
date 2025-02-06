@@ -152,7 +152,9 @@ func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64, i
 	defer func() {
 		consensus.didReachPreCommitQ = viewID
 	}()
-	fmt.Println("faired finalCommit", from)
+	if consensus.ShardID == 0 {
+		fmt.Println("faired finalCommit", from)
+	}
 	consensus.transitions.finalCommit = false
 	if viewID == consensus.getCurBlockViewID() {
 		consensus._finalCommit(isLeader)

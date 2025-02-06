@@ -80,7 +80,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	threshold := consensus.decider.QuorumThreshold()
 
 	if quorumPostNewSignatures {
-		time.AfterFunc(2*time.Second, func() {
+		time.AfterFunc(3*time.Second, func() {
 
 			consensus.mutex.Lock()
 			defer consensus.mutex.Unlock()
@@ -90,7 +90,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 		})
 	}
 
-	fmt.Println("announce", utils.GetPort(), quorumPostNewSignatures, tally.String(), threshold.String(), tally.GTE(threshold))
+	if consensus.ShardID == 0 {
+		fmt.Println("announce", utils.GetPort(), quorumPostNewSignatures, tally.String(), threshold.String(), tally.GTE(threshold))
+	}
 	// Construct broadcast p2p message
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.getBlockNum(), msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{

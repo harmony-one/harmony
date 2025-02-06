@@ -92,7 +92,7 @@ func (consensus *Consensus) didReachPrepareQuorum(from string) error {
 		if maxWaitTime > waitTime {
 			waitTime = maxWaitTime
 		}
-		go consensus.finalCommit(waitTime, viewID, consensus.isLeader(), "hack final commit")
+		go consensus.finalCommit(waitTime, viewID, consensus.isLeader(), fmt.Sprintf("hack final commit block: %d view: %d", blockObj.NumberU64(), viewID))
 	}()
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.BlockNum(),
