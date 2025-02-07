@@ -43,7 +43,15 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 				Msg("[Explorer] onCommitted unable to parse msg")
 			return err
 		}
-
+		// If a future block is received, it logs a warning and discards the block
+		// TODO: can be done with isRightBlockNumAndViewID(recvMsg)
+		if recvMsg.BlockNum != node.Blockchain().CurrentBlock().NumberU64()+1 {
+			utils.Logger().Warn().
+				Uint64("Received BlockNum", recvMsg.BlockNum).
+				Uint64("Consensus BlockNum", node.GetConsensusBlockNum()).
+				Msg("[Explorer] received a future block on COMMIT phase")
+			return nil
+		}
 		aggSig, mask, err := node.Consensus.ReadSignatureBitmapPayload(
 			recvMsg.Payload, 0,
 		)
@@ -87,6 +95,15 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("[Explorer] Unable to parse Prepared msg")
 			return err
+		}
+		// If a future block is received, it logs a warning and discards the block
+		// TODO: can be done with isRightBlockNumAndViewID(recvMsg)
+		if recvMsg.BlockNum != node.Blockchain().CurrentBlock().NumberU64()+1 {
+			utils.Logger().Warn().
+				Uint64("Received BlockNum", recvMsg.BlockNum).
+				Uint64("Consensus BlockNum", node.GetConsensusBlockNum()).
+				Msg("[Explorer] received a future block on PREPARE phase")
+			return nil
 		}
 		block, blockObj := recvMsg.Block, &types.Block{}
 		if err := rlp.DecodeBytes(block, blockObj); err != nil {
