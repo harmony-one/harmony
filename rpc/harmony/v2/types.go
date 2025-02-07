@@ -221,6 +221,11 @@ type TxReceipt struct {
 	EffectiveGasPrice uint64         `json:"effectiveGasPrice"`
 }
 
+// GetEffectiveGasPrice returns the effective gas price of the tx receipt
+func (s TxReceipt) GetEffectiveGasPrice() uint64 {
+	return s.EffectiveGasPrice
+}
+
 // StakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
 type StakingTxReceipt struct {
 	BlockHash         common.Hash       `json:"blockHash"`
@@ -237,6 +242,11 @@ type StakingTxReceipt struct {
 	Root              hexutil.Bytes     `json:"root"`
 	Status            uint              `json:"status"`
 	EffectiveGasPrice uint64            `json:"effectiveGasPrice"`
+}
+
+// GetEffectiveGasPrice returns the effective gas price of the staking tx receipt
+func (s StakingTxReceipt) GetEffectiveGasPrice() uint64 {
+	return s.EffectiveGasPrice
 }
 
 // CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
@@ -334,10 +344,13 @@ func NewTransaction(
 	return result, nil
 }
 
+// Receipt represents a transaction OR staking transaction that will serialize to the RPC representation
+type Receipt interface{}
+
 // NewReceipt returns a transaction OR staking transaction that will serialize to the RPC representation
 func NewReceipt(
 	tx interface{}, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
-) (interface{}, error) {
+) (Receipt, error) {
 	plainTx, ok := tx.(*types.Transaction)
 	if ok {
 		return NewTxReceipt(plainTx, blockHash, blockNumber, blockIndex, receipt)
@@ -811,4 +824,28 @@ func NewStakingTransactionFromBlockIndex(b *types.Block, index uint64) (*Staking
 		)
 	}
 	return NewStakingTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index, true)
+}
+
+type getEffectiveGasPrice interface {
+	GetEffectiveGasPrice() uint64
+}
+
+type getContractAddress interface {
+	GetContractAddress() common.Address
+}
+
+// MustReceiptEffectivePrice getter for effective gas price
+func MustReceiptEffectivePrice(receipt Receipt) uint64 {
+	if s, ok := receipt.(getEffectiveGasPrice); ok {
+		return s.GetEffectiveGasPrice()
+	}
+	panic(fmt.Sprintf("<failed to convert, i(%T) does not support GetEffectiveGasPrice interface>", receipt))
+}
+
+// MustContractAddress getter for contract address
+func MustContractAddress(receipt Receipt) common.Address {
+	if s, ok := receipt.(getContractAddress); ok {
+		return s.GetContractAddress()
+	}
+	panic(fmt.Sprintf("<failed to convert, i(%T) does not support getContractAddress interface>", receipt))
 }
