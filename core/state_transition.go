@@ -92,6 +92,7 @@ type Message interface {
 	Nonce() uint64
 	SkipNonceChecks() bool
 	SkipFromEOACheck() bool
+
 	Data() []byte
 	Type() types.TransactionType
 	BlockNum() *big.Int
