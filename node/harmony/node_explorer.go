@@ -48,7 +48,7 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 		if recvMsg.BlockNum != node.Blockchain().CurrentBlock().NumberU64()+1 {
 			utils.Logger().Warn().
 				Uint64("Received BlockNum", recvMsg.BlockNum).
-				Uint64("Consensus BlockNum", node.GetConsensusBlockNum()).
+				Uint64("Current Block Number", node.Blockchain().CurrentBlock().NumberU64()).
 				Msg("[Explorer] received a future block on COMMIT phase")
 			return nil
 		}
@@ -101,7 +101,7 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 		if recvMsg.BlockNum != node.Blockchain().CurrentBlock().NumberU64()+1 {
 			utils.Logger().Warn().
 				Uint64("Received BlockNum", recvMsg.BlockNum).
-				Uint64("Consensus BlockNum", node.GetConsensusBlockNum()).
+				Uint64("Current Block Number", node.Blockchain().CurrentBlock().NumberU64()).
 				Msg("[Explorer] received a future block on PREPARE phase")
 			return nil
 		}
