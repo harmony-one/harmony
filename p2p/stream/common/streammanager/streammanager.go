@@ -277,6 +277,11 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 		if sm.reservedStreams.size() < MaxReservedStreams {
 			if _, ok := sm.reservedStreams.get(id); !ok {
 				sm.reservedStreams.addStream(st)
+				sm.logger.Info().
+					Int("NumStreams", sm.streams.size()).
+					Int("NumReservedStreams", sm.reservedStreams.size()).
+					Interface("StreamID", id).
+					Msg("[StreamManager] added new stream to reserved list")
 			}
 			return nil
 		}
@@ -284,6 +289,10 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	}
 
 	sm.streams.addStream(st)
+	sm.logger.Info().
+		Int("NumStreams", sm.streams.size()).
+		Interface("StreamID", id).
+		Msg("[StreamManager] added new stream to main streams list")
 
 	sm.addStreamFeed.Send(EvtStreamAdded{st})
 	addedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
@@ -407,6 +416,11 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 	if sm.config.HiCap-numStreams < sm.config.DiscBatch {
 		discBatch = sm.config.HiCap - numStreams
 	}
+	sm.logger.Debug().
+		Interface("protoID", protoID).
+		Int("numStreams", numStreams).
+		Int("discBatch", discBatch).
+		Msg("[StreamManager] discovering")
 	if discBatch < 0 {
 		return nil, nil
 	}
