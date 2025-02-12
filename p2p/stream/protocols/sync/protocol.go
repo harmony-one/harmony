@@ -262,7 +262,7 @@ func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 		NetworkType:       p.config.Network,
 		ShardID:           p.config.ShardID,
 		Version:           v,
-		IsBeaconValidator: p.config.Validator && p.config.BeaconNode,
+		IsBeaconValidator: (p.config.Validator || p.config.Explorer) && p.config.BeaconNode,
 	}
 	return spec.ToProtoID()
 }
