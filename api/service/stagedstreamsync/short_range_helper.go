@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 	syncProto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
@@ -138,7 +137,7 @@ func (sh *srHelper) getBlocksByHashes(ctx context.Context, hashes []common.Hash,
 
 func (sh *srHelper) checkPrerequisites() error {
 	if sh.syncProtocol.NumStreams() < sh.config.Concurrency {
-		utils.Logger().Info().
+		sh.logger.Info().
 			Int("available streams", sh.syncProtocol.NumStreams()).
 			Interface("concurrency", sh.config.Concurrency).
 			Msg("not enough streams to do concurrent processes")
