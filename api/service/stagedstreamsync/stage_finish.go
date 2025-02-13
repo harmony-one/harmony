@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ledgerwatch/erigon-lib/kv"
+	"github.com/rs/zerolog"
 )
 
 type StageFinish struct {
@@ -11,7 +12,8 @@ type StageFinish struct {
 }
 
 type StageFinishCfg struct {
-	db kv.RwDB
+	db     kv.RwDB
+	logger zerolog.Logger
 }
 
 func NewStageFinish(cfg StageFinishCfg) *StageFinish {
@@ -20,9 +22,12 @@ func NewStageFinish(cfg StageFinishCfg) *StageFinish {
 	}
 }
 
-func NewStageFinishCfg(db kv.RwDB) StageFinishCfg {
+func NewStageFinishCfg(db kv.RwDB, logger zerolog.Logger) StageFinishCfg {
 	return StageFinishCfg{
 		db: db,
+		logger: logger.With().
+			Str("stage", "StageFinish").
+			Logger(),
 	}
 }
 
