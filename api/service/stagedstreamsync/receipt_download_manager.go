@@ -46,8 +46,9 @@ func newReceiptDownloadManager(tx kv.RwTx, chain blockChain, targetBN uint64, lo
 		retries:    newPrioritizedNumbers(),
 		rdd:        make(map[uint64]ReceiptDownloadDetails),
 		received:   make(map[uint64]Received),
-
-		logger: logger,
+		logger: logger.With().
+			Str("sub-module", "receipt download manager").
+			Logger(),
 	}
 }
 
