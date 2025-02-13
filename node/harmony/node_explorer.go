@@ -45,10 +45,10 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 		}
 		// If a future block is received, it logs a warning and discards the block
 		// TODO: can be done with isRightBlockNumAndViewID(recvMsg)
-		if recvMsg.BlockNum != node.Blockchain().CurrentBlock().NumberU64()+1 {
+		if current := node.Blockchain().CurrentBlock().NumberU64(); recvMsg.BlockNum != current+1 {
 			utils.Logger().Debug().
 				Uint64("Received BlockNum", recvMsg.BlockNum).
-				Uint64("Current Block Number", node.Blockchain().CurrentBlock().NumberU64()).
+				Uint64("Current Block Number", current).
 				Msg("[Explorer] received a future block on COMMIT phase")
 			return nil
 		}
@@ -98,10 +98,10 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 		}
 		// If a future block is received, it logs a warning and discards the block
 		// TODO: can be done with isRightBlockNumAndViewID(recvMsg)
-		if recvMsg.BlockNum != node.Blockchain().CurrentBlock().NumberU64()+1 {
+		if current := node.Blockchain().CurrentBlock().NumberU64(); recvMsg.BlockNum != current+1 {
 			utils.Logger().Debug().
 				Uint64("Received BlockNum", recvMsg.BlockNum).
-				Uint64("Current Block Number", node.Blockchain().CurrentBlock().NumberU64()).
+				Uint64("Current Block Number", current).
 				Msg("[Explorer] received a future block on PREPARE phase")
 			return nil
 		}
