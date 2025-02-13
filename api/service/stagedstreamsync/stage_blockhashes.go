@@ -8,10 +8,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 // Hash frequency and stream tracking
@@ -33,6 +33,7 @@ type StageBlockHashesCfg struct {
 	isBeaconShard bool
 	cachedb       kv.RwDB
 	logProgress   bool
+	logger        zerolog.Logger
 }
 
 func NewStageBlockHashes(cfg StageBlockHashesCfg) *StageBlockHashes {
@@ -41,12 +42,16 @@ func NewStageBlockHashes(cfg StageBlockHashesCfg) *StageBlockHashes {
 	}
 }
 
-func NewStageBlockHashesCfg(bc core.BlockChain, db kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, logProgress bool) StageBlockHashesCfg {
+func NewStageBlockHashesCfg(bc core.BlockChain, db kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, logger zerolog.Logger, logProgress bool) StageBlockHashesCfg {
 	return StageBlockHashesCfg{
 		bc:            bc,
 		db:            db,
 		isBeaconShard: isBeaconShard,
 		logProgress:   logProgress,
+		logger: logger.With().
+			Str("stage", "StageBlockHashes").
+			Str("mode", "long range").
+			Logger(),
 	}
 }
 
@@ -125,7 +130,7 @@ func (bh *StageBlockHashes) Exec(ctx context.Context, firstCycle bool, invalidBl
 	}
 
 	// create download manager instant
-	hdm := newDownloadManager(bh.configs.bc, targetHeight, BlockHashesPerRequest, s.state.logger)
+	hdm := newDownloadManager(bh.configs.bc, targetHeight, BlockHashesPerRequest, bh.configs.logger)
 
 	// Fetch block hashes from neighbors
 	if err := bh.runBlockHashWorkerLoop(ctx, tx, hdm, s, startTime, currentHead, targetHeight); err != nil {
@@ -138,19 +143,19 @@ func (bh *StageBlockHashes) Exec(ctx context.Context, firstCycle bool, invalidBl
 func (bh *StageBlockHashes) downloadBlockHashes(ctx context.Context, bns []uint64) ([]common.Hash, sttypes.StreamID, error) {
 	hashes, stid, err := bh.configs.protocol.GetBlockHashes(ctx, bns)
 	if hashes == nil {
-		utils.Logger().Warn().
+		bh.configs.logger.Warn().
 			Interface("bns", bns).
 			Msg("[StageBlockHashes] downloadBlockHashes Nil Response")
 		bh.configs.protocol.RemoveStream(stid)
 		return []common.Hash{}, stid, errors.New("nil response for hashes")
 	}
-	utils.Logger().Info().
+	bh.configs.logger.Info().
 		Int("request size", len(bns)).
 		Int("received size", len(hashes)).
 		Interface("stid", stid).
 		Msg("[StageBlockHashes] downloadBlockHashes received hashes")
 	if len(hashes) > len(bns) {
-		utils.Logger().Warn().
+		bh.configs.logger.Warn().
 			Int("request size", len(bns)).
 			Int("received size", len(hashes)).
 			Interface("stid", stid).
@@ -240,7 +245,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 
 		// save progress
 		if err := bh.saveProgress(ctx, s, currProgress, tx); err != nil {
-			utils.Logger().Error().
+			bh.configs.logger.Error().
 				Err(err).
 				Msgf("[STAGED_STREAM_SYNC] saving progress for block hashes stage failed")
 			return err
@@ -347,7 +352,7 @@ func (bh *StageBlockHashes) saveBlockHashes(ctx context.Context, tx kv.RwTx, has
 		blkKey := marshalData(bn)
 
 		if err := tx.Put(BlockHashesBucket, blkKey, hash.Bytes()); err != nil {
-			utils.Logger().Error().
+			bh.configs.logger.Error().
 				Err(err).
 				Uint64("block number", bn).
 				Msg("[STAGED_STREAM_SYNC] adding block hash to db failed")
@@ -377,7 +382,7 @@ func (bh *StageBlockHashes) saveProgress(ctx context.Context, s *StageState, pro
 
 	// save progress
 	if err = s.Update(tx, progress); err != nil {
-		utils.Logger().Error().
+		bh.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] saving progress for block hashes stage failed")
 		return ErrSavingHashesProgressFail
@@ -450,7 +455,7 @@ func (bh *StageBlockHashes) Revert(ctx context.Context, firstCycle bool, u *Reve
 
 	// clean block hashes db
 	if err = tx.ClearBucket(BlockHashesBucket); err != nil {
-		utils.Logger().Error().
+		bh.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] clear block hashes bucket after revert failed")
 		return err
@@ -458,7 +463,7 @@ func (bh *StageBlockHashes) Revert(ctx context.Context, firstCycle bool, u *Reve
 
 	// clean cache db as well
 	if err := bh.clearCache(); err != nil {
-		utils.Logger().Error().
+		bh.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] clear block hashes cache failed")
 		return err
@@ -467,14 +472,14 @@ func (bh *StageBlockHashes) Revert(ctx context.Context, firstCycle bool, u *Reve
 	// save progress
 	currentHead := bh.configs.bc.CurrentBlock().NumberU64()
 	if err = s.Update(tx, currentHead); err != nil {
-		utils.Logger().Error().
+		bh.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] saving progress for block hashes stage after revert failed")
 		return err
 	}
 
 	if err = u.Done(tx); err != nil {
-		utils.Logger().Error().
+		bh.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] reset after revert failed")
 		return err
