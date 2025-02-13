@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ledgerwatch/erigon-lib/kv"
+	"github.com/rs/zerolog"
 )
 
 type StageHeads struct {
@@ -13,8 +13,9 @@ type StageHeads struct {
 }
 
 type StageHeadsCfg struct {
-	bc core.BlockChain
-	db kv.RwDB
+	bc     core.BlockChain
+	db     kv.RwDB
+	logger zerolog.Logger
 }
 
 func NewStageHeads(cfg StageHeadsCfg) *StageHeads {
@@ -23,10 +24,13 @@ func NewStageHeads(cfg StageHeadsCfg) *StageHeads {
 	}
 }
 
-func NewStageHeadersCfg(bc core.BlockChain, db kv.RwDB) StageHeadsCfg {
+func NewStageHeadersCfg(bc core.BlockChain, db kv.RwDB, logger zerolog.Logger) StageHeadsCfg {
 	return StageHeadsCfg{
 		bc: bc,
 		db: db,
+		logger: logger.With().
+			Str("stage", "StageHeads").
+			Logger(),
 	}
 }
 
@@ -74,9 +78,11 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 		if maxHeight <= currentHeight {
 			return nil
 		}
-		utils.Logger().Info().
+		heads.configs.logger.Info().
 			Uint64("max blocks per sync cycle", maxBlocksPerSyncCycle).
+			Uint64("currentHeight", currentHeight).
 			Uint64("maxPeersHeight", maxHeight).
+			Uint64("targetHeight", targetHeight).
 			Msgf(WrapStagedSyncMsg("current height is ahead of target height, target height is readjusted to max peers height"))
 		targetHeight = maxHeight
 	}
@@ -100,7 +106,7 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 	s.state.currentCycle.SetTargetHeight(targetHeight)
 
 	if err := s.Update(tx, targetHeight); err != nil {
-		utils.Logger().Error().
+		heads.configs.logger.Error().
 			Err(err).
 			Msgf(WrapStagedSyncMsg("saving progress for headers stage failed"))
 		return err

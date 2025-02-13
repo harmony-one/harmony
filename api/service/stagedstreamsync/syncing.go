@@ -14,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
@@ -110,17 +109,17 @@ func CreateStagedSync(ctx context.Context,
 	}
 
 	extractReceiptHashes := config.SyncMode == FastSync || config.SyncMode == SnapSync
-	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB)
-	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB)
-	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB)
-	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, extractReceiptHashes, config.LogProgress)
-	stageHashesCfg := NewStageBlockHashesCfg(bc, mainDB, config.Concurrency, protocol, isBeaconValidator, config.LogProgress)
+	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB, logger)
+	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB, logger)
+	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB, logger)
+	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, extractReceiptHashes, logger, config.LogProgress)
+	stageHashesCfg := NewStageBlockHashesCfg(bc, mainDB, config.Concurrency, protocol, isBeaconValidator, logger, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
 	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageFullStateSyncCfg := NewStageFullStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
-	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, config.LogProgress)
-	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB)
-	stageFinishCfg := NewStageFinishCfg(mainDB)
+	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, logger, config.LogProgress)
+	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB, logger)
+	stageFinishCfg := NewStageFinishCfg(mainDB, logger)
 
 	// init stages order based on sync mode
 	initStagesOrder(config.SyncMode)
@@ -374,7 +373,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 		n, err := s.doSyncCycle(ctx)
 		if err != nil {
-			utils.Logger().Error().
+			s.logger.Error().
 				Err(err).
 				Bool("initSync", s.initSync).
 				Bool("isValidator", s.isValidator).
@@ -400,7 +399,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	}
 
 	if totalInserted > 0 {
-		utils.Logger().Info().
+		s.logger.Info().
 			Bool("initSync", s.initSync).
 			Bool("isBeaconShard", s.isBeaconShard).
 			Uint32("shard", s.bc.ShardID()).
@@ -412,7 +411,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 	if s.consensus != nil {
 		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
-			utils.Logger().Error().Err(err).
+			s.logger.Error().Err(err).
 				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
 			s.RollbackLastMileBlocks(downloaderContext, hashes)
 			return estimatedHeight, totalInserted, err
@@ -457,7 +456,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 	// Do one cycle of staged sync
 	initialCycle := s.currentCycle.GetBlockNumber() == 0
 	if err := s.Run(ctx, s.DB(), tx, initialCycle); err != nil {
-		utils.Logger().Error().
+		s.logger.Error().
 			Err(err).
 			Bool("isBeaconShard", s.isBeaconShard).
 			Uint32("shard", s.bc.ShardID()).
