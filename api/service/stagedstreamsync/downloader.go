@@ -62,14 +62,17 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, nodeConfig *nodeconfig.Con
 
 	host.AddStreamProtocol(sp)
 
+	logger := utils.Logger().With().
+		Str("module", "StagedStreamSync").
+		Uint32("ShardID", bc.ShardID()).
+		Uint64("currentHeight", bc.CurrentBlock().NumberU64()).
+		Interface("currentHeadHash", bc.CurrentBlock().Hash()).
+		Logger()
+
 	var bh *beaconHelper
 	if config.BHConfig != nil && bc.ShardID() == shard.BeaconChainShardID {
-		bh = newBeaconHelper(bc, config.BHConfig.BlockC, config.BHConfig.InsertHook)
+		bh = newBeaconHelper(bc, logger, config.BHConfig.BlockC, config.BHConfig.InsertHook)
 	}
-
-	logger := utils.Logger().With().
-		Str("module", "staged stream sync").
-		Uint32("ShardID", bc.ShardID()).Logger()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -204,7 +207,15 @@ func (d *Downloader) waitForEnoughStreams(requiredStreams int) (bool, int) {
 			trigger()
 
 		case <-checkCh:
+			d.logger.Debug().
+				Int("requiredStreams", requiredStreams).
+				Int("NumStreams", d.syncProtocol.NumStreams()).
+				Msg("check stream connections...")
 			if d.syncProtocol.NumStreams() >= requiredStreams {
+				d.logger.Info().
+					Int("requiredStreams", requiredStreams).
+					Int("NumStreams", d.syncProtocol.NumStreams()).
+					Msg("it has enough stream connections and will continue syncing")
 				return true, d.syncProtocol.NumStreams()
 			}
 		case <-d.closeC:
