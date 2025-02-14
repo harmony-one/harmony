@@ -22,6 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -90,6 +91,7 @@ type Message interface {
 
 	Nonce() uint64
 	SkipNonceChecks() bool
+	SkipFromEOACheck() bool
 	Data() []byte
 	Type() types.TransactionType
 	BlockNum() *big.Int
@@ -204,6 +206,14 @@ func (st *StateTransition) preCheck() error {
 			return ErrNonceTooLow
 		}
 	}
+
+	// Ensure that the sender is an EOA (EIP-3607)
+	if !st.msg.SkipFromEOACheck() {
+		if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != state.EmptyCodeHash && codeHash != (common.Hash{}) { // getCodeHash returns EmptyCodeHash for unused accounts
+			return ErrSenderNotEOA
+		}
+	}
+
 	return st.buyGas()
 }
 

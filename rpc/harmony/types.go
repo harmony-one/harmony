@@ -72,7 +72,7 @@ func (args *CallArgs) ToMessage(globalGasCap *big.Int) types.Message {
 		data = []byte(*args.Data)
 	}
 
-	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, data, true)
+	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, data, true, true)
 	return msg
 }
 

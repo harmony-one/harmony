@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
@@ -213,5 +214,159 @@ func TestCollectGasRounding(t *testing.T) {
 			t.Errorf("Balance mismatch for collector %v: got %v, expected %v",
 				collector, balance, expectedFeePerCollector)
 		}
+	}
+}
+
+func TestPreCheck(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+
+	setCode := func(db *state.DB, addr common.Address) {
+		code := []byte("code")
+		db.SetCode(addr, code, false)
+	}
+
+	tests := []struct {
+		name          string
+		msg           types.Message
+		expectedError error
+		setup         func(db *state.DB, addr common.Address)
+	}{
+		{
+			name: "NonceTooHigh",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				2,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				false,
+			),
+			expectedError: ErrNonceTooHigh,
+		},
+		{
+			name: "NonceTooLow",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				0,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				false,
+			),
+			expectedError: ErrNonceTooLow,
+			setup: func(db *state.DB, addr common.Address) {
+				db.SetNonce(addr, 1)
+			},
+		},
+		{
+			name: "SenderNotEOA",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				0,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				false,
+			),
+			expectedError: ErrSenderNotEOA,
+			setup:         setCode,
+		},
+		{
+			name: "SuccessfulPreCheck",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				0,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				false,
+			),
+			expectedError: nil,
+		},
+		{
+			name: "SkipNonceChecks",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				2,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				true,
+				false,
+			),
+			expectedError: nil,
+		},
+		{
+			name: "SkipFromEOACheck",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				0,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				false,
+				true,
+			),
+			expectedError: nil,
+			setup:         setCode,
+		},
+		{
+			name: "SkipBothChecks",
+			msg: types.NewMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				nil,
+				2,
+				big.NewInt(0),
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				true,
+				true,
+			),
+			expectedError: nil,
+			setup:         setCode,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			chain, db, header, _ := getTestEnvironment(*key)
+			gp := new(GasPool).AddGas(math.MaxUint64)
+
+			initialBalance := big.NewInt(2e18)
+			addr := crypto.PubkeyToAddress(key.PublicKey)
+			db.AddBalance(addr, initialBalance)
+
+			if tt.setup != nil {
+				tt.setup(db, addr)
+			}
+
+			ctx := NewEVMContext(tt.msg, header, chain, nil) // coinbase is nil, no block reward
+			ctx.TxType = types.SameShardTx
+			vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+
+			st := NewStateTransition(vmenv, tt.msg, gp)
+			err := st.preCheck()
+
+			if !errors.Is(err, tt.expectedError) {
+				t.Errorf("expected error %v, got %v", tt.expectedError, err)
+			}
+		})
 	}
 }
