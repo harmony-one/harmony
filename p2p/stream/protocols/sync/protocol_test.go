@@ -46,6 +46,7 @@ func TestProtocol_advertiseLoop(t *testing.T) {
 	p := &Protocol{
 		disc:   disc,
 		closeC: make(chan struct{}),
+		ctx:    context.Background(),
 	}
 
 	go p.advertiseLoop()
