@@ -615,6 +615,9 @@ type ChainConfig struct {
 	// if crosslink are not sent for an entire epoch signed and toSign will be 0 and 0. when that happen, next epoch there will no shard 1 validator elected in the committee.
 	HIP32Epoch *big.Int `json:"hip32-epoch,omitempty"`
 
+	// HIP33Epoch: effectiveGasPrice+block v4+evm opcode BASEFEE
+	EIP1559Epoch *big.Int `json:"eip1559-epoch,omitempty"`
+
 	IsOneSecondEpoch *big.Int `json:"is-one-second-epoch,omitempty"`
 }
 
@@ -907,6 +910,20 @@ func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 // their balances over to shard 0 or 1.
 func (c *ChainConfig) IsOneEpochBeforeHIP30(epoch *big.Int) bool {
 	return new(big.Int).Sub(c.HIP30Epoch, epoch).Cmp(common.Big1) == 0
+}
+
+func (c *ChainConfig) IsLondon(epoch *big.Int) bool {
+	panic("unimplemented")
+}
+
+// BaseFeeChangeDenominator
+func (c *ChainConfig) BaseFeeChangeDenominator() uint64 {
+	return DefaultBaseFeeChangeDenominator
+}
+
+// ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
+func (c *ChainConfig) ElasticityMultiplier() uint64 {
+	return DefaultElasticityMultiplier
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.

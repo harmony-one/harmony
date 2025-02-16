@@ -236,4 +236,8 @@ type Header interface {
 	// SetSlashes sets the RLP-encoded form of slashes
 	// It stores a copy; the caller may freely modify the original.
 	SetSlashes(newSlashes []byte)
+
+	BaseFee() *big.Int
+
+	SetBaseFee(newBaseFee *big.Int)
 }
