@@ -46,6 +46,8 @@ func NewStageBlockHashesCfg(bc core.BlockChain, db kv.RwDB, concurrency int, pro
 	return StageBlockHashesCfg{
 		bc:            bc,
 		db:            db,
+		concurrency:   concurrency,
+		protocol:      protocol,
 		isBeaconShard: isBeaconShard,
 		logProgress:   logProgress,
 		logger: logger.With().
