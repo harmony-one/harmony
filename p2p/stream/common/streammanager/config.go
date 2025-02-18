@@ -12,6 +12,8 @@ const (
 	connectTimeout = 60 * time.Second
 	// MaxReservedStreams is the maximum number of reserved streams
 	MaxReservedStreams = 100
+	// RemovalCooldownDuration defines the cooldown period (in minutes) before a removed stream can reconnect.
+	RemovalCooldownDuration = 60 // 1 hour
 )
 
 // Config is the config for stream manager

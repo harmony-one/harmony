@@ -26,6 +26,8 @@ var (
 	ErrStreamAlreadyExist = errors.New("stream already exist")
 	// ErrTooManyStreams is the error that the number of streams is exceeded the capacity
 	ErrTooManyStreams = errors.New("too many streams")
+	// ErrStreamRemovalNotExpired is the error that the stream was removed before and can't be added yet
+	ErrStreamRemovalNotExpired = errors.New("stream removal not expired yet")
 )
 
 // streamManager is the implementation of StreamManager. It manages streams on
@@ -44,6 +46,8 @@ type streamManager struct {
 	// Note that it could happen that remote node does not share exactly the same
 	// protocol ID (e.g. different version)
 	streams *streamSet
+	// tracks removed streams with cooldown
+	removedStreams *sttypes.SafeMap[sttypes.StreamID, *RemovalInfo]
 	// reserved streams
 	reservedStreams *streamSet
 	// libp2p utilities
@@ -64,6 +68,35 @@ type streamManager struct {
 	logger           zerolog.Logger
 	ctx              context.Context
 	cancel           func()
+}
+
+type RemovalInfo struct {
+	count     uint64
+	removedAt time.Time
+	expireAt  time.Time
+}
+
+// MarkAsRemoved resets the removal time and increments the removal count.
+func (rm *RemovalInfo) MarkAsRemoved() {
+	now := time.Now()
+	rm.removedAt = now
+	rm.expireAt = now.Add(RemovalCooldownDuration * time.Minute)
+	rm.count++
+}
+
+// RemovedAt returns the timestamp when the stream was removed.
+func (rm *RemovalInfo) RemovedAt() time.Time {
+	return rm.removedAt
+}
+
+// HasExpired checks if the cooldown period has passed, allowing the stream to reconnect.
+func (rm *RemovalInfo) HasExpired() bool {
+	return time.Now().After(rm.expireAt)
+}
+
+// IncrementRemovalCount increases the removal count.
+func (rm *RemovalInfo) IncrementRemovalCount() {
+	rm.count++
 }
 
 // NewStreamManager creates a new stream manager for the given proto ID
@@ -92,6 +125,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		config:          c,
 		streams:         newStreamSet(),
 		reservedStreams: newStreamSet(),
+		removedStreams:  sttypes.NewSafeMap[sttypes.StreamID, *RemovalInfo](),
 		host:            host,
 		pf:              pf,
 		handleStream:    handleStream,
@@ -271,6 +305,12 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	if _, ok := sm.streams.get(id); ok {
 		return ErrStreamAlreadyExist
 	}
+	// Check if stream was recently removed
+	if removalInfo, exists := sm.removedStreams.Get(id); exists {
+		if !removalInfo.HasExpired() {
+			return ErrStreamRemovalNotExpired
+		}
+	}
 
 	// If the stream list has sufficient capacity, the stream can be added to the reserved list
 	if sm.streams.size() >= sm.config.HiCap {
@@ -321,8 +361,16 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
 	if !ok {
 		return ErrStreamAlreadyRemoved
 	}
-
 	sm.streams.deleteStream(st)
+
+	info, exist := sm.removedStreams.Get(id)
+	if !exist {
+		info = &RemovalInfo{
+			count: 0,
+		}
+		sm.removedStreams.Set(id, info)
+	}
+	info.MarkAsRemoved()
 
 	// try to replace removed streams from reserved list
 	requiredStreams := sm.hardRequiredStreams()
