@@ -10,7 +10,7 @@ import (
 )
 
 type DownloadDetails struct {
-	loopID   int
+	workerID int
 	streamID sttypes.StreamID
 	hash     common.Hash
 }
@@ -84,7 +84,7 @@ func (dm *downloadManager) HandleRequestError(bns []uint64, err error, streamID 
 }
 
 // HandleRequestResult handles get blocks result
-func (dm *downloadManager) HandleRequestResult(bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, streamID sttypes.StreamID) error {
+func (dm *downloadManager) HandleRequestResult(bns []uint64, blockBytes [][]byte, sigBytes [][]byte, workerID int, streamID sttypes.StreamID) error {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -95,7 +95,7 @@ func (dm *downloadManager) HandleRequestResult(bns []uint64, blockBytes [][]byte
 		} else {
 			dm.processing[bn] = struct{}{}
 			dm.details[bn] = &DownloadDetails{
-				loopID:   loopID,
+				workerID: workerID,
 				streamID: streamID,
 			}
 		}
@@ -121,13 +121,13 @@ func indexExists[T any](slice []T, index int) bool {
 }
 
 // SetDownloadDetails sets the download details for a batch of blocks
-func (dm *downloadManager) SetDownloadDetails(bns []uint64, loopID int, streamID sttypes.StreamID) error {
+func (dm *downloadManager) SetDownloadDetails(bns []uint64, workerID int, streamID sttypes.StreamID) error {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
 	for _, bn := range bns {
 		dm.details[bn] = &DownloadDetails{
-			loopID:   loopID,
+			workerID: workerID,
 			streamID: streamID,
 		}
 	}
@@ -135,12 +135,12 @@ func (dm *downloadManager) SetDownloadDetails(bns []uint64, loopID int, streamID
 }
 
 // GetDownloadDetails returns the download details for a block
-func (dm *downloadManager) GetDownloadDetails(blockNumber uint64) (loopID int, streamID sttypes.StreamID, err error) {
+func (dm *downloadManager) GetDownloadDetails(blockNumber uint64) (workerID int, streamID sttypes.StreamID, err error) {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
 	if dm, exist := dm.details[blockNumber]; exist {
-		return dm.loopID, dm.streamID, nil
+		return dm.workerID, dm.streamID, nil
 	}
 	return 0, sttypes.StreamID(fmt.Sprint(0)), fmt.Errorf("there is no download details for the block number: %d", blockNumber)
 }

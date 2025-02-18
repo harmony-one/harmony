@@ -132,9 +132,9 @@ func TestSetDownloadDetailsAndGetDownloadDetails(t *testing.T) {
 
 	dm.SetDownloadDetails([]uint64{10}, 1, sttypes.StreamID("stream1"))
 
-	loopID, streamID, err := dm.GetDownloadDetails(10)
+	workerID, streamID, err := dm.GetDownloadDetails(10)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, loopID)
+	assert.Equal(t, 1, workerID)
 	assert.Equal(t, sttypes.StreamID("stream1"), streamID)
 }
 

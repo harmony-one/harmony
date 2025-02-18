@@ -319,7 +319,7 @@ func (s *StateDownloadManager) HandleRequestError(codeHashes []common.Hash, trie
 }
 
 // HandleRequestResult handles get trie paths and code hashes result
-func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, triePaths []string, response [][]byte, loopID int, streamID sttypes.StreamID) error {
+func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, triePaths []string, response [][]byte, workerID int, streamID sttypes.StreamID) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
