@@ -313,9 +313,14 @@ func (bh *StageBlockHashes) calculateFinalBlockHashes(
 			details.Count++
 			details.StreamIDs[stid] = struct{}{}
 
-			// Update the final hash for the block if this hash has higher frequency
-			if details.Count > len(hashFrequency[blockNumber][finalHashes[blockNumber]].StreamIDs) {
+			if fh, ok := finalHashes[blockNumber]; !ok {
 				finalHashes[blockNumber] = hash
+			} else {
+				if hashFreq, ok := hashFrequency[blockNumber][fh]; ok {
+					if details.Count > len(hashFreq.StreamIDs) {
+						finalHashes[blockNumber] = hash
+					}
+				}
 			}
 		}
 	})
