@@ -248,7 +248,7 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 
 		for _, bn := range batch {
 			blkKey := marshalData(bn)
-			loopID, _, errBDD := gbm.GetDownloadDetails(bn)
+			workerID, _, errBDD := gbm.GetDownloadDetails(bn)
 			if errBDD != nil {
 				r.configs.logger.Warn().
 					Err(errBDD).
@@ -256,11 +256,11 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 					Msg(WrapStagedSyncMsg("get block download details failed"))
 				return
 			}
-			blockBytes, err := txs[loopID].GetOne(BlocksBucket, blkKey)
+			blockBytes, err := txs[workerID].GetOne(BlocksBucket, blkKey)
 			if err != nil {
 				return
 			}
-			sigBytes, err := txs[loopID].GetOne(BlockSignaturesBucket, blkKey)
+			sigBytes, err := txs[workerID].GetOne(BlockSignaturesBucket, blkKey)
 			if err != nil {
 				return
 			}
