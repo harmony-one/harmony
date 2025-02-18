@@ -219,16 +219,16 @@ func initDB(ctx context.Context, mainDB kv.RwDB, dbs []kv.RwDB) error {
 }
 
 // getBlockDbPath returns the path of the cache database which stores blocks
-func getBlockDbPath(shardID uint32, beacon bool, loopID int, dbDir string) string {
+func getBlockDbPath(shardID uint32, beacon bool, workerID int, dbDir string) string {
 	if beacon {
-		if loopID >= 0 {
-			return fmt.Sprintf("%s_%d", filepath.Join(dbDir, "cache/beacon_blocks_db"), loopID)
+		if workerID >= 0 {
+			return fmt.Sprintf("%s_%d", filepath.Join(dbDir, "cache/beacon_blocks_db"), workerID)
 		} else {
 			return filepath.Join(dbDir, "cache/beacon_blocks_db_main")
 		}
 	} else {
-		if loopID >= 0 {
-			return fmt.Sprintf("%s_%d_%d", filepath.Join(dbDir, "cache/blocks_db"), shardID, loopID)
+		if workerID >= 0 {
+			return fmt.Sprintf("%s_%d_%d", filepath.Join(dbDir, "cache/blocks_db"), shardID, workerID)
 		} else {
 			return fmt.Sprintf("%s_%d", filepath.Join(dbDir, "cache/blocks_db_main"), shardID)
 		}

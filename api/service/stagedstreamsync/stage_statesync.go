@@ -166,7 +166,7 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 }
 
 // runStateWorkerLoop creates a work loop for download states
-func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDownloadManager, wg *sync.WaitGroup, loopID int, startTime time.Time, s *StageState) {
+func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDownloadManager, wg *sync.WaitGroup, workerID int, startTime time.Time, s *StageState) {
 
 	defer wg.Done()
 
@@ -203,7 +203,7 @@ func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDow
 			err := errors.New("downloadStates received empty data bytes")
 			sdm.HandleRequestError(codes, paths, stid, err)
 		} else {
-			sdm.HandleRequestResult(nodes, paths, data, loopID, stid)
+			sdm.HandleRequestResult(nodes, paths, data, workerID, stid)
 			if sss.configs.logProgress {
 				//calculating block download speed
 				dt := time.Now().Sub(startTime).Seconds()
