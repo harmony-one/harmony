@@ -232,7 +232,7 @@ func TestPreCheck(t *testing.T) {
 		setup         func(db *state.DB, addr common.Address)
 	}{
 		{
-			name: "NonceTooHigh",
+			name: "NonceTooHigh", // nonce is 0, but expected is 2
 			msg: types.NewMessage(
 				crypto.PubkeyToAddress(key.PublicKey),
 				nil,
@@ -247,7 +247,7 @@ func TestPreCheck(t *testing.T) {
 			expectedError: ErrNonceTooHigh,
 		},
 		{
-			name: "NonceTooLow",
+			name: "NonceTooLow", // nonce is 1, but expected is 0
 			msg: types.NewMessage(
 				crypto.PubkeyToAddress(key.PublicKey),
 				nil,
@@ -265,7 +265,7 @@ func TestPreCheck(t *testing.T) {
 			},
 		},
 		{
-			name: "SenderNotEOA",
+			name: "SenderNotEOA", // sender has a code hash, thus not an EOA
 			msg: types.NewMessage(
 				crypto.PubkeyToAddress(key.PublicKey),
 				nil,
@@ -281,7 +281,7 @@ func TestPreCheck(t *testing.T) {
 			setup:         setCode,
 		},
 		{
-			name: "SuccessfulPreCheck",
+			name: "SuccessfulPreCheck", // all checks pass
 			msg: types.NewMessage(
 				crypto.PubkeyToAddress(key.PublicKey),
 				nil,
@@ -296,7 +296,7 @@ func TestPreCheck(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name: "SkipNonceChecks",
+			name: "SkipNonceChecks", // skip nonce checks
 			msg: types.NewMessage(
 				crypto.PubkeyToAddress(key.PublicKey),
 				nil,
@@ -311,7 +311,7 @@ func TestPreCheck(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name: "SkipFromEOACheck",
+			name: "SkipFromEOACheck", // skip EOA check
 			msg: types.NewMessage(
 				crypto.PubkeyToAddress(key.PublicKey),
 				nil,
@@ -327,7 +327,7 @@ func TestPreCheck(t *testing.T) {
 			setup:         setCode,
 		},
 		{
-			name: "SkipBothChecks",
+			name: "SkipBothChecks", // skip both checks
 			msg: types.NewMessage(
 				crypto.PubkeyToAddress(key.PublicKey),
 				nil,
@@ -341,6 +341,45 @@ func TestPreCheck(t *testing.T) {
 			),
 			expectedError: nil,
 			setup:         setCode,
+		},
+
+		// staking messages
+		{
+			name: "StakingWithCodeHash", // staking message with code hash
+			msg: types.NewStakingMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				0,
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				big.NewInt(1000),
+			),
+			expectedError: nil,
+			setup:         setCode,
+		},
+		{
+			name: "StakingWithoutCodeHash", // staking message without code hash
+			msg: types.NewStakingMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				0,
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				big.NewInt(1000),
+			),
+			expectedError: nil,
+		},
+		{
+			name: "StakingNonceTooHigh", // staking message with nonce too high
+			msg: types.NewStakingMessage(
+				crypto.PubkeyToAddress(key.PublicKey),
+				2,
+				21000,
+				big.NewInt(1),
+				[]byte{},
+				big.NewInt(1000),
+			),
+			expectedError: ErrNonceTooHigh,
 		},
 	}
 

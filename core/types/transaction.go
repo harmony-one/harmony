@@ -724,9 +724,8 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 	}
 }
 
-// NewStakingMessage returns new message of staking type
-// always need checkNonce
-// TODO (sun): allow staking transactions to bypass EIP-3607 check
+// NewStakingMessage returns new message of staking type.
+// It requires to check the nonce and skip the EOA check.
 func NewStakingMessage(from common.Address, nonce uint64, gasLimit uint64, gasPrice *big.Int, data []byte, blockNum *big.Int) Message {
 	return Message{
 		from:             from,
