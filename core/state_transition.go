@@ -207,6 +207,7 @@ func (st *StateTransition) preCheck() error {
 	return st.buyGas()
 }
 
+// todo(sun): clear transient storage (and access list?)
 // TransitionDb will transition the state by applying the current message and
 // returning the result including the used gas. It returns an error if failed.
 // An error indicates a consensus issue.
@@ -309,6 +310,8 @@ func (st *StateTransition) collectGas() {
 func (st *StateTransition) gasUsed() uint64 {
 	return st.initialGas - st.gas
 }
+
+// todo(sun): do transient storage and access lists need to be cleared?
 
 // StakingTransitionDb will transition the state by applying the staking message and
 // returning the result including the used gas. It returns an error if failed.
