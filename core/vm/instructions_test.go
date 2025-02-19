@@ -639,3 +639,10 @@ func TestCreate2Addreses(t *testing.T) {
 
 	}
 }
+
+// todo(sun): test the following cases:
+// tload then store
+// ensure if config does not set eip1153, then the ops don't load
+func TestOpTstoreAndTload(t *testing.T) {
+
+}
