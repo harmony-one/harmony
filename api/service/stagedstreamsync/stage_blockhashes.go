@@ -163,11 +163,18 @@ func (bh *StageBlockHashes) downloadBlockHashes(ctx context.Context, bns []uint6
 			Interface("stid", stid).
 			Msg("[StageBlockHashes] received more blockHashes than requested!")
 		return hashes[:len(bns)], stid, nil
+	} else if len(hashes) < len(bns) {
+		utils.Logger().Warn().
+			Int("request size", len(bns)).
+			Int("received size", len(hashes)).
+			Interface("stid", stid).
+			Msg("[StageBlockHashes] received less hashes than requested, target stream is not synced!")
+		return []common.Hash{}, stid, errors.New("not synced stream")
 	}
 	return hashes, stid, err
 }
 
-// runBlockhashWorkerLoop downloads block hashes
+// runBlockHashWorkerLoop downloads block hashes
 func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 	tx kv.RwTx,
 	hdm *downloadManager,
@@ -177,7 +184,6 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 	targetHeight uint64) error {
 
 	currProgress := startHeight
-	var wg sync.WaitGroup
 
 	useInternalTx := tx == nil
 	if useInternalTx {
@@ -205,6 +211,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 
 		// Map to store block hashes fetched from peers
 		peerHashes := sttypes.NewSafeMap[sttypes.StreamID, []common.Hash]()
+		var wg sync.WaitGroup
 
 		// Fetch block hashes concurrently
 		for i := 0; i < bh.configs.concurrency; i++ {
@@ -216,10 +223,17 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 				// Download block hashes
 				hashes, stid, err := bh.downloadBlockHashes(ctx, batch)
 				if err != nil {
+					bh.configs.protocol.StreamFailed(stid, "downloadBlockHashes failed")
 					return
 				}
 
-				// Store the result in peerHashes
+				// Check if any hash is zero
+				if bh.containsZeroHash(hashes) {
+					bh.configs.protocol.RemoveStream(stid) // Remove immediately
+					return
+				}
+
+				// Store valid hashes
 				peerHashes.Set(stid, hashes)
 			}()
 		}
@@ -228,10 +242,11 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		wg.Wait()
 
 		// Calculate the final block hashes for the batch
-		finalBlockHashes, _, errFinalHashCaclulations := bh.calculateFinalBlockHashes(peerHashes, batch)
-		if errFinalHashCaclulations != nil {
+		finalBlockHashes, _, errFinalHashCalculations := bh.calculateFinalBlockHashes(peerHashes, batch)
+		if errFinalHashCalculations != nil {
 			panic(ErrFinalBlockHashesCalculationFailed)
 		}
+		peerHashes.Clear()
 
 		// save block hashes in db
 		if err := bh.saveBlockHashes(ctx, tx, finalBlockHashes); err != nil {
@@ -255,7 +270,6 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 
 		// log the stage progress in console
 		if bh.configs.logProgress {
-			//calculating block hash speed
 			dt := time.Since(startTime).Seconds()
 			speed := float64(0)
 			if dt > 0 {
@@ -274,6 +288,15 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 	}
 
 	return nil
+}
+
+func (bh *StageBlockHashes) containsZeroHash(hashes []common.Hash) bool {
+	for _, h := range hashes {
+		if h == (common.Hash{}) { // Check if hash is all zeros
+			return true
+		}
+	}
+	return false
 }
 
 // calculateFinalBlockHashes Calculates the most frequent block hashes for a given batch and removes streams with invalid hashes.
