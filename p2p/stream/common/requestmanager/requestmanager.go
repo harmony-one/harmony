@@ -34,6 +34,11 @@ type requestManager struct {
 	deliveryC   chan responseData
 	newRequestC chan *request
 
+	// lastActiveStreamTime keeps track of the last time an active stream was available.
+	// It helps determine when all streams have been lost, triggering request cancellations
+	// if no connections exist for a defined timeout period.
+	lastActiveStreamTime time.Time
+
 	subs   []event.Subscription
 	logger zerolog.Logger
 	stopC  chan struct{}
@@ -67,6 +72,8 @@ func newRequestManager(sm streammanager.ReaderSubscriber) *requestManager {
 		cancelReqC:  make(chan cancelReqData, 16),
 		deliveryC:   make(chan responseData, 128),
 		newRequestC: make(chan *request, 128),
+
+		lastActiveStreamTime: time.Now(),
 
 		subs:   []event.Subscription{sub1, sub2},
 		logger: logger,
@@ -129,10 +136,54 @@ func (rm *requestManager) DeliverResponse(stID sttypes.StreamID, resp sttypes.Re
 	}()
 }
 
+func (rm *requestManager) monitorStreamHealth() {
+	now := time.Now()
+	streams := rm.streams.Keys()
+
+	if len(streams) > 0 {
+		rm.lastActiveStreamTime = now
+		return
+	}
+
+	// No streams left, check if timeout has passed
+	if now.Sub(rm.lastActiveStreamTime) <= StreamTimeoutThreshold {
+		return
+	}
+
+	// Batch process and cancel all requests
+	var pendingRequests []*request
+	for {
+		req := rm.popRequestFromWaitings()
+		if req == nil {
+			break
+		}
+		if !req.isDone() {
+			pendingRequests = append(pendingRequests, req)
+		}
+	}
+
+	if len(pendingRequests) == 0 {
+		return
+	}
+
+	rm.logger.Warn().Msgf("No active streams for %d seconds, canceling all waiting requests.", StreamTimeoutThreshold)
+
+	// Process cancellations in batch
+	for _, req := range pendingRequests {
+		req.doneWithResponse(responseData{
+			err: ErrNoAvailableStream,
+		})
+	}
+
+	// Reset watchdog timer
+	rm.lastActiveStreamTime = now
+}
+
 func (rm *requestManager) loop() {
 	var (
-		throttleC = make(chan struct{}, 1) // throttle the waiting requests periodically
-		ticker    = time.NewTicker(throttleInterval)
+		throttleC     = make(chan struct{}, 1) // throttle the waiting requests periodically
+		ticker        = time.NewTicker(throttleInterval)
+		monitorTicker = time.NewTicker(StreamMonitorInterval)
 	)
 	defer ticker.Stop()
 	throttle := func() {
@@ -146,6 +197,9 @@ func (rm *requestManager) loop() {
 		select {
 		case <-ticker.C:
 			throttle()
+
+		case <-monitorTicker.C:
+			rm.monitorStreamHealth()
 
 		case <-throttleC:
 		loop:
@@ -283,6 +337,7 @@ func (rm *requestManager) getNextRequest() (*request, *stream) {
 	st, err := rm.pickAvailableStream(req)
 	if err != nil {
 		rm.logger.Debug().Err(err).Str("request", req.String()).Msg("Pick available streams.")
+		// either no stream available or all streams are busy, so request has to wait
 		rm.addRequestToWaitings(req, reqPriorityHigh)
 		return nil, nil
 	}

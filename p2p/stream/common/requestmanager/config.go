@@ -7,6 +7,12 @@ const (
 	// throttle to do request every 100 milliseconds
 	throttleInterval = 100 * time.Millisecond
 
+	// StreamMonitorInterval monitors stream connections every 1000 milliseconds
+	StreamMonitorInterval = 1000 * time.Millisecond
+
+	// StreamTimeoutThreshold defines stream timeout duration
+	StreamTimeoutThreshold = 30 * time.Second
+
 	// number of request to be done in each throttle loop
 	throttleBatch = 16
 
