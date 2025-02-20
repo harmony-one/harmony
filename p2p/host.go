@@ -633,7 +633,10 @@ func (host *HostV2) ListTopic() []string {
 func (host *HostV2) ListPeer(topic string) []libp2p_peer.ID {
 	host.lock.Lock()
 	defer host.lock.Unlock()
-	return host.joined[topic].ListPeers()
+	if t, ok := host.joined[topic]; ok {
+		return t.ListPeers()
+	}
+	return nil
 }
 
 // ListBlockedPeer returns list of blocked peer
@@ -692,6 +695,23 @@ func (host *HostV2) Connected(net libp2p_network.Network, conn libp2p_network.Co
 		}
 	}
 }
+
+// TODO: this function could be used later to get peer topics and filter them based on the topics
+// getPeerTopics returns the list of topics a peer is subscribed to
+// func (host *HostV2) getPeerTopics(peerID libp2p_peer.ID) map[string]bool {
+// 	topics := make(map[string]bool)
+// 	host.lock.Lock()
+// 	defer host.lock.Unlock()
+// 	for topic, t := range host.joined {
+// 		for _, p := range t.ListPeers() {
+// 			if p == peerID {
+// 				topics[topic] = true
+// 				break
+// 			}
+// 		}
+// 	}
+// 	return topics
+// }
 
 // called when a connection closed
 func (host *HostV2) Disconnected(net libp2p_network.Network, conn libp2p_network.Conn) {
