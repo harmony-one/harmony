@@ -381,7 +381,19 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
 	info.MarkAsRemoved()
 
 	// try to replace removed streams from reserved list
+	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
+	removedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
+
+	sm.tryToReplaceRemovedStream()
+
+	return nil
+}
+
+func (sm *streamManager) tryToReplaceRemovedStream() error {
+	// try to replace removed streams from the reserved list.
 	requiredStreams := sm.hardRequiredStreams()
+
 	if added, err := sm.addStreamFromReserved(requiredStreams); added > 0 {
 		sm.logger.Info().
 			Err(err). // in case if some new streams added and others failed
