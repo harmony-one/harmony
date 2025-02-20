@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -48,6 +49,9 @@ type (
 		sm       streammanager.StreamManager   // stream management
 		rm       requestmanager.RequestManager // deliver the response from stream
 		disc     discovery.Discovery
+
+		lastAdvertiseDuration    time.Duration // last advertise duration to adjust it dynamically
+		recentPeerDiscoveryCount int           // recent peer discovery count
 
 		config Config
 		logger zerolog.Logger
@@ -200,12 +204,30 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 }
 
 func (p *Protocol) advertiseLoop() {
+	minSleepTime := 30 * time.Second
+	maxSleepTime := time.Duration(p.config.MaxAdvertiseWaitTime) * time.Minute
+
 	for {
 		sleep := p.advertise()
-		maxSleepTime := time.Duration(p.config.MaxAdvertiseWaitTime) * time.Minute
-		if sleep > maxSleepTime {
+
+		// Adaptive sleep: Increase if new peers were found, decrease otherwise
+		if p.recentPeerDiscoveryCount > 0 {
+			sleep += time.Duration(p.recentPeerDiscoveryCount) * time.Second
+		} else {
+			sleep /= 2
+		}
+
+		// Enforce sleep boundaries
+		if sleep < minSleepTime {
+			sleep = minSleepTime
+		} else if sleep > maxSleepTime {
 			sleep = maxSleepTime
 		}
+
+		// Add jitter to prevent synchronized advertisements
+		jitter := time.Duration(rand.Intn(30)) * time.Second
+		sleep += jitter
+
 		select {
 		case <-p.closeC:
 			return
@@ -218,22 +240,74 @@ func (p *Protocol) advertiseLoop() {
 // version
 func (p *Protocol) advertise() time.Duration {
 	var nextWait time.Duration
+	newPeersDiscovered := false
+	maxRetries := 3
+
+	// Start with a 10s timeout and increase dynamically
+	timeout := 10 * time.Second
+	if p.lastAdvertiseDuration > timeout {
+		timeout = p.lastAdvertiseDuration + 5*time.Second
+	}
 
 	pids := p.supportedProtoIDs()
+
 	for _, pid := range pids {
-		w, e := p.disc.Advertise(p.ctx, string(pid))
-		if e != nil {
-			p.logger.Warn().Err(e).Str("protocol", string(pid)).
-				Msg("cannot advertise sync protocol")
+		var err error
+		var w time.Duration
+		retries := 0
+
+		for retries < maxRetries {
+			ctx, cancel := context.WithTimeout(p.ctx, timeout)
+			defer cancel()
+
+			start := time.Now()
+			w, err = p.disc.Advertise(ctx, string(pid))
+			elapsed := time.Since(start)
+
+			p.logger.Info().Str("protocol", string(pid)).
+				Dur("elapsed", elapsed).Int("retry", retries).
+				Msg("advertise call completed")
+
+			// Store the last advertisement duration
+			p.lastAdvertiseDuration = elapsed
+
+			if err == nil {
+				newPeersDiscovered = true
+				break
+			}
+
+			p.logger.Warn().Err(err).Str("protocol", string(pid)).
+				Int("retry", retries).Msg("advertise failed, retrying")
+
+			retries++
+			time.Sleep(time.Duration(retries) * 2 * time.Second) // Exponential backoff
+		}
+
+		if err != nil {
+			p.logger.Error().Err(err).Str("protocol", string(pid)).
+				Msg("advertise failed after retries")
 			continue
 		}
+
 		if nextWait == 0 || nextWait > w {
 			nextWait = w
 		}
 	}
+
 	if nextWait < minAdvertiseInterval {
 		nextWait = minAdvertiseInterval
 	}
+
+	// Adjust next wait time based on success/failure
+	if newPeersDiscovered {
+		nextWait += 10 * time.Second
+	} else {
+		nextWait /= 2
+		if nextWait < minAdvertiseInterval {
+			nextWait = minAdvertiseInterval
+		}
+	}
+
 	return nextWait
 }
 
