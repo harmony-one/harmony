@@ -107,14 +107,14 @@ func TestRequestManager_NoStream_CancelRequests(t *testing.T) {
 	res := <-resC
 
 	// Validate results
-	if res.err == context.Canceled {
-		t.Fatalf("unexpected error: %v", res.err)
-	}
 	if res.err == nil {
 		t.Fatalf("expected request to be canceled but got no error")
 	}
-	if res.stID == "" {
-		t.Fatalf("expected canceled request to have a stream ID, but got empty")
+	if res.err != ErrNoAvailableStream {
+		t.Errorf("unexpected error: %v", res.err)
+	}
+	if res.stID != "" {
+		t.Errorf("canceled request shouldn't have a stream ID")
 	}
 }
 
