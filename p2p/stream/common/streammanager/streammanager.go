@@ -352,6 +352,13 @@ func (sm *streamManager) addStreamFromReserved(count int) (int, error) {
 			return added, err
 		}
 		sm.streams.addStream(st)
+		sm.logger.Info().
+			Int("NumStreams", sm.streams.size()).
+			Interface("StreamID", st.ID()).
+			Msg("[StreamManager] added new stream from reserved streams list")
+		sm.addStreamFeed.Send(EvtStreamAdded{st})
+		addedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+		numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
 		added++
 	}
 	return added, nil
@@ -391,9 +398,6 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
 		}
 	}
 
-	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
-	removedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
-	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
 	return nil
 }
 
