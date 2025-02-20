@@ -10,10 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 type StageBodies struct {
@@ -29,6 +29,7 @@ type StageBodiesCfg struct {
 	isBeaconShard        bool
 	extractReceiptHashes bool
 	logProgress          bool
+	logger               zerolog.Logger
 }
 
 func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
@@ -37,7 +38,7 @@ func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
 	}
 }
 
-func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, extractReceiptHashes bool, logProgress bool) StageBodiesCfg {
+func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, extractReceiptHashes bool, logger zerolog.Logger, logProgress bool) StageBodiesCfg {
 	return StageBodiesCfg{
 		bc:                   bc,
 		db:                   db,
@@ -46,7 +47,11 @@ func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concu
 		protocol:             protocol,
 		isBeaconShard:        isBeaconShard,
 		extractReceiptHashes: extractReceiptHashes,
-		logProgress:          logProgress,
+		logger: logger.With().
+			Str("stage", "StageBodies").
+			Str("mode", "long range").
+			Logger(),
+		logProgress: logProgress,
 	}
 }
 
@@ -113,19 +118,29 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	}
 
 	// Fetch blocks from neighbors
-	s.state.gbm = newDownloadManager(b.configs.bc, targetHeight, BlocksPerRequest, s.state.logger)
+	s.state.gbm = newDownloadManager(b.configs.bc, targetHeight, BlocksPerRequest, b.configs.logger)
 
 	// Setup workers to fetch blocks from remote node
 	var wg sync.WaitGroup
 
 	for i := 0; i != s.state.config.Concurrency; i++ {
 		wg.Add(1)
-		go b.runBlockWorkerLoop(ctx, tx, s.state.gbm, &wg, i, s, startTime)
+		go func() {
+			tx, err = b.configs.blockDBs[i].BeginRw(ctx)
+			if err != nil {
+				return
+			}
+			defer tx.Rollback()
+			b.runBlockWorkerLoop(ctx, tx, s.state.gbm, &wg, i, s, startTime)
+			if err := tx.Commit(); err != nil {
+				return
+			}
+		}()
 	}
 	wg.Wait()
 
 	if err := b.saveProgress(ctx, s, targetHeight, tx); err != nil {
-		utils.Logger().Error().
+		b.configs.logger.Error().
 			Err(err).
 			Uint64("targetHeight", targetHeight).
 			Msg(WrapStagedSyncMsg("save progress failed"))
@@ -170,12 +185,12 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
 			}
 		}
 
-		blockBytes, sigBytes, stid, err := b.downloadRawBlocksByHashes(ctx, tx, batch)
+		blockBytes, sigBytes, stid, err := b.downloadRawBlocksByHashes(ctx, batch)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
 			}
-			utils.Logger().Error().
+			b.configs.logger.Error().
 				Err(err).
 				Str("stream", string(stid)).
 				Interface("block numbers", batch).
@@ -183,7 +198,7 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
 			err = errors.Wrap(err, "request error")
 			gbm.HandleRequestError(batch, err, stid)
 		} else if blockBytes == nil {
-			utils.Logger().Warn().
+			b.configs.logger.Warn().
 				Str("stream", string(stid)).
 				Interface("block numbers", batch).
 				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received invalid (nil) blockBytes"))
@@ -191,7 +206,7 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
 			gbm.HandleRequestError(batch, err, stid)
 			b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
 		} else if len(blockBytes) == 0 {
-			utils.Logger().Warn().
+			b.configs.logger.Warn().
 				Str("stream", string(stid)).
 				Interface("block numbers", batch).
 				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received empty blockBytes, remote peer is not fully synced"))
@@ -199,7 +214,7 @@ func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
 			gbm.HandleRequestError(batch, err, stid)
 			b.configs.protocol.RemoveStream(stid)
 		} else {
-			if err = b.saveBlocks(ctx, nil, batch, blockBytes, sigBytes, loopID, stid); err != nil {
+			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, loopID, stid); err != nil {
 				panic(ErrSaveBlocksToDbFailed)
 			}
 			gbm.HandleRequestResult(batch, blockBytes, sigBytes, loopID, stid)
@@ -235,7 +250,7 @@ func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte
 			continue
 		}
 		if err := rlp.DecodeBytes(blockBytes, &block); err != nil {
-			utils.Logger().Error().
+			b.configs.logger.Error().
 				Uint64("block number", i).
 				Msg("block size invalid")
 			return ErrInvalidBlockBytes
@@ -263,7 +278,7 @@ badBlockDownloadLoop:
 
 	for {
 		if b.configs.protocol.NumStreams() == 0 {
-			utils.Logger().Error().
+			b.configs.logger.Error().
 				Uint64("bad block number", s.state.invalidBlock.Number).
 				Msg("[STAGED_STREAM_SYNC] not enough streams to re-download bad block")
 			return errors.Errorf("not enough streams to re-download bad block")
@@ -271,7 +286,7 @@ badBlockDownloadLoop:
 		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-				utils.Logger().Error().
+				b.configs.logger.Error().
 					Uint64("bad block number", s.state.invalidBlock.Number).
 					Msg("[STAGED_STREAM_SYNC] tried to re-download bad block from this stream, but downloadRawBlocks failed")
 				b.configs.protocol.StreamFailed(stid, "tried to re-download bad block from this stream, but downloadRawBlocks failed")
@@ -288,7 +303,7 @@ badBlockDownloadLoop:
 		s.state.gbm.SetDownloadDetails(batch, 0, stid)
 		if errU := b.configs.blockDBs[0].Update(ctx, func(_tx kv.RwTx) error {
 			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, 0, stid); err != nil {
-				utils.Logger().Error().
+				b.configs.logger.Error().
 					Uint64("bad block number", s.state.invalidBlock.Number).
 					Err(err).
 					Msg("[STAGED_STREAM_SYNC] saving re-downloaded bad block to db failed")
@@ -337,13 +352,19 @@ func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]
 	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
 }
 
-func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
+func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	if len(bns) == 0 {
 		return nil, nil, "", errors.New("empty batch of block numbers")
 	}
+
+	tx, err := b.configs.db.BeginRw(ctx)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	defer tx.Rollback()
 
 	hashes := make([]common.Hash, 0, len(bns))
 
@@ -352,7 +373,7 @@ func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx,
 			blkKey := marshalData(bn)
 			hashBytes, err := etx.GetOne(BlockHashesBucket, blkKey)
 			if err != nil {
-				utils.Logger().Error().
+				b.configs.logger.Error().
 					Err(err).
 					Uint64("block number", bn).
 					Msg("[STAGED_STREAM_SYNC] fetching block hash from db failed")
@@ -364,6 +385,10 @@ func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx,
 		}
 		return nil
 	}); err != nil {
+		return nil, nil, "", err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, nil, "", err
 	}
 
@@ -393,7 +418,7 @@ func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, 
 		blkKey := marshalData(bns[i])
 
 		if err := tx.Put(BlocksBucket, blkKey, block); err != nil {
-			utils.Logger().Error().
+			b.configs.logger.Error().
 				Err(err).
 				Uint64("block height", bns[i]).
 				Msg("[STAGED_STREAM_SYNC] adding block to db failed")
@@ -401,7 +426,7 @@ func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, 
 		}
 		// sigKey := []byte("s" + string(bns[i]))
 		if err := tx.Put(BlockSignaturesBucket, blkKey, sig); err != nil {
-			utils.Logger().Error().
+			b.configs.logger.Error().
 				Err(err).
 				Uint64("block height", bns[i]).
 				Msg("[STAGED_STREAM_SYNC] adding block sig to db failed")
@@ -431,7 +456,7 @@ func (b *StageBodies) saveProgress(ctx context.Context, s *StageState, progress 
 
 	// save progress
 	if err = s.Update(tx, progress); err != nil {
-		utils.Logger().Error().
+		b.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] saving progress for block bodies stage failed")
 		return ErrSavingBodiesProgressFail
@@ -454,14 +479,14 @@ func (b *StageBodies) cleanBlocksDB(ctx context.Context, loopID int) (err error)
 
 	// clean block bodies db
 	if err = tx.ClearBucket(BlocksBucket); err != nil {
-		utils.Logger().Error().
+		b.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] clear blocks bucket after revert failed")
 		return err
 	}
 	// clean block signatures db
 	if err = tx.ClearBucket(BlockSignaturesBucket); err != nil {
-		utils.Logger().Error().
+		b.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] clear block signatures bucket after revert failed")
 		return err
@@ -502,7 +527,7 @@ func (b *StageBodies) Revert(ctx context.Context, firstCycle bool, u *RevertStat
 	// save progress
 	currentHead := s.state.CurrentBlockNumber()
 	if err = s.Update(tx, currentHead); err != nil {
-		utils.Logger().Error().
+		b.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] saving progress for block bodies stage after revert failed")
 		return err

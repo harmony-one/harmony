@@ -39,7 +39,9 @@ func newDownloadManager(chain blockChain, targetBN uint64, batchSize int, logger
 		rq:         newResultQueue(),
 		details:    make(map[uint64]*DownloadDetails),
 		batchSize:  batchSize,
-		logger:     logger,
+		logger: logger.With().
+			Str("sub-module", "download manager").
+			Logger(),
 	}
 }
 
