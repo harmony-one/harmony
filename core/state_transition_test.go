@@ -215,3 +215,55 @@ func TestCollectGasRounding(t *testing.T) {
 		}
 	}
 }
+
+func TestPrepare(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	chain, db, header, _ := getTestEnvironment(*key)
+	header.SetEpoch(new(big.Int).Set(params.LocalnetChainConfig.FeeCollectEpoch))
+	shardingconfig.InitLocalnetConfig(16, 16)
+
+	// set the shard schedule so that fee collectors are available
+	shard.Schedule = shardingconfig.LocalnetSchedule
+	feeCollectors := shard.Schedule.InstanceForEpoch(header.Epoch()).FeeCollectors()
+	if len(feeCollectors) == 0 {
+		t.Fatal("No fee collectors set")
+	}
+
+	tx := types.NewTransaction(
+		0, // nonce
+		common.BytesToAddress([]byte("to")),
+		0,                 // shardid
+		big.NewInt(1e18),  // amount, 1 ONE
+		50000,             // gasLimit, intentionally higher than the 21000 required
+		big.NewInt(100e9), // gasPrice
+		[]byte{},          // payload, intentionally empty
+	)
+	from, _ := tx.SenderAddress()
+	initialBalance := big.NewInt(2e18)
+	db.AddBalance(from, initialBalance)
+	msg, _ := tx.AsMessage(types.NewEIP155Signer(common.Big2))
+	ctx := NewEVMContext(msg, header, chain, nil /* coinbase is nil, no block reward */)
+	ctx.TxType = types.SameShardTx
+
+	// populate transient storage
+	transientKey := common.BytesToHash(common.Hex2Bytes("key"))
+	db.SetTransientState(from, transientKey, common.BytesToHash(common.Hex2Bytes("value")))
+	value := db.GetTransientState(from, transientKey)
+	if value != common.BytesToHash(common.Hex2Bytes("value")) {
+		t.Fatal("value does not match")
+	}
+
+	// transition state db by calling apply message
+	vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+	gasPool := new(GasPool).AddGas(math.MaxUint64)
+	_, err := ApplyMessage(vmenv, msg, gasPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// ensure that transient storage is empty
+	value = db.GetTransientState(from, transientKey)
+	if value != (common.Hash{}) {
+		t.Fatal("value should be empty")
+	}
+}

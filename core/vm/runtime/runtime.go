@@ -91,8 +91,6 @@ func setDefaults(cfg *Config) {
 	}
 }
 
-// todo(sun): unit tests for the following
-
 // Execute executes the code using the input as call data during the execution.
 // It returns the EVM's return value, the new state and an error if it failed.
 //
