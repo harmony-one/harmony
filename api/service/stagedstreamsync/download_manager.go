@@ -25,11 +25,12 @@ type downloadManager struct {
 	rq         *resultQueue                // result queue wait to be inserted into blockchain
 	details    map[uint64]*DownloadDetails // details about how this block was downloaded
 	batchSize  int
+	curNumber  uint64
 	logger     zerolog.Logger
 	lock       sync.Mutex
 }
 
-func newDownloadManager(chain blockChain, targetBN uint64, batchSize int, logger zerolog.Logger) *downloadManager {
+func newDownloadManager(chain blockChain, currHeight uint64, targetBN uint64, batchSize int, logger zerolog.Logger) *downloadManager {
 	return &downloadManager{
 		chain:      chain,
 		targetBN:   targetBN,
@@ -39,6 +40,7 @@ func newDownloadManager(chain blockChain, targetBN uint64, batchSize int, logger
 		rq:         newResultQueue(),
 		details:    make(map[uint64]*DownloadDetails),
 		batchSize:  batchSize,
+		curNumber:  currHeight,
 		logger: logger.With().
 			Str("sub-module", "download manager").
 			Logger(),
@@ -46,7 +48,7 @@ func newDownloadManager(chain blockChain, targetBN uint64, batchSize int, logger
 }
 
 // GetNextBatch get the next block numbers batch
-func (dm *downloadManager) GetNextBatch(curHeight uint64) []uint64 {
+func (dm *downloadManager) GetNextBatch() []uint64 {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -63,7 +65,7 @@ func (dm *downloadManager) GetNextBatch(curHeight uint64) []uint64 {
 	}
 
 	if dm.availableForMoreTasks() {
-		addBNs := dm.getBatchFromUnprocessed(cap, curHeight)
+		addBNs := dm.getBatchFromUnprocessed(cap)
 		dm.addBatchToRequesting(addBNs)
 		bns = append(bns, addBNs...)
 	}
@@ -184,14 +186,15 @@ func (dm *downloadManager) getBatchFromRetries(cap int) []uint64 {
 }
 
 // getBatchFromUnprocessed returns a batch of block numbers to be requested from unprocessed.
-func (dm *downloadManager) getBatchFromUnprocessed(cap int, curHeight uint64) []uint64 {
+func (dm *downloadManager) getBatchFromUnprocessed(cap int) []uint64 {
 	var (
 		requestBNs []uint64
 	)
-	bn := curHeight + 1
+	bn := dm.curNumber + 1
 	// TODO: this algorithm can be potentially optimized.
 	for cnt := 0; cnt < cap && bn <= dm.targetBN; cnt++ {
 		for bn <= dm.targetBN {
+			dm.curNumber = bn
 			_, ok1 := dm.requesting[bn]
 			_, ok2 := dm.processing[bn]
 			if !ok1 && !ok2 {
@@ -199,6 +202,7 @@ func (dm *downloadManager) getBatchFromUnprocessed(cap int, curHeight uint64) []
 				bn++
 				break
 			}
+			// skip and go next block number
 			bn++
 		}
 	}
