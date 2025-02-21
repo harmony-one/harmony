@@ -1170,7 +1170,7 @@ func (db *DB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 //
 // - reset transient storage (1153)
 //
-// todo(sun): Berlin fork
+// todo(sun): berlin fork
 // - add sender to access list (2929)
 // - add destination to access list (2929)
 // - add precompiles to access list (2929)
