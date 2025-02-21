@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
@@ -30,6 +31,11 @@ type StageBodiesCfg struct {
 	extractReceiptHashes bool
 	logProgress          bool
 	logger               zerolog.Logger
+}
+
+type blockTask struct {
+	bns    []uint64
+	hashes []common.Hash
 }
 
 func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
@@ -118,26 +124,9 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	}
 
 	// Fetch blocks from neighbors
-	s.state.gbm = newDownloadManager(b.configs.bc, targetHeight, BlocksPerRequest, b.configs.logger)
+	s.state.gbm = newDownloadManager(b.configs.bc, currProgress, targetHeight, BlocksPerRequest, s.state.logger)
 
-	// Setup workers to fetch blocks from remote node
-	var wg sync.WaitGroup
-
-	for i := 0; i != s.state.config.Concurrency; i++ {
-		wg.Add(1)
-		go func() {
-			tx, err = b.configs.blockDBs[i].BeginRw(ctx)
-			if err != nil {
-				return
-			}
-			defer tx.Rollback()
-			b.runBlockWorkerLoop(ctx, tx, s.state.gbm, &wg, i, s, startTime)
-			if err := tx.Commit(); err != nil {
-				return
-			}
-		}()
-	}
-	wg.Wait()
+	b.runDownloadLoop(ctx, tx, s.state.gbm, s, currProgress, startTime)
 
 	if err := b.saveProgress(ctx, s, targetHeight, tx); err != nil {
 		b.configs.logger.Error().
@@ -155,89 +144,167 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	return nil
 }
 
-// runBlockWorkerLoop creates a work loop for download blocks
-func (b *StageBodies) runBlockWorkerLoop(ctx context.Context,
-	tx kv.RwTx,
-	gbm *downloadManager,
-	wg *sync.WaitGroup,
-	loopID int,
-	s *StageState,
-	startTime time.Time) {
+// runDownloadLoop fetches block hash batches and assigns them to workers dynamically
+func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *downloadManager, s *StageState, startBlockNumber uint64, startTime time.Time) {
+	var currentBlock uint64
+	currentBlock = startBlockNumber
+	concurrency := s.state.config.Concurrency
+	batchChan := make(chan blockTask, concurrency) // Channel for batches
+	var wg sync.WaitGroup
+	// Start worker pool
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for batch := range batchChan { // Workers continuously pick up batches
+				if err := b.runBlockWorker(ctx, gbm, batch.bns, batch.hashes, workerID); err != nil {
+					continue
+				}
+			}
+		}(i)
+	}
 
-	currentBlock := s.state.CurrentBlockNumber()
+	defer func() {
+		// select {
+		// case <-ctx.Done():
+		// 	return
+		// case <-time.After(100 * time.Millisecond):
+		// 	return
+		// }
+		close(batchChan) // Close channel after all batches are sent
+		wg.Wait()        // Wait for all workers to complete
+	}()
 
-	defer wg.Done()
-
+	// Fetch and send batches to workers
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 		}
-		batch := gbm.GetNextBatch(currentBlock)
 
-		if len(batch) == 0 {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(100 * time.Millisecond):
-				return
-			}
+		batch := gbm.GetNextBatch()
+		if len(batch) == 0 { // No more batches to process
+			return
 		}
 
-		blockBytes, sigBytes, stid, err := b.downloadRawBlocksByHashes(ctx, batch)
+		hashes, err := b.fetchBlockHashes(ctx, tx, batch)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-				b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
-			}
-			b.configs.logger.Error().
+			utils.Logger().Error().
 				Err(err).
-				Str("stream", string(stid)).
 				Interface("block numbers", batch).
-				Msg(WrapStagedSyncMsg("downloadRawBlocks failed"))
-			err = errors.Wrap(err, "request error")
-			gbm.HandleRequestError(batch, err, stid)
-		} else if blockBytes == nil {
-			b.configs.logger.Warn().
-				Str("stream", string(stid)).
+				Msg(WrapStagedSyncMsg("fetchBlockHashes failed"))
+			panic(ErrReadBlockHashesFromDBFailed)
+		}
+
+		if len(batch) != len(hashes) {
+			utils.Logger().Error().
 				Interface("block numbers", batch).
-				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received invalid (nil) blockBytes"))
-			err := errors.New("downloadRawBlocks received invalid (nil) blockBytes")
-			gbm.HandleRequestError(batch, err, stid)
-			b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
-		} else if len(blockBytes) == 0 {
-			b.configs.logger.Warn().
-				Str("stream", string(stid)).
-				Interface("block numbers", batch).
-				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received empty blockBytes, remote peer is not fully synced"))
-			err := errors.New("downloadRawBlocks received empty blockBytes")
-			gbm.HandleRequestError(batch, err, stid)
-			b.configs.protocol.RemoveStream(stid)
-		} else {
-			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, loopID, stid); err != nil {
-				panic(ErrSaveBlocksToDbFailed)
-			}
-			gbm.HandleRequestResult(batch, blockBytes, sigBytes, loopID, stid)
-			// adjust current block
+				Msg(WrapStagedSyncMsg("fetchBlockHashes failed: some hashes failed to retrieve"))
+			panic(ErrReadBlockHashesFromDBFailed)
+		}
+
+		blockTask := blockTask{
+			bns:    batch,
+			hashes: hashes,
+		}
+		batchChan <- blockTask // Send batch to an available worker
+
+		// Logging progress
+		if b.configs.logProgress {
 			lastBlockInBatch := batch[len(batch)-1]
 			if lastBlockInBatch > currentBlock {
 				currentBlock = lastBlockInBatch
 			}
-			if b.configs.logProgress {
-				//calculating block download speed
-				dt := time.Since(startTime).Seconds()
-				speed := float64(0)
-				numBlocks := uint64(len(gbm.details))
+			//calculating block download speed
+			dt := time.Since(startTime).Seconds()
+			speed := float64(0)
+			numBlocks := uint64(len(gbm.details))
 
-				if dt > 0 {
-					speed = float64(numBlocks) / dt
-				}
-				blockSpeed := fmt.Sprintf("%.2f", speed)
+			if dt > 0 {
+				speed = float64(numBlocks) / dt
+			}
+			blockSpeed := fmt.Sprintf("%.2f", speed)
 
-				fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-				fmt.Println("downloaded blocks:", currentBlock+numBlocks, "/", int(gbm.targetBN), "(", blockSpeed, "blocks/s", ")")
+			fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+			fmt.Println("downloaded blocks:", currentBlock, "/", int(gbm.targetBN), "(", blockSpeed, "blocks/s", ")")
+		}
+	}
+}
+
+// runBlockWorker downloads and processes a single batch of blocks
+func (b *StageBodies) runBlockWorker(ctx context.Context,
+	gbm *downloadManager,
+	bns []uint64,
+	hashes []common.Hash,
+	workerID int) error {
+
+	if len(hashes) == 0 {
+		return errors.New("empty hashes")
+	}
+
+	blockBytes, sigBytes, stid, err := b.configs.protocol.GetRawBlocksByHashes(ctx, hashes)
+	if err != nil {
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
+		}
+		utils.Logger().Error().
+			Err(err).
+			Str("stream", string(stid)).
+			Interface("block numbers", bns).
+			Msg(WrapStagedSyncMsg("downloadRawBlocks failed"))
+		err = errors.Wrap(err, "request error")
+		gbm.HandleRequestError(bns, err, stid)
+		return err
+	} else if blockBytes == nil {
+		utils.Logger().Warn().
+			Str("stream", string(stid)).
+			Interface("block numbers", bns).
+			Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received invalid (nil) blockBytes"))
+		err := errors.New("downloadRawBlocks received invalid (nil) blockBytes")
+		gbm.HandleRequestError(bns, err, stid)
+		b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
+		return err
+	} else if len(blockBytes) == 0 {
+		utils.Logger().Warn().
+			Str("stream", string(stid)).
+			Interface("block numbers", bns).
+			Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received empty blockBytes, remote peer is not fully synced"))
+		err := errors.New("downloadRawBlocks received empty blockBytes")
+		gbm.HandleRequestError(bns, err, stid)
+		b.configs.protocol.RemoveStream(stid)
+		return err
+	} else if len(blockBytes) != len(bns) {
+		utils.Logger().Warn().
+			Str("stream", string(stid)).
+			Interface("block numbers", bns).
+			Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received blockBytes length is not match with requested block numbers"))
+		err := errors.New("downloadRawBlocks received blockBytes length is not match with requested block numbers")
+		gbm.HandleRequestError(bns, err, stid)
+		b.configs.protocol.RemoveStream(stid)
+		return err
+	} else {
+		validBlocks := true
+		for _, bb := range blockBytes {
+			if len(bb) <= 1 {
+				validBlocks = false
 			}
 		}
+		if !validBlocks {
+			utils.Logger().Warn().
+				Str("stream", string(stid)).
+				Interface("block numbers", bns).
+				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, some block Bytes are not valid"))
+			err := errors.New("downloadRawBlocks received blockBytes are not valid")
+			gbm.HandleRequestError(bns, err, stid)
+			b.configs.protocol.RemoveStream(stid)
+			return err
+		}
+		if err = b.saveBlocks(ctx, nil, bns, blockBytes, sigBytes, workerID, stid); err != nil {
+			panic(ErrSaveBlocksToDbFailed)
+		}
+		gbm.HandleRequestResult(bns, blockBytes, sigBytes, workerID, stid)
+		return nil
 	}
 }
 
@@ -352,7 +419,36 @@ func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]
 	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
 }
 
-func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
+func (b *StageBodies) fetchBlockHashes(ctx context.Context, tx kv.RwTx, bns []uint64) ([]common.Hash, error) {
+	if len(bns) == 0 {
+		return nil, errors.New("empty batch of block numbers")
+	}
+
+	hashes := make([]common.Hash, 0, len(bns))
+
+	err := CreateView(ctx, b.configs.db, tx, func(etx kv.Tx) error {
+		for _, bn := range bns {
+
+			blkKey := marshalData(bn)
+			hashBytes, err := etx.GetOne(BlockHashesBucket, blkKey)
+			if err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Uint64("block number", bn).
+					Msg("[STAGED_STREAM_SYNC] fetching block hash from db failed")
+				return err
+			}
+			var h common.Hash
+			copy(h[:], hashBytes)
+			hashes = append(hashes, h)
+		}
+		return nil
+	})
+
+	return hashes, err
+}
+
+func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -397,11 +493,11 @@ func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, bns []uint6
 }
 
 // saveBlocks saves the blocks into db
-func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, loopID int, stid sttypes.StreamID) error {
+func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, workerID int, stid sttypes.StreamID) error {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
-		tx, err = b.configs.blockDBs[loopID].BeginRw(ctx)
+		tx, err = b.configs.blockDBs[workerID].BeginRw(ctx)
 		if err != nil {
 			return err
 		}
@@ -470,8 +566,8 @@ func (b *StageBodies) saveProgress(ctx context.Context, s *StageState, progress 
 	return nil
 }
 
-func (b *StageBodies) cleanBlocksDB(ctx context.Context, loopID int) (err error) {
-	tx, errb := b.configs.blockDBs[loopID].BeginRw(ctx)
+func (b *StageBodies) cleanBlocksDB(ctx context.Context, workerID int) (err error) {
+	tx, errb := b.configs.blockDBs[workerID].BeginRw(ctx)
 	if errb != nil {
 		return errb
 	}
