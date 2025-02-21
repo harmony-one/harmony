@@ -24,7 +24,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 )
 
-// todo(sun): update the config to enable eip1153
+// todo(sun): enable eip1153 (london fork)
 // EnableEIP enables the given EIP on the config.
 // This operation writes in-place, and callers need to ensure that the globally
 // defined jump tables are not polluted.
