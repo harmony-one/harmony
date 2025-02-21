@@ -72,6 +72,8 @@ type StateDB interface {
 	// is defined according to EIP161 (balance = nonce = code = 0).
 	Empty(common.Address) bool
 
+	Prepare()
+
 	RevertToSnapshot(int)
 	Snapshot() int
 
