@@ -324,7 +324,7 @@ func (db *DB) GetNonce(addr common.Address) uint64 {
 	return 0
 }
 
-// TxIndex returns the current transaction index set by Prepare.
+// TxIndex returns the current transaction index set by SetTxContext.
 func (db *DB) TxIndex() int {
 	return db.txIndex
 }
@@ -337,7 +337,7 @@ func (db *DB) TxHashETH() common.Hash {
 	return db.ethTxHash
 }
 
-// BlockHash returns the current block hash set by Prepare.
+// BlockHash returns the current block hash set by SetTxContext.
 func (db *DB) BlockHash() common.Hash {
 	return db.bhash
 }
@@ -1009,19 +1009,12 @@ func (db *DB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 	return db.trie.Hash()
 }
 
-// Prepare sets the current transaction hash and index and block hash which is
-// used when the EVM emits new state logs.
-func (db *DB) Prepare(thash, bhash common.Hash, ti int) {
-	db.thash = thash
-	db.bhash = bhash
-	db.txIndex = ti
-}
-
-// SetTxContext sets the current transaction hash and index which are
+// SetTxContext sets the current transaction hash and index and block hash which are
 // used when the EVM emits new state logs. It should be invoked before
 // transaction execution.
-func (db *DB) SetTxContext(thash common.Hash, ti int) {
+func (db *DB) SetTxContext(thash, bhash common.Hash, ti int) {
 	db.thash = thash
+	db.bhash = bhash
 	db.txIndex = ti
 }
 
@@ -1170,6 +1163,21 @@ func (db *DB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		}
 	}
 	return root, nil
+}
+
+// Prepare handles the preparatory steps for executing a state transition with.
+// This method must be invoked before state transition.
+//
+// - reset transient storage (1153)
+//
+// todo(sun): Berlin fork
+// - add sender to access list (2929)
+// - add destination to access list (2929)
+// - add precompiles to access list (2929)
+// - add the contents of the optional tx access list (2930)
+func (db *DB) Prepare() {
+	// reset transient storage prior to transaction execution
+	db.transientStorage = newTransientStorage()
 }
 
 // AddAddressToAccessList adds the given address to the access list

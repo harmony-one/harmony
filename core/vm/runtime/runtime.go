@@ -91,6 +91,8 @@ func setDefaults(cfg *Config) {
 	}
 }
 
+// todo(sun): unit tests for the following
+
 // Execute executes the code using the input as call data during the execution.
 // It returns the EVM's return value, the new state and an error if it failed.
 //
@@ -111,7 +113,9 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 		sender  = vm.AccountRef(cfg.Origin)
 	)
 
-	// todo(sun): clear transient storage (and access list?)
+	// Execute the preparatory steps for state transition which includes:
+	// - reset transient storage(eip 1153)
+	vmenv.StateDB.Prepare()
 
 	cfg.State.CreateAccount(address)
 	// set the receiver's (the executing contract) code for execution.
@@ -143,7 +147,9 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 		sender = vm.AccountRef(cfg.Origin)
 	)
 
-	// todo(sun): clear transient storage (and access list?)
+	// Execute the preparatory steps for state transition which includes:
+	// - reset transient storage(eip 1153)
+	vmenv.StateDB.Prepare()
 
 	// Call the code with the given configuration.
 	code, address, leftOverGas, err := vmenv.Create(
@@ -167,7 +173,9 @@ func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, er
 
 	sender := cfg.State.GetOrNewStateObject(cfg.Origin)
 
-	// todo(sun): clear transient storage (and access list?)
+	// Execute the preparatory steps for state transition which includes:
+	// - reset transient storage(eip 1153)
+	vmenv.StateDB.Prepare()
 
 	// Call the code with the given configuration.
 	ret, leftOverGas, err := vmenv.Call(
