@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
@@ -132,11 +133,17 @@ func (bh *StageBlockHashes) Exec(ctx context.Context, firstCycle bool, invalidBl
 	}
 
 	// create download manager instant
-	hdm := newDownloadManager(bh.configs.bc, targetHeight, BlockHashesPerRequest, bh.configs.logger)
+	hdm := newDownloadManager(bh.configs.bc, currProgress, targetHeight, BlockHashesPerRequest, bh.configs.logger)
 
 	// Fetch block hashes from neighbors
 	if err := bh.runBlockHashWorkerLoop(ctx, tx, hdm, s, startTime, currentHead, targetHeight); err != nil {
 		return nil
+	}
+
+	if useInternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -204,7 +211,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		}
 
 		// Fetch the next batch of block numbers
-		batch := hdm.GetNextBatch(currProgress)
+		batch := hdm.GetNextBatch()
 		if len(batch) == 0 {
 			break
 		}
