@@ -474,13 +474,14 @@ func (tx *Transaction) ConvertToEth() *EthTransaction {
 // XXX Rename message to something less arbitrary?
 func (tx *Transaction) AsMessage(s Signer) (Message, error) {
 	msg := Message{
-		nonce:           tx.data.AccountNonce,
-		gasLimit:        tx.data.GasLimit,
-		gasPrice:        new(big.Int).Set(tx.data.Price),
-		to:              tx.data.Recipient,
-		value:           tx.data.Amount,
-		data:            tx.data.Payload,
-		skipNonceChecks: false,
+		nonce:            tx.data.AccountNonce,
+		gasLimit:         tx.data.GasLimit,
+		gasPrice:         new(big.Int).Set(tx.data.Price),
+		to:               tx.data.Recipient,
+		value:            tx.data.Amount,
+		data:             tx.data.Payload,
+		skipNonceChecks:  false,
+		skipFromEOACheck: false,
 	}
 
 	var err error
@@ -708,55 +709,33 @@ type Message struct {
 	txType   TransactionType
 }
 
-//type Message struct {
-//	To                    *common.Address
-//	From                  common.Address
-//	Nonce                 uint64
-//	Value                 *big.Int
-//	GasLimit              uint64
-//	GasPrice              *big.Int
-//	GasFeeCap             *big.Int
-//	GasTipCap             *big.Int
-//	Data                  []byte
-//	AccessList            types.AccessList
-//	BlobGasFeeCap         *big.Int
-//	BlobHashes            []common.Hash
-//	SetCodeAuthorizations []types.SetCodeAuthorization
-//
-//	// When SkipNonceChecks is true, the message nonce is not checked against the
-//	// account nonce in state.
-//	// This field will be set to true for operations like RPC eth_call.
-//	SkipNonceChecks bool
-//
-//	// When SkipFromEOACheck is true, the message sender is not checked to be an EOA.
-//	SkipFromEOACheck bool
-//}
-
 // NewMessage returns new message.
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, skipNonceChecks bool) Message {
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, skipNonceChecks, skipFromEOACheck bool) Message {
 	return Message{
-		from:            from,
-		to:              to,
-		nonce:           nonce,
-		value:           amount,
-		gasLimit:        gasLimit,
-		gasPrice:        gasPrice,
-		data:            data,
-		skipNonceChecks: skipNonceChecks,
+		from:             from,
+		to:               to,
+		nonce:            nonce,
+		value:            amount,
+		gasLimit:         gasLimit,
+		gasPrice:         gasPrice,
+		data:             data,
+		skipNonceChecks:  skipNonceChecks,
+		skipFromEOACheck: skipFromEOACheck,
 	}
 }
 
-// NewStakingMessage returns new message of staking type
-// always need checkNonce
+// NewStakingMessage returns new message of staking type.
+// It requires to check the nonce and skip the EOA check.
 func NewStakingMessage(from common.Address, nonce uint64, gasLimit uint64, gasPrice *big.Int, data []byte, blockNum *big.Int) Message {
 	return Message{
-		from:            from,
-		nonce:           nonce,
-		gasLimit:        gasLimit,
-		gasPrice:        new(big.Int).Set(gasPrice),
-		data:            data,
-		skipNonceChecks: false,
-		blockNum:        blockNum,
+		from:             from,
+		nonce:            nonce,
+		gasLimit:         gasLimit,
+		gasPrice:         new(big.Int).Set(gasPrice),
+		data:             data,
+		blockNum:         blockNum,
+		skipNonceChecks:  false,
+		skipFromEOACheck: true,
 	}
 }
 
@@ -798,6 +777,11 @@ func (m Message) Data() []byte {
 // CheckNonce returns checkNonce of Message.
 func (m Message) SkipNonceChecks() bool {
 	return m.skipNonceChecks
+}
+
+// SkipFromEOACheck returns skipFromEOACheck of Message.
+func (m Message) SkipFromEOACheck() bool {
+	return m.skipFromEOACheck
 }
 
 // Type returns the type of message
