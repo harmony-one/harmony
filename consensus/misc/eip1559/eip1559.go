@@ -17,24 +17,26 @@
 package eip1559
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/pkg/errors"
 )
 
-/*
 // VerifyEIP1559Header verifies some header attributes which were changed in EIP-1559,
 // - gas limit check
 // - basefee check
-func VerifyEIP1559Header(config *params.ChainConfig, parent, header *types.Header) error {
+func VerifyEIP1559Header(config *params.ChainConfig, parent, header *block.Header) error {
 	// Verify that the gas limit remains within allowed bounds
-	parentGasLimit := parent.GasLimit
-	if !config.IsLondon(parent.Number) {
-		parentGasLimit = parent.GasLimit * config.ElasticityMultiplier()
+	parentGasLimit := parent.GasLimit()
+	if !config.IsLondon(parent.Number()) {
+		parentGasLimit = parent.GasLimit() * config.ElasticityMultiplier()
 	}
-	if err := misc.VerifyGaslimit(parentGasLimit, header.GasLimit); err != nil {
+	if err := misc.VerifyGaslimit(parentGasLimit, header.GasLimit()); err != nil {
 		return err
 	}
 	// Verify the header is not malformed
@@ -43,13 +45,12 @@ func VerifyEIP1559Header(config *params.ChainConfig, parent, header *types.Heade
 	}
 	// Verify the baseFee is correct based on the parent header.
 	expectedBaseFee := CalcBaseFee(config, parent)
-	if header.BaseFee.Cmp(expectedBaseFee) != 0 {
+	if header.BaseFee().Cmp(expectedBaseFee) != 0 {
 		return fmt.Errorf("invalid baseFee: have %s, want %s, parentBaseFee %s, parentGasUsed %d",
-			header.BaseFee, expectedBaseFee, parent.BaseFee, parent.GasUsed)
+			header.BaseFee(), expectedBaseFee, parent.BaseFee(), parent.GasUsed())
 	}
 	return nil
 }
-*/
 
 // CalcBaseFee calculates the basefee of the header.
 func CalcBaseFee(config *params.ChainConfig, parent *block.Header) *big.Int {

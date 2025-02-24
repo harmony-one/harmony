@@ -328,6 +328,7 @@ var (
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		EIP1559Epoch:                          big.NewInt(1),
 		IsOneSecondEpoch:                      big.NewInt(4),
 	}
 
@@ -913,7 +914,7 @@ func (c *ChainConfig) IsOneEpochBeforeHIP30(epoch *big.Int) bool {
 }
 
 func (c *ChainConfig) IsLondon(epoch *big.Int) bool {
-	panic("unimplemented")
+	return false
 }
 
 // BaseFeeChangeDenominator

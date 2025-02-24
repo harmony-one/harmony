@@ -22,7 +22,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/internal/params"
+
+	"github.com/harmony-one/harmony/block"
+	v4 "github.com/harmony-one/harmony/block/v4"
 )
 
 // copyConfig does a _shallow_ copy of a given config. Safe to set new values, but
@@ -51,7 +54,7 @@ func copyConfig(original *params.ChainConfig) *params.ChainConfig {
 
 func config() *params.ChainConfig {
 	config := copyConfig(params.TestChainConfig)
-	config.LondonBlock = big.NewInt(5)
+	config.EIP1559Epoch = big.NewInt(1)
 	return config
 }
 
@@ -83,7 +86,7 @@ func TestBlockGasLimits(t *testing.T) {
 		{40000000, 5, 39960939, true},  // lower limit
 		{40000000, 5, 39960938, false}, // Lower limit -1
 	} {
-		parent := &types.Header{
+		parent := &block.Header{
 			GasUsed:  tc.pGasLimit / 2,
 			GasLimit: tc.pGasLimit,
 			BaseFee:  initial,
@@ -118,7 +121,7 @@ func TestCalcBaseFee(t *testing.T) {
 		{params.InitialBaseFee, 20000000, 11000000, 1012500000},            // usage above target
 	}
 	for i, test := range tests {
-		parent := &types.Header{
+		parent := &v4.Header{
 			Number:   common.Big32,
 			GasLimit: test.parentGasLimit,
 			GasUsed:  test.parentGasUsed,
