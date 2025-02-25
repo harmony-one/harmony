@@ -12,7 +12,7 @@ import (
 )
 
 func asString(i any) string {
-	if s, ok := i.(hexutil.Big); ok {
+	if s, ok := i.(*hexutil.Big); ok {
 		return s.String()
 	}
 	return "<failed to convert>"
@@ -33,7 +33,7 @@ func TestNewReceipt(t *testing.T) {
 	t.Run("effectiveGasPrice", func(t *testing.T) {
 		r, err = NewReceipt(common2.Address(senderAddr), tx, blockHash, blockNumber, blockIndex, receipt)
 		require.NoError(t, err)
-		require.EqualValues(t, asString(r["effectiveGasPrice"]), "0x0")
+		require.Nil(t, r["effectiveGasPrice"])
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),

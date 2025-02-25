@@ -58,7 +58,7 @@ func TestNewReceipt(t *testing.T) {
 		require.NoError(t, err)
 
 		price := MustReceiptEffectivePrice(r)
-		require.EqualValues(t, "0x0", price.String())
+		require.Nil(t, price)
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),
@@ -76,7 +76,7 @@ func TestNewReceipt(t *testing.T) {
 		require.NoError(t, err)
 
 		receiptEffectivePrice := MustReceiptEffectivePrice(r)
-		assert.EqualValues(t, "0x0", receiptEffectivePrice.String())
+		assert.Nil(t, receiptEffectivePrice)
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),
