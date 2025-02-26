@@ -82,6 +82,42 @@ func TestRequestManager_NewStream(t *testing.T) {
 	}
 }
 
+// TestRequestManager_NoStream_CancelRequests verifies that when all streams are removed,
+// the request is canceled after exceeding the StreamTimeoutThreshold.
+func TestRequestManager_NoStream_CancelRequests(t *testing.T) {
+	delayF := makeDefaultDelayFunc(500 * time.Millisecond)
+	respF := makeDefaultResponseFunc()
+	ts := newTestSuite(delayF, respF, 3)
+	ts.Start()
+	defer ts.Close()
+
+	req := makeTestRequest(100)
+	ctx := context.Background()
+
+	// Simulate all streams being removed
+	ts.RemoveAllStreams()
+
+	// Perform async request
+	resC := ts.rm.doRequestAsync(ctx, req)
+
+	// Wait for the timeout threshold
+	time.Sleep(StreamTimeoutThreshold + time.Second)
+
+	// Retrieve response
+	res := <-resC
+
+	// Validate results
+	if res.err == nil {
+		t.Fatalf("expected request to be canceled but got no error")
+	}
+	if res.err != ErrNoAvailableStream {
+		t.Errorf("unexpected error: %v", res.err)
+	}
+	if res.stID != "" {
+		t.Errorf("canceled request shouldn't have a stream ID")
+	}
+}
+
 // For request assigned to the stream being removed, the request will be rescheduled.
 func TestRequestManager_RemoveStream(t *testing.T) {
 	delayF := makeOnceBlockDelayFunc(150 * time.Millisecond)
@@ -512,6 +548,13 @@ func (ts *testSuite) Start() {
 func (ts *testSuite) Close() {
 	ts.rm.Close()
 	ts.cancel()
+}
+
+func (ts *testSuite) RemoveAllStreams() {
+	streams := ts.sm.GetStreams()
+	for _, st := range streams {
+		ts.sm.rmStream(st.ID())
+	}
 }
 
 func (ts *testSuite) pickOneOccupiedStream() sttypes.StreamID {
