@@ -63,7 +63,7 @@ func TestNewReceipt(t *testing.T) {
 		}
 		r, err = NewReceipt(tx, blockHash, blockNumber, blockIndex, rec)
 		require.NoError(t, err)
-		require.EqualValues(t, 1, MustReceiptEffectivePrice(r))
+		require.EqualValues(t, 1, *MustReceiptEffectivePrice(r))
 	})
 	t.Run("effectiveGasPrice-staking", func(t *testing.T) {
 		unsigned, err := helpers.CreateTestStakingTransaction(payloadMaker, nil, 0, gasLimit, gasPrice)
