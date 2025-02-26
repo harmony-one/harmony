@@ -56,6 +56,12 @@ var allPrecompiles = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{7}):    &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}):    &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{9}):    &blake2F{},
+	common.BytesToAddress([]byte{251}):  &epoch{},
+	// marked nil to ensure no overwrite
+	common.BytesToAddress([]byte{252}): nil, // used by WriteCapablePrecompiledContractsStaking
+	common.BytesToAddress([]byte{253}): &sha3fip{},
+	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
+	common.BytesToAddress([]byte{255}): &vrf{},
 }
 
 // modexpTests are the test and benchmark data for the modexp precompiled contract.
@@ -416,7 +422,8 @@ var blake2FTests = []precompiledTest{
 }
 
 func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
-	p := PrecompiledContractsSHA3FIPS[common.HexToAddress(addr)]
+	hex := common.HexToAddress(addr)
+	p := allPrecompiles[hex]
 	in := common.Hex2Bytes(test.input)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
 		nil, new(big.Int), p.RequiredGas(in))
