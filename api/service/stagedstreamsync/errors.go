@@ -23,6 +23,7 @@ var (
 	ErrEmptyWhitelist                    = WrapStagedSyncError("empty white list")
 	ErrWrongGetBlockNumberType           = WrapStagedSyncError("wrong type of getBlockNumber interface")
 	ErrSaveBlocksToDbFailed              = WrapStagedSyncError("saving downloaded blocks to db failed")
+	ErrReadBlockHashesFromDBFailed       = WrapStagedSyncError("fetching block hashes from db failed")
 	ErrSaveBlockHashesToDbFailed         = WrapStagedSyncError("saving downloaded block hashes to db failed")
 	ErrFinalBlockHashesCalculationFailed = WrapStagedSyncError("calculating final hashes failed")
 )

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
@@ -46,6 +47,8 @@ func NewStageBlockHashesCfg(bc core.BlockChain, db kv.RwDB, concurrency int, pro
 	return StageBlockHashesCfg{
 		bc:            bc,
 		db:            db,
+		concurrency:   concurrency,
+		protocol:      protocol,
 		isBeaconShard: isBeaconShard,
 		logProgress:   logProgress,
 		logger: logger.With().
@@ -130,11 +133,17 @@ func (bh *StageBlockHashes) Exec(ctx context.Context, firstCycle bool, invalidBl
 	}
 
 	// create download manager instant
-	hdm := newDownloadManager(bh.configs.bc, targetHeight, BlockHashesPerRequest, bh.configs.logger)
+	hdm := newDownloadManager(bh.configs.bc, currProgress, targetHeight, BlockHashesPerRequest, bh.configs.logger)
 
 	// Fetch block hashes from neighbors
 	if err := bh.runBlockHashWorkerLoop(ctx, tx, hdm, s, startTime, currentHead, targetHeight); err != nil {
 		return nil
+	}
+
+	if useInternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -161,11 +170,18 @@ func (bh *StageBlockHashes) downloadBlockHashes(ctx context.Context, bns []uint6
 			Interface("stid", stid).
 			Msg("[StageBlockHashes] received more blockHashes than requested!")
 		return hashes[:len(bns)], stid, nil
+	} else if len(hashes) < len(bns) {
+		utils.Logger().Warn().
+			Int("request size", len(bns)).
+			Int("received size", len(hashes)).
+			Interface("stid", stid).
+			Msg("[StageBlockHashes] received less hashes than requested, target stream is not synced!")
+		return []common.Hash{}, stid, errors.New("not synced stream")
 	}
 	return hashes, stid, err
 }
 
-// runBlockhashWorkerLoop downloads block hashes
+// runBlockHashWorkerLoop downloads block hashes
 func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 	tx kv.RwTx,
 	hdm *downloadManager,
@@ -175,7 +191,6 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 	targetHeight uint64) error {
 
 	currProgress := startHeight
-	var wg sync.WaitGroup
 
 	useInternalTx := tx == nil
 	if useInternalTx {
@@ -196,13 +211,14 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		}
 
 		// Fetch the next batch of block numbers
-		batch := hdm.GetNextBatch(currProgress)
+		batch := hdm.GetNextBatch()
 		if len(batch) == 0 {
 			break
 		}
 
 		// Map to store block hashes fetched from peers
 		peerHashes := sttypes.NewSafeMap[sttypes.StreamID, []common.Hash]()
+		var wg sync.WaitGroup
 
 		// Fetch block hashes concurrently
 		for i := 0; i < bh.configs.concurrency; i++ {
@@ -214,10 +230,17 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 				// Download block hashes
 				hashes, stid, err := bh.downloadBlockHashes(ctx, batch)
 				if err != nil {
+					bh.configs.protocol.StreamFailed(stid, "downloadBlockHashes failed")
 					return
 				}
 
-				// Store the result in peerHashes
+				// Check if any hash is zero
+				if bh.containsZeroHash(hashes) {
+					bh.configs.protocol.RemoveStream(stid) // Remove immediately
+					return
+				}
+
+				// Store valid hashes
 				peerHashes.Set(stid, hashes)
 			}()
 		}
@@ -226,10 +249,11 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		wg.Wait()
 
 		// Calculate the final block hashes for the batch
-		finalBlockHashes, _, errFinalHashCaclulations := bh.calculateFinalBlockHashes(peerHashes, batch)
-		if errFinalHashCaclulations != nil {
+		finalBlockHashes, _, errFinalHashCalculations := bh.calculateFinalBlockHashes(peerHashes, batch)
+		if errFinalHashCalculations != nil {
 			panic(ErrFinalBlockHashesCalculationFailed)
 		}
+		peerHashes.Clear()
 
 		// save block hashes in db
 		if err := bh.saveBlockHashes(ctx, tx, finalBlockHashes); err != nil {
@@ -253,7 +277,6 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 
 		// log the stage progress in console
 		if bh.configs.logProgress {
-			//calculating block hash speed
 			dt := time.Since(startTime).Seconds()
 			speed := float64(0)
 			if dt > 0 {
@@ -272,6 +295,15 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 	}
 
 	return nil
+}
+
+func (bh *StageBlockHashes) containsZeroHash(hashes []common.Hash) bool {
+	for _, h := range hashes {
+		if h == (common.Hash{}) { // Check if hash is all zeros
+			return true
+		}
+	}
+	return false
 }
 
 // calculateFinalBlockHashes Calculates the most frequent block hashes for a given batch and removes streams with invalid hashes.
@@ -311,9 +343,14 @@ func (bh *StageBlockHashes) calculateFinalBlockHashes(
 			details.Count++
 			details.StreamIDs[stid] = struct{}{}
 
-			// Update the final hash for the block if this hash has higher frequency
-			if details.Count > len(hashFrequency[blockNumber][finalHashes[blockNumber]].StreamIDs) {
+			if fh, ok := finalHashes[blockNumber]; !ok {
 				finalHashes[blockNumber] = hash
+			} else {
+				if hashFreq, ok := hashFrequency[blockNumber][fh]; ok {
+					if details.Count > len(hashFreq.StreamIDs) {
+						finalHashes[blockNumber] = hash
+					}
+				}
 			}
 		}
 	})

@@ -1446,7 +1446,7 @@ func (s *FullStateDownloadManager) HandleAccountRequestResult(task *accountTask,
 	proof [][]byte,
 	origin []byte,
 	last []byte,
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	hashes, accounts, err := s.UnpackAccountRanges(retAccounts)
@@ -1620,7 +1620,7 @@ func (s *FullStateDownloadManager) processAccountResponse(task *accountTask, // 
 func (s *FullStateDownloadManager) HandleBytecodeRequestResult(task interface{}, // Task which this request is filling
 	reqHashes []common.Hash, // Hashes of the bytecode to avoid double hashing
 	bytecodes [][]byte, // Actual bytecodes to store into the database (nil = missing)
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	s.lock.RLock()
@@ -1782,7 +1782,7 @@ func (s *FullStateDownloadManager) HandleStorageRequestResult(mainTask *accountT
 	limit common.Hash,
 	receivedSlots [][]*message.StorageData,
 	proof [][]byte,
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	s.lock.Lock()
@@ -2143,7 +2143,7 @@ func (s *FullStateDownloadManager) HandleTrieNodeHealRequestResult(task *healTas
 	reqPaths []string,
 	reqHashes []common.Hash,
 	trienodes [][]byte,
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	s.lock.Lock()
@@ -2302,7 +2302,7 @@ func (s *FullStateDownloadManager) processTrienodeHealResponse(task *healTask, /
 func (s *FullStateDownloadManager) HandleByteCodeHealRequestResult(task *healTask, // Task which this request is filling
 	hashes []common.Hash, // Hashes of the bytecode to avoid double hashing
 	codes [][]byte, // Actual bytecodes to store into the database (nil = missing)
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	s.lock.Lock()

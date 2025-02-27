@@ -116,16 +116,16 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 
 	for i := currProgress + 1; i <= targetHeight; i++ {
 		blkKey := marshalData(i)
-		loopID, streamID, errBDD := gbm.GetDownloadDetails(i)
+		workerID, streamID, errBDD := gbm.GetDownloadDetails(i)
 		if errBDD != nil {
 			return errBDD
 		}
 
-		blockBytes, err := txs[loopID].GetOne(BlocksBucket, blkKey)
+		blockBytes, err := txs[workerID].GetOne(BlocksBucket, blkKey)
 		if err != nil {
 			return err
 		}
-		sigBytes, err := txs[loopID].GetOne(BlockSignaturesBucket, blkKey)
+		sigBytes, err := txs[workerID].GetOne(BlockSignaturesBucket, blkKey)
 		if err != nil {
 			return err
 		}
