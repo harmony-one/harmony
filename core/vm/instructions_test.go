@@ -25,7 +25,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/internal/params"
 )
 
@@ -637,5 +640,51 @@ func TestCreate2Addreses(t *testing.T) {
 			t.Errorf("test %d: expected %s, got %s", i, expected.String(), address.String())
 		}
 
+	}
+}
+
+func TestOpTstoreAndTload(t *testing.T) {
+	// initialize context, evm, statedb, etc.
+	var (
+		stateDB, _     = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+		env            = NewEVM(Context{}, stateDB, params.TestChainConfig, Config{})
+		stack          = newstack()
+		memory         = NewMemory()
+		evmInterpreter = NewEVMInterpreter(env, env.vmConfig)
+		caller         = common.Address{}
+		to             = common.Address{1}
+		contractRef    = vm.AccountRef(caller)
+		contract       = NewContract(contractRef, vm.AccountRef(to), new(big.Int), 0)
+		value          = common.Hex2Bytes("12345")
+	)
+
+	stateDB.CreateAccount(caller)
+	stateDB.CreateAccount(to)
+	env.interpreter = evmInterpreter
+	pc := uint64(0)
+
+	// push to value then location to the stack
+	stack.push(new(big.Int).SetBytes(value))
+	stack.push(new(big.Int))
+
+	// call tstore and ensure stack length is 0
+	opTstore(&pc, evmInterpreter, contract, memory, stack)
+	if stack.len() != 0 {
+		t.Fatal("stack should be empty")
+	}
+
+	// push location to the stack
+	stack.push(new(big.Int))
+
+	// call tload and ensure stack length is 1
+	opTload(&pc, evmInterpreter, contract, memory, stack)
+	if stack.len() != 1 {
+		t.Fatal("stack should have a single element")
+	}
+
+	// ensure the value read is same as the original value
+	val := stack.peek()
+	if !bytes.Equal(value, val.Bytes()) {
+		t.Fatalf("wrong value loaded to the stack")
 	}
 }
