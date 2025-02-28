@@ -358,13 +358,14 @@ func (tx *EthTransaction) IsEthCompatible() bool {
 // XXX Rename message to something less arbitrary?
 func (tx *EthTransaction) AsMessage(s Signer) (Message, error) {
 	msg := Message{
-		nonce:      tx.data.AccountNonce,
-		gasLimit:   tx.data.GasLimit,
-		gasPrice:   new(big.Int).Set(tx.data.Price),
-		to:         tx.data.Recipient,
-		amount:     tx.data.Amount,
-		data:       tx.data.Payload,
-		checkNonce: true,
+		nonce:            tx.data.AccountNonce,
+		gasLimit:         tx.data.GasLimit,
+		gasPrice:         new(big.Int).Set(tx.data.Price),
+		to:               tx.data.Recipient,
+		value:            tx.data.Amount,
+		data:             tx.data.Payload,
+		skipNonceChecks:  false,
+		skipFromEOACheck: false,
 	}
 
 	var err error
