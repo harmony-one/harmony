@@ -76,6 +76,10 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return nil
 	}
 
+	if invalidBlockRevert {
+		return b.redownloadBadBlock(ctx, s)
+	}
+
 	if useInternalTx {
 		var err error
 		tx, err = b.configs.db.BeginRw(ctx)
@@ -83,10 +87,6 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 			return err
 		}
 		defer tx.Rollback()
-	}
-
-	if invalidBlockRevert {
-		return b.redownloadBadBlock(ctx, tx, s)
 	}
 
 	maxHeight := s.state.status.GetTargetBN()
@@ -336,53 +336,68 @@ func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte
 	return nil
 }
 
-// redownloadBadBlock tries to redownload the bad block from other streams
-func (b *StageBodies) redownloadBadBlock(ctx context.Context, tx kv.RwTx, s *StageState) error {
-
+// redownloadBadBlock tries to redownload the bad block from other streams with retry limits and improved error handling.
+func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) error {
 	batch := []uint64{s.state.invalidBlock.Number}
+	maxRetries := b.configs.protocol.NumStreams()
+	retryDelay := 5 * time.Second
 
 badBlockDownloadLoop:
 
-	for {
+	for attempt := 1; attempt <= maxRetries; attempt++ {
 		if b.configs.protocol.NumStreams() == 0 {
 			b.configs.logger.Error().
 				Uint64("bad block number", s.state.invalidBlock.Number).
-				Msg("[STAGED_STREAM_SYNC] not enough streams to re-download bad block")
-			return errors.Errorf("not enough streams to re-download bad block")
+				Msg("[STAGED_STREAM_SYNC] Not enough streams to re-download bad block")
+			return ErrNotEnoughStreams
 		}
+
 		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-				b.configs.logger.Error().
-					Uint64("bad block number", s.state.invalidBlock.Number).
-					Msg("[STAGED_STREAM_SYNC] tried to re-download bad block from this stream, but downloadRawBlocks failed")
-				b.configs.protocol.StreamFailed(stid, "tried to re-download bad block from this stream, but downloadRawBlocks failed")
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				b.configs.logger.Warn().Msg("[STAGED_STREAM_SYNC] Re-download canceled or timed out")
+				time.Sleep(retryDelay)
+				continue
 			}
+
+			b.configs.logger.Error().
+				Uint64("bad block number", s.state.invalidBlock.Number).
+				Interface("stream ID", stid).
+				Msg("[STAGED_STREAM_SYNC] Failed to download bad block, marking stream as failed")
+			b.configs.protocol.StreamFailed(stid, "failed to re-download bad block")
+
+			time.Sleep(retryDelay)
 			continue
 		}
+
+		// Verify the block isn't from a previously failing stream
 		for _, id := range s.state.invalidBlock.StreamID {
 			if id == stid {
-				// TODO: if block is invalid then call StreamFailed
-				b.configs.protocol.StreamFailed(stid, "re-download bad block from this stream failed")
+				b.configs.protocol.StreamFailed(stid, "re-download from this stream failed")
+				time.Sleep(retryDelay)
 				continue badBlockDownloadLoop
 			}
 		}
+
+		// Save block details and persist the re-downloaded data
 		s.state.gbm.SetDownloadDetails(batch, 0, stid)
-		if errU := b.configs.blockDBs[0].Update(ctx, func(_tx kv.RwTx) error {
-			if err = b.saveBlocks(ctx, tx, batch, blockBytes, sigBytes, 0, stid); err != nil {
-				b.configs.logger.Error().
-					Uint64("bad block number", s.state.invalidBlock.Number).
-					Err(err).
-					Msg("[STAGED_STREAM_SYNC] saving re-downloaded bad block to db failed")
-				return errors.Errorf("%s: %s", ErrSaveBlocksToDbFailed.Error(), err.Error())
-			}
-			return nil
-		}); errU != nil {
-			continue
+		if err = b.saveBlocks(ctx, nil, batch, blockBytes, sigBytes, 0, stid); err != nil {
+			b.configs.logger.Error().
+				Err(err).
+				Uint64("bad block number", s.state.invalidBlock.Number).
+				Msg("[STAGED_STREAM_SYNC] Saving re-downloaded bad block to DB failed")
+			return errors.Errorf("%s: %s", ErrSaveBlocksToDbFailed.Error(), err.Error())
 		}
-		break
+
+		b.configs.logger.Info().
+			Uint64("bad block number", s.state.invalidBlock.Number).
+			Interface("retried on stream", stid).
+			Int("attempt", attempt).
+			Msg("[STAGED_STREAM_SYNC] Successfully re-downloaded bad block")
+		return nil
 	}
-	return nil
+
+	return errors.Errorf("[STAGED_STREAM_SYNC] Max retries reached for bad block %d", s.state.invalidBlock.Number)
 }
 
 func (b *StageBodies) downloadBlocks(ctx context.Context, bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
