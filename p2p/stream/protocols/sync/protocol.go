@@ -281,14 +281,14 @@ func (p *Protocol) advertise() time.Duration {
 				break
 			}
 
-			p.logger.Warn().Err(err).
+			p.logger.Debug().Err(err).
 				Str("protocol", string(pid)).
 				Int("retry", retries).
 				Msg("Advertise failed, retrying")
 
 			// If the error is a timeout, increase the timeout duration
 			if errors.Is(err, context.DeadlineExceeded) {
-				p.logger.Warn().
+				p.logger.Debug().
 					Str("protocol", string(pid)).
 					Msg("Advertise failed due to timeout, increasing timeout")
 
