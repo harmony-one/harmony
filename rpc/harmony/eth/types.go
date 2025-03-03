@@ -144,6 +144,9 @@ func NewReceipt(senderAddr common.Address, tx *types.EthTransaction, blockHash c
 	if receipt.EffectiveGasPrice != nil {
 		e := hexutil.Big(*new(big.Int).Set(receipt.EffectiveGasPrice))
 		effectiveGasPrice = &e
+	} else {
+		e := hexutil.Big(*big.NewInt(int64(receipt.GasUsed)))
+		effectiveGasPrice = &e
 	}
 
 	fields := map[string]interface{}{
