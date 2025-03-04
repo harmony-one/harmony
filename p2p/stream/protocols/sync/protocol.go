@@ -236,64 +236,92 @@ func (p *Protocol) advertiseLoop() {
 	}
 }
 
-// advertise will advertise all compatible protocol versions for helping nodes running low
-// version
+// advertise will advertise all compatible protocol versions for helping nodes running low version
 func (p *Protocol) advertise() time.Duration {
 	var nextWait time.Duration
 	newPeersDiscovered := false
 	maxRetries := 3
 
-	// Start with a 10s timeout and increase dynamically
-	timeout := 10 * time.Second
+	// Constants for timeout adjustments
+	baseTimeout := 60 * time.Second          // Initial timeout for the advertise call
+	timeoutIncrementStep := 10 * time.Second // Increase timeout if context deadline is exceeded
+	maxTimeout := 5 * time.Minute            // Maximum allowed timeout
+	backoffTimeRatio := 2 * time.Second      // Base time for exponential backoff
+	maxBackoff := 10 * time.Second           // Cap for the exponential backoff delay
+
+	timeout := baseTimeout
+
+	// Adjust timeout if the last advertise call took longer
 	if p.lastAdvertiseDuration > timeout {
-		timeout = p.lastAdvertiseDuration + 5*time.Second
+		timeout = p.lastAdvertiseDuration + timeoutIncrementStep
 	}
 
-	pids := p.supportedProtoIDs()
-
-	for _, pid := range pids {
+	for _, pid := range p.supportedProtoIDs() {
+		retries := 0
 		var err error
 		var w time.Duration
-		retries := 0
 
 		for retries < maxRetries {
 			ctx, cancel := context.WithTimeout(p.ctx, timeout)
-			defer cancel()
-
 			start := time.Now()
 			w, err = p.disc.Advertise(ctx, string(pid))
 			elapsed := time.Since(start)
-
-			p.logger.Info().Str("protocol", string(pid)).
-				Dur("elapsed", elapsed).Int("retry", retries).
-				Msg("advertise call completed")
+			cancel()
 
 			// Store the last advertisement duration
 			p.lastAdvertiseDuration = elapsed
 
 			if err == nil {
 				newPeersDiscovered = true
+				p.logger.Info().
+					Str("protocol", string(pid)).
+					Dur("elapsed", elapsed).
+					Int("retry", retries).
+					Msg("Advertise call completed")
 				break
 			}
 
-			p.logger.Warn().Err(err).Str("protocol", string(pid)).
-				Int("retry", retries).Msg("advertise failed, retrying")
+			p.logger.Debug().Err(err).
+				Str("protocol", string(pid)).
+				Int("retry", retries).
+				Msg("Advertise failed, retrying")
+
+			// If the error is a timeout, increase the timeout duration
+			if errors.Is(err, context.DeadlineExceeded) {
+				p.logger.Debug().
+					Str("protocol", string(pid)).
+					Msg("Advertise failed due to timeout, increasing timeout")
+
+				timeout += timeoutIncrementStep
+				if timeout > maxTimeout {
+					timeout = maxTimeout
+				}
+			}
 
 			retries++
-			time.Sleep(time.Duration(retries) * 2 * time.Second) // Exponential backoff
+
+			// Dynamic backoff to avoid excessive retries
+			backoff := time.Duration(retries) * backoffTimeRatio
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+			time.Sleep(backoff)
 		}
 
 		if err != nil {
-			p.logger.Error().Err(err).Str("protocol", string(pid)).
-				Msg("advertise failed after retries")
+			p.logger.Error().Err(err).
+				Str("protocol", string(pid)).
+				Msg("Advertise failed after retries")
 			continue
 		}
 
+		// Set the next wait time based on the response
 		if nextWait == 0 || nextWait > w {
 			nextWait = w
 		}
 	}
 
+	// Ensure a minimum advertise interval
 	if nextWait < minAdvertiseInterval {
 		nextWait = minAdvertiseInterval
 	}
