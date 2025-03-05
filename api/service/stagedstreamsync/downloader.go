@@ -251,11 +251,7 @@ func (d *Downloader) loop() {
 			trigger()
 
 		case <-d.downloadC:
-			go func() {
-				d.syncMutex.Lock()
-				defer d.syncMutex.Unlock()
-				d.handleDownload(&initSync, trigger)
-			}()
+			go d.handleDownload(&initSync, trigger)
 
 		case <-d.closeC:
 			return
