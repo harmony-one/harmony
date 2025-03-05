@@ -243,11 +243,11 @@ func (p *Protocol) advertise() time.Duration {
 	maxRetries := 3
 
 	// Constants for timeout adjustments
-	baseTimeout := 60 * time.Second          // Initial timeout for the advertise call
-	timeoutIncrementStep := 10 * time.Second // Increase timeout if context deadline is exceeded
-	maxTimeout := 5 * time.Minute            // Maximum allowed timeout
-	backoffTimeRatio := 2 * time.Second      // Base time for exponential backoff
-	maxBackoff := 10 * time.Second           // Cap for the exponential backoff delay
+	baseTimeout := 300 * time.Second         // Initial timeout for the advertise call
+	timeoutIncrementStep := 30 * time.Second // Increase timeout if context deadline is exceeded
+	maxTimeout := 600 * time.Second          // Maximum allowed timeout
+	backoffTimeRatio := 5 * time.Second      // Base time for exponential backoff
+	maxBackoff := 30 * time.Second           // Cap for the exponential backoff delay
 
 	timeout := baseTimeout
 
@@ -275,7 +275,7 @@ func (p *Protocol) advertise() time.Duration {
 				newPeersDiscovered = true
 				p.logger.Info().
 					Str("protocol", string(pid)).
-					Dur("elapsed", elapsed).
+					Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
 					Int("retry", retries).
 					Msg("Advertise call completed")
 				break
@@ -284,12 +284,14 @@ func (p *Protocol) advertise() time.Duration {
 			p.logger.Debug().Err(err).
 				Str("protocol", string(pid)).
 				Int("retry", retries).
+				Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
 				Msg("Advertise failed, retrying")
 
 			// If the error is a timeout, increase the timeout duration
 			if errors.Is(err, context.DeadlineExceeded) {
 				p.logger.Debug().
 					Str("protocol", string(pid)).
+					Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
 					Msg("Advertise failed due to timeout, increasing timeout")
 
 				timeout += timeoutIncrementStep
