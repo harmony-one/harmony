@@ -248,19 +248,19 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 	jst.cur.input = input
 	jst.cur.gas = gas
 	jst.cur.value = vv
-	//jst.cur.blockHash = env.StateDB.BlockHash()
-	//jst.cur.transactionPosition = uint64(env.StateDB.TxIndex())
-	//jst.cur.transactionHash = env.StateDB.TxHashETH()
-	//jst.cur.blockNumber = env.BlockNumber.Uint64()
+	jst.cur.blockHash = env.StateDB.BlockHash()
+	jst.cur.transactionPosition = uint64(env.StateDB.TxIndex())
+	jst.cur.transactionHash = env.StateDB.TxHashETH()
+	jst.cur.blockNumber = env.BlockNumber.Uint64()
 	jst.cur.descended = false
 	jst.cur.push(&jst.cur.action)
 	return nil
 }
 
 // CaptureState implements the ParityBlockTracer interface to trace a single step of VM execution.
-func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
+func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, returnStack *vm.ReturnStack, bts []byte, contract *vm.Contract, depth int, err error) error {
 	if err != nil {
-		return jst.CaptureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
+		return jst.CaptureFault(env, pc, op, gas, cost, memory, stack, nil, contract, depth, err)
 	}
 	var retErr error
 	stackPeek := func(n int) *uint256.Int {
@@ -378,7 +378,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 
 // CaptureFault implements the ParityBlockTracer interface to trace an execution fault
 // while running an opcode.
-func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
+func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, returnStack *vm.ReturnStack, contract *vm.Contract, depth int, err error) error {
 	if jst.cur.last().err != nil {
 		return nil
 	}
