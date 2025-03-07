@@ -85,11 +85,11 @@ func (st *BaseStream) ProtoSpec() (ProtoSpec, error) {
 
 // Close reset the stream
 func (st *BaseStream) Close() error {
-    err := st.raw.Close()
-    if err != nil {
-        return st.raw.Reset()
-    }
-    return nil
+	err := st.raw.Close()
+	if err != nil {
+		return st.raw.Reset()
+	}
+	return nil
 }
 
 func (st *BaseStream) Failures() int {
