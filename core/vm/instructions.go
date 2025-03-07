@@ -17,11 +17,26 @@
 package vm
 
 import (
+	"errors"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
+	coreTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
+)
+
+var (
+	bigZero                  = new(big.Int)
+	tt255                    = math.BigPow(2, 255)
+	errWriteProtection       = errors.New("evm: write protection")
+	errReturnDataOutOfBounds = errors.New("evm: return data out of bounds")
+	//ErrExecutionReverted     = errors.New("evm: execution reverted")
+	errMaxCodeSizeExceeded = errors.New("evm: max code size exceeded")
+	errInvalidJump         = errors.New("evm: invalid jump destination")
 )
 
 func opAdd(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
@@ -628,7 +643,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]
 	// homestead we must check for CodeStoreOutOfGasError (homestead only
 	// rule) and treat as an error, if the ruleset is frontier we must
 	// ignore this error and pretend the operation was successful.
-	if interpreter.evm.chainRules.IsHomestead && suberr == ErrCodeStoreOutOfGas {
+	if interpreter.evm.ChainConfig().IsS3(interpreter.evm.EpochNumber) && suberr == ErrCodeStoreOutOfGas {
 		stackvalue.Clear()
 	} else if suberr != nil && suberr != ErrCodeStoreOutOfGas {
 		stackvalue.Clear()
@@ -845,14 +860,14 @@ func makeLog(size int) executionFunc {
 		}
 
 		d := callContext.memory.GetCopy(int64(mStart.Uint64()), int64(mSize.Uint64()))
-		interpreter.evm.StateDB.AddLog(&types.Log{
+		interpreter.evm.StateDB.AddLog((*coreTypes.Log)(&types.Log{
 			Address: callContext.contract.Address(),
 			Topics:  topics,
 			Data:    d,
 			// This is a non-consensus field, but assigned here because
 			// core/state doesn't know the current block number.
 			BlockNumber: interpreter.evm.Context.BlockNumber.Uint64(),
-		})
+		}))
 
 		return nil, nil
 	}
