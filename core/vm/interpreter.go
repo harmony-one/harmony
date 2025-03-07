@@ -41,7 +41,7 @@ type Config struct {
 	// JumpTable contains the EVM instruction table. This
 	// may be left uninitialised and will be set to the default
 	// table.
-	JumpTable [256]operation
+	JumpTable [256]*operation
 
 	// Type of the EWASM interpreter
 	EWASMInterpreter string
@@ -96,8 +96,6 @@ type EVMInterpreter struct {
 	evm *EVM
 	cfg Config
 
-	intPool *intPool
-
 	hasher    keccakState // Keccak256 hasher instance shared across opcodes
 	hasherBuf common.Hash // Keccak256 hasher result array shared aross opcodes
 
@@ -110,7 +108,7 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	// We use the STOP instruction whether to see
 	// the jump table was initialised. If it was not
 	// we'll set the default jump table.
-	if !cfg.JumpTable[STOP].valid {
+	if cfg.JumpTable[STOP] == nil {
 		var jt JumpTable
 		switch {
 		case evm.chainRules.IsIstanbul:
@@ -141,15 +139,8 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 //
 // It's important to note that any errors returned by the interpreter should be
 // considered a revert-and-consume-all-gas operation except for
-// errExecutionReverted which means revert-and-keep-gas-left.
+// ErrExecutionReverted which means revert-and-keep-gas-left.
 func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (ret []byte, err error) {
-	if in.intPool == nil {
-		in.intPool = poolOfIntPools.get()
-		defer func() {
-			poolOfIntPools.put(in.intPool)
-			in.intPool = nil
-		}()
-	}
 
 	// Increment the call depth which is restricted to 1024
 	in.evm.depth++
@@ -172,9 +163,16 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	}
 
 	var (
-		op    OpCode        // current opcode
-		mem   = NewMemory() // bound memory
-		stack = newstack()  // local stack
+		op          OpCode             // current opcode
+		mem         = NewMemory()      // bound memory
+		stack       = newstack()       // local stack
+		returns     = newReturnStack() // local returns stack
+		callContext = &callCtx{
+			memory:   mem,
+			stack:    stack,
+			rstack:   returns,
+			contract: contract,
+		}
 		// For optimisation reason we're using uint64 as the program counter.
 		// It's theoretically possible to go above 2^64. The YP defines the PC
 		// to be uint256. Practically much less so feasible.
@@ -186,18 +184,22 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		logged  bool   // deferred Tracer should ignore already logged steps
 		res     []byte // result of the opcode execution function
 	)
+	// Don't move this deferrred function, it's placed before the capturestate-deferred method,
+	// so that it get's executed _after_: the capturestate needs the stacks before
+	// they are returned to the pools
+	defer func() {
+		returnStack(stack)
+		returnRStack(returns)
+	}()
 	contract.Input = input
-
-	// Reclaim the stack as an int pool when the execution stops
-	defer func() { in.intPool.put(stack.data...) }()
 
 	if in.cfg.Debug {
 		defer func() {
 			if err != nil {
 				if !logged {
-					in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, mem, stack, contract, in.evm.depth, err)
+					in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, mem, stack, returns, in.returnData, contract, in.evm.depth, err)
 				} else {
-					in.cfg.Tracer.CaptureFault(in.evm, pcCopy, op, gasCopy, cost, mem, stack, contract, in.evm.depth, err)
+					in.cfg.Tracer.CaptureFault(in.evm, pcCopy, op, gasCopy, cost, mem, stack, returns, contract, in.evm.depth, err)
 				}
 			}
 		}()
@@ -206,7 +208,12 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	// explicit STOP, RETURN or SELFDESTRUCT is executed, an error occurred during
 	// the execution of one of the operations or until the done flag is set by the
 	// parent context.
-	for atomic.LoadInt32(&in.evm.abort) == 0 {
+	steps := 0
+	for {
+		steps++
+		if steps%1000 == 0 && atomic.LoadInt32(&in.evm.abort) != 0 {
+			break
+		}
 		if in.cfg.Debug {
 			// Capture pre-execution values for tracing.
 			logged, pcCopy, gasCopy = false, pc, contract.Gas
@@ -216,14 +223,14 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		// enough stack items available to perform the operation.
 		op = contract.GetOp(pc)
 		operation := in.cfg.JumpTable[op]
-		if !operation.valid {
-			return nil, fmt.Errorf("invalid opcode 0x%x", int(op))
+		if operation == nil {
+			return nil, &ErrInvalidOpCode{opcode: op}
 		}
 		// Validate stack
 		if sLen := stack.len(); sLen < operation.minStack {
-			return nil, fmt.Errorf("stack underflow (%d <=> %d)", sLen, operation.minStack)
+			return nil, &ErrStackUnderflow{stackLen: sLen, required: operation.minStack}
 		} else if sLen > operation.maxStack {
-			return nil, fmt.Errorf("stack limit reached %d (%d)", sLen, operation.maxStack)
+			return nil, &ErrStackOverflow{stackLen: sLen, limit: operation.maxStack}
 		}
 		// If the operation is valid, enforce and write restrictions
 		if in.readOnly && in.evm.chainRules.IsS3 {
@@ -233,7 +240,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			// account to the others means the state is modified and should also
 			// return with an error.
 			if operation.writes || (op == CALL && stack.Back(2).Sign() != 0) {
-				return nil, errWriteProtection
+				return nil, ErrWriteProtection
 			}
 		}
 		// Static portion of gas
@@ -250,12 +257,12 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		if operation.memorySize != nil {
 			memSize, overflow := operation.memorySize(stack)
 			if overflow {
-				return nil, errGasUintOverflow
+				return nil, ErrGasUintOverflow
 			}
 			// memory is expanded in words of 32 bytes. Gas
 			// is also calculated in words.
 			if memorySize, overflow = math.SafeMul(toWordSize(memSize), 32); overflow {
-				return nil, errGasUintOverflow
+				return nil, ErrGasUintOverflow
 			}
 		}
 		// Dynamic portion of gas
@@ -273,29 +280,17 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			mem.Resize(memorySize)
 		}
 
-		var afterHook HookAfter
 		if in.cfg.Debug {
-			afterHook, _ = in.cfg.Tracer.CaptureState(in.evm, pc, op, gasCopy, cost, mem, stack, contract, in.evm.depth, err)
+			in.cfg.Tracer.CaptureState(in.evm, pc, op, gasCopy, cost, mem, stack, returns, in.returnData, contract, in.evm.depth, err)
 			logged = true
 		}
 
 		// execute the operation
-		res, err = operation.execute(&pc, in, contract, mem, stack)
-
-		// record the after executed operation content
-		if afterHook != nil {
-			afterHook(mem, stack)
-		}
-
-		// verifyPool is a build flag. Pool verification makes sure the integrity
-		// of the integer pool by comparing values to a default value.
-		if verifyPool {
-			verifyIntegerPool(in.intPool)
-		}
+		res, err = operation.execute(&pc, in, callContext)
 		// if the operation clears the return data (e.g. it has returning data)
 		// set the last return to the result of the operation.
 		if operation.returns {
-			in.returnData = res
+			in.returnData = common.CopyBytes(res)
 		}
 
 		switch {
