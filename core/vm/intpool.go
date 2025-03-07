@@ -16,6 +16,7 @@
 
 package vm
 
+/*
 import (
 	"math/big"
 	"sync"
@@ -104,3 +105,4 @@ func (ipp *intPoolPool) put(ip *intPool) {
 		ipp.pools = append(ipp.pools, ip)
 	}
 }
+*/
