@@ -13,6 +13,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, maxMsgBytes)
+	},
+}
+
 // Stream is the interface for streams implemented in each service.
 // The stream interface is used for stream management as well as rate limiters
 type Stream interface {
@@ -26,6 +32,7 @@ type Stream interface {
 	Failures() int
 	AddFailedTimes(faultRecoveryThreshold time.Duration)
 	ResetFailedTimes()
+	Reconnect() error
 }
 
 // BaseStream is the wrapper around
@@ -76,9 +83,13 @@ func (st *BaseStream) ProtoSpec() (ProtoSpec, error) {
 	return st.spec, st.specErr
 }
 
-// Close reset the stream, and close the connection for both sides.
+// Close reset the stream
 func (st *BaseStream) Close() error {
-	return st.raw.Reset()
+    err := st.raw.Close()
+    if err != nil {
+        return st.raw.Reset()
+    }
+    return nil
 }
 
 func (st *BaseStream) Failures() int {
@@ -87,6 +98,7 @@ func (st *BaseStream) Failures() int {
 
 func (st *BaseStream) AddFailedTimes(faultRecoveryThreshold time.Duration) {
 	atomic.AddInt32(&st.failures, 1)
+	st.lastFailureTime = time.Now()
 }
 
 func (st *BaseStream) ResetFailedTimes() {
@@ -98,7 +110,7 @@ const (
 	sizeBytes   = 4                // uint32
 )
 
-// WriteBytes write the bytes to the stream.
+// WriteBytes writes the bytes to the stream.
 // First 4 bytes is used as the size bytes, and the rest is the content
 func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	defer func() {
@@ -109,24 +121,26 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	}()
 
 	if len(b) > maxMsgBytes {
-		err = errors.New("message too long")
-		return
+		return errors.New("message too long")
 	}
+
 	size := sizeBytes + len(b)
-	message := make([]byte, size)
-	copy(message, intToBytes(len(b)))
+	message := bufferPool.Get().([]byte)
+	defer bufferPool.Put(message)
+
+	copy(message[:sizeBytes], intToBytes(len(b)))
 	copy(message[sizeBytes:], b)
 
 	st.writeLock.Lock()
 	defer st.writeLock.Unlock()
-	if _, err = st.raw.Write(message); err != nil {
+	if _, err = st.raw.Write(message[:size]); err != nil {
 		return err
 	}
 	bytesWriteCounter.Add(float64(size))
 	return nil
 }
 
-// ReadBytes read the bytes from the stream.
+// ReadBytes reads the bytes from the stream.
 func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 	defer func() {
 		msgReadCounter.Inc()
@@ -151,7 +165,9 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 		return nil, err
 	}
 
-	cb = make([]byte, size)
+	cb = bufferPool.Get().([]byte)[:size]
+	defer bufferPool.Put(cb)
+
 	n, err := io.ReadFull(st.reader, cb)
 	if err != nil {
 		err = errors.Wrap(err, "read content")
@@ -165,9 +181,22 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 	return
 }
 
-// CloseOnExit reset the stream during the shutdown of the node
+// CloseOnExit resets the stream during the shutdown of the node
 func (st *BaseStream) CloseOnExit() error {
 	return st.raw.Reset()
+}
+
+// Reconnect attempts to reset the stream up to 3 times
+func (st *BaseStream) Reconnect() error {
+	for i := 0; i < 3; i++ {
+		err := st.raw.Reset()
+		if err == nil {
+			st.ResetFailedTimes()
+			return nil
+		}
+		time.Sleep(2 * time.Second)
+	}
+	return errors.New("failed to reconnect after 3 attempts")
 }
 
 func intToBytes(val int) []byte {
