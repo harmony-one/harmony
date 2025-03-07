@@ -80,6 +80,8 @@ type StateDB interface {
 	// even if the feature/fork is not active yet
 	AddSlotToAccessList(addr common.Address, slot common.Hash)
 
+	Prepare()
+
 	RevertToSnapshot(int)
 	Snapshot() int
 
