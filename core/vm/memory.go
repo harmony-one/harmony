@@ -68,7 +68,7 @@ func (m *Memory) Resize(size uint64) {
 	}
 }
 
-// GetCopy returns offset + size as a new slice
+// Get returns offset + size as a new slice
 func (m *Memory) GetCopy(offset, size int64) (cpy []byte) {
 	if size == 0 {
 		return nil
