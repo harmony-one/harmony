@@ -38,7 +38,7 @@ type StateDB interface {
 
 	GetCodeHash(common.Address) common.Hash
 	GetCode(common.Address) []byte
-	SetCode(common.Address, []byte)
+	SetCode(common.Address, []byte, bool)
 	GetCodeSize(common.Address) int
 
 	ValidatorWrapper(common.Address, bool, bool) (*staking.ValidatorWrapper, error)
