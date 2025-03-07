@@ -63,19 +63,24 @@ type LogConfig struct {
 // StructLog is emitted to the EVM each cycle and lists information about the current internal state
 // prior to the execution of the statement.
 type StructLog struct {
-	Pc            uint64                      `json:"pc"`
-	Op            OpCode                      `json:"op"`
-	Gas           uint64                      `json:"gas"`
-	GasCost       uint64                      `json:"gasCost"`
-	Memory        []byte                      `json:"memory"`
-	MemorySize    int                         `json:"memSize"`
-	Stack         []*big.Int                  `json:"stack"`
-	ReturnStack   []uint32                    `json:"returnStack"`
-	ReturnData    []byte                      `json:"returnData"`
-	Storage       map[common.Hash]common.Hash `json:"-"`
-	Depth         int                         `json:"depth"`
-	RefundCounter uint64                      `json:"refund"`
-	Err           error                       `json:"-"`
+	Pc              uint64         `json:"pc"`
+	Op              OpCode         `json:"op"`
+	CallerAddress   common.Address `json:"callerAddress"`
+	ContractAddress common.Address
+	Gas             uint64                      `json:"gas"`
+	GasCost         uint64                      `json:"gasCost"`
+	Memory          []byte                      `json:"memory"`
+	MemorySize      int                         `json:"memSize"`
+	Stack           []*big.Int                  `json:"stack"`
+	ReturnStack     []uint32                    `json:"returnStack"`
+	ReturnData      []byte                      `json:"returnData"`
+	Storage         map[common.Hash]common.Hash `json:"-"`
+	Depth           int                         `json:"depth"`
+	RefundCounter   uint64                      `json:"refund"`
+	Err             error                       `json:"-"`
+	AfterStack      []*big.Int                  `json:"afterStack"`
+	AfterMemory     []byte                      `json:"afterMemory"`
+	OperatorEvent   map[string]string           `json:"operatorEvent"`
 }
 
 // overrides for gencodec
@@ -109,7 +114,7 @@ func (s *StructLog) ErrorString() string {
 // Note that reference types are actual VM data structures; make copies
 // if you need to retain them beyond the current call.
 type Tracer interface {
-	CaptureStart(from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error
+	CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error
 	CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, rStack *ReturnStack, rData []byte, contract *Contract, depth int, err error) error
 	CaptureFault(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, rStack *ReturnStack, contract *Contract, depth int, err error) error
 	CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error
@@ -141,7 +146,7 @@ func NewStructLogger(cfg *LogConfig) *StructLogger {
 }
 
 // CaptureStart implements the Tracer interface to initialize the tracing operation.
-func (l *StructLogger) CaptureStart(from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
+func (l *StructLogger) CaptureStart(_ *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
 	return nil
 }
 
