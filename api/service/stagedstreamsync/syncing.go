@@ -454,7 +454,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 	startTime := time.Now()
 
 	// Do one cycle of staged sync
-	initialCycle := s.currentCycle.GetBlockNumber() == 0
+	initialCycle := s.currentCycle.GetCycleNumber() == 0
 	if err := s.Run(ctx, s.DB(), tx, initialCycle); err != nil {
 		s.logger.Error().
 			Err(err).
@@ -467,11 +467,11 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 
 	totalInserted += s.inserted
 
-	s.currentCycle.AddBlockNumber(1)
+	s.currentCycle.AddCycleNumber(1)
 
 	// calculating sync speed (blocks/second)
 	if s.LogProgress && s.inserted > 0 {
-		dt := time.Now().Sub(startTime).Seconds()
+		dt := time.Since(startTime).Seconds()
 		speed := float64(0)
 		if dt > 0 {
 			speed = float64(s.inserted) / dt
@@ -557,9 +557,11 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 				s.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("getCurrentNumber request failed"))
 
-				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					// Mark stream failure if it's not due to context cancelation or deadline
 					s.protocol.StreamFailed(stid, "getCurrentNumber request failed")
+				} else {
+					s.protocol.RemoveStream(stid)
 				}
 
 				// Propagate the error for external handling
