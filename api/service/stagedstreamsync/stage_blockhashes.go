@@ -220,6 +220,11 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		peerHashes := sttypes.NewSafeMap[sttypes.StreamID, []common.Hash]()
 		var wg sync.WaitGroup
 
+		if bh.configs.protocol.NumStreams() < bh.configs.concurrency {
+			return ErrNotEnoughStreams
+		}
+
+		hctx, _ := context.WithTimeout(ctx, 1*time.Minute)
 		// Fetch block hashes concurrently
 		for i := 0; i < bh.configs.concurrency; i++ {
 			wg.Add(1)
@@ -228,7 +233,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 				defer wg.Done()
 
 				// Download block hashes
-				hashes, stid, err := bh.downloadBlockHashes(ctx, batch)
+				hashes, stid, err := bh.downloadBlockHashes(hctx, batch)
 				if err != nil {
 					bh.configs.protocol.StreamFailed(stid, "downloadBlockHashes failed")
 					return
@@ -247,6 +252,14 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 
 		// Wait for all workers to complete
 		wg.Wait()
+
+		// all workers failed
+		if peerHashes.Length() == 0 {
+			hdm.HandleRequestError(batch, errors.New("workers failed"), sttypes.StreamID(0))
+			bh.configs.logger.Warn().
+				Msgf("[STAGED_STREAM_SYNC] all block hash workers failed")
+			continue
+		}
 
 		// Calculate the final block hashes for the batch
 		finalBlockHashes, _, errFinalHashCalculations := bh.calculateFinalBlockHashes(peerHashes, batch)
