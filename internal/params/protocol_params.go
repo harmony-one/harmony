@@ -62,12 +62,9 @@ const (
 	// NetSstoreDirtyGas ...
 	NetSstoreDirtyGas uint64 = 200 // Once per SSTORE operation from dirty.
 
-	// NetSstoreClearRefund ...
-	NetSstoreClearRefund uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
-	// NetSstoreResetRefund ...
-	NetSstoreResetRefund uint64 = 4800 // Once per SSTORE operation for resetting to the original non-zero value
-	// NetSstoreResetClearRefund ...
-	NetSstoreResetClearRefund uint64 = 19800 // Once per SSTORE operation for resetting to the original zero value
+	SstoreSetGasEIP2200               uint64 = 20000 // Once per SSTORE operation from clean zero to non-zero
+	SstoreResetGasEIP2200             uint64 = 5000  // Once per SSTORE operation from clean non-zero to something else
+	SstoreClearsScheduleRefundEIP2200 uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
 
 	// SstoreSentryGasEIP2200 ...
 	SstoreSentryGasEIP2200 uint64 = 2300 // Minimum gas required to be present for an SSTORE call, not consumed
@@ -85,6 +82,10 @@ const (
 	SstoreCleanRefundEIP2200 uint64 = 4200 // Once per SSTORE operation for resetting to the original non-zero value
 	// SstoreClearRefundEIP2200 ...
 	SstoreClearRefundEIP2200 uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
+
+	NetSstoreClearRefund      uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
+	NetSstoreResetRefund      uint64 = 4800  // Once per SSTORE operation for resetting to the original non-zero value
+	NetSstoreResetClearRefund uint64 = 19800 // Once per SSTORE operation for resetting to the original zero value
 
 	// todo(sun): implement eip2929
 	ColdAccountAccessCostEIP2929 uint64 = 2600 // COLD_ACCOUNT_ACCESS_COST
@@ -137,6 +138,7 @@ const (
 	SloadGasFrontier             uint64 = 50
 	SloadGasEIP150               uint64 = 200
 	SloadGasEIP1884              uint64 = 800  // Cost of SLOAD after EIP 1884 (part of Istanbul)
+	SloadGasEIP2200              uint64 = 800  // Cost of SLOAD after EIP 2200 (part of Istanbul)
 	ExtcodeHashGasConstantinople uint64 = 400  // Cost of EXTCODEHASH (introduced in Constantinople)
 	ExtcodeHashGasEIP1884        uint64 = 700  // Cost of EXTCODEHASH after EIP 1884 (part in Istanbul)
 	SelfdestructGasEIP150        uint64 = 5000 // Cost of SELFDESTRUCT post EIP 150 (Tangerine)
