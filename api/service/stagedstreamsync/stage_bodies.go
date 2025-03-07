@@ -373,7 +373,8 @@ badBlockDownloadLoop:
 		// Verify the block isn't from a previously failing stream
 		for _, id := range s.state.invalidBlock.StreamID {
 			if id == stid {
-				b.configs.protocol.StreamFailed(stid, "re-download from this stream failed")
+				// re-download from this stream failed
+				b.configs.protocol.RemoveStream(stid)
 				time.Sleep(retryDelay)
 				continue badBlockDownloadLoop
 			}
