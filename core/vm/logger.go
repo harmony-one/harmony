@@ -208,8 +208,17 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 		rdata = make([]byte, len(rData))
 		copy(rdata, rData)
 	}
+
+	var operatorEvent map[string]string
+	switch op {
+	case SELFDESTRUCT:
+		operatorEvent = map[string]string{}
+
+		operatorEvent["balance"] = env.StateDB.GetBalance(contract.Address()).String()
+	}
+
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rstack, rdata, storage, depth, env.StateDB.GetRefund(), err}
+	log := StructLog{pc, op, contract.CallerAddress, contract.Address(), gas, cost, mem, memory.Len(), stck, rstack, rdata, storage, depth, env.StateDB.GetRefund(), err, nil, nil, operatorEvent}
 	l.logs = append(l.logs, log)
 	return nil
 }
