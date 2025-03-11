@@ -31,7 +31,6 @@ install:
 #  - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.41.1
   - make go-get
   - go install golang.org/x/tools/cmd/goimports@latest
-  - go install github.com/harmony-ek/gencodec@latest
   - echo "[WARN] - workaround for the GOPATH:"
   - mv /home/travis/build/harmony-one/harmony $GOPATH/src/github.com/harmony-one/
 script:
