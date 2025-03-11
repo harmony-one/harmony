@@ -256,7 +256,7 @@ func (consensus *Consensus) getLeaderPrivateKey(leaderKey *bls_core.PublicKey) (
 			return &consensus.priKey[i], nil
 		}
 	}
-	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
+	return nil, errors.Wrap(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
 }
 
 // getConsensusLeaderPrivateKey returns consensus leader private key if node is the leader

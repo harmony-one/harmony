@@ -450,7 +450,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 			Bool("isBeaconShard", s.isBeaconShard).
 			Uint32("shard", s.bc.ShardID()).
 			Uint64("currentHeight", startHead).
-			Msgf(WrapStagedSyncMsg("sync cycle failed"))
+			Msg(WrapStagedSyncMsg("sync cycle failed"))
 		return totalInserted, err
 	}
 
