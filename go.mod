@@ -1,8 +1,8 @@
 module github.com/harmony-one/harmony
 
-go 1.22.0
+go 1.24.0
 
-toolchain go1.22.5
+toolchain go1.24.1
 
 require (
 	github.com/RoaringBitmap/roaring v1.2.3
@@ -69,7 +69,6 @@ require (
 )
 
 require (
-	github.com/c2h5oh/datasize v0.0.0-20220606134207-859f65c6625b
 	github.com/dustin/go-humanize v1.0.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/holiman/bloomfilter/v2 v2.0.3
@@ -80,6 +79,7 @@ require (
 	github.com/ledgerwatch/log/v3 v3.8.0
 	github.com/libp2p/go-libp2p-mplex v0.9.0
 	github.com/multiformats/go-base32 v0.1.0
+	github.com/multiformats/go-multihash v0.2.3
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
@@ -99,6 +99,7 @@ require (
 	github.com/bombsimon/wsl/v2 v2.0.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2 // indirect
+	github.com/c2h5oh/datasize v0.0.0-20220606134207-859f65c6625b // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cockroachdb/errors v1.11.1 // indirect
@@ -216,7 +217,6 @@ require (
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
 	github.com/multiformats/go-multibase v0.2.0 // indirect
 	github.com/multiformats/go-multicodec v0.9.0 // indirect
-	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/multiformats/go-multistream v0.6.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
