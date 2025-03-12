@@ -13,12 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var bufferPool = sync.Pool{
-	New: func() interface{} {
-		return make([]byte, maxMsgBytes)
-	},
-}
-
 // Stream is the interface for streams implemented in each service.
 // The stream interface is used for stream management as well as rate limiters
 type Stream interface {
@@ -82,7 +76,7 @@ func (st *BaseStream) ProtoSpec() (ProtoSpec, error) {
 	return st.spec, st.specErr
 }
 
-// Close reset the stream
+// Close reset the stream, and close the connection for both sides.
 func (st *BaseStream) Close() error {
 	err := st.raw.Close()
 	if err != nil {
@@ -124,10 +118,8 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	}
 
 	size := sizeBytes + len(b)
-	message := bufferPool.Get().([]byte)
-	defer bufferPool.Put(message)
-
-	copy(message[:sizeBytes], intToBytes(len(b)))
+	message := make([]byte, size)
+	copy(message, intToBytes(len(b)))
 	copy(message[sizeBytes:], b)
 
 	st.writeLock.Lock()
@@ -177,8 +169,7 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 		return nil, err
 	}
 
-	cb = bufferPool.Get().([]byte)[:size]
-	defer bufferPool.Put(cb)
+	cb = make([]byte, size)
 
 	n, err := io.ReadFull(st.reader, cb)
 	if err != nil {
@@ -203,7 +194,6 @@ func (st *BaseStream) reconnect() error {
 	for i := 0; i < 3; i++ {
 		err := st.raw.Reset()
 		if err == nil {
-			st.ResetFailedTimes()
 			return nil
 		}
 		time.Sleep(2 * time.Second)
