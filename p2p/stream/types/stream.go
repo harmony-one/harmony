@@ -32,7 +32,6 @@ type Stream interface {
 	Failures() int
 	AddFailedTimes(faultRecoveryThreshold time.Duration)
 	ResetFailedTimes()
-	Reconnect() error
 }
 
 // BaseStream is the wrapper around
@@ -133,8 +132,15 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 
 	st.writeLock.Lock()
 	defer st.writeLock.Unlock()
-	if _, err = st.raw.Write(message[:size]); err != nil {
-		return err
+	_, err = st.raw.Write(message[:size])
+	if err != nil {
+		// try to reconnect and write again
+		if errC := st.reconnect(); errC == nil {
+			st.raw.Write(message[:size])
+		}
+		if err != nil {
+			return err
+		}
 	}
 	bytesWriteCounter.Add(float64(size))
 	return nil
@@ -155,8 +161,14 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 	sb := make([]byte, sizeBytes)
 	_, err = st.reader.Read(sb)
 	if err != nil {
-		err = errors.Wrap(err, "read size")
-		return
+		// try to reconnect and read again
+		if errC := st.reconnect(); errC == nil {
+			_, err = st.reader.Read(sb)
+		}
+		if err != nil {
+			err = errors.Wrap(err, "read size")
+			return
+		}
 	}
 	bytesReadCounter.Add(sizeBytes)
 	size := bytesToInt(sb)
@@ -186,8 +198,8 @@ func (st *BaseStream) CloseOnExit() error {
 	return st.raw.Reset()
 }
 
-// Reconnect attempts to reset the stream up to 3 times
-func (st *BaseStream) Reconnect() error {
+// reconnect attempts to reset the stream up to 3 times
+func (st *BaseStream) reconnect() error {
 	for i := 0; i < 3; i++ {
 		err := st.raw.Reset()
 		if err == nil {
