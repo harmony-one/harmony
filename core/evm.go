@@ -59,8 +59,8 @@ type ChainContext interface {
 	ShardID() uint32 // this is implemented by blockchain.go already
 }
 
-// NewEVMContext creates a new context for use in the EVM.
-func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author *common.Address) vm.Context {
+// NewEVMBlockContext creates a new context for use in the EVM.
+func NewEVMBlockContext(msg Message, header *block.Header, chain ChainContext, author *common.Address) vm.BlockContext {
 	// If we don't have an explicit author (i.e. not mining), extract from the header
 	var beneficiary common.Address
 	if author == nil {
@@ -73,21 +73,21 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		vrfAndProof := header.Vrf()
 		copy(vrf[:], vrfAndProof[:32])
 	}
-	return vm.Context{
-		CanTransfer:           CanTransfer,
-		Transfer:              Transfer,
-		GetHash:               GetHashFn(header, chain),
-		GetVRF:                GetVRFFn(header, chain),
-		IsValidator:           IsValidator,
-		Origin:                msg.From(),
-		GasPrice:              new(big.Int).Set(msg.GasPrice()),
-		Coinbase:              beneficiary,
-		GasLimit:              header.GasLimit(),
-		BlockNumber:           header.Number(),
-		EpochNumber:           header.Epoch(),
-		Time:                  header.Time(),
-		VRF:                   vrf,
-		TxType:                0,
+	return vm.BlockContext{
+		CanTransfer: CanTransfer,
+		Transfer:    Transfer,
+		GetHash:     GetHashFn(header, chain),
+		GetVRF:      GetVRFFn(header, chain),
+		IsValidator: IsValidator,
+		//Origin:                msg.From(),
+		//GasPrice:              new(big.Int).Set(msg.GasPrice()),
+		Coinbase:    beneficiary,
+		GasLimit:    header.GasLimit(),
+		BlockNumber: header.Number(),
+		EpochNumber: header.Epoch(),
+		Time:        header.Time(),
+		VRF:         vrf,
+		//TxType:                0,
 		CreateValidator:       CreateValidatorFn(header, chain),
 		EditValidator:         EditValidatorFn(header, chain),
 		Delegate:              DelegateFn(header, chain),
@@ -97,6 +97,19 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		ShardID:               chain.ShardID(),
 		NumShards:             shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards(),
 	}
+}
+
+// NewEVMTxContext creates a new transaction context for a single transaction.
+func NewEVMTxContext(msg Message) vm.TxContext {
+	ctx := vm.TxContext{
+		Origin:   msg.From(),
+		GasPrice: new(big.Int).Set(msg.GasPrice()),
+		//BlobHashes: msg.BlobHashes,
+	}
+	//if msg.BlobGasFeeCap != nil {
+	//	ctx.BlobFeeCap = new(big.Int).Set(msg.BlobGasFeeCap)
+	//}
+	return ctx
 }
 
 // HandleStakeMsgFn returns a function which accepts
