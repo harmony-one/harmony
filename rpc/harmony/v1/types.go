@@ -188,11 +188,11 @@ type TxReceipt struct {
 	To                string         `json:"to"`
 	Root              hexutil.Bytes  `json:"root"`
 	Status            hexutil.Uint   `json:"status"`
-	EffectiveGasPrice hexutil.Big    `json:"effectiveGasPrice"`
+	EffectiveGasPrice *hexutil.Big   `json:"effectiveGasPrice"`
 }
 
 // GetEffectiveGasPrice returns the effective gas price of the tx receipt
-func (s TxReceipt) GetEffectiveGasPrice() hexutil.Big {
+func (s TxReceipt) GetEffectiveGasPrice() *hexutil.Big {
 	return s.EffectiveGasPrice
 }
 
@@ -216,11 +216,11 @@ type StakingTxReceipt struct {
 	Type              hexutil.Uint64 `json:"type"`
 	Root              hexutil.Bytes  `json:"root"`
 	Status            hexutil.Uint   `json:"status"`
-	EffectiveGasPrice hexutil.Big    `json:"effectiveGasPrice"`
+	EffectiveGasPrice *hexutil.Big   `json:"effectiveGasPrice"`
 }
 
 // GetEffectiveGasPrice returns the effective gas price of the staking tx receipt
-func (s StakingTxReceipt) GetEffectiveGasPrice() hexutil.Big {
+func (s StakingTxReceipt) GetEffectiveGasPrice() *hexutil.Big {
 	return s.EffectiveGasPrice
 }
 
@@ -368,11 +368,10 @@ func NewTxReceipt(
 		}
 	}
 
-	var effectiveGasPrice hexutil.Big
+	var effectiveGasPrice *hexutil.Big
 	if receipt.EffectiveGasPrice != nil {
-		effectiveGasPrice = hexutil.Big(*receipt.EffectiveGasPrice)
-	} else {
-		effectiveGasPrice = hexutil.Big(*big.NewInt(int64(receipt.GasUsed)))
+		e := hexutil.Big(*receipt.EffectiveGasPrice)
+		effectiveGasPrice = &e
 	}
 
 	// Declare receipt
@@ -419,13 +418,10 @@ func NewStakingTxReceipt(
 		return nil, err
 	}
 
-	var effectiveGasPrice hexutil.Big
+	var effectiveGasPrice *hexutil.Big
 	if receipt.EffectiveGasPrice != nil {
 		e := hexutil.Big(*receipt.EffectiveGasPrice)
-		effectiveGasPrice = e
-	} else {
-		e := hexutil.Big(*big.NewInt(int64(receipt.GasUsed)))
-		effectiveGasPrice = e
+		effectiveGasPrice = &e
 	}
 
 	// Declare receipt
@@ -761,14 +757,14 @@ func NewStakingTransactionFromBlockIndex(b *types.Block, index uint64) (*Staking
 }
 
 type getEffectiveGasPrice interface {
-	GetEffectiveGasPrice() hexutil.Big
+	GetEffectiveGasPrice() *hexutil.Big
 }
 
 type getContractAddress interface {
 	GetContractAddress() common.Address
 }
 
-func MustReceiptEffectivePrice(receipt Receipt) hexutil.Big {
+func MustReceiptEffectivePrice(receipt Receipt) *hexutil.Big {
 	if s, ok := receipt.(getEffectiveGasPrice); ok {
 		return s.GetEffectiveGasPrice()
 	}

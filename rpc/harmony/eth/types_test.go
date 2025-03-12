@@ -25,7 +25,7 @@ func TestNewReceipt(t *testing.T) {
 		blockHash          = common2.Hash{}
 		blockNumber uint64 = 1
 		blockIndex  uint64 = 1
-		receipt            = &types.Receipt{GasUsed: 150}
+		receipt            = &types.Receipt{}
 		r                  = make(map[string]interface{})
 		err         error
 	)
@@ -33,8 +33,7 @@ func TestNewReceipt(t *testing.T) {
 	t.Run("effectiveGasPrice", func(t *testing.T) {
 		r, err = NewReceipt(common2.Address(senderAddr), tx, blockHash, blockNumber, blockIndex, receipt)
 		require.NoError(t, err)
-		expected := hexutil.Big(*big.NewInt(150))
-		require.Equal(t, &expected, r["effectiveGasPrice"])
+		require.Nil(t, r["effectiveGasPrice"])
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),

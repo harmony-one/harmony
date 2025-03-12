@@ -30,11 +30,17 @@ func TestNewReceipt(t *testing.T) {
 		blockHash                           = common.Hash{}
 		blockNumber                  uint64 = 1
 		blockIndex                   uint64 = 1
-		receipt                             = &types.Receipt{GasUsed: 150}
+		receipt                             = &types.Receipt{}
 		r                            any
 		err                          error
-		createValidatorTxDescription = stakingTypes.Description{}
-		payloadMaker                 = func() (stakingTypes.Directive, interface{}) {
+		createValidatorTxDescription = stakingTypes.Description{
+			Name:            "SuperHero",
+			Identity:        "YouWouldNotKnow",
+			Website:         "Secret Website",
+			SecurityContact: "LicenseToKill",
+			Details:         "blah blah blah",
+		}
+		payloadMaker = func() (stakingTypes.Directive, interface{}) {
 			fromKey, _ := crypto.GenerateKey()
 			return stakingTypes.DirectiveCreateValidator, stakingTypes.CreateValidator{
 				Description:        createValidatorTxDescription,
@@ -52,7 +58,7 @@ func TestNewReceipt(t *testing.T) {
 		require.NoError(t, err)
 
 		price := MustReceiptEffectivePrice(r)
-		require.Equal(t, big.NewInt(150), price.ToInt())
+		require.Nil(t, price)
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),
@@ -70,7 +76,7 @@ func TestNewReceipt(t *testing.T) {
 		require.NoError(t, err)
 
 		receiptEffectivePrice := MustReceiptEffectivePrice(r)
-		require.Equal(t, big.NewInt(150), receiptEffectivePrice.ToInt())
+		assert.Nil(t, receiptEffectivePrice)
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),
