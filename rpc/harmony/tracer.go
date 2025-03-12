@@ -205,7 +205,7 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 
 	// Execute the trace
 	msg := args.ToMessage(s.hmy.RPCGasCap)
-	vmctx := core.NewEVMContext(msg, header, s.hmy.BlockChain, nil)
+	vmctx := core.NewEVMBlockContext(msg, header, s.hmy.BlockChain, nil)
 
 	// Apply overrides customization if required
 	if config != nil {
@@ -223,7 +223,6 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 			config.Stateoverrides.Apply(statedb, precompiles)
 		}
 	}
-
 	// Trace the transaction and return
 	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 }
