@@ -92,7 +92,7 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T, e
 }
 
 func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
-	var env = NewEVM(Context{CollectRewards: CollectRewardsFn(),
+	var env = NewEVM(BlockContext{CollectRewards: CollectRewardsFn(),
 		Delegate:        DelegateFn(),
 		Undelegate:      UndelegateFn(),
 		CreateValidator: CreateValidatorFn(),
@@ -239,7 +239,7 @@ func testCrossShardXferPrecompile(test writeCapablePrecompileTest, t *testing.T)
 	if err != nil {
 		t.Fatalf("Error while initializing state %s", err)
 	}
-	var env = NewEVM(Context{
+	var env = NewEVM(BlockContext{
 		NumShards: 4,
 		Transfer:  transfer,
 		CanTransfer: func(_ StateDB, _ common.Address, _ *big.Int) bool {
