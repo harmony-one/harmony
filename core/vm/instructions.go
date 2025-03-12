@@ -625,7 +625,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]
 		input        = callContext.memory.GetCopy(int64(offset.Uint64()), int64(size.Uint64()))
 		gas          = callContext.contract.Gas
 	)
-	if interpreter.evm.ChainConfig().IsS3(interpreter.evm.EpochNumber) {
+	if interpreter.evm.ChainConfig().IsS3(interpreter.evm.Context.EpochNumber) {
 		gas -= gas / 64
 	}
 	// reuse size int for stackvalue
@@ -643,7 +643,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]
 	// homestead we must check for CodeStoreOutOfGasError (homestead only
 	// rule) and treat as an error, if the ruleset is frontier we must
 	// ignore this error and pretend the operation was successful.
-	if interpreter.evm.ChainConfig().IsS3(interpreter.evm.EpochNumber) && suberr == ErrCodeStoreOutOfGas {
+	if interpreter.evm.ChainConfig().IsS3(interpreter.evm.Context.EpochNumber) && suberr == ErrCodeStoreOutOfGas {
 		stackvalue.Clear()
 	} else if suberr != nil && suberr != ErrCodeStoreOutOfGas {
 		stackvalue.Clear()
