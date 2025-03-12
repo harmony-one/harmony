@@ -224,7 +224,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 			return ErrNotEnoughStreams
 		}
 
-		hctx, _ := context.WithTimeout(ctx, 1*time.Minute)
+		hctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 		// Fetch block hashes concurrently
 		for i := 0; i < bh.configs.concurrency; i++ {
 			wg.Add(1)
@@ -252,10 +252,11 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 
 		// Wait for all workers to complete
 		wg.Wait()
+		cancel()
 
 		// all workers failed
 		if peerHashes.Length() == 0 {
-			hdm.HandleRequestError(batch, errors.New("workers failed"), sttypes.StreamID(0))
+			hdm.HandleRequestError(batch, errors.New("workers failed"), sttypes.StreamID(""))
 			bh.configs.logger.Warn().
 				Msgf("[STAGED_STREAM_SYNC] all block hash workers failed")
 			continue
