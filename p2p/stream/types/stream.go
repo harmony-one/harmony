@@ -136,7 +136,7 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	if err != nil {
 		// try to reconnect and write again
 		if errC := st.reconnect(); errC == nil {
-			st.raw.Write(message[:size])
+			_, err = st.raw.Write(message[:size])
 		}
 		if err != nil {
 			return err
