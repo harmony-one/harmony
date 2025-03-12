@@ -251,7 +251,7 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 	jst.cur.blockHash = env.StateDB.BlockHash()
 	jst.cur.transactionPosition = uint64(env.StateDB.TxIndex())
 	jst.cur.transactionHash = env.StateDB.TxHashETH()
-	jst.cur.blockNumber = env.BlockNumber.Uint64()
+	jst.cur.blockNumber = env.Context.BlockNumber.Uint64()
 	jst.cur.descended = false
 	jst.cur.push(&jst.cur.action)
 	return nil
