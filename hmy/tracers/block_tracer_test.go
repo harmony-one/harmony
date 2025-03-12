@@ -98,7 +98,7 @@ func initFromJson(ts *TraceBlockStorage, bytes []byte) {
 			ac.to = callAc.To
 			ac.value = new(uint256.Int)
 			_ = ac.value.SetFromHex(callAc.Value[2:]) //, 16)
-			_prev, _ := new(big.Int).SetString(callAc.Value[2:], 16)
+			_prev, _ := new(uint256.Int).SetString(callAc.Value[2:], 16)
 			if _prev.Uint64() != ac.value.Uint64() {
 				panic(fmt.Sprintf("big int set from hex failed, expected be equal %s and %s", _prev.String(), ac.value.String()))
 			}
