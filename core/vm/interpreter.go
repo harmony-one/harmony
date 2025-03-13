@@ -20,35 +20,24 @@ import (
 	"hash"
 	"sync/atomic"
 
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Config are the configuration options for the Interpreter
 type Config struct {
-	// Debug enabled debugging Interpreter options
-	Debug bool
-	// Tracer is the op code logger
-	Tracer Tracer
-	// NoRecursion disabled Interpreter call, callcode,
-	// delegate call and create.
-	NoRecursion bool
-	// Enable recording of SHA3/keccak preimages
-	EnablePreimageRecording bool
-	// JumpTable contains the EVM instruction table. This
-	// may be left uninitialised and will be set to the default
-	// table.
-	JumpTable [256]*operation
+	Debug                   bool   // Enables debugging
+	Tracer                  Tracer // Opcode logger
+	NoRecursion             bool   // Disables call, callcode, delegate call and create
+	EnablePreimageRecording bool   // Enables recording of SHA3/keccak preimages
 
-	// Type of the EWASM interpreter
-	EWASMInterpreter string
-	// Type of the EVM interpreter
-	EVMInterpreter string
+	JumpTable [256]*operation // EVM instruction table, automatically populated if unset
 
-	// ExtraEips the additional EIPS that are to be enabled
-	ExtraEips []int
+	EWASMInterpreter string // External EWASM interpreter options
+	EVMInterpreter   string // External EVM interpreter options
+
+	ExtraEips []int // Additional EIPS that are to be enabled
 }
 
 // Interpreter is used to run Ethereum based contracts and will utilise the
