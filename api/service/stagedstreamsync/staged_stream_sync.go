@@ -105,30 +105,30 @@ type Timing struct {
 }
 
 type SyncCycle struct {
-	BlockNumber  uint64
+	CycleNumber  uint64
 	TargetHeight uint64
 	lock         sync.RWMutex
 }
 
 // GetBlockNumber returns the current sync block number.
-func (sc *SyncCycle) GetBlockNumber() uint64 {
+func (sc *SyncCycle) GetCycleNumber() uint64 {
 	sc.lock.RLock()
 	defer sc.lock.RUnlock()
-	return sc.BlockNumber
+	return sc.CycleNumber
 }
 
 // SetBlockNumber sets the sync block number
-func (sc *SyncCycle) SetBlockNumber(number uint64) {
+func (sc *SyncCycle) SetCycleNumber(number uint64) {
 	sc.lock.Lock()
 	defer sc.lock.Unlock()
-	sc.BlockNumber = number
+	sc.CycleNumber = number
 }
 
 // AddBlockNumber adds inc to the sync block number
-func (sc *SyncCycle) AddBlockNumber(inc uint64) {
+func (sc *SyncCycle) AddCycleNumber(inc uint64) {
 	sc.lock.Lock()
 	defer sc.lock.Unlock()
-	sc.BlockNumber += inc
+	sc.CycleNumber += inc
 }
 
 // GetTargetHeight returns the current target height
@@ -377,7 +377,7 @@ func New(
 
 // doGetCurrentNumberRequest returns estimated current block number and corresponding stream
 func (sss *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint64, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	bn, stid, err := sss.protocol.GetCurrentBlockNumber(ctx, syncproto.WithHighPriority())
@@ -389,7 +389,7 @@ func (sss *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uin
 
 // doGetBlockByNumberRequest returns block by its number and corresponding stream
 func (sss *StagedStreamSync) doGetBlockByNumberRequest(ctx context.Context, bn uint64) (*types.Block, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	blocks, stid, err := sss.protocol.GetBlocksByNumber(ctx, []uint64{bn}, syncproto.WithHighPriority())

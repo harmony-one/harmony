@@ -167,7 +167,13 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		}
 
 		if stg.configs.bc.HasBlock(block.Hash(), block.NumberU64()) {
-			continue
+			// At this point, there should be some db discrepancies
+			if blk := stg.configs.bc.GetBlock(block.Hash(), block.NumberU64()); blk != nil {
+				if blk.NumberU64() == block.NumberU64() && blk.Hash() == block.Hash() {
+					stg.configs.bc.CurrentHeader().SetNumber(block.Number())
+					continue
+				}
+			}
 		}
 
 		if err := verifyAndInsertBlock(stg.configs.bc, block); err != nil {
