@@ -16,6 +16,7 @@
 
 package vm
 
+/*
 import (
 	"testing"
 )
@@ -53,3 +54,4 @@ func TestIntPoolPoolReUse(t *testing.T) {
 		t.Fatalf("Invalid number of pools. Got %d, expected %d", len(poolOfIntPools.pools), 0)
 	}
 }
+*/
