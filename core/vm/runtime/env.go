@@ -24,22 +24,25 @@ import (
 
 // NewEnv ...
 func NewEnv(cfg *Config) *vm.EVM {
-	context := vm.Context{
+	context := vm.BlockContext{
 		CanTransfer: core.CanTransfer,
 		Transfer:    core.Transfer,
 		IsValidator: core.IsValidator,
 		GetHash:     func(uint64) common.Hash { return common.Hash{} },
 		GetVRF:      func(uint64) common.Hash { return common.Hash{} },
 
-		Origin:      cfg.Origin,
+		//Origin:      cfg.Origin,
 		Coinbase:    cfg.Coinbase,
 		BlockNumber: cfg.BlockNumber,
 		EpochNumber: cfg.EpochNumber,
 		VRF:         cfg.VRF,
 		Time:        cfg.Time,
 		GasLimit:    cfg.GasLimit,
-		GasPrice:    cfg.GasPrice,
+		//GasPrice:    cfg.GasPrice,
 	}
 
-	return vm.NewEVM(context, cfg.State, cfg.ChainConfig, cfg.EVMConfig)
+	return vm.NewEVM(context, vm.TxContext{
+		Origin:   cfg.Origin,
+		GasPrice: cfg.GasPrice,
+	}, cfg.State, cfg.ChainConfig, cfg.EVMConfig)
 }

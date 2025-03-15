@@ -11,9 +11,9 @@ import (
 // this test is here so we can cover the input = epoch.bytes() line as well
 func TestEpochPrecompile(t *testing.T) {
 	targetEpoch := big.NewInt(1)
-	evm := NewEVM(Context{
+	evm := NewEVM(BlockContext{
 		EpochNumber: targetEpoch,
-	}, nil, params.TestChainConfig, Config{})
+	}, TxContext{}, nil, params.TestChainConfig, Config{})
 	input := []byte{}
 	precompileAddr := common.BytesToAddress([]byte{251})
 	contract := Contract{
