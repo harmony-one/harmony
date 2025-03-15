@@ -100,7 +100,7 @@ func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
 		ShardID:         0,
 		//MigrateDelegations:    MigrateDelegationsFn(),
 		CalculateMigrationGas: CalculateMigrationGasFn(),
-	}, nil, params.TestChainConfig, Config{})
+	}, TxContext{}, nil, params.TestChainConfig, Config{})
 	p := &stakingPrecompile{}
 	testWriteCapablePrecompile(test, t, env, p)
 }
@@ -245,7 +245,7 @@ func testCrossShardXferPrecompile(test writeCapablePrecompileTest, t *testing.T)
 		CanTransfer: func(_ StateDB, _ common.Address, _ *big.Int) bool {
 			return true
 		},
-	}, state, params.TestChainConfig, Config{})
+	}, TxContext{}, state, params.TestChainConfig, Config{})
 	p := &crossShardXferPrecompile{}
 	testWriteCapablePrecompile(test, t, env, p)
 }
