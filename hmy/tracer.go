@@ -495,7 +495,7 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 		statedb.SetTxHashETH(tx.ConvertToEth().Hash())
 		vmctx := core.NewEVMBlockContext(msg, block.Header(), hmy.BlockChain, nil)
 
-		vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vm.Config{})
+		vmenv := vm.NewEVM(vmctx, core.NewEVMTxContext(msg), statedb, hmy.BlockChain.Config(), vm.Config{})
 		if _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas())); err != nil {
 			failed = err
 			break
@@ -593,7 +593,7 @@ func (hmy *Harmony) standardTraceBlockToFile(ctx context.Context, block *types.B
 			}
 		}
 		// Execute the transaction and flush any traces to disk
-		vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vmConf)
+		vmenv := vm.NewEVM(vmctx, core.NewEVMTxContext(msg), statedb, hmy.BlockChain.Config(), vmConf)
 		_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
 		if writer != nil {
 			writer.Flush()
@@ -751,7 +751,7 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 		tracer = vm.NewStructLogger(config.LogConfig)
 	}
 	// Run the transaction with tracing enabled.
-	vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer})
+	vmenv := vm.NewEVM(vmctx, core.NewEVMTxContext(message), statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer})
 
 	result, err := core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()))
 	if err != nil {
@@ -812,7 +812,7 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 			return msg, context, statedb, nil
 		}
 		// Not yet the searched for transaction, execute on top of the current state
-		vmenv := vm.NewEVM(context, statedb, hmy.BlockChain.Config(), vm.Config{})
+		vmenv := vm.NewEVM(context, core.NewEVMTxContext(msg), statedb, hmy.BlockChain.Config(), vm.Config{})
 		if _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.GasLimit())); err != nil {
 			return nil, vm.BlockContext{}, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
 		}

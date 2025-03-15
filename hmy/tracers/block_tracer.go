@@ -462,7 +462,7 @@ func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 		)
 		var resultPiece string
 		if ac.err != nil {
-			resultPiece = fmt.Sprintf(`,"error":"Reverted","revert":"0x%x"`, ac.revert)
+			resultPiece = fmt.Sprintf(`,"error":"Reverted","revert":"%x"`, ac.revert)
 
 		} else if outStr != nil {
 			resultPiece = fmt.Sprintf(`,"result":%s`, *outStr)

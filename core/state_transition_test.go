@@ -72,8 +72,8 @@ func testApplyStakingMessage(test applyStakingMessageTest, t *testing.T) {
 		msg, _ := StakingToMessage(test.tx, header.Number())
 
 		// make EVM
-		ctx := NewEVMContext(msg, header, chain, nil /* coinbase */)
-		vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+		ctx := NewEVMBlockContext(msg, header, chain, nil /* coinbase */)
+		vmenv := vm.NewEVM(ctx, NewEVMTxContext(msg), db, params.TestChainConfig, vm.Config{})
 
 		// run the staking tx
 		_, err := ApplyStakingMessage(vmenv, msg, gp)
@@ -115,10 +115,10 @@ func TestCollectGas(t *testing.T) {
 	initialBalance := big.NewInt(2e18)
 	db.AddBalance(from, initialBalance)
 	msg, _ := tx.AsMessage(types.NewEIP155Signer(common.Big2))
-	ctx := NewEVMContext(msg, header, chain, nil /* coinbase is nil, no block reward */)
+	ctx := NewEVMBlockContext(msg, header, chain, nil /* coinbase is nil, no block reward */)
 	ctx.TxType = types.SameShardTx
 
-	vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+	vmenv := vm.NewEVM(ctx, NewEVMTxContext(msg), db, params.TestChainConfig, vm.Config{})
 	gasPool := new(GasPool).AddGas(math.MaxUint64)
 	_, err := ApplyMessage(vmenv, msg, gasPool)
 	if err != nil {
@@ -191,10 +191,11 @@ func TestCollectGasRounding(t *testing.T) {
 	initialBalance := big.NewInt(2e18)
 	db.AddBalance(from, initialBalance)
 	msg, _ := tx.AsMessage(types.NewEIP155Signer(common.Big2))
-	ctx := NewEVMContext(msg, header, chain, nil /* coinbase is nil, no block reward */)
+	ctx := NewEVMBlockContext(msg, header, chain, nil /* coinbase is nil, no block reward */)
 	ctx.TxType = types.SameShardTx
 
-	vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+	vmenv := vm.NewEVM(ctx, NewEVMTxContext(msg), db, params.TestChainConfig, vm.Config{})
+	vmenv.SetTxContext(NewEVMTxContext(msg))
 	gasPool := new(GasPool).AddGas(math.MaxUint64)
 	st := NewStateTransition(vmenv, msg, gasPool)
 	// buy gas to set initial gas to 5: gasLimit * gasPrice
@@ -242,7 +243,7 @@ func TestPrepare(t *testing.T) {
 	initialBalance := big.NewInt(2e18)
 	db.AddBalance(from, initialBalance)
 	msg, _ := tx.AsMessage(types.NewEIP155Signer(common.Big2))
-	ctx := NewEVMContext(msg, header, chain, nil /* coinbase is nil, no block reward */)
+	ctx := NewEVMBlockContext(msg, header, chain, nil /* coinbase is nil, no block reward */)
 	ctx.TxType = types.SameShardTx
 
 	// populate transient storage
@@ -254,7 +255,7 @@ func TestPrepare(t *testing.T) {
 	}
 
 	// transition state db by calling apply message
-	vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+	vmenv := vm.NewEVM(ctx, NewEVMTxContext(msg), db, params.TestChainConfig, vm.Config{})
 	gasPool := new(GasPool).AddGas(math.MaxUint64)
 	_, err := ApplyMessage(vmenv, msg, gasPool)
 	if err != nil {
