@@ -305,7 +305,7 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	context.TxType = txType
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
-	vmenv := vm.NewEVM(context, statedb, config, cfg)
+	vmenv := vm.NewEVM(context, NewEVMTxContext(msg), statedb, config, cfg)
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
@@ -397,7 +397,7 @@ func ApplyStakingTransaction(
 
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
-	vmenv := vm.NewEVM(context, statedb, config, cfg)
+	vmenv := vm.NewEVM(context, NewEVMTxContext(msg), statedb, config, cfg)
 
 	// Apply the transaction to the current state (included in the env)
 	gas, err = ApplyStakingMessage(vmenv, msg, gp)
