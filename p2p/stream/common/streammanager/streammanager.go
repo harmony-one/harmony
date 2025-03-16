@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -112,12 +111,6 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		Str("protocol ID", string(pid)).Logger()
 
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
-
-	// if it is a beacon node or shard node, print the peer id and proto id
-	if protoSpec.IsBeaconValidator || protoSpec.ShardID != shard.BeaconChainShardID {
-		fmt.Println("My peer id: ", host.ID().String())
-		fmt.Println("My proto id: ", pid)
-	}
 
 	return &streamManager{
 		myProtoID:       pid,
@@ -476,13 +469,12 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrInfo, error) {
 	numStreams := sm.streams.size()
 
-	protoID := sm.targetProtoID()
 	discBatch := sm.config.DiscBatch
 	if sm.config.HiCap-numStreams < sm.config.DiscBatch {
 		discBatch = sm.config.HiCap - numStreams
 	}
 	sm.logger.Debug().
-		Interface("protoID", protoID).
+		Interface("protoID", sm.myProtoID).
 		Int("numStreams", numStreams).
 		Int("discBatch", discBatch).
 		Msg("[StreamManager] discovering")
@@ -495,15 +487,7 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 		<-time.After(discTimeout)
 		cancel()
 	}()
-	return sm.pf.FindPeers(ctx2, protoID, discBatch)
-}
-
-func (sm *streamManager) targetProtoID() string {
-	targetSpec := sm.myProtoSpec
-	if targetSpec.ShardID == shard.BeaconChainShardID { // for beacon chain, only connect to beacon nodes
-		targetSpec.IsBeaconValidator = true
-	}
-	return string(targetSpec.ToProtoID())
+	return sm.pf.FindPeers(ctx2, string(sm.myProtoID), discBatch)
 }
 
 func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_peer.ID) error {
@@ -513,7 +497,7 @@ func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_pee
 	nCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 
-	st, err := sm.host.NewStream(nCtx, pid, protocol.ID(sm.targetProtoID()))
+	st, err := sm.host.NewStream(nCtx, pid, protocol.ID(sm.myProtoID))
 	if err != nil {
 		return err
 	}
