@@ -160,7 +160,7 @@ func (c action) toJsonStr() (string, *string, *string) {
 	callType := strings.ToLower(c.op.String())
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
 		action := fmt.Sprintf(
-			`{"from":"0x%x","gas":"0x%x","init":"0x%x","value":"0x%s"}`,
+			`{"from":"0x%x","gas":"0x%x","init":"0x%x","value":"%s"}`,
 			c.from, c.gas, c.input, c.value.Hex(),
 		)
 		output := fmt.Sprintf(
@@ -176,7 +176,7 @@ func (c action) toJsonStr() (string, *string, *string) {
 
 		var valueStr string
 		if c.op != vm.STATICCALL && c.op != vm.DELEGATECALL {
-			valueStr = fmt.Sprintf(`,"value":"0x%s"`, c.value.Hex())
+			valueStr = fmt.Sprintf(`,"value":"%s"`, c.value.Hex())
 		}
 
 		action := fmt.Sprintf(
@@ -192,7 +192,7 @@ func (c action) toJsonStr() (string, *string, *string) {
 	}
 	if c.op == vm.SELFDESTRUCT {
 		action := fmt.Sprintf(
-			`{"refundAddress":"0x%x","balance":"0x%s","address":"0x%x"}`,
+			`{"refundAddress":"0x%x","balance":"%s","address":"0x%x"}`,
 			c.to, c.value.Hex(), c.from,
 		)
 		return "suicide", &action, nil
