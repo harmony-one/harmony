@@ -42,26 +42,27 @@ type (
 )
 
 // NewDownloader creates a new downloader
-func NewDownloader(host p2p.Host, bc core.BlockChain, nodeConfig *nodeconfig.ConfigType, consensus *consensus.Consensus, dbDir string, isBeaconNode bool, config Config) *Downloader {
+func NewDownloader(host p2p.Host,
+	bc core.BlockChain,
+	nodeConfig *nodeconfig.ConfigType,
+	consensus *consensus.Consensus,
+	dbDir string,
+	isBeaconNode bool,
+	config Config) *Downloader {
+
 	config.fixValues()
 
-	sp := streamSyncProtocol.NewProtocol(streamSyncProtocol.Config{
-		Chain:                bc,
-		Host:                 host.GetP2PHost(),
-		Discovery:            host.GetDiscovery(),
-		ShardID:              nodeconfig.ShardID(bc.ShardID()),
-		Network:              config.Network,
-		BeaconNode:           isBeaconNode,
-		Validator:            nodeConfig.Role() == nodeconfig.Validator,
-		Explorer:             nodeConfig.Role() == nodeconfig.ExplorerNode,
-		MaxAdvertiseWaitTime: config.MaxAdvertiseWaitTime,
-		SmSoftLowCap:         config.SmSoftLowCap,
-		SmHardLowCap:         config.SmHardLowCap,
-		SmHiCap:              config.SmHiCap,
-		DiscBatch:            config.SmDiscBatch,
-	})
-
+	protoCfg := protocolConfig(host, bc, nodeConfig, isBeaconNode, config)
+	sp := streamSyncProtocol.NewProtocol(*protoCfg)
 	host.AddStreamProtocol(sp)
+
+	// beacon nodes support epoch chain as well
+	if isBeaconNode {
+		epochProtoCfg := protocolConfig(host, bc, nodeConfig, isBeaconNode, config)
+		epochProtoCfg.EpochChain = true
+		epochChainProtocol := streamSyncProtocol.NewProtocol(*epochProtoCfg)
+		host.AddStreamProtocol(epochChainProtocol)
+	}
 
 	logger := utils.Logger().With().
 		Str("module", "StagedStreamSync").
@@ -98,6 +99,31 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, nodeConfig *nodeconfig.Con
 
 		config: config,
 		logger: logger,
+	}
+}
+
+// protocolConfig returns protocol config
+func protocolConfig(host p2p.Host,
+	bc core.BlockChain,
+	nodeConfig *nodeconfig.ConfigType,
+	isBeaconNode bool,
+	config Config) *streamSyncProtocol.Config {
+
+	return &streamSyncProtocol.Config{
+		Chain:                bc,
+		Host:                 host.GetP2PHost(),
+		Discovery:            host.GetDiscovery(),
+		ShardID:              nodeconfig.ShardID(bc.ShardID()),
+		Network:              config.Network,
+		BeaconNode:           isBeaconNode,
+		Validator:            nodeConfig.Role() == nodeconfig.Validator,
+		Explorer:             nodeConfig.Role() == nodeconfig.ExplorerNode,
+		EpochChain:           !isBeaconNode && bc.ShardID() == shard.BeaconChainShardID,
+		MaxAdvertiseWaitTime: config.MaxAdvertiseWaitTime,
+		SmSoftLowCap:         config.SmSoftLowCap,
+		SmHardLowCap:         config.SmHardLowCap,
+		SmHiCap:              config.SmHiCap,
+		DiscBatch:            config.SmDiscBatch,
 	}
 }
 

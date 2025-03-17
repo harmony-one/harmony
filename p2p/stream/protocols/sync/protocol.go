@@ -3,8 +3,8 @@ package sync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
-	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/hashicorp/go-version"
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -27,7 +26,8 @@ import (
 
 const (
 	// serviceSpecifier is the specifier for the service.
-	serviceSpecifier = "sync"
+	SyncServiceSpecifier      = "sync"
+	EpochSyncServiceSpecifier = "epochsync"
 )
 
 var (
@@ -71,6 +71,7 @@ type (
 		BeaconNode bool
 		Validator  bool
 		Explorer   bool
+		EpochChain bool
 
 		MaxAdvertiseWaitTime int
 		// stream manager config
@@ -106,6 +107,12 @@ func NewProtocol(config Config) *Protocol {
 
 	sp.rm = requestmanager.NewRequestManager(sp.sm)
 
+	// if it is not epoch chain, print the peer id and proto id
+	if !config.EpochChain {
+		fmt.Println("My peer id: ", config.Host.ID().String())
+		fmt.Println("My proto id: ", sp.ProtoID())
+	}
+
 	sp.logger = utils.Logger().With().Str("Protocol", string(sp.ProtoID())).Logger()
 	return sp
 }
@@ -115,10 +122,7 @@ func (p *Protocol) Start() {
 	p.sm.Start()
 	p.rm.Start()
 	p.rl.Start()
-	// If it's not EpochChain, advertise
-	if p.config.BeaconNode || p.chain.ShardID() != shard.BeaconChainShardID {
-		go p.advertiseLoop()
-	}
+	go p.advertiseLoop()
 }
 
 // Close close the protocol
@@ -130,19 +134,18 @@ func (p *Protocol) Close() {
 	close(p.closeC)
 }
 
-// Specifier return the specifier for the protocol
-func (p *Protocol) Specifier() string {
-	return serviceSpecifier + "/" + strconv.Itoa(int(p.config.ShardID))
-}
-
 // ProtoID return the ProtoID of the sync protocol
 func (p *Protocol) ProtoID() sttypes.ProtoID {
 	return p.protoIDByVersion(MyVersion)
 }
 
-// ShardProtoID returns the ProtoID of the sync protocol for shard nodes
-func (p *Protocol) ShardProtoID() sttypes.ProtoID {
-	return p.protoIDByVersionForShardNodes(MyVersion)
+// ServiceID returns the service ID of the sync protocol
+func (p *Protocol) ServiceID() string {
+	serviceID := SyncServiceSpecifier
+	if p.config.EpochChain {
+		serviceID = EpochSyncServiceSpecifier
+	}
+	return serviceID
 }
 
 // Version returns the sync protocol version
@@ -153,6 +156,11 @@ func (p *Protocol) Version() *version.Version {
 // IsBeaconValidator returns true if it is a beacon chain validator
 func (p *Protocol) IsBeaconValidator() bool {
 	return p.config.BeaconNode && p.config.Validator
+}
+
+// IsEpochChain returns true if it is a epoch chain
+func (p *Protocol) IsEpochChain() bool {
+	return p.config.EpochChain
 }
 
 // IsValidator returns true if it is a validator node
@@ -171,7 +179,7 @@ func (p *Protocol) Match(targetID protocol.ID) bool {
 	if err != nil {
 		return false
 	}
-	if target.Service != serviceSpecifier {
+	if target.Service != p.ServiceID() {
 		return false
 	}
 	if target.NetworkType != p.config.Network {
@@ -347,11 +355,6 @@ func (p *Protocol) supportedProtoIDs() []sttypes.ProtoID {
 	pids := make([]sttypes.ProtoID, 0, len(vs))
 	for _, v := range vs {
 		pids = append(pids, p.protoIDByVersion(v))
-		// beacon node needs to inform shard nodes about it supports them as well for EpochChain
-		// basically beacon node can accept connection from shard nodes to share last epoch blocks
-		if p.IsBeaconValidator() {
-			pids = append(pids, p.protoIDByVersionForShardNodes(v))
-		}
 	}
 	return pids
 }
@@ -362,22 +365,10 @@ func (p *Protocol) supportedVersions() []*version.Version {
 
 func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 	spec := sttypes.ProtoSpec{
-		Service:           serviceSpecifier,
-		NetworkType:       p.config.Network,
-		ShardID:           p.config.ShardID,
-		Version:           v,
-		IsBeaconValidator: (p.config.Validator || p.config.Explorer) && p.config.BeaconNode,
-	}
-	return spec.ToProtoID()
-}
-
-func (p *Protocol) protoIDByVersionForShardNodes(v *version.Version) sttypes.ProtoID {
-	spec := sttypes.ProtoSpec{
-		Service:           serviceSpecifier,
-		NetworkType:       p.config.Network,
-		ShardID:           p.config.ShardID,
-		Version:           v,
-		IsBeaconValidator: false,
+		Service:     p.ServiceID(),
+		NetworkType: p.config.Network,
+		ShardID:     p.config.ShardID,
+		Version:     v,
 	}
 	return spec.ToProtoID()
 }
