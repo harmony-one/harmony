@@ -255,10 +255,6 @@ var TestActions = []string{
 	`{"refundAddress":"0xf012702a5f0e54015362cbca26a26fc90aa832a3","balance":"0x9f2d9ea5d38f03446","address":"0xf012702a5f0e54015362cbca26a26fc90aa832a3"}`,
 }
 
-
-[{"blockNumber":14054302,"blockHash":"0x04d7a0d62d3211151db0dadcaebcb1686c4a3df0e551a00c023c651546293975","transactionHash":"0xce49e42e0fbd37a0cfd08c2da3f1acc371ddbc02c428afa123a43663e57953d7","transactionPosition":0,"subtraces":0,"traceAddress":[0],"type":"suicide","action":{"refundAddress":"0x12e49d93588e0056bd25530c3b1e8aac68f4b70a","balance":"0x0x0","address":"0x7006c42d6fa41844baa53b0388f9542e634cf55a"},"result":null}]
-[{"blockNumber":14054302,"blockHash":"0x04d7a0d62d3211151db0dadcaebcb1686c4a3df0e551a00c023c651546293975","transactionHash":"0xce49e42e0fbd37a0cfd08c2da3f1acc371ddbc02c428afa123a43663e57953d7","transactionPosition":0,"subtraces":0,"traceAddress":[0],"type":"suicide","action":{"refundAddress":"0x12e49d93588e0056bd25530c3b1e8aac68f4b70a","balance":"0x0","address":"0x7006c42d6fa41844baa53b0388f9542e634cf55a"},"result":null}]
-
 func unmarshalAction(jsonstr string) (*action, error) {
 	actionInterface := make(map[string]string)
 	if err := json.Unmarshal([]byte(jsonstr), &actionInterface); err != nil {
