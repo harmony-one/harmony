@@ -364,6 +364,9 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 	if consensus.Blockchain().Config().IsTwoSeconds(nextEpoch) {
 		consensus.BlockPeriod = 2 * time.Second
 	}
+	if consensus.Blockchain().Config().IsOneSecond(nextEpoch) {
+		consensus.BlockPeriod = 1 * time.Second
+	}
 
 	isFirstTimeStaking := consensus.Blockchain().Config().IsStaking(nextEpoch) &&
 		curHeader.IsLastBlockInEpoch() && !consensus.Blockchain().Config().IsStaking(curEpoch)
@@ -493,11 +496,12 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 			// If the leader changed and I myself become the leader
 			if (oldLeader != nil && consensus.getLeaderPubKey() != nil &&
 				!consensus.getLeaderPubKey().Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
+				trace := utils.GetStackTrace(1)
 				go func() {
 					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal(NewProposal(SyncProposal, curHeader.NumberU64()+1), "updateConsensusInformation", "leader changed and I am the new leader")
+					consensus.ReadySignal(NewProposal(SyncProposal, curHeader.NumberU64()+1, trace), "updateConsensusInformation", "leader changed and I am the new leader")
 				}()
 			}
 			return Normal
