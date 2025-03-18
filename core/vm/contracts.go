@@ -19,8 +19,7 @@ package vm
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	//Needed for SHA3-256 FIPS202
-	"encoding/hex"
+	"encoding/hex" //Needed for SHA3-256 FIPS202
 	"errors"
 	"fmt"
 	"math/big"
@@ -37,7 +36,6 @@ import (
 
 	//lint:ignore SA1019 Needed for precompile
 	"golang.org/x/crypto/ripemd160"
-
 	"golang.org/x/crypto/sha3"
 )
 
