@@ -19,21 +19,18 @@ package vm
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	//Needed for SHA3-256 FIPS202
-	"encoding/hex"
+	"encoding/hex" //Needed for SHA3-256 FIPS202
 	"errors"
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/crypto/blake2b"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/blake2b"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
 	"github.com/harmony-one/harmony/internal/params"
 	"golang.org/x/crypto/ripemd160"
-
 	"golang.org/x/crypto/sha3"
 )
 
