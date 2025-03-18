@@ -1,6 +1,7 @@
 package eth
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func asString(i any) string {
-	if s, ok := i.(*hexutil.Big); ok {
+	if s, ok := i.(hexutil.Big); ok {
 		return s.String()
 	}
 	return "<failed to convert>"
@@ -33,13 +34,13 @@ func TestNewReceipt(t *testing.T) {
 	t.Run("effectiveGasPrice", func(t *testing.T) {
 		r, err = NewReceipt(common2.Address(senderAddr), tx, blockHash, blockNumber, blockIndex, receipt)
 		require.NoError(t, err)
-		require.Nil(t, r["effectiveGasPrice"])
+		require.EqualValues(t, fmt.Sprintf("0x%x", types.DefaultEffectiveGasPrice), asString(r["effectiveGasPrice"]))
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),
 		}
 		r, err = NewReceipt(common2.Address(senderAddr), tx, blockHash, blockNumber, blockIndex, rec)
 		require.NoError(t, err)
-		require.EqualValues(t, asString(r["effectiveGasPrice"]), "0x1")
+		require.EqualValues(t, "0x1", asString(r["effectiveGasPrice"]))
 	})
 }

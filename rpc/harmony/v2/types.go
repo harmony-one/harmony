@@ -218,11 +218,11 @@ type TxReceipt struct {
 	To                string         `json:"to"`
 	Root              hexutil.Bytes  `json:"root"`
 	Status            uint           `json:"status"`
-	EffectiveGasPrice *uint64        `json:"effectiveGasPrice"`
+	EffectiveGasPrice uint64         `json:"effectiveGasPrice"`
 }
 
 // GetEffectiveGasPrice returns the effective gas price of the tx receipt
-func (s TxReceipt) GetEffectiveGasPrice() *uint64 {
+func (s TxReceipt) GetEffectiveGasPrice() uint64 {
 	return s.EffectiveGasPrice
 }
 
@@ -241,11 +241,11 @@ type StakingTxReceipt struct {
 	Type              staking.Directive `json:"type"`
 	Root              hexutil.Bytes     `json:"root"`
 	Status            uint              `json:"status"`
-	EffectiveGasPrice *uint64           `json:"effectiveGasPrice"`
+	EffectiveGasPrice uint64            `json:"effectiveGasPrice"`
 }
 
 // GetEffectiveGasPrice returns the effective gas price of the staking tx receipt
-func (s StakingTxReceipt) GetEffectiveGasPrice() *uint64 {
+func (s StakingTxReceipt) GetEffectiveGasPrice() uint64 {
 	return s.EffectiveGasPrice
 }
 
@@ -387,10 +387,9 @@ func NewTxReceipt(
 			return nil, err
 		}
 	}
-	var effectiveGasPrice *uint64
+	var effectiveGasPrice uint64 = 100
 	if receipt.EffectiveGasPrice != nil {
-		e := receipt.EffectiveGasPrice.Uint64()
-		effectiveGasPrice = &e
+		effectiveGasPrice = receipt.EffectiveGasPrice.Uint64()
 	}
 
 	// Declare receipt
@@ -444,10 +443,9 @@ func NewStakingTxReceipt(
 		return nil, err
 	}
 
-	var effectiveGasPrice *uint64
+	var effectiveGasPrice uint64 = types.DefaultEffectiveGasPrice
 	if receipt.EffectiveGasPrice != nil {
-		e := receipt.EffectiveGasPrice.Uint64()
-		effectiveGasPrice = &e
+		effectiveGasPrice = receipt.EffectiveGasPrice.Uint64()
 	}
 
 	// Declare receipt
@@ -829,7 +827,7 @@ func NewStakingTransactionFromBlockIndex(b *types.Block, index uint64) (*Staking
 }
 
 type getEffectiveGasPrice interface {
-	GetEffectiveGasPrice() *uint64
+	GetEffectiveGasPrice() uint64
 }
 
 type getContractAddress interface {
@@ -837,7 +835,7 @@ type getContractAddress interface {
 }
 
 // MustReceiptEffectivePrice getter for effective gas price
-func MustReceiptEffectivePrice(receipt Receipt) *uint64 {
+func MustReceiptEffectivePrice(receipt Receipt) uint64 {
 	if s, ok := receipt.(getEffectiveGasPrice); ok {
 		return s.GetEffectiveGasPrice()
 	}

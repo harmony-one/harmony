@@ -140,10 +140,12 @@ func NewReceipt(senderAddr common.Address, tx *types.EthTransaction, blockHash c
 		receipt.Logs[i].TxHash = ethTxHash
 	}
 
-	var effectiveGasPrice *hexutil.Big
+	var effectiveGasPrice hexutil.Big = hexutil.Big(*big.NewInt(types.DefaultEffectiveGasPrice))
 	if receipt.EffectiveGasPrice != nil {
-		e := hexutil.Big(*new(big.Int).Set(receipt.EffectiveGasPrice))
-		effectiveGasPrice = &e
+		//e := hexutil.Big(*new(big.Int).Set(receipt.EffectiveGasPrice))
+		//effectiveGasPrice = &e
+		//effectiveGasPrice = hexutil.Big(*receipt.EffectiveGasPrice)
+		effectiveGasPrice = hexutil.Big(*receipt.EffectiveGasPrice)
 	}
 
 	fields := map[string]interface{}{

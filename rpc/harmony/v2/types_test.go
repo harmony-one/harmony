@@ -56,27 +56,27 @@ func TestNewReceipt(t *testing.T) {
 		tx, _ := types.SignTx(unsigned, types.HomesteadSigner{}, FaucetPriKey)
 		r, err = NewReceipt(tx, blockHash, blockNumber, blockIndex, receipt)
 		require.NoError(t, err)
-		require.Nil(t, MustReceiptEffectivePrice(r))
+		require.EqualValues(t, types.DefaultEffectiveGasPrice, MustReceiptEffectivePrice(r))
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),
 		}
 		r, err = NewReceipt(tx, blockHash, blockNumber, blockIndex, rec)
 		require.NoError(t, err)
-		require.EqualValues(t, 1, *MustReceiptEffectivePrice(r))
+		require.EqualValues(t, 1, MustReceiptEffectivePrice(r))
 	})
 	t.Run("effectiveGasPrice-staking", func(t *testing.T) {
 		unsigned, err := helpers.CreateTestStakingTransaction(payloadMaker, nil, 0, gasLimit, gasPrice)
 		tx, _ := staking.Sign(unsigned, staking.NewEIP155Signer(unsigned.ChainID()), FaucetPriKey)
 		r, err = NewReceipt(tx, blockHash, blockNumber, blockIndex, receipt)
 		require.NoError(t, err)
-		require.Nil(t, MustReceiptEffectivePrice(r))
+		require.EqualValues(t, types.DefaultEffectiveGasPrice, MustReceiptEffectivePrice(r))
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),
 		}
 		r, err = NewReceipt(tx, blockHash, blockNumber, blockIndex, rec)
 		require.NoError(t, err)
-		assert.EqualValues(t, 1, *MustReceiptEffectivePrice(r))
+		assert.EqualValues(t, 1, MustReceiptEffectivePrice(r))
 	})
 }
