@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -59,7 +58,7 @@ func TestNewReceipt(t *testing.T) {
 		require.NoError(t, err)
 
 		price := MustReceiptEffectivePrice(r)
-		require.EqualValues(t, fmt.Sprintf("0x%x", types.DefaultEffectiveGasPrice), price.String())
+		require.EqualValues(t, big.NewInt(types.DefaultEffectiveGasPrice), price.ToInt())
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),
@@ -77,7 +76,7 @@ func TestNewReceipt(t *testing.T) {
 		require.NoError(t, err)
 
 		receiptEffectivePrice := MustReceiptEffectivePrice(r)
-		assert.EqualValues(t, fmt.Sprintf("0x%x", types.DefaultEffectiveGasPrice), receiptEffectivePrice.String())
+		assert.EqualValues(t, big.NewInt(types.DefaultEffectiveGasPrice), receiptEffectivePrice.ToInt())
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),

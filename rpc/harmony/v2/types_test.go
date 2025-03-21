@@ -56,7 +56,7 @@ func TestNewReceipt(t *testing.T) {
 		tx, _ := types.SignTx(unsigned, types.HomesteadSigner{}, FaucetPriKey)
 		r, err = NewReceipt(tx, blockHash, blockNumber, blockIndex, receipt)
 		require.NoError(t, err)
-		require.EqualValues(t, types.DefaultEffectiveGasPrice, MustReceiptEffectivePrice(r))
+		require.EqualValues(t, uint64(types.DefaultEffectiveGasPrice), MustReceiptEffectivePrice(r))
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),

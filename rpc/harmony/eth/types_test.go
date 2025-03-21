@@ -1,7 +1,6 @@
 package eth
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -12,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func asString(i any) string {
+func asInt(i any) *big.Int {
 	if s, ok := i.(hexutil.Big); ok {
-		return s.String()
+		return s.ToInt()
 	}
-	return "<failed to convert>"
+	panic("<failed to convert>")
 }
 
 func TestNewReceipt(t *testing.T) {
@@ -34,13 +33,13 @@ func TestNewReceipt(t *testing.T) {
 	t.Run("effectiveGasPrice", func(t *testing.T) {
 		r, err = NewReceipt(common2.Address(senderAddr), tx, blockHash, blockNumber, blockIndex, receipt)
 		require.NoError(t, err)
-		require.EqualValues(t, fmt.Sprintf("0x%x", types.DefaultEffectiveGasPrice), asString(r["effectiveGasPrice"]))
+		require.EqualValues(t, big.NewInt(types.DefaultEffectiveGasPrice), asInt(r["effectiveGasPrice"]))
 
 		rec := &types.Receipt{
 			EffectiveGasPrice: big.NewInt(1),
 		}
 		r, err = NewReceipt(common2.Address(senderAddr), tx, blockHash, blockNumber, blockIndex, rec)
 		require.NoError(t, err)
-		require.EqualValues(t, "0x1", asString(r["effectiveGasPrice"]))
+		require.EqualValues(t, big.NewInt(1), asInt(r["effectiveGasPrice"]))
 	})
 }

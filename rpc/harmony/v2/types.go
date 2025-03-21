@@ -387,7 +387,7 @@ func NewTxReceipt(
 			return nil, err
 		}
 	}
-	var effectiveGasPrice uint64 = 100
+	var effectiveGasPrice uint64 = types.DefaultEffectiveGasPrice
 	if receipt.EffectiveGasPrice != nil {
 		effectiveGasPrice = receipt.EffectiveGasPrice.Uint64()
 	}

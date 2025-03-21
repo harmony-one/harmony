@@ -45,7 +45,7 @@ const (
 	ReceiptStatusSuccessful = uint64(1)
 
 	// DefaultEffectiveGasPrice is the default effective gas price for a transaction.
-	DefaultEffectiveGasPrice = 100
+	DefaultEffectiveGasPrice = 100 * 1e9
 )
 
 // Receipt represents the results of a transaction.
