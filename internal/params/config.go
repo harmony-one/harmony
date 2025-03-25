@@ -81,6 +81,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		HIP32Epoch:                            big.NewInt(2152), // 2024-10-31 13:02 UTC
+		IsOneSecondEpoch:                      EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -129,6 +130,7 @@ var (
 		MaxRateEpoch:                          big.NewInt(2520), // 2023-12-16 12:17:14+00:00
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  big.NewInt(3044),
+		IsOneSecondEpoch:                      EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -177,6 +179,7 @@ var (
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		IsOneSecondEpoch:                      EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -276,6 +279,7 @@ var (
 		MaxRateEpoch:                          EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		IsOneSecondEpoch:                      EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
