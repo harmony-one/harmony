@@ -168,9 +168,20 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 			"shard ID %d out of range 0..%d", shardID, p.numShards-1)
 	}
 	shards := [][]string{
-		{"6000", "6004", "6008", "6012", "6016", "6020", "6100", "6104", "6108", "6112", "6116", "6120"},
-		{"6002", "6006", "6010", "6014", "6018", "6022", "6102", "6106", "6110", "6114", "6118", "6122"},
+		{
+			"6000",
+			"6004",
+			"6008",
+			"6120",
+		},
+		{
+			"6002",
+			"6006",
+			"6010",
+			"6122",
+		},
 	}
+
 	selfport := fmt.Sprint(p.selfPort)
 	for _, port := range shards[shardID] {
 		if port == selfport {
@@ -278,6 +289,9 @@ func (node *Node) doSync(syncInstance ISync, syncingPeerProvider SyncingPeerProv
 	}
 	// TODO: treat fake maximum height
 	if isSynchronized, _, _ := syncInstance.GetParsedSyncStatusDoubleChecked(); !isSynchronized {
+		if consensus.IsLeader() {
+			return
+		}
 		node.IsSynchronized.UnSet()
 		if willJoinConsensus {
 			consensus.BlocksNotSynchronized("node.doSync")
