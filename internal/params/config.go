@@ -226,7 +226,7 @@ var (
 		MaxRateEpoch:                          EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		DevnetExternalEpoch:                   big.NewInt(144),
-		IsOneSecondEpoch:                      big.NewInt(17432),
+		IsOneSecondEpoch:                      big.NewInt(17436),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
