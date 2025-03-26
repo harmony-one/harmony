@@ -63,10 +63,10 @@ type LogConfig struct {
 // StructLog is emitted to the EVM each cycle and lists information about the current internal state
 // prior to the execution of the statement.
 type StructLog struct {
-	Pc              uint64         `json:"pc"`
-	Op              OpCode         `json:"op"`
-	CallerAddress   common.Address `json:"callerAddress"`
-	ContractAddress common.Address
+	Pc              uint64                      `json:"pc"`
+	Op              OpCode                      `json:"op"`
+	CallerAddress   common.Address              `json:"callerAddress"`
+	ContractAddress common.Address              `json:"contractAddress"`
 	Gas             uint64                      `json:"gas"`
 	GasCost         uint64                      `json:"gasCost"`
 	Memory          []byte                      `json:"memory"`
