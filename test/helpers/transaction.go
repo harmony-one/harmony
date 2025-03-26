@@ -4,12 +4,8 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 
-	"github.com/coinbase/rosetta-sdk-go/types"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	hmytypes "github.com/harmony-one/harmony/core/types"
-	rpcV2 "github.com/harmony-one/harmony/rpc/harmony/v2"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -30,15 +26,6 @@ func CreateTestStakingTransaction(
 	}
 	// Staking transactions are always post EIP155 epoch
 	return stakingTypes.Sign(tx, stakingTypes.NewEIP155Signer(tx.ChainID()), key)
-}
-
-// GetMessageFromStakingTx gets the staking message, as seen by the rpc layer
-func GetMessageFromStakingTx(tx *stakingTypes.StakingTransaction) (map[string]interface{}, error) {
-	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0, true)
-	if err != nil {
-		return nil, err
-	}
-	return types.MarshalMap(rpcStakingTx.Msg)
 }
 
 // CreateTestTransaction creates a pre-signed transaction
