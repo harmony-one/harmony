@@ -48,15 +48,17 @@ func (l *JSONLogger) CaptureStart(env *EVM, from common.Address, to common.Addre
 // CaptureState outputs state information on the logger.
 func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, rStack *ReturnStack, rData []byte, contract *Contract, depth int, err error) error {
 	log := StructLog{
-		Pc:            pc,
-		Op:            op,
-		Gas:           gas,
-		GasCost:       cost,
-		MemorySize:    memory.Len(),
-		Storage:       nil,
-		Depth:         depth,
-		RefundCounter: env.StateDB.GetRefund(),
-		Err:           err,
+		Pc:              pc,
+		Op:              op,
+		ContractAddress: contract.Address(),
+		CallerAddress:   contract.CallerAddress,
+		Gas:             gas,
+		GasCost:         cost,
+		MemorySize:      memory.Len(),
+		Storage:         nil,
+		Depth:           depth,
+		RefundCounter:   env.StateDB.GetRefund(),
+		Err:             err,
 	}
 	if !l.cfg.DisableMemory {
 		log.Memory = memory.Data()
