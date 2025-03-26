@@ -191,6 +191,16 @@ type TxReceipt struct {
 	EffectiveGasPrice hexutil.Big    `json:"effectiveGasPrice"`
 }
 
+// GetEffectiveGasPrice returns the effective gas price of the tx receipt
+func (s TxReceipt) GetEffectiveGasPrice() hexutil.Big {
+	return s.EffectiveGasPrice
+}
+
+// GetContractAddress returns the contract address of the tx receipt
+func (s TxReceipt) GetContractAddress() common.Address {
+	return s.ContractAddress
+}
+
 // StakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
 type StakingTxReceipt struct {
 	BlockHash         common.Hash    `json:"blockHash"`
@@ -207,6 +217,16 @@ type StakingTxReceipt struct {
 	Root              hexutil.Bytes  `json:"root"`
 	Status            hexutil.Uint   `json:"status"`
 	EffectiveGasPrice hexutil.Big    `json:"effectiveGasPrice"`
+}
+
+// GetEffectiveGasPrice returns the effective gas price of the staking tx receipt
+func (s StakingTxReceipt) GetEffectiveGasPrice() hexutil.Big {
+	return s.EffectiveGasPrice
+}
+
+// GetContractAddress returns the contract address of the staking tx receipt
+func (s StakingTxReceipt) GetContractAddress() common.Address {
+	return s.ContractAddress
 }
 
 // CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
@@ -304,11 +324,13 @@ func NewTransaction(
 	return result, nil
 }
 
+type Receipt interface{}
+
 // NewReceipt returns a transaction OR staking transaction that will serialize to the RPC
 // representation.
 func NewReceipt(
 	tx interface{}, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
-) (interface{}, error) {
+) (Receipt, error) {
 	plainTx, ok := tx.(*types.Transaction)
 	if ok {
 		return NewTxReceipt(plainTx, blockHash, blockNumber, blockIndex, receipt)
@@ -346,6 +368,11 @@ func NewTxReceipt(
 		}
 	}
 
+	var effectiveGasPrice = hexutil.Big(*big.NewInt(types.DefaultEffectiveGasPrice))
+	if receipt.EffectiveGasPrice != nil {
+		effectiveGasPrice = hexutil.Big(*receipt.EffectiveGasPrice)
+	}
+
 	// Declare receipt
 	txReceipt := &TxReceipt{
 		BlockHash:         blockHash,
@@ -361,7 +388,7 @@ func NewTxReceipt(
 		To:                receiver,
 		Root:              receipt.PostState,
 		Status:            hexutil.Uint(receipt.Status),
-		EffectiveGasPrice: hexutil.Big(*receipt.EffectiveGasPrice),
+		EffectiveGasPrice: effectiveGasPrice,
 	}
 
 	// Set empty array for empty logs
@@ -390,6 +417,11 @@ func NewStakingTxReceipt(
 		return nil, err
 	}
 
+	var effectiveGasPrice hexutil.Big = hexutil.Big(*big.NewInt(types.DefaultEffectiveGasPrice))
+	if receipt.EffectiveGasPrice != nil {
+		effectiveGasPrice = hexutil.Big(*receipt.EffectiveGasPrice)
+	}
+
 	// Declare receipt
 	txReceipt := &StakingTxReceipt{
 		BlockHash:         blockHash,
@@ -404,7 +436,7 @@ func NewStakingTxReceipt(
 		Type:              hexutil.Uint64(tx.StakingType()),
 		Root:              receipt.PostState,
 		Status:            hexutil.Uint(receipt.Status),
-		EffectiveGasPrice: hexutil.Big(*receipt.EffectiveGasPrice),
+		EffectiveGasPrice: effectiveGasPrice,
 	}
 
 	// Set empty array for empty logs
@@ -720,4 +752,26 @@ func NewStakingTransactionFromBlockIndex(b *types.Block, index uint64) (*Staking
 		)
 	}
 	return NewStakingTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
+}
+
+type getEffectiveGasPrice interface {
+	GetEffectiveGasPrice() hexutil.Big
+}
+
+type getContractAddress interface {
+	GetContractAddress() common.Address
+}
+
+func MustReceiptEffectivePrice(receipt Receipt) hexutil.Big {
+	if s, ok := receipt.(getEffectiveGasPrice); ok {
+		return s.GetEffectiveGasPrice()
+	}
+	panic(fmt.Sprintf("<failed to convert, i(%T) does not support GetEffectiveGasPrice interface>", receipt))
+}
+
+func MustContractAddress(receipt Receipt) common.Address {
+	if s, ok := receipt.(getContractAddress); ok {
+		return s.GetContractAddress()
+	}
+	panic(fmt.Sprintf("<failed to convert, i(%T) does not support getContractAddress interface>", receipt))
 }

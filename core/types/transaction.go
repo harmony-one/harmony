@@ -25,16 +25,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
 	staking "github.com/harmony-one/harmony/staking/types"
+	errs "github.com/pkg/errors"
 )
 
 // no go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
@@ -531,7 +530,7 @@ func (tx *Transaction) SenderAddress() (common.Address, error) {
 	}
 	addr, err := Sender(signer, tx)
 	if err != nil {
-		return common.Address{}, err
+		return common.Address{}, errs.WithMessage(err, "failed to extract sender address")
 	}
 	return addr, nil
 }
