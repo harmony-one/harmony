@@ -961,8 +961,7 @@ func newFrontierInstructionSet() JumpTable {
 			minStack:   minStack(5, 0),
 			maxStack:   maxStack(5, 0),
 			memorySize: memoryLog,
-
-			writes: true,
+			writes:     true,
 		},
 		LOG4: {
 			execute:    makeLog(4),
@@ -970,8 +969,7 @@ func newFrontierInstructionSet() JumpTable {
 			minStack:   minStack(6, 0),
 			maxStack:   maxStack(6, 0),
 			memorySize: memoryLog,
-
-			writes: true,
+			writes:     true,
 		},
 		CREATE: {
 			execute:     opCreate,
@@ -980,9 +978,8 @@ func newFrontierInstructionSet() JumpTable {
 			minStack:    minStack(3, 1),
 			maxStack:    maxStack(3, 1),
 			memorySize:  memoryCreate,
-
-			writes:  true,
-			returns: true,
+			writes:      true,
+			returns:     true,
 		},
 		CALL: {
 			execute:     opCall,
@@ -991,8 +988,7 @@ func newFrontierInstructionSet() JumpTable {
 			minStack:    minStack(7, 1),
 			maxStack:    maxStack(7, 1),
 			memorySize:  memoryCall,
-
-			returns: true,
+			returns:     true,
 		},
 		CALLCODE: {
 			execute:     opCallCode,
@@ -1001,8 +997,7 @@ func newFrontierInstructionSet() JumpTable {
 			minStack:    minStack(7, 1),
 			maxStack:    maxStack(7, 1),
 			memorySize:  memoryCall,
-
-			returns: true,
+			returns:     true,
 		},
 		RETURN: {
 			execute:    opReturn,
@@ -1018,8 +1013,7 @@ func newFrontierInstructionSet() JumpTable {
 			minStack:   minStack(1, 0),
 			maxStack:   maxStack(1, 0),
 			halts:      true,
-
-			writes: true,
+			writes:     true,
 		},
 	}
 }
