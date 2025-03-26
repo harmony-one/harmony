@@ -43,6 +43,9 @@ const (
 
 	// ReceiptStatusSuccessful is the status code of a transaction if execution succeeded.
 	ReceiptStatusSuccessful = uint64(1)
+
+	// DefaultEffectiveGasPrice is the default effective gas price for a transaction.
+	DefaultEffectiveGasPrice = 100 * 1e9
 )
 
 // Receipt represents the results of a transaction.
