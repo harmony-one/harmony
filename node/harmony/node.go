@@ -149,7 +149,7 @@ func (node *Node) SyncInstance() ISync {
 func (node *Node) GetOrCreateSyncInstance(initiate bool) ISync {
 	if initiate && node.stateSync == nil {
 		utils.Logger().Info().Msg("initializing legacy state sync")
-		node.stateSync = node.createStateSync(node.Beaconchain())
+		node.stateSync = node.createStateSync(node.Blockchain())
 	}
 	return node.stateSync
 }
