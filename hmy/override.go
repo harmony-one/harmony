@@ -121,7 +121,7 @@ type BlockOverrides struct {
 
 // apply overrides the given header fields into the given block context
 // difficulty & random not part of vm.Context
-func (b *BlockOverrides) Apply(blockCtx *vm.Context) {
+func (b *BlockOverrides) Apply(blockCtx *vm.BlockContext) {
 	if b == nil {
 		return
 	}
