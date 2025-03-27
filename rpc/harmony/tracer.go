@@ -28,6 +28,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 )
@@ -205,6 +206,24 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 	// Execute the trace
 	msg := args.ToMessage(s.hmy.RPCGasCap)
 	vmctx := core.NewEVMContext(msg, header, s.hmy.BlockChain, nil)
+
+	// Apply overrides customization if required
+	if config != nil {
+		config.BlockOverrides.Apply(&vmctx)
+
+		// Precompile overrides in `StateOverrides.Apply()` don't affect execution in `TraceCall`
+		// because the EVM uses precompiles from canonical chain rules, ensuring consistent tracing.
+		// This is different than the behavior of `eth_call (doCall())`, which simulates the call with updated precompiles.
+		if config.Stateoverrides != nil {
+			// need a copy to prevent altering the original precompiles
+			precompiles := make(map[common.Address]vm.PrecompiledContract)
+			for addr, contract := range vm.PrecompiledContractsStaking {
+				precompiles[addr] = contract
+			}
+			config.Stateoverrides.Apply(statedb, precompiles)
+		}
+	}
+
 	// Trace the transaction and return
 	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 }
