@@ -24,7 +24,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
@@ -532,12 +531,12 @@ func (s *FullStateDownloadManager) commitHealer(force bool) {
 	}
 	batch := s.db.NewBatch()
 	if err := s.scheduler.Commit(batch); err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to commit healing data")
+		s.logger.Error().Err(err).Msg("Failed to commit healing data")
 	}
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to persist healing data", "err", err)
 	}
-	utils.Logger().Debug().Str("type", "trienodes").Interface("bytes", common.StorageSize(batch.ValueSize())).Msg("Persisted set of healing data")
+	s.logger.Debug().Str("type", "trienodes").Interface("bytes", common.StorageSize(batch.ValueSize())).Msg("Persisted set of healing data")
 }
 
 func (s *FullStateDownloadManager) SyncStarted() {
@@ -568,11 +567,11 @@ func (s *FullStateDownloadManager) SyncCompleted() {
 
 	// Whether sync completed or not, disregard any future packets
 	defer func() {
-		utils.Logger().Debug().Interface("root", s.root).Msg("Terminating snapshot sync cycle")
+		s.logger.Debug().Interface("root", s.root).Msg("Terminating snapshot sync cycle")
 	}()
 
 	elapsed := time.Since(s.startTime)
-	utils.Logger().Debug().Interface("elapsed", elapsed).Msg("Snapshot sync already completed")
+	s.logger.Debug().Interface("elapsed", elapsed).Msg("Snapshot sync already completed")
 }
 
 // getNextBatch returns objects with a maximum of n state download
@@ -615,14 +614,14 @@ func (s *FullStateDownloadManager) saveSyncStatus() {
 	// Serialize any partial progress to disk before spinning down
 	for _, task := range s.tasks.accountTasks {
 		if err := task.genBatch.Write(); err != nil {
-			utils.Logger().Debug().
+			s.logger.Debug().
 				Err(err).
 				Msg("Failed to persist account slots")
 		}
 		for _, subtasks := range task.SubTasks {
 			for _, subtask := range subtasks {
 				if err := subtask.genBatch.Write(); err != nil {
-					utils.Logger().Debug().
+					s.logger.Debug().
 						Err(err).
 						Msg("Failed to persist storage slots")
 				}
@@ -657,12 +656,12 @@ func (s *FullStateDownloadManager) loadSyncStatus() {
 
 	if status := rawdb.ReadSnapshotSyncStatus(s.db); status != nil {
 		if err := json.Unmarshal(status, &progress); err != nil {
-			utils.Logger().Error().
+			s.logger.Error().
 				Err(err).
 				Msg("Failed to decode snap sync status")
 		} else {
 			for _, task := range progress.Tasks {
-				utils.Logger().Debug().
+				s.logger.Debug().
 					Interface("from", task.Next).
 					Interface("last", task.Last).
 					Msg("Scheduled account sync task")
@@ -772,7 +771,7 @@ func (s *FullStateDownloadManager) loadSyncStatus() {
 			genBatch: batch,
 			genTrie:  trie.NewStackTrie(writeFn),
 		})
-		utils.Logger().Debug().
+		s.logger.Debug().
 			Interface("from", next).
 			Interface("last", last).
 			Msg("Created account sync task")
@@ -879,7 +878,7 @@ func (s *FullStateDownloadManager) forwardAccountTask(task *accountTask) {
 	}
 	// Flush anything written just now and update the stats
 	if err := batch.Write(); err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to persist accounts")
+		s.logger.Error().Err(err).Msg("Failed to persist accounts")
 	}
 	s.accountSynced += uint64(len(res.accounts))
 
@@ -902,11 +901,11 @@ func (s *FullStateDownloadManager) forwardAccountTask(task *accountTask) {
 	}
 	if task.genBatch.ValueSize() > ethdb.IdealBatchSize || task.done {
 		if err := task.genBatch.Write(); err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to persist stack account")
+			s.logger.Error().Err(err).Msg("Failed to persist stack account")
 		}
 		task.genBatch.Reset()
 	}
-	utils.Logger().Debug().
+	s.logger.Debug().
 		Int("accounts", len(res.accounts)).
 		Float64("bytes", float64(s.accountBytes-oldAccountBytes)).
 		Msg("Persisted range of accounts")
@@ -919,7 +918,7 @@ func (s *FullStateDownloadManager) updateStats(written, duplicate, unexpected in
 
 	// for now, we just jog current stats
 	if written > 0 || duplicate > 0 || unexpected > 0 {
-		utils.Logger().Info().
+		s.logger.Info().
 			Int("count", written).
 			Int("duplicate", duplicate).
 			Int("unexpected", unexpected).
@@ -1447,7 +1446,7 @@ func (s *FullStateDownloadManager) HandleAccountRequestResult(task *accountTask,
 	proof [][]byte,
 	origin []byte,
 	last []byte,
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	hashes, accounts, err := s.UnpackAccountRanges(retAccounts)
@@ -1462,7 +1461,7 @@ func (s *FullStateDownloadManager) HandleAccountRequestResult(task *accountTask,
 	for _, node := range proof {
 		size += common.StorageSize(len(node))
 	}
-	utils.Logger().Trace().
+	s.logger.Trace().
 		Int("hashes", len(hashes)).
 		Int("accounts", len(accounts)).
 		Int("proofs", len(proof)).
@@ -1477,7 +1476,7 @@ func (s *FullStateDownloadManager) HandleAccountRequestResult(task *accountTask,
 	// retrieved was either already pruned remotely, or the peer is not yet
 	// synced to our head.
 	if len(hashes) == 0 && len(accounts) == 0 && len(proof) == 0 {
-		utils.Logger().Debug().
+		s.logger.Debug().
 			Interface("root", s.root).
 			Msg("Peer rejected account range request")
 		s.lock.Unlock()
@@ -1497,7 +1496,7 @@ func (s *FullStateDownloadManager) HandleAccountRequestResult(task *accountTask,
 	}
 	cont, err := trie.VerifyRangeProof(root, origin[:], last[:], keys, accounts, nodes.Set())
 	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("Account range failed proof")
+		s.logger.Warn().Err(err).Msg("Account range failed proof")
 		// Signal this request as failed, and ready for rescheduling
 		return err
 	}
@@ -1581,7 +1580,7 @@ func (s *FullStateDownloadManager) processAccountResponse(task *accountTask, // 
 				// is interrupted and resumed later. However, *do* update the
 				// previous root hash.
 				if subtasks, ok := task.SubTasks[hashes[i]]; ok {
-					utils.Logger().Debug().Interface("account", hashes[i]).Interface("root", account.Root).Msg("Resuming large storage retrieval")
+					s.logger.Debug().Interface("account", hashes[i]).Interface("root", account.Root).Msg("Resuming large storage retrieval")
 					for _, subtask := range subtasks {
 						subtask.root = account.Root
 					}
@@ -1600,7 +1599,7 @@ func (s *FullStateDownloadManager) processAccountResponse(task *accountTask, // 
 	// now we have to live with that.
 	for hash := range task.SubTasks {
 		if _, ok := resumed[hash]; !ok {
-			utils.Logger().Debug().Interface("account", hash).Msg("Aborting suspended storage retrieval")
+			s.logger.Debug().Interface("account", hash).Msg("Aborting suspended storage retrieval")
 			delete(task.SubTasks, hash)
 		}
 	}
@@ -1621,7 +1620,7 @@ func (s *FullStateDownloadManager) processAccountResponse(task *accountTask, // 
 func (s *FullStateDownloadManager) HandleBytecodeRequestResult(task interface{}, // Task which this request is filling
 	reqHashes []common.Hash, // Hashes of the bytecode to avoid double hashing
 	bytecodes [][]byte, // Actual bytecodes to store into the database (nil = missing)
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	s.lock.RLock()
@@ -1642,7 +1641,7 @@ func (s *FullStateDownloadManager) onByteCodes(task *accountTask, bytecodes [][]
 		size += common.StorageSize(len(code))
 	}
 
-	utils.Logger().Trace().Int("bytecodes", len(bytecodes)).Interface("bytes", size).Msg("Delivering set of bytecodes")
+	s.logger.Trace().Int("bytecodes", len(bytecodes)).Interface("bytes", size).Msg("Delivering set of bytecodes")
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -1651,7 +1650,7 @@ func (s *FullStateDownloadManager) onByteCodes(task *accountTask, bytecodes [][]
 	// the requested data. For bytecode range queries that means the peer is not
 	// yet synced.
 	if len(bytecodes) == 0 {
-		utils.Logger().Debug().Msg("Peer rejected bytecode request")
+		s.logger.Debug().Msg("Peer rejected bytecode request")
 		return nil
 	}
 
@@ -1676,7 +1675,7 @@ func (s *FullStateDownloadManager) onByteCodes(task *accountTask, bytecodes [][]
 			continue
 		}
 		// We've either ran out of hashes, or got unrequested data
-		utils.Logger().Warn().Int("count", len(bytecodes)-i).Msg("Unexpected bytecodes")
+		s.logger.Warn().Int("count", len(bytecodes)-i).Msg("Unexpected bytecodes")
 		// Signal this request as failed, and ready for rescheduling
 		return errors.New("unexpected bytecode")
 	}
@@ -1725,7 +1724,7 @@ func (s *FullStateDownloadManager) processBytecodeResponse(task *accountTask, //
 	s.bytecodeSynced += codes
 	s.bytecodeBytes += bytes
 
-	utils.Logger().Debug().Interface("count", codes).Float64("bytes", float64(bytes)).Msg("Persisted set of bytecodes")
+	s.logger.Debug().Interface("count", codes).Float64("bytes", float64(bytes)).Msg("Persisted set of bytecodes")
 
 	// If this delivery completed the last pending task, forward the account task
 	// to the next chunk
@@ -1783,7 +1782,7 @@ func (s *FullStateDownloadManager) HandleStorageRequestResult(mainTask *accountT
 	limit common.Hash,
 	receivedSlots [][]*message.StorageData,
 	proof [][]byte,
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	s.lock.Lock()
@@ -1811,7 +1810,7 @@ func (s *FullStateDownloadManager) HandleStorageRequestResult(mainTask *accountT
 		size += common.StorageSize(len(node))
 	}
 
-	utils.Logger().Trace().
+	s.logger.Trace().
 		Int("accounts", len(hashes)).
 		Int("hashes", hashCount).
 		Int("slots", slotCount).
@@ -1825,14 +1824,14 @@ func (s *FullStateDownloadManager) HandleStorageRequestResult(mainTask *accountT
 	// Reject the response if the hash sets and slot sets don't match, or if the
 	// peer sent more data than requested.
 	if len(hashes) != len(slots) {
-		utils.Logger().Warn().
+		s.logger.Warn().
 			Int("hashset", len(hashes)).
 			Int("slotset", len(slots)).
 			Msg("Hash and slot set size mismatch")
 		return errors.New("hash and slot set size mismatch")
 	}
 	if len(hashes) > len(reqAccounts) {
-		utils.Logger().Warn().
+		s.logger.Warn().
 			Int("hashset", len(hashes)).
 			Int("requested", len(reqAccounts)).
 			Msg("Hash set larger than requested")
@@ -1843,7 +1842,7 @@ func (s *FullStateDownloadManager) HandleStorageRequestResult(mainTask *accountT
 	// retrieved was either already pruned remotely, or the peer is not yet
 	// synced to our head.
 	if len(hashes) == 0 && len(proof) == 0 {
-		utils.Logger().Debug().Msg("Peer rejected storage request")
+		s.logger.Debug().Msg("Peer rejected storage request")
 		return nil
 	}
 
@@ -1875,7 +1874,7 @@ func (s *FullStateDownloadManager) HandleStorageRequestResult(mainTask *accountT
 			// space and hash to the origin root.
 			_, err = trie.VerifyRangeProof(roots[i], nil, nil, keys, slots[i], nil)
 			if err != nil {
-				utils.Logger().Warn().Err(err).Msg("Storage slots failed proof")
+				s.logger.Warn().Err(err).Msg("Storage slots failed proof")
 				return err
 			}
 		} else {
@@ -1885,7 +1884,7 @@ func (s *FullStateDownloadManager) HandleStorageRequestResult(mainTask *accountT
 
 			cont, err = trie.VerifyRangeProof(roots[i], origin[:], limit[:], keys, slots[i], proofdb)
 			if err != nil {
-				utils.Logger().Warn().Err(err).Msg("Storage range failed proof")
+				s.logger.Warn().Err(err).Msg("Storage range failed proof")
 				return err
 			}
 		}
@@ -1970,14 +1969,14 @@ func (s *FullStateDownloadManager) processStorageResponse(mainTask *accountTask,
 						if n := estimate / (2 * (maxRequestSize / 64)); n+1 < chunks {
 							chunks = n + 1
 						}
-						utils.Logger().Debug().
+						s.logger.Debug().
 							Int("initiators", len(keys)).
 							Interface("tail", lastKey).
 							Uint64("remaining", estimate).
 							Uint64("chunks", chunks).
 							Msg("Chunked large contract")
 					} else {
-						utils.Logger().Debug().
+						s.logger.Debug().
 							Int("initiators", len(keys)).
 							Interface("tail", lastKey).
 							Uint64("chunks", chunks).
@@ -2024,7 +2023,7 @@ func (s *FullStateDownloadManager) processStorageResponse(mainTask *accountTask,
 						})
 					}
 					for _, task := range tasks {
-						utils.Logger().Debug().
+						s.logger.Debug().
 							Interface("from", task.Next).
 							Interface("last", task.Last).
 							Interface("root", acc.Root).
@@ -2120,7 +2119,7 @@ func (s *FullStateDownloadManager) processStorageResponse(mainTask *accountTask,
 	}
 	s.storageSynced += uint64(slots)
 
-	utils.Logger().Debug().
+	s.logger.Debug().
 		Int("accounts", len(hashes)).
 		Int("slots", slots).
 		Interface("bytes", s.storageBytes-oldStorageBytes).
@@ -2144,7 +2143,7 @@ func (s *FullStateDownloadManager) HandleTrieNodeHealRequestResult(task *healTas
 	reqPaths []string,
 	reqHashes []common.Hash,
 	trienodes [][]byte,
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	s.lock.Lock()
@@ -2155,7 +2154,7 @@ func (s *FullStateDownloadManager) HandleTrieNodeHealRequestResult(task *healTas
 		size += common.StorageSize(len(node))
 	}
 
-	utils.Logger().Trace().
+	s.logger.Trace().
 		Int("trienodes", len(trienodes)).
 		Interface("bytes", size).
 		Msg("Delivering set of healing trienodes")
@@ -2164,7 +2163,7 @@ func (s *FullStateDownloadManager) HandleTrieNodeHealRequestResult(task *healTas
 	// the requested data. For bytecode range queries that means the peer is not
 	// yet synced.
 	if len(trienodes) == 0 {
-		utils.Logger().Debug().Msg("Peer rejected trienode heal request")
+		s.logger.Debug().Msg("Peer rejected trienode heal request")
 		return nil
 	}
 
@@ -2192,7 +2191,7 @@ func (s *FullStateDownloadManager) HandleTrieNodeHealRequestResult(task *healTas
 			continue
 		}
 		// We've either ran out of hashes, or got unrequested data
-		utils.Logger().Warn().Int("count", len(trienodes)-i).Msg("Unexpected healing trienodes")
+		s.logger.Warn().Int("count", len(trienodes)-i).Msg("Unexpected healing trienodes")
 
 		// Signal this request as failed, and ready for rescheduling
 		return errors.New("unexpected healing trienode")
@@ -2243,7 +2242,7 @@ func (s *FullStateDownloadManager) processTrienodeHealResponse(task *healTask, /
 		case trie.ErrNotRequested:
 			s.trienodeHealNops++
 		default:
-			utils.Logger().Err(err).Interface("hash", hash).Msg("Invalid trienode processed")
+			s.logger.Err(err).Interface("hash", hash).Msg("Invalid trienode processed")
 		}
 	}
 	s.commitHealer(false)
@@ -2289,7 +2288,7 @@ func (s *FullStateDownloadManager) processTrienodeHealResponse(task *healTask, /
 		}
 		s.trienodeHealThrottled = time.Now()
 
-		utils.Logger().Debug().
+		s.logger.Debug().
 			Float64("rate", s.trienodeHealRate).
 			Uint64("pending", pending).
 			Float64("throttle", s.trienodeHealThrottle).
@@ -2303,7 +2302,7 @@ func (s *FullStateDownloadManager) processTrienodeHealResponse(task *healTask, /
 func (s *FullStateDownloadManager) HandleByteCodeHealRequestResult(task *healTask, // Task which this request is filling
 	hashes []common.Hash, // Hashes of the bytecode to avoid double hashing
 	codes [][]byte, // Actual bytecodes to store into the database (nil = missing)
-	loopID int,
+	workerID int,
 	streamID sttypes.StreamID) error {
 
 	s.lock.Lock()
@@ -2327,7 +2326,7 @@ func (s *FullStateDownloadManager) onHealByteCodes(task *healTask,
 		size += common.StorageSize(len(code))
 	}
 
-	utils.Logger().Trace().
+	s.logger.Trace().
 		Int("bytecodes", len(bytecodes)).
 		Interface("bytes", size).
 		Msg("Delivering set of healing bytecodes")
@@ -2339,7 +2338,7 @@ func (s *FullStateDownloadManager) onHealByteCodes(task *healTask,
 	// the requested data. For bytecode range queries that means the peer is not
 	// yet synced.
 	if len(bytecodes) == 0 {
-		utils.Logger().Debug().Msg("Peer rejected bytecode heal request")
+		s.logger.Debug().Msg("Peer rejected bytecode heal request")
 		return nil
 	}
 
@@ -2364,7 +2363,7 @@ func (s *FullStateDownloadManager) onHealByteCodes(task *healTask,
 			continue
 		}
 		// We've either ran out of hashes, or got unrequested data
-		utils.Logger().Warn().Int("count", len(bytecodes)-i).Msg("Unexpected healing bytecodes")
+		s.logger.Warn().Int("count", len(bytecodes)-i).Msg("Unexpected healing bytecodes")
 
 		// Signal this request as failed, and ready for rescheduling
 		return errors.New("unexpected healing bytecode")

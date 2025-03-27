@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/rs/zerolog"
 )
@@ -45,7 +44,10 @@ func NewStageStatesCfg(
 		db:          db,
 		blockDBs:    blockDBs,
 		concurrency: concurrency,
-		logger:      logger,
+		logger: logger.With().
+			Str("stage", "StageStates").
+			Str("mode", "long range").
+			Logger(),
 		logProgress: logProgress,
 	}
 }
@@ -114,16 +116,16 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 
 	for i := currProgress + 1; i <= targetHeight; i++ {
 		blkKey := marshalData(i)
-		loopID, streamID, errBDD := gbm.GetDownloadDetails(i)
+		workerID, streamID, errBDD := gbm.GetDownloadDetails(i)
 		if errBDD != nil {
 			return errBDD
 		}
 
-		blockBytes, err := txs[loopID].GetOne(BlocksBucket, blkKey)
+		blockBytes, err := txs[workerID].GetOne(BlocksBucket, blkKey)
 		if err != nil {
 			return err
 		}
-		sigBytes, err := txs[loopID].GetOne(BlockSignaturesBucket, blkKey)
+		sigBytes, err := txs[workerID].GetOne(BlockSignaturesBucket, blkKey)
 		if err != nil {
 			return err
 		}
@@ -132,7 +134,7 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		// we don't need to do rollback, because the latest batch haven't added to chain yet
 		sz := len(blockBytes)
 		if sz <= 1 {
-			utils.Logger().Error().
+			stg.configs.logger.Error().
 				Uint64("block number", i).
 				Msg("block size invalid")
 			invalidBlockHash := common.Hash{}
@@ -143,7 +145,7 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 
 		var block *types.Block
 		if err := rlp.DecodeBytes(blockBytes, &block); err != nil {
-			utils.Logger().Error().
+			stg.configs.logger.Error().
 				Uint64("block number", i).
 				Msg("block size invalid")
 			s.state.protocol.StreamFailed(streamID, "invalid block is received from stream")
@@ -165,7 +167,13 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		}
 
 		if stg.configs.bc.HasBlock(block.Hash(), block.NumberU64()) {
-			continue
+			// At this point, there should be some db discrepancies
+			if blk := stg.configs.bc.GetBlock(block.Hash(), block.NumberU64()); blk != nil {
+				if blk.NumberU64() == block.NumberU64() && blk.Hash() == block.Hash() {
+					stg.configs.bc.CurrentHeader().SetNumber(block.Number())
+					continue
+				}
+			}
 		}
 
 		if err := verifyAndInsertBlock(stg.configs.bc, block); err != nil {
@@ -189,25 +197,24 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		s.state.inserted++
 		longRangeSyncedBlockCounterVec.With(pl).Inc()
 
-		utils.Logger().Info().
+		stg.configs.logger.Info().
 			Uint64("blockHeight", block.NumberU64()).
 			Uint64("blockEpoch", block.Epoch().Uint64()).
 			Str("blockHex", block.Hash().Hex()).
-			Uint32("ShardID", block.ShardID()).
 			Msg("[STAGED_STREAM_SYNC] New Block Added to Blockchain")
 
 		// update cur progress
 		currProgress = stg.configs.bc.CurrentBlock().NumberU64()
 
 		for i, tx := range block.StakingTransactions() {
-			utils.Logger().Info().
+			stg.configs.logger.Info().
 				Msgf(
 					"StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage(),
 				)
 		}
 
 		if err := stg.saveProgress(ctx, s, tx); err != nil {
-			utils.Logger().Error().
+			stg.configs.logger.Error().
 				Err(err).
 				Uint64("currProgress", currProgress).
 				Msg(WrapStagedSyncMsg("save progress of stage states failed"))
@@ -250,7 +257,7 @@ func (stg *StageStates) saveProgress(ctx context.Context, s *StageState, tx kv.R
 
 	// save progress
 	if err = s.Update(tx, stg.configs.bc.CurrentBlock().NumberU64()); err != nil {
-		utils.Logger().Error().
+		stg.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] saving progress for block States stage failed")
 		return ErrSaveStateProgressFail

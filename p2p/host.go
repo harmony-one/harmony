@@ -11,13 +11,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/common/clock"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
 	"github.com/harmony-one/harmony/p2p/discovery"
+	"github.com/harmony-one/harmony/p2p/gating"
 	"github.com/harmony-one/harmony/p2p/security"
+	store "github.com/harmony-one/harmony/p2p/store"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	ds "github.com/ipfs/go-datastore"
+	dsSync "github.com/ipfs/go-datastore/sync"
+	leveldb "github.com/ipfs/go-ds-leveldb"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	mplex "github.com/libp2p/go-libp2p-mplex"
@@ -31,6 +38,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/sec/insecure"
 	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoreds"
 	yamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
@@ -134,14 +142,52 @@ func init() {
 // NewHost ..
 func NewHost(cfg HostConfig) (Host, error) {
 	var (
-		self = cfg.Self
-		key  = cfg.BLSKey
+		self   = cfg.Self
+		key    = cfg.BLSKey
+		pub    = cfg.BLSKey.GetPublic()
+		psPath = cfg.DataStoreFile
 	)
+
+	pubKey := key.GetPublic()
+	peerID, err := libp2p_peer.IDFromPublicKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive peer ID from public key: %w", err)
+	}
+	self.PeerID = peerID
 
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port)
 	listenAddr := libp2p.ListenAddrStrings(
 		addr, // regular tcp connections
 	)
+	datastore, err := createDatastore(psPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create data store: %w", err)
+	}
+	basePs, err := pstoreds.NewPeerstore(context.Background(), datastore, pstoreds.DefaultOpts())
+	if err != nil {
+		return nil, fmt.Errorf("failed to open peerstore: %w", err)
+	}
+	var scoreRetention time.Duration
+	// TODO: add scoreRetention to configs (for now, it is zero and so, peer scoring is disabled)
+	scoreRetention = 0
+	logger := log.New()
+	ps, err := store.NewExtendedPeerstore(context.Background(), logger, clock.SystemClock, basePs, datastore, scoreRetention)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open extended peerstore: %w", err)
+	}
+	if err := ps.AddPrivKey(peerID, key); err != nil {
+		return nil, fmt.Errorf("failed to set up peerstore with priv key: %w", err)
+	}
+	if err := ps.AddPubKey(peerID, pub); err != nil {
+		return nil, fmt.Errorf("failed to set up peerstore with pub key: %w", err)
+	}
+	var connGtr gating.BlockingConnectionGater
+	connGtr, err = gating.NewBlockingConnectionGater(datastore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open connection gater: %w", err)
+	}
+	connGtr = gating.AddBanExpiry(connGtr, ps, clock.SystemClock)
+	connGtr = gating.AddMetering(connGtr)
 
 	// transporters
 	tcpTransport := libp2p.Transport(
@@ -178,7 +224,6 @@ func NewHost(cfg HostConfig) (Host, error) {
 	if dto <= 0 {
 		dto = time.Minute
 	}
-
 	// prepare host options
 	p2pHostConfig := []libp2p.Option{
 		libp2p.Identity(key),
@@ -186,6 +231,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.UserAgent(cfg.UserAgent),
 		// regular tcp connections
 		tcpTransport,
+		// set connection gater
+		libp2p.ConnectionGater(connGtr),
 		// dial timeout
 		libp2p.WithDialTimeout(dto),
 		// No relay services, direct connections between peers only.
@@ -212,7 +259,6 @@ func NewHost(cfg HostConfig) (Host, error) {
 		// NAT Rate Limiter
 		libp2p.AutoNATServiceRateLimit(10, 5, time.Second*60),
 	}
-
 	if cfg.ResourceMgrEnabled {
 		rmgr, err := makeResourceMgr(cfg.ResourceMgrEnabled, cfg.ResourceMgrMemoryLimitBytes, cfg.ResourceMgrFileDescriptorsLimit, cfg.ConnManagerHighWatermark)
 		if err != nil {
@@ -254,6 +300,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		p2pHostConfig = append(p2pHostConfig, libp2p.ForceReachabilityPublic())
 	}
 
+	// TODO: this should be moved to main gater
 	if cfg.DisablePrivateIPScan {
 		// Prevent dialing of public addresses
 		p2pHostConfig = append(p2pHostConfig, libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)))
@@ -360,6 +407,20 @@ func NewHost(cfg HostConfig) (Host, error) {
 		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
 		Msg("libp2p host ready")
 	return h, nil
+}
+
+func createDatastore(peerstorePath *string) (ds.Batching, error) {
+	var err error
+	var store ds.Batching
+	if peerstorePath == nil || len(*peerstorePath) == 0 {
+		store = dsSync.MutexWrap(ds.NewMapDatastore())
+	} else {
+		store, err = leveldb.NewDatastore(*peerstorePath, nil) // default leveldb options are fine
+		if err != nil {
+			return store, fmt.Errorf("failed to open leveldb db for peerstore: %w", err)
+		}
+	}
+	return store, nil
 }
 
 func YamuxC() libp2p.Option {
@@ -633,7 +694,10 @@ func (host *HostV2) ListTopic() []string {
 func (host *HostV2) ListPeer(topic string) []libp2p_peer.ID {
 	host.lock.Lock()
 	defer host.lock.Unlock()
-	return host.joined[topic].ListPeers()
+	if t, ok := host.joined[topic]; ok {
+		return t.ListPeers()
+	}
+	return nil
 }
 
 // ListBlockedPeer returns list of blocked peer
@@ -692,6 +756,23 @@ func (host *HostV2) Connected(net libp2p_network.Network, conn libp2p_network.Co
 		}
 	}
 }
+
+// TODO: this function could be used later to get peer topics and filter them based on the topics
+// getPeerTopics returns the list of topics a peer is subscribed to
+// func (host *HostV2) getPeerTopics(peerID libp2p_peer.ID) map[string]bool {
+// 	topics := make(map[string]bool)
+// 	host.lock.Lock()
+// 	defer host.lock.Unlock()
+// 	for topic, t := range host.joined {
+// 		for _, p := range t.ListPeers() {
+// 			if p == peerID {
+// 				topics[topic] = true
+// 				break
+// 			}
+// 		}
+// 	}
+// 	return topics
+// }
 
 // called when a connection closed
 func (host *HostV2) Disconnected(net libp2p_network.Network, conn libp2p_network.Conn) {

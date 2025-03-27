@@ -44,7 +44,7 @@ func TestNewDownloadManager(t *testing.T) {
 	logger := zerolog.Nop()
 	chain := createTestBlockChain()
 
-	dm := newDownloadManager(chain, 1000, 10, logger)
+	dm := newDownloadManager(chain, 1, 1000, 10, logger)
 
 	assert.NotNil(t, dm)
 	assert.Equal(t, uint64(1000), dm.targetBN)
@@ -70,15 +70,14 @@ func TestGetNextBatch(t *testing.T) {
 	retries := makeTestPrioritizedNumbers([]uint64{5, 6})
 	rq := makeTestResultQueue([]uint64{5, 6})
 
-	dm := newDownloadManager(chain, 1000, 3, logger)
+	// Simulate current height
+	// curHeight is 3
+	dm := newDownloadManager(chain, 3, 1000, 3, logger)
 	dm.retries = retries
 	dm.rq = rq
 
-	// Simulate current height
-	curHeight := uint64(3)
-
 	// Call GetNextBatch
-	batch := dm.GetNextBatch(curHeight)
+	batch := dm.GetNextBatch()
 
 	// Verify batch
 	expectedBatch := []uint64{5, 6, 4}
@@ -91,7 +90,7 @@ func TestGetNextBatch(t *testing.T) {
 func TestHandleRequestError(t *testing.T) {
 	logger := zerolog.Nop()
 	chain := createTestBlockChain()
-	dm := newDownloadManager(chain, 1000, 3, logger)
+	dm := newDownloadManager(chain, 1, 1000, 3, logger)
 	dm.retries = makeTestPrioritizedNumbers([]uint64{})
 
 	dm.requesting[5] = struct{}{}
@@ -108,7 +107,7 @@ func TestHandleRequestError(t *testing.T) {
 func TestHandleRequestResult(t *testing.T) {
 	logger := zerolog.Nop()
 	chain := createTestBlockChain()
-	dm := newDownloadManager(chain, 1000, 3, logger)
+	dm := newDownloadManager(chain, 1, 1000, 3, logger)
 
 	dm.requesting[5] = struct{}{}
 	dm.requesting[6] = struct{}{}
@@ -128,20 +127,20 @@ func TestHandleRequestResult(t *testing.T) {
 func TestSetDownloadDetailsAndGetDownloadDetails(t *testing.T) {
 	logger := zerolog.Nop()
 	chain := createTestBlockChain()
-	dm := newDownloadManager(chain, 1000, 3, logger)
+	dm := newDownloadManager(chain, 1, 1000, 3, logger)
 
 	dm.SetDownloadDetails([]uint64{10}, 1, sttypes.StreamID("stream1"))
 
-	loopID, streamID, err := dm.GetDownloadDetails(10)
+	workerID, streamID, err := dm.GetDownloadDetails(10)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, loopID)
+	assert.Equal(t, 1, workerID)
 	assert.Equal(t, sttypes.StreamID("stream1"), streamID)
 }
 
 func TestSetRootHashAndGetRootHash(t *testing.T) {
 	logger := zerolog.Nop()
 	chain := createTestBlockChain()
-	dm := newDownloadManager(chain, 1000, 3, logger)
+	dm := newDownloadManager(chain, 1, 1000, 3, logger)
 
 	hash := common.HexToHash("0x12345")
 	dm.details[10] = &DownloadDetails{}

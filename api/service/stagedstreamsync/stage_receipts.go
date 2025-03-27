@@ -10,10 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 type StageReceipts struct {
@@ -28,6 +28,7 @@ type StageReceiptsCfg struct {
 	protocol      syncProtocol
 	isBeaconShard bool
 	logProgress   bool
+	logger        zerolog.Logger
 }
 
 func NewStageReceipts(cfg StageReceiptsCfg) *StageReceipts {
@@ -36,7 +37,7 @@ func NewStageReceipts(cfg StageReceiptsCfg) *StageReceipts {
 	}
 }
 
-func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, logProgress bool) StageReceiptsCfg {
+func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, logger zerolog.Logger, logProgress bool) StageReceiptsCfg {
 	return StageReceiptsCfg{
 		bc:            bc,
 		db:            db,
@@ -44,7 +45,11 @@ func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, con
 		concurrency:   concurrency,
 		protocol:      protocol,
 		isBeaconShard: isBeaconShard,
-		logProgress:   logProgress,
+		logger: logger.With().
+			Str("stage", "StageReceipts").
+			Str("mode", "long range").
+			Logger(),
+		logProgress: logProgress,
 	}
 }
 
@@ -157,7 +162,7 @@ func (r *StageReceipts) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		wg.Wait()
 		// insert all downloaded blocks and receipts to chain
 		if err := r.insertBlocksAndReceipts(ctx, rdm, toBn, s); err != nil {
-			utils.Logger().Err(err).Msg(WrapStagedSyncMsg("InsertReceiptChain failed"))
+			r.configs.logger.Err(err).Msg(WrapStagedSyncMsg("InsertReceiptChain failed"))
 		}
 	}
 
@@ -194,7 +199,7 @@ func (r *StageReceipts) insertBlocksAndReceipts(ctx context.Context, rdm *receip
 	}
 	// insert sorted blocks and receipts to chain
 	if inserted, err := r.configs.bc.InsertReceiptChain(blocks, receipts); err != nil {
-		utils.Logger().Err(err).
+		r.configs.logger.Err(err).
 			Interface("streams", streamIDs).
 			Interface("block numbers", bns).
 			Msg(WrapStagedSyncMsg("InsertReceiptChain failed"))
@@ -202,7 +207,7 @@ func (r *StageReceipts) insertBlocksAndReceipts(ctx context.Context, rdm *receip
 		return fmt.Errorf("InsertReceiptChain failed: %s", err.Error())
 	} else {
 		if inserted != len(blocks) {
-			utils.Logger().Warn().
+			r.configs.logger.Warn().
 				Interface("block numbers", bns).
 				Int("inserted", inserted).
 				Int("blocks to insert", len(blocks)).
@@ -243,19 +248,19 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 
 		for _, bn := range batch {
 			blkKey := marshalData(bn)
-			loopID, _, errBDD := gbm.GetDownloadDetails(bn)
+			workerID, _, errBDD := gbm.GetDownloadDetails(bn)
 			if errBDD != nil {
-				utils.Logger().Warn().
+				r.configs.logger.Warn().
 					Err(errBDD).
 					Interface("block numbers", bn).
 					Msg(WrapStagedSyncMsg("get block download details failed"))
 				return
 			}
-			blockBytes, err := txs[loopID].GetOne(BlocksBucket, blkKey)
+			blockBytes, err := txs[workerID].GetOne(BlocksBucket, blkKey)
 			if err != nil {
 				return
 			}
-			sigBytes, err := txs[loopID].GetOne(BlockSignaturesBucket, blkKey)
+			sigBytes, err := txs[workerID].GetOne(BlockSignaturesBucket, blkKey)
 			if err != nil {
 				return
 			}
@@ -288,7 +293,7 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				r.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
 			}
-			utils.Logger().Error().
+			r.configs.logger.Error().
 				Err(err).
 				Str("stream", string(stid)).
 				Interface("block numbers", batch).
@@ -348,7 +353,7 @@ func (r *StageReceipts) saveProgress(ctx context.Context, s *StageState, progres
 
 	// save progress
 	if err = s.Update(tx, progress); err != nil {
-		utils.Logger().Error().
+		r.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] saving progress for receipt stage failed")
 		return ErrSavingBodiesProgressFail

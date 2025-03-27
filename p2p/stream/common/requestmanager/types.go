@@ -15,6 +15,10 @@ var (
 
 	// ErrClosed is request error that the module is closed during request
 	ErrClosed = errors.New("request manager module closed")
+
+	// ErrNoAvailableStream indicates that a request cannot be processed
+	// because there are no active streams available.
+	ErrNoAvailableStream = errors.New("no available stream")
 )
 
 // stream is the wrapped version of sttypes.Stream.

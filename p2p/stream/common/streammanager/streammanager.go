@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -26,6 +25,8 @@ var (
 	ErrStreamAlreadyExist = errors.New("stream already exist")
 	// ErrTooManyStreams is the error that the number of streams is exceeded the capacity
 	ErrTooManyStreams = errors.New("too many streams")
+	// ErrStreamRemovalNotExpired is the error that the stream was removed before and can't be added yet
+	ErrStreamRemovalNotExpired = errors.New("stream removal not expired yet")
 )
 
 // streamManager is the implementation of StreamManager. It manages streams on
@@ -44,6 +45,8 @@ type streamManager struct {
 	// Note that it could happen that remote node does not share exactly the same
 	// protocol ID (e.g. different version)
 	streams *streamSet
+	// tracks removed streams with cooldown
+	removedStreams *sttypes.SafeMap[sttypes.StreamID, *RemovalInfo]
 	// reserved streams
 	reservedStreams *streamSet
 	// libp2p utilities
@@ -66,6 +69,35 @@ type streamManager struct {
 	cancel           func()
 }
 
+type RemovalInfo struct {
+	count     uint64
+	removedAt time.Time
+	expireAt  time.Time
+}
+
+// MarkAsRemoved resets the removal time and increments the removal count.
+func (rm *RemovalInfo) MarkAsRemoved() {
+	now := time.Now()
+	rm.removedAt = now
+	rm.expireAt = now.Add(RemovalCooldownDuration * time.Minute)
+	rm.count++
+}
+
+// RemovedAt returns the timestamp when the stream was removed.
+func (rm *RemovalInfo) RemovedAt() time.Time {
+	return rm.removedAt
+}
+
+// HasExpired checks if the cooldown period has passed, allowing the stream to reconnect.
+func (rm *RemovalInfo) HasExpired() bool {
+	return time.Now().After(rm.expireAt)
+}
+
+// IncrementRemovalCount increases the removal count.
+func (rm *RemovalInfo) IncrementRemovalCount() {
+	rm.count++
+}
+
 // NewStreamManager creates a new stream manager for the given proto ID
 func NewStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStream func(network.Stream), c Config) StreamManager {
 	return newStreamManager(pid, host, pf, handleStream, c)
@@ -80,18 +112,13 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
 
-	// if it is a beacon node or shard node, print the peer id and proto id
-	if protoSpec.IsBeaconValidator || protoSpec.ShardID != shard.BeaconChainShardID {
-		fmt.Println("My peer id: ", host.ID().String())
-		fmt.Println("My proto id: ", pid)
-	}
-
 	return &streamManager{
 		myProtoID:       pid,
 		myProtoSpec:     protoSpec,
 		config:          c,
 		streams:         newStreamSet(),
 		reservedStreams: newStreamSet(),
+		removedStreams:  sttypes.NewSafeMap[sttypes.StreamID, *RemovalInfo](),
 		host:            host,
 		pf:              pf,
 		handleStream:    handleStream,
@@ -185,6 +212,7 @@ func (sm *streamManager) loop() {
 // NewStream handles a new stream from stream handler protocol
 func (sm *streamManager) NewStream(stream sttypes.Stream) error {
 	if err := sm.sanityCheckStream(stream); err != nil {
+		stream.Close()
 		return errors.Wrap(err, "stream sanity check failed")
 	}
 	task := addStreamTask{
@@ -271,12 +299,23 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	if _, ok := sm.streams.get(id); ok {
 		return ErrStreamAlreadyExist
 	}
+	// Check if stream was recently removed
+	if removalInfo, exists := sm.removedStreams.Get(id); exists {
+		if !removalInfo.HasExpired() {
+			return ErrStreamRemovalNotExpired
+		}
+	}
 
 	// If the stream list has sufficient capacity, the stream can be added to the reserved list
 	if sm.streams.size() >= sm.config.HiCap {
 		if sm.reservedStreams.size() < MaxReservedStreams {
 			if _, ok := sm.reservedStreams.get(id); !ok {
 				sm.reservedStreams.addStream(st)
+				sm.logger.Info().
+					Int("NumStreams", sm.streams.size()).
+					Int("NumReservedStreams", sm.reservedStreams.size()).
+					Interface("StreamID", id).
+					Msg("[StreamManager] added new stream to reserved list")
 			}
 			return nil
 		}
@@ -284,6 +323,10 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	}
 
 	sm.streams.addStream(st)
+	sm.logger.Info().
+		Int("NumStreams", sm.streams.size()).
+		Interface("StreamID", id).
+		Msg("[StreamManager] added new stream to main streams list")
 
 	sm.addStreamFeed.Send(EvtStreamAdded{st})
 	addedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
@@ -302,6 +345,13 @@ func (sm *streamManager) addStreamFromReserved(count int) (int, error) {
 			return added, err
 		}
 		sm.streams.addStream(st)
+		sm.logger.Info().
+			Int("NumStreams", sm.streams.size()).
+			Interface("StreamID", st.ID()).
+			Msg("[StreamManager] added new stream from reserved streams list")
+		sm.addStreamFeed.Send(EvtStreamAdded{st})
+		addedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+		numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
 		added++
 	}
 	return added, nil
@@ -312,11 +362,31 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
 	if !ok {
 		return ErrStreamAlreadyRemoved
 	}
-
 	sm.streams.deleteStream(st)
 
+	info, exist := sm.removedStreams.Get(id)
+	if !exist {
+		info = &RemovalInfo{
+			count: 0,
+		}
+		sm.removedStreams.Set(id, info)
+	}
+	info.MarkAsRemoved()
+
 	// try to replace removed streams from reserved list
+	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
+	removedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
+
+	sm.tryToReplaceRemovedStream()
+
+	return nil
+}
+
+func (sm *streamManager) tryToReplaceRemovedStream() error {
+	// try to replace removed streams from the reserved list.
 	requiredStreams := sm.hardRequiredStreams()
+
 	if added, err := sm.addStreamFromReserved(requiredStreams); added > 0 {
 		sm.logger.Info().
 			Err(err). // in case if some new streams added and others failed
@@ -333,9 +403,6 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
 		}
 	}
 
-	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
-	removedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
-	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
 	return nil
 }
 
@@ -402,11 +469,15 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrInfo, error) {
 	numStreams := sm.streams.size()
 
-	protoID := sm.targetProtoID()
 	discBatch := sm.config.DiscBatch
 	if sm.config.HiCap-numStreams < sm.config.DiscBatch {
 		discBatch = sm.config.HiCap - numStreams
 	}
+	sm.logger.Debug().
+		Interface("protoID", sm.myProtoID).
+		Int("numStreams", numStreams).
+		Int("discBatch", discBatch).
+		Msg("[StreamManager] discovering")
 	if discBatch < 0 {
 		return nil, nil
 	}
@@ -416,15 +487,7 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 		<-time.After(discTimeout)
 		cancel()
 	}()
-	return sm.pf.FindPeers(ctx2, protoID, discBatch)
-}
-
-func (sm *streamManager) targetProtoID() string {
-	targetSpec := sm.myProtoSpec
-	if targetSpec.ShardID == shard.BeaconChainShardID { // for beacon chain, only connect to beacon nodes
-		targetSpec.IsBeaconValidator = true
-	}
-	return string(targetSpec.ToProtoID())
+	return sm.pf.FindPeers(ctx2, string(sm.myProtoID), discBatch)
 }
 
 func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_peer.ID) error {
@@ -434,7 +497,7 @@ func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_pee
 	nCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 
-	st, err := sm.host.NewStream(nCtx, pid, protocol.ID(sm.targetProtoID()))
+	st, err := sm.host.NewStream(nCtx, pid, protocol.ID(sm.myProtoID))
 	if err != nil {
 		return err
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/rs/zerolog"
@@ -232,7 +231,7 @@ func (s *StateDownloadManager) updateStats(written, duplicate, unexpected int, d
 
 	// for now, we just jog current stats
 	if written > 0 || duplicate > 0 || unexpected > 0 {
-		utils.Logger().Info().
+		s.logger.Info().
 			Int("count", written).
 			Int("duplicate", duplicate).
 			Int("unexpected", unexpected).
@@ -320,7 +319,7 @@ func (s *StateDownloadManager) HandleRequestError(codeHashes []common.Hash, trie
 }
 
 // HandleRequestResult handles get trie paths and code hashes result
-func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, triePaths []string, response [][]byte, loopID int, streamID sttypes.StreamID) error {
+func (s *StateDownloadManager) HandleRequestResult(codeHashes []common.Hash, triePaths []string, response [][]byte, workerID int, streamID sttypes.StreamID) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

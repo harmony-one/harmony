@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
 
@@ -48,7 +47,10 @@ func NewStageFullStateSyncCfg(bc core.BlockChain,
 		db:          db,
 		concurrency: concurrency,
 		protocol:    protocol,
-		logger:      logger,
+		logger: logger.With().
+			Str("stage", "StageFullStateSync").
+			Str("mode", "long range").
+			Logger(),
 		logProgress: logProgress,
 	}
 }
@@ -178,7 +180,7 @@ func (sss *StageFullStateSync) Exec(ctx context.Context, bool, invalidBlockRever
 }
 
 // runStateWorkerLoop creates a work loop for download states
-func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *FullStateDownloadManager, wg *sync.WaitGroup, loopID int, startTime time.Time, s *StageState) {
+func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *FullStateDownloadManager, wg *sync.WaitGroup, workerID int, startTime time.Time, s *StageState) {
 
 	defer wg.Done()
 
@@ -190,7 +192,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 		}
 		accountTasks, codes, storages, healtask, codetask, nTasks, err := sdm.GetNextBatch()
 		if nTasks == 0 {
-			utils.Logger().Debug().Msg("the state worker loop received no more tasks")
+			sss.configs.logger.Debug().Msg("the state worker loop received no more tasks")
 			return
 		}
 		if err != nil {
@@ -214,7 +216,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 					sss.configs.protocol.StreamFailed(stid, "GetAccountRange failed")
 				}
-				utils.Logger().Error().
+				sss.configs.logger.Error().
 					Err(err).
 					Str("stream", string(stid)).
 					Msg(WrapStagedSyncMsg("GetAccountRange failed"))
@@ -222,15 +224,15 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 				return
 			} else if retAccounts == nil || len(retAccounts) == 0 {
-				utils.Logger().Warn().
+				sss.configs.logger.Warn().
 					Str("stream", string(stid)).
 					Msg(WrapStagedSyncMsg("GetAccountRange failed, received empty accounts"))
 				//err := errors.New("GetAccountRange received empty slots")
 				//sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 				return
 			}
-			if err := sdm.HandleAccountRequestResult(task, retAccounts, proof, origin[:], limit[:], loopID, stid); err != nil {
-				utils.Logger().Error().
+			if err := sdm.HandleAccountRequestResult(task, retAccounts, proof, origin[:], limit[:], workerID, stid); err != nil {
+				sss.configs.logger.Error().
 					Err(err).
 					Str("stream", string(stid)).
 					Msg(WrapStagedSyncMsg("GetAccountRange handle result failed"))
@@ -241,12 +243,12 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 
 		} else if codes != nil && len(codes) > 0 {
 
-			stid, err := sss.downloadByteCodes(ctx, sdm, codes, loopID)
+			stid, err := sss.downloadByteCodes(ctx, sdm, codes, workerID)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 					sss.configs.protocol.StreamFailed(stid, "downloadByteCodes failed")
 				}
-				utils.Logger().Error().
+				sss.configs.logger.Error().
 					Err(err).
 					Str("stream", string(stid)).
 					Msg(WrapStagedSyncMsg("downloadByteCodes failed"))
@@ -271,7 +273,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 					sss.configs.protocol.StreamFailed(stid, "GetStorageRanges failed")
 				}
-				utils.Logger().Error().
+				sss.configs.logger.Error().
 					Err(err).
 					Str("stream", string(stid)).
 					Msg(WrapStagedSyncMsg("GetStorageRanges failed"))
@@ -279,15 +281,15 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 				return
 			} else if slots == nil || len(slots) == 0 {
-				utils.Logger().Warn().
+				sss.configs.logger.Warn().
 					Str("stream", string(stid)).
 					Msg(WrapStagedSyncMsg("GetStorageRanges failed, received empty slots"))
 				err := errors.New("GetStorageRanges received empty slots")
 				sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 				return
 			}
-			if err := sdm.HandleStorageRequestResult(mainTask, subTask, accounts, roots, origin, limit, slots, proof, loopID, stid); err != nil {
-				utils.Logger().Error().
+			if err := sdm.HandleStorageRequestResult(mainTask, subTask, accounts, roots, origin, limit, slots, proof, workerID, stid); err != nil {
+				sss.configs.logger.Error().
 					Err(err).
 					Str("stream", string(stid)).
 					Msg(WrapStagedSyncMsg("GetStorageRanges handle result failed"))
@@ -311,7 +313,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 						sss.configs.protocol.StreamFailed(stid, "GetTrieNodes failed")
 					}
-					utils.Logger().Error().
+					sss.configs.logger.Error().
 						Err(err).
 						Str("stream", string(stid)).
 						Msg(WrapStagedSyncMsg("GetTrieNodes failed"))
@@ -319,15 +321,15 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 					return
 				} else if nodes == nil || len(nodes) == 0 {
-					utils.Logger().Warn().
+					sss.configs.logger.Warn().
 						Str("stream", string(stid)).
 						Msg(WrapStagedSyncMsg("GetTrieNodes failed, received empty nodes"))
 					err := errors.New("GetTrieNodes received empty nodes")
 					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 					return
 				}
-				if err := sdm.HandleTrieNodeHealRequestResult(task, paths, hashes, nodes, loopID, stid); err != nil {
-					utils.Logger().Error().
+				if err := sdm.HandleTrieNodeHealRequestResult(task, paths, hashes, nodes, workerID, stid); err != nil {
+					sss.configs.logger.Error().
 						Err(err).
 						Str("stream", string(stid)).
 						Msg(WrapStagedSyncMsg("GetTrieNodes handle result failed"))
@@ -346,7 +348,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 						sss.configs.protocol.StreamFailed(stid, "GetByteCodes failed")
 					}
-					utils.Logger().Error().
+					sss.configs.logger.Error().
 						Err(err).
 						Str("stream", string(stid)).
 						Msg(WrapStagedSyncMsg("GetByteCodes failed"))
@@ -354,15 +356,15 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 					return
 				} else if retCodes == nil || len(retCodes) == 0 {
-					utils.Logger().Warn().
+					sss.configs.logger.Warn().
 						Str("stream", string(stid)).
 						Msg(WrapStagedSyncMsg("GetByteCodes failed, received empty codes"))
 					err := errors.New("GetByteCodes received empty codes")
 					sdm.HandleRequestError(accountTasks, codes, storages, healtask, codetask, stid, err)
 					return
 				}
-				if err := sdm.HandleBytecodeRequestResult(task, hashes, retCodes, loopID, stid); err != nil {
-					utils.Logger().Error().
+				if err := sdm.HandleBytecodeRequestResult(task, hashes, retCodes, workerID, stid); err != nil {
+					sss.configs.logger.Error().
 						Err(err).
 						Str("stream", string(stid)).
 						Msg(WrapStagedSyncMsg("GetByteCodes handle result failed"))
@@ -375,7 +377,7 @@ func (sss *StageFullStateSync) runStateWorkerLoop(ctx context.Context, sdm *Full
 	}
 }
 
-func (sss *StageFullStateSync) downloadByteCodes(ctx context.Context, sdm *FullStateDownloadManager, codeTasks []*byteCodeTasksBundle, loopID int) (stid sttypes.StreamID, err error) {
+func (sss *StageFullStateSync) downloadByteCodes(ctx context.Context, sdm *FullStateDownloadManager, codeTasks []*byteCodeTasksBundle, workerID int) (stid sttypes.StreamID, err error) {
 	for _, codeTask := range codeTasks {
 		// try to get byte codes from remote peer
 		// if any of them failed, the stid will be the id of the failed stream
@@ -386,7 +388,7 @@ func (sss *StageFullStateSync) downloadByteCodes(ctx context.Context, sdm *FullS
 		if len(retCodes) == 0 {
 			return stid, errors.New("empty codes array")
 		}
-		if err = sdm.HandleBytecodeRequestResult(codeTask.task, codeTask.hashes, retCodes, loopID, stid); err != nil {
+		if err = sdm.HandleBytecodeRequestResult(codeTask.task, codeTask.hashes, retCodes, workerID, stid); err != nil {
 			return stid, err
 		}
 	}
@@ -439,7 +441,7 @@ func (stg *StageFullStateSync) saveProgress(s *StageState, tx kv.RwTx) (err erro
 
 	// save progress
 	if err = s.Update(tx, s.state.status.GetPivotBlockNumber()); err != nil {
-		utils.Logger().Error().
+		stg.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] saving progress for block States stage failed")
 		return ErrSaveStateProgressFail

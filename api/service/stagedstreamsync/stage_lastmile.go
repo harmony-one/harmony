@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/ledgerwatch/erigon-lib/kv"
+	"github.com/rs/zerolog"
 )
 
 type StageLastMile struct {
@@ -13,9 +14,10 @@ type StageLastMile struct {
 }
 
 type StageLastMileCfg struct {
-	ctx context.Context
-	bc  core.BlockChain
-	db  kv.RwDB
+	ctx    context.Context
+	bc     core.BlockChain
+	db     kv.RwDB
+	logger zerolog.Logger
 }
 
 func NewStageLastMile(cfg StageLastMileCfg) *StageLastMile {
@@ -24,11 +26,14 @@ func NewStageLastMile(cfg StageLastMileCfg) *StageLastMile {
 	}
 }
 
-func NewStageLastMileCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) StageLastMileCfg {
+func NewStageLastMileCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, logger zerolog.Logger) StageLastMileCfg {
 	return StageLastMileCfg{
 		ctx: ctx,
 		bc:  bc,
 		db:  db,
+		logger: logger.With().
+			Str("stage", "StageLastMile").
+			Logger(),
 	}
 }
 
