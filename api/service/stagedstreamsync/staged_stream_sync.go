@@ -65,8 +65,6 @@ type StagedStreamSync struct {
 	db                kv.RwDB
 	protocol          syncProtocol
 	gbm               *downloadManager // initialized when finished get block number
-	lastMileBlocks    []*types.Block   // last mile blocks to catch up with the consensus
-	lastMileMux       sync.Mutex
 	isEpochChain      bool
 	isBeaconValidator bool
 	isBeaconShard     bool
@@ -360,7 +358,6 @@ func New(
 		isExplorer:        isExplorer,
 		isValidator:       isValidator,
 		joinConsensus:     joinConsensus,
-		lastMileBlocks:    []*types.Block{},
 		gbm:               nil,
 		status:            status,
 		inserted:          0,
@@ -718,77 +715,6 @@ func (sss *StagedStreamSync) EnableStages(ids ...SyncStageID) {
 			sss.stages[i].Disabled = false
 		}
 	}
-}
-
-func (sss *StagedStreamSync) purgeLastMileBlocksFromCache() {
-	sss.lastMileMux.Lock()
-	sss.lastMileBlocks = nil
-	sss.lastMileMux.Unlock()
-}
-
-// AddLastMileBlock adds the latest a few block into queue for syncing
-// only keep the latest blocks with size capped by LastMileBlocksSize
-func (sss *StagedStreamSync) AddLastMileBlock(block *types.Block) {
-	sss.lastMileMux.Lock()
-	defer sss.lastMileMux.Unlock()
-	if sss.lastMileBlocks != nil {
-		if len(sss.lastMileBlocks) >= LastMileBlocksSize {
-			sss.lastMileBlocks = sss.lastMileBlocks[1:]
-		}
-		sss.lastMileBlocks = append(sss.lastMileBlocks, block)
-	}
-}
-
-func (sss *StagedStreamSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Hash) *types.Block {
-	sss.lastMileMux.Lock()
-	defer sss.lastMileMux.Unlock()
-	for _, block := range sss.lastMileBlocks {
-		ph := block.ParentHash()
-		if ph == parentHash {
-			return block
-		}
-	}
-	return nil
-}
-
-func (sss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) ([]common.Hash, error) {
-	curNumber := bc.CurrentBlock().NumberU64()
-	var hashes []common.Hash
-
-	err := cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
-		for {
-			block := blockIter.Next()
-			if block == nil {
-				break
-			}
-			_, err := bc.InsertChain(types.Blocks{block}, true)
-			switch {
-			case errors.Is(err, core.ErrKnownBlock):
-			case errors.Is(err, core.ErrNotLastBlockInEpoch):
-			case err != nil:
-				return errors.Wrap(err, "failed to InsertChain")
-			default:
-				hashes = append(hashes, block.Header().Hash())
-			}
-		}
-		return nil
-	})
-	return hashes, err
-}
-
-func (sss *StagedStreamSync) RollbackLastMileBlocks(ctx context.Context, hashes []common.Hash) error {
-	if len(hashes) == 0 {
-		return nil
-	}
-	sss.logger.Info().
-		Interface("block", sss.bc.CurrentBlock()).
-		Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
-	if err := sss.bc.Rollback(hashes); err != nil {
-		sss.logger.Error().Err(err).
-			Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
-		return err
-	}
-	return nil
 }
 
 // UpdateBlockAndStatus updates block and its status in db
