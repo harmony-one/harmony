@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
@@ -38,6 +39,8 @@ type request struct {
 	doneC   chan struct{}
 	// stream info
 	owner *stream // Current owner
+	// time out
+	timeout time.Time
 	// utils
 	lock sync.RWMutex
 	raw  *interface{}
@@ -64,7 +67,10 @@ func (req *request) SetReqID(val uint64) {
 func (req *request) doneWithResponse(resp responseData) {
 	notDone := atomic.CompareAndSwapUint32(&req.atmDone, 0, 1)
 	if notDone {
-		req.respC <- resp
+		select {
+		case req.respC <- resp:
+		default:
+		}
 		close(req.respC)
 		close(req.doneC)
 	}
