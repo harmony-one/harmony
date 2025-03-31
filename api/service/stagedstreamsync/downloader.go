@@ -358,6 +358,9 @@ func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
 			Bool("initSync", *initSync).
 			Msg(WrapStagedSyncMsg("sync loop failed"))
 
+		// Wait for enough available streams before retrying
+		d.waitForEnoughStreams(d.config.MinStreams)
+
 		// Retry sync after 5 seconds
 		go func() {
 			time.Sleep(5 * time.Second)
