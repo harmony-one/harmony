@@ -130,6 +130,7 @@ func (rm *requestManager) DeliverResponse(stID sttypes.StreamID, resp sttypes.Re
 	go func() {
 		select {
 		case rm.deliveryC <- sd:
+			return // Success
 		case <-time.After(deliverTimeout):
 			rm.logger.Error().Msg("WARNING: delivery timeout. Possible stuck in loop")
 		}
@@ -139,6 +140,16 @@ func (rm *requestManager) DeliverResponse(stID sttypes.StreamID, resp sttypes.Re
 func (rm *requestManager) monitorStreamHealth() {
 	now := time.Now()
 	streams := rm.streams.Keys()
+
+	// Check for expired pending requests
+	rm.pendings.Iterate(func(id uint64, req *request) {
+		if !req.timeout.IsZero() && now.After(req.timeout) {
+			rm.removePendingRequest(req)
+			req.doneWithResponse(responseData{
+				err: errors.New("request timeout"),
+			})
+		}
+	})
 
 	if len(streams) > 0 {
 		rm.lastActiveStreamTime = now
@@ -215,12 +226,18 @@ func (rm *requestManager) loop() {
 				if err != nil {
 					rm.logger.Warn().Str("request", req.String()).Err(err).
 						Msg("request encode error")
+					rm.removePendingRequest(req)
+					req.doneWithResponse(responseData{
+						err: errors.Wrap(err, "encode request"),
+					})
+					continue
 				}
 
 				go func() {
 					if err := st.WriteBytes(b); err != nil {
 						rm.logger.Warn().Str("streamID", string(st.ID())).Err(err).
 							Msg("write bytes")
+						rm.removePendingRequest(req)
 						req.doneWithResponse(responseData{
 							stID: st.ID(),
 							err:  errors.Wrap(err, "write bytes"),
@@ -358,6 +375,7 @@ func (rm *requestManager) addPendingRequest(req *request, st *stream) {
 	req.SetReqID(reqID)
 
 	req.owner = st
+	req.timeout = time.Now().Add(PendingRequestTimeout)
 	st.req = req
 
 	rm.available.Delete(st.ID())
@@ -438,7 +456,6 @@ func (rm *requestManager) addNewStream(st sttypes.Stream) {
 func (rm *requestManager) removeStream(st *stream) {
 	id := st.ID()
 	rm.available.Delete(id)
-	rm.streams.Delete(id)
 
 	cleared := st.clearPendingRequest()
 	if cleared != nil {
@@ -447,6 +464,7 @@ func (rm *requestManager) removeStream(st *stream) {
 			err:  errors.New("stream removed when doing request"),
 		})
 	}
+	rm.streams.Delete(id)
 }
 
 func (rm *requestManager) close() {
