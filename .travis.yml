@@ -7,6 +7,8 @@ go_import_path: github.com/harmony-one/harmony
 cache:
   directories:
     - docker_images
+    - $HOME/.cache/go-build
+    - $GOPATH/pkg/mod
 env:
   - TEST="make"
   - TEST="bash ./scripts/travis_go_checker.sh"
