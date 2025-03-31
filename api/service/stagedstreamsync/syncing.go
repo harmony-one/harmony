@@ -569,7 +569,6 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 	wg.Wait()
 	close(errChan) // Close the error channel when done
 
-
 	// Check if the context was canceled and return an error accordingly
 	select {
 	case <-ctx.Done():
