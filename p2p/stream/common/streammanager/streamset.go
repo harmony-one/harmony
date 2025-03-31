@@ -7,6 +7,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	// ErrNoAvailableStream indicates that a request cannot be processed
+	// because there are no active streams available.
+	ErrNoAvailableStream = errors.New("no available stream")
+)
+
 // streamSet is the concurrency safe stream set.
 type streamSet struct {
 	streams    map[sttypes.StreamID]sttypes.Stream
@@ -101,7 +107,7 @@ func (ss *streamSet) popStream() (sttypes.Stream, error) {
 	defer ss.lock.Unlock()
 
 	if len(ss.streams) == 0 {
-		return nil, errors.New("no available stream")
+		return nil, ErrNoAvailableStream
 	}
 	for id, stream := range ss.streams {
 		delete(ss.streams, id)
