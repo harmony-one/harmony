@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -144,71 +145,87 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	return nil
 }
 
-// runDownloadLoop fetches block hash batches and assigns them to workers dynamically
 func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *downloadManager, s *StageState, startBlockNumber uint64, startTime time.Time) {
-	var currentBlock uint64
-	currentBlock = startBlockNumber
+	currentBlock := startBlockNumber
 	concurrency := s.state.config.Concurrency
-	batchChan := make(chan blockTask, concurrency) // Channel for batches
-	var wg sync.WaitGroup
-	// Start worker pool
-	for i := 0; i < concurrency; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-			for batch := range batchChan { // Workers continuously pick up batches
-				if err := b.runBlockWorker(ctx, gbm, batch.bns, batch.hashes, workerID); err != nil {
-					continue
-				}
-			}
-		}(i)
+	if b.configs.protocol.NumStreams() < concurrency {
+		concurrency = b.configs.protocol.NumStreams()
 	}
 
+	// Use unbuffered channel for perfect worker synchronization
+	taskChan := make(chan blockTask)
+	var wg sync.WaitGroup
+	activeWorkers := int32(concurrency)
+
+	// Worker function
+	worker := func(workerID int) {
+		defer wg.Done()
+		defer atomic.AddInt32(&activeWorkers, -1)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case task, ok := <-taskChan:
+				if !ok {
+					return
+				}
+				if err := b.runBlockWorker(ctx, gbm, task.bns, task.hashes, workerID); err != nil {
+					continue // gbm handles retries
+				}
+			}
+		}
+	}
+
+	// Start workers
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go worker(i)
+	}
+
+	// Cleanup
 	defer func() {
-		// select {
-		// case <-ctx.Done():
-		// 	return
-		// case <-time.After(100 * time.Millisecond):
-		// 	return
-		// }
-		close(batchChan) // Close channel after all batches are sent
-		wg.Wait()        // Wait for all workers to complete
+		close(taskChan)
+		wg.Wait()
 	}()
 
-	// Fetch and send batches to workers
-	for {
+	// Dispatcher loop
+	for atomic.LoadInt32(&activeWorkers) > 0 {
+		// Check context cancellation
 		select {
 		case <-ctx.Done():
 			return
 		default:
 		}
 
+		// Get next batch
 		batch := gbm.GetNextBatch()
-		if len(batch) == 0 { // No more batches to process
-			return
+		if len(batch) == 0 {
+			// No more work - check if workers are done
+			if atomic.LoadInt32(&activeWorkers) == 0 {
+				return
+			}
+			// Wait briefly in case workers fail and re-add tasks
+			select {
+			case <-time.After(100 * time.Millisecond):
+			case <-ctx.Done():
+				return
+			}
+			continue
 		}
 
+		// Prepare task
 		hashes, err := b.fetchBlockHashes(ctx, tx, batch)
 		if err != nil {
-			utils.Logger().Error().
-				Err(err).
-				Interface("block numbers", batch).
-				Msg(WrapStagedSyncMsg("fetchBlockHashes failed"))
-			panic(ErrReadBlockHashesFromDBFailed)
+			panic(fmt.Errorf("fetchBlockHashes failed: %w", err))
 		}
 
-		if len(batch) != len(hashes) {
-			utils.Logger().Error().
-				Interface("block numbers", batch).
-				Msg(WrapStagedSyncMsg("fetchBlockHashes failed: some hashes failed to retrieve"))
-			panic(ErrReadBlockHashesFromDBFailed)
+		// Send to worker (blocks until worker is available)
+		select {
+		case taskChan <- blockTask{bns: batch, hashes: hashes}:
+		case <-ctx.Done():
+			return
 		}
-
-		blockTask := blockTask{
-			bns:    batch,
-			hashes: hashes,
-		}
-		batchChan <- blockTask // Send batch to an available worker
 
 		// Logging progress
 		if b.configs.logProgress {
