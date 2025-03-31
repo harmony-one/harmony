@@ -176,6 +176,7 @@ func (bh *StageBlockHashes) downloadBlockHashes(ctx context.Context, bns []uint6
 			Int("received size", len(hashes)).
 			Interface("stid", stid).
 			Msg("[StageBlockHashes] received less hashes than requested, target stream is not synced!")
+		bh.configs.protocol.RemoveStream(stid)
 		return []common.Hash{}, stid, errors.New("not synced stream")
 	}
 	return hashes, stid, err
