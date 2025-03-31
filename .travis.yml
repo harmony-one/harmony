@@ -13,6 +13,12 @@ env:
   - TEST="bash ./scripts/travis_rpc_checker.sh"
   - TEST="bash ./scripts/travis_rosetta_checker.sh"
 
+# We enable Travis on the main/dev branches or forked repositories here.
+# PRs workflow isn't affected by this condition
+if: >
+  repo != harmony-one/harmony OR
+  (repo = harmony-one/harmony AND (branch = main OR branch = dev))
+
 # upgrade docker to latest stable version
 before_install:
   - echo "deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
