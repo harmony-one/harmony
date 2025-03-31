@@ -546,9 +546,12 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 
 	// Create a channel to propagate errors back if needed.
 	errChan := make(chan error, s.config.Concurrency)
-	wg.Add(s.config.Concurrency)
 
-	for i := 0; i != s.config.Concurrency; i++ {
+	numStreams := s.protocol.NumStreams()
+	wg.Add(numStreams)
+
+	// ask all streams for height
+	for i := 0; i != numStreams; i++ {
 		go func() {
 			defer wg.Done()
 
@@ -563,9 +566,6 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 				} else {
 					s.protocol.RemoveStream(stid)
 				}
-
-				// Propagate the error for external handling
-				errChan <- err
 				return
 			}
 
@@ -580,13 +580,6 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 	wg.Wait()
 	close(errChan) // Close the error channel when done
 
-	// Check if there were any errors
-	for err := range errChan {
-		// If there were errors other than context cancellation, propagate the first one.
-		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			return 0, err
-		}
-	}
 
 	// Check if the context was canceled and return an error accordingly
 	select {
