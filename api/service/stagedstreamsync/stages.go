@@ -17,7 +17,6 @@ const (
 	StateSync     SyncStageID = "StateSync"     // State sync
 	FullStateSync SyncStageID = "FullStateSync" // Full State Sync
 	Receipts      SyncStageID = "Receipts"      // Receipts
-	LastMile      SyncStageID = "LastMile"      // update blocks after sync and update last mile blocks as well
 	Finish        SyncStageID = "Finish"        // Nominal stage after all other stages
 )
 
