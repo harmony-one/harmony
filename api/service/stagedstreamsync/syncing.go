@@ -118,7 +118,6 @@ func CreateStagedSync(ctx context.Context,
 	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageFullStateSyncCfg := NewStageFullStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, logger, config.LogProgress)
-	lastMileCfg := NewStageLastMileCfg(ctx, bc, mainDB, logger)
 	stageFinishCfg := NewStageFinishCfg(mainDB, logger)
 
 	// init stages order based on sync mode
@@ -134,7 +133,6 @@ func CreateStagedSync(ctx context.Context,
 		stageFullStateSyncCfg,
 		stageStatesCfg,
 		stageReceiptsCfg,
-		lastMileCfg,
 		stageFinishCfg,
 	)
 
@@ -410,21 +408,12 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	}
 
 	if s.consensus != nil {
-		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
-			s.logger.Error().Err(err).
-				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
-			s.RollbackLastMileBlocks(downloaderContext, hashes)
-			return estimatedHeight, totalInserted, err
-		} else {
-			totalInserted += len(hashes)
-		}
 		// TODO: move this to explorer handler code.
 		if s.isExplorer {
 			s.consensus.UpdateConsensusInformation("stream sync is explorer")
 		}
-		s.purgeLastMileBlocksFromCache()
 
-		if totalInserted > 0 && !s.isEpochChain {
+		if initSync && totalInserted > 0 && !s.isEpochChain {
 			s.consensus.BlocksSynchronized("StagedStreamSync block synchronized")
 		}
 	}

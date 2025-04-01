@@ -33,13 +33,11 @@ func initFullSyncStagesOrder() {
 		BlockHashes,
 		BlockBodies,
 		States,
-		LastMile,
 		Finish,
 	}
 
 	StagesRevertOrder = RevertOrder{
 		Finish,
-		LastMile,
 		States,
 		BlockBodies,
 		BlockHashes,
@@ -50,7 +48,6 @@ func initFullSyncStagesOrder() {
 
 	StagesCleanUpOrder = CleanUpOrder{
 		Finish,
-		LastMile,
 		States,
 		BlockBodies,
 		BlockHashes,
@@ -69,13 +66,11 @@ func initFastSyncStagesOrder() {
 		Receipts,
 		FullStateSync,
 		States,
-		LastMile,
 		Finish,
 	}
 
 	StagesRevertOrder = RevertOrder{
 		Finish,
-		LastMile,
 		States,
 		FullStateSync,
 		Receipts,
@@ -87,7 +82,6 @@ func initFastSyncStagesOrder() {
 
 	StagesCleanUpOrder = CleanUpOrder{
 		Finish,
-		LastMile,
 		States,
 		FullStateSync,
 		Receipts,
@@ -108,7 +102,6 @@ func DefaultStages(ctx context.Context,
 	fullStateSyncCfg StageFullStateSyncCfg,
 	statesCfg StageStatesCfg,
 	receiptsCfg StageReceiptsCfg,
-	lastMileCfg StageLastMileCfg,
 	finishCfg StageFinishCfg,
 ) []*Stage {
 
@@ -121,7 +114,6 @@ func DefaultStages(ctx context.Context,
 	handlerStageStateSync := NewStageStateSync(stateSyncCfg)
 	handlerStageFullStateSync := NewStageFullStateSync(fullStateSyncCfg)
 	handlerStageReceipts := NewStageReceipts(receiptsCfg)
-	handlerStageLastMile := NewStageLastMile(lastMileCfg)
 	handlerStageFinish := NewStageFinish(finishCfg)
 
 	return []*Stage{
@@ -186,13 +178,6 @@ func DefaultStages(ctx context.Context,
 			Description:        "Retrieve Receipts",
 			Handler:            handlerStageReceipts,
 			RangeMode:          OnlyLongRange,
-			ChainExecutionMode: AllChainsExceptEpochChain,
-		},
-		{
-			ID:                 LastMile,
-			Description:        "update status for blocks after sync and update last mile blocks as well",
-			Handler:            handlerStageLastMile,
-			RangeMode:          LongRangeAndShortRange,
 			ChainExecutionMode: AllChainsExceptEpochChain,
 		},
 		{
