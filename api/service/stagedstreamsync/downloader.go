@@ -322,8 +322,8 @@ func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
 			distanceAfterSync := estimatedHeight - bnAfterSync
 
 			// Switch to short-range sync if both before and after sync distances are small.
-			if distanceBeforeSync <= uint64(LastMileBlocksThreshold) &&
-				distanceAfterSync <= uint64(LastMileBlocksThreshold) {
+			if distanceBeforeSync <= uint64(ShortRangeThreshold) &&
+				distanceAfterSync <= uint64(ShortRangeThreshold) {
 				*initSync = false
 			}
 		}
@@ -333,6 +333,9 @@ func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
 		d.waitForEnoughStreams(d.config.MinStreams)
 
 	default:
+		if d.NumPeers() < d.config.Concurrency {
+			d.waitForEnoughStreams(d.config.MinStreams)
+		}
 		// Handle unresolvable bad blocks
 		if d.stagedSyncInstance.invalidBlock.Active {
 			numTriedStreams := len(d.stagedSyncInstance.invalidBlock.StreamID)
