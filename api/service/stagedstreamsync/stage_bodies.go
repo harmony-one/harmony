@@ -228,12 +228,13 @@ func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *down
 	activeWorkers := int32(concurrency)
 	busyWorkers := int32(0)
 
-	handleTask := func(workerID int, task blockTask) {
+	handleTask := func(workerID int, task blockTask) error {
 		atomic.AddInt32(&busyWorkers, +1)
 		defer atomic.AddInt32(&busyWorkers, -1)
 		if err := b.runBlockWorker(ctx, gbm, task.bns, task.hashes, workerID, wl); err != nil {
-			return
+			return err
 		}
+		return nil
 	}
 
 	// Worker function
@@ -254,7 +255,9 @@ func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *down
 				if !ok {
 					return
 				}
-				handleTask(workerID, task)
+				if err := handleTask(workerID, task); err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -281,14 +284,15 @@ func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *down
 		default:
 		}
 
+		// check if workers are done
+		if atomic.LoadInt32(&activeWorkers) == 0 {
+			return
+		}
+
 		// Get next batch
 		batch := gbm.GetNextBatch()
 		if len(batch) == 0 {
 			noWorkCounter++
-			// No more work - check if workers are done
-			if atomic.LoadInt32(&activeWorkers) == 0 {
-				return
-			}
 			// No more work - check if all workers are available
 			if noWorkCounter >= 3 && atomic.LoadInt32(&busyWorkers) == 0 {
 				return
@@ -352,10 +356,26 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 		return errors.New("empty hashes")
 	}
 
-	blockBytes, sigBytes, stid, err := b.configs.protocol.GetRawBlocksByHashes(ctx, hashes, syncProto.WithWhitelist(wl))
+	var blockBytes, sigBytes [][]byte
+	var stid sttypes.StreamID
+	var err error
+
+	if len(wl) > 0 {
+		blockBytes, sigBytes, stid, err = b.configs.protocol.GetRawBlocksByHashes(ctx, hashes, syncProto.WithWhitelist(wl))
+	} else {
+		blockBytes, sigBytes, stid, err = b.configs.protocol.GetRawBlocksByHashes(ctx, hashes)
+	}
+
 	if err != nil {
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
+		}
+		// try with other streams
+		if len(wl) > 0 {
+			utils.Logger().Warn().
+				Interface("block numbers", bns).
+				Msg("downloadRawBlocks failed with whitelist, will try with other streams")
+			return b.runBlockWorker(ctx, gbm, bns, hashes, workerID, []sttypes.StreamID{})
 		}
 		utils.Logger().Error().
 			Err(err).
