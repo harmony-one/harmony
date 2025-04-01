@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	syncProto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
@@ -127,7 +128,17 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	// Fetch blocks from neighbors
 	s.state.gbm = newDownloadManager(b.configs.bc, currProgress, targetHeight, BlocksPerRequest, s.state.logger)
 
-	b.runDownloadLoop(ctx, tx, s.state.gbm, s, currProgress, startTime)
+	// Identify available valid streams
+	whitelistStreams, err := b.identifySyncedStreams(context.Background(), targetHeight)
+	if err != nil {
+		b.configs.logger.Error().
+			Err(err).
+			Uint64("targetHeight", targetHeight).
+			Msg(WrapStagedSyncMsg("identifying synced streams failed"))
+		return err
+	}
+
+	b.runDownloadLoop(ctx, tx, s.state.gbm, s, whitelistStreams, currProgress, startTime)
 
 	if err := b.saveProgress(ctx, s, targetHeight, tx); err != nil {
 		b.configs.logger.Error().
@@ -145,22 +156,95 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	return nil
 }
 
-func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *downloadManager, s *StageState, startBlockNumber uint64, startTime time.Time) {
+// IdentifySyncedStreams roughly find the synced streams.
+func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight uint64) (streams []sttypes.StreamID, err error) {
+	var (
+		synced = make(map[sttypes.StreamID]uint64)
+		lock   sync.Mutex
+		wg     sync.WaitGroup
+	)
+
+	numStreams := b.configs.protocol.NumStreams()
+	wg.Add(numStreams)
+
+	// ask all streams for height
+	for i := 0; i < numStreams; i++ {
+		go func() {
+			defer wg.Done()
+
+			bn, stid, err := b.configs.protocol.GetCurrentBlockNumber(ctx)
+			if err != nil {
+				b.configs.logger.Err(err).Str("streamID", string(stid)).
+					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
+
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					// Mark stream failure if it's not due to context cancelation or deadline
+					b.configs.protocol.StreamFailed(stid, "getCurrentNumber request failed")
+				} else {
+					b.configs.protocol.RemoveStream(stid)
+				}
+				return
+			}
+
+			if bn < targetHeight {
+				return
+			}
+
+			// Safely update the cnResults map
+			lock.Lock()
+			synced[stid] = bn
+			lock.Unlock()
+		}()
+	}
+
+	// Wait for all goroutines to finish
+	wg.Wait()
+
+	// If no valid block number results were received, return an error
+	if len(synced) == 0 {
+		return nil, ErrZeroBlockResponse
+	}
+
+	// Compute synced streams array
+	for st := range synced {
+		streams = append(streams, st)
+	}
+
+	return streams, nil
+}
+
+func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *downloadManager, s *StageState, wl []sttypes.StreamID, startBlockNumber uint64, startTime time.Time) {
 	currentBlock := startBlockNumber
 	concurrency := s.state.config.Concurrency
 	if b.configs.protocol.NumStreams() < concurrency {
 		concurrency = b.configs.protocol.NumStreams()
 	}
 
-	// Use unbuffered channel for perfect worker synchronization
 	taskChan := make(chan blockTask)
+	allWorkersDone := make(chan struct{})
+	var once sync.Once
+
 	var wg sync.WaitGroup
 	activeWorkers := int32(concurrency)
+	busyWorkers := int32(0)
+
+	handleTask := func(workerID int, task blockTask) {
+		atomic.AddInt32(&busyWorkers, +1)
+		defer atomic.AddInt32(&busyWorkers, -1)
+		if err := b.runBlockWorker(ctx, gbm, task.bns, task.hashes, workerID, wl); err != nil {
+			return
+		}
+	}
 
 	// Worker function
 	worker := func(workerID int) {
 		defer wg.Done()
-		defer atomic.AddInt32(&activeWorkers, -1)
+		defer func() {
+			atomic.AddInt32(&activeWorkers, -1)
+			if atomic.LoadInt32(&activeWorkers) == 0 {
+				once.Do(func() { close(allWorkersDone) }) // Ensure only one workers close all
+			}
+		}()
 
 		for {
 			select {
@@ -170,9 +254,7 @@ func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *down
 				if !ok {
 					return
 				}
-				if err := b.runBlockWorker(ctx, gbm, task.bns, task.hashes, workerID); err != nil {
-					continue // gbm handles retries
-				}
+				handleTask(workerID, task)
 			}
 		}
 	}
@@ -190,6 +272,7 @@ func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *down
 	}()
 
 	// Dispatcher loop
+	noWorkCounter := 0
 	for atomic.LoadInt32(&activeWorkers) > 0 {
 		// Check context cancellation
 		select {
@@ -201,18 +284,24 @@ func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *down
 		// Get next batch
 		batch := gbm.GetNextBatch()
 		if len(batch) == 0 {
+			noWorkCounter++
 			// No more work - check if workers are done
 			if atomic.LoadInt32(&activeWorkers) == 0 {
 				return
 			}
-			// Wait briefly in case workers fail and re-add tasks
+			// No more work - check if all workers are available
+			if noWorkCounter >= 3 && atomic.LoadInt32(&busyWorkers) == 0 {
+				return
+			}
+
 			select {
 			case <-time.After(100 * time.Millisecond):
+				continue
 			case <-ctx.Done():
 				return
 			}
-			continue
 		}
+		noWorkCounter = 0 // Reset counter if work is found
 
 		// Prepare task
 		hashes, err := b.fetchBlockHashes(ctx, tx, batch)
@@ -224,6 +313,8 @@ func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *down
 		select {
 		case taskChan <- blockTask{bns: batch, hashes: hashes}:
 		case <-ctx.Done():
+			return
+		case <-allWorkersDone:
 			return
 		}
 
@@ -254,13 +345,14 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 	gbm *downloadManager,
 	bns []uint64,
 	hashes []common.Hash,
-	workerID int) error {
+	workerID int,
+	wl []sttypes.StreamID) error {
 
 	if len(hashes) == 0 {
 		return errors.New("empty hashes")
 	}
 
-	blockBytes, sigBytes, stid, err := b.configs.protocol.GetRawBlocksByHashes(ctx, hashes)
+	blockBytes, sigBytes, stid, err := b.configs.protocol.GetRawBlocksByHashes(ctx, hashes, syncProto.WithWhitelist(wl))
 	if err != nil {
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
