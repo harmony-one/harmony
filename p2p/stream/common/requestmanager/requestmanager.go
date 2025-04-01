@@ -130,7 +130,6 @@ func (rm *requestManager) DeliverResponse(stID sttypes.StreamID, resp sttypes.Re
 	go func() {
 		select {
 		case rm.deliveryC <- sd:
-			return // Success
 		case <-time.After(deliverTimeout):
 			rm.logger.Error().Msg("WARNING: delivery timeout. Possible stuck in loop")
 		}
