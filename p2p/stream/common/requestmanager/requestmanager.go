@@ -156,7 +156,7 @@ func (rm *requestManager) monitorStreamHealth() {
 	}
 
 	// No streams left, check if timeout has passed
-	if now.Sub(rm.lastActiveStreamTime) <= StreamTimeoutThreshold {
+	if rm.lastActiveStreamTime.IsZero() || now.Sub(rm.lastActiveStreamTime) <= StreamTimeoutThreshold {
 		return
 	}
 
