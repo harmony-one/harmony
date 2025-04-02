@@ -63,7 +63,7 @@ help:
 	@echo "debug-restart-log - restart a docker compose Promtail->Loki->Grafana stack"
 	@echo "debug-delete-log - removes persistent volume for the Loki and host folder for it"
 	@echo "debug-multi-bls-multi-ext-node - start a localnet with multiple external nodes and multi-BLS configuration"
-	@echo "protofiles - generate Go code from protobuf files"
+	@echo "protofiles - generate Go code from protobuf files, dummy commit"
 
 libs:
 	make -C $(TOP)/mcl -j8
