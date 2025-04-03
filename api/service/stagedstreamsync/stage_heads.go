@@ -83,7 +83,7 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 			Uint64("currentHeight", currentHeight).
 			Uint64("maxPeersHeight", maxHeight).
 			Uint64("targetHeight", targetHeight).
-			Msgf(WrapStagedSyncMsg("current height is ahead of target height, target height is readjusted to max peers height"))
+			Msg(WrapStagedSyncMsg("current height is ahead of target height, target height is readjusted to max peers height"))
 		targetHeight = maxHeight
 	}
 
@@ -108,7 +108,7 @@ func (heads *StageHeads) Exec(ctx context.Context, firstCycle bool, invalidBlock
 	if err := s.Update(tx, targetHeight); err != nil {
 		heads.configs.logger.Error().
 			Err(err).
-			Msgf(WrapStagedSyncMsg("saving progress for headers stage failed"))
+			Msg(WrapStagedSyncMsg("saving progress for headers stage failed"))
 		return err
 	}
 

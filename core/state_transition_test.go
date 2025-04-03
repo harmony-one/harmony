@@ -79,9 +79,9 @@ func testApplyStakingMessage(test applyStakingMessageTest, t *testing.T) {
 		_, err := ApplyStakingMessage(vmenv, msg, gp)
 		if err != nil {
 			if test.expectedError == nil {
-				t.Errorf(fmt.Sprintf("Got error %v but expected none", err))
+				t.Error(fmt.Sprintf("Got error %v but expected none", err))
 			} else if test.expectedError.Error() != err.Error() {
-				t.Errorf(fmt.Sprintf("Got error %v, but expected %v", err, test.expectedError))
+				t.Error(fmt.Sprintf("Got error %v, but expected %v", err, test.expectedError))
 			}
 		}
 	})
