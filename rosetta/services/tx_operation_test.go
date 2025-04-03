@@ -177,12 +177,12 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	gasLimit := uint64(1e18)
 	senderKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	senderAddr := crypto.PubkeyToAddress(senderKey.PublicKey)
 	validatorKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	validatorAddr := crypto.PubkeyToAddress(validatorKey.PublicKey)
 	tx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
@@ -313,12 +313,12 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	gasLimit := uint64(1e18)
 	senderKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	senderAddr := crypto.PubkeyToAddress(senderKey.PublicKey)
 	validatorKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	validatorAddr := crypto.PubkeyToAddress(validatorKey.PublicKey)
 	tx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
@@ -394,7 +394,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	gasLimit := uint64(1e18)
 	senderKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	senderAddr := crypto.PubkeyToAddress(senderKey.PublicKey)
 	tx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
@@ -455,7 +455,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	gasLimit := uint64(1e18)
 	senderKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	senderAddr := crypto.PubkeyToAddress(senderKey.PublicKey)
 	tx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
@@ -932,7 +932,7 @@ func TestGetContractTransferNativeOperations(t *testing.T) {
 func TestGetContractCreationNativeOperations(t *testing.T) {
 	dummyContractKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	chainID := params.TestChainConfig.ChainID
 	signer := hmytypes.NewEIP155Signer(chainID)

@@ -256,3 +256,4 @@ debug-delete-log:
 	docker volume rm logs_aggregator_loki_data
 	@echo "[WARN] - it needs sudo to remove folder created with loki docker image user"
 	sudo rm -rf test/logs_aggregator/loki
+
