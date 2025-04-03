@@ -90,7 +90,7 @@ func VerifyAndCreateValidatorFromMsg(
 		return nil, errNegativeAmount
 	}
 	if stateDB.IsValidator(msg.ValidatorAddress) {
-		return nil, errors.Wrapf(
+		return nil, errors.Wrap(
 			errValidatorExist, common2.MustAddressToBech32(msg.ValidatorAddress),
 		)
 	}

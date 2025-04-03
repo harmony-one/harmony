@@ -40,11 +40,11 @@ func TestFormatTransactionIntegration(t *testing.T) {
 	gasUsed := uint64(1e5)
 	senderKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	receiverKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
 	testFormatStakingTransaction(t, gasLimit, gasUsed, senderKey, receiverKey)

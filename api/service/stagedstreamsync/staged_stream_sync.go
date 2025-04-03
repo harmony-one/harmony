@@ -225,7 +225,7 @@ func (sss *StagedStreamSync) RevertTo(revertPoint uint64, invalidBlockNumber uin
 		Interface("invalidBlockHash", invalidBlockHash).
 		Interface("invalidBlockStreamID", invalidBlockStreamID).
 		Uint64("revertPoint", revertPoint).
-		Msgf(WrapStagedSyncMsg("Reverting blocks"))
+		Msg(WrapStagedSyncMsg("Reverting blocks"))
 	sss.revertPoint = &revertPoint
 	if invalidBlockNumber > 0 || invalidBlockHash != (common.Hash{}) {
 		resetBadStreams := !sss.invalidBlock.Active
@@ -286,7 +286,7 @@ func (sss *StagedStreamSync) cleanUp(ctx context.Context, fromStage int, db kv.R
 		if err := sss.pruneStage(ctx, firstCycle, sss.pruningOrder[i], db, tx); err != nil {
 			sss.logger.Error().Err(err).
 				Interface("stage id", sss.pruningOrder[i].ID).
-				Msgf(WrapStagedSyncMsg("stage cleanup failed"))
+				Msg(WrapStagedSyncMsg("stage cleanup failed"))
 			panic(err)
 		}
 	}
@@ -431,7 +431,7 @@ func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, fi
 						sss.logger.Error().
 							Err(err).
 							Interface("stage id", sss.revertOrder[j].ID).
-							Msgf(WrapStagedSyncMsg("revert stage failed"))
+							Msg(WrapStagedSyncMsg("revert stage failed"))
 						return err
 					}
 				}
@@ -446,7 +446,7 @@ func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, fi
 
 		if stage.Disabled {
 			sss.logger.Trace().
-				Msgf(WrapStagedSyncMsg(fmt.Sprintf("%s disabled. %s", stage.ID, stage.DisabledDescription)))
+				Msg(WrapStagedSyncMsg(fmt.Sprintf("%s disabled. %s", stage.ID, stage.DisabledDescription)))
 
 			sss.NextStage()
 			continue
@@ -461,7 +461,7 @@ func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, fi
 			sss.logger.Error().
 				Err(err).
 				Interface("stage id", stage.ID).
-				Msgf(WrapStagedSyncMsg("stage failed"))
+				Msg(WrapStagedSyncMsg("stage failed"))
 			return err
 		}
 		sss.NextStage()
@@ -470,7 +470,7 @@ func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, fi
 	if err := sss.cleanUp(ctx, 0, db, tx, firstCycle); err != nil {
 		sss.logger.Error().
 			Err(err).
-			Msgf(WrapStagedSyncMsg("stages cleanup failed"))
+			Msg(WrapStagedSyncMsg("stages cleanup failed"))
 		return err
 	}
 	if err := sss.SetCurrentStage(sss.stages[0].ID); err != nil {
@@ -564,7 +564,7 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 	}
 	if len(logCtx) > 0 {
 		timingLog := fmt.Sprintf("Timings (slower than 50ms) %v", logCtx)
-		utils.Logger().Info().Msgf(WrapStagedSyncMsg(timingLog))
+		utils.Logger().Info().Msg(WrapStagedSyncMsg(timingLog))
 	}
 
 	if tx == nil {
@@ -582,7 +582,7 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 			bucketSizes = append(bucketSizes, bucket, ByteCount(sz))
 		}
 		utils.Logger().Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("Tables %v", bucketSizes...)))
+			Msg(WrapStagedSyncMsg(fmt.Sprintf("Tables %v", bucketSizes...)))
 	}
 	tx.CollectMetrics()
 	return nil
@@ -599,7 +599,7 @@ func (sss *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.R
 		sss.logger.Error().
 			Err(err).
 			Interface("stage id", stage.ID).
-			Msgf(WrapStagedSyncMsg("stage failed"))
+			Msg(WrapStagedSyncMsg("stage failed"))
 		return fmt.Errorf("[%s] %w", sss.LogPrefix(), err)
 	}
 
@@ -607,7 +607,7 @@ func (sss *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.R
 	if took > 60*time.Second {
 		logPrefix := sss.LogPrefix()
 		sss.logger.Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("%s:  DONE in %d", logPrefix, took)))
+			Msg(WrapStagedSyncMsg(fmt.Sprintf("%s:  DONE in %d", logPrefix, took)))
 
 	}
 	sss.timings = append(sss.timings, Timing{stage: stage.ID, took: took})
@@ -641,7 +641,7 @@ func (sss *StagedStreamSync) revertStage(ctx context.Context, firstCycle bool, s
 	if took > 60*time.Second {
 		logPrefix := sss.LogPrefix()
 		sss.logger.Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("%s: Revert done in %d", logPrefix, took)))
+			Msg(WrapStagedSyncMsg(fmt.Sprintf("%s: Revert done in %d", logPrefix, took)))
 	}
 	sss.timings = append(sss.timings, Timing{isRevert: true, stage: stage.ID, took: took})
 	return nil
@@ -673,7 +673,7 @@ func (sss *StagedStreamSync) pruneStage(ctx context.Context, firstCycle bool, st
 	if took > 60*time.Second {
 		logPrefix := sss.LogPrefix()
 		sss.logger.Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("%s: CleanUp done in %d", logPrefix, took)))
+			Msg(WrapStagedSyncMsg(fmt.Sprintf("%s: CleanUp done in %d", logPrefix, took)))
 	}
 	sss.timings = append(sss.timings, Timing{isCleanUp: true, stage: stage.ID, took: took})
 	return nil

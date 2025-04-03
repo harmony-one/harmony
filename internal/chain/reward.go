@@ -192,7 +192,7 @@ func accumulateRewardsAndCountSigsBeforeStaking(
 			Int64("block-reward", stakingReward.PreStakedBlocks.Int64()).
 			Int64("total-amount-paid-out", totalAmount.Int64()).
 			Msg("Total paid out was not equal to block-reward")
-		return numeric.ZeroDec(), nil, errors.Wrapf(
+		return numeric.ZeroDec(), nil, errors.Wrap(
 			network.ErrPayoutNotEqualBlockReward, "payout "+totalAmount.String(),
 		)
 	}

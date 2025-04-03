@@ -70,7 +70,7 @@ func TestUnpackWrappedTransactionFromString(t *testing.T) {
 	// Test staking transactions
 	receiverKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	stx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
 		return stakingTypes.DirectiveDelegate, stakingTypes.Delegate{
