@@ -1,4 +1,4 @@
-package sttypes
+package types
 
 import (
 	"sync"
