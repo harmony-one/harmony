@@ -3,7 +3,7 @@ package requestmanager
 import (
 	"context"
 	"fmt"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -42,7 +42,8 @@ type requestManager struct {
 	subs   []event.Subscription
 	logger zerolog.Logger
 	stopC  chan struct{}
-	lock   sync.Mutex
+
+	isCheckingExpiry atomic.Bool
 }
 
 // NewRequestManager creates a new request manager
@@ -105,7 +106,17 @@ func (rm *requestManager) doRequestAsync(ctx context.Context, raw sttypes.Reques
 	for _, opt := range options {
 		opt(req)
 	}
-	rm.newRequestC <- req
+	select {
+	case rm.newRequestC <- req:
+	case <-ctx.Done():
+		ch := make(chan responseData, 1)
+		ch <- responseData{err: ctx.Err()}
+		return ch
+	default:
+		ch := make(chan responseData, 1)
+		ch <- responseData{err: errors.New("too many requests")}
+		return ch
+	}
 
 	go func() {
 		select {
@@ -136,19 +147,29 @@ func (rm *requestManager) DeliverResponse(stID sttypes.StreamID, resp sttypes.Re
 	}()
 }
 
-func (rm *requestManager) monitorStreamHealth() {
-	now := time.Now()
-	streams := rm.streams.Keys()
+func (rm *requestManager) checkRequestsExpiry(now time.Time) {
+	rm.isCheckingExpiry.Store(true)
+	defer rm.isCheckingExpiry.Store(false)
 
-	// Check for expired pending requests
 	rm.pendings.Iterate(func(id uint64, req *request) {
 		if !req.timeout.IsZero() && now.After(req.timeout) {
 			rm.removePendingRequest(req)
 			req.doneWithResponse(responseData{
 				err: errors.New("request timeout"),
 			})
+			rm.removePendingRequest(req)
 		}
 	})
+}
+
+func (rm *requestManager) monitorStreamHealth() {
+	now := time.Now()
+	streams := rm.streams.Keys()
+
+	// Check for expired pending requests
+	if !rm.isCheckingExpiry.Load() && rm.pendings.Length() > 0 {
+		go rm.checkRequestsExpiry(now)
+	}
 
 	if len(streams) > 0 {
 		rm.lastActiveStreamTime = now
@@ -196,6 +217,7 @@ func (rm *requestManager) loop() {
 		monitorTicker = time.NewTicker(StreamMonitorInterval)
 	)
 	defer ticker.Stop()
+	defer monitorTicker.Stop()
 	throttle := func() {
 		select {
 		case throttleC <- struct{}{}:
@@ -225,24 +247,24 @@ func (rm *requestManager) loop() {
 				if err != nil {
 					rm.logger.Warn().Str("request", req.String()).Err(err).
 						Msg("request encode error")
-					rm.removePendingRequest(req)
 					req.doneWithResponse(responseData{
 						err: errors.Wrap(err, "encode request"),
 					})
+					rm.removePendingRequest(req)
 					continue
 				}
 
-				go func() {
+				go func(req *request, st *stream, b []byte) {
 					if err := st.WriteBytes(b); err != nil {
 						rm.logger.Warn().Str("streamID", string(st.ID())).Err(err).
 							Msg("write bytes")
-						rm.removePendingRequest(req)
 						req.doneWithResponse(responseData{
 							stID: st.ID(),
 							err:  errors.Wrap(err, "write bytes"),
 						})
+						rm.removePendingRequest(req)
 					}
-				}()
+				}(req, st, b)
 			}
 
 		case req := <-rm.newRequestC:
@@ -302,9 +324,15 @@ func (rm *requestManager) validateDelivery(data responseData) error {
 	if data.err != nil {
 		return data.err
 	}
+	if data.stID == "" {
+		return errors.New("stream is not defined")
+	}
 	st, _ := rm.streams.Get(data.stID)
 	if st == nil {
 		return fmt.Errorf("data delivered from dead stream: %v", data.stID)
+	}
+	if data.resp == nil {
+		return errors.New("response is not defined")
 	}
 	req, _ := rm.pendings.Get(data.resp.ReqID())
 	if req == nil {
@@ -325,8 +353,6 @@ func (rm *requestManager) handleCancelRequest(data cancelReqData) {
 		req = data.req
 		err = data.err
 	)
-	rm.waitings.Remove(req)
-	rm.removePendingRequest(req)
 	var stid sttypes.StreamID
 	if req.owner != nil {
 		stid = req.owner.ID()
@@ -336,6 +362,8 @@ func (rm *requestManager) handleCancelRequest(data cancelReqData) {
 		stID: stid,
 		err:  err,
 	})
+	rm.waitings.Remove(req)
+	rm.removePendingRequest(req)
 }
 
 func (rm *requestManager) getNextRequest() (*request, *stream) {
@@ -385,12 +413,12 @@ func (rm *requestManager) removePendingRequest(req *request) {
 	if _, ok := rm.pendings.Get(req.ReqID()); !ok {
 		return
 	}
-	rm.pendings.Delete(req.ReqID())
-
+	reqID := req.ReqID()
 	if st := req.owner; st != nil {
 		st.clearPendingRequest()
 		rm.available.Set(st.ID(), struct{}{})
 	}
+	rm.pendings.Delete(reqID)
 }
 
 func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
