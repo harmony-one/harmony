@@ -256,7 +256,7 @@ func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *down
 					return
 				}
 				if err := handleTask(workerID, task); err != nil {
-					return
+					continue
 				}
 			}
 		}
@@ -417,6 +417,7 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 		for _, bb := range blockBytes {
 			if len(bb) <= 1 {
 				validBlocks = false
+				break
 			}
 		}
 		if !validBlocks {
