@@ -203,10 +203,9 @@ func (rl *requestQueue) pop() *request {
 	if elem == nil {
 		return nil
 	}
-	rl.l.Remove(elem)
-
 	req := elem.Value.(*request)
 	delete(rl.elemM, req)
+	rl.l.Remove(elem)
 	return req
 }
 
