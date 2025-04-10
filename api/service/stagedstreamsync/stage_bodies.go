@@ -165,10 +165,11 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 	)
 
 	numStreams := b.configs.protocol.NumStreams()
-	wg.Add(numStreams)
 
 	// ask all streams for height
 	for i := 0; i < numStreams; i++ {
+		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 
@@ -532,9 +533,6 @@ badBlockDownloadLoop:
 }
 
 func (b *StageBodies) downloadBlocks(ctx context.Context, bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	blocks, stid, err := b.configs.protocol.GetBlocksByNumber(ctx, bns)
 	if err != nil {
 		return nil, stid, err
@@ -559,9 +557,6 @@ func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 }
 
 func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
 }
 
@@ -595,9 +590,6 @@ func (b *StageBodies) fetchBlockHashes(ctx context.Context, tx kv.RwTx, bns []ui
 }
 
 func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	if len(bns) == 0 {
 		return nil, nil, "", errors.New("empty batch of block numbers")
 	}
