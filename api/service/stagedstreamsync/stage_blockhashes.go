@@ -137,7 +137,7 @@ func (bh *StageBlockHashes) Exec(ctx context.Context, firstCycle bool, invalidBl
 
 	// Fetch block hashes from neighbors
 	if err := bh.runBlockHashWorkerLoop(ctx, tx, hdm, s, startTime, currentHead, targetHeight); err != nil {
-		return nil
+		return err
 	}
 
 	if useInternalTx {
@@ -225,7 +225,6 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 			return ErrNotEnoughStreams
 		}
 
-		hctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 		// Fetch block hashes concurrently
 		for i := 0; i < bh.configs.concurrency; i++ {
 			wg.Add(1)
@@ -234,9 +233,8 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 				defer wg.Done()
 
 				// Download block hashes
-				hashes, stid, err := bh.downloadBlockHashes(hctx, batch)
+				hashes, stid, err := bh.downloadBlockHashes(ctx, batch)
 				if err != nil {
-					bh.configs.protocol.StreamFailed(stid, "downloadBlockHashes failed")
 					return
 				}
 
@@ -253,7 +251,6 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 
 		// Wait for all workers to complete
 		wg.Wait()
-		cancel()
 
 		// all workers failed
 		if peerHashes.Length() == 0 {
