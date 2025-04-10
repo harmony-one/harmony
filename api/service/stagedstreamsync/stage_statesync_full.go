@@ -402,9 +402,6 @@ func (sss *StageFullStateSync) downloadByteCodes(ctx context.Context, sdm *FullS
 // 	codes []common.Hash,
 // 	storages *storageTaskBundle) ([][]byte, sttypes.StreamID, error) {
 
-// 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-// 	defer cancel()
-
 // 	// if there is any account task, first we have to complete that
 // 	if len(accounts) > 0 {
 

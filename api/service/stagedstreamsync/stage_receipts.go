@@ -321,9 +321,6 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 }
 
 func (r *StageReceipts) downloadReceipts(ctx context.Context, hs []common.Hash) ([]types.Receipts, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	receipts, stid, err := r.configs.protocol.GetReceipts(ctx, hs)
 	if err != nil {
 		return nil, stid, err
