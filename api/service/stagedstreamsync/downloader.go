@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -254,6 +255,8 @@ func (d *Downloader) waitForEnoughStreams(requiredStreams int) (bool, int) {
 func (d *Downloader) loop() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
+	// Helps to check if sync already in progress, skipping trigger
+	var isDownloading int32
 
 	// Shard chain and beacon chain nodes start with initSync=true
 	// to ensure they first go through long-range sync.
@@ -277,7 +280,12 @@ func (d *Downloader) loop() {
 			trigger()
 
 		case <-d.downloadC:
-			go d.handleDownload(&initSync, trigger)
+			if atomic.CompareAndSwapInt32(&isDownloading, 0, 1) {
+				go func() {
+					defer atomic.StoreInt32(&isDownloading, 0)
+					d.handleDownload(&initSync, trigger)
+				}()
+			}
 
 		case <-d.closeC:
 			return
@@ -329,11 +337,18 @@ func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
 		}
 
 	case ErrNotEnoughStreams:
+		// Log sync failure and retry after a short delay
+		d.logger.Error().
+			Err(err).
+			Bool("initSync", *initSync).
+			Msg(WrapStagedSyncMsg("sync loop failed"))
 		// Wait for enough available streams before retrying
 		d.waitForEnoughStreams(d.config.MinStreams)
+		trigger()
 
 	default:
 		if d.NumPeers() < d.config.Concurrency {
+			// Wait for enough available streams before retrying
 			d.waitForEnoughStreams(d.config.MinStreams)
 		}
 		// Handle unresolvable bad blocks
@@ -357,9 +372,6 @@ func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
 			Err(err).
 			Bool("initSync", *initSync).
 			Msg(WrapStagedSyncMsg("sync loop failed"))
-
-		// Wait for enough available streams before retrying
-		d.waitForEnoughStreams(d.config.MinStreams)
 
 		// Retry sync after 5 seconds
 		go func() {
