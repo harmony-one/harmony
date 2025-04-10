@@ -83,7 +83,7 @@ func TestRequestManager_NewStream(t *testing.T) {
 }
 
 // TestRequestManager_NoStream_CancelRequests verifies that when all streams are removed,
-// the request is canceled after exceeding the StreamTimeoutThreshold.
+// the request is canceled after exceeding the NoStreamTimeout.
 func TestRequestManager_NoStream_CancelRequests(t *testing.T) {
 	delayF := makeDefaultDelayFunc(500 * time.Millisecond)
 	respF := makeDefaultResponseFunc()
@@ -101,7 +101,7 @@ func TestRequestManager_NoStream_CancelRequests(t *testing.T) {
 	resC := ts.rm.doRequestAsync(ctx, req)
 
 	// Wait for the timeout threshold
-	time.Sleep(StreamTimeoutThreshold + time.Second)
+	time.Sleep(NoStreamTimeout + time.Second)
 
 	// Retrieve response
 	res := <-resC
