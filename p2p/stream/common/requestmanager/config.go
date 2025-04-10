@@ -8,16 +8,16 @@ const (
 	throttleInterval = 100 * time.Millisecond
 
 	// StreamMonitorInterval monitors stream connections every 1000 milliseconds
-	StreamMonitorInterval = 1000 * time.Millisecond
+	StreamMonitorInterval = 5000 * time.Millisecond
 
-	// StreamTimeoutThreshold defines stream timeout duration
-	StreamTimeoutThreshold = 30 * time.Second
+	// NoStreamTimeout defines no stream timeout duration
+	NoStreamTimeout = 60 * time.Second
 
 	// number of request to be done in each throttle loop
 	throttleBatch = 16
 
 	// PendingRequestTimeout is the pending request timeout
-	PendingRequestTimeout = 60 * time.Second
+	PendingRequestTimeout = 180 * time.Second
 
 	// deliverTimeout is the timeout for a response delivery. If the response cannot be delivered
 	// within timeout because blocking of the channel, the response will be dropped.
