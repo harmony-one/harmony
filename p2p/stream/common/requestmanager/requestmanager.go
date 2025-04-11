@@ -535,9 +535,9 @@ func (rm *requestManager) close() {
 	rm.pendings.Iterate(func(key uint64, req *request) {
 		req.doneWithResponse(responseData{err: ErrClosed})
 	})
-	rm.streams = sttypes.NewSafeMap[sttypes.StreamID, *stream]()
-	rm.available = sttypes.NewSafeMap[sttypes.StreamID, struct{}]()
-	rm.pendings = sttypes.NewSafeMap[uint64, *request]()
+	rm.streams.Clear()
+	rm.available.Clear()
+	rm.pendings.Clear()
 	rm.waitings = newRequestQueues()
 	close(rm.stopC)
 }
