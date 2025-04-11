@@ -8,7 +8,7 @@ const (
 	throttleInterval = 100 * time.Millisecond
 
 	// StreamMonitorInterval monitors stream connections every 1000 milliseconds
-	StreamMonitorInterval = 5000 * time.Millisecond
+	StreamMonitorInterval = 1000 * time.Millisecond
 
 	// NoStreamTimeout defines no stream timeout duration
 	NoStreamTimeout = 60 * time.Second
