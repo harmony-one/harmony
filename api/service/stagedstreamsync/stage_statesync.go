@@ -221,9 +221,6 @@ func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDow
 }
 
 func (sss *StageStateSync) downloadStates(ctx context.Context, nodes []common.Hash, codes []common.Hash) ([][]byte, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	hashes := append(codes, nodes...)
 	data, stid, err := sss.configs.protocol.GetNodeData(ctx, hashes)
 	if err != nil {

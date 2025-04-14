@@ -374,9 +374,6 @@ func New(
 
 // doGetCurrentNumberRequest returns estimated current block number and corresponding stream
 func (sss *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint64, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
 	bn, stid, err := sss.protocol.GetCurrentBlockNumber(ctx, syncproto.WithHighPriority())
 	if err != nil {
 		return 0, stid, err
@@ -386,9 +383,6 @@ func (sss *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uin
 
 // doGetBlockByNumberRequest returns block by its number and corresponding stream
 func (sss *StagedStreamSync) doGetBlockByNumberRequest(ctx context.Context, bn uint64) (*types.Block, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
 	blocks, stid, err := sss.protocol.GetBlocksByNumber(ctx, []uint64{bn}, syncproto.WithHighPriority())
 	if err != nil || len(blocks) != 1 {
 		return nil, stid, err

@@ -157,9 +157,6 @@ func (sh *srHelper) prepareBlockHashNumbers(curNumber uint64) []uint64 {
 }
 
 func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64, acceptPartially bool) ([]common.Hash, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	hashes, stid, err := sh.syncProtocol.GetBlockHashes(ctx, bns)
 	if err != nil {
 		sh.logger.Warn().Err(err).
@@ -179,9 +176,6 @@ func (sh *srHelper) doGetBlockHashesRequest(ctx context.Context, bns []uint64, a
 }
 
 func (sh *srHelper) doGetBlocksByNumbersRequest(ctx context.Context, bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	blocks, stid, err := sh.syncProtocol.GetBlocksByNumber(ctx, bns)
 	if err != nil {
 		sh.logger.Warn().Err(err).
@@ -193,9 +187,6 @@ func (sh *srHelper) doGetBlocksByNumbersRequest(ctx context.Context, bns []uint6
 }
 
 func (sh *srHelper) doGetBlocksByHashesRequest(ctx context.Context, hashes []common.Hash, wl []sttypes.StreamID) ([]*types.Block, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	blocks, stid, err := sh.syncProtocol.GetBlocksByHashes(ctx, hashes, syncProto.WithWhitelist(wl))
 	if err != nil {
 		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg("failed to getBlockByHashes")

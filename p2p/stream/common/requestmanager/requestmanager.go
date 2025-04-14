@@ -3,7 +3,7 @@ package requestmanager
 import (
 	"context"
 	"fmt"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -42,7 +42,8 @@ type requestManager struct {
 	subs   []event.Subscription
 	logger zerolog.Logger
 	stopC  chan struct{}
-	lock   sync.Mutex
+
+	isCheckingExpiry atomic.Bool
 }
 
 // NewRequestManager creates a new request manager
@@ -105,7 +106,17 @@ func (rm *requestManager) doRequestAsync(ctx context.Context, raw sttypes.Reques
 	for _, opt := range options {
 		opt(req)
 	}
-	rm.newRequestC <- req
+	select {
+	case rm.newRequestC <- req:
+	case <-ctx.Done():
+		ch := make(chan responseData, 1)
+		ch <- responseData{err: ctx.Err()}
+		return ch
+	default:
+		ch := make(chan responseData, 1)
+		ch <- responseData{err: errors.New("too many requests")}
+		return ch
+	}
 
 	go func() {
 		select {
@@ -136,50 +147,69 @@ func (rm *requestManager) DeliverResponse(stID sttypes.StreamID, resp sttypes.Re
 	}()
 }
 
-func (rm *requestManager) monitorStreamHealth() {
-	now := time.Now()
-	streams := rm.streams.Keys()
+func (rm *requestManager) checkRequestsExpiry(now time.Time) {
+	rm.isCheckingExpiry.Store(true)
+	defer rm.isCheckingExpiry.Store(false)
+	var expiredRequests []*request
 
-	// Check for expired pending requests
 	rm.pendings.Iterate(func(id uint64, req *request) {
 		if !req.timeout.IsZero() && now.After(req.timeout) {
-			rm.removePendingRequest(req)
-			req.doneWithResponse(responseData{
-				err: errors.New("request timeout"),
-			})
+			expiredRequests = append(expiredRequests, req)
 		}
 	})
 
-	if len(streams) > 0 {
+	// Process cancellations in batch
+	for _, req := range expiredRequests {
+		req.doneWithResponse(responseData{
+			err:  errors.New("request timeout"),
+			stID: req.owner.ID(),
+		})
+		rm.removePendingRequest(req)
+	}
+}
+
+func (rm *requestManager) monitorStreamHealth() {
+	now := time.Now()
+	numStreams := rm.streams.Length()
+
+	// Check for expired pending requests
+	if !rm.isCheckingExpiry.Load() && rm.pendings.Length() > 0 {
+		go rm.checkRequestsExpiry(now)
+	}
+
+	if numStreams > 0 {
+		// Reset watchdog timer
 		rm.lastActiveStreamTime = now
 		return
 	}
 
 	// No streams left, check if timeout has passed
-	if rm.lastActiveStreamTime.IsZero() || now.Sub(rm.lastActiveStreamTime) <= StreamTimeoutThreshold {
+	if rm.lastActiveStreamTime.IsZero() || now.Sub(rm.lastActiveStreamTime) <= NoStreamTimeout {
 		return
 	}
 
-	// Batch process and cancel all requests
-	var pendingRequests []*request
+	// Batch process and cancel all waiting requests (are not sent yet)
+	var waitingRequests []*request
 	for {
 		req := rm.popRequestFromWaitings()
 		if req == nil {
 			break
 		}
 		if !req.isDone() {
-			pendingRequests = append(pendingRequests, req)
+			waitingRequests = append(waitingRequests, req)
 		}
 	}
 
-	if len(pendingRequests) == 0 {
+	if len(waitingRequests) == 0 {
+		// Reset watchdog timer
+		rm.lastActiveStreamTime = now
 		return
 	}
 
-	rm.logger.Warn().Msgf("No active streams for %d seconds, canceling all waiting requests.", StreamTimeoutThreshold)
+	rm.logger.Warn().Msgf("No active streams for %d seconds, canceling all waiting requests.", NoStreamTimeout)
 
 	// Process cancellations in batch
-	for _, req := range pendingRequests {
+	for _, req := range waitingRequests {
 		req.doneWithResponse(responseData{
 			err: ErrNoAvailableStream,
 		})
@@ -196,6 +226,7 @@ func (rm *requestManager) loop() {
 		monitorTicker = time.NewTicker(StreamMonitorInterval)
 	)
 	defer ticker.Stop()
+	defer monitorTicker.Stop()
 	throttle := func() {
 		select {
 		case throttleC <- struct{}{}:
@@ -225,24 +256,24 @@ func (rm *requestManager) loop() {
 				if err != nil {
 					rm.logger.Warn().Str("request", req.String()).Err(err).
 						Msg("request encode error")
-					rm.removePendingRequest(req)
 					req.doneWithResponse(responseData{
 						err: errors.Wrap(err, "encode request"),
 					})
+					rm.removePendingRequest(req)
 					continue
 				}
 
-				go func() {
+				go func(req *request, st *stream, b []byte) {
 					if err := st.WriteBytes(b); err != nil {
 						rm.logger.Warn().Str("streamID", string(st.ID())).Err(err).
 							Msg("write bytes")
-						rm.removePendingRequest(req)
 						req.doneWithResponse(responseData{
 							stID: st.ID(),
 							err:  errors.Wrap(err, "write bytes"),
 						})
+						rm.removePendingRequest(req)
 					}
-				}()
+				}(req, st, b)
 			}
 
 		case req := <-rm.newRequestC:
@@ -294,6 +325,12 @@ func (rm *requestManager) handleDeliverData(data responseData) {
 	}
 	// req and st is ensured not to be empty in validateDelivery
 	req, _ := rm.pendings.Get(data.resp.ReqID())
+	if req == nil { // Request has been timed out and deleted
+		return
+	}
+	if req.owner == nil { // shouldn't be possible
+		return
+	}
 	req.doneWithResponse(data)
 	rm.removePendingRequest(req)
 }
@@ -302,9 +339,15 @@ func (rm *requestManager) validateDelivery(data responseData) error {
 	if data.err != nil {
 		return data.err
 	}
+	if data.stID == "" {
+		return errors.New("stream is not defined")
+	}
 	st, _ := rm.streams.Get(data.stID)
 	if st == nil {
 		return fmt.Errorf("data delivered from dead stream: %v", data.stID)
+	}
+	if data.resp == nil {
+		return errors.New("response is not defined")
 	}
 	req, _ := rm.pendings.Get(data.resp.ReqID())
 	if req == nil {
@@ -325,8 +368,6 @@ func (rm *requestManager) handleCancelRequest(data cancelReqData) {
 		req = data.req
 		err = data.err
 	)
-	rm.waitings.Remove(req)
-	rm.removePendingRequest(req)
 	var stid sttypes.StreamID
 	if req.owner != nil {
 		stid = req.owner.ID()
@@ -336,6 +377,8 @@ func (rm *requestManager) handleCancelRequest(data cancelReqData) {
 		stID: stid,
 		err:  err,
 	})
+	rm.waitings.Remove(req)
+	rm.removePendingRequest(req)
 }
 
 func (rm *requestManager) getNextRequest() (*request, *stream) {
@@ -357,6 +400,10 @@ func (rm *requestManager) getNextRequest() (*request, *stream) {
 		rm.addRequestToWaitings(req, reqPriorityHigh)
 		return nil, nil
 	}
+
+	reqID := rm.genReqID()
+	req.SetReqID(reqID)
+
 	return req, st
 }
 
@@ -370,14 +417,11 @@ func (rm *requestManager) genReqID() uint64 {
 }
 
 func (rm *requestManager) addPendingRequest(req *request, st *stream) {
-	reqID := rm.genReqID()
-	req.SetReqID(reqID)
-
 	req.owner = st
 	req.timeout = time.Now().Add(PendingRequestTimeout)
 	st.req = req
 
-	rm.available.Delete(st.ID())
+	rm.setStreamAvailability(st.ID(), false)
 	rm.pendings.Set(req.ReqID(), req)
 }
 
@@ -385,11 +429,27 @@ func (rm *requestManager) removePendingRequest(req *request) {
 	if _, ok := rm.pendings.Get(req.ReqID()); !ok {
 		return
 	}
-	rm.pendings.Delete(req.ReqID())
-
+	reqID := req.ReqID()
 	if st := req.owner; st != nil {
 		st.clearPendingRequest()
-		rm.available.Set(st.ID(), struct{}{})
+		rm.setStreamAvailability(st.ID(), true)
+	}
+	rm.pendings.Delete(reqID)
+}
+
+func (rm *requestManager) setStreamAvailability(stID sttypes.StreamID, available bool) {
+	if _, streamIsActive := rm.streams.Get(stID); !streamIsActive {
+		rm.available.Delete(stID)
+		return
+	}
+
+	if available {
+		rm.available.Set(stID, struct{}{})
+		return
+	}
+
+	if _, streamIsAvailable := rm.available.Get(stID); streamIsAvailable {
+		rm.available.Delete(stID)
 	}
 }
 
@@ -454,7 +514,9 @@ func (rm *requestManager) addNewStream(st sttypes.Stream) {
 // of the stream.
 func (rm *requestManager) removeStream(st *stream) {
 	id := st.ID()
-	rm.available.Delete(id)
+	if _, exists := rm.available.Get(id); exists {
+		rm.available.Delete(id)
+	}
 
 	cleared := st.clearPendingRequest()
 	if cleared != nil {
@@ -473,9 +535,9 @@ func (rm *requestManager) close() {
 	rm.pendings.Iterate(func(key uint64, req *request) {
 		req.doneWithResponse(responseData{err: ErrClosed})
 	})
-	rm.streams = sttypes.NewSafeMap[sttypes.StreamID, *stream]()
-	rm.available = sttypes.NewSafeMap[sttypes.StreamID, struct{}]()
-	rm.pendings = sttypes.NewSafeMap[uint64, *request]()
+	rm.streams.Clear()
+	rm.available.Clear()
+	rm.pendings.Clear()
 	rm.waitings = newRequestQueues()
 	close(rm.stopC)
 }
