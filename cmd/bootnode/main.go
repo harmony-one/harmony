@@ -107,8 +107,8 @@ func main() {
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
-	httpPort := flag.Int("rpc_http_port", 9500, "port of the rpc http")
-	wsPort := flag.Int("rpc_ws_port", 9800, "port of the rpc ws")
+	httpPort := flag.Int("rpc_http_port", 9513, "port of the rpc http")
+	wsPort := flag.Int("rpc_ws_port", 9813, "port of the rpc ws")
 	console := flag.Bool("console_only", false, "Output to console only")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	logMaxSize := flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
@@ -210,7 +210,9 @@ func main() {
 	currentBootNode := bootnode.New(host, &hc)
 	rpcConfigs := currentBootNode.GetRPCServerConfig()
 	rpcConfigs.HTTPPort = *httpPort
+	rpcConfigs.HTTPIp = *ip
 	rpcConfigs.WSPort = *wsPort
+	rpcConfigs.WSIp = *ip
 
 	// TODO: enable boot services
 	/*
