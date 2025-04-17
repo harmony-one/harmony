@@ -369,6 +369,8 @@ func New(
 
 	status := NewStatus()
 
+	bnCache := NewBlockNumberCache(protocol)
+
 	return &StagedStreamSync{
 		bc:                bc,
 		consensus:         consensus,
@@ -392,16 +394,8 @@ func New(
 		pruningOrder:      pruneStages,
 		logPrefixes:       logPrefixes,
 		UseMemDB:          config.UseMemDB,
+		bnCache:           bnCache,
 	}
-}
-
-// doGetCurrentNumberRequest returns estimated current block number and corresponding stream
-func (sss *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint64, sttypes.StreamID, error) {
-	bn, stid, err := sss.protocol.GetCurrentBlockNumber(ctx, syncproto.WithHighPriority())
-	if err != nil {
-		return 0, stid, err
-	}
-	return bn, stid, nil
 }
 
 // doGetBlockByNumberRequest returns block by its number and corresponding stream
