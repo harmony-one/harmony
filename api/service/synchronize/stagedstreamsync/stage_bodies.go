@@ -186,7 +186,7 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
 
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					// Mark stream failure if it's not due to context cancelation or deadline
+					// Mark stream failure if it's not due to context cancellation or deadline
 					b.configs.protocol.StreamFailed(stid, "getCurrentNumber request failed")
 				} else {
 					b.configs.protocol.RemoveStream(stid, "getCurrentNumber request failed")
@@ -202,7 +202,7 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 			lock.Lock()
 			synced[stid] = bn
 			lock.Unlock()
-		}()
+		}(stID, targetHeight)
 	}
 
 	// Wait for all goroutines to finish
