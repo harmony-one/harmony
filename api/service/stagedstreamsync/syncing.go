@@ -544,7 +544,7 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 		go func() {
 			defer wg.Done()
 
-			bn, stid, err := s.doGetCurrentNumberRequest(ctx)
+			bn, stid, err := s.bnCache.doGetCurrentNumberRequest(ctx)
 			if err != nil {
 				s.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("getCurrentNumber request failed"))
