@@ -298,6 +298,13 @@ func (sp *testSyncProtocol) NumStreams() int {
 	return len(sp.streamIDs)
 }
 
+func (sp *testSyncProtocol) StreamIDs() []sttypes.StreamID {
+	sp.lock.Lock()
+	defer sp.lock.Unlock()
+
+	return sp.streamIDs
+}
+
 func (sp *testSyncProtocol) SubscribeAddStreamEvent(ch chan<- streammanager.EvtStreamAdded) event.Subscription {
 	var evtFeed event.Feed
 	go func() {

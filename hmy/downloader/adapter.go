@@ -21,6 +21,7 @@ type syncProtocol interface {
 	RemoveStream(stID sttypes.StreamID) // If a stream delivers invalid data, remove the stream
 	SubscribeAddStreamEvent(ch chan<- streammanager.EvtStreamAdded) event.Subscription
 	NumStreams() int
+	StreamIDs() []sttypes.StreamID
 }
 
 type blockChain interface {
