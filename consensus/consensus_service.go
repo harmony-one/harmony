@@ -379,6 +379,12 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 		consensus.decider = decider
 	}
 
+	if consensus.Blockchain().Config().IsStaking(curEpoch) {
+		if curEpoch.Cmp(nextEpoch) == 0 {
+			return Listening
+		}
+	}
+
 	var committeeToSet *shard.Committee
 	epochToSet := curEpoch
 	hasError := false

@@ -101,3 +101,11 @@ func TestFinalCommitDisablesTransition(t *testing.T) {
 
 	require.False(t, consensus.transitions.finalCommit)
 }
+
+func TestUpdateConsensusInformation(t *testing.T) {
+	_, _, consensus, _, err := GenerateConsensusForTesting()
+	require.NoError(t, err)
+
+	rs := consensus.UpdateConsensusInformation("reason")
+	require.Equal(t, Syncing, rs)
+}
