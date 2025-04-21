@@ -46,8 +46,8 @@ type request struct {
 	raw  *interface{}
 	// options
 	priority  reqPriority
-	blacklist map[sttypes.StreamID]struct{} // banned streams
-	whitelist map[sttypes.StreamID]struct{} // allowed streams
+	whitelist *sttypes.SafeMap[sttypes.StreamID, struct{}] // allowed streams
+	blacklist *sttypes.SafeMap[sttypes.StreamID, struct{}] // banned streams
 }
 
 func (req *request) ReqID() uint64 {
@@ -86,32 +86,54 @@ func (req *request) isStreamAllowed(stid sttypes.StreamID) bool {
 
 func (req *request) addBlacklistedStream(stid sttypes.StreamID) {
 	if req.blacklist == nil {
-		req.blacklist = make(map[sttypes.StreamID]struct{})
+		req.blacklist = sttypes.NewSafeMap[sttypes.StreamID, struct{}]()
 	}
-	req.blacklist[stid] = struct{}{}
+	req.blacklist.Set(stid, struct{}{})
 }
 
 func (req *request) isStreamBlacklisted(stid sttypes.StreamID) bool {
 	if req.blacklist == nil {
 		return false
 	}
-	_, ok := req.blacklist[stid]
+	_, ok := req.blacklist.Get(stid)
 	return ok
 }
 
 func (req *request) addWhiteListStream(stid sttypes.StreamID) {
 	if req.whitelist == nil {
-		req.whitelist = make(map[sttypes.StreamID]struct{})
+		req.whitelist = sttypes.NewSafeMap[sttypes.StreamID, struct{}]()
 	}
-	req.whitelist[stid] = struct{}{}
+	req.whitelist.Set(stid, struct{}{})
 }
 
 func (req *request) isStreamWhitelisted(stid sttypes.StreamID) bool {
 	if req.whitelist == nil {
 		return true
 	}
-	_, ok := req.whitelist[stid]
+	_, ok := req.whitelist.Get(stid)
 	return ok
+}
+
+func (req *request) hasWhiteList() bool {
+	return req.whitelist != nil && req.whitelist.Length() > 0
+}
+
+func (req *request) whitelistIDs() []sttypes.StreamID {
+	if req.whitelist == nil || req.whitelist.Length() == 0 {
+		return []sttypes.StreamID{}
+	}
+	return req.whitelist.Keys()
+}
+
+func (req *request) hasBlackList() bool {
+	return req.blacklist != nil && req.blacklist.Length() > 0
+}
+
+func (req *request) blacklistIDs() []sttypes.StreamID {
+	if req.blacklist == nil || req.blacklist.Length() == 0 {
+		return []sttypes.StreamID{}
+	}
+	return req.blacklist.Keys()
 }
 
 func (st *stream) clearPendingRequest() *request {
