@@ -42,6 +42,7 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 				for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
 					time.Sleep(SleepPeriod)
 					consensus.GetLogger().Info().
+						Uint32("shardID", consensus.ShardID).
 						Uint64("blockNum", proposal.blockNum).
 						Bool("asyncProposal", proposal.Type == AsyncProposal).
 						Str("called", proposal.Caller).
