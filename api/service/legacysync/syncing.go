@@ -16,11 +16,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
 	consensus2 "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -217,6 +219,15 @@ func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, p
 type blockChain interface {
 	CurrentBlock() *types.Block
 	ShardID() uint32
+	Engine() engine.Engine
+}
+
+type BC struct {
+	core.BlockChain
+}
+
+func (bc BC) VerifyHeaderSignature(header *block.Header, commitSig bls.SerializedSignature, commitBitmap []byte) error {
+	return bc.Engine().VerifyHeaderSignature(bc, header, commitSig, commitBitmap)
 }
 
 // StateSync is the struct that implements StateSyncInterface.
@@ -834,7 +845,7 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain) error {
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc blockChain) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Debug().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
@@ -860,22 +871,10 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 			utils.Logger().Debug().Int64("elapsed time", time.Since(startTime).Milliseconds()).Msg("[Sync] VerifyHeaderSignature")
 		}
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
-		if err == engine.ErrUnknownAncestor {
-			return err
-		} else if err != nil {
+		if err != nil {
 			utils.Logger().Error().Err(err).Msgf("[SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
-
-			if !verifyAllSig {
-				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
-				for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
-					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
-						utils.Logger().Err(rbErr).Msg("[SYNC] UpdateBlockAndStatus: failed to rollback")
-						return err
-					}
-				}
-			}
-			return err
 		}
+		return err
 	}
 
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)

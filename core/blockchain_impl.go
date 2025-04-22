@@ -62,6 +62,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 
 	"github.com/harmony-one/harmony/hmy/tracers"
+	internal_chain "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -1664,6 +1665,9 @@ func (bc *BlockChainImpl) GetMaxGarbageCollectedBlockNumber() int64 {
 }
 
 func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
+	if len(chain) > 1 {
+		return 0, errors.New("chain length exceeds 1")
+	}
 	// if in tikv mode, writer node need preempt master or come be a follower
 	if bc.isInitTiKV() && !bc.tikvPreemptMaster(bc.rangeBlock(chain)) {
 		return len(chain), nil
@@ -1757,6 +1761,16 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 		abort, results := bc.Engine().VerifyHeaders(bc, headers, seals)
 		verifyHeadersResults = results
 		defer close(abort)
+	}
+
+	{
+		sig, bitmap, err := internal_chain.ParseCommitSigAndBitmap(chain[0].GetCurrentCommitSig())
+		if err != nil {
+			return 0, nil, nil, errors.Wrap(err, "parse commitSigAndBitmap")
+		}
+		if err := bc.Engine().VerifyHeaderSignature(bc, chain[0].Header(), sig, bitmap); err != nil {
+			return 0, nil, nil, errors.WithMessage(err, "verify header signature")
+		}
 	}
 
 	// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
