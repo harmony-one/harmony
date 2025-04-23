@@ -75,7 +75,7 @@ func (bh *beaconHelper) loop() {
 		case <-t.C:
 			bh.insertAsync()
 
-		case b, ok := <-bh.blockC:
+		case b, ok := <-bh.blockC: // for side chain, it receives last block of each epoch
 			if !ok {
 				return // blockC closed. Node exited
 			}
