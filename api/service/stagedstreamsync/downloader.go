@@ -73,7 +73,7 @@ func NewDownloader(host p2p.Host,
 		Logger()
 
 	var bh *beaconHelper
-	if config.BHConfig != nil && bc.ShardID() == shard.BeaconChainShardID {
+	if config.BHConfig != nil {
 		bh = newBeaconHelper(bc, logger, config.BHConfig.BlockC, config.BHConfig.InsertHook)
 	}
 
