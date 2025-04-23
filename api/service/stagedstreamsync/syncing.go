@@ -67,35 +67,36 @@ func CreateStagedSync(ctx context.Context,
 	isBeaconShard := bc.ShardID() == shard.BeaconChainShardID
 	isEpochChain := !isBeaconNode && isBeaconShard
 	isBeaconValidator := isBeaconNode && isValidator
+	isBeaconExplorer := isBeaconNode && isExplorer
 	joinConsensus := false
-	switch nodeConfig.Role() {
-	case nodeconfig.Validator:
+	if isValidator {
 		joinConsensus = true
 	}
 
 	var mainDB kv.RwDB
 	dbs := make([]kv.RwDB, config.Concurrency)
+	beacon := isBeaconValidator || isBeaconExplorer
 	if config.UseMemDB {
-		mdbPath := getBlockDbPath(bc.ShardID(), isBeaconValidator, -1, dbDir)
+		mdbPath := getBlockDbPath(bc.ShardID(), beacon, -1, dbDir)
 		logger.Info().
 			Str("path", mdbPath).
 			Msg(WrapStagedSyncMsg("creating main db in memory"))
 		mainDB = mdbx.NewMDBX(log.New()).InMem(mdbPath).MustOpen()
 		for i := 0; i < config.Concurrency; i++ {
-			dbPath := getBlockDbPath(bc.ShardID(), isBeaconValidator, i, dbDir)
+			dbPath := getBlockDbPath(bc.ShardID(), beacon, i, dbDir)
 			logger.Info().
 				Str("path", dbPath).
 				Msg(WrapStagedSyncMsg("creating blocks db in memory"))
 			dbs[i] = mdbx.NewMDBX(log.New()).InMem(dbPath).MustOpen()
 		}
 	} else {
-		mdbPath := getBlockDbPath(bc.ShardID(), isBeaconValidator, -1, dbDir)
+		mdbPath := getBlockDbPath(bc.ShardID(), beacon, -1, dbDir)
 		logger.Info().
 			Str("path", mdbPath).
 			Msg(WrapStagedSyncMsg("creating main db in disk"))
 		mainDB = mdbx.NewMDBX(log.New()).Path(mdbPath).MustOpen()
 		for i := 0; i < config.Concurrency; i++ {
-			dbPath := getBlockDbPath(bc.ShardID(), isBeaconValidator, i, dbDir)
+			dbPath := getBlockDbPath(bc.ShardID(), beacon, i, dbDir)
 			logger.Info().
 				Str("path", dbPath).
 				Msg(WrapStagedSyncMsg("creating blocks db in disk"))
@@ -112,12 +113,12 @@ func CreateStagedSync(ctx context.Context,
 	stageHeadsCfg := NewStageHeadersCfg(bc, mainDB, logger)
 	stageShortRangeCfg := NewStageShortRangeCfg(bc, mainDB, logger)
 	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB, logger)
-	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, extractReceiptHashes, logger, config.LogProgress)
-	stageHashesCfg := NewStageBlockHashesCfg(bc, mainDB, config.Concurrency, protocol, isBeaconValidator, logger, config.LogProgress)
+	stageBodiesCfg := NewStageBodiesCfg(bc, mainDB, dbs, config.Concurrency, protocol, extractReceiptHashes, logger, config.LogProgress)
+	stageHashesCfg := NewStageBlockHashesCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageStatesCfg := NewStageStatesCfg(bc, mainDB, dbs, config.Concurrency, logger, config.LogProgress)
 	stageStateSyncCfg := NewStageStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
 	stageFullStateSyncCfg := NewStageFullStateSyncCfg(bc, mainDB, config.Concurrency, protocol, logger, config.LogProgress)
-	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, isBeaconValidator, logger, config.LogProgress)
+	stageReceiptsCfg := NewStageReceiptsCfg(bc, mainDB, dbs, config.Concurrency, protocol, logger, config.LogProgress)
 	stageFinishCfg := NewStageFinishCfg(mainDB, logger)
 
 	// init stages order based on sync mode
@@ -157,9 +158,9 @@ func CreateStagedSync(ctx context.Context,
 		consensus,
 		mainDB,
 		defaultStages,
+		protocol,
 		isEpochChain,
 		isBeaconShard,
-		protocol,
 		isBeaconValidator,
 		isExplorer,
 		isValidator,
@@ -328,7 +329,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 	var totalInserted int
 
-	s.initSync = initSync
 	if err := s.checkPrerequisites(); err != nil {
 		return 0, 0, err
 	}
@@ -459,7 +459,7 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 	s.currentCycle.AddCycleNumber(1)
 
 	// calculating sync speed (blocks/second)
-	if s.LogProgress && s.inserted > 0 {
+	if s.config.LogProgress && s.inserted > 0 {
 		dt := time.Since(startTime).Seconds()
 		speed := float64(0)
 		if dt > 0 {
