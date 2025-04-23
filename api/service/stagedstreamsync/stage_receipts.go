@@ -21,14 +21,13 @@ type StageReceipts struct {
 }
 
 type StageReceiptsCfg struct {
-	bc            core.BlockChain
-	db            kv.RwDB
-	blockDBs      []kv.RwDB
-	concurrency   int
-	protocol      syncProtocol
-	isBeaconShard bool
-	logProgress   bool
-	logger        zerolog.Logger
+	bc          core.BlockChain
+	db          kv.RwDB
+	blockDBs    []kv.RwDB
+	concurrency int
+	protocol    syncProtocol
+	logProgress bool
+	logger      zerolog.Logger
 }
 
 func NewStageReceipts(cfg StageReceiptsCfg) *StageReceipts {
@@ -37,14 +36,13 @@ func NewStageReceipts(cfg StageReceiptsCfg) *StageReceipts {
 	}
 }
 
-func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, logger zerolog.Logger, logProgress bool) StageReceiptsCfg {
+func NewStageReceiptsCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, logger zerolog.Logger, logProgress bool) StageReceiptsCfg {
 	return StageReceiptsCfg{
-		bc:            bc,
-		db:            db,
-		blockDBs:      blockDBs,
-		concurrency:   concurrency,
-		protocol:      protocol,
-		isBeaconShard: isBeaconShard,
+		bc:          bc,
+		db:          db,
+		blockDBs:    blockDBs,
+		concurrency: concurrency,
+		protocol:    protocol,
 		logger: logger.With().
 			Str("stage", "StageReceipts").
 			Str("mode", "long range").
