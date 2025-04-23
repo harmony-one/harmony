@@ -115,7 +115,7 @@ func (st *testStream) CloseOnExit() error {
 	return nil
 }
 
-func (st *testStream) Failures() int {
+func (st *testStream) Failures() int32 {
 	return 0
 }
 

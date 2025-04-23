@@ -22,7 +22,7 @@ type Stream interface {
 	ReadBytes() ([]byte, error)
 	Close() error
 	CloseOnExit() error
-	Failures() int
+	Failures() int32
 	AddFailedTimes(faultRecoveryThreshold time.Duration)
 	ResetFailedTimes()
 }
