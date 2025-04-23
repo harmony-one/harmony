@@ -29,7 +29,6 @@ type StageBodiesCfg struct {
 	blockDBs             []kv.RwDB
 	concurrency          int
 	protocol             syncProtocol
-	isBeaconShard        bool
 	extractReceiptHashes bool
 	logProgress          bool
 	logger               zerolog.Logger
@@ -46,14 +45,13 @@ func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
 	}
 }
 
-func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, extractReceiptHashes bool, logger zerolog.Logger, logProgress bool) StageBodiesCfg {
+func NewStageBodiesCfg(bc core.BlockChain, db kv.RwDB, blockDBs []kv.RwDB, concurrency int, protocol syncProtocol, extractReceiptHashes bool, logger zerolog.Logger, logProgress bool) StageBodiesCfg {
 	return StageBodiesCfg{
 		bc:                   bc,
 		db:                   db,
 		blockDBs:             blockDBs,
 		concurrency:          concurrency,
 		protocol:             protocol,
-		isBeaconShard:        isBeaconShard,
 		extractReceiptHashes: extractReceiptHashes,
 		logger: logger.With().
 			Str("stage", "StageBodies").
