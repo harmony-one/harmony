@@ -945,7 +945,7 @@ func setupStagedSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.Har
 
 	// If we are running side chain, we will need to do some extra works for beacon
 	// sync.
-	if !node.IsRunningBeaconChain() {
+	if len(blockchains) > 1 {
 		sConfig.BHConfig = &stagedstreamsync.BeaconHelperConfig{
 			BlockC:     node.BeaconBlockChannel,
 			InsertHook: node.BeaconSyncHook,
