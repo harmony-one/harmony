@@ -358,6 +358,7 @@ func New(
 		joinConsensus:     joinConsensus,
 		gbm:               nil,
 		status:            status,
+		initSync:          true,
 		inserted:          0,
 		config:            config,
 		logger:            logger,

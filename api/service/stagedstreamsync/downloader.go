@@ -261,7 +261,7 @@ func (d *Downloader) loop() {
 	// Shard chain and beacon chain nodes start with initSync=true
 	// to ensure they first go through long-range sync.
 	// Epoch chain nodes only require epoch sync.
-	initSync := !d.stagedSyncInstance.isEpochChain
+	d.stagedSyncInstance.initSync = !d.stagedSyncInstance.isEpochChain
 
 	trigger := func() {
 		select {
@@ -283,7 +283,7 @@ func (d *Downloader) loop() {
 			if atomic.CompareAndSwapInt32(&isDownloading, 0, 1) {
 				go func() {
 					defer atomic.StoreInt32(&isDownloading, 0)
-					d.handleDownload(&initSync, trigger)
+					d.handleDownload(trigger)
 				}()
 			}
 
@@ -293,23 +293,23 @@ func (d *Downloader) loop() {
 	}
 }
 
-func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
+func (d *Downloader) handleDownload(trigger func()) {
 	d.syncMutex.Lock()
 	defer d.syncMutex.Unlock()
 
 	bnBeforeSync := d.bc.CurrentBlock().NumberU64()
 
 	// Perform sync and get estimated height and blocks added
-	estimatedHeight, addedBN, err := d.stagedSyncInstance.doSync(d.ctx, *initSync)
+	estimatedHeight, addedBN, err := d.stagedSyncInstance.doSync(d.ctx)
 
 	switch err {
 	case nil:
 		// Log completion when finishing initial long-range sync
-		if *initSync {
+		if d.stagedSyncInstance.initSync {
 			d.logger.Info().
 				Int("block added", addedBN).
 				Uint64("current height", d.bc.CurrentBlock().NumberU64()).
-				Bool("initSync", *initSync).
+				Bool("initSync", d.stagedSyncInstance.initSync).
 				Uint32("shard", d.bc.ShardID()).
 				Msg(WrapStagedSyncMsg("sync finished"))
 		}
@@ -324,7 +324,7 @@ func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
 
 		// Transition from long-range sync to short-range sync if nearing the latest height.
 		// This prevents staying in long-range mode when only a few blocks remain.
-		if *initSync && addedBN > 0 {
+		if d.stagedSyncInstance.initSync && addedBN > 0 {
 			bnAfterSync := d.bc.CurrentBlock().NumberU64()
 			distanceBeforeSync := estimatedHeight - bnBeforeSync
 			distanceAfterSync := estimatedHeight - bnAfterSync
@@ -332,7 +332,7 @@ func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
 			// Switch to short-range sync if both before and after sync distances are small.
 			if distanceBeforeSync <= uint64(ShortRangeThreshold) &&
 				distanceAfterSync <= uint64(ShortRangeThreshold) {
-				*initSync = false
+				d.stagedSyncInstance.initSync = false
 			}
 		}
 
@@ -340,7 +340,7 @@ func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
 		// Log sync failure and retry after a short delay
 		d.logger.Error().
 			Err(err).
-			Bool("initSync", *initSync).
+			Bool("initSync", d.stagedSyncInstance.initSync).
 			Msg(WrapStagedSyncMsg("sync loop failed"))
 		// Wait for enough available streams before retrying
 		d.waitForEnoughStreams(d.config.MinStreams)
@@ -370,7 +370,7 @@ func (d *Downloader) handleDownload(initSync *bool, trigger func()) {
 		// Log sync failure and retry after a short delay
 		d.logger.Error().
 			Err(err).
-			Bool("initSync", *initSync).
+			Bool("initSync", d.stagedSyncInstance.initSync).
 			Msg(WrapStagedSyncMsg("sync loop failed"))
 
 		// Retry sync after 5 seconds
