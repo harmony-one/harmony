@@ -392,7 +392,7 @@ func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
 		st.AddFailedTimes(FaultRecoveryThreshold)
 		p.logger.Info().
 			Str("stream ID", string(st.ID())).
-			Int("num failures", st.Failures()).
+			Int32("num failures", st.Failures()).
 			Str("reason", reason).
 			Msg("stream failed")
 		if st.Failures() >= MaxStreamFailures {
