@@ -262,14 +262,14 @@ func (s *StagedStreamSync) Debug(source string, msg interface{}) {
 }
 
 // checkPivot checks pivot block and returns pivot block and cycle Sync mode
-func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint64, initSync bool) (*types.Block, SyncMode, error) {
+func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint64) (*types.Block, SyncMode, error) {
 
 	if s.config.SyncMode == FullSync {
 		return nil, FullSync, nil
 	}
 
 	// do full sync if chain is at early stage
-	if initSync && estimatedHeight < MaxPivotDistanceToHead {
+	if s.initSync && estimatedHeight < MaxPivotDistanceToHead {
 		return nil, FullSync, nil
 	}
 
@@ -323,7 +323,7 @@ func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint6
 // doSync does the long range sync.
 // One LongRangeSync consists of several iterations.
 // For each iteration, estimate the current block number, then fetch block & insert to blockchain
-func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bool) (uint64, int, error) {
+func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, int, error) {
 
 	startedNumber := s.bc.CurrentBlock().NumberU64()
 
@@ -334,7 +334,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 	}
 
 	var estimatedHeight uint64
-	if initSync {
+	if s.initSync {
 		if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
 			return 0, 0, err
 		} else {
@@ -353,7 +353,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 
 	// We are probably in full sync, but we might have rewound to before the
 	// fast/snap sync pivot, check if we should reenable
-	if pivotBlock, cycleSyncMode, err := s.checkPivot(downloaderContext, estimatedHeight, initSync); err != nil {
+	if pivotBlock, cycleSyncMode, err := s.checkPivot(downloaderContext, estimatedHeight); err != nil {
 		s.logger.Error().Err(err).Msg(WrapStagedSyncMsg("check pivot failed"))
 		return 0, 0, err
 	} else {
@@ -413,7 +413,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context, initSync bo
 			s.consensus.UpdateConsensusInformation("stream sync is explorer")
 		}
 
-		if initSync && totalInserted > 0 && !s.isEpochChain {
+		if s.initSync && totalInserted > 0 {
 			s.consensus.BlocksSynchronized("StagedStreamSync block synchronized")
 		}
 	}
