@@ -476,6 +476,46 @@ func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, fi
 	return nil
 }
 
+func (sss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) ([]common.Hash, error) {
+	curNumber := bc.CurrentBlock().NumberU64()
+	var hashes []common.Hash
+
+	err := cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
+		for {
+			block := blockIter.Next()
+			if block == nil {
+				break
+			}
+			_, err := bc.InsertChain(types.Blocks{block}, true)
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+			case errors.Is(err, core.ErrNotLastBlockInEpoch):
+			case err != nil:
+				return errors.Wrap(err, "failed to InsertChain")
+			default:
+				hashes = append(hashes, block.Header().Hash())
+			}
+		}
+		return nil
+	})
+	return hashes, err
+}
+
+func (sss *StagedStreamSync) RollbackLastMileBlocks(ctx context.Context, hashes []common.Hash) error {
+	if len(hashes) == 0 {
+		return nil
+	}
+	sss.logger.Info().
+		Interface("block", sss.bc.CurrentBlock()).
+		Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
+	if err := sss.bc.Rollback(hashes); err != nil {
+		sss.logger.Error().Err(err).
+			Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
+		return err
+	}
+	return nil
+}
+
 func (sss *StagedStreamSync) canExecute(stage *Stage) bool {
 	// check range mode
 	if stage.RangeMode != LongRangeAndShortRange {
