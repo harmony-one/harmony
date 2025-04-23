@@ -59,6 +59,7 @@ func (d *dhtDiscovery) Start() error {
 
 // Stop stop the dhtDiscovery service
 func (d *dhtDiscovery) Close() error {
+	d.dht.Close()
 	d.cancel()
 	return nil
 }
