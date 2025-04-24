@@ -176,10 +176,6 @@ func (bh *beaconHelper) getNextBlock(expBN uint64) *types.Block {
 		if b.NumberU64() < expBN {
 			continue
 		}
-		// if b.NumberU64() > expBN {
-		// 	bh.lastMileCache.push(b)
-		// 	return nil
-		// }
 		return b
 	}
 	return nil
