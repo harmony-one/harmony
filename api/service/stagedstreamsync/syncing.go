@@ -390,8 +390,8 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 
 		totalInserted += n
 
-		// if it's not long range sync, skip loop
-		if n == 0 { //|| !initSync {
+		// if there is no more blocks to add, skip loop
+		if n == 0 {
 			break
 		}
 	}
