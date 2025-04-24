@@ -108,11 +108,12 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		}
 	}
 	curBN := s.state.bc.CurrentBlock().NumberU64()
+	curEpoch := s.state.bc.CurrentHeader().Epoch().Uint64()
 	bns := make([]uint64, 0, BlocksPerRequest)
 	// in epoch chain, we have only the last block of each epoch, so, the current
 	// block's epoch number shows the last epoch we have. We should start
 	// from next epoch then
-	loopEpoch := s.state.bc.CurrentHeader().Epoch().Uint64() + 1
+	loopEpoch := curEpoch + 1
 	for len(bns) < BlocksPerRequest {
 		blockNum := shard.Schedule.EpochLastBlock(loopEpoch)
 		if blockNum > curBN {
