@@ -419,6 +419,16 @@ func (p *Protocol) NumStreams() int {
 	return res
 }
 
+func (p *Protocol) StreamIDs() []sttypes.StreamID {
+	ids := make([]sttypes.StreamID, 0)
+	sts := p.sm.GetStreams()
+
+	for _, st := range sts {
+		ids = append(ids, st.ID())
+	}
+	return ids
+}
+
 // GetStreamManager get the underlying stream manager for upper level stream operations
 func (p *Protocol) GetStreamManager() streammanager.StreamManager {
 	return p.sm

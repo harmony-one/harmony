@@ -454,6 +454,31 @@ func (rm *requestManager) setStreamAvailability(stID sttypes.StreamID, available
 }
 
 func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
+	// if there are white listed streams, then choose from white list
+	if req.hasWhiteList() {
+		whitelistStreamIDs := req.whitelistIDs()
+		for _, id := range whitelistStreamIDs {
+			if !rm.available.Exists(id) {
+				continue
+			}
+			if req.isStreamBlacklisted(id) {
+				continue
+			}
+			st, ok := rm.streams.Get(id)
+			if !ok {
+				continue
+			}
+			if st.req != nil {
+				continue
+			}
+			spec, _ := st.ProtoSpec()
+			if req.Request.IsSupportedByProto(spec) {
+				return st, nil
+			}
+		}
+		return nil, errors.New("no more available whitelisted streams")
+	}
+
 	availableStreamIDs := rm.available.Keys()
 	for _, id := range availableStreamIDs {
 		if !req.isStreamAllowed(id) {

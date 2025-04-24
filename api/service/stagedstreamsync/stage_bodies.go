@@ -129,7 +129,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	s.state.gbm = newDownloadManager(b.configs.bc, currProgress, targetHeight, BlocksPerRequest, s.state.logger)
 
 	// Identify available valid streams
-	whitelistStreams, err := b.identifySyncedStreams(context.Background(), targetHeight)
+	whitelistStreams, err := b.identifySyncedStreams(context.Background(), s, targetHeight)
 	if err != nil {
 		b.configs.logger.Error().
 			Err(err).
@@ -157,29 +157,31 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 }
 
 // IdentifySyncedStreams roughly find the synced streams.
-func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight uint64) (streams []sttypes.StreamID, err error) {
+func (b *StageBodies) identifySyncedStreams(ctx context.Context, s *StageState, targetHeight uint64) (streams []sttypes.StreamID, err error) {
 	var (
 		synced = make(map[sttypes.StreamID]uint64)
 		lock   sync.Mutex
 		wg     sync.WaitGroup
 	)
 
-	numStreams := b.configs.protocol.NumStreams()
+	streamIDs := b.configs.protocol.StreamIDs()
+	numStreams := len(streamIDs)
 
 	// ask all streams for height
 	for i := 0; i < numStreams; i++ {
 		wg.Add(1)
+		stID := streamIDs[i]
 
-		go func() {
+		go func(stid sttypes.StreamID, targetHeight uint64) {
 			defer wg.Done()
 
-			bn, stid, err := b.configs.protocol.GetCurrentBlockNumber(ctx)
+			bn, err := s.state.bnCache.GetBlockNumber(ctx, stid, targetHeight, 0)
 			if err != nil {
 				b.configs.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
 
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					// Mark stream failure if it's not due to context cancelation or deadline
+					// Mark stream failure if it's not due to context cancellation or deadline
 					b.configs.protocol.StreamFailed(stid, "getCurrentNumber request failed")
 				} else {
 					b.configs.protocol.RemoveStream(stid)
@@ -195,7 +197,7 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 			lock.Lock()
 			synced[stid] = bn
 			lock.Unlock()
-		}()
+		}(stID, targetHeight)
 	}
 
 	// Wait for all goroutines to finish
