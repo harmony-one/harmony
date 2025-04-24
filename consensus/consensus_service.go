@@ -279,7 +279,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		}
 		consensus.setLeaderPubKey(msg.SenderPubkeys[0])
 		consensus.IgnoreViewIDCheck.UnSet()
-		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensus.consensusTimeout[timeoutConsensus].Start("checkViewID")
 		consensus.getLogger().Info().
 			Str("leaderKey", consensus.getLeaderPubKey().Bytes.Hex()).
 			Msg("[checkViewID] Start consensus timer")

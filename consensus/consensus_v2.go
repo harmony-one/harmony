@@ -217,7 +217,7 @@ func (consensus *Consensus) _finalCommit(isLeader bool) {
 				Msg("[finalCommit] Sent Committed Message")
 		}
 		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
-		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensus.consensusTimeout[timeoutConsensus].Start("finalCommit")
 	} else {
 		// delayed send
 		consensus.msgSender.DelayedSendWithRetry(
@@ -354,7 +354,7 @@ func (consensus *Consensus) Start(
 	}()
 
 	consensus.mutex.Lock()
-	consensus.consensusTimeout[timeoutBootstrap].Start()
+	consensus.consensusTimeout[timeoutBootstrap].Start("bootstrap")
 	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
 	// Set up next block due time.
 	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
@@ -382,7 +382,7 @@ func (consensus *Consensus) syncReadyChan(reason string) {
 		mode := consensus.updateConsensusInformation(reason)
 		consensus.current.SetMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
-		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensus.consensusTimeout[timeoutConsensus].Start("syncReadyChan")
 		consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 		consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
 	} else if consensus.mode() == Syncing {
@@ -391,7 +391,7 @@ func (consensus *Consensus) syncReadyChan(reason string) {
 		mode := consensus.updateConsensusInformation(reason)
 		consensus.setMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
-		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensus.consensusTimeout[timeoutConsensus].Start("syncReadyChan2")
 		consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
 	}
 }
@@ -615,7 +615,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		}
 		consensus.mutex.Lock()
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
-		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensus.consensusTimeout[timeoutConsensus].Start("preCommitAndPropose")
 
 		// Send signal to Node to propose the new block for consensus
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")

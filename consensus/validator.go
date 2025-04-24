@@ -403,7 +403,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 
 	if initBn < consensus.BlockNum() {
 		consensus.getLogger().Info().Msg("[OnCommitted] Start consensus timer (new block added)")
-		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensus.consensusTimeout[timeoutConsensus].Start("onCommitted")
 	}
 }
 
