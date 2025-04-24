@@ -723,7 +723,7 @@ func (consensus *Consensus) BlockVerifier(newBlock *types.Block) error {
 				}()
 			}
 		}
-		utils.Logger().Error().
+		consensus.GetLogger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Int("numTx", len(newBlock.Transactions())).
 			Int("numStakingTx", len(newBlock.StakingTransactions())).

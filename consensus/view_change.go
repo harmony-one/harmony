@@ -231,12 +231,12 @@ func (consensus *Consensus) startViewChange() {
 	epoch := curHeader.Epoch()
 	ss, err := consensus.Blockchain().ReadShardState(epoch)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
+		consensus.getLogger().Error().Err(err).Msg("Failed to read shard state")
 		return
 	}
 	committee, err := ss.FindCommitteeByID(consensus.ShardID)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to find committee")
+		consensus.getLogger().Error().Err(err).Msg("Failed to find committee")
 		return
 	}
 	// TODO: set the Leader PubKey to the next leader for view change
