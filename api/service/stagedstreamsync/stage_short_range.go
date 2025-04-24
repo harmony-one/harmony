@@ -112,7 +112,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	}
 	curBN := sr.configs.bc.CurrentBlock().NumberU64()
 	blkNums := sh.prepareBlockHashNumbers(curBN)
-	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums)
+	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums, true)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, nil
