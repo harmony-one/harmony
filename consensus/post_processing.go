@@ -15,10 +15,10 @@ import (
 	"github.com/harmony-one/harmony/webhooks"
 )
 
-// PostConsensusProcessing is called by consensus participants, after consensus is done, to:
+// postConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. [leader] send new block to the client
 // 2. [leader] send cross shard tx receipts to destination shard
-func (consensus *Consensus) PostConsensusProcessing(newBlock *types.Block) error {
+func (consensus *Consensus) postConsensusProcessing(newBlock *types.Block) error {
 	if consensus.IsLeader() {
 		if IsRunningBeaconChain(consensus) {
 			// TODO: consider removing this and letting other nodes broadcast new blocks.
@@ -29,7 +29,7 @@ func (consensus *Consensus) PostConsensusProcessing(newBlock *types.Block) error
 	} else {
 		if mode := consensus.mode(); mode != Listening {
 			numSignatures := consensus.NumSignaturesIncludedInBlock(newBlock)
-			utils.Logger().Info().
+			consensus.getLogger().Info().
 				Uint64("blockNum", newBlock.NumberU64()).
 				Uint64("epochNum", newBlock.Epoch().Uint64()).
 				Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
@@ -41,7 +41,7 @@ func (consensus *Consensus) PostConsensusProcessing(newBlock *types.Block) error
 				Msg("BINGO !!! Reached Consensus")
 			if consensus.mode() == Syncing {
 				mode = consensus.updateConsensusInformation("consensus.mode() == Syncing")
-				utils.Logger().Info().Msgf("Switching to mode %s", mode)
+				consensus.getLogger().Info().Msgf("Switching to mode %s", mode)
 				consensus.setMode(mode)
 			}
 
@@ -66,7 +66,7 @@ func (consensus *Consensus) PostConsensusProcessing(newBlock *types.Block) error
 		if h.Availability != nil {
 			shardState, err := consensus.Blockchain().ReadShardState(newBlock.Epoch())
 			if err != nil {
-				utils.Logger().Error().Err(err).
+				consensus.getLogger().Error().Err(err).
 					Int64("epoch", newBlock.Epoch().Int64()).
 					Uint32("shard-id", consensus.ShardID).
 					Msg("failed to read shard state")
@@ -76,12 +76,12 @@ func (consensus *Consensus) PostConsensusProcessing(newBlock *types.Block) error
 			for _, addr := range consensus.Registry().GetAddressToBLSKey().GetAddresses(consensus.getPublicKeys(), shardState, newBlock.Epoch()) {
 				wrapper, err := consensus.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
-					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator info")
+					consensus.getLogger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator info")
 					return nil
 				}
 				snapshot, err := consensus.Beaconchain().ReadValidatorSnapshot(addr)
 				if err != nil {
-					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator snapshot")
+					consensus.getLogger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator snapshot")
 					return nil
 				}
 				computed := availability.ComputeCurrentSigning(

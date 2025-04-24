@@ -231,12 +231,12 @@ func (consensus *Consensus) startViewChange() {
 	epoch := curHeader.Epoch()
 	ss, err := consensus.Blockchain().ReadShardState(epoch)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to read shard state")
+		consensus.getLogger().Error().Err(err).Msg("Failed to read shard state")
 		return
 	}
 	committee, err := ss.FindCommitteeByID(consensus.ShardID)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to find committee")
+		consensus.getLogger().Error().Err(err).Msg("Failed to find committee")
 		return
 	}
 	// TODO: set the Leader PubKey to the next leader for view change
@@ -257,7 +257,7 @@ func (consensus *Consensus) startViewChange() {
 	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "started"}).Inc()
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
-	defer consensus.consensusTimeout[timeoutViewChange].Start()
+	defer consensus.consensusTimeout[timeoutViewChange].Start("start view change")
 
 	// update the dictionary key if the viewID is first time received
 	members := consensus.decider.Participants()
@@ -328,7 +328,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 	consensus.setViewIDs(viewID)
 	consensus.resetViewChangeState()
-	consensus.consensusTimeout[timeoutConsensus].Start()
+	consensus.consensusTimeout[timeoutConsensus].Start("starting new view")
 
 	consensus.getLogger().Info().
 		Uint64("viewID", viewID).
@@ -546,7 +546,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	consensus.getLogger().Info().
 		Str("newLeaderKey", consensus.getLeaderPubKey().Bytes.Hex()).
 		Msg("new leader changed")
-	consensus.consensusTimeout[timeoutConsensus].Start()
+	consensus.consensusTimeout[timeoutConsensus].Start("starting on new view")
 	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "finished"}).Inc()
 }
 

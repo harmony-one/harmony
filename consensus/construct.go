@@ -9,7 +9,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 	protobuf "google.golang.org/protobuf/proto"
 )
 
@@ -131,7 +130,7 @@ func (consensus *Consensus) construct(
 		marshaledMessage, err = protobuf.Marshal(message)
 	}
 	if err != nil {
-		utils.Logger().Error().Err(err).
+		consensus.getLogger().Error().Err(err).
 			Str("phase", p.String()).
 			Msg("Failed to sign and marshal consensus message")
 		return nil, err
@@ -140,7 +139,7 @@ func (consensus *Consensus) construct(
 	FBFTMsg, err2 := consensus.parseFBFTMessage(message)
 
 	if err2 != nil {
-		utils.Logger().Error().Err(err).
+		consensus.getLogger().Error().Err(err).
 			Str("phase", p.String()).
 			Msg("failed to deal with the FBFT message")
 		return nil, err
@@ -167,7 +166,7 @@ func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.Phase) []byte {
 	} else if p == quorum.Commit {
 		buffer.Write(consensus.commitBitmap.Bitmap)
 	} else {
-		utils.Logger().Error().
+		consensus.getLogger().Error().
 			Str("phase", p.String()).
 			Msg("[constructQuorumSigAndBitmap] Invalid phase is supplied.")
 		return []byte{}

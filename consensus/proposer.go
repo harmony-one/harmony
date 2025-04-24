@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/harmony/worker"
 )
 
@@ -24,7 +23,7 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 		// Setup stoppedChan
 		defer close(stoppedChan)
 
-		utils.Logger().Debug().
+		consensus.GetLogger().Debug().
 			Msg("Waiting for Consensus ready")
 		select {
 		case <-time.After(30 * time.Second):
@@ -36,13 +35,13 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 			// keep waiting for Consensus ready
 			select {
 			case <-stopChan:
-				utils.Logger().Warn().
+				consensus.GetLogger().Warn().
 					Msg("Consensus new block proposal: STOPPED!")
 				return
 			case proposal := <-consensus.GetReadySignal():
 				for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
 					time.Sleep(SleepPeriod)
-					utils.Logger().Info().
+					consensus.GetLogger().Info().
 						Uint64("blockNum", proposal.blockNum).
 						Bool("asyncProposal", proposal.Type == AsyncProposal).
 						Str("called", proposal.Caller).
@@ -59,19 +58,19 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 						select {
 						case <-time.After(waitTime):
 							if waitTime == 0 {
-								utils.Logger().Info().Msg("[ProposeNewBlock] Sync block proposal, reading commit sigs directly from DB")
+								consensus.GetLogger().Info().Msg("[ProposeNewBlock] Sync block proposal, reading commit sigs directly from DB")
 							} else {
-								utils.Logger().Info().Msg("[ProposeNewBlock] Timeout waiting for commit sigs, reading directly from DB")
+								consensus.GetLogger().Info().Msg("[ProposeNewBlock] Timeout waiting for commit sigs, reading directly from DB")
 							}
 							sigs, err := consensus.BlockCommitSigs(consensus.Blockchain().CurrentBlock().NumberU64())
 
 							if err != nil {
-								utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
+								consensus.GetLogger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
 							} else {
 								newCommitSigsChan <- sigs
 							}
 						case commitSigs := <-consensus.GetCommitSigChannel():
-							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
+							consensus.GetLogger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
 							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
 								newCommitSigsChan <- commitSigs
 							}
@@ -79,7 +78,7 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 					}()
 					newBlock, err := consensus.ProposeNewBlock(newCommitSigsChan)
 					if err == nil {
-						utils.Logger().Info().
+						consensus.GetLogger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
 							Uint64("epoch", newBlock.Epoch().Uint64()).
 							Uint64("viewID", newBlock.Header().ViewID().Uint64()).
@@ -92,7 +91,7 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 						consensus.BlockChannel(newBlock)
 						break
 					} else {
-						utils.Logger().Err(err).Int("retryCount", retryCount).
+						consensus.GetLogger().Err(err).Int("retryCount", retryCount).
 							Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
 						continue
 					}

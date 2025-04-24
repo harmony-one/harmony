@@ -161,7 +161,7 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 }
 
 func (consensus *Consensus) ReadySignal(p Proposal, signalSource string, signalReason string) {
-	utils.Logger().Info().
+	consensus.GetLogger().Info().
 		Str("signalSource", signalSource).
 		Str("signalReason", signalReason).
 		Msg("ReadySignal is called to propose new block")
@@ -303,10 +303,10 @@ func New(
 
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey
-		utils.Logger().Info().
+		consensus.getLogger().Info().
 			Str("publicKey", consensus.GetPublicKeys().SerializeToHexStr()).Msg("My Public Key")
 	} else {
-		utils.Logger().Error().Msg("the bls key is nil")
+		consensus.getLogger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
@@ -358,7 +358,7 @@ func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err
 	blockNum := currentBlock.NumberU64()
 
 	epoch := currentBlock.Epoch()
-	utils.Logger().Info().
+	consensus.getLogger().Info().
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
@@ -367,7 +367,7 @@ func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err
 		epoch, consensus.Blockchain(),
 	)
 	if err != nil {
-		utils.Logger().Err(err).
+		consensus.getLogger().Err(err).
 			Uint64("blockNum", blockNum).
 			Uint32("shardID", shardID).
 			Uint64("epoch", epoch.Uint64()).
@@ -376,14 +376,14 @@ func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err
 	}
 	subComm, err := shardState.FindCommitteeByID(shardID)
 	if err != nil {
-		utils.Logger().Err(err).
+		consensus.getLogger().Err(err).
 			Interface("shardState", shardState).
 			Msg("[InitConsensusWithValidators] Find CommitteeByID")
 		return err
 	}
 	pubKeys, err := subComm.BLSPublicKeys()
 	if err != nil {
-		utils.Logger().Error().
+		consensus.getLogger().Error().
 			Uint32("shardID", shardID).
 			Uint64("blockNum", blockNum).
 			Msg("[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys")
@@ -395,7 +395,7 @@ func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err
 
 	for _, key := range pubKeys {
 		if consensus.getPublicKeys().Contains(key.Object) {
-			utils.Logger().Info().
+			consensus.getLogger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
 				Str("mode", consensus.Mode().String()).

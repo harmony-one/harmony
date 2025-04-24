@@ -8,16 +8,15 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 func (consensus *Consensus) didReachPrepareQuorum() error {
-	logger := utils.Logger()
+	logger := consensus.getLogger()
 	logger.Info().Msg("[OnPrepare] Received Enough Prepare Signatures")
 	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("[OnPrepare] leader not found")
+		logger.Warn().Err(err).Msg("[OnPrepare] leader not found")
 		return err
 	}
 	// Construct and broadcast prepared message
