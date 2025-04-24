@@ -14,7 +14,7 @@ func TestNewTimeout(t *testing.T) {
 
 func TestCheckExpire(t *testing.T) {
 	timer := NewTimeout(time.Second)
-	timer.Start()
+	timer.Start("start")
 	now := time.Now()
 	if timer.Expired(now) {
 		t.Fatalf("Timer shouldn't be expired")
@@ -23,7 +23,7 @@ func TestCheckExpire(t *testing.T) {
 		t.Fatalf("Timer should be expired")
 	}
 	// start again
-	timer.Start()
+	timer.Start("start")
 	if timer.Expired(now) {
 		t.Fatalf("Timer shouldn't be expired")
 	}
@@ -37,5 +37,8 @@ func TestCheckExpire(t *testing.T) {
 	}
 	if timer.Expired(now.Add(2 * time.Second)) {
 		t.Fatalf("Timer shouldn't be expired because it is stopped")
+	}
+	if timer.Reason() != "" {
+		t.Fatalf("Timer reason should be empty")
 	}
 }

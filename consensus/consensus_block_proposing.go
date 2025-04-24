@@ -86,7 +86,7 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 
 		pendingPoolTxs, err := consensus.registry.GetTxPool().Pending()
 		if err != nil {
-			utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
+			consensus.GetLogger().Err(err).Msg("Failed to fetch pending transactions")
 			return nil, err
 		}
 		pendingPlainTxs := map[common.Address]types.Transactions{}
@@ -102,7 +102,7 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 						pendingStakingTxs = append(pendingStakingTxs, stakingTx)
 					}
 				} else {
-					utils.Logger().Err(types.ErrUnknownPoolTxType).
+					consensus.GetLogger().Err(types.ErrUnknownPoolTxType).
 						Msg("Failed to parse pending transactions")
 					return nil, types.ErrUnknownPoolTxType
 				}
@@ -117,7 +117,7 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 		if err := worker.CommitTransactions(
 			pendingPlainTxs, pendingStakingTxs, beneficiary,
 		); err != nil {
-			utils.Logger().Error().Err(err).Msg("cannot commit transactions")
+			consensus.GetLogger().Error().Err(err).Msg("cannot commit transactions")
 			return nil, err
 		}
 		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
@@ -154,7 +154,7 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 			for _, pending := range allPending {
 				if !consensus.Blockchain().Config().IsCrossLink(pending.Epoch()) {
 					invalidToDelete = append(invalidToDelete, pending)
-					utils.Logger().Debug().
+					consensus.GetLogger().Debug().
 						AnErr("[ProposeNewBlock] pending crosslink that's before crosslink epoch", err)
 					continue
 				}
@@ -162,13 +162,13 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 				exist, err := consensus.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
 				if err == nil || exist != nil {
 					invalidToDelete = append(invalidToDelete, pending)
-					utils.Logger().Debug().
+					consensus.GetLogger().Debug().
 						AnErr("[ProposeNewBlock] pending crosslink is already committed onchain", err)
 					continue
 				}
 				last, err := consensus.Blockchain().ReadShardLastCrossLink(pending.ShardID())
 				if err != nil {
-					utils.Logger().Debug().
+					consensus.GetLogger().Debug().
 						AnErr("[ProposeNewBlock] failed to read last crosslink", err)
 					// no return
 				}
@@ -177,7 +177,7 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 					// Crosslink is already verified before it's accepted to pending,
 					// no need to verify again in proposal.
 					invalidToDelete = append(invalidToDelete, pending)
-					utils.Logger().Debug().
+					consensus.GetLogger().Debug().
 						AnErr("[ProposeNewBlock] pending crosslink is older than last shard crosslink", err)
 					continue
 				}
@@ -187,22 +187,22 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 					break
 				}
 			}
-			utils.Logger().Info().
+			consensus.GetLogger().Info().
 				Msgf("[ProposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
 					len(crossLinksToPropose), len(allPending),
 				)
 		} else {
-			utils.Logger().Warn().Err(err).Msgf(
+			consensus.GetLogger().Warn().Err(err).Msgf(
 				"[ProposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
 				len(allPending),
 			)
 		}
 		if n, err := consensus.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete); err != nil {
-			utils.Logger().Error().
+			consensus.GetLogger().Error().
 				Err(err).
 				Msg("[ProposeNewBlock] invalid pending cross links failed")
 		} else if len(invalidToDelete) > 0 {
-			utils.Logger().Info().
+			consensus.GetLogger().Info().
 				Int("not-deleted", n).
 				Int("deleted", len(invalidToDelete)).
 				Msg("[ProposeNewBlock] deleted invalid pending cross links")
@@ -234,15 +234,15 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 		coinbase, crossLinksToPropose, shardState,
 	)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed finalizing the new block")
+		consensus.GetLogger().Error().Err(err).Msg("[ProposeNewBlock] Failed finalizing the new block")
 		return nil, err
 	}
 
-	utils.Logger().Info().Msg("[ProposeNewBlock] verifying the new block header")
+	consensus.GetLogger().Info().Msg("[ProposeNewBlock] verifying the new block header")
 	err = core.NewBlockValidator(consensus.Blockchain()).ValidateHeader(finalizedBlock, true)
 
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed verifying the new block header")
+		consensus.GetLogger().Error().Err(err).Msg("[ProposeNewBlock] Failed verifying the new block header")
 		return nil, err
 	}
 
@@ -288,7 +288,7 @@ Loop:
 		}
 		// check double spent
 		if consensus.Blockchain().IsSpent(cxp) {
-			utils.Logger().Debug().Interface("cxp", cxp).Msg("[proposeReceiptsProof] CXReceipt is spent")
+			consensus.getLogger().Debug().Interface("cxp", cxp).Msg("[proposeReceiptsProof] CXReceipt is spent")
 			continue
 		}
 		hash := cxp.MerkleProof.BlockHash
@@ -309,12 +309,12 @@ Loop:
 			if strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
 				pendingReceiptsList = append(pendingReceiptsList, cxp)
 			} else {
-				utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+				consensus.getLogger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
 			}
 			continue
 		}
 
-		utils.Logger().Debug().Interface("cxp", cxp).Msg("[proposeReceiptsProof] CXReceipts Added")
+		consensus.getLogger().Debug().Interface("cxp", cxp).Msg("[proposeReceiptsProof] CXReceipts Added")
 		validReceiptsList = append(validReceiptsList, cxp)
 		numProposed = numProposed + len(cxp.Receipts)
 	}
@@ -327,7 +327,7 @@ Loop:
 		consensus.pendingCXReceipts[key] = v
 	}
 
-	utils.Logger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d", len(validReceiptsList))
+	consensus.getLogger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d", len(validReceiptsList))
 	return validReceiptsList
 }
 
@@ -335,7 +335,7 @@ func (consensus *Consensus) AddPendingReceipts(receipts *types.CXReceiptsProof) 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	if receipts.ContainsEmptyField() {
-		utils.Logger().Info().
+		consensus.getLogger().Info().
 			Int("totalPendingReceipts", len(consensus.pendingCXReceipts)).
 			Msg("CXReceiptsProof contains empty field")
 		return
@@ -348,14 +348,14 @@ func (consensus *Consensus) AddPendingReceipts(receipts *types.CXReceiptsProof) 
 
 	if err := core.NewBlockValidator(consensus.Blockchain()).ValidateCXReceiptsProof(receipts); err != nil {
 		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
-			utils.Logger().Error().Err(err).Msg("[AddPendingReceipts] Invalid CXReceiptsProof")
+			consensus.getLogger().Error().Err(err).Msg("[AddPendingReceipts] Invalid CXReceiptsProof")
 			return
 		}
 	}
 
 	// cross-shard receipt should not be coming from our shard
 	if s := consensus.ShardID; s == shardID {
-		utils.Logger().Info().
+		consensus.getLogger().Info().
 			Uint32("my-shard", s).
 			Uint32("receipt-shard", shardID).
 			Msg("ShardID of incoming receipt was same as mine")
@@ -364,7 +364,7 @@ func (consensus *Consensus) AddPendingReceipts(receipts *types.CXReceiptsProof) 
 
 	if e := receipts.Header.Epoch(); blockNum == 0 ||
 		!consensus.Blockchain().Config().AcceptsCrossTx(e) {
-		utils.Logger().Info().
+		consensus.getLogger().Info().
 			Uint64("incoming-epoch", e.Uint64()).
 			Msg("Incoming receipt had meaningless epoch")
 		return
@@ -375,7 +375,7 @@ func (consensus *Consensus) AddPendingReceipts(receipts *types.CXReceiptsProof) 
 	// DDoS protection
 	const maxCrossTxnSize = 4096
 	if s := len(consensus.pendingCXReceipts); s >= maxCrossTxnSize {
-		utils.Logger().Info().
+		consensus.getLogger().Info().
 			Int("pending-cx-receipts-size", s).
 			Int("pending-cx-receipts-limit", maxCrossTxnSize).
 			Msg("Current pending cx-receipts reached size limit")
@@ -383,13 +383,13 @@ func (consensus *Consensus) AddPendingReceipts(receipts *types.CXReceiptsProof) 
 	}
 
 	if _, ok := consensus.pendingCXReceipts[key]; ok {
-		utils.Logger().Info().
+		consensus.getLogger().Info().
 			Int("totalPendingReceipts", len(consensus.pendingCXReceipts)).
 			Msg("Already Got Same Receipt message")
 		return
 	}
 	consensus.pendingCXReceipts[key] = receipts
-	utils.Logger().Info().
+	consensus.getLogger().Info().
 		Int("totalPendingReceipts", len(consensus.pendingCXReceipts)).
 		Msg("Got ONE more receipt message")
 }
