@@ -75,7 +75,7 @@ func (bh *beaconHelper) loop() {
 		case <-t.C:
 			bh.insertAsync()
 
-		case b, ok := <-bh.blockC:
+		case b, ok := <-bh.blockC: // for side chain, it receives last block of each epoch
 			if !ok {
 				return // blockC closed. Node exited
 			}
@@ -175,10 +175,6 @@ func (bh *beaconHelper) getNextBlock(expBN uint64) *types.Block {
 		}
 		if b.NumberU64() < expBN {
 			continue
-		}
-		if b.NumberU64() > expBN {
-			bh.lastMileCache.push(b)
-			return nil
 		}
 		return b
 	}

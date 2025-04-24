@@ -60,35 +60,33 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 }
 
 type StagedStreamSync struct {
-	bc                core.BlockChain
-	consensus         *consensus.Consensus
-	db                kv.RwDB
-	protocol          syncProtocol
-	gbm               *downloadManager // initialized when finished get block number
-	isEpochChain      bool
-	isBeaconValidator bool
-	isBeaconShard     bool
-	isExplorer        bool
-	isValidator       bool
-	joinConsensus     bool
-	inserted          int
-	config            Config
-	logger            zerolog.Logger
-	status            *status //TODO: merge this with currentSyncCycle
-	initSync          bool    // if sets to true, node start long range syncing
-	UseMemDB          bool
-	revertPoint       *uint64 // used to run stages
-	prevRevertPoint   *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
-	invalidBlock      InvalidBlock
-	currentStage      uint
-	LogProgress       bool
-	currentCycle      SyncCycle // current cycle
-	stages            []*Stage
-	revertOrder       []*Stage
-	pruningOrder      []*Stage
-	timings           []Timing
-	logPrefixes       []string
-
+	bc                            core.BlockChain
+	consensus                     *consensus.Consensus
+	db                            kv.RwDB
+	protocol                      syncProtocol
+	gbm                           *downloadManager // initialized when finished get block number
+	isEpochChain                  bool
+	isBeaconValidator             bool
+	isBeaconShard                 bool
+	isExplorer                    bool
+	isValidator                   bool
+	joinConsensus                 bool
+	inserted                      int
+	config                        Config
+	logger                        zerolog.Logger
+	status                        *status //TODO: merge this with currentSyncCycle
+	initSync                      bool    // if sets to true, node start long range syncing
+	UseMemDB                      bool
+	revertPoint                   *uint64 // used to run stages
+	prevRevertPoint               *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
+	invalidBlock                  InvalidBlock
+	currentStage                  uint
+	currentCycle                  SyncCycle // current cycle
+	stages                        []*Stage
+	revertOrder                   []*Stage
+	pruningOrder                  []*Stage
+	timings                       []Timing
+	logPrefixes                   []string
 	evtDownloadFinished           event.Feed // channel for each download task finished
 	evtDownloadFinishedSubscribed bool
 	evtDownloadStarted            event.Feed // channel for each download has started
@@ -299,9 +297,9 @@ func New(
 	consensus *consensus.Consensus,
 	db kv.RwDB,
 	stagesList []*Stage,
+	protocol syncProtocol,
 	isEpochChain bool,
 	isBeaconShard bool,
-	protocol syncProtocol,
 	isBeaconValidator bool,
 	isExplorer bool,
 	isValidator bool,
@@ -360,6 +358,7 @@ func New(
 		joinConsensus:     joinConsensus,
 		gbm:               nil,
 		status:            status,
+		initSync:          true,
 		inserted:          0,
 		config:            config,
 		logger:            logger,
@@ -474,6 +473,46 @@ func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, fi
 		sss.logger.Warn().Err(err).Msg("print timing logs failed")
 	}
 	sss.currentStage = 0
+	return nil
+}
+
+func (sss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) ([]common.Hash, error) {
+	curNumber := bc.CurrentBlock().NumberU64()
+	var hashes []common.Hash
+
+	err := cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
+		for {
+			block := blockIter.Next()
+			if block == nil {
+				break
+			}
+			_, err := bc.InsertChain(types.Blocks{block}, true)
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+			case errors.Is(err, core.ErrNotLastBlockInEpoch):
+			case err != nil:
+				return errors.Wrap(err, "failed to InsertChain")
+			default:
+				hashes = append(hashes, block.Header().Hash())
+			}
+		}
+		return nil
+	})
+	return hashes, err
+}
+
+func (sss *StagedStreamSync) RollbackLastMileBlocks(ctx context.Context, hashes []common.Hash) error {
+	if len(hashes) == 0 {
+		return nil
+	}
+	sss.logger.Info().
+		Interface("block", sss.bc.CurrentBlock()).
+		Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
+	if err := sss.bc.Rollback(hashes); err != nil {
+		sss.logger.Error().Err(err).
+			Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
+		return err
+	}
 	return nil
 }
 

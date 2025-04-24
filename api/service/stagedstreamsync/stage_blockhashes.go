@@ -31,10 +31,9 @@ type StageBlockHashesCfg struct {
 	concurrency int
 	protocol    syncProtocol
 	//bgProcRunning bool
-	isBeaconShard bool
-	cachedb       kv.RwDB
-	logProgress   bool
-	logger        zerolog.Logger
+	cachedb     kv.RwDB
+	logProgress bool
+	logger      zerolog.Logger
 }
 
 func NewStageBlockHashes(cfg StageBlockHashesCfg) *StageBlockHashes {
@@ -43,14 +42,13 @@ func NewStageBlockHashes(cfg StageBlockHashesCfg) *StageBlockHashes {
 	}
 }
 
-func NewStageBlockHashesCfg(bc core.BlockChain, db kv.RwDB, concurrency int, protocol syncProtocol, isBeaconShard bool, logger zerolog.Logger, logProgress bool) StageBlockHashesCfg {
+func NewStageBlockHashesCfg(bc core.BlockChain, db kv.RwDB, concurrency int, protocol syncProtocol, logger zerolog.Logger, logProgress bool) StageBlockHashesCfg {
 	return StageBlockHashesCfg{
-		bc:            bc,
-		db:            db,
-		concurrency:   concurrency,
-		protocol:      protocol,
-		isBeaconShard: isBeaconShard,
-		logProgress:   logProgress,
+		bc:          bc,
+		db:          db,
+		concurrency: concurrency,
+		protocol:    protocol,
+		logProgress: logProgress,
 		logger: logger.With().
 			Str("stage", "StageBlockHashes").
 			Str("mode", "long range").

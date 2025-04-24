@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"io"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -23,7 +22,7 @@ type Stream interface {
 	ReadBytes() ([]byte, error)
 	Close() error
 	CloseOnExit() error
-	Failures() int
+	Failures() int32
 	AddFailedTimes(faultRecoveryThreshold time.Duration)
 	ResetFailedTimes()
 }
@@ -42,15 +41,17 @@ type BaseStream struct {
 
 	failures        int32
 	lastFailureTime time.Time
+	failureLock     sync.Mutex
 }
 
 // NewBaseStream creates BaseStream as the wrapper of libp2p Stream
 func NewBaseStream(st libp2p_network.Stream) *BaseStream {
 	reader := bufio.NewReader(st)
 	return &BaseStream{
-		raw:      st,
-		reader:   reader,
-		failures: 0,
+		raw:             st,
+		reader:          reader,
+		failures:        0,
+		lastFailureTime: time.Now(),
 	}
 }
 
@@ -85,17 +86,23 @@ func (st *BaseStream) Close() error {
 	return nil
 }
 
-func (st *BaseStream) Failures() int {
-	return int(atomic.LoadInt32(&st.failures))
+func (st *BaseStream) Failures() int32 {
+	st.failureLock.Lock()
+	defer st.failureLock.Unlock()
+	return st.failures
 }
 
 func (st *BaseStream) AddFailedTimes(faultRecoveryThreshold time.Duration) {
-	atomic.AddInt32(&st.failures, 1)
+	st.failureLock.Lock()
+	defer st.failureLock.Unlock()
+	st.failures += 1
 	st.lastFailureTime = time.Now()
 }
 
 func (st *BaseStream) ResetFailedTimes() {
-	atomic.StoreInt32(&st.failures, 0)
+	st.failureLock.Lock()
+	defer st.failureLock.Unlock()
+	st.failures = 0
 }
 
 const (
@@ -126,13 +133,8 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	defer st.writeLock.Unlock()
 	_, err = st.raw.Write(message[:size])
 	if err != nil {
-		// try to reconnect and write again
-		if errC := st.reconnect(); errC == nil {
-			_, err = st.raw.Write(message[:size])
-		}
-		if err != nil {
-			return err
-		}
+		st.raw.Reset()
+		return err
 	}
 	bytesWriteCounter.Add(float64(size))
 	return nil
@@ -153,14 +155,9 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 	sb := make([]byte, sizeBytes)
 	_, err = st.reader.Read(sb)
 	if err != nil {
-		// try to reconnect and read again
-		if errC := st.reconnect(); errC == nil {
-			_, err = st.reader.Read(sb)
-		}
-		if err != nil {
-			err = errors.Wrap(err, "read size")
-			return
-		}
+		st.raw.Reset()
+		err = errors.Wrap(err, "read size")
+		return
 	}
 	bytesReadCounter.Add(sizeBytes)
 	size := bytesToInt(sb)
@@ -173,12 +170,13 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 
 	n, err := io.ReadFull(st.reader, cb)
 	if err != nil {
+		st.raw.Reset()
 		err = errors.Wrap(err, "read content")
 		return
 	}
 	bytesReadCounter.Add(float64(n))
 	if n != size {
-		err = errors.New("ReadBytes sanity failed: byte size")
+		err = errors.Errorf("read %d bytes but expected %d", n, size)
 		return
 	}
 	return
