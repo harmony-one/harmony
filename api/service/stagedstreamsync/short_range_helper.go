@@ -19,7 +19,7 @@ type srHelper struct {
 	logger       zerolog.Logger
 }
 
-func (sh *srHelper) getHashChain(ctx context.Context, bns []uint64) ([]common.Hash, []sttypes.StreamID, error) {
+func (sh *srHelper) getHashChain(ctx context.Context, bns []uint64, partially bool) ([]common.Hash, []sttypes.StreamID, error) {
 	results := newBlockHashResults(bns)
 
 	concurrency := sh.config.Concurrency
@@ -34,7 +34,7 @@ func (sh *srHelper) getHashChain(ctx context.Context, bns []uint64) ([]common.Ha
 		go func(index int) {
 			defer wg.Done()
 
-			hashes, stid, err := sh.doGetBlockHashesRequest(ctx, bns, false)
+			hashes, stid, err := sh.doGetBlockHashesRequest(ctx, bns, partially)
 			if err != nil {
 				sh.logger.Warn().Err(err).Str("StreamID", string(stid)).
 					Msg(WrapStagedSyncMsg("doGetBlockHashes return error"))
