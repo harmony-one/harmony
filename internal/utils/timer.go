@@ -16,9 +16,10 @@ const (
 
 // Timeout is the implementation of timeout
 type Timeout struct {
-	state TimeoutState
-	d     time.Duration
-	start time.Time
+	state  TimeoutState
+	d      time.Duration
+	start  time.Time
+	reason string
 }
 
 // NewTimeout creates a new timeout class
@@ -28,15 +29,28 @@ func NewTimeout(d time.Duration) *Timeout {
 }
 
 // Start starts the timeout clock
-func (timeout *Timeout) Start() {
+func (timeout *Timeout) Start(reason string) {
 	timeout.state = Active
 	timeout.start = time.Now()
+	if timeout.reason != "" {
+		Logger().Warn().
+			Str("old", timeout.reason).
+			Str("new", reason).
+			Msg("timeout reason was overwritten")
+	}
+	timeout.reason = reason
 }
 
 // Stop stops the timeout clock
 func (timeout *Timeout) Stop() {
 	timeout.state = Inactive
 	timeout.start = time.Now()
+	if timeout.reason == "" {
+		Logger().Warn().
+			Str("reason", timeout.reason).
+			Msg("timeout reason was empty")
+	}
+	timeout.reason = ""
 }
 
 // Expired checks whether the timeout is reached/expired
@@ -65,4 +79,8 @@ func (timeout *Timeout) SetDuration(nd time.Duration) {
 // and also not expired with time elapses longer than duration from start
 func (timeout *Timeout) IsActive() bool {
 	return timeout.state == Active
+}
+
+func (timeout *Timeout) Reason() string {
+	return timeout.reason
 }
