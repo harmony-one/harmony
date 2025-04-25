@@ -34,17 +34,20 @@ type State struct {
 	block []byte
 
 	// FBFT phase: Announce, Prepare, Commit
-	phase FBFTPhase
+	phase atomic.Value // FBFTPhase
 
 	// ShardID of the consensus
 	ShardID uint32
 }
 
 func NewState(mode Mode, shardID uint32) State {
-	return State{
+	state := State{
 		mode:    uint32(mode),
 		ShardID: shardID,
+		phase:   atomic.Value{},
 	}
+	state.phase.Store(FBFTAnnounce)
+	return state
 }
 
 func (pm *State) getBlockNum() uint64 {
@@ -79,7 +82,7 @@ func (pm *State) getLogger() *zerolog.Logger {
 		Uint32("shardID", pm.ShardID).
 		Uint64("myBlock", pm.getBlockNum()).
 		Uint64("myViewID", pm.GetCurBlockViewID()).
-		Str("phase", pm.phase.String()).
+		Str("phase", pm.phase.Load().(FBFTPhase).String()).
 		Str("mode", pm.Mode().String()).
 		Logger()
 	return &logger
@@ -88,11 +91,11 @@ func (pm *State) getLogger() *zerolog.Logger {
 // switchPhase will switch FBFTPhase to desired phase.
 func (pm *State) switchPhase(subject string, desired FBFTPhase) {
 	pm.getLogger().Info().
-		Str("from:", pm.phase.String()).
+		Str("from:", pm.phase.Load().(FBFTPhase).String()).
 		Str("to:", desired.String()).
 		Str("switchPhase:", subject)
 
-	pm.phase = desired
+	pm.phase.Store(desired)
 }
 
 // GetCurBlockViewID returns the current view ID of the consensus

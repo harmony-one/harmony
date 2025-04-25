@@ -86,7 +86,6 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.msgSender.StopRetry(msg_pb.MessageType_COMMITTED)
 
 	consensus.getLogger().Debug().
-		Str("From", consensus.current.phase.String()).
 		Str("To", FBFTCommit.String()).
 		Msg("[OnPrepare] Switching phase")
 

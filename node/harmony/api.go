@@ -112,7 +112,7 @@ func (node *Node) GetConsensusMode() string {
 
 // GetConsensusPhase returns the current consensus phase
 func (node *Node) GetConsensusPhase() string {
-	return node.Consensus.GetConsensusPhase()
+	return node.Consensus.GetConsensusPhase().String()
 }
 
 // GetConsensusViewChangingID returns the view changing ID
