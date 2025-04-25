@@ -1,15 +1,13 @@
 package consensus
 
 // GetConsensusPhase returns the current phase of the consensus.
-func (consensus *Consensus) GetConsensusPhase() string {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
+func (consensus *Consensus) GetConsensusPhase() FBFTPhase {
 	return consensus.getConsensusPhase()
 }
 
 // GetConsensusPhase returns the current phase of the consensus.
-func (consensus *Consensus) getConsensusPhase() string {
-	return consensus.current.phase.String()
+func (consensus *Consensus) getConsensusPhase() FBFTPhase {
+	return consensus.current.phase.Load().(FBFTPhase)
 }
 
 // GetConsensusMode returns the current mode of the consensus
