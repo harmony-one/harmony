@@ -271,7 +271,7 @@ func (sp *testSyncProtocol) GetBlocksByHashes(ctx context.Context, hs []common.H
 	return res, sp.nextStreamID(), nil
 }
 
-func (sp *testSyncProtocol) RemoveStream(target sttypes.StreamID) {
+func (sp *testSyncProtocol) RemoveStream(target sttypes.StreamID, reason string) {
 	sp.lock.Lock()
 	defer sp.lock.Unlock()
 

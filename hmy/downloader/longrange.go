@@ -104,7 +104,7 @@ func (lsi *lrSyncIter) estimateCurrentNumber() (uint64, error) {
 				lsi.logger.Err(err).Str("streamID", string(stid)).
 					Msg("getCurrentNumber request failed. Removing stream")
 				if !errors.Is(err, context.Canceled) {
-					lsi.p.RemoveStream(stid)
+					lsi.p.RemoveStream(stid, "getCurrentNumber request failed")
 				}
 				return
 			}
@@ -218,7 +218,7 @@ func (lsi *lrSyncIter) processBlocks(results []*blockResult, targetBN uint64) {
 			pl["error"] = err.Error()
 			longRangeFailInsertedBlockCounterVec.With(pl).Inc()
 
-			lsi.p.RemoveStream(results[i].stid)
+			lsi.p.RemoveStream(results[i].stid, "invalid block")
 			lsi.gbm.HandleInsertError(results, i)
 			return
 		}
@@ -264,7 +264,7 @@ func (w *getBlocksWorker) workLoop(ctx context.Context) {
 		blocks, stid, err := w.doBatch(ctx, batch)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				w.protocol.RemoveStream(stid)
+				w.protocol.RemoveStream(stid, "doBatch failed")
 			}
 			err = errors.Wrap(err, "request error")
 			w.gbm.HandleRequestError(batch, err, stid)
