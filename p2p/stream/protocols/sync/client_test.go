@@ -818,7 +818,7 @@ func (sm *testStreamManager) NewStream(stream sttypes.Stream) error {
 	return nil
 }
 
-func (sm *testStreamManager) RemoveStream(stID sttypes.StreamID) error {
+func (sm *testStreamManager) RemoveStream(stID sttypes.StreamID, reason string) error {
 	for i, id := range sm.streamIDs {
 		if id == stID {
 			sm.streamIDs = append(sm.streamIDs[:i], sm.streamIDs[i+1:]...)

@@ -193,7 +193,7 @@ func (sm *streamManager) loop() {
 			addStream.errC <- err
 
 		case rmStream := <-sm.rmStreamCh:
-			err := sm.handleRemoveStream(rmStream.id)
+			err := sm.handleRemoveStream(rmStream.id, rmStream.reason)
 			rmStream.errC <- err
 
 		case stop := <-sm.stopCh:
@@ -224,10 +224,11 @@ func (sm *streamManager) NewStream(stream sttypes.Stream) error {
 }
 
 // RemoveStream close and remove a stream from stream manager
-func (sm *streamManager) RemoveStream(stID sttypes.StreamID) error {
+func (sm *streamManager) RemoveStream(stID sttypes.StreamID, reason string) error {
 	task := rmStreamTask{
-		id:   stID,
-		errC: make(chan error),
+		id:     stID,
+		reason: reason,
+		errC:   make(chan error),
 	}
 	sm.rmStreamCh <- task
 	return <-task.errC
@@ -260,8 +261,9 @@ type (
 	}
 
 	rmStreamTask struct {
-		id   sttypes.StreamID
-		errC chan error
+		id     sttypes.StreamID
+		reason string
+		errC   chan error
 	}
 
 	discTask struct{}
@@ -357,12 +359,18 @@ func (sm *streamManager) addStreamFromReserved(count int) (int, error) {
 	return added, nil
 }
 
-func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
+func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string) error {
 	st, ok := sm.streams.get(id)
 	if !ok {
 		return ErrStreamAlreadyRemoved
 	}
 	sm.streams.deleteStream(st)
+
+	sm.logger.Info().
+		Int("NumStreams", sm.streams.size()).
+		Interface("StreamID", id).
+		Str("reason", reason).
+		Msg("[StreamManager] removed stream from main streams list")
 
 	info, exist := sm.removedStreams.Get(id)
 	if !exist {

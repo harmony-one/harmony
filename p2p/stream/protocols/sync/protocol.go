@@ -375,13 +375,14 @@ func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 
 // RemoveStream removes the stream of the given stream ID
 // TODO: add reason to parameters
-func (p *Protocol) RemoveStream(stID sttypes.StreamID) {
+func (p *Protocol) RemoveStream(stID sttypes.StreamID, reason string) {
 	st, exist := p.sm.GetStreamByID(stID)
 	if exist && st != nil {
 		//TODO: log this incident with reason
 		st.Close()
 		p.logger.Info().
 			Str("stream ID", string(stID)).
+			Str("reason", reason).
 			Msg("stream removed")
 	}
 }
@@ -399,6 +400,7 @@ func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
 			st.Close()
 			p.logger.Warn().
 				Str("stream ID", string(st.ID())).
+				Str("reason", "too many failures").
 				Msg("stream removed")
 		}
 	}
