@@ -27,7 +27,7 @@ type syncProtocol interface {
 	GetByteCodes(ctx context.Context, hs []common.Hash, bytes uint64, opts ...syncproto.Option) (codes [][]byte, stid sttypes.StreamID, err error)
 	GetTrieNodes(ctx context.Context, root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, opts ...syncproto.Option) (nodes [][]byte, stid sttypes.StreamID, err error)
 
-	RemoveStream(stID sttypes.StreamID) // If a stream delivers invalid data, remove the stream
+	RemoveStream(stID sttypes.StreamID, reason string) // If a stream delivers invalid data, remove the stream
 	StreamFailed(stID sttypes.StreamID, reason string)
 	SubscribeAddStreamEvent(ch chan<- streammanager.EvtStreamAdded) event.Subscription
 	NumStreams() int
