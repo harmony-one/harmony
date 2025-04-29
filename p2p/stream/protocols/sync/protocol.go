@@ -281,7 +281,7 @@ func (p *Protocol) advertise() time.Duration {
 
 			if err == nil {
 				newPeersDiscovered = true
-				p.logger.Info().
+				p.logger.Debug().
 					Str("protocol", string(pid)).
 					Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
 					Int("retry", retries).
@@ -319,7 +319,7 @@ func (p *Protocol) advertise() time.Duration {
 		}
 
 		if err != nil {
-			p.logger.Error().Err(err).
+			p.logger.Debug().Err(err).
 				Str("protocol", string(pid)).
 				Msg("Advertise failed after retries")
 			continue
@@ -379,7 +379,7 @@ func (p *Protocol) RemoveStream(stID sttypes.StreamID, reason string) {
 	st, exist := p.sm.GetStreamByID(stID)
 	if exist && st != nil {
 		//TODO: log this incident with reason
-		st.Close()
+		st.Close(reason)
 		p.logger.Info().
 			Str("stream ID", string(stID)).
 			Str("reason", reason).
@@ -397,7 +397,7 @@ func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
 			Str("reason", reason).
 			Msg("stream failed")
 		if st.Failures() >= MaxStreamFailures {
-			st.Close()
+			st.Close("too many failures")
 			p.logger.Warn().
 				Str("stream ID", string(st.ID())).
 				Str("reason", "too many failures").
