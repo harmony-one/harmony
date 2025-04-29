@@ -107,7 +107,7 @@ func (st *testStream) ProtoSpec() (sttypes.ProtoSpec, error) {
 	return sttypes.ProtoIDToProtoSpec(testProtoID)
 }
 
-func (st *testStream) Close() error {
+func (st *testStream) Close(reason string) error {
 	return nil
 }
 
