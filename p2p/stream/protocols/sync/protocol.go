@@ -200,7 +200,7 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 	st := p.wrapStream(raw)
 	if err := p.sm.NewStream(st); err != nil {
 		// Possibly we have reach the hard limit of the stream
-		if !errors.Is(err, streammanager.ErrStreamAlreadyExist) {
+		if !errors.Is(err, streammanager.ErrStreamAlreadyExist) && !errors.Is(err, streammanager.ErrStreamRemovalNotExpired) {
 			p.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
 				Msg("failed to add new stream")
 		}
