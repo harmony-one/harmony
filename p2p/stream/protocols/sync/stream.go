@@ -156,7 +156,7 @@ func (st *syncStream) Close() error {
 		// Already closed by another goroutine. Directly return
 		return nil
 	}
-	if err := st.protocol.sm.RemoveStream(st.ID()); err != nil {
+	if err := st.protocol.sm.RemoveStream(st.ID(), "force close"); err != nil {
 		st.logger.Err(err).Str("stream ID", string(st.ID())).
 			Msg("failed to remove sync stream on close")
 	}

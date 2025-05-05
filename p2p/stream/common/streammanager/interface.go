@@ -28,7 +28,7 @@ type ReaderSubscriber interface {
 // Operator handles new stream or remove stream
 type Operator interface {
 	NewStream(stream sttypes.Stream) error
-	RemoveStream(stID sttypes.StreamID) error
+	RemoveStream(stID sttypes.StreamID, reason string) error
 }
 
 // Subscriber is the interface to support stream event subscription
