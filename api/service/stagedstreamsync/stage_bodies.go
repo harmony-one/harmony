@@ -180,7 +180,7 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 					// Mark stream failure if it's not due to context cancelation or deadline
 					b.configs.protocol.StreamFailed(stid, "getCurrentNumber request failed")
 				} else {
-					b.configs.protocol.RemoveStream(stid)
+					b.configs.protocol.RemoveStream(stid, "getCurrentNumber request failed")
 				}
 				return
 			}
@@ -391,7 +391,7 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 			Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received invalid (nil) blockBytes"))
 		err := errors.New("downloadRawBlocks received invalid (nil) blockBytes")
 		gbm.HandleRequestError(bns, err, stid)
-		b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
+		b.configs.protocol.StreamFailed(stid, "downloadRawBlocks received nil blockBytes")
 		return err
 	} else if len(blockBytes) == 0 {
 		utils.Logger().Warn().
@@ -400,7 +400,7 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 			Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received empty blockBytes, remote peer is not fully synced"))
 		err := errors.New("downloadRawBlocks received empty blockBytes")
 		gbm.HandleRequestError(bns, err, stid)
-		b.configs.protocol.RemoveStream(stid)
+		b.configs.protocol.RemoveStream(stid, "downloadRawBlocks received empty blockBytes")
 		return err
 	} else if len(blockBytes) != len(bns) {
 		utils.Logger().Warn().
@@ -409,7 +409,7 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 			Msg(WrapStagedSyncMsg("downloadRawBlocks failed, received blockBytes length is not match with requested block numbers"))
 		err := errors.New("downloadRawBlocks received blockBytes length is not match with requested block numbers")
 		gbm.HandleRequestError(bns, err, stid)
-		b.configs.protocol.RemoveStream(stid)
+		b.configs.protocol.RemoveStream(stid, "downloadRawBlocks received unexpected blockBytes")
 		return err
 	} else {
 		validBlocks := true
@@ -426,7 +426,7 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, some block Bytes are not valid"))
 			err := errors.New("downloadRawBlocks received blockBytes are not valid")
 			gbm.HandleRequestError(bns, err, stid)
-			b.configs.protocol.RemoveStream(stid)
+			b.configs.protocol.RemoveStream(stid, "downloadRawBlocks received blockBytes are not valid")
 			return err
 		}
 		if err = b.saveBlocks(ctx, nil, bns, blockBytes, sigBytes, workerID, stid); err != nil {
@@ -503,7 +503,7 @@ badBlockDownloadLoop:
 		for _, id := range s.state.invalidBlock.StreamID {
 			if id == stid {
 				// re-download from this stream failed
-				b.configs.protocol.RemoveStream(stid)
+				b.configs.protocol.RemoveStream(stid, "same stream failed to redownload bad block")
 				time.Sleep(retryDelay)
 				continue badBlockDownloadLoop
 			}

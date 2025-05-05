@@ -153,7 +153,7 @@ func (bh *StageBlockHashes) downloadBlockHashes(ctx context.Context, bns []uint6
 		bh.configs.logger.Warn().
 			Interface("bns", bns).
 			Msg("[StageBlockHashes] downloadBlockHashes Nil Response")
-		bh.configs.protocol.RemoveStream(stid)
+		bh.configs.protocol.RemoveStream(stid, "nil block hashes")
 		return []common.Hash{}, stid, errors.New("nil response for hashes")
 	}
 	bh.configs.logger.Info().
@@ -174,7 +174,7 @@ func (bh *StageBlockHashes) downloadBlockHashes(ctx context.Context, bns []uint6
 			Int("received size", len(hashes)).
 			Interface("stid", stid).
 			Msg("[StageBlockHashes] received less hashes than requested, target stream is not synced!")
-		bh.configs.protocol.RemoveStream(stid)
+		bh.configs.protocol.RemoveStream(stid, "expected more hashes")
 		return []common.Hash{}, stid, errors.New("not synced stream")
 	}
 	return hashes, stid, err
@@ -238,7 +238,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 
 				// Check if any hash is zero
 				if bh.containsZeroHash(hashes) {
-					bh.configs.protocol.RemoveStream(stid) // Remove immediately
+					bh.configs.protocol.RemoveStream(stid, "stream response contains zero hashes") // Remove immediately
 					return
 				}
 
@@ -370,7 +370,7 @@ func (bh *StageBlockHashes) calculateFinalBlockHashes(
 		for i, blockNumber := range batch {
 			if i >= len(hashes) || finalHashes[blockNumber] != hashes[i] {
 				invalidStreams[stid] = struct{}{}
-				bh.configs.protocol.RemoveStream(stid)
+				bh.configs.protocol.RemoveStream(stid, "calculateFinalBlockHashes - invalid stream")
 				break
 			}
 		}

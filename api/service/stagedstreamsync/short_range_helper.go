@@ -202,9 +202,9 @@ func (sh *srHelper) doGetBlocksByHashesRequest(ctx context.Context, hashes []com
 	return blocks, stid, nil
 }
 
-func (sh *srHelper) removeStreams(sts []sttypes.StreamID) {
+func (sh *srHelper) removeStreams(sts []sttypes.StreamID, reason string) {
 	for _, st := range sts {
-		sh.syncProtocol.RemoveStream(st)
+		sh.syncProtocol.RemoveStream(st, reason)
 	}
 }
 

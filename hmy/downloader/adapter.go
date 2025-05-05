@@ -18,7 +18,7 @@ type syncProtocol interface {
 	GetBlockHashes(ctx context.Context, bns []uint64, opts ...syncproto.Option) ([]common.Hash, sttypes.StreamID, error)
 	GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts ...syncproto.Option) ([]*types.Block, sttypes.StreamID, error)
 
-	RemoveStream(stID sttypes.StreamID) // If a stream delivers invalid data, remove the stream
+	RemoveStream(stID sttypes.StreamID, reason string) // If a stream delivers invalid data, remove the stream
 	SubscribeAddStreamEvent(ch chan<- streammanager.EvtStreamAdded) event.Subscription
 	NumStreams() int
 }
