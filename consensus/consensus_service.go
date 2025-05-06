@@ -135,7 +135,6 @@ func signConsensusMessage(message *msg_pb.Message,
 // UpdateBitmaps update the bitmaps for prepare and commit phase
 func (consensus *Consensus) updateBitmaps() {
 	consensus.getLogger().Debug().
-		Str("MessageType", consensus.current.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
 	members := consensus.decider.Participants()
 	prepareBitmap := bls_cosi.NewMask(members)
@@ -685,8 +684,6 @@ func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uin
 
 // GetLogger returns logger for consensus contexts added.
 func (consensus *Consensus) GetLogger() *zerolog.Logger {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
 	return consensus.getLogger()
 }
 
@@ -696,7 +693,7 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 		Uint32("shardID", consensus.ShardID).
 		Uint64("myBlock", consensus.current.getBlockNum()).
 		Uint64("myViewID", consensus.current.getCurBlockViewID()).
-		Str("phase", consensus.current.phase.String()).
+		Str("phase", consensus.getConsensusPhase().String()).
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
 	return &logger
