@@ -14,6 +14,7 @@ env:
   - TEST="bash ./scripts/travis_go_checker.sh"
   - TEST="bash ./scripts/travis_rpc_checker.sh"
   - TEST="bash ./scripts/travis_rosetta_checker.sh"
+  - TEST="bash ./scripts/travis_pyhmy_checker.sh"
 
 # We enable Travis on the main/dev branches or forked repositories here.
 # PRs workflow isn't affected by this condition
