@@ -79,7 +79,9 @@ func (st *syncStream) readMsgLoop() {
 				}
 				return
 			}
-			st.deliverMsg(msg)
+			if msg != nil {
+				st.deliverMsg(msg)
+			}
 		}
 	}
 }
@@ -98,6 +100,8 @@ func (st *syncStream) deliverMsg(msg protobuf.Message) {
 			case <-time.After(1 * time.Minute):
 				st.logger.Warn().Str("request", req.String()).
 					Msg("request handler severely jammed, message dropped")
+			case <-st.closeC:
+				return
 			}
 		}()
 	}
@@ -108,6 +112,8 @@ func (st *syncStream) deliverMsg(msg protobuf.Message) {
 			case <-time.After(1 * time.Minute):
 				st.logger.Warn().Str("response", resp.String()).
 					Msg("response handler severely jammed, message dropped")
+			case <-st.closeC:
+				return
 			}
 		}()
 	}
@@ -170,6 +176,9 @@ func (st *syncStream) CloseOnExit() error {
 	if !notClosed {
 		// Already closed by another goroutine. Directly return
 		return nil
+	}
+	if err := st.BaseStream.Close(); err != nil {
+		//TODO: log closure error
 	}
 	close(st.closeC)
 	return st.BaseStream.CloseOnExit()
@@ -432,6 +441,9 @@ func (st *syncStream) readMsg() (*syncpb.Message, error) {
 	b, err := st.ReadBytes()
 	if err != nil {
 		return nil, err
+	}
+	if b == nil || len(b) == 0 {
+		return nil, nil
 	}
 	var msg = &syncpb.Message{}
 	if err := protobuf.Unmarshal(b, msg); err != nil {
