@@ -19,6 +19,7 @@ const (
 	sizeBytes          = 4                // uint32
 	streamReadTimeout  = 60 * time.Second
 	streamWriteTimeout = 60 * time.Second
+	withDeadlines      = false // set stream deadlines
 )
 
 // Stream is the interface for streams implemented in each service.
@@ -171,6 +172,17 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 
 	st.lock.Lock()
 	defer st.lock.Unlock()
+
+	// Adjust write timeout
+	if withDeadlines {
+		if err := st.setWriteDeadline(); err != nil {
+			return err
+		}
+	} else {
+		// Disable write timeout
+		st.raw.SetWriteDeadline(time.Time{})
+	}
+
 	_, err = st.raw.Write(message[:size])
 	if err != nil {
 		return err
@@ -192,13 +204,19 @@ func (st *BaseStream) ReadBytes() (content []byte, err error) {
 		}
 	}()
 
-	// Disable read timeout for true blocking behavior
-	if err := st.setReadDeadline(); err != nil {
-		utils.Logger().Debug().
-			Str("streamID", string(st.ID())).
-			Err(err).
-			Msg("failed to disable read deadline")
-		return nil, errors.Wrap(err, "failed to disable read deadline")
+	// Adjust read timeout
+	if withDeadlines {
+		if err := st.setReadDeadline(); err != nil {
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Err(err).
+				Msg("failed to disable read deadline")
+			//st.raw.Reset()
+			return nil, errors.Wrap(err, "failed to disable read deadline")
+		}
+	} else {
+		// Disable read timeout for true blocking behavior
+		st.raw.SetReadDeadline(time.Time{})
 	}
 
 	// 1. Read message length prefix (blocking)
