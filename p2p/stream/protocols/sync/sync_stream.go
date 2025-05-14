@@ -74,7 +74,7 @@ func (st *syncStream) readMsgLoop() {
 		default:
 			msg, err := st.readMsg()
 			if err != nil {
-				if err := st.Close("read msg failed"); err != nil {
+				if err := st.Close("read msg failed", false); err != nil {
 					st.logger.Err(err).Msg("failed to close sync stream")
 				}
 				return
@@ -131,7 +131,7 @@ func (st *syncStream) handleReqLoop() {
 			if err != nil {
 				st.logger.Info().Err(err).Str("request", req.String()).
 					Msg("handle request error. Closing stream")
-				if err := st.Close("handle request error"); err != nil {
+				if err := st.Close("handle request error", false); err != nil {
 					st.logger.Err(err).Msg("failed to close sync stream")
 				}
 				return
@@ -156,13 +156,13 @@ func (st *syncStream) handleRespLoop() {
 }
 
 // Close stops the stream handling and closes the underlying stream
-func (st *syncStream) Close(reason string) error {
+func (st *syncStream) Close(reason string, criticalErr bool) error {
 	notClosed := atomic.CompareAndSwapUint32(&st.closeStat, 0, 1)
 	if !notClosed {
 		// Already closed by another goroutine. Directly return
 		return nil
 	}
-	if err := st.protocol.sm.RemoveStream(st.ID(), "force close: "+reason); err != nil {
+	if err := st.protocol.sm.RemoveStream(st.ID(), "force close: "+reason, criticalErr); err != nil {
 		st.logger.Err(err).Str("stream ID", string(st.ID())).
 			Msg("failed to remove sync stream on close")
 	}
