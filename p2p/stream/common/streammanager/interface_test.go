@@ -83,7 +83,7 @@ func (st *testStream) ResetFailedTimes() {
 	return
 }
 
-func (st *testStream) Close(reason string) error {
+func (st *testStream) Close(reason string, criticalErr bool) error {
 	if st.closed {
 		return errors.New("already closed")
 	}
