@@ -260,7 +260,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.AutoNATServiceRateLimit(10, 5, time.Second*60),
 	}
 	if cfg.ResourceMgrEnabled {
-		rmgr, err := makeResourceMgr(cfg.ResourceMgrEnabled, cfg.ResourceMgrMemoryLimitBytes, cfg.ResourceMgrFileDescriptorsLimit, cfg.ConnManagerHighWatermark)
+		rmgr, err := makeResourceMgr(false, cfg.ResourceMgrMemoryLimitBytes, cfg.ResourceMgrFileDescriptorsLimit, cfg.ConnManagerHighWatermark)
 		if err != nil {
 			cancel()
 			return nil, fmt.Errorf("failed to open resource manager: %w", err)
