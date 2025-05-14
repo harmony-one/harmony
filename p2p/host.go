@@ -266,6 +266,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 			return nil, fmt.Errorf("failed to open resource manager: %w", err)
 		}
 		p2pHostConfig = append(p2pHostConfig, libp2p.ResourceManager(rmgr))
+	} else {
+		p2pHostConfig = append(p2pHostConfig, libp2p.ResourceManager(nil))
 	}
 
 	// Set host security
