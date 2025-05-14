@@ -176,11 +176,21 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	// Adjust write timeout
 	if withDeadlines {
 		if err := st.setWriteDeadline(); err != nil {
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Err(err).
+				Msg("failed to adjust write deadline")
 			return err
 		}
 	} else {
 		// Disable write timeout
-		st.raw.SetWriteDeadline(time.Time{})
+		if err := st.raw.SetWriteDeadline(time.Time{}); err != nil {
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Err(err).
+				Msg("failed to disable write deadline")
+			return err
+		}
 	}
 
 	_, err = st.raw.Write(message[:size])
@@ -210,13 +220,18 @@ func (st *BaseStream) ReadBytes() (content []byte, err error) {
 			utils.Logger().Debug().
 				Str("streamID", string(st.ID())).
 				Err(err).
-				Msg("failed to disable read deadline")
-			//st.raw.Reset()
-			return nil, errors.Wrap(err, "failed to disable read deadline")
+				Msg("failed to adjust read deadline")
+			return nil, errors.Wrap(err, "failed to adjust read deadline")
 		}
 	} else {
 		// Disable read timeout for true blocking behavior
-		st.raw.SetReadDeadline(time.Time{})
+		if err := st.raw.SetReadDeadline(time.Time{}); err != nil {
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Err(err).
+				Msg("failed to disable read deadline")
+			return nil, errors.Wrap(err, "failed to disable read deadline")
+		}
 	}
 
 	// 1. Read message length prefix (blocking)
