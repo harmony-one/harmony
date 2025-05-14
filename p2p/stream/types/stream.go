@@ -30,7 +30,7 @@ type Stream interface {
 	ProtoSpec() (ProtoSpec, error)
 	WriteBytes([]byte) error
 	ReadBytes() ([]byte, error)
-	Close(reason string) error
+	Close(reason string, criticalErr bool) error
 	CloseOnExit() error
 	Failures() int32
 	AddFailedTimes(faultRecoveryThreshold time.Duration)

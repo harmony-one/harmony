@@ -222,7 +222,7 @@ func TestStreamManager_HandleRemoveStream(t *testing.T) {
 		sm.Start()
 		time.Sleep(defTestWait)
 
-		err := sm.RemoveStream(test.id, "test stream removal")
+		err := sm.RemoveStream(test.id, "test stream removal", true)
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}
@@ -243,7 +243,7 @@ func TestStreamManager_HandleRemoveStream_Disc(t *testing.T) {
 	// Remove DiscBatch - HardLoCap + 1 streams
 	num := 0
 	for _, st := range sm.streams.slice() {
-		if err := sm.RemoveStream(st.ID(), "test handle remove"); err != nil {
+		if err := sm.RemoveStream(st.ID(), "test handle remove", true); err != nil {
 			t.Error(err)
 		}
 		num++
