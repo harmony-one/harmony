@@ -1,36 +1,31 @@
 package gating
 
 import (
-	"net"
-
-	ds "github.com/ipfs/go-datastore"
-	"github.com/libp2p/go-libp2p/core/connmgr"
+	libp2p_dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/p2p/net/conngater"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
-type BlockingConnectionGater interface {
-	connmgr.ConnectionGater
-
-	// BlockPeer adds a peer to the set of blocked peers.
-	// Note: active connections to the peer are not automatically closed.
-	BlockPeer(p peer.ID) error
-	UnblockPeer(p peer.ID) error
-	ListBlockedPeers() []peer.ID
-
-	// BlockAddr adds an IP address to the set of blocked addresses.
-	// Note: active connections to the IP address are not automatically closed.
-	BlockAddr(ip net.IP) error
-	UnblockAddr(ip net.IP) error
-	ListBlockedAddrs() []net.IP
-
-	// BlockSubnet adds an IP subnet to the set of blocked addresses.
-	// Note: active connections to the IP subnet are not automatically closed.
-	BlockSubnet(ipnet *net.IPNet) error
-	UnblockSubnet(ipnet *net.IPNet) error
-	ListBlockedSubnets() []*net.IPNet
+// ExpiryConnectionGater enhances a ExtendedConnectionGater by implementing ban-expiration
+type BlockingConnectionGater struct {
+	ExtendedConnectionGater
+	isGating bool
 }
 
-func NewBlockingConnectionGater(store ds.Batching) (BlockingConnectionGater, error) {
-	return conngater.NewBasicConnectionGater(store)
+func AddBlocking(gater ExtendedConnectionGater, disablePrivateIPScan bool) *BlockingConnectionGater {
+	return &BlockingConnectionGater{
+		ExtendedConnectionGater: gater,
+		isGating:                disablePrivateIPScan,
+	}
+}
+
+// Blocking connections at this stage is typical for address filtering.
+func (g *BlockingConnectionGater) InterceptAddrDial(p peer.ID, m ma.Multiaddr) (allow bool) {
+	if g.isGating {
+		return libp2p_dht.PublicQueryFilter(nil, peer.AddrInfo{
+			ID:    p,
+			Addrs: []ma.Multiaddr{m},
+		})
+	}
+	return true
 }
