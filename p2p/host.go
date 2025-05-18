@@ -181,10 +181,14 @@ func NewHost(cfg HostConfig) (Host, error) {
 	if err := ps.AddPubKey(peerID, pub); err != nil {
 		return nil, fmt.Errorf("failed to set up peerstore with pub key: %w", err)
 	}
-	var connGtr gating.BlockingConnectionGater
-	connGtr, err = gating.NewBlockingConnectionGater(datastore)
+	var connGtr gating.ExtendedConnectionGater
+	connGtr, err = gating.NewExtendedConnectionGater(datastore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open connection gater: %w", err)
+	}
+	if cfg.DisablePrivateIPScan {
+		// Prevent dialing of public addresses
+		connGtr = gating.AddBlocking(connGtr, cfg.DisablePrivateIPScan)
 	}
 	connGtr = gating.AddBanExpiry(connGtr, ps, clock.SystemClock)
 	connGtr = gating.AddMetering(connGtr)
@@ -300,12 +304,6 @@ func NewHost(cfg HostConfig) (Host, error) {
 		// ForceReachabilityPublic overrides automatic reachability detection in the AutoNAT subsystem,
 		// forcing the local node to believe it is reachable externally
 		p2pHostConfig = append(p2pHostConfig, libp2p.ForceReachabilityPublic())
-	}
-
-	// TODO: this should be moved to main gater
-	if cfg.DisablePrivateIPScan {
-		// Prevent dialing of public addresses
-		p2pHostConfig = append(p2pHostConfig, libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)))
 	}
 
 	// create p2p host
