@@ -24,23 +24,23 @@ type ExpiryStore interface {
 	store.PeerBanStore
 }
 
-// ExpiryConnectionGater enhances a BlockingConnectionGater by implementing ban-expiration
+// ExpiryConnectionGater enhances a ExtendedConnectionGater by implementing ban-expiration
 type ExpiryConnectionGater struct {
-	BlockingConnectionGater
+	ExtendedConnectionGater
 	store ExpiryStore
 	clock clock.Clock
 }
 
-func AddBanExpiry(gater BlockingConnectionGater, store ExpiryStore, clock clock.Clock) *ExpiryConnectionGater {
+func AddBanExpiry(gater ExtendedConnectionGater, store ExpiryStore, clock clock.Clock) *ExpiryConnectionGater {
 	return &ExpiryConnectionGater{
-		BlockingConnectionGater: gater,
+		ExtendedConnectionGater: gater,
 		store:                   store,
 		clock:                   clock,
 	}
 }
 
 func (g *ExpiryConnectionGater) UnblockPeer(p peer.ID) error {
-	if err := g.BlockingConnectionGater.UnblockPeer(p); err != nil {
+	if err := g.ExtendedConnectionGater.UnblockPeer(p); err != nil {
 		utils.Logger().Warn().
 			Str("method", "UnblockPeer").
 			Str("peer_id", p.String()).
@@ -131,7 +131,7 @@ func (g *ExpiryConnectionGater) addrBanExpiryCheck(ma multiaddr.Multiaddr) (allo
 }
 
 func (g *ExpiryConnectionGater) InterceptPeerDial(p peer.ID) (allow bool) {
-	if !g.BlockingConnectionGater.InterceptPeerDial(p) {
+	if !g.ExtendedConnectionGater.InterceptPeerDial(p) {
 		return false
 	}
 	peerBan := g.peerBanExpiryCheck(p)
@@ -145,7 +145,7 @@ func (g *ExpiryConnectionGater) InterceptPeerDial(p peer.ID) (allow bool) {
 }
 
 func (g *ExpiryConnectionGater) InterceptAddrDial(id peer.ID, ma multiaddr.Multiaddr) (allow bool) {
-	if !g.BlockingConnectionGater.InterceptAddrDial(id, ma) {
+	if !g.ExtendedConnectionGater.InterceptAddrDial(id, ma) {
 		return false
 	}
 	peerBan := g.peerBanExpiryCheck(id)
@@ -170,7 +170,7 @@ func (g *ExpiryConnectionGater) InterceptAddrDial(id peer.ID, ma multiaddr.Multi
 }
 
 func (g *ExpiryConnectionGater) InterceptAccept(mas network.ConnMultiaddrs) (allow bool) {
-	if !g.BlockingConnectionGater.InterceptAccept(mas) {
+	if !g.ExtendedConnectionGater.InterceptAccept(mas) {
 		return false
 	}
 	addrBan := g.addrBanExpiryCheck(mas.RemoteMultiaddr())
@@ -187,7 +187,7 @@ func (g *ExpiryConnectionGater) InterceptSecured(direction network.Direction, id
 	if direction == network.DirOutbound {
 		return true
 	}
-	if !g.BlockingConnectionGater.InterceptSecured(direction, id, mas) {
+	if !g.ExtendedConnectionGater.InterceptSecured(direction, id, mas) {
 		return false
 	}
 	peerBan := g.peerBanExpiryCheck(id)

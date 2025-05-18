@@ -13,13 +13,13 @@ type Scores interface {
 
 // ScoringConnectionGater enhances a ConnectionGater by enforcing a minimum score for peer connections
 type ScoringConnectionGater struct {
-	BlockingConnectionGater
+	ExtendedConnectionGater
 	scores   Scores
 	minScore float64
 }
 
-func AddScoring(gater BlockingConnectionGater, scores Scores, minScore float64) *ScoringConnectionGater {
-	return &ScoringConnectionGater{BlockingConnectionGater: gater, scores: scores, minScore: minScore}
+func AddScoring(gater ExtendedConnectionGater, scores Scores, minScore float64) *ScoringConnectionGater {
+	return &ScoringConnectionGater{ExtendedConnectionGater: gater, scores: scores, minScore: minScore}
 }
 
 func (g *ScoringConnectionGater) checkScore(p peer.ID) (allow bool, score float64) {
@@ -32,7 +32,7 @@ func (g *ScoringConnectionGater) checkScore(p peer.ID) (allow bool, score float6
 }
 
 func (g *ScoringConnectionGater) InterceptPeerDial(p peer.ID) (allow bool) {
-	if !g.BlockingConnectionGater.InterceptPeerDial(p) {
+	if !g.ExtendedConnectionGater.InterceptPeerDial(p) {
 		return false
 	}
 	check, score := g.checkScore(p)
@@ -43,7 +43,7 @@ func (g *ScoringConnectionGater) InterceptPeerDial(p peer.ID) (allow bool) {
 }
 
 func (g *ScoringConnectionGater) InterceptAddrDial(id peer.ID, ma multiaddr.Multiaddr) (allow bool) {
-	if !g.BlockingConnectionGater.InterceptAddrDial(id, ma) {
+	if !g.ExtendedConnectionGater.InterceptAddrDial(id, ma) {
 		return false
 	}
 	check, score := g.checkScore(id)
@@ -54,7 +54,7 @@ func (g *ScoringConnectionGater) InterceptAddrDial(id peer.ID, ma multiaddr.Mult
 }
 
 func (g *ScoringConnectionGater) InterceptSecured(dir network.Direction, id peer.ID, mas network.ConnMultiaddrs) (allow bool) {
-	if !g.BlockingConnectionGater.InterceptSecured(dir, id, mas) {
+	if !g.ExtendedConnectionGater.InterceptSecured(dir, id, mas) {
 		return false
 	}
 	check, score := g.checkScore(id)
@@ -65,7 +65,7 @@ func (g *ScoringConnectionGater) InterceptSecured(dir network.Direction, id peer
 }
 
 func (g *ScoringConnectionGater) InterceptAccept(mas network.ConnMultiaddrs) (allow bool) {
-	if !g.BlockingConnectionGater.InterceptAccept(mas) {
+	if !g.ExtendedConnectionGater.InterceptAccept(mas) {
 		return false
 	}
 	utils.Logger().Info().Str("multi_addr", mas.RemoteMultiaddr().String()).Msg("connection accepted")
