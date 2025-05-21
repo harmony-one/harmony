@@ -74,12 +74,14 @@ func (st *syncStream) readMsgLoop() {
 		default:
 			msg, err := st.readMsg()
 			if err != nil {
-				if err := st.Close("read msg failed"); err != nil {
+				if err := st.Close("read msg failed", false); err != nil {
 					st.logger.Err(err).Msg("failed to close sync stream")
 				}
 				return
 			}
-			st.deliverMsg(msg)
+			if msg != nil {
+				st.deliverMsg(msg)
+			}
 		}
 	}
 }
@@ -98,6 +100,8 @@ func (st *syncStream) deliverMsg(msg protobuf.Message) {
 			case <-time.After(1 * time.Minute):
 				st.logger.Warn().Str("request", req.String()).
 					Msg("request handler severely jammed, message dropped")
+			case <-st.closeC:
+				return
 			}
 		}()
 	}
@@ -108,6 +112,8 @@ func (st *syncStream) deliverMsg(msg protobuf.Message) {
 			case <-time.After(1 * time.Minute):
 				st.logger.Warn().Str("response", resp.String()).
 					Msg("response handler severely jammed, message dropped")
+			case <-st.closeC:
+				return
 			}
 		}()
 	}
@@ -125,7 +131,7 @@ func (st *syncStream) handleReqLoop() {
 			if err != nil {
 				st.logger.Info().Err(err).Str("request", req.String()).
 					Msg("handle request error. Closing stream")
-				if err := st.Close("handle request error"); err != nil {
+				if err := st.Close("handle request error", false); err != nil {
 					st.logger.Err(err).Msg("failed to close sync stream")
 				}
 				return
@@ -150,13 +156,13 @@ func (st *syncStream) handleRespLoop() {
 }
 
 // Close stops the stream handling and closes the underlying stream
-func (st *syncStream) Close(reason string) error {
+func (st *syncStream) Close(reason string, criticalErr bool) error {
 	notClosed := atomic.CompareAndSwapUint32(&st.closeStat, 0, 1)
 	if !notClosed {
 		// Already closed by another goroutine. Directly return
 		return nil
 	}
-	if err := st.protocol.sm.RemoveStream(st.ID(), "force close: "+reason); err != nil {
+	if err := st.protocol.sm.RemoveStream(st.ID(), "force close: "+reason, criticalErr); err != nil {
 		st.logger.Err(err).Str("stream ID", string(st.ID())).
 			Msg("failed to remove sync stream on close")
 	}
@@ -170,6 +176,9 @@ func (st *syncStream) CloseOnExit() error {
 	if !notClosed {
 		// Already closed by another goroutine. Directly return
 		return nil
+	}
+	if err := st.BaseStream.Close(); err != nil {
+		//TODO: log closure error
 	}
 	close(st.closeC)
 	return st.BaseStream.CloseOnExit()
@@ -432,6 +441,9 @@ func (st *syncStream) readMsg() (*syncpb.Message, error) {
 	b, err := st.ReadBytes()
 	if err != nil {
 		return nil, err
+	}
+	if b == nil || len(b) == 0 {
+		return nil, nil
 	}
 	var msg = &syncpb.Message{}
 	if err := protobuf.Unmarshal(b, msg); err != nil {

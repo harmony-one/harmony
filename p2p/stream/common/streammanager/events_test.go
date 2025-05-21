@@ -59,7 +59,7 @@ func TestStreamManager_SubscribeRemoveStreamEvent(t *testing.T) {
 	sm.Start()
 	time.Sleep(defTestWait)
 
-	err := sm.RemoveStream(makeStreamID(1), "test stream remove subscribe")
+	err := sm.RemoveStream(makeStreamID(1), "test stream remove subscribe", true)
 	if err != nil {
 		t.Fatal(err)
 	}

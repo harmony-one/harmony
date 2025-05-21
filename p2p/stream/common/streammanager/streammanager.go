@@ -76,10 +76,22 @@ type RemovalInfo struct {
 }
 
 // MarkAsRemoved resets the removal time and increments the removal count.
-func (rm *RemovalInfo) MarkAsRemoved() {
+func (rm *RemovalInfo) MarkAsRemoved(criticalErr bool) {
 	now := time.Now()
+	if rm.count > 0 && now.Sub(rm.removedAt) > MaxRemovalCooldownDuration {
+		rm.count = 0
+	}
+	if criticalErr {
+		rm.expireAt = now.Add(MaxRemovalCooldownDuration)
+	} else {
+		// First failure (count=0) gets no cooldown to avoid penalizing one-off disconnects.
+		cooldownDur := RemovalCooldownDuration * time.Duration(rm.count)
+		if cooldownDur > MaxRemovalCooldownDuration {
+			cooldownDur = MaxRemovalCooldownDuration
+		}
+		rm.expireAt = now.Add(cooldownDur)
+	}
 	rm.removedAt = now
-	rm.expireAt = now.Add(RemovalCooldownDuration * time.Minute)
 	rm.count++
 }
 
@@ -93,8 +105,8 @@ func (rm *RemovalInfo) HasExpired() bool {
 	return time.Now().After(rm.expireAt)
 }
 
-// IncrementRemovalCount increases the removal count.
-func (rm *RemovalInfo) IncrementRemovalCount() {
+// BumpCount increases the removal count.
+func (rm *RemovalInfo) BumpCount() {
 	rm.count++
 }
 
@@ -193,7 +205,7 @@ func (sm *streamManager) loop() {
 			addStream.errC <- err
 
 		case rmStream := <-sm.rmStreamCh:
-			err := sm.handleRemoveStream(rmStream.id, rmStream.reason)
+			err := sm.handleRemoveStream(rmStream.id, rmStream.reason, rmStream.criticalErr)
 			rmStream.errC <- err
 
 		case stop := <-sm.stopCh:
@@ -212,7 +224,7 @@ func (sm *streamManager) loop() {
 // NewStream handles a new stream from stream handler protocol
 func (sm *streamManager) NewStream(stream sttypes.Stream) error {
 	if err := sm.sanityCheckStream(stream); err != nil {
-		stream.Close("stream sanity check failed")
+		stream.Close("stream sanity check failed", true)
 		return errors.Wrap(err, "stream sanity check failed")
 	}
 	task := addStreamTask{
@@ -224,11 +236,12 @@ func (sm *streamManager) NewStream(stream sttypes.Stream) error {
 }
 
 // RemoveStream close and remove a stream from stream manager
-func (sm *streamManager) RemoveStream(stID sttypes.StreamID, reason string) error {
+func (sm *streamManager) RemoveStream(stID sttypes.StreamID, reason string, criticalErr bool) error {
 	task := rmStreamTask{
-		id:     stID,
-		reason: reason,
-		errC:   make(chan error),
+		id:          stID,
+		reason:      reason,
+		criticalErr: criticalErr,
+		errC:        make(chan error),
 	}
 	sm.rmStreamCh <- task
 	return <-task.errC
@@ -261,9 +274,10 @@ type (
 	}
 
 	rmStreamTask struct {
-		id     sttypes.StreamID
-		reason string
-		errC   chan error
+		id          sttypes.StreamID
+		reason      string
+		criticalErr bool
+		errC        chan error
 	}
 
 	discTask struct{}
@@ -359,7 +373,7 @@ func (sm *streamManager) addStreamFromReserved(count int) (int, error) {
 	return added, nil
 }
 
-func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string) error {
+func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, criticalErr bool) error {
 	st, ok := sm.streams.get(id)
 	if !ok {
 		return ErrStreamAlreadyRemoved
@@ -379,7 +393,7 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string) 
 		}
 		sm.removedStreams.Set(id, info)
 	}
-	info.MarkAsRemoved()
+	info.MarkAsRemoved(criticalErr)
 
 	// try to replace removed streams from reserved list
 	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
