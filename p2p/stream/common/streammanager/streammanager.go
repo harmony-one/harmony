@@ -73,10 +73,14 @@ type RemovalInfo struct {
 	count     uint64
 	removedAt time.Time
 	expireAt  time.Time
+	mu        sync.RWMutex
 }
 
 // MarkAsRemoved resets the removal time and increments the removal count.
 func (rm *RemovalInfo) MarkAsRemoved(criticalErr bool) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
 	now := time.Now()
 	if rm.count > 0 && now.Sub(rm.removedAt) > MaxRemovalCooldownDuration {
 		rm.count = 0
@@ -97,17 +101,34 @@ func (rm *RemovalInfo) MarkAsRemoved(criticalErr bool) {
 
 // RemovedAt returns the timestamp when the stream was removed.
 func (rm *RemovalInfo) RemovedAt() time.Time {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+
 	return rm.removedAt
 }
 
 // HasExpired checks if the cooldown period has passed, allowing the stream to reconnect.
 func (rm *RemovalInfo) HasExpired() bool {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+
 	return time.Now().After(rm.expireAt)
 }
 
 // BumpCount increases the removal count.
 func (rm *RemovalInfo) BumpCount() {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
 	rm.count++
+}
+
+// ResetCount resets the removal count.
+func (rm *RemovalInfo) ResetCount() {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	rm.count = 0
 }
 
 // NewStreamManager creates a new stream manager for the given proto ID
