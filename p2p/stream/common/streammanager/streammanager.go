@@ -336,6 +336,9 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	if _, ok := sm.streams.get(id); ok {
 		return ErrStreamAlreadyExist
 	}
+	if _, ok := sm.reservedStreams.get(id); ok {
+		return ErrStreamAlreadyExist
+	}
 	// Check if stream was recently removed
 	if removalInfo, exists := sm.removedStreams.Get(id); exists {
 		if !removalInfo.HasExpired() {
@@ -486,11 +489,18 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			// If the peer has the same ID and was just connected, skip.
 			continue
 		}
-		if _, ok := sm.streams.get(sttypes.StreamID(peer.ID)); ok {
+		newStreamID := sttypes.StreamID(peer.ID)
+		if _, ok := sm.streams.get(newStreamID); ok {
 			continue
 		}
-		if _, ok := sm.reservedStreams.get(sttypes.StreamID(peer.ID)); ok {
+		if _, ok := sm.reservedStreams.get(newStreamID); ok {
 			continue
+		}
+		// Check if stream was recently removed
+		if removalInfo, exists := sm.removedStreams.Get(newStreamID); exists {
+			if !removalInfo.HasExpired() {
+				continue
+			}
 		}
 		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		connecting += 1
