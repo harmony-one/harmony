@@ -58,6 +58,10 @@ func (ss *streamSet) addStream(st sttypes.Stream) {
 	ss.lock.Lock()
 	defer ss.lock.Unlock()
 
+	if _, exists := ss.streams[st.ID()]; exists {
+		return
+	}
+
 	if spec, err := st.ProtoSpec(); err != nil {
 		return
 	} else {
@@ -70,6 +74,10 @@ func (ss *streamSet) addStream(st sttypes.Stream) {
 func (ss *streamSet) deleteStream(st sttypes.Stream) {
 	ss.lock.Lock()
 	defer ss.lock.Unlock()
+
+	if _, exists := ss.streams[st.ID()]; !exists {
+		return
+	}
 
 	delete(ss.streams, st.ID())
 
