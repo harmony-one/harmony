@@ -403,6 +403,7 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 		return ErrStreamAlreadyRemoved
 	}
 	sm.streams.deleteStream(st)
+	sm.reservedStreams.deleteStream(st)
 
 	sm.logger.Info().
 		Int("NumStreams", sm.streams.size()).
