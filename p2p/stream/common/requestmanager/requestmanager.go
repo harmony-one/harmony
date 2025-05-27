@@ -379,6 +379,7 @@ func (rm *requestManager) handleCancelRequest(data cancelReqData) {
 	})
 	rm.waitings.Remove(req)
 	rm.removePendingRequest(req)
+	numWaitingRequestsVec.WithLabelValues("default").Dec()
 }
 
 func (rm *requestManager) getNextRequest() (*request, *stream) {
@@ -423,6 +424,7 @@ func (rm *requestManager) addPendingRequest(req *request, st *stream) {
 
 	rm.setStreamAvailability(st.ID(), false)
 	rm.pendings.Set(req.ReqID(), req)
+	numPendingRequestsVec.WithLabelValues("default").Set(float64(rm.pendings.Length()))
 }
 
 func (rm *requestManager) removePendingRequest(req *request) {
@@ -435,21 +437,31 @@ func (rm *requestManager) removePendingRequest(req *request) {
 		rm.setStreamAvailability(st.ID(), true)
 	}
 	rm.pendings.Delete(reqID)
+	numPendingRequestsVec.WithLabelValues("default").Set(float64(rm.pendings.Length()))
 }
 
 func (rm *requestManager) setStreamAvailability(stID sttypes.StreamID, available bool) {
+	_, streamIsAvailable := rm.available.Get(stID)
+
 	if _, streamIsActive := rm.streams.Get(stID); !streamIsActive {
-		rm.available.Delete(stID)
+		if streamIsAvailable {
+			rm.available.Delete(stID)
+			numAvailableStreamsVec.WithLabelValues("default").Dec()
+		}
 		return
 	}
 
 	if available {
-		rm.available.Set(stID, struct{}{})
+		if !streamIsAvailable {
+			rm.available.Set(stID, struct{}{})
+			numAvailableStreamsVec.WithLabelValues("default").Inc()
+		}
 		return
 	}
 
-	if _, streamIsAvailable := rm.available.Get(stID); streamIsAvailable {
+	if streamIsAvailable {
 		rm.available.Delete(stID)
+		numAvailableStreamsVec.WithLabelValues("default").Dec()
 	}
 }
 
@@ -508,6 +520,8 @@ func checkStreamUpdates(exists *sttypes.SafeMap[sttypes.StreamID, *stream], targ
 func (rm *requestManager) addNewStream(st sttypes.Stream) {
 	rm.streams.Set(st.ID(), &stream{Stream: st})
 	rm.available.Set(st.ID(), struct{}{})
+	numConnectedStreamsVec.WithLabelValues("default").Inc()
+	numAvailableStreamsVec.WithLabelValues("default").Inc()
 }
 
 // removeStream remove the stream from request manager, clear the pending request
@@ -516,6 +530,7 @@ func (rm *requestManager) removeStream(st *stream) {
 	id := st.ID()
 	if _, exists := rm.available.Get(id); exists {
 		rm.available.Delete(id)
+		numAvailableStreamsVec.WithLabelValues("default").Dec()
 	}
 
 	cleared := st.clearPendingRequest()
@@ -526,6 +541,7 @@ func (rm *requestManager) removeStream(st *stream) {
 		})
 	}
 	rm.streams.Delete(id)
+	numConnectedStreamsVec.WithLabelValues("default").Dec()
 }
 
 func (rm *requestManager) close() {
@@ -547,6 +563,12 @@ func (rm *requestManager) close() {
 	rm.available.Clear()
 	rm.pendings.Clear()
 	rm.waitings = newRequestQueues()
+
+	numConnectedStreamsVec.WithLabelValues("default").Set(0)
+	numAvailableStreamsVec.WithLabelValues("default").Set(0)
+	numWaitingRequestsVec.WithLabelValues("default").Set(0)
+	numPendingRequestsVec.WithLabelValues("default").Set(0)
+
 	close(rm.stopC)
 }
 
@@ -558,9 +580,11 @@ const (
 )
 
 func (rm *requestManager) addRequestToWaitings(req *request, priority reqPriority) error {
+	numWaitingRequestsVec.WithLabelValues("default").Inc()
 	return rm.waitings.Push(req, priority)
 }
 
 func (rm *requestManager) popRequestFromWaitings() *request {
+	numWaitingRequestsVec.WithLabelValues("default").Dec()
 	return rm.waitings.Pop()
 }
