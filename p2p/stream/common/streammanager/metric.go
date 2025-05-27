@@ -13,6 +13,7 @@ func init() {
 		removedStreamsCounterVec,
 		setupStreamDuration,
 		numStreamsGaugeVec,
+		numReservedStreamsGaugeVec,
 	)
 }
 
@@ -57,6 +58,26 @@ var (
 		[]string{"topic"},
 	)
 
+	streamCriticalErrorCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "stream",
+			Name:      "stream_critical_errors",
+			Help:      "number of critical errors of stream removals in stream manager",
+		},
+		[]string{"topic"},
+	)
+
+	streamRemovalReasonCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "stream",
+			Name:      "stream_removal_reasons",
+			Help:      "removal reason of streams in stream manager",
+		},
+		[]string{"reason", "critical"},
+	)
+
 	setupStreamDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "hmy",
@@ -75,6 +96,16 @@ var (
 			Subsystem: "stream",
 			Name:      "num_streams",
 			Help:      "number of connected streams",
+		},
+		[]string{"topic"},
+	)
+
+	numReservedStreamsGaugeVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "stream",
+			Name:      "num_reserved_streams",
+			Help:      "number of reserved streams",
 		},
 		[]string{"topic"},
 	)
