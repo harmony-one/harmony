@@ -3,6 +3,7 @@ package streammanager
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -332,6 +333,7 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 					Int("NumReservedStreams", sm.reservedStreams.size()).
 					Interface("StreamID", id).
 					Msg("[StreamManager] added new stream to reserved list")
+				numReservedStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.reservedStreams.size()))
 			}
 			return nil
 		}
@@ -368,6 +370,7 @@ func (sm *streamManager) addStreamFromReserved(count int) (int, error) {
 		sm.addStreamFeed.Send(EvtStreamAdded{st})
 		addedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
+		numReservedStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.reservedStreams.size()))
 		added++
 	}
 	return added, nil
@@ -399,6 +402,10 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
 	removedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
+	streamRemovalReasonCounterVec.With(prometheus.Labels{"reason": reason, "critical": strconv.FormatBool(criticalErr)}).Inc()
+	if criticalErr {
+		streamCriticalErrorCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+	}
 
 	sm.tryToReplaceRemovedStream()
 
