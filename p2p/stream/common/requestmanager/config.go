@@ -25,4 +25,7 @@ const (
 
 	// maxWaitingSize is the maximum requests that are in waiting list
 	maxWaitingSize = 1024
+
+	// writeConcurrency is the maximum concurrent writes to streams
+	writeConcurrency = 32
 )
