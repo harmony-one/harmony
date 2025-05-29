@@ -15,6 +15,9 @@ const (
 	// RemovalCooldownDuration defines the cooldown period (in minutes) before a removed stream can reconnect.
 	RemovalCooldownDuration    = 5 * time.Minute
 	MaxRemovalCooldownDuration = 60 * time.Minute
+
+	// setupConcurrency limits concurrent stream setup goroutines
+	setupConcurrency = 16
 )
 
 // Config is the config for stream manager
