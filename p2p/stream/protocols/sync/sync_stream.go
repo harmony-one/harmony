@@ -79,9 +79,13 @@ func (st *syncStream) readMsgLoop() {
 				}
 				return
 			}
-			if msg != nil {
-				st.deliverMsg(msg)
+			if msg == nil {
+				if err := st.Close("remote closed stream", false); err != nil {
+					st.logger.Err(err).Msg("failed to close sync stream")
+				}
+				return
 			}
+			st.deliverMsg(msg)
 		}
 	}
 }
@@ -176,9 +180,6 @@ func (st *syncStream) CloseOnExit() error {
 	if !notClosed {
 		// Already closed by another goroutine. Directly return
 		return nil
-	}
-	if err := st.BaseStream.Close(); err != nil {
-		//TODO: log closure error
 	}
 	close(st.closeC)
 	return st.BaseStream.CloseOnExit()
