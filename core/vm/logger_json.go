@@ -16,6 +16,14 @@
 
 package vm
 
+/*
+import (
+	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+)
+
+
 import (
 	"encoding/json"
 	"io"
@@ -96,3 +104,4 @@ func (l *JSONLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, 
 	}
 	return l.encoder.Encode(endLog{common.Bytes2Hex(output), math.HexOrDecimal64(gasUsed), t, ""})
 }
+*/
