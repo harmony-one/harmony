@@ -1,6 +1,8 @@
 package discovery
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 
 	p2ptypes "github.com/harmony-one/harmony/p2p/types"
@@ -15,7 +17,10 @@ type DHTConfig struct {
 	BootNodes       []string
 	DataStoreFile   *string // File path to store DHT data. Shall be only used for bootstrap nodes.
 	DiscConcurrency int
-	DHT             *dht.IpfsDHT
+	// BootstrapTimeout defines how long the DHT bootstrap should run. Zero
+	// means using the passed in context without additional timeout.
+	BootstrapTimeout time.Duration
+	DHT              *dht.IpfsDHT
 }
 
 // GetLibp2pRawOptions get the raw libp2p options as a slice.
