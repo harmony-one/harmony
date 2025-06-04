@@ -1,6 +1,10 @@
 package streammanager
 
-import "time"
+import (
+	"time"
+
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
+)
 
 const (
 	// checkInterval is the default interval for checking stream number. If the stream
@@ -30,4 +34,6 @@ type Config struct {
 	HiCap int
 	// DiscBatch is the size of each discovery
 	DiscBatch int
+	// TrustedPeers are peer IDs considered trusted
+	TrustedPeers map[libp2p_peer.ID]struct{}
 }

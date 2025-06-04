@@ -77,6 +77,10 @@ type Host interface {
 	ListPeer(topic string) []libp2p_peer.ID
 	ListTopic() []string
 	ListBlockedPeer() []libp2p_peer.ID
+	// TrustedPeers returns ids of trusted peers
+	TrustedPeers() []libp2p_peer.ID
+	// IsTrustedPeer checks whether a peer is trusted
+	IsTrustedPeer(id libp2p_peer.ID) bool
 }
 
 // Peer is the object for a p2p peer (node)
@@ -387,20 +391,35 @@ func NewHost(cfg HostConfig) (Host, error) {
 	security := security.NewManager(cfg.MaxConnPerIP, int(cfg.MaxPeers), banned)
 	// has to save the private key for host
 	h := &HostV2{
-		h:             p2pHost,
-		pubsub:        pubsub,
-		joined:        map[string]*libp2p_pubsub.Topic{},
-		self:          *self,
-		trustedNodes:  cfg.TrustedNodes,
-		priKey:        key,
-		discovery:     disc,
-		security:      security,
-		onConnections: ConnectCallbacks{},
-		onDisconnects: DisconnectCallbacks{},
-		logger:        &subLogger,
-		ctx:           ctx,
-		cancel:        cancel,
-		banned:        banned,
+		h:              p2pHost,
+		pubsub:         pubsub,
+		joined:         map[string]*libp2p_pubsub.Topic{},
+		self:           *self,
+		trustedNodes:   cfg.TrustedNodes,
+		trustedPeerIDs: make(map[libp2p_peer.ID]struct{}),
+		priKey:         key,
+		discovery:      disc,
+		security:       security,
+		onConnections:  ConnectCallbacks{},
+		onDisconnects:  DisconnectCallbacks{},
+		logger:         &subLogger,
+		ctx:            ctx,
+		cancel:         cancel,
+		banned:         banned,
+	}
+
+	for _, addr := range cfg.TrustedNodes {
+		peerAddr, err := ma.NewMultiaddr(addr)
+		if err != nil {
+			subLogger.Error().Err(err).Str("addr", addr).Msg("invalid trusted node addr")
+			continue
+		}
+		info, err := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
+		if err != nil {
+			subLogger.Error().Err(err).Str("addr", addr).Msg("failed to parse trusted node")
+			continue
+		}
+		h.trustedPeerIDs[info.ID] = struct{}{}
 	}
 
 	utils.Logger().Info().
@@ -477,23 +496,24 @@ func connectionManager(low int, high int) (libp2p_config.Option, error) {
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
-	h             libp2p_host.Host
-	pubsub        *libp2p_pubsub.PubSub
-	joined        map[string]*libp2p_pubsub.Topic
-	streamProtos  []sttypes.Protocol
-	self          Peer
-	trustedNodes  []string
-	priKey        libp2p_crypto.PrivKey
-	lock          sync.Mutex
-	discovery     discovery.Discovery
-	security      security.Security
-	logger        *zerolog.Logger
-	blocklist     libp2p_pubsub.Blacklist
-	onConnections ConnectCallbacks
-	onDisconnects DisconnectCallbacks
-	ctx           context.Context
-	cancel        func()
-	banned        *blockedpeers.Manager
+	h              libp2p_host.Host
+	pubsub         *libp2p_pubsub.PubSub
+	joined         map[string]*libp2p_pubsub.Topic
+	streamProtos   []sttypes.Protocol
+	self           Peer
+	trustedNodes   []string
+	trustedPeerIDs map[libp2p_peer.ID]struct{}
+	priKey         libp2p_crypto.PrivKey
+	lock           sync.Mutex
+	discovery      discovery.Discovery
+	security       security.Security
+	logger         *zerolog.Logger
+	blocklist      libp2p_pubsub.Blacklist
+	onConnections  ConnectCallbacks
+	onDisconnects  DisconnectCallbacks
+	ctx            context.Context
+	cancel         func()
+	banned         *blockedpeers.Manager
 }
 
 // PubSub ..
@@ -705,6 +725,19 @@ func (host *HostV2) ListPeer(topic string) []libp2p_peer.ID {
 // ListBlockedPeer returns list of blocked peer
 func (host *HostV2) ListBlockedPeer() []libp2p_peer.ID {
 	return host.banned.Keys()
+}
+
+func (host *HostV2) TrustedPeers() []libp2p_peer.ID {
+	peers := make([]libp2p_peer.ID, 0, len(host.trustedPeerIDs))
+	for id := range host.trustedPeerIDs {
+		peers = append(peers, id)
+	}
+	return peers
+}
+
+func (host *HostV2) IsTrustedPeer(id libp2p_peer.ID) bool {
+	_, ok := host.trustedPeerIDs[id]
+	return ok
 }
 
 // GetPeerCount ...
