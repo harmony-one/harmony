@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 type StageShortRange struct {
@@ -15,8 +15,9 @@ type StageShortRange struct {
 }
 
 type StageShortRangeCfg struct {
-	bc core.BlockChain
-	db kv.RwDB
+	bc     core.BlockChain
+	db     kv.RwDB
+	logger zerolog.Logger
 }
 
 func NewStageShortRange(cfg StageShortRangeCfg) *StageShortRange {
@@ -25,10 +26,14 @@ func NewStageShortRange(cfg StageShortRangeCfg) *StageShortRange {
 	}
 }
 
-func NewStageShortRangeCfg(bc core.BlockChain, db kv.RwDB) StageShortRangeCfg {
+func NewStageShortRangeCfg(bc core.BlockChain, db kv.RwDB, logger zerolog.Logger) StageShortRangeCfg {
 	return StageShortRangeCfg{
 		bc: bc,
 		db: db,
+		logger: logger.With().
+			Str("stage", "StageShortRange").
+			Str("mode", "short range").
+			Logger(),
 	}
 }
 
@@ -52,11 +57,11 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 	n, err := sr.doShortRangeSync(ctx, s)
 	s.state.inserted = n
 	if err != nil {
-		utils.Logger().Info().Err(err).Msg("short range sync failed")
+		sr.configs.logger.Info().Err(err).Msg("short range sync failed")
 		return err
 	}
 	if n > 0 {
-		utils.Logger().Info().Int("blocks inserted", n).Msg("short range blocks inserted successfully")
+		sr.configs.logger.Info().Int("blocks inserted", n).Msg("short range blocks inserted successfully")
 	}
 
 	useInternalTx := tx == nil
@@ -92,7 +97,9 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	sh := &srHelper{
 		syncProtocol: s.state.protocol,
 		config:       s.state.config,
-		logger:       utils.Logger().With().Str("mode", "short range").Logger(),
+		logger: sr.configs.logger.With().
+			Str("sub-module", "short range helper").
+			Logger(),
 	}
 
 	if err := sh.checkPrerequisites(); err != nil {
@@ -105,7 +112,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	}
 	curBN := sr.configs.bc.CurrentBlock().NumberU64()
 	blkNums := sh.prepareBlockHashNumbers(curBN)
-	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums)
+	hashChain, whitelist, err := sh.getHashChain(ctx, blkNums, true)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, nil
@@ -119,7 +126,7 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 	}
 
 	expEndBN := curBN + uint64(len(hashChain))
-	utils.Logger().Info().Uint64("current number", curBN).
+	sr.configs.logger.Info().Uint64("current number", curBN).
 		Uint64("target number", expEndBN).
 		Interface("hashChain", hashChain).
 		Msg("short range start syncing")
@@ -128,22 +135,22 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 
 	blocks, stids, err := sh.getBlocksByHashes(ctx, hashChain, whitelist)
 	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("getBlocksByHashes failed")
+		sr.configs.logger.Warn().Err(err).Msg("getBlocksByHashes failed")
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, errors.Wrap(err, "getBlocksByHashes")
 		}
 		sh.streamsFailed(whitelist, "remote nodes cannot provide blocks with target hashes")
 	}
 
-	utils.Logger().Info().Int("num blocks", len(blocks)).Msg("getBlockByHashes result")
+	sr.configs.logger.Info().Int("num blocks", len(blocks)).Msg("getBlockByHashes result")
 
 	n, err := verifyAndInsertBlocks(sr.configs.bc, blocks)
 	numBlocksInsertedShortRangeHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 	if err != nil {
-		utils.Logger().Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
+		sr.configs.logger.Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
 		// rollback all added new blocks
 		if rbErr := sr.configs.bc.Rollback(hashChain); rbErr != nil {
-			utils.Logger().Error().Err(rbErr).Msg("short range failed to rollback")
+			sr.configs.logger.Error().Err(rbErr).Msg("short range failed to rollback")
 			return 0, rbErr
 		}
 		// fail streams

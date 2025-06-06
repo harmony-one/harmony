@@ -154,7 +154,7 @@ func (p *StateProcessor) Process(
 		startTime := time.Now()
 		// Iterate over and process the individual transactions
 		for i, tx := range block.Transactions() {
-			statedb.Prepare(tx.Hash(), block.Hash(), i)
+			statedb.SetTxContext(tx.Hash(), block.Hash(), i)
 			receipt, cxReceipt, stakeMsgs, _, err := ApplyTransaction(
 				p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 			)
@@ -177,7 +177,7 @@ func (p *StateProcessor) Process(
 		// Iterate over and process the staking transactions
 		L := len(block.Transactions())
 		for i, tx := range block.StakingTransactions() {
-			statedb.Prepare(tx.Hash(), block.Hash(), i+L)
+			statedb.SetTxContext(tx.Hash(), block.Hash(), i+L)
 			receipt, _, err := ApplyStakingTransaction(
 				p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 			)

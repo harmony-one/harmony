@@ -14,7 +14,7 @@ func TestBasicViewChanging(t *testing.T) {
 	_, _, consensus, _, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)
 
-	state := NewState(Normal)
+	state := NewState(Normal, consensus.ShardID)
 
 	// Change Mode
 	assert.Equal(t, state.mode, consensus.current.mode)
@@ -42,7 +42,7 @@ func TestPhaseSwitching(t *testing.T) {
 	_, _, consensus, _, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)
 
-	assert.Equal(t, FBFTAnnounce, consensus.phase) // It's a new consensus, we should be at the FBFTAnnounce phase.
+	assert.Equal(t, FBFTAnnounce, consensus.getConsensusPhase()) // It's a new consensus, we should be at the FBFTAnnounce phase.
 
 	switches := []phaseSwitch{
 		{start: FBFTAnnounce, end: FBFTPrepare},
@@ -72,10 +72,10 @@ func TestPhaseSwitching(t *testing.T) {
 func testPhaseGroupSwitching(t *testing.T, consensus *Consensus, phases []FBFTPhase, startPhase FBFTPhase, desiredPhase FBFTPhase) {
 	for range phases {
 		consensus.switchPhase("test", desiredPhase)
-		assert.Equal(t, desiredPhase, consensus.phase)
+		assert.Equal(t, desiredPhase, consensus.getConsensusPhase())
 	}
 
-	assert.Equal(t, desiredPhase, consensus.phase)
+	assert.Equal(t, desiredPhase, consensus.getConsensusPhase())
 
 	return
 }
@@ -86,7 +86,7 @@ func TestGetNextLeaderKeyShouldFailForStandardGeneratedConsensus(t *testing.T) {
 
 	// The below results in: "panic: runtime error: integer divide by zero"
 	// This happens because there's no check for if there are any participants or not in https://github.com/harmony-one/harmony/blob/main/consensus/quorum/quorum.go#L188-L197
-	assert.Panics(t, func() { consensus.getNextLeaderKey(uint64(1), nil) })
+	assert.Panics(t, func() { consensus.current.getNextLeaderKey(consensus.Blockchain(), consensus.decider, uint64(1), nil) })
 }
 
 func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
@@ -114,7 +114,7 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 	assert.Equal(t, keyCount, consensus.Decider().ParticipantsCount())
 
 	consensus.setLeaderPubKey(&wrappedBLSKeys[0])
-	nextKey := consensus.getNextLeaderKey(uint64(1), nil)
+	nextKey := consensus.current.getNextLeaderKey(consensus.Blockchain(), consensus.decider, uint64(1), nil)
 
 	assert.Equal(t, nextKey, &wrappedBLSKeys[1])
 }

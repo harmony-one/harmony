@@ -19,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
-	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -103,7 +102,6 @@ type Node struct {
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	stateSync              *legacysync.StateSync
 	epochSync              *legacysync.EpochSync
-	stateStagedSync        *stagedsync.StagedSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
@@ -149,16 +147,9 @@ func (node *Node) SyncInstance() ISync {
 // GetOrCreateSyncInstance returns an instance of state sync, either legacy or staged
 // if initiate sets to true, it generates a new instance
 func (node *Node) GetOrCreateSyncInstance(initiate bool) ISync {
-	if node.NodeConfig.StagedSync {
-		if initiate && node.stateStagedSync == nil {
-			utils.Logger().Info().Msg("initializing staged state sync")
-			node.stateStagedSync = node.createStagedSync(node.Blockchain())
-		}
-		return node.stateStagedSync
-	}
 	if initiate && node.stateSync == nil {
 		utils.Logger().Info().Msg("initializing legacy state sync")
-		node.stateSync = node.createStateSync(node.Beaconchain())
+		node.stateSync = node.createStateSync(node.Blockchain())
 	}
 	return node.stateSync
 }

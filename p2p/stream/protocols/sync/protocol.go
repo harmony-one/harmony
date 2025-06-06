@@ -3,7 +3,8 @@ package sync
 import (
 	"context"
 	"errors"
-	"strconv"
+	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -16,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/hashicorp/go-version"
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -26,7 +26,8 @@ import (
 
 const (
 	// serviceSpecifier is the specifier for the service.
-	serviceSpecifier = "sync"
+	SyncServiceSpecifier      = "sync"
+	EpochSyncServiceSpecifier = "epochsync"
 )
 
 var (
@@ -49,6 +50,9 @@ type (
 		rm       requestmanager.RequestManager // deliver the response from stream
 		disc     discovery.Discovery
 
+		lastAdvertiseDuration    time.Duration // last advertise duration to adjust it dynamically
+		recentPeerDiscoveryCount int           // recent peer discovery count
+
 		config Config
 		logger zerolog.Logger
 
@@ -67,6 +71,7 @@ type (
 		BeaconNode bool
 		Validator  bool
 		Explorer   bool
+		EpochChain bool
 
 		MaxAdvertiseWaitTime int
 		// stream manager config
@@ -102,6 +107,12 @@ func NewProtocol(config Config) *Protocol {
 
 	sp.rm = requestmanager.NewRequestManager(sp.sm)
 
+	// if it is not epoch chain, print the peer id and proto id
+	if !config.EpochChain {
+		fmt.Println("My peer id: ", config.Host.ID().String())
+		fmt.Println("My proto id: ", sp.ProtoID())
+	}
+
 	sp.logger = utils.Logger().With().Str("Protocol", string(sp.ProtoID())).Logger()
 	return sp
 }
@@ -111,10 +122,7 @@ func (p *Protocol) Start() {
 	p.sm.Start()
 	p.rm.Start()
 	p.rl.Start()
-	// If it's not EpochChain, advertise
-	if p.config.BeaconNode || p.chain.ShardID() != shard.BeaconChainShardID {
-		go p.advertiseLoop()
-	}
+	go p.advertiseLoop()
 }
 
 // Close close the protocol
@@ -126,19 +134,18 @@ func (p *Protocol) Close() {
 	close(p.closeC)
 }
 
-// Specifier return the specifier for the protocol
-func (p *Protocol) Specifier() string {
-	return serviceSpecifier + "/" + strconv.Itoa(int(p.config.ShardID))
-}
-
 // ProtoID return the ProtoID of the sync protocol
 func (p *Protocol) ProtoID() sttypes.ProtoID {
 	return p.protoIDByVersion(MyVersion)
 }
 
-// ShardProtoID returns the ProtoID of the sync protocol for shard nodes
-func (p *Protocol) ShardProtoID() sttypes.ProtoID {
-	return p.protoIDByVersionForShardNodes(MyVersion)
+// ServiceID returns the service ID of the sync protocol
+func (p *Protocol) ServiceID() string {
+	serviceID := SyncServiceSpecifier
+	if p.config.EpochChain {
+		serviceID = EpochSyncServiceSpecifier
+	}
+	return serviceID
 }
 
 // Version returns the sync protocol version
@@ -149,6 +156,11 @@ func (p *Protocol) Version() *version.Version {
 // IsBeaconValidator returns true if it is a beacon chain validator
 func (p *Protocol) IsBeaconValidator() bool {
 	return p.config.BeaconNode && p.config.Validator
+}
+
+// IsEpochChain returns true if it is a epoch chain
+func (p *Protocol) IsEpochChain() bool {
+	return p.config.EpochChain
 }
 
 // IsValidator returns true if it is a validator node
@@ -167,7 +179,7 @@ func (p *Protocol) Match(targetID protocol.ID) bool {
 	if err != nil {
 		return false
 	}
-	if target.Service != serviceSpecifier {
+	if target.Service != p.ServiceID() {
 		return false
 	}
 	if target.NetworkType != p.config.Network {
@@ -188,7 +200,7 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 	st := p.wrapStream(raw)
 	if err := p.sm.NewStream(st); err != nil {
 		// Possibly we have reach the hard limit of the stream
-		if !errors.Is(err, streammanager.ErrStreamAlreadyExist) {
+		if !errors.Is(err, streammanager.ErrStreamAlreadyExist) && !errors.Is(err, streammanager.ErrStreamRemovalNotExpired) {
 			p.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
 				Msg("failed to add new stream")
 		}
@@ -200,12 +212,30 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 }
 
 func (p *Protocol) advertiseLoop() {
+	minSleepTime := 30 * time.Second
+	maxSleepTime := time.Duration(p.config.MaxAdvertiseWaitTime) * time.Minute
+
 	for {
 		sleep := p.advertise()
-		maxSleepTime := time.Duration(p.config.MaxAdvertiseWaitTime) * time.Minute
-		if sleep > maxSleepTime {
+
+		// Adaptive sleep: Increase if new peers were found, decrease otherwise
+		if p.recentPeerDiscoveryCount > 0 {
+			sleep += time.Duration(p.recentPeerDiscoveryCount) * time.Second
+		} else {
+			sleep /= 2
+		}
+
+		// Enforce sleep boundaries
+		if sleep < minSleepTime {
+			sleep = minSleepTime
+		} else if sleep > maxSleepTime {
 			sleep = maxSleepTime
 		}
+
+		// Add jitter to prevent synchronized advertisements
+		jitter := time.Duration(rand.Intn(30)) * time.Second
+		sleep += jitter
+
 		select {
 		case <-p.closeC:
 			return
@@ -214,26 +244,108 @@ func (p *Protocol) advertiseLoop() {
 	}
 }
 
-// advertise will advertise all compatible protocol versions for helping nodes running low
-// version
+// advertise will advertise all compatible protocol versions for helping nodes running low version
 func (p *Protocol) advertise() time.Duration {
 	var nextWait time.Duration
+	newPeersDiscovered := false
+	maxRetries := 3
 
-	pids := p.supportedProtoIDs()
-	for _, pid := range pids {
-		w, e := p.disc.Advertise(p.ctx, string(pid))
-		if e != nil {
-			p.logger.Warn().Err(e).Str("protocol", string(pid)).
-				Msg("cannot advertise sync protocol")
+	// Constants for timeout adjustments
+	baseTimeout := 300 * time.Second         // Initial timeout for the advertise call
+	timeoutIncrementStep := 30 * time.Second // Increase timeout if context deadline is exceeded
+	maxTimeout := 600 * time.Second          // Maximum allowed timeout
+	backoffTimeRatio := 5 * time.Second      // Base time for exponential backoff
+	maxBackoff := 30 * time.Second           // Cap for the exponential backoff delay
+
+	timeout := baseTimeout
+
+	// Adjust timeout if the last advertise call took longer
+	if p.lastAdvertiseDuration > timeout {
+		timeout = p.lastAdvertiseDuration + timeoutIncrementStep
+	}
+
+	for _, pid := range p.supportedProtoIDs() {
+		retries := 0
+		var err error
+		var w time.Duration
+
+		for retries < maxRetries {
+			ctx, cancel := context.WithTimeout(p.ctx, timeout)
+			start := time.Now()
+			w, err = p.disc.Advertise(ctx, string(pid))
+			elapsed := time.Since(start)
+			cancel()
+
+			// Store the last advertisement duration
+			p.lastAdvertiseDuration = elapsed
+
+			if err == nil {
+				newPeersDiscovered = true
+				p.logger.Debug().
+					Str("protocol", string(pid)).
+					Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
+					Int("retry", retries).
+					Msg("Advertise call completed")
+				break
+			}
+
+			p.logger.Debug().Err(err).
+				Str("protocol", string(pid)).
+				Int("retry", retries).
+				Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
+				Msg("Advertise failed, retrying")
+
+			// If the error is a timeout, increase the timeout duration
+			if errors.Is(err, context.DeadlineExceeded) {
+				p.logger.Debug().
+					Str("protocol", string(pid)).
+					Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
+					Msg("Advertise failed due to timeout, increasing timeout")
+
+				timeout += timeoutIncrementStep
+				if timeout > maxTimeout {
+					timeout = maxTimeout
+				}
+			}
+
+			retries++
+
+			// Dynamic backoff to avoid excessive retries
+			backoff := time.Duration(retries) * backoffTimeRatio
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+			time.Sleep(backoff)
+		}
+
+		if err != nil {
+			p.logger.Debug().Err(err).
+				Str("protocol", string(pid)).
+				Msg("Advertise failed after retries")
 			continue
 		}
+
+		// Set the next wait time based on the response
 		if nextWait == 0 || nextWait > w {
 			nextWait = w
 		}
 	}
+
+	// Ensure a minimum advertise interval
 	if nextWait < minAdvertiseInterval {
 		nextWait = minAdvertiseInterval
 	}
+
+	// Adjust next wait time based on success/failure
+	if newPeersDiscovered {
+		nextWait += 10 * time.Second
+	} else {
+		nextWait /= 2
+		if nextWait < minAdvertiseInterval {
+			nextWait = minAdvertiseInterval
+		}
+	}
+
 	return nextWait
 }
 
@@ -243,11 +355,6 @@ func (p *Protocol) supportedProtoIDs() []sttypes.ProtoID {
 	pids := make([]sttypes.ProtoID, 0, len(vs))
 	for _, v := range vs {
 		pids = append(pids, p.protoIDByVersion(v))
-		// beacon node needs to inform shard nodes about it supports them as well for EpochChain
-		// basically beacon node can accept connection from shard nodes to share last epoch blocks
-		if p.IsBeaconValidator() {
-			pids = append(pids, p.protoIDByVersionForShardNodes(v))
-		}
 	}
 	return pids
 }
@@ -258,35 +365,24 @@ func (p *Protocol) supportedVersions() []*version.Version {
 
 func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 	spec := sttypes.ProtoSpec{
-		Service:           serviceSpecifier,
-		NetworkType:       p.config.Network,
-		ShardID:           p.config.ShardID,
-		Version:           v,
-		IsBeaconValidator: p.config.Validator && p.config.BeaconNode,
-	}
-	return spec.ToProtoID()
-}
-
-func (p *Protocol) protoIDByVersionForShardNodes(v *version.Version) sttypes.ProtoID {
-	spec := sttypes.ProtoSpec{
-		Service:           serviceSpecifier,
-		NetworkType:       p.config.Network,
-		ShardID:           p.config.ShardID,
-		Version:           v,
-		IsBeaconValidator: false,
+		Service:     p.ServiceID(),
+		NetworkType: p.config.Network,
+		ShardID:     p.config.ShardID,
+		Version:     v,
 	}
 	return spec.ToProtoID()
 }
 
 // RemoveStream removes the stream of the given stream ID
 // TODO: add reason to parameters
-func (p *Protocol) RemoveStream(stID sttypes.StreamID) {
+func (p *Protocol) RemoveStream(stID sttypes.StreamID, reason string) {
 	st, exist := p.sm.GetStreamByID(stID)
 	if exist && st != nil {
 		//TODO: log this incident with reason
-		st.Close()
+		st.Close(reason, true)
 		p.logger.Info().
 			Str("stream ID", string(stID)).
+			Str("reason", reason).
 			Msg("stream removed")
 	}
 }
@@ -297,13 +393,14 @@ func (p *Protocol) StreamFailed(stID sttypes.StreamID, reason string) {
 		st.AddFailedTimes(FaultRecoveryThreshold)
 		p.logger.Info().
 			Str("stream ID", string(st.ID())).
-			Int("num failures", st.Failures()).
+			Int32("num failures", st.Failures()).
 			Str("reason", reason).
 			Msg("stream failed")
 		if st.Failures() >= MaxStreamFailures {
-			st.Close()
+			st.Close("too many failures", true)
 			p.logger.Warn().
 				Str("stream ID", string(st.ID())).
+				Str("reason", "too many failures").
 				Msg("stream removed")
 		}
 	}

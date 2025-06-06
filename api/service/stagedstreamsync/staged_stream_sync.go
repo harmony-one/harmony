@@ -60,37 +60,33 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 }
 
 type StagedStreamSync struct {
-	bc                core.BlockChain
-	consensus         *consensus.Consensus
-	db                kv.RwDB
-	protocol          syncProtocol
-	gbm               *blockDownloadManager // initialized when finished get block number
-	lastMileBlocks    []*types.Block        // last mile blocks to catch up with the consensus
-	lastMileMux       sync.Mutex
-	isEpochChain      bool
-	isBeaconValidator bool
-	isBeaconShard     bool
-	isExplorer        bool
-	isValidator       bool
-	joinConsensus     bool
-	inserted          int
-	config            Config
-	logger            zerolog.Logger
-	status            *status //TODO: merge this with currentSyncCycle
-	initSync          bool    // if sets to true, node start long range syncing
-	UseMemDB          bool
-	revertPoint       *uint64 // used to run stages
-	prevRevertPoint   *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
-	invalidBlock      InvalidBlock
-	currentStage      uint
-	LogProgress       bool
-	currentCycle      SyncCycle // current cycle
-	stages            []*Stage
-	revertOrder       []*Stage
-	pruningOrder      []*Stage
-	timings           []Timing
-	logPrefixes       []string
-
+	bc                            core.BlockChain
+	consensus                     *consensus.Consensus
+	db                            kv.RwDB
+	protocol                      syncProtocol
+	gbm                           *downloadManager // initialized when finished get block number
+	isEpochChain                  bool
+	isBeaconValidator             bool
+	isBeaconShard                 bool
+	isExplorer                    bool
+	isValidator                   bool
+	joinConsensus                 bool
+	inserted                      int
+	config                        Config
+	logger                        zerolog.Logger
+	status                        *status //TODO: merge this with currentSyncCycle
+	initSync                      bool    // if sets to true, node start long range syncing
+	UseMemDB                      bool
+	revertPoint                   *uint64 // used to run stages
+	prevRevertPoint               *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
+	invalidBlock                  InvalidBlock
+	currentStage                  uint
+	currentCycle                  SyncCycle // current cycle
+	stages                        []*Stage
+	revertOrder                   []*Stage
+	pruningOrder                  []*Stage
+	timings                       []Timing
+	logPrefixes                   []string
 	evtDownloadFinished           event.Feed // channel for each download task finished
 	evtDownloadFinishedSubscribed bool
 	evtDownloadStarted            event.Feed // channel for each download has started
@@ -105,69 +101,69 @@ type Timing struct {
 }
 
 type SyncCycle struct {
-	BlockNumber  uint64
+	CycleNumber  uint64
 	TargetHeight uint64
 	lock         sync.RWMutex
 }
 
 // GetBlockNumber returns the current sync block number.
-func (s *SyncCycle) GetBlockNumber() uint64 {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.BlockNumber
+func (sc *SyncCycle) GetCycleNumber() uint64 {
+	sc.lock.RLock()
+	defer sc.lock.RUnlock()
+	return sc.CycleNumber
 }
 
 // SetBlockNumber sets the sync block number
-func (s *SyncCycle) SetBlockNumber(number uint64) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.BlockNumber = number
+func (sc *SyncCycle) SetCycleNumber(number uint64) {
+	sc.lock.Lock()
+	defer sc.lock.Unlock()
+	sc.CycleNumber = number
 }
 
 // AddBlockNumber adds inc to the sync block number
-func (s *SyncCycle) AddBlockNumber(inc uint64) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.BlockNumber += inc
+func (sc *SyncCycle) AddCycleNumber(inc uint64) {
+	sc.lock.Lock()
+	defer sc.lock.Unlock()
+	sc.CycleNumber += inc
 }
 
 // GetTargetHeight returns the current target height
-func (s *SyncCycle) GetTargetHeight() uint64 {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.TargetHeight
+func (sc *SyncCycle) GetTargetHeight() uint64 {
+	sc.lock.RLock()
+	defer sc.lock.RUnlock()
+	return sc.TargetHeight
 }
 
 // SetTargetHeight sets the target height
-func (s *SyncCycle) SetTargetHeight(height uint64) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.TargetHeight = height
+func (sc *SyncCycle) SetTargetHeight(height uint64) {
+	sc.lock.Lock()
+	defer sc.lock.Unlock()
+	sc.TargetHeight = height
 }
 
-func (s *StagedStreamSync) Len() int                    { return len(s.stages) }
-func (s *StagedStreamSync) Blockchain() core.BlockChain { return s.bc }
-func (s *StagedStreamSync) DB() kv.RwDB                 { return s.db }
-func (s *StagedStreamSync) IsBeacon() bool              { return s.isBeaconShard }
-func (s *StagedStreamSync) IsExplorer() bool            { return s.isExplorer }
-func (s *StagedStreamSync) LogPrefix() string {
-	if s == nil {
+func (sss *StagedStreamSync) Len() int                    { return len(sss.stages) }
+func (sss *StagedStreamSync) Blockchain() core.BlockChain { return sss.bc }
+func (sss *StagedStreamSync) DB() kv.RwDB                 { return sss.db }
+func (sss *StagedStreamSync) IsBeacon() bool              { return sss.isBeaconShard }
+func (sss *StagedStreamSync) IsExplorer() bool            { return sss.isExplorer }
+func (sss *StagedStreamSync) LogPrefix() string {
+	if sss == nil {
 		return ""
 	}
-	return s.logPrefixes[s.currentStage]
+	return sss.logPrefixes[sss.currentStage]
 }
-func (s *StagedStreamSync) PrevRevertPoint() *uint64 { return s.prevRevertPoint }
+func (sss *StagedStreamSync) PrevRevertPoint() *uint64 { return sss.prevRevertPoint }
 
-func (s *StagedStreamSync) NewRevertState(id SyncStageID, revertPoint uint64) *RevertState {
-	return &RevertState{id, revertPoint, s}
+func (sss *StagedStreamSync) NewRevertState(id SyncStageID, revertPoint uint64) *RevertState {
+	return &RevertState{id, revertPoint, sss}
 }
 
-func (s *StagedStreamSync) CleanUpStageState(ctx context.Context, id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*CleanUpState, error) {
+func (sss *StagedStreamSync) CleanUpStageState(ctx context.Context, id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*CleanUpState, error) {
 	var pruneProgress uint64
 	var err error
 
 	if errV := CreateView(ctx, db, tx, func(tx kv.Tx) error {
-		pruneProgress, err = GetStageCleanUpProgress(tx, id, s.isBeaconShard)
+		pruneProgress, err = GetStageCleanUpProgress(tx, id, sss.isBeaconShard)
 		if err != nil {
 			return err
 		}
@@ -176,21 +172,21 @@ func (s *StagedStreamSync) CleanUpStageState(ctx context.Context, id SyncStageID
 		return nil, errV
 	}
 
-	return &CleanUpState{id, forwardProgress, pruneProgress, s}, nil
+	return &CleanUpState{id, forwardProgress, pruneProgress, sss}, nil
 }
 
-func (s *StagedStreamSync) NextStage() {
-	if s == nil {
+func (sss *StagedStreamSync) NextStage() {
+	if sss == nil {
 		return
 	}
-	s.currentStage++
+	sss.currentStage++
 }
 
 // IsBefore returns true if stage1 goes before stage2 in staged sync
-func (s *StagedStreamSync) IsBefore(stage1, stage2 SyncStageID) bool {
+func (sss *StagedStreamSync) IsBefore(stage1, stage2 SyncStageID) bool {
 	idx1 := -1
 	idx2 := -1
-	for i, stage := range s.stages {
+	for i, stage := range sss.stages {
 		if stage.ID == stage1 {
 			idx1 = i
 		}
@@ -204,10 +200,10 @@ func (s *StagedStreamSync) IsBefore(stage1, stage2 SyncStageID) bool {
 }
 
 // IsAfter returns true if stage1 goes after stage2 in staged sync
-func (s *StagedStreamSync) IsAfter(stage1, stage2 SyncStageID) bool {
+func (sss *StagedStreamSync) IsAfter(stage1, stage2 SyncStageID) bool {
 	idx1 := -1
 	idx2 := -1
-	for i, stage := range s.stages {
+	for i, stage := range sss.stages {
 		if stage.ID == stage1 {
 			idx1 = i
 		}
@@ -221,36 +217,36 @@ func (s *StagedStreamSync) IsAfter(stage1, stage2 SyncStageID) bool {
 }
 
 // RevertTo sets the revert point
-func (s *StagedStreamSync) RevertTo(revertPoint uint64, invalidBlockNumber uint64, invalidBlockHash common.Hash, invalidBlockStreamID sttypes.StreamID) {
-	utils.Logger().Info().
+func (sss *StagedStreamSync) RevertTo(revertPoint uint64, invalidBlockNumber uint64, invalidBlockHash common.Hash, invalidBlockStreamID sttypes.StreamID) {
+	sss.logger.Info().
 		Uint64("invalidBlockNumber", invalidBlockNumber).
 		Interface("invalidBlockHash", invalidBlockHash).
 		Interface("invalidBlockStreamID", invalidBlockStreamID).
 		Uint64("revertPoint", revertPoint).
-		Msgf(WrapStagedSyncMsg("Reverting blocks"))
-	s.revertPoint = &revertPoint
+		Msg(WrapStagedSyncMsg("Reverting blocks"))
+	sss.revertPoint = &revertPoint
 	if invalidBlockNumber > 0 || invalidBlockHash != (common.Hash{}) {
-		resetBadStreams := !s.invalidBlock.Active
-		s.invalidBlock.set(invalidBlockNumber, invalidBlockHash, resetBadStreams)
-		s.invalidBlock.addBadStream(invalidBlockStreamID)
+		resetBadStreams := !sss.invalidBlock.Active
+		sss.invalidBlock.set(invalidBlockNumber, invalidBlockHash, resetBadStreams)
+		sss.invalidBlock.addBadStream(invalidBlockStreamID)
 	}
 }
 
-func (s *StagedStreamSync) Done() {
-	s.currentStage = uint(len(s.stages))
-	s.revertPoint = nil
+func (sss *StagedStreamSync) Done() {
+	sss.currentStage = uint(len(sss.stages))
+	sss.revertPoint = nil
 }
 
 // IsDone returns true if last stage have been done
-func (s *StagedStreamSync) IsDone() bool {
-	return s.currentStage >= uint(len(s.stages)) && s.revertPoint == nil
+func (sss *StagedStreamSync) IsDone() bool {
+	return sss.currentStage >= uint(len(sss.stages)) && sss.revertPoint == nil
 }
 
 // SetCurrentStage sets the current stage to a given stage id
-func (s *StagedStreamSync) SetCurrentStage(id SyncStageID) error {
-	for i, stage := range s.stages {
+func (sss *StagedStreamSync) SetCurrentStage(id SyncStageID) error {
+	for i, stage := range sss.stages {
 		if stage.ID == id {
-			s.currentStage = uint(i)
+			sss.currentStage = uint(i)
 			return nil
 		}
 	}
@@ -259,11 +255,11 @@ func (s *StagedStreamSync) SetCurrentStage(id SyncStageID) error {
 }
 
 // StageState retrieves the latest stage state from db
-func (s *StagedStreamSync) StageState(ctx context.Context, stage SyncStageID, tx kv.Tx, db kv.RwDB) (*StageState, error) {
+func (sss *StagedStreamSync) StageState(ctx context.Context, stage SyncStageID, tx kv.Tx, db kv.RwDB) (*StageState, error) {
 	var blockNum uint64
 	var err error
 	if errV := CreateView(ctx, db, tx, func(rtx kv.Tx) error {
-		blockNum, err = GetStageProgress(rtx, stage, s.isBeaconShard)
+		blockNum, err = GetStageProgress(rtx, stage, sss.isBeaconShard)
 		if err != nil {
 			return err
 		}
@@ -272,23 +268,23 @@ func (s *StagedStreamSync) StageState(ctx context.Context, stage SyncStageID, tx
 		return nil, errV
 	}
 
-	return &StageState{s, stage, blockNum}, nil
+	return &StageState{sss, stage, blockNum}, nil
 }
 
 // cleanUp cleans up the stage by calling pruneStage
-func (s *StagedStreamSync) cleanUp(ctx context.Context, fromStage int, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
+func (sss *StagedStreamSync) cleanUp(ctx context.Context, fromStage int, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	found := false
-	for i := 0; i < len(s.pruningOrder); i++ {
-		if s.pruningOrder[i].ID == s.stages[fromStage].ID {
+	for i := 0; i < len(sss.pruningOrder); i++ {
+		if sss.pruningOrder[i].ID == sss.stages[fromStage].ID {
 			found = true
 		}
-		if !found || s.pruningOrder[i] == nil || s.pruningOrder[i].Disabled {
+		if !found || sss.pruningOrder[i] == nil || sss.pruningOrder[i].Disabled {
 			continue
 		}
-		if err := s.pruneStage(ctx, firstCycle, s.pruningOrder[i], db, tx); err != nil {
-			utils.Logger().Error().Err(err).
-				Interface("stage id", s.pruningOrder[i].ID).
-				Msgf(WrapStagedSyncMsg("stage cleanup failed"))
+		if err := sss.pruneStage(ctx, firstCycle, sss.pruningOrder[i], db, tx); err != nil {
+			sss.logger.Error().Err(err).
+				Interface("stage id", sss.pruningOrder[i].ID).
+				Msg(WrapStagedSyncMsg("stage cleanup failed"))
 			panic(err)
 		}
 	}
@@ -301,9 +297,9 @@ func New(
 	consensus *consensus.Consensus,
 	db kv.RwDB,
 	stagesList []*Stage,
+	protocol syncProtocol,
 	isEpochChain bool,
 	isBeaconShard bool,
-	protocol syncProtocol,
 	isBeaconValidator bool,
 	isExplorer bool,
 	isValidator bool,
@@ -360,9 +356,9 @@ func New(
 		isExplorer:        isExplorer,
 		isValidator:       isValidator,
 		joinConsensus:     joinConsensus,
-		lastMileBlocks:    []*types.Block{},
 		gbm:               nil,
 		status:            status,
+		initSync:          true,
 		inserted:          0,
 		config:            config,
 		logger:            logger,
@@ -376,11 +372,8 @@ func New(
 }
 
 // doGetCurrentNumberRequest returns estimated current block number and corresponding stream
-func (s *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint64, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	bn, stid, err := s.protocol.GetCurrentBlockNumber(ctx, syncproto.WithHighPriority())
+func (sss *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint64, sttypes.StreamID, error) {
+	bn, stid, err := sss.protocol.GetCurrentBlockNumber(ctx, syncproto.WithHighPriority())
 	if err != nil {
 		return 0, stid, err
 	}
@@ -388,11 +381,8 @@ func (s *StagedStreamSync) doGetCurrentNumberRequest(ctx context.Context) (uint6
 }
 
 // doGetBlockByNumberRequest returns block by its number and corresponding stream
-func (s *StagedStreamSync) doGetBlockByNumberRequest(ctx context.Context, bn uint64) (*types.Block, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	blocks, stid, err := s.protocol.GetBlocksByNumber(ctx, []uint64{bn}, syncproto.WithHighPriority())
+func (sss *StagedStreamSync) doGetBlockByNumberRequest(ctx context.Context, bn uint64) (*types.Block, sttypes.StreamID, error) {
+	blocks, stid, err := sss.protocol.GetBlocksByNumber(ctx, []uint64{bn}, syncproto.WithHighPriority())
 	if err != nil || len(blocks) != 1 {
 		return nil, stid, err
 	}
@@ -400,96 +390,136 @@ func (s *StagedStreamSync) doGetBlockByNumberRequest(ctx context.Context, bn uin
 }
 
 // promLabels returns a prometheus labels for current shard id
-func (s *StagedStreamSync) promLabels() prometheus.Labels {
-	sid := s.bc.ShardID()
+func (sss *StagedStreamSync) promLabels() prometheus.Labels {
+	sid := sss.bc.ShardID()
 	return prometheus.Labels{"ShardID": fmt.Sprintf("%d", sid)}
 }
 
 // checkHaveEnoughStreams checks whether node is connected to certain number of streams
-func (s *StagedStreamSync) checkHaveEnoughStreams() error {
-	numStreams := s.protocol.NumStreams()
-	if numStreams < s.config.MinStreams {
-		s.logger.Debug().Msgf("number of streams smaller than minimum: %v < %v",
-			numStreams, s.config.MinStreams)
+func (sss *StagedStreamSync) checkHaveEnoughStreams() error {
+	numStreams := sss.protocol.NumStreams()
+	if numStreams < sss.config.MinStreams {
+		sss.logger.Debug().Msgf("number of streams smaller than minimum: %v < %v",
+			numStreams, sss.config.MinStreams)
 		return ErrNotEnoughStreams
 	}
 	return nil
 }
 
 // Run runs a full cycle of stages
-func (s *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
-	s.prevRevertPoint = nil
-	s.timings = s.timings[:0]
+func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
+	sss.prevRevertPoint = nil
+	sss.timings = sss.timings[:0]
 
-	for !s.IsDone() {
-		if s.revertPoint != nil {
-			s.prevRevertPoint = s.revertPoint
-			s.revertPoint = nil
-			if !s.invalidBlock.Active {
-				for j := 0; j < len(s.revertOrder); j++ {
-					if s.revertOrder[j] == nil || s.revertOrder[j].Disabled {
+	for !sss.IsDone() {
+		if sss.revertPoint != nil {
+			sss.prevRevertPoint = sss.revertPoint
+			sss.revertPoint = nil
+			if !sss.invalidBlock.Active {
+				for j := 0; j < len(sss.revertOrder); j++ {
+					if sss.revertOrder[j] == nil || sss.revertOrder[j].Disabled {
 						continue
 					}
-					if err := s.revertStage(ctx, firstCycle, s.revertOrder[j], db, tx); err != nil {
-						utils.Logger().Error().
+					if err := sss.revertStage(ctx, firstCycle, sss.revertOrder[j], db, tx); err != nil {
+						sss.logger.Error().
 							Err(err).
-							Interface("stage id", s.revertOrder[j].ID).
-							Msgf(WrapStagedSyncMsg("revert stage failed"))
+							Interface("stage id", sss.revertOrder[j].ID).
+							Msg(WrapStagedSyncMsg("revert stage failed"))
 						return err
 					}
 				}
 			}
-			if err := s.SetCurrentStage(s.stages[0].ID); err != nil {
+			if err := sss.SetCurrentStage(sss.stages[0].ID); err != nil {
 				return err
 			}
 			firstCycle = false
 		}
 
-		stage := s.stages[s.currentStage]
+		stage := sss.stages[sss.currentStage]
 
 		if stage.Disabled {
-			utils.Logger().Trace().
-				Msgf(WrapStagedSyncMsg(fmt.Sprintf("%s disabled. %s", stage.ID, stage.DisabledDescription)))
+			sss.logger.Trace().
+				Msg(WrapStagedSyncMsg(fmt.Sprintf("%s disabled. %s", stage.ID, stage.DisabledDescription)))
 
-			s.NextStage()
+			sss.NextStage()
 			continue
 		}
 
 		// TODO: enable this part after make sure all works well
-		// if !s.canExecute(stage) {
+		// if !sss.canExecute(stage) {
 		// 	continue
 		// }
 
-		if err := s.runStage(ctx, stage, db, tx, firstCycle, s.invalidBlock.Active); err != nil {
-			utils.Logger().Error().
+		if err := sss.runStage(ctx, stage, db, tx, firstCycle, sss.invalidBlock.Active); err != nil {
+			sss.logger.Error().
 				Err(err).
 				Interface("stage id", stage.ID).
-				Msgf(WrapStagedSyncMsg("stage failed"))
+				Msg(WrapStagedSyncMsg("stage failed"))
 			return err
 		}
-		s.NextStage()
+		sss.NextStage()
 	}
 
-	if err := s.cleanUp(ctx, 0, db, tx, firstCycle); err != nil {
-		utils.Logger().Error().
+	if err := sss.cleanUp(ctx, 0, db, tx, firstCycle); err != nil {
+		sss.logger.Error().
 			Err(err).
-			Msgf(WrapStagedSyncMsg("stages cleanup failed"))
+			Msg(WrapStagedSyncMsg("stages cleanup failed"))
 		return err
 	}
-	if err := s.SetCurrentStage(s.stages[0].ID); err != nil {
+	if err := sss.SetCurrentStage(sss.stages[0].ID); err != nil {
 		return err
 	}
-	if err := printLogs(tx, s.timings); err != nil {
-		utils.Logger().Warn().Err(err).Msg("print timing logs failed")
+	if err := printLogs(tx, sss.timings); err != nil {
+		sss.logger.Warn().Err(err).Msg("print timing logs failed")
 	}
-	s.currentStage = 0
+	sss.currentStage = 0
 	return nil
 }
 
-func (s *StagedStreamSync) canExecute(stage *Stage) bool {
+func (sss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) ([]common.Hash, error) {
+	curNumber := bc.CurrentBlock().NumberU64()
+	var hashes []common.Hash
+
+	err := cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
+		for {
+			block := blockIter.Next()
+			if block == nil {
+				break
+			}
+			_, err := bc.InsertChain(types.Blocks{block}, true)
+			switch {
+			case errors.Is(err, core.ErrKnownBlock):
+			case errors.Is(err, core.ErrNotLastBlockInEpoch):
+			case err != nil:
+				return errors.Wrap(err, "failed to InsertChain")
+			default:
+				hashes = append(hashes, block.Header().Hash())
+			}
+		}
+		return nil
+	})
+	return hashes, err
+}
+
+func (sss *StagedStreamSync) RollbackLastMileBlocks(ctx context.Context, hashes []common.Hash) error {
+	if len(hashes) == 0 {
+		return nil
+	}
+	sss.logger.Info().
+		Interface("block", sss.bc.CurrentBlock()).
+		Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
+	if err := sss.bc.Rollback(hashes); err != nil {
+		sss.logger.Error().Err(err).
+			Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
+		return err
+	}
+	return nil
+}
+
+func (sss *StagedStreamSync) canExecute(stage *Stage) bool {
 	// check range mode
 	if stage.RangeMode != LongRangeAndShortRange {
-		isLongRange := s.initSync
+		isLongRange := sss.initSync
 		switch stage.RangeMode {
 		case OnlyLongRange:
 			if !isLongRange {
@@ -506,10 +536,10 @@ func (s *StagedStreamSync) canExecute(stage *Stage) bool {
 
 	// check chain execution
 	if stage.ChainExecutionMode != AllChains {
-		shardID := s.bc.ShardID()
-		isBeaconValidator := s.isBeaconValidator
+		shardID := sss.bc.ShardID()
+		isBeaconValidator := sss.isBeaconValidator
 		isShardChain := shardID != shard.BeaconChainShardID
-		isEpochChain := s.isEpochChain
+		isEpochChain := sss.isEpochChain
 		switch stage.ChainExecutionMode {
 		case AllChainsExceptEpochChain:
 			if isEpochChain {
@@ -567,7 +597,7 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 	}
 	if len(logCtx) > 0 {
 		timingLog := fmt.Sprintf("Timings (slower than 50ms) %v", logCtx)
-		utils.Logger().Info().Msgf(WrapStagedSyncMsg(timingLog))
+		utils.Logger().Info().Msg(WrapStagedSyncMsg(timingLog))
 	}
 
 	if tx == nil {
@@ -585,216 +615,145 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 			bucketSizes = append(bucketSizes, bucket, ByteCount(sz))
 		}
 		utils.Logger().Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("Tables %v", bucketSizes...)))
+			Msg(WrapStagedSyncMsg(fmt.Sprintf("Tables %v", bucketSizes...)))
 	}
 	tx.CollectMetrics()
 	return nil
 }
 
 // runStage executes stage
-func (s *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, invalidBlockRevert bool) (err error) {
+func (sss *StagedStreamSync) runStage(ctx context.Context, stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, invalidBlockRevert bool) (err error) {
 	start := time.Now()
-	stageState, err := s.StageState(ctx, stage.ID, tx, db)
+	stageState, err := sss.StageState(ctx, stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
-	if err = stage.Handler.Exec(ctx, firstCycle, invalidBlockRevert, stageState, s, tx); err != nil {
-		utils.Logger().Error().
+	if err = stage.Handler.Exec(ctx, firstCycle, invalidBlockRevert, stageState, sss, tx); err != nil {
+		sss.logger.Error().
 			Err(err).
 			Interface("stage id", stage.ID).
-			Msgf(WrapStagedSyncMsg("stage failed"))
-		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
+			Msg(WrapStagedSyncMsg("stage failed"))
+		return fmt.Errorf("[%s] %w", sss.LogPrefix(), err)
 	}
 
 	took := time.Since(start)
 	if took > 60*time.Second {
-		logPrefix := s.LogPrefix()
-		utils.Logger().Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("%s:  DONE in %d", logPrefix, took)))
+		logPrefix := sss.LogPrefix()
+		sss.logger.Info().
+			Msg(WrapStagedSyncMsg(fmt.Sprintf("%s:  DONE in %d", logPrefix, took)))
 
 	}
-	s.timings = append(s.timings, Timing{stage: stage.ID, took: took})
+	sss.timings = append(sss.timings, Timing{stage: stage.ID, took: took})
 	return nil
 }
 
 // revertStage reverts stage
-func (s *StagedStreamSync) revertStage(ctx context.Context, firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
+func (sss *StagedStreamSync) revertStage(ctx context.Context, firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
-	stageState, err := s.StageState(ctx, stage.ID, tx, db)
+	stageState, err := sss.StageState(ctx, stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
 
-	revert := s.NewRevertState(stage.ID, *s.revertPoint)
+	revert := sss.NewRevertState(stage.ID, *sss.revertPoint)
 
 	if stageState.BlockNumber <= revert.RevertPoint {
 		return nil
 	}
 
-	if err = s.SetCurrentStage(stage.ID); err != nil {
+	if err = sss.SetCurrentStage(stage.ID); err != nil {
 		return err
 	}
 
 	err = stage.Handler.Revert(ctx, firstCycle, revert, stageState, tx)
 	if err != nil {
-		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
+		return fmt.Errorf("[%s] %w", sss.LogPrefix(), err)
 	}
 
 	took := time.Since(start)
 	if took > 60*time.Second {
-		logPrefix := s.LogPrefix()
-		utils.Logger().Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("%s: Revert done in %d", logPrefix, took)))
+		logPrefix := sss.LogPrefix()
+		sss.logger.Info().
+			Msg(WrapStagedSyncMsg(fmt.Sprintf("%s: Revert done in %d", logPrefix, took)))
 	}
-	s.timings = append(s.timings, Timing{isRevert: true, stage: stage.ID, took: took})
+	sss.timings = append(sss.timings, Timing{isRevert: true, stage: stage.ID, took: took})
 	return nil
 }
 
 // pruneStage cleans up the stage and logs the timing
-func (s *StagedStreamSync) pruneStage(ctx context.Context, firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
+func (sss *StagedStreamSync) pruneStage(ctx context.Context, firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
 
-	stageState, err := s.StageState(ctx, stage.ID, tx, db)
+	stageState, err := sss.StageState(ctx, stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
 
-	prune, err := s.CleanUpStageState(ctx, stage.ID, stageState.BlockNumber, tx, db)
+	prune, err := sss.CleanUpStageState(ctx, stage.ID, stageState.BlockNumber, tx, db)
 	if err != nil {
 		return err
 	}
-	if err = s.SetCurrentStage(stage.ID); err != nil {
+	if err = sss.SetCurrentStage(stage.ID); err != nil {
 		return err
 	}
 
 	err = stage.Handler.CleanUp(ctx, firstCycle, prune, tx)
 	if err != nil {
-		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
+		return fmt.Errorf("[%s] %w", sss.LogPrefix(), err)
 	}
 
 	took := time.Since(start)
 	if took > 60*time.Second {
-		logPrefix := s.LogPrefix()
-		utils.Logger().Info().
-			Msgf(WrapStagedSyncMsg(fmt.Sprintf("%s: CleanUp done in %d", logPrefix, took)))
+		logPrefix := sss.LogPrefix()
+		sss.logger.Info().
+			Msg(WrapStagedSyncMsg(fmt.Sprintf("%s: CleanUp done in %d", logPrefix, took)))
 	}
-	s.timings = append(s.timings, Timing{isCleanUp: true, stage: stage.ID, took: took})
+	sss.timings = append(sss.timings, Timing{isCleanUp: true, stage: stage.ID, took: took})
 	return nil
 }
 
 // DisableAllStages disables all stages including their reverts
-func (s *StagedStreamSync) DisableAllStages() []SyncStageID {
+func (sss *StagedStreamSync) DisableAllStages() []SyncStageID {
 	var backupEnabledIds []SyncStageID
-	for i := range s.stages {
-		if !s.stages[i].Disabled {
-			backupEnabledIds = append(backupEnabledIds, s.stages[i].ID)
+	for i := range sss.stages {
+		if !sss.stages[i].Disabled {
+			backupEnabledIds = append(backupEnabledIds, sss.stages[i].ID)
 		}
 	}
-	for i := range s.stages {
-		s.stages[i].Disabled = true
+	for i := range sss.stages {
+		sss.stages[i].Disabled = true
 	}
 	return backupEnabledIds
 }
 
 // DisableStages disables stages by a set of given stage IDs
-func (s *StagedStreamSync) DisableStages(ids ...SyncStageID) {
-	for i := range s.stages {
+func (sss *StagedStreamSync) DisableStages(ids ...SyncStageID) {
+	for i := range sss.stages {
 		for _, id := range ids {
-			if s.stages[i].ID != id {
+			if sss.stages[i].ID != id {
 				continue
 			}
-			s.stages[i].Disabled = true
+			sss.stages[i].Disabled = true
 		}
 	}
 }
 
 // EnableStages enables stages by a set of given stage IDs
-func (s *StagedStreamSync) EnableStages(ids ...SyncStageID) {
-	for i := range s.stages {
+func (sss *StagedStreamSync) EnableStages(ids ...SyncStageID) {
+	for i := range sss.stages {
 		for _, id := range ids {
-			if s.stages[i].ID != id {
+			if sss.stages[i].ID != id {
 				continue
 			}
-			s.stages[i].Disabled = false
+			sss.stages[i].Disabled = false
 		}
 	}
-}
-
-func (ss *StagedStreamSync) purgeLastMileBlocksFromCache() {
-	ss.lastMileMux.Lock()
-	ss.lastMileBlocks = nil
-	ss.lastMileMux.Unlock()
-}
-
-// AddLastMileBlock adds the latest a few block into queue for syncing
-// only keep the latest blocks with size capped by LastMileBlocksSize
-func (ss *StagedStreamSync) AddLastMileBlock(block *types.Block) {
-	ss.lastMileMux.Lock()
-	defer ss.lastMileMux.Unlock()
-	if ss.lastMileBlocks != nil {
-		if len(ss.lastMileBlocks) >= LastMileBlocksSize {
-			ss.lastMileBlocks = ss.lastMileBlocks[1:]
-		}
-		ss.lastMileBlocks = append(ss.lastMileBlocks, block)
-	}
-}
-
-func (ss *StagedStreamSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Hash) *types.Block {
-	ss.lastMileMux.Lock()
-	defer ss.lastMileMux.Unlock()
-	for _, block := range ss.lastMileBlocks {
-		ph := block.ParentHash()
-		if ph == parentHash {
-			return block
-		}
-	}
-	return nil
-}
-
-func (ss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) ([]common.Hash, error) {
-	curNumber := bc.CurrentBlock().NumberU64()
-	var hashes []common.Hash
-
-	err := cs.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus.LastMileBlockIter) error {
-		for {
-			block := blockIter.Next()
-			if block == nil {
-				break
-			}
-			_, err := bc.InsertChain(types.Blocks{block}, true)
-			switch {
-			case errors.Is(err, core.ErrKnownBlock):
-			case errors.Is(err, core.ErrNotLastBlockInEpoch):
-			case err != nil:
-				return errors.Wrap(err, "failed to InsertChain")
-			default:
-				hashes = append(hashes, block.Header().Hash())
-			}
-		}
-		return nil
-	})
-	return hashes, err
-}
-
-func (ss *StagedStreamSync) RollbackLastMileBlocks(ctx context.Context, hashes []common.Hash) error {
-	if len(hashes) == 0 {
-		return nil
-	}
-	utils.Logger().Info().
-		Interface("block", ss.bc.CurrentBlock()).
-		Msg("[STAGED_STREAM_SYNC] Rolling back last mile blocks")
-	if err := ss.bc.Rollback(hashes); err != nil {
-		utils.Logger().Error().Err(err).
-			Msg("[STAGED_STREAM_SYNC] failed to rollback last mile blocks")
-		return err
-	}
-	return nil
 }
 
 // UpdateBlockAndStatus updates block and its status in db
-func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
+func (sss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
-		utils.Logger().Debug().
+		sss.logger.Debug().
 			Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).
 			Uint64("receivedBlockNum", block.NumberU64()).
 			Msg("[STAGED_STREAM_SYNC] Inappropriate block number, ignore!")
@@ -817,7 +776,7 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
 				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
 			}
-			utils.Logger().Debug().
+			sss.logger.Debug().
 				Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).
 				Msg("[STAGED_STREAM_SYNC] VerifyHeaderSignature")
 		}
@@ -825,7 +784,7 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 		if err == engine.ErrUnknownAncestor {
 			return nil
 		} else if err != nil {
-			utils.Logger().Error().
+			sss.logger.Error().
 				Err(err).
 				Uint64("block number", block.NumberU64()).
 				Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block")
@@ -837,7 +796,7 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 	switch {
 	case errors.Is(err, core.ErrKnownBlock):
 	case err != nil:
-		utils.Logger().Error().
+		sss.logger.Error().
 			Err(err).
 			Uint64("block number", block.NumberU64()).
 			Uint32("shard", block.ShardID()).
@@ -845,15 +804,14 @@ func (ss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Blo
 		return err
 	default:
 	}
-	utils.Logger().Info().
+	sss.logger.Info().
 		Uint64("blockHeight", block.NumberU64()).
 		Uint64("blockEpoch", block.Epoch().Uint64()).
 		Str("blockHex", block.Hash().Hex()).
-		Uint32("ShardID", block.ShardID()).
 		Msg("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
 
 	for i, tx := range block.StakingTransactions() {
-		utils.Logger().Info().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
+		sss.logger.Info().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
 	}
 	return nil
 }

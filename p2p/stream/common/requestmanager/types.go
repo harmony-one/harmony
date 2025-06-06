@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
@@ -15,6 +16,10 @@ var (
 
 	// ErrClosed is request error that the module is closed during request
 	ErrClosed = errors.New("request manager module closed")
+
+	// ErrNoAvailableStream indicates that a request cannot be processed
+	// because there are no active streams available.
+	ErrNoAvailableStream = errors.New("no available stream")
 )
 
 // stream is the wrapped version of sttypes.Stream.
@@ -34,6 +39,8 @@ type request struct {
 	doneC   chan struct{}
 	// stream info
 	owner *stream // Current owner
+	// time out
+	timeout time.Time
 	// utils
 	lock sync.RWMutex
 	raw  *interface{}
@@ -60,7 +67,10 @@ func (req *request) SetReqID(val uint64) {
 func (req *request) doneWithResponse(resp responseData) {
 	notDone := atomic.CompareAndSwapUint32(&req.atmDone, 0, 1)
 	if notDone {
-		req.respC <- resp
+		select {
+		case req.respC <- resp:
+		default:
+		}
 		close(req.respC)
 		close(req.doneC)
 	}
@@ -193,10 +203,9 @@ func (rl *requestQueue) pop() *request {
 	if elem == nil {
 		return nil
 	}
-	rl.l.Remove(elem)
-
 	req := elem.Value.(*request)
 	delete(rl.elemM, req)
+	rl.l.Remove(elem)
 	return req
 }
 

@@ -12,14 +12,14 @@ RPMBUILD=$(HOME)/rpmbuild
 DEBBUILD=$(HOME)/debbuild
 SHELL := bash
 
-.PHONY: all help libs exe race trace-pointer debug debug-ext debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker
+.PHONY: all help libs exe race trace-pointer debug debug-ext debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker go-vet go-test docker build_localnet_validator protofiles travis_go_checker travis_rpc_checker travis_rosetta_checker debug-start-log debug-stop-log debug-restart-log debug-delete-log
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
 
 help:
 	@echo "all - build the harmony binary & bootnode along with the MCL & BLS libs (if necessary)"
-	@echo "libs - build only the MCL & BLS libs (if necessary) "
+	@echo "libs - build only the MCL & BLS libs (if necessary)"
 	@echo "exe - build the harmony binary & bootnode"
 	@echo "race - build the harmony binary & bootnode with race condition checks"
 	@echo "trace-pointer - build the harmony binary & bootnode with pointer analysis"
@@ -55,10 +55,15 @@ help:
 	@echo "travis_rpc_checker - run the Travis RPC checker script, defaulting the test branch to 'master' unless overridden by TEST_REPO_BRANCH"
 	@echo "travis_rosetta_checker - run the Travis Rosetta checker script, defaulting the test branch to 'master' unless overridden by TEST_REPO_BRANCH"
 	@echo "debug_external - cleans up environment, rebuilds the binary, and deploys with external nodes"
+	@echo "debug-multi-bls - cleans up environment, rebuilds the binary, and deploys with external nodes in configuration 1 harmony process -> 2 validators"
 	@echo "build_localnet_validator - imports validator keys, funds validator accounts, waits for the epoch, and creates external validators on a local network"
-	@echo "debug-start-log - start a docker compose Promtail->Loki->Grafana stack against localnet logs, needs docker compose and started localnet"
+	@echo "debug-start-log - start a docker compose Promtail->Loki->Grafana stack against localnet logs, creates"\
+		"persistent volume to store parsed logs between localnet runs, needs docker compose and started localnet"
 	@echo "debug-stop-log - stops a docker compose Promtail->Loki->Grafana stack"
 	@echo "debug-restart-log - restart a docker compose Promtail->Loki->Grafana stack"
+	@echo "debug-delete-log - removes persistent volume for the Loki and host folder for it"
+	@echo "debug-multi-bls-multi-ext-node - start a localnet with multiple external nodes and multi-BLS configuration"
+	@echo "protofiles - generate Go code from protobuf files"
 
 libs:
 	make -C $(TOP)/mcl -j8
@@ -85,6 +90,7 @@ debug:
 debug-kill:
 	bash ./test/kill_node.sh
 	pkill -9 -f debug.sh
+	pkill -9 -f deploy.sh
 
 debug-ext:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
@@ -101,7 +107,7 @@ debug-multi-bls:
 	echo sleep 10s before creating the external validator
 	sleep 10
 	bash ./test/build-localnet-validator.sh
-	
+
 debug-multi-bls-with-terminal:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
@@ -111,7 +117,7 @@ debug-multi-bls-with-terminal:
 	bash ./test/build-localnet-validator.sh
 	screen -r localnet
 
-debug-multi-bls-multi-ext-node: pre-external
+debug-multi-bls-multi-ext-node:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	./test/debug.sh ./test/configs/local-multi-bls-multi-ext-node.txt &
@@ -120,7 +126,7 @@ debug-multi-bls-multi-ext-node: pre-external
 	bash ./test/build-localnet-validator.sh
 
 clean:
-	rm -rf ./tmp_log*
+	rm -rf ./tmp_log/*
 	rm -rf ./.dht*
 	rm -rf ./db-*
 	rm -rf ./latest
@@ -232,9 +238,6 @@ travis_rpc_checker:
 travis_rosetta_checker:
 	bash ./scripts/travis_rosetta_checker.sh
 
-debug_external: clean
-	bash test/debug-external.sh
-
 build_localnet_validator:
 	bash test/build-localnet-validator.sh
 
@@ -248,3 +251,9 @@ debug-stop-log:
 	bash ./test/logs_aggregator/stop_log_aggregator.sh
 
 debug-restart-log: debug-stop-log debug-start-log
+
+debug-delete-log:
+	docker volume rm logs_aggregator_loki_data
+	@echo "[WARN] - it needs sudo to remove folder created with loki docker image user"
+	sudo rm -rf test/logs_aggregator/loki
+

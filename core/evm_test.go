@@ -448,7 +448,7 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 	expectedError := errors.New("abi: cannot marshal in to go type: length insufficient 31 require 32")
 	if err != nil {
 		if err.Error() != expectedError.Error() {
-			t.Errorf(fmt.Sprintf("Got error %v in evm.Call but expected %v", err, expectedError))
+			t.Error(fmt.Sprintf("Got error %v in evm.Call but expected %v", err, expectedError))
 		}
 	}
 
@@ -460,7 +460,7 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 		[]byte{},
 		math.MaxUint64, new(big.Int))
 	if err != nil {
-		t.Errorf(fmt.Sprintf("Got error %v in evm.Call", err))
+		t.Error(fmt.Sprintf("Got error %v in evm.Call", err))
 	}
 
 	// now without staking precompile
@@ -472,6 +472,6 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 		[]byte{},
 		math.MaxUint64, new(big.Int))
 	if err != nil {
-		t.Errorf(fmt.Sprintf("Got error %v in evm.Call", err))
+		t.Error(fmt.Sprintf("Got error %v in evm.Call", err))
 	}
 }

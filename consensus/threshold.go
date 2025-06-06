@@ -8,16 +8,15 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 func (consensus *Consensus) didReachPrepareQuorum() error {
-	logger := utils.Logger()
+	logger := consensus.getLogger()
 	logger.Info().Msg("[OnPrepare] Received Enough Prepare Signatures")
 	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("[OnPrepare] leader not found")
+		logger.Warn().Err(err).Msg("[OnPrepare] leader not found")
 		return err
 	}
 	// Construct and broadcast prepared message
@@ -39,7 +38,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
 	// Leader add commit phase signature
 	var blockObj types.Block
-	if err := rlp.DecodeBytes(consensus.block, &blockObj); err != nil {
+	if err := rlp.DecodeBytes(consensus.current.block, &blockObj); err != nil {
 		consensus.getLogger().Warn().
 			Err(err).
 			Uint64("BlockNum", consensus.BlockNum()).
@@ -78,7 +77,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 	} else {
 		consensus.getLogger().Info().
-			Hex("blockHash", consensus.blockHash[:]).
+			Hex("blockHash", consensus.current.blockHash[:]).
 			Uint64("blockNum", consensus.BlockNum()).
 			Msg("[OnPrepare] Sent Prepared Message!!")
 	}
@@ -87,7 +86,6 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.msgSender.StopRetry(msg_pb.MessageType_COMMITTED)
 
 	consensus.getLogger().Debug().
-		Str("From", consensus.phase.String()).
 		Str("To", FBFTCommit.String()).
 		Msg("[OnPrepare] Switching phase")
 

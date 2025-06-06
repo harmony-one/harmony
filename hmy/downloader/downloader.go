@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	"github.com/harmony-one/harmony/p2p/stream/protocols/sync"
+	"github.com/harmony-one/harmony/shard"
 )
 
 type (
@@ -56,6 +57,7 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, nodeConfig *nodeconfig.Con
 		BeaconNode:   isBeaconNode,
 		Validator:    nodeConfig.Role() == nodeconfig.Validator,
 		Explorer:     nodeConfig.Role() == nodeconfig.ExplorerNode,
+		EpochChain:   !isBeaconNode && bc.ShardID() == shard.BeaconChainShardID,
 		SmSoftLowCap: config.SmSoftLowCap,
 		SmHardLowCap: config.SmHardLowCap,
 		SmHiCap:      config.SmHiCap,

@@ -133,7 +133,7 @@ func (w *Worker) CommitSortedTransactions(
 		}
 
 		// Start executing the transaction
-		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
+		w.current.state.SetTxContext(tx.Hash(), common.Hash{}, len(w.current.txs))
 		err := w.commitTransaction(tx, coinbase)
 
 		sender, _ := common2.AddressToBech32(from)
@@ -228,7 +228,7 @@ func (w *Worker) CommitTransactions(
 			}
 
 			// Start executing the transaction
-			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs)+len(w.current.stakingTxs))
+			w.current.state.SetTxContext(tx.Hash(), common.Hash{}, len(w.current.txs)+len(w.current.stakingTxs))
 			// THESE CODE ARE DUPLICATED AS ABOVE>>
 			if err := w.commitStakingTransaction(tx, coinbase); err != nil {
 				txID := tx.Hash().Hex()

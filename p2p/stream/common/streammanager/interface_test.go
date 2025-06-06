@@ -18,14 +18,14 @@ var _ StreamManager = &streamManager{}
 
 var (
 	myPeerID    = makePeerID(0)
-	testProtoID = sttypes.ProtoID("harmony/sync/unitest/0/1.0.0/1")
+	testProtoID = sttypes.ProtoID("harmony/sync/unitest/0/1.0.0")
 )
 
 const (
-	defHardLoCap = 16  // discovery trigger immediately when size smaller than this number
-	defSoftLoCap = 32  // discovery trigger for routine check
-	defHiCap     = 128 // Hard cap of the stream number
-	defDiscBatch = 16  // batch size for discovery
+	defHardLoCap = 16 // discovery trigger immediately when size smaller than this number
+	defSoftLoCap = 32 // discovery trigger for routine check
+	defHiCap     = 64 // Hard cap of the stream number
+	defDiscBatch = 16 // batch size for discovery
 )
 
 var defConfig = Config{
@@ -71,7 +71,7 @@ func (st *testStream) ReadBytes() ([]byte, error) {
 	return nil, nil
 }
 
-func (st *testStream) Failures() int {
+func (st *testStream) Failures() int32 {
 	return 0
 }
 
@@ -83,7 +83,7 @@ func (st *testStream) ResetFailedTimes() {
 	return
 }
 
-func (st *testStream) Close() error {
+func (st *testStream) Close(reason string, criticalErr bool) error {
 	if st.closed {
 		return errors.New("already closed")
 	}

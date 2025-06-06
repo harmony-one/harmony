@@ -15,7 +15,6 @@ import (
 	downloader_pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/stagedstreamsync"
-	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
@@ -87,44 +86,6 @@ func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
 	return legacysync.CreateStateSync(bc, node.SelfPeer.IP, mutatedPort,
 		node.GetSyncID(), node.host.GetID(),
 		node.NodeConfig.Role() == nodeconfig.ExplorerNode, role)
-}
-
-func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
-	// Temp hack: The actual port used in dns sync is node.downloaderServer.Port.
-	// But registration is done through an old way of port arithmetics (syncPort + 3000).
-	// Thus for compatibility, we are doing the arithmetics here, and not to change the
-	// protocol itself. This is just the temporary hack and will not be a concern after
-	// state sync.
-	var mySyncPort int
-	if node.downloaderServer != nil {
-		mySyncPort = node.downloaderServer.Port
-	} else {
-		// If local sync server is not started, the port field in protocol is actually not
-		// functional, simply set it to default value.
-		mySyncPort = nodeconfig.DefaultDNSPort
-	}
-	mutatedPort := strconv.Itoa(mySyncPort + legacysync.SyncingPortDifference)
-	role := node.NodeConfig.Role()
-	isExplorer := node.NodeConfig.Role() == nodeconfig.ExplorerNode
-	dbDir := node.NodeConfig.DBDir
-
-	if s, err := stagedsync.CreateStagedSync(node.SelfPeer.IP, mutatedPort,
-		node.GetSyncID(), bc, dbDir, role, isExplorer,
-		node.NodeConfig.StagedSyncTurboMode,
-		node.NodeConfig.UseMemDB,
-		node.NodeConfig.DoubleCheckBlockHashes,
-		node.NodeConfig.MaxBlocksPerSyncCycle,
-		node.NodeConfig.MaxBackgroundBlocks,
-		node.NodeConfig.MaxMemSyncCycleSize,
-		node.NodeConfig.VerifyAllSig,
-		node.NodeConfig.VerifyHeaderBatchSize,
-		node.NodeConfig.InsertChainBatchSize,
-		node.NodeConfig.LogProgress,
-		node.NodeConfig.DebugMode); err != nil {
-		return nil
-	} else {
-		return s
-	}
 }
 
 // SyncingPeerProvider is an interface for getting the peers in the given shard.
@@ -207,9 +168,20 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 			"shard ID %d out of range 0..%d", shardID, p.numShards-1)
 	}
 	shards := [][]string{
-		{"6000", "6004", "6008", "6012", "6016", "6020", "6100", "6104", "6108", "6112", "6116", "6120"},
-		{"6002", "6006", "6010", "6014", "6018", "6022", "6102", "6106", "6110", "6114", "6118", "6122"},
+		{
+			"6000",
+			"6004",
+			"6008",
+			"6120",
+		},
+		{
+			"6002",
+			"6006",
+			"6010",
+			"6122",
+		},
 	}
+
 	selfport := fmt.Sprint(p.selfPort)
 	for _, port := range shards[shardID] {
 		if port == selfport {
@@ -317,6 +289,9 @@ func (node *Node) doSync(syncInstance ISync, syncingPeerProvider SyncingPeerProv
 	}
 	// TODO: treat fake maximum height
 	if isSynchronized, _, _ := syncInstance.GetParsedSyncStatusDoubleChecked(); !isSynchronized {
+		if consensus.IsLeader() {
+			return
+		}
 		node.IsSynchronized.UnSet()
 		if willJoinConsensus {
 			consensus.BlocksNotSynchronized("node.doSync")
@@ -386,14 +361,9 @@ func (node *Node) supportSyncing() {
 		return
 	}
 
-	if !node.NodeConfig.StagedSync && node.stateSync == nil {
+	if node.stateSync == nil {
 		node.stateSync = node.createStateSync(node.Blockchain())
 		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
-	}
-
-	if node.NodeConfig.StagedSync && node.stateStagedSync == nil {
-		node.stateStagedSync = node.createStagedSync(node.Blockchain())
-		utils.Logger().Debug().Msg("[SYNC] initialized state for staged sync")
 	}
 
 	go node.DoSyncing(node.Blockchain(), joinConsensus)
@@ -844,9 +814,7 @@ func (node *Node) IsOutOfSync(shardID uint32) bool {
 func (node *Node) legacyIsOutOfSync(shardID uint32) bool {
 	switch shardID {
 	case node.NodeConfig.ShardID:
-		if !node.NodeConfig.StagedSync && node.stateSync == nil {
-			return true
-		} else if node.NodeConfig.StagedSync && node.stateStagedSync == nil {
+		if node.stateSync == nil {
 			return true
 		}
 		return node.SyncInstance().IsSynchronized()

@@ -14,16 +14,16 @@ import (
 func TestNewAccountIdentifier(t *testing.T) {
 	key, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 	b32Addr, err := internalCommon.AddressToBech32(addr)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	metadata, err := types.MarshalMap(AccountMetadata{Address: addr.String()})
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
 	referenceAccID := &types.AccountIdentifier{
@@ -42,12 +42,12 @@ func TestNewAccountIdentifier(t *testing.T) {
 func TestGetAddress(t *testing.T) {
 	key, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 	b32Addr, err := internalCommon.AddressToBech32(addr)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	testAccID := &types.AccountIdentifier{
 		Address: b32Addr,

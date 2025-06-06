@@ -30,17 +30,17 @@ func initFullSyncStagesOrder() {
 		Heads,
 		SyncEpoch,
 		ShortRange,
+		BlockHashes,
 		BlockBodies,
 		States,
-		LastMile,
 		Finish,
 	}
 
 	StagesRevertOrder = RevertOrder{
 		Finish,
-		LastMile,
 		States,
 		BlockBodies,
+		BlockHashes,
 		ShortRange,
 		SyncEpoch,
 		Heads,
@@ -48,9 +48,9 @@ func initFullSyncStagesOrder() {
 
 	StagesCleanUpOrder = CleanUpOrder{
 		Finish,
-		LastMile,
 		States,
 		BlockBodies,
+		BlockHashes,
 		ShortRange,
 		SyncEpoch,
 		Heads,
@@ -66,13 +66,11 @@ func initFastSyncStagesOrder() {
 		Receipts,
 		FullStateSync,
 		States,
-		LastMile,
 		Finish,
 	}
 
 	StagesRevertOrder = RevertOrder{
 		Finish,
-		LastMile,
 		States,
 		FullStateSync,
 		Receipts,
@@ -84,7 +82,6 @@ func initFastSyncStagesOrder() {
 
 	StagesCleanUpOrder = CleanUpOrder{
 		Finish,
-		LastMile,
 		States,
 		FullStateSync,
 		Receipts,
@@ -99,24 +96,24 @@ func DefaultStages(ctx context.Context,
 	headsCfg StageHeadsCfg,
 	seCfg StageEpochCfg,
 	srCfg StageShortRangeCfg,
+	hashesCfg StageBlockHashesCfg,
 	bodiesCfg StageBodiesCfg,
 	stateSyncCfg StageStateSyncCfg,
 	fullStateSyncCfg StageFullStateSyncCfg,
 	statesCfg StageStatesCfg,
 	receiptsCfg StageReceiptsCfg,
-	lastMileCfg StageLastMileCfg,
 	finishCfg StageFinishCfg,
 ) []*Stage {
 
 	handlerStageHeads := NewStageHeads(headsCfg)
 	handlerStageShortRange := NewStageShortRange(srCfg)
 	handlerStageEpochSync := NewStageEpoch(seCfg)
+	handlerStageHashes := NewStageBlockHashes(hashesCfg)
 	handlerStageBodies := NewStageBodies(bodiesCfg)
 	handlerStageStates := NewStageStates(statesCfg)
 	handlerStageStateSync := NewStageStateSync(stateSyncCfg)
 	handlerStageFullStateSync := NewStageFullStateSync(fullStateSyncCfg)
 	handlerStageReceipts := NewStageReceipts(receiptsCfg)
-	handlerStageLastMile := NewStageLastMile(lastMileCfg)
 	handlerStageFinish := NewStageFinish(finishCfg)
 
 	return []*Stage{
@@ -139,6 +136,13 @@ func DefaultStages(ctx context.Context,
 			Description:        "Short Range Sync",
 			Handler:            handlerStageShortRange,
 			RangeMode:          OnlyShortRange,
+			ChainExecutionMode: AllChainsExceptEpochChain,
+		},
+		{
+			ID:                 BlockHashes,
+			Description:        "Retrieve Block Hashes",
+			Handler:            handlerStageHashes,
+			RangeMode:          OnlyLongRange,
 			ChainExecutionMode: AllChainsExceptEpochChain,
 		},
 		{
@@ -174,13 +178,6 @@ func DefaultStages(ctx context.Context,
 			Description:        "Retrieve Receipts",
 			Handler:            handlerStageReceipts,
 			RangeMode:          OnlyLongRange,
-			ChainExecutionMode: AllChainsExceptEpochChain,
-		},
-		{
-			ID:                 LastMile,
-			Description:        "update status for blocks after sync and update last mile blocks as well",
-			Handler:            handlerStageLastMile,
-			RangeMode:          LongRangeAndShortRange,
 			ChainExecutionMode: AllChainsExceptEpochChain,
 		},
 		{

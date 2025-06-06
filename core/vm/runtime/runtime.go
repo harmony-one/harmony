@@ -110,6 +110,11 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 		vmenv   = NewEnv(cfg)
 		sender  = vm.AccountRef(cfg.Origin)
 	)
+
+	// Execute the preparatory steps for state transition which includes:
+	// - reset transient storage(eip 1153)
+	vmenv.StateDB.Prepare()
+
 	cfg.State.CreateAccount(address)
 	// set the receiver's (the executing contract) code for execution.
 	cfg.State.SetCode(address, code, false)
@@ -140,6 +145,10 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 		sender = vm.AccountRef(cfg.Origin)
 	)
 
+	// Execute the preparatory steps for state transition which includes:
+	// - reset transient storage(eip 1153)
+	vmenv.StateDB.Prepare()
+
 	// Call the code with the given configuration.
 	code, address, leftOverGas, err := vmenv.Create(
 		sender,
@@ -161,6 +170,11 @@ func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, er
 	vmenv := NewEnv(cfg)
 
 	sender := cfg.State.GetOrNewStateObject(cfg.Origin)
+
+	// Execute the preparatory steps for state transition which includes:
+	// - reset transient storage(eip 1153)
+	vmenv.StateDB.Prepare()
+
 	// Call the code with the given configuration.
 	ret, leftOverGas, err := vmenv.Call(
 		sender,

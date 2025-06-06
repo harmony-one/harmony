@@ -10,6 +10,11 @@ const (
 	discTimeout = 10 * time.Second
 	// connectTimeout is the timeout for setting up a stream with a discovered peer
 	connectTimeout = 60 * time.Second
+	// MaxReservedStreams is the maximum number of reserved streams
+	MaxReservedStreams = 100
+	// RemovalCooldownDuration defines the cooldown period (in minutes) before a removed stream can reconnect.
+	RemovalCooldownDuration    = 5 * time.Minute
+	MaxRemovalCooldownDuration = 60 * time.Minute
 )
 
 // Config is the config for stream manager

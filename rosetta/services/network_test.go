@@ -170,7 +170,7 @@ func TestGetPeersFromNodePeerInfo(t *testing.T) {
 		}
 
 		if err := checkPeerID(p, refTopics); err != nil {
-			t.Errorf(err.Error())
+			t.Error(err.Error())
 		}
 	}
 

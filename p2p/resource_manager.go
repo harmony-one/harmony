@@ -20,8 +20,8 @@ func GetNumFDs() uint64 {
 // mostly copy/pasted from https://github.com/ipfs/rainbow/blob/main/rcmgr.go
 // which is itself copy-pasted from Kubo, because libp2p does not have
 // a sane way of doing this.
-func makeResourceMgr(enabled bool, maxMemory, maxFD uint64, connMgrHighWater int) (network.ResourceManager, error) {
-	if !enabled {
+func makeResourceMgr(infiniteLimits bool, maxMemory, maxFD uint64, connMgrHighWater int) (network.ResourceManager, error) {
+	if infiniteLimits {
 		rmgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
 		utils.Logger().Info().Msg("go-libp2p Resource Manager DISABLED")
 		return rmgr, err

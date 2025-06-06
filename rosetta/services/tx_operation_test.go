@@ -7,22 +7,30 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/harmony-one/harmony/hmy/tracers"
-
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
+	rpcV2 "github.com/harmony-one/harmony/rpc/harmony/v2"
 	"github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/test/helpers"
 )
+
+// GetMessageFromStakingTx gets the staking message, as seen by the rpc layer
+func GetMessageFromStakingTx(tx *stakingTypes.StakingTransaction) (map[string]interface{}, error) {
+	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0, true)
+	if err != nil {
+		return nil, err
+	}
+	return types.MarshalMap(rpcStakingTx.Msg)
+}
 
 func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	gasLimit := uint64(1e18)
@@ -46,7 +54,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	metadata, err := helpers.GetMessageFromStakingTx(tx)
+	metadata, err := GetMessageFromStakingTx(tx)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -169,12 +177,12 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	gasLimit := uint64(1e18)
 	senderKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	senderAddr := crypto.PubkeyToAddress(senderKey.PublicKey)
 	validatorKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	validatorAddr := crypto.PubkeyToAddress(validatorKey.PublicKey)
 	tx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
@@ -187,7 +195,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	metadata, err := helpers.GetMessageFromStakingTx(tx)
+	metadata, err := GetMessageFromStakingTx(tx)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -305,12 +313,12 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	gasLimit := uint64(1e18)
 	senderKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	senderAddr := crypto.PubkeyToAddress(senderKey.PublicKey)
 	validatorKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	validatorAddr := crypto.PubkeyToAddress(validatorKey.PublicKey)
 	tx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
@@ -323,7 +331,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	metadata, err := helpers.GetMessageFromStakingTx(tx)
+	metadata, err := GetMessageFromStakingTx(tx)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -386,7 +394,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	gasLimit := uint64(1e18)
 	senderKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	senderAddr := crypto.PubkeyToAddress(senderKey.PublicKey)
 	tx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
@@ -397,7 +405,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	metadata, err := helpers.GetMessageFromStakingTx(tx)
+	metadata, err := GetMessageFromStakingTx(tx)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -447,7 +455,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	gasLimit := uint64(1e18)
 	senderKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	senderAddr := crypto.PubkeyToAddress(senderKey.PublicKey)
 	tx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
@@ -458,7 +466,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	metadata, err := helpers.GetMessageFromStakingTx(tx)
+	metadata, err := GetMessageFromStakingTx(tx)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -924,7 +932,7 @@ func TestGetContractTransferNativeOperations(t *testing.T) {
 func TestGetContractCreationNativeOperations(t *testing.T) {
 	dummyContractKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	chainID := params.TestChainConfig.ChainID
 	signer := hmytypes.NewEIP155Signer(chainID)

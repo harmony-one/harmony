@@ -5,7 +5,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -65,8 +64,6 @@ type Consensus struct {
 	decider quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	fBFTLog *FBFTLog
-	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
-	phase FBFTPhase
 	// current indicates what state a node is in
 	current State
 	// isBackup declarative the node is in backup mode
@@ -89,15 +86,7 @@ type Consensus struct {
 	MinPeers int
 	// private/public keys of current node
 	priKey multibls.PrivateKeys
-	// the publickey of leader
-	leaderPubKey unsafe.Pointer //*bls.PublicKeyWrapper
-	// blockNum: the next blockNumber that FBFT is going to agree on,
-	// should be equal to the blockNumber of next block
-	blockNum uint64
-	// Blockhash - 32 byte
-	blockHash [32]byte
-	// Block to run consensus on
-	block []byte
+
 	// Shard Id which this node belongs to
 	ShardID uint32
 	// IgnoreViewIDCheck determines whether to ignore viewID check
@@ -172,7 +161,7 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 }
 
 func (consensus *Consensus) ReadySignal(p Proposal, signalSource string, signalReason string) {
-	utils.Logger().Info().
+	consensus.GetLogger().Info().
 		Str("signalSource", signalSource).
 		Str("signalReason", signalReason).
 		Msg("ReadySignal is called to propose new block")
@@ -241,13 +230,11 @@ func (consensus *Consensus) getPublicKeys() multibls.PublicKeys {
 }
 
 func (consensus *Consensus) GetLeaderPubKey() *bls_cosi.PublicKeyWrapper {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
 	return consensus.getLeaderPubKey()
 }
 
 func (consensus *Consensus) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {
-	return (*bls_cosi.PublicKeyWrapper)(atomic.LoadPointer(&consensus.leaderPubKey))
+	return consensus.current.getLeaderPubKey()
 }
 
 func (consensus *Consensus) SetLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
@@ -255,7 +242,7 @@ func (consensus *Consensus) SetLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
 }
 
 func (consensus *Consensus) setLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
-	atomic.StorePointer(&consensus.leaderPubKey, unsafe.Pointer(pub))
+	consensus.current.setLeaderPubKey(pub)
 }
 
 func (consensus *Consensus) GetPrivateKeys() multibls.PrivateKeys {
@@ -269,7 +256,7 @@ func (consensus *Consensus) getLeaderPrivateKey(leaderKey *bls_core.PublicKey) (
 			return &consensus.priKey[i], nil
 		}
 	}
-	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
+	return nil, errors.Wrap(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
 }
 
 // getConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
@@ -284,11 +271,11 @@ func (consensus *Consensus) IsBackup() bool {
 }
 
 func (consensus *Consensus) BlockNum() uint64 {
-	return atomic.LoadUint64(&consensus.blockNum)
+	return consensus.getBlockNum()
 }
 
 func (consensus *Consensus) getBlockNum() uint64 {
-	return atomic.LoadUint64(&consensus.blockNum)
+	return atomic.LoadUint64(&consensus.current.blockNum)
 }
 
 // New create a new Consensus record
@@ -301,8 +288,7 @@ func New(
 		mutex:        &sync.RWMutex{},
 		ShardID:      shard,
 		fBFTLog:      NewFBFTLog(),
-		phase:        FBFTAnnounce,
-		current:      NewState(Normal),
+		current:      NewState(Normal, shard),
 		decider:      Decider,
 		registry:     registry,
 		MinPeers:     minPeers,
@@ -317,10 +303,10 @@ func New(
 
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey
-		utils.Logger().Info().
+		consensus.getLogger().Info().
 			Str("publicKey", consensus.GetPublicKeys().SerializeToHexStr()).Msg("My Public Key")
 	} else {
-		utils.Logger().Error().Msg("the bls key is nil")
+		consensus.getLogger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
@@ -372,7 +358,7 @@ func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err
 	blockNum := currentBlock.NumberU64()
 
 	epoch := currentBlock.Epoch()
-	utils.Logger().Info().
+	consensus.getLogger().Info().
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
@@ -381,7 +367,7 @@ func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err
 		epoch, consensus.Blockchain(),
 	)
 	if err != nil {
-		utils.Logger().Err(err).
+		consensus.getLogger().Err(err).
 			Uint64("blockNum", blockNum).
 			Uint32("shardID", shardID).
 			Uint64("epoch", epoch.Uint64()).
@@ -390,14 +376,14 @@ func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err
 	}
 	subComm, err := shardState.FindCommitteeByID(shardID)
 	if err != nil {
-		utils.Logger().Err(err).
+		consensus.getLogger().Err(err).
 			Interface("shardState", shardState).
 			Msg("[InitConsensusWithValidators] Find CommitteeByID")
 		return err
 	}
 	pubKeys, err := subComm.BLSPublicKeys()
 	if err != nil {
-		utils.Logger().Error().
+		consensus.getLogger().Error().
 			Uint32("shardID", shardID).
 			Uint64("blockNum", blockNum).
 			Msg("[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys")
@@ -409,7 +395,7 @@ func (consensus *Consensus) initConsensusWithValidators(bc core.BlockChain) (err
 
 	for _, key := range pubKeys {
 		if consensus.getPublicKeys().Contains(key.Object) {
-			utils.Logger().Info().
+			consensus.getLogger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
 				Str("mode", consensus.Mode().String()).

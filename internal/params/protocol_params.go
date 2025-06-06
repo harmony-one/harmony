@@ -86,6 +86,11 @@ const (
 	// SstoreClearRefundEIP2200 ...
 	SstoreClearRefundEIP2200 uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
 
+	// todo(sun): implement eip2929
+	ColdAccountAccessCostEIP2929 uint64 = 2600 // COLD_ACCOUNT_ACCESS_COST
+	ColdSloadCostEIP2929         uint64 = 2100 // COLD_SLOAD_COST
+	WarmStorageReadCostEIP2929   uint64 = 100  // WARM_STORAGE_READ_COST
+
 	// JumpdestGas ...
 	JumpdestGas uint64 = 1 // Refunded gas, once per SSTORE operation if the zeroness changes to zero.
 	// EpochDuration ...

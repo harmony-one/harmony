@@ -5,11 +5,11 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 type StageEpoch struct {
@@ -17,8 +17,9 @@ type StageEpoch struct {
 }
 
 type StageEpochCfg struct {
-	bc core.BlockChain
-	db kv.RwDB
+	bc     core.BlockChain
+	db     kv.RwDB
+	logger zerolog.Logger
 }
 
 func NewStageEpoch(cfg StageEpochCfg) *StageEpoch {
@@ -27,10 +28,14 @@ func NewStageEpoch(cfg StageEpochCfg) *StageEpoch {
 	}
 }
 
-func NewStageEpochCfg(bc core.BlockChain, db kv.RwDB) StageEpochCfg {
+func NewStageEpochCfg(bc core.BlockChain, db kv.RwDB, logger zerolog.Logger) StageEpochCfg {
 	return StageEpochCfg{
 		bc: bc,
 		db: db,
+		logger: logger.With().
+			Str("stage", "StageEpoch").
+			Str("mode", "short range").
+			Logger(),
 	}
 }
 
@@ -53,11 +58,11 @@ func (sr *StageEpoch) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	n, err := sr.doShortRangeSyncForEpochSync(ctx, s)
 	s.state.inserted = n
 	if err != nil {
-		utils.Logger().Info().Err(err).Msg("short range for epoch sync failed")
+		sr.configs.logger.Info().Err(err).Msg("short range for epoch sync failed")
 		return err
 	}
 	if n > 0 {
-		utils.Logger().Info().Int("blocks inserted", n).Msg("epoch sync short range blocks inserted successfully")
+		sr.configs.logger.Info().Int("blocks inserted", n).Msg("epoch sync short range blocks inserted successfully")
 	}
 	useInternalTx := tx == nil
 	if useInternalTx {
@@ -89,7 +94,9 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	sh := &srHelper{
 		syncProtocol: s.state.protocol,
 		config:       s.state.config,
-		logger:       utils.Logger().With().Str("mode", "epoch chain short range").Logger(),
+		logger: sr.configs.logger.With().
+			Str("sub-module", "short range helper").
+			Logger(),
 	}
 
 	if err := sh.checkPrerequisites(); err != nil {
@@ -101,11 +108,12 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		}
 	}
 	curBN := s.state.bc.CurrentBlock().NumberU64()
+	curEpoch := s.state.bc.CurrentHeader().Epoch().Uint64()
 	bns := make([]uint64, 0, BlocksPerRequest)
 	// in epoch chain, we have only the last block of each epoch, so, the current
 	// block's epoch number shows the last epoch we have. We should start
 	// from next epoch then
-	loopEpoch := s.state.bc.CurrentHeader().Epoch().Uint64() + 1
+	loopEpoch := curEpoch + 1
 	for len(bns) < BlocksPerRequest {
 		blockNum := shard.Schedule.EpochLastBlock(loopEpoch)
 		if blockNum > curBN {
@@ -136,7 +144,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		switch {
 		case errors.Is(err, core.ErrKnownBlock):
 		case err != nil:
-			utils.Logger().Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
+			sr.configs.logger.Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
 			sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
 			numBlocksInsertedEpochSyncHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 			return n, err

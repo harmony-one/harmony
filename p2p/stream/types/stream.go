@@ -4,13 +4,22 @@ import (
 	"bufio"
 	"encoding/binary"
 	"io"
+	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+const (
+	maxMsgBytes        = 20 * 1024 * 1024 // 20MB
+	sizeBytes          = 4                // uint32
+	streamReadTimeout  = 60 * time.Second
+	streamWriteTimeout = 60 * time.Second
+	withDeadlines      = false // set stream deadlines
 )
 
 // Stream is the interface for streams implemented in each service.
@@ -21,19 +30,21 @@ type Stream interface {
 	ProtoSpec() (ProtoSpec, error)
 	WriteBytes([]byte) error
 	ReadBytes() ([]byte, error)
-	Close() error
+	Close(reason string, criticalErr bool) error
 	CloseOnExit() error
-	Failures() int
+	Failures() int32
 	AddFailedTimes(faultRecoveryThreshold time.Duration)
 	ResetFailedTimes()
 }
 
 // BaseStream is the wrapper around
 type BaseStream struct {
-	raw       libp2p_network.Stream
-	reader    *bufio.Reader
-	readLock  sync.Mutex
-	writeLock sync.Mutex
+	raw    libp2p_network.Stream
+	reader *bufio.Reader
+	lock   sync.Mutex
+
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 
 	// parse protocol spec fields
 	spec     ProtoSpec
@@ -42,16 +53,27 @@ type BaseStream struct {
 
 	failures        int32
 	lastFailureTime time.Time
+	failureLock     sync.Mutex
 }
 
 // NewBaseStream creates BaseStream as the wrapper of libp2p Stream
 func NewBaseStream(st libp2p_network.Stream) *BaseStream {
-	reader := bufio.NewReader(st)
 	return &BaseStream{
-		raw:      st,
-		reader:   reader,
-		failures: 0,
+		raw:             st,
+		reader:          bufio.NewReader(st),
+		readTimeout:     streamReadTimeout,
+		writeTimeout:    streamWriteTimeout,
+		failures:        0,
+		lastFailureTime: time.Now(),
 	}
+}
+
+func (st *BaseStream) setReadDeadline() error {
+	return st.raw.SetReadDeadline(time.Now().Add(st.readTimeout))
+}
+
+func (st *BaseStream) setWriteDeadline() error {
+	return st.raw.SetWriteDeadline(time.Now().Add(st.writeTimeout))
 }
 
 // StreamID is the unique identifier for the stream. It has the value of
@@ -78,27 +100,58 @@ func (st *BaseStream) ProtoSpec() (ProtoSpec, error) {
 
 // Close reset the stream, and close the connection for both sides.
 func (st *BaseStream) Close() error {
-	return st.raw.Reset()
+	st.lock.Lock()
+	defer st.lock.Unlock()
+
+	// Clean up resources
+	if st.reader != nil {
+		st.reader.Reset(nil) // Clear buffer
+	}
+
+	err := st.raw.Close()
+	if err != nil {
+		return st.raw.Reset()
+	}
+	return nil
 }
 
-func (st *BaseStream) Failures() int {
-	return int(atomic.LoadInt32(&st.failures))
+func (st *BaseStream) Failures() int32 {
+	st.failureLock.Lock()
+	defer st.failureLock.Unlock()
+	return st.failures
 }
 
 func (st *BaseStream) AddFailedTimes(faultRecoveryThreshold time.Duration) {
-	atomic.AddInt32(&st.failures, 1)
+	st.failureLock.Lock()
+	defer st.failureLock.Unlock()
+	st.failures += 1
+	st.lastFailureTime = time.Now()
 }
 
 func (st *BaseStream) ResetFailedTimes() {
-	atomic.StoreInt32(&st.failures, 0)
+	st.failureLock.Lock()
+	defer st.failureLock.Unlock()
+	st.failures = 0
 }
 
-const (
-	maxMsgBytes = 20 * 1024 * 1024 // 20MB
-	sizeBytes   = 4                // uint32
-)
+func (st *BaseStream) IsHealthy() bool {
+	st.failureLock.Lock()
+	defer st.failureLock.Unlock()
 
-// WriteBytes write the bytes to the stream.
+	// Too many failures recently
+	if st.failures > 3 && time.Since(st.lastFailureTime) < 5*time.Minute {
+		return false
+	}
+
+	// Check if underlying connection is still good
+	if st.raw.Conn().IsClosed() {
+		return false
+	}
+
+	return true
+}
+
+// WriteBytes writes the bytes to the stream.
 // First 4 bytes is used as the size bytes, and the rest is the content
 func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	defer func() {
@@ -109,25 +162,51 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	}()
 
 	if len(b) > maxMsgBytes {
-		err = errors.New("message too long")
-		return
+		return errors.New("message too long")
 	}
+
 	size := sizeBytes + len(b)
 	message := make([]byte, size)
 	copy(message, intToBytes(len(b)))
 	copy(message[sizeBytes:], b)
 
-	st.writeLock.Lock()
-	defer st.writeLock.Unlock()
-	if _, err = st.raw.Write(message); err != nil {
+	st.lock.Lock()
+	defer st.lock.Unlock()
+
+	// Adjust write timeout
+	if withDeadlines {
+		if err := st.setWriteDeadline(); err != nil {
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Err(err).
+				Msg("failed to adjust write deadline")
+			return err
+		}
+	} else {
+		// Disable write timeout
+		if err := st.raw.SetWriteDeadline(time.Time{}); err != nil {
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Err(err).
+				Msg("failed to disable write deadline")
+			return err
+		}
+	}
+
+	_, err = st.raw.Write(message[:size])
+	if err != nil {
 		return err
 	}
 	bytesWriteCounter.Add(float64(size))
 	return nil
 }
 
-// ReadBytes read the bytes from the stream.
-func (st *BaseStream) ReadBytes() (cb []byte, err error) {
+// ReadBytes reads bytes from the stream with blocking behavior.
+// It will wait indefinitely for data unless:
+// - The stream is explicitly closed
+// - A network error occurs
+// - The message size exceeds maxMsgBytes
+func (st *BaseStream) ReadBytes() (content []byte, err error) {
 	defer func() {
 		msgReadCounter.Inc()
 		if err != nil {
@@ -135,39 +214,93 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 		}
 	}()
 
-	st.readLock.Lock()
-	defer st.readLock.Unlock()
+	// Adjust read timeout
+	if withDeadlines {
+		if err := st.setReadDeadline(); err != nil {
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Err(err).
+				Msg("failed to adjust read deadline")
+			return nil, errors.Wrap(err, "failed to adjust read deadline")
+		}
+	} else {
+		// Disable read timeout for true blocking behavior
+		if err := st.raw.SetReadDeadline(time.Time{}); err != nil {
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Err(err).
+				Msg("failed to disable read deadline")
+			return nil, errors.Wrap(err, "failed to disable read deadline")
+		}
+	}
 
-	sb := make([]byte, sizeBytes)
-	_, err = st.reader.Read(sb)
+	// 1. Read message length prefix (blocking)
+	lengthBuf := make([]byte, sizeBytes)
+	n, err := io.ReadFull(st.reader, lengthBuf)
 	if err != nil {
-		err = errors.Wrap(err, "read size")
-		return
+		if err == io.EOF {
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Msg("clean stream closure")
+			return nil, nil
+		}
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return nil, nil
+		}
+		if err == nil && n == 0 {
+			return nil, nil
+		}
+		utils.Logger().Debug().
+			Str("streamID", string(st.ID())).
+			Err(err).
+			Msg("failed reading length prefix")
+		return nil, errors.Wrap(err, "length prefix read failed")
 	}
 	bytesReadCounter.Add(sizeBytes)
-	size := bytesToInt(sb)
+
+	// 2. Process length
+	size := bytesToInt(lengthBuf)
 	if size > maxMsgBytes {
-		err = errors.New("message size exceed max")
-		return nil, err
+		utils.Logger().Warn().
+			Str("streamID", string(st.ID())).
+			Int("size", size).
+			Int("max", maxMsgBytes).
+			Msg("message size exceeds limit")
+		return nil, errors.Errorf("message size %d exceeds max %d", size, maxMsgBytes)
 	}
 
-	cb = make([]byte, size)
-	n, err := io.ReadFull(st.reader, cb)
+	// 3. Read message content (blocking)
+	content = make([]byte, size)
+	n, err = io.ReadFull(st.reader, content)
 	if err != nil {
-		err = errors.Wrap(err, "read content")
-		return
+		utils.Logger().Debug().
+			Str("streamID", string(st.ID())).
+			Err(err).
+			Int("expected", size).
+			Msg("failed reading message content")
+		return nil, errors.Wrap(err, "content read failed")
 	}
 	bytesReadCounter.Add(float64(n))
+
 	if n != size {
-		err = errors.New("ReadBytes sanity failed: byte size")
-		return
+		utils.Logger().Debug().
+			Str("streamID", string(st.ID())).
+			Int("read", n).
+			Int("expected", size).
+			Msg("incomplete message read")
+		return nil, errors.Errorf("read %d bytes but expected %d", n, size)
 	}
-	return
+
+	return content, nil
 }
 
-// CloseOnExit reset the stream during the shutdown of the node
+// CloseOnExit resets the stream during the shutdown of the node
 func (st *BaseStream) CloseOnExit() error {
-	return st.raw.Reset()
+	err := st.raw.Close()
+	if err != nil {
+		return st.raw.Reset()
+	}
+	return nil
 }
 
 func intToBytes(val int) []byte {

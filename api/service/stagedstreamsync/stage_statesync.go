@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
@@ -47,7 +46,10 @@ func NewStageStateSyncCfg(bc core.BlockChain,
 		db:          db,
 		concurrency: concurrency,
 		protocol:    protocol,
-		logger:      logger,
+		logger: logger.With().
+			Str("stage", "StageStateSync").
+			Str("mode", "long range").
+			Logger(),
 		logProgress: logProgress,
 	}
 }
@@ -164,7 +166,7 @@ func (sss *StageStateSync) Exec(ctx context.Context, bool, invalidBlockRevert bo
 }
 
 // runStateWorkerLoop creates a work loop for download states
-func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDownloadManager, wg *sync.WaitGroup, loopID int, startTime time.Time, s *StageState) {
+func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDownloadManager, wg *sync.WaitGroup, workerID int, startTime time.Time, s *StageState) {
 
 	defer wg.Done()
 
@@ -188,20 +190,20 @@ func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDow
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				sss.configs.protocol.StreamFailed(stid, "downloadStates failed")
 			}
-			utils.Logger().Error().
+			sss.configs.logger.Error().
 				Err(err).
 				Str("stream", string(stid)).
 				Msg(WrapStagedSyncMsg("downloadStates failed"))
 			err = errors.Wrap(err, "request error")
 			sdm.HandleRequestError(codes, paths, stid, err)
 		} else if data == nil || len(data) == 0 {
-			utils.Logger().Warn().
+			sss.configs.logger.Warn().
 				Str("stream", string(stid)).
 				Msg(WrapStagedSyncMsg("downloadStates failed, received empty data bytes"))
 			err := errors.New("downloadStates received empty data bytes")
 			sdm.HandleRequestError(codes, paths, stid, err)
 		} else {
-			sdm.HandleRequestResult(nodes, paths, data, loopID, stid)
+			sdm.HandleRequestResult(nodes, paths, data, workerID, stid)
 			if sss.configs.logProgress {
 				//calculating block download speed
 				dt := time.Now().Sub(startTime).Seconds()
@@ -219,9 +221,6 @@ func (sss *StageStateSync) runStateWorkerLoop(ctx context.Context, sdm *StateDow
 }
 
 func (sss *StageStateSync) downloadStates(ctx context.Context, nodes []common.Hash, codes []common.Hash) ([][]byte, sttypes.StreamID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	hashes := append(codes, nodes...)
 	data, stid, err := sss.configs.protocol.GetNodeData(ctx, hashes)
 	if err != nil {
@@ -240,7 +239,7 @@ func validateGetNodeDataResult(requested []common.Hash, result [][]byte) error {
 	return nil
 }
 
-func (stg *StageStateSync) insertChain(gbm *blockDownloadManager,
+func (stg *StageStateSync) insertChain(gbm *downloadManager,
 	protocol syncProtocol,
 	lbls prometheus.Labels,
 	targetBN uint64) {
@@ -261,9 +260,9 @@ func (stg *StageStateSync) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 
 	// save progress
 	if err = s.Update(tx, s.state.CurrentBlockNumber()); err != nil {
-		utils.Logger().Error().
+		stg.configs.logger.Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block States stage failed")
+			Msgf("[STAGED_STREAM_SYNC] saving progress for block States stage failed")
 		return ErrSaveStateProgressFail
 	}
 

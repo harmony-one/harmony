@@ -7,7 +7,6 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/rs/zerolog"
 )
 
@@ -38,7 +37,7 @@ type (
 	}
 )
 
-func newBeaconHelper(bc blockChain, blockC <-chan *types.Block, insertHook func()) *beaconHelper {
+func newBeaconHelper(bc blockChain, logger zerolog.Logger, blockC <-chan *types.Block, insertHook func()) *beaconHelper {
 	return &beaconHelper{
 		bc:            bc,
 		blockC:        blockC,
@@ -46,8 +45,7 @@ func newBeaconHelper(bc blockChain, blockC <-chan *types.Block, insertHook func(
 		lastMileCache: newBlocksByNumber(lastMileCap),
 		insertC:       make(chan insertTask, 1),
 		closeC:        make(chan struct{}),
-		logger: utils.Logger().With().
-			Str("module", "staged stream sync").
+		logger: logger.With().
 			Str("sub-module", "beacon helper").
 			Logger(),
 	}
@@ -77,7 +75,7 @@ func (bh *beaconHelper) loop() {
 		case <-t.C:
 			bh.insertAsync()
 
-		case b, ok := <-bh.blockC:
+		case b, ok := <-bh.blockC: // for side chain, it receives last block of each epoch
 			if !ok {
 				return // blockC closed. Node exited
 			}
@@ -177,10 +175,6 @@ func (bh *beaconHelper) getNextBlock(expBN uint64) *types.Block {
 		}
 		if b.NumberU64() < expBN {
 			continue
-		}
-		if b.NumberU64() > expBN {
-			bh.lastMileCache.push(b)
-			return nil
 		}
 		return b
 	}

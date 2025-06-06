@@ -16,7 +16,7 @@ http://api.hmny.io/
 
 ## Requirements
 
-### **Go 1.22.5**
+### **Go 1.24.2**
 ### **GMP and OpenSSL**
 
 On macOS:
@@ -25,14 +25,15 @@ brew install gmp
 brew install openssl
 sudo ln -sf /usr/local/opt/openssl@1.1 /usr/local/opt/openssl
 ```
-On Linux (Ubuntu)
+On Linux (Ubuntu):
 ```bash
-sudo apt install libgmp-dev  libssl-dev  make gcc g++
+sudo apt install libgmp-dev libssl-dev make gcc g++
 ```
-On Linux (Cent OS / Amazon Linux 2)
+On Linux (Cent OS / Amazon Linux 2):
 ```bash
 sudo yum install glibc-static gmp-devel gmp-static openssl-libs openssl-static gcc-c++
 ```
+
 ### **Docker** (for testing)
 
 On macOS:
@@ -41,13 +42,55 @@ brew install --cask docker
 open /Applications/Docker.app
 ```
 On Linux, reference official documentation [here](https://docs.docker.com/engine/install/).
+
 ### **Bash 4+**
 
 For macOS, you can reference this [guide](http://tldrdevnotes.com/bash-upgrade-3-4-macos). For Linux, you can reference this [guide](https://fossbytes.com/installing-gnu-bash-4-4-linux-distros/).
 
+### **Developer Tools for macOS**
+
+On macOS, make sure you have the **Xcode Command Line Tools** installed. This includes essential tools like `git`, `make`, and other development utilities:
+```bash
+xcode-select --install
+```
+
+## Setting Up MCL & BLS Libraries on macOS
+
+The Harmony project depends on the MCL (multi-curve library) and BLS (Boneh-Lynn-Shacham) cryptographic libraries. These need to be installed and configured before building the project.
+
+### Clone and Build MCL & BLS Repositories
+First, clone the MCL and BLS repositories:
+```bash
+git clone https://github.com/harmony-one/mcl.git
+git clone https://github.com/harmony-one/bls.git
+```
+
+### Update `.zshrc` for MCL and BLS Paths
+
+To ensure the libraries are correctly located when building the project, you need to add the MCL and BLS library paths to your `.zshrc` file.
+
+Add the following lines to your `.zshrc` (or `.bash_profile` for bash users):
+```bash
+# MCL & BLS paths for Harmony
+export MCL_PATH=$GOPATH/src/github.com/harmony-one/mcl
+export BLS_PATH=$GOPATH/src/github.com/harmony-one/bls
+
+# Add library paths for MCL and BLS
+export CGO_CFLAGS="-I$MCL_PATH/include -I$BLS_PATH/include -I/opt/homebrew/opt/openssl@1.1/include"
+export CGO_LDFLAGS="-L$MCL_PATH/lib -L$BLS_PATH/lib -L/opt/homebrew/opt/openssl@1.1/lib"
+export LD_LIBRARY_PATH=$MCL_PATH/lib:$BLS_PATH/lib:/opt/homebrew/opt/openssl@1.1/lib
+export LIBRARY_PATH=$LD_LIBRARY_PATH
+export DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
+```
+
+Then, apply the changes by running:
+```bash
+source ~/.zshrc
+```
+
 ## Dev Environment
 
-**Most repos from [harmony-one](https://github.com/harmony-one) assumes the GOPATH convention. More information [here](https://github.com/golang/go/wiki/GOPATH).**
+**Most repos from [harmony-one](https://github.com/harmony-one) assume the GOPATH convention. More information [here](https://github.com/golang/go/wiki/GOPATH).**
 
 ### First Install
 Clone and set up all of the repos with the following set of commands:
@@ -77,9 +120,7 @@ make
 
 ## Dev Docker Image
 
-Included in this repo is a Dockerfile that has a full harmony development environment and
-comes with emacs, vim, ag, tig and other creature comforts. Most importantly, it already has the go environment
-with our C/C++ based library dependencies (`libbls` and `mcl`) set up correctly for you.
+Included in this repo is a Dockerfile that has a full harmony development environment and comes with emacs, vim, ag, tig, and other creature comforts. Most importantly, it already has the go environment with our C/C++ based library dependencies (`libbls` and `mcl`) set up correctly for you.
 
 You can build the docker image for yourself with the following commands:
 ```bash
@@ -92,8 +133,6 @@ docker build -t harmony .
 > docker build --platform linux/amd64 -t harmony .
 > ```
 > Learn more about the `--platform` arg and multi-CPU architecture support, [here](https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope) and [here](https://docs.docker.com/desktop/multi-arch/).
-
-
 
 Then you can start your docker container with the following command:
 ```bash
@@ -204,13 +243,9 @@ make test-rosetta-attach
 
 ## License
 
-Harmony is licensed under GNU Lesser General Public License v3.0. See [`LICENSE`](LICENSE) file for
-the terms and conditions.
+Harmony is licensed under GNU Lesser General Public License v3.0. See [`LICENSE`](LICENSE) file for the terms and conditions.
 
-Harmony includes third-party open-source code. In general, a source subtree
-with a `LICENSE` or `COPYRIGHT` file is from a third party, and our
-modifications thereto are licensed under the same third-party open source
-license.
+Harmony includes third-party open-source code. In general, a source subtree with a `LICENSE` or `COPYRIGHT` file is from a third party, and our modifications thereto are licensed under the same third-party open source license.
 
 Also please see [our Fiduciary License Agreement](FLA.md) if you are
 contributing to the project. By your submission of your contribution to us, you
