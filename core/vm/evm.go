@@ -36,11 +36,25 @@ var emptyCodeHash = crypto.Keccak256Hash(nil)
 type (
 	// CanTransferFunc is the signature of a transfer guard function
 	CanTransferFunc func(StateDB, common.Address, *big.Int) bool
+	// IsValidatorFunc is the signature of IsValidator function
+	IsValidatorFunc func(StateDB, common.Address) bool
 	// TransferFunc is the signature of a transfer function
-	TransferFunc func(StateDB, common.Address, common.Address, *big.Int)
-	// GetHashFunc returns the n'th block hash in the blockchain
+	TransferFunc func(StateDB, common.Address, common.Address, *big.Int, types.TransactionType)
+	// GetHashFunc returns the nth block hash in the blockchain
 	// and is used by the BLOCKHASH EVM op code.
 	GetHashFunc func(uint64) common.Hash
+	// GetVRFFunc returns the nth block vrf in the blockchain
+	// and is used by the precompile VRF contract.
+	GetVRFFunc func(uint64) common.Hash
+	// Below functions are used by staking precompile, and state transition
+	CreateValidatorFunc func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CreateValidator) error
+	EditValidatorFunc   func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.EditValidator) error
+	DelegateFunc        func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Delegate) error
+	UndelegateFunc      func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Undelegate) error
+	CollectRewardsFunc  func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CollectRewards) error
+	// Used for migrating delegations via the staking precompile
+	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
+	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
 )
 
 // ActivePrecompiles returns the addresses of the precompiles enabled with the current
