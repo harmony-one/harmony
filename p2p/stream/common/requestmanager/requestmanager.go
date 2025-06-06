@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -24,6 +25,8 @@ type requestManager struct {
 	available *sttypes.SafeMap[sttypes.StreamID, struct{}] // Streams that are available for request
 	pendings  *sttypes.SafeMap[uint64, *request]           // requests that are sent but not received response
 	waitings  requestQueues                                // double linked list of requests that are on the waiting list
+
+	myProtoID sttypes.ProtoID
 
 	// Stream events
 	sm         streammanager.Reader
@@ -47,11 +50,11 @@ type requestManager struct {
 }
 
 // NewRequestManager creates a new request manager
-func NewRequestManager(sm streammanager.ReaderSubscriber) RequestManager {
-	return newRequestManager(sm)
+func NewRequestManager(sm streammanager.ReaderSubscriber, pid sttypes.ProtoID) RequestManager {
+	return newRequestManager(sm, pid)
 }
 
-func newRequestManager(sm streammanager.ReaderSubscriber) *requestManager {
+func newRequestManager(sm streammanager.ReaderSubscriber, pid sttypes.ProtoID) *requestManager {
 	// subscribe at initialize to prevent misuse of upper function which might cause
 	// the bootstrap peers are ignored
 	newStreamC := make(chan streammanager.EvtStreamAdded)
@@ -66,6 +69,8 @@ func newRequestManager(sm streammanager.ReaderSubscriber) *requestManager {
 		available: sttypes.NewSafeMap[sttypes.StreamID, struct{}](),
 		pendings:  sttypes.NewSafeMap[uint64, *request](),
 		waitings:  newRequestQueues(),
+
+		myProtoID: pid,
 
 		sm:          sm,
 		newStreamC:  newStreamC,
@@ -379,6 +384,7 @@ func (rm *requestManager) handleCancelRequest(data cancelReqData) {
 	})
 	rm.waitings.Remove(req)
 	rm.removePendingRequest(req)
+	numWaitingRequestsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
 }
 
 func (rm *requestManager) getNextRequest() (*request, *stream) {
@@ -423,6 +429,7 @@ func (rm *requestManager) addPendingRequest(req *request, st *stream) {
 
 	rm.setStreamAvailability(st.ID(), false)
 	rm.pendings.Set(req.ReqID(), req)
+	numPendingRequestsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Set(float64(rm.pendings.Length()))
 }
 
 func (rm *requestManager) removePendingRequest(req *request) {
@@ -435,21 +442,31 @@ func (rm *requestManager) removePendingRequest(req *request) {
 		rm.setStreamAvailability(st.ID(), true)
 	}
 	rm.pendings.Delete(reqID)
+	numPendingRequestsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Set(float64(rm.pendings.Length()))
 }
 
 func (rm *requestManager) setStreamAvailability(stID sttypes.StreamID, available bool) {
+	_, streamIsAvailable := rm.available.Get(stID)
+
 	if _, streamIsActive := rm.streams.Get(stID); !streamIsActive {
-		rm.available.Delete(stID)
+		if streamIsAvailable {
+			rm.available.Delete(stID)
+			numAvailableStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
+		}
 		return
 	}
 
 	if available {
-		rm.available.Set(stID, struct{}{})
+		if !streamIsAvailable {
+			rm.available.Set(stID, struct{}{})
+			numAvailableStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Inc()
+		}
 		return
 	}
 
-	if _, streamIsAvailable := rm.available.Get(stID); streamIsAvailable {
+	if streamIsAvailable {
 		rm.available.Delete(stID)
+		numAvailableStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
 	}
 }
 
@@ -508,6 +525,8 @@ func checkStreamUpdates(exists *sttypes.SafeMap[sttypes.StreamID, *stream], targ
 func (rm *requestManager) addNewStream(st sttypes.Stream) {
 	rm.streams.Set(st.ID(), &stream{Stream: st})
 	rm.available.Set(st.ID(), struct{}{})
+	numConnectedStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Inc()
+	numAvailableStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Inc()
 }
 
 // removeStream remove the stream from request manager, clear the pending request
@@ -516,6 +535,7 @@ func (rm *requestManager) removeStream(st *stream) {
 	id := st.ID()
 	if _, exists := rm.available.Get(id); exists {
 		rm.available.Delete(id)
+		numAvailableStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
 	}
 
 	cleared := st.clearPendingRequest()
@@ -526,6 +546,7 @@ func (rm *requestManager) removeStream(st *stream) {
 		})
 	}
 	rm.streams.Delete(id)
+	numConnectedStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
 }
 
 func (rm *requestManager) close() {
@@ -547,6 +568,12 @@ func (rm *requestManager) close() {
 	rm.available.Clear()
 	rm.pendings.Clear()
 	rm.waitings = newRequestQueues()
+
+	numConnectedStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Set(0)
+	numAvailableStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Set(0)
+	numWaitingRequestsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Set(0)
+	numPendingRequestsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Set(0)
+
 	close(rm.stopC)
 }
 
@@ -558,9 +585,11 @@ const (
 )
 
 func (rm *requestManager) addRequestToWaitings(req *request, priority reqPriority) error {
+	numWaitingRequestsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Inc()
 	return rm.waitings.Push(req, priority)
 }
 
 func (rm *requestManager) popRequestFromWaitings() *request {
+	numWaitingRequestsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
 	return rm.waitings.Pop()
 }

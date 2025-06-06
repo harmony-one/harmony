@@ -519,7 +519,7 @@ type testSuite struct {
 
 func newTestSuite(delayF delayFunc, respF responseFunc, numStreams int) *testSuite {
 	sm := newTestStreamManager()
-	rm := newRequestManager(sm)
+	rm := newRequestManager(sm, sttypes.ProtoID("harmony/sync/unittest/0/1.0"))
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ts := &testSuite{

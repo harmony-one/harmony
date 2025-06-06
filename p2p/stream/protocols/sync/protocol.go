@@ -105,7 +105,7 @@ func NewProtocol(config Config) *Protocol {
 
 	sp.rl = ratelimiter.NewRateLimiter(sp.sm, rateLimiterGlobalRequestPerSecond, rateLimiterSingleRequestsPerSecond)
 
-	sp.rm = requestmanager.NewRequestManager(sp.sm)
+	sp.rm = requestmanager.NewRequestManager(sp.sm, sp.ProtoID())
 
 	// if it is not epoch chain, print the peer id and proto id
 	if !config.EpochChain {
