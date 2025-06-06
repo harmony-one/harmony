@@ -58,9 +58,8 @@ type Contract struct {
 	CodeAddr *common.Address
 	Input    []byte
 
-	Gas             uint64
-	value           *big.Int
-	WithDataCopyFix bool // with fix for https://github.com/ethereum/go-ethereum/pull/23446
+	Gas   uint64
+	value *big.Int
 }
 
 // NewContract returns a new contract environment for the execution of EVM.
@@ -92,19 +91,6 @@ func (c *Contract) validJumpdest(dest *uint256.Int) bool {
 	}
 	// Only JUMPDESTs allowed for destinations
 	if OpCode(c.Code[udest]) != JUMPDEST {
-		return false
-	}
-	return c.isCode(udest)
-}
-
-func (c *Contract) validJumpSubdest(udest uint64) bool {
-	// PC cannot go beyond len(code) and certainly can't be bigger than 63 bits.
-	// Don't bother checking for BEGINSUB in that case.
-	if int64(udest) < 0 || udest >= uint64(len(c.Code)) {
-		return false
-	}
-	// Only BEGINSUBs allowed for destinations
-	if OpCode(c.Code[udest]) != BEGINSUB {
 		return false
 	}
 	return c.isCode(udest)
@@ -157,16 +143,11 @@ func (c *Contract) AsDelegate() *Contract {
 
 // GetOp returns the n'th element in the contract's byte array
 func (c *Contract) GetOp(n uint64) OpCode {
-	return OpCode(c.GetByte(n))
-}
-
-// GetByte returns the n'th byte in the contract's byte array
-func (c *Contract) GetByte(n uint64) byte {
 	if n < uint64(len(c.Code)) {
-		return c.Code[n]
+		return OpCode(c.Code[n])
 	}
 
-	return 0
+	return STOP
 }
 
 // Caller returns the caller of the contract.
