@@ -52,7 +52,7 @@ func RunWriteCapablePrecompiledContract(
 ) ([]byte, error) {
 	// immediately error out if readOnly
 	if readOnly {
-		return nil, errWriteProtection
+		return nil, ErrWriteProtection
 	}
 	gas, err := p.RequiredGas(evm, contract, input)
 	if err != nil {
