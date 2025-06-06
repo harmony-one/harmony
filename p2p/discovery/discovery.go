@@ -54,7 +54,18 @@ func NewDHTDiscovery(ctx context.Context, cancel context.CancelFunc, host libp2p
 
 // Start bootstrap the dht discovery service.
 func (d *dhtDiscovery) Start() error {
-	return d.dht.Bootstrap(d.ctx)
+	ctx := d.ctx
+	if d.opt.BootstrapTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, d.opt.BootstrapTimeout)
+		defer cancel()
+	}
+	start := time.Now()
+	err := d.dht.Bootstrap(ctx)
+	if err == nil {
+		d.logger.Debug().Dur("duration", time.Since(start)).Msg("dht bootstrap completed")
+	}
+	return err
 }
 
 // Stop stop the dhtDiscovery service
