@@ -535,6 +535,14 @@ func (rm *requestManager) close() {
 	rm.pendings.Iterate(func(key uint64, req *request) {
 		req.doneWithResponse(responseData{err: ErrClosed})
 	})
+	// clean up waiting requests as well to avoid goroutine leaks
+	for {
+		req := rm.popRequestFromWaitings()
+		if req == nil {
+			break
+		}
+		req.doneWithResponse(responseData{err: ErrClosed})
+	}
 	rm.streams.Clear()
 	rm.available.Clear()
 	rm.pendings.Clear()
