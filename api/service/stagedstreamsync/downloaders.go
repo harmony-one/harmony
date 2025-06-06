@@ -63,7 +63,7 @@ func (ds *Downloaders) Close() {
 // DownloadAsync triggers a download
 func (ds *Downloaders) DownloadAsync(shardID uint32) {
 	d, ok := ds.ds[shardID]
-	if !ok && d != nil {
+	if ok && d != nil {
 		d.DownloadAsync()
 	}
 }
