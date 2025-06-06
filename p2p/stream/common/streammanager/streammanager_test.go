@@ -273,7 +273,7 @@ func TestStreamSet_numStreamsWithMinProtoID(t *testing.T) {
 	for i := 0; i != numPid1; i++ {
 		ss.addStream(newTestStream(makeStreamID(i), pid1))
 	}
-	for i := 0; i != numPid2; i++ {
+	for i := numPid1; i != numPid1+numPid2; i++ {
 		ss.addStream(newTestStream(makeStreamID(i), pid2))
 	}
 
