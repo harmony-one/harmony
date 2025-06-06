@@ -24,6 +24,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/core/types"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/holiman/uint256"
 )
 
@@ -126,15 +128,32 @@ type BlockContext struct {
 	Transfer TransferFunc
 	// GetHash returns the hash corresponding to n
 	GetHash GetHashFunc
+	// GetVRF returns the VRF corresponding to n
+	GetVRF GetVRFFunc
+
+	// IsValidator determines whether the address corresponds to a validator or a smart contract
+	// true: is a validator address; false: is smart contract address
+	IsValidator IsValidatorFunc
 
 	// Block information
 	Coinbase    common.Address // Provides information for COINBASE
 	GasLimit    uint64         // Provides information for GASLIMIT
 	BlockNumber *big.Int       // Provides information for NUMBER
+	EpochNumber *big.Int       // Provides information for EPOCH
 	Time        *big.Int       // Provides information for TIME
-	Difficulty  *big.Int       // Provides information for DIFFICULTY
-	BaseFee     *big.Int       // Provides information for BASEFEE
-	Random      *common.Hash   // Provides information for RANDOM
+	VRF         common.Hash    // Provides information for VRF
+
+	ShardID   uint32 // Used by staking and cross shard transfer precompile
+	NumShards uint32 // Used by cross shard transfer precompile
+
+	CreateValidator       CreateValidatorFunc
+	EditValidator         EditValidatorFunc
+	Delegate              DelegateFunc
+	Undelegate            UndelegateFunc
+	CollectRewards        CollectRewardsFunc
+	CalculateMigrationGas CalculateMigrationGasFunc
+
+	TxType types.TransactionType
 }
 
 // TxContext provides the EVM with information about a transaction.
@@ -271,6 +290,11 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
+
+	// stored temporarily by stakingPrecompile and cleared immediately after return
+	// (although the EVM object itself is ephemeral)
+	StakeMsgs []stakingTypes.StakeMsg
+	CXReceipt *types.CXReceipt
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
