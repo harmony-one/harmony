@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/go-version"
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 )
@@ -99,6 +100,13 @@ func NewProtocol(config Config) *Protocol {
 		HardLoCap: config.SmHardLowCap,
 		HiCap:     config.SmHiCap,
 		DiscBatch: config.DiscBatch,
+		TrustedPeers: func() map[libp2p_peer.ID]struct{} {
+			tmp := make(map[libp2p_peer.ID]struct{})
+			for _, id := range config.Host.TrustedPeers() {
+				tmp[id] = struct{}{}
+			}
+			return tmp
+		}(),
 	}
 	sp.sm = streammanager.NewStreamManager(sp.ProtoID(), config.Host, config.Discovery,
 		sp.HandleStream, smConfig)
