@@ -67,6 +67,9 @@ type streamManager struct {
 	logger           zerolog.Logger
 	ctx              context.Context
 	cancel           func()
+
+	// limit concurrent setup of streams
+	setupSem chan struct{}
 }
 
 type RemovalInfo struct {
@@ -143,6 +146,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		logger:          logger,
 		ctx:             ctx,
 		cancel:          cancel,
+		setupSem:        make(chan struct{}, setupConcurrency),
 	}
 }
 
@@ -473,7 +477,9 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 		}
 		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		connecting += 1
+		sm.setupSem <- struct{}{}
 		go func(pid libp2p_peer.ID) {
+			defer func() { <-sm.setupSem }()
 			// The ctx here is using the module context instead of discover context
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
 			if err != nil {

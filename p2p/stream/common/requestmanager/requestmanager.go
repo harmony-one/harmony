@@ -3,6 +3,7 @@ package requestmanager
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -44,6 +45,11 @@ type requestManager struct {
 	stopC  chan struct{}
 
 	isCheckingExpiry atomic.Bool
+
+	// limit concurrent writes
+	writeSem chan struct{}
+
+	lock sync.Mutex
 }
 
 // NewRequestManager creates a new request manager
@@ -76,9 +82,10 @@ func newRequestManager(sm streammanager.ReaderSubscriber) *requestManager {
 
 		lastActiveStreamTime: time.Now(),
 
-		subs:   []event.Subscription{sub1, sub2},
-		logger: logger,
-		stopC:  make(chan struct{}),
+		subs:     []event.Subscription{sub1, sub2},
+		logger:   logger,
+		stopC:    make(chan struct{}),
+		writeSem: make(chan struct{}, writeConcurrency),
 	}
 }
 
@@ -264,6 +271,8 @@ func (rm *requestManager) loop() {
 				}
 
 				go func(req *request, st *stream, b []byte) {
+					rm.writeSem <- struct{}{}
+					defer func() { <-rm.writeSem }()
 					if err := st.WriteBytes(b); err != nil {
 						rm.logger.Warn().Str("streamID", string(st.ID())).Err(err).
 							Msg("write bytes")
