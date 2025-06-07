@@ -221,7 +221,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			return nil, &ErrStackOverflow{stackLen: sLen, limit: operation.maxStack}
 		}
 		// If the operation is valid, enforce and write restrictions
-		if in.readOnly && in.evm.chainRules.IsS3 {
+		if in.readOnly && in.evm.chainRules.IsByzantium {
 			// If the interpreter is operating in readonly mode, make sure no
 			// state-modifying operation is performed. The 3rd stack item
 			// for a call operation is the value. Transferring value from one
