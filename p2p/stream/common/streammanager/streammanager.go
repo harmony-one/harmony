@@ -77,10 +77,14 @@ type RemovalInfo struct {
 	count     uint64
 	removedAt time.Time
 	expireAt  time.Time
+	mu        sync.RWMutex
 }
 
 // MarkAsRemoved resets the removal time and increments the removal count.
 func (rm *RemovalInfo) MarkAsRemoved(criticalErr bool) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
 	now := time.Now()
 	if rm.count > 0 && now.Sub(rm.removedAt) > MaxRemovalCooldownDuration {
 		rm.count = 0
@@ -101,17 +105,34 @@ func (rm *RemovalInfo) MarkAsRemoved(criticalErr bool) {
 
 // RemovedAt returns the timestamp when the stream was removed.
 func (rm *RemovalInfo) RemovedAt() time.Time {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+
 	return rm.removedAt
 }
 
 // HasExpired checks if the cooldown period has passed, allowing the stream to reconnect.
 func (rm *RemovalInfo) HasExpired() bool {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+
 	return time.Now().After(rm.expireAt)
 }
 
 // BumpCount increases the removal count.
 func (rm *RemovalInfo) BumpCount() {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
 	rm.count++
+}
+
+// ResetCount resets the removal count.
+func (rm *RemovalInfo) ResetCount() {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	rm.count = 0
 }
 
 // NewStreamManager creates a new stream manager for the given proto ID
@@ -320,6 +341,9 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	if _, ok := sm.streams.get(id); ok {
 		return ErrStreamAlreadyExist
 	}
+	if _, ok := sm.reservedStreams.get(id); ok {
+		return ErrStreamAlreadyExist
+	}
 	// Check if stream was recently removed
 	if removalInfo, exists := sm.removedStreams.Get(id); exists {
 		if !removalInfo.HasExpired() {
@@ -386,6 +410,7 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 		return ErrStreamAlreadyRemoved
 	}
 	sm.streams.deleteStream(st)
+	sm.reservedStreams.deleteStream(st)
 
 	sm.logger.Info().
 		Int("NumStreams", sm.streams.size()).
@@ -476,11 +501,18 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			// If the peer has the same ID and was just connected, skip.
 			continue
 		}
-		if _, ok := sm.streams.get(sttypes.StreamID(peer.ID)); ok {
+		newStreamID := sttypes.StreamID(peer.ID)
+		if _, ok := sm.streams.get(newStreamID); ok {
 			continue
 		}
-		if _, ok := sm.reservedStreams.get(sttypes.StreamID(peer.ID)); ok {
+		if _, ok := sm.reservedStreams.get(newStreamID); ok {
 			continue
+		}
+		// Check if stream was recently removed
+		if removalInfo, exists := sm.removedStreams.Get(newStreamID); exists {
+			if !removalInfo.HasExpired() {
+				continue
+			}
 		}
 		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		connecting += 1
