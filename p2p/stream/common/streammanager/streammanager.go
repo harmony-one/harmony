@@ -50,6 +50,7 @@ type streamManager struct {
 	removedStreams *sttypes.SafeMap[sttypes.StreamID, *RemovalInfo]
 	// reserved streams
 	reservedStreams *streamSet
+	trustedPeers    map[libp2p_peer.ID]struct{}
 	// libp2p utilities
 	host         host
 	pf           peerFinder
@@ -132,6 +133,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		streams:         newStreamSet(),
 		reservedStreams: newStreamSet(),
 		removedStreams:  sttypes.NewSafeMap[sttypes.StreamID, *RemovalInfo](),
+		trustedPeers:    c.TrustedPeers,
 		host:            host,
 		pf:              pf,
 		handleStream:    handleStream,
@@ -389,14 +391,16 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 		Str("reason", reason).
 		Msg("[StreamManager] removed stream from main streams list")
 
-	info, exist := sm.removedStreams.Get(id)
-	if !exist {
-		info = &RemovalInfo{
-			count: 0,
+	if _, trusted := sm.trustedPeers[libp2p_peer.ID(id)]; !trusted {
+		info, exist := sm.removedStreams.Get(id)
+		if !exist {
+			info = &RemovalInfo{count: 0}
+			sm.removedStreams.Set(id, info)
 		}
-		sm.removedStreams.Set(id, info)
+		info.MarkAsRemoved(criticalErr)
+	} else {
+		go sm.setupStreamWithPeer(sm.ctx, libp2p_peer.ID(id))
 	}
-	info.MarkAsRemoved(criticalErr)
 
 	// try to replace removed streams from reserved list
 	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
@@ -457,19 +461,49 @@ func (sm *streamManager) removeAllStreamOnClose() {
 }
 
 func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, error) {
+	connecting := 0
+
+	for pid := range sm.trustedPeers {
+		if pid == sm.host.ID() {
+			continue
+		}
+		if sm.coolDownCache.Has(pid) {
+			continue
+		}
+		if _, ok := sm.streams.get(sttypes.StreamID(pid)); ok {
+			continue
+		}
+		if _, ok := sm.reservedStreams.get(sttypes.StreamID(pid)); ok {
+			continue
+		}
+		connecting++
+		go func(id libp2p_peer.ID) {
+			err := sm.setupStreamWithPeer(sm.ctx, id)
+			if err != nil {
+				sm.coolDownCache.Add(id)
+				sm.logger.Warn().Err(err).
+					Interface("peerID", id).
+					Msg("failed to setup stream with trusted peer")
+				return
+			}
+		}(pid)
+	}
+
+	if sm.streams.size()+connecting >= sm.config.HardLoCap {
+		return connecting, nil
+	}
+
 	peers, err := sm.discover(discCtx)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to discover")
+		return connecting, errors.Wrap(err, "failed to discover")
 	}
 	discoverCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 
-	connecting := 0
 	for peer := range peers {
 		if peer.ID == sm.host.ID() {
 			continue
 		}
 		if sm.coolDownCache.Has(peer.ID) {
-			// If the peer has the same ID and was just connected, skip.
 			continue
 		}
 		if _, ok := sm.streams.get(sttypes.StreamID(peer.ID)); ok {
@@ -481,7 +515,6 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		connecting += 1
 		go func(pid libp2p_peer.ID) {
-			// The ctx here is using the module context instead of discover context
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
 			if err != nil {
 				sm.coolDownCache.Add(pid)
@@ -492,6 +525,7 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			}
 		}(peer.ID)
 	}
+
 	return connecting, nil
 }
 
