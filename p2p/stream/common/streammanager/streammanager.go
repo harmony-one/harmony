@@ -529,40 +529,43 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 		}(pid)
 	}
 
-	if sm.streams.size()+connecting < sm.config.HardLoCap {
-		peers, err := sm.discover(discCtx)
-		if err != nil {
-			return connecting, errors.Wrap(err, "failed to discover")
-		}
-		discoverCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
-
-		for peer := range peers {
-			if peer.ID == sm.host.ID() {
-				continue
-			}
-			if sm.coolDownCache.Has(peer.ID) {
-				continue
-			}
-			if _, ok := sm.streams.get(sttypes.StreamID(peer.ID)); ok {
-				continue
-			}
-			if _, ok := sm.reservedStreams.get(sttypes.StreamID(peer.ID)); ok {
-				continue
-			}
-			discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
-			connecting += 1
-			go func(pid libp2p_peer.ID) {
-				err := sm.setupStreamWithPeer(sm.ctx, pid)
-				if err != nil {
-					sm.coolDownCache.Add(pid)
-					sm.logger.Warn().Err(err).
-						Interface("peerID", pid).
-						Msg("failed to setup stream with peer")
-					return
-				}
-			}(peer.ID)
-		}
+	if sm.streams.size()+connecting >= sm.config.HardLoCap {
+		return connecting, nil
 	}
+
+	peers, err := sm.discover(discCtx)
+	if err != nil {
+		return connecting, errors.Wrap(err, "failed to discover")
+	}
+	discoverCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+
+	for peer := range peers {
+		if peer.ID == sm.host.ID() {
+			continue
+		}
+		if sm.coolDownCache.Has(peer.ID) {
+			continue
+		}
+		if _, ok := sm.streams.get(sttypes.StreamID(peer.ID)); ok {
+			continue
+		}
+		if _, ok := sm.reservedStreams.get(sttypes.StreamID(peer.ID)); ok {
+			continue
+		}
+		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+		connecting += 1
+		go func(pid libp2p_peer.ID) {
+			err := sm.setupStreamWithPeer(sm.ctx, pid)
+			if err != nil {
+				sm.coolDownCache.Add(pid)
+				sm.logger.Warn().Err(err).
+					Interface("peerID", pid).
+					Msg("failed to setup stream with peer")
+				return
+			}
+		}(peer.ID)
+	}
+
 	return connecting, nil
 }
 
