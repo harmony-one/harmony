@@ -504,7 +504,11 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 		return nil, nil
 	}
 
-	ctx2, _ := context.WithTimeout(ctx, discTimeout)
+	ctx2, cancel := context.WithTimeout(ctx, discTimeout)
+	go func() { // avoid context leak
+		<-time.After(discTimeout)
+		cancel()
+	}()
 	return sm.pf.FindPeers(ctx2, string(sm.myProtoID), discBatch)
 }
 
