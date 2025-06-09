@@ -12,6 +12,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/discovery"
 	"github.com/harmony-one/harmony/p2p/stream/common/ratelimiter"
 	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
@@ -102,7 +103,8 @@ func NewProtocol(config Config) *Protocol {
 		DiscBatch: config.DiscBatch,
 		TrustedPeers: func() map[libp2p_peer.ID]struct{} {
 			tmp := make(map[libp2p_peer.ID]struct{})
-			for _, id := range config.Host.TrustedPeers() {
+			h := config.Host.(p2p.Host)
+			for _, id := range h.TrustedPeers() {
 				tmp[id] = struct{}{}
 			}
 			return tmp
