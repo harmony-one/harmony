@@ -38,6 +38,7 @@ help:
 	@echo "test-rosetta-attach - attach onto the rosetta testing docker container for inspection"
 	@echo "linux_static - static build the harmony binary & bootnode along with the MCL & BLS libs (for linux)"
 	@echo "linux_static_quick - static build the harmony binary & bootnode more quickly without recompiling dependencies (for linux)"
+	@echo "linux_static_cross_build - cross-compile static Linux binaries for Harmony and Bootnode from macOS"
 	@echo "rpm_init - prepare the RPM build environment by creating directories, copying files, and generating the spec file and source tarball"
 	@echo "rpm_build - build an RPM package for x86_64 architecture using the spec file (<RPMBUILD>/SPECS/harmony.spec)"
 	@echo "rpm - build a harmony RPM pacakge"
@@ -167,6 +168,9 @@ linux_static:
 
 linux_static_quick:
 	bash ./scripts/go_executable_build.sh -s
+
+linux_static_cross_build:
+	bash ./scripts/linux_executable_from_macos.sh -s
 
 deb_init:
 	rm -rf $(DEBBUILD)
