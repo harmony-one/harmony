@@ -483,12 +483,13 @@ func newBallotsBackedSignatureReader() *cIdentities {
 }
 
 // NewDecider ..
-func NewDecider(p Policy, shardID uint32) Decider {
+func NewDecider(p Policy, shardID uint32, useGTforQuorumChecking bool) Decider {
 	switch p {
 	case SuperMajorityVote:
 		return &uniformVoteWeight{
 			SignatureReader:            newBallotsBackedSignatureReader(),
 			lastPowerSignersCountCache: make(map[Phase]int64),
+			useGTforQuorumChecking:     useGTforQuorumChecking,
 		}
 	case SuperMajorityStake:
 		return &stakedVoteWeight{

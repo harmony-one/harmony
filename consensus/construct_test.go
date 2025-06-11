@@ -36,7 +36,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+		quorum.SuperMajorityVote, shard.BeaconChainShardID, false,
 	)
 	blsPriKey := bls.RandPrivateKey()
 	reg := registry.New()
@@ -69,7 +69,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+		quorum.SuperMajorityVote, shard.BeaconChainShardID, false,
 	)
 	blsPriKey := bls.RandPrivateKey()
 	reg := registry.New()
@@ -149,7 +149,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 	priKeyWrapper2 := bls.PrivateKeyWrapper{Pri: blsPriKey2, Pub: &pubKeyWrapper2}
 
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityStake, shard.BeaconChainShardID,
+		quorum.SuperMajorityStake, shard.BeaconChainShardID, false,
 	)
 
 	consensus, err := New(
@@ -241,7 +241,7 @@ func TestConstructCommitMessage(test *testing.T) {
 	priKeyWrapper2 := bls.PrivateKeyWrapper{Pri: blsPriKey2, Pub: &pubKeyWrapper2}
 
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityStake, shard.BeaconChainShardID,
+		quorum.SuperMajorityStake, shard.BeaconChainShardID, false,
 	)
 
 	consensus, err := New(host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey1), registry.New(), decider, 3, false)
@@ -323,7 +323,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	}
 	blsPriKey := bls.RandPrivateKey()
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+		quorum.SuperMajorityVote, shard.BeaconChainShardID, false,
 	)
 	consensus, err := New(
 		host, shard.BeaconChainShardID, multibls.GetPrivateKeys(blsPriKey), registry.New(), decider, 3, false,
