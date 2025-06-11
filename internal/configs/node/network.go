@@ -93,8 +93,8 @@ const (
 	DefaultUserAgent = ""
 	// DefaultDialTimeout dial timeout
 	DefaultDialTimeout = time.Minute
-	// DefaultDiscBootstrapTimeout is the timeout for DHT bootstrap
-	DefaultDiscBootstrapTimeout = 30 * time.Second
+	// DefaultDiscBootstrapTimeout is the timeout for DHT bootstrap (0=unlimited)
+	DefaultDiscBootstrapTimeout = 0
 	// DefaultMuxerType P2P multiplexer type
 	DefaultMuxer = "mplex, yamux"
 	// DefaultNoRelay disables p2p host relay
