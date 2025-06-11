@@ -50,7 +50,7 @@ func NewDownloader(host p2p.Host, bc core.BlockChain, nodeConfig *nodeconfig.Con
 
 	sp := sync.NewProtocol(sync.Config{
 		Chain:        bc,
-		Host:         host.GetP2PHost(),
+		Host:         host,
 		Discovery:    host.GetDiscovery(),
 		ShardID:      nodeconfig.ShardID(bc.ShardID()),
 		Network:      config.Network,

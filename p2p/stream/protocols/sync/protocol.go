@@ -13,13 +13,13 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_host "github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/discovery"
 	"github.com/harmony-one/harmony/p2p/stream/common/ratelimiter"
 	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/hashicorp/go-version"
-	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -66,7 +66,7 @@ type (
 	// Config is the sync protocol config
 	Config struct {
 		Chain      engine.ChainReader
-		Host       libp2p_host.Host
+		Host       p2p_host.Host
 		Discovery  discovery.Discovery
 		ShardID    nodeconfig.ShardID
 		Network    nodeconfig.NetworkType
@@ -110,7 +110,7 @@ func NewProtocol(config Config) *Protocol {
 			return tmp
 		}(),
 	}
-	sp.sm = streammanager.NewStreamManager(sp.ProtoID(), config.Host, config.Discovery,
+	sp.sm = streammanager.NewStreamManager(sp.ProtoID(), config.Host.GetP2PHost(), config.Discovery,
 		sp.HandleStream, smConfig)
 
 	sp.rl = ratelimiter.NewRateLimiter(sp.sm, rateLimiterGlobalRequestPerSecond, rateLimiterSingleRequestsPerSecond)
@@ -119,7 +119,7 @@ func NewProtocol(config Config) *Protocol {
 
 	// if it is not epoch chain, print the peer id and proto id
 	if !config.EpochChain {
-		fmt.Println("My peer id: ", config.Host.ID().String())
+		fmt.Println("My peer id: ", config.Host.GetID().String())
 		fmt.Println("My proto id: ", sp.ProtoID())
 	}
 

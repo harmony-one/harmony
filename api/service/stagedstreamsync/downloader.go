@@ -112,7 +112,7 @@ func protocolConfig(host p2p.Host,
 
 	return &streamSyncProtocol.Config{
 		Chain:                bc,
-		Host:                 host.GetP2PHost(),
+		Host:                 host,
 		Discovery:            host.GetDiscovery(),
 		ShardID:              nodeconfig.ShardID(bc.ShardID()),
 		Network:              config.Network,
