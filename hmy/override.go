@@ -34,7 +34,7 @@ func (s *StateOverrides) has(address common.Address) bool {
 }
 
 // Apply overrides the fields of specified accounts into the given state.
-func (s *StateOverrides) Apply(state *state.DB, precompiles map[common.Address]vm.PrecompiledContract) error {
+func (s *StateOverrides) Apply(state *state.DB, precompiles map[common.Address]vm.WriteCapablePrecompiledContract) error {
 	if s == nil {
 		return nil
 	}
