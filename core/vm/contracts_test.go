@@ -401,10 +401,14 @@ var blake2FTests = []precompiledTest{
 func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
 	p := PrecompiledContractsEIP2537[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
+	requiredGas, err := p.RequiredGas(nil, nil, in)
+	if err != nil {
+		t.Error(err)
+	}
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
-		nil, new(big.Int), p.RequiredGas(in))
+		nil, new(big.Int), requiredGas)
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.name, contract.Gas), func(t *testing.T) {
-		if res, err := RunPrecompiledContract(p, in, contract); err != nil {
+		if res, _, err := RunPrecompiledContract(p, nil, contract, in, requiredGas); err != nil {
 			t.Error(err)
 		} else if common.Bytes2Hex(res) != test.expected {
 			t.Errorf("Expected %v, got %v", test.expected, common.Bytes2Hex(res))
@@ -420,10 +424,14 @@ func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
 func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 	p := PrecompiledContractsEIP2537[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
+	requiredGas, err := p.RequiredGas(nil, nil, in)
+	if err != nil {
+		t.Error(err)
+	}
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
-		nil, new(big.Int), p.RequiredGas(in)-1)
+		nil, new(big.Int), requiredGas-1)
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.name, contract.Gas), func(t *testing.T) {
-		_, err := RunPrecompiledContract(p, in, contract)
+		_, _, err := RunPrecompiledContract(p, nil, contract, in, requiredGas)
 		if err.Error() != "out of gas" {
 			t.Errorf("Expected error [out of gas], got [%v]", err)
 		}
@@ -438,11 +446,15 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing.T) {
 	p := PrecompiledContractsEIP2537[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
+	gas, err := p.RequiredGas(nil, nil, in)
+	if err != nil {
+		t.Error(err)
+	}
 	contract := NewContract(AccountRef(common.HexToAddress("31337")),
-		nil, new(big.Int), p.RequiredGas(in))
+		nil, new(big.Int), gas)
 
 	t.Run(test.name, func(t *testing.T) {
-		_, err := RunPrecompiledContract(p, in, contract)
+		_, _, err := RunPrecompiledContract(p, nil, contract, in, gas)
 		if !reflect.DeepEqual(err, test.expectedError) {
 			t.Errorf("Expected error [%v], got [%v]", test.expectedError, err)
 		}
@@ -460,7 +472,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 	}
 	p := PrecompiledContractsEIP2537[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
-	reqGas := p.RequiredGas(in)
+	reqGas, _ := p.RequiredGas(nil, nil, in)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
 		nil, new(big.Int), reqGas)
 
@@ -475,7 +487,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 		for i := 0; i < bench.N; i++ {
 			contract.Gas = reqGas
 			copy(data, in)
-			res, err = RunPrecompiledContract(p, data, contract)
+			res, _, err = RunPrecompiledContract(p, nil, contract, data, reqGas)
 		}
 		bench.StopTimer()
 		//Check if it is correct
