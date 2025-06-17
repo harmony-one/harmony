@@ -223,7 +223,7 @@ func init() {
 // - the returned bytes,
 // - the _remaining_ gas,
 // - any error that occurred
-func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contract *Contract, input []byte, suppliedGas uint64) (ret []byte, remainingGas uint64, err error) {
+func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contract *Contract, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	////if contract.CodeAddr != nil {
 	//precompiles := PrecompiledContractsHomestead
 	//// assign empty write capable precompiles till they are available in the fork
@@ -287,6 +287,10 @@ func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contrac
 		//
 		//}
 		//return RunPrecompiledContract(p, evm, input, contract, readOnly)
+	}
+	// immediately error out if readOnly
+	if readOnly && !p.IsWrite() {
+		return nil, 0, errWriteProtection
 	}
 	gasCost, err := p.RequiredGas(evm, contract, input)
 	if err != nil {
@@ -770,6 +774,10 @@ func (c *epoch) RunWriteCapable(_ *EVM, _ *Contract, input []byte) ([]byte, erro
 	return c.Run(input)
 }
 
+func (c *epoch) IsWrite() bool {
+	return true
+}
+
 // implements WriteCapablePrecompiledContract because if it is wrapped by wrapper it will hide ModifyInput method usage.
 var _ WriteCapablePrecompiledContract = &epoch{}
 
@@ -800,6 +808,11 @@ type vrf struct{}
 
 func (c *vrf) RunWriteCapable(_ *EVM, _ *Contract, input []byte) ([]byte, error) {
 	return c.Run(input)
+}
+
+// IsWrite returns true if the pre-compiled contract is write capable.
+func (c *vrf) IsWrite() bool {
+	return true
 }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.

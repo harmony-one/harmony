@@ -55,9 +55,18 @@ type WriteCapablePrecompiledContract interface {
 	RequiredGas(evm *EVM, contract *Contract, input []byte) (uint64, error)
 	// use a different name from read-only contracts to be safe
 	RunWriteCapable(evm *EVM, contract *Contract, input []byte) ([]byte, error)
+
+	IsWrite() bool
 }
 
 type stakingPrecompile struct{}
+
+var _ WriteCapablePrecompiledContract = (*stakingPrecompile)(nil)
+
+// IsWrite returns true for staking precompile
+func (c *stakingPrecompile) IsWrite() bool {
+	return true
+}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
@@ -201,6 +210,13 @@ func init() {
 
 type crossShardXferPrecompile struct{}
 
+var _ WriteCapablePrecompiledContract = (*crossShardXferPrecompile)(nil)
+
+// IsWrite returns true if the pre-compiled contract is a write capable contract.
+func (c *crossShardXferPrecompile) IsWrite() bool {
+	return true
+}
+
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
 // This method does not require any overflow checking as the input size gas costs
@@ -309,6 +325,10 @@ func (a wrapper) RunWriteCapable(_ *EVM, _ *Contract, input []byte) ([]byte, err
 func (a wrapper) RequiredGas(_ *EVM, _ *Contract, input []byte) (uint64, error) {
 	gas := a.c.RequiredGas(input)
 	return gas, nil
+}
+
+func (a wrapper) IsWrite() bool {
+	return false
 }
 
 type eip2537Precompile struct{}

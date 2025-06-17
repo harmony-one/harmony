@@ -76,7 +76,7 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T, e
 			t.Error(err)
 		}
 		contract.Gas = gas
-		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false); err != nil {
+		if res, _, err := RunPrecompiledContract(p, env, contract, test.input, false); err != nil {
 			if test.expectedError != nil {
 				if test.expectedError.Error() != err.Error() {
 					t.Errorf("Expected error %v, got %v", test.expectedError, err)
@@ -212,7 +212,7 @@ func TestStakingPrecompiles(t *testing.T) {
 func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
 	p := &stakingPrecompile{}
 	expectedError := errWriteProtection
-	res, err := RunWriteCapablePrecompiledContract(p, nil, nil, []byte{}, true)
+	res, _, err := RunPrecompiledContract(p, nil, nil, []byte{}, true)
 	if err != nil {
 		if err.Error() != expectedError.Error() {
 			t.Errorf("Expected error %v, got %v", expectedError, err)
