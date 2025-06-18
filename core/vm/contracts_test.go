@@ -18,7 +18,9 @@ package vm
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"reflect"
 	"testing"
@@ -398,6 +400,16 @@ var blake2FTests = []precompiledTest{
 	},
 }
 
+func loadJson(name string) ([]precompiledTest, error) {
+	data, err := ioutil.ReadFile(fmt.Sprintf("testdata/precompiles/%v.json", name))
+	if err != nil {
+		return nil, err
+	}
+	var testcases []precompiledTest
+	err = json.Unmarshal(data, &testcases)
+	return testcases, err
+}
+
 func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
 	p := PrecompiledContractsEIP2537[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
@@ -572,6 +584,10 @@ func BenchmarkPrecompiledBn256Add(bench *testing.B) {
 
 // Tests OOG
 func TestPrecompiledModExpOOG(t *testing.T) {
+	modexpTests, err := loadJson("modexp")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range modexpTests {
 		testPrecompiledOOG("05", test, t)
 	}

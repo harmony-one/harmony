@@ -24,6 +24,10 @@ import (
 // dummy version of vm.PrecompiledContract
 type dummyPrecompile struct{}
 
+func (d dummyPrecompile) IsWrite() bool {
+	return false
+}
+
 var _ vm.WriteCapablePrecompiledContract = dummyPrecompile{}
 
 func (d dummyPrecompile) Run(input []byte) ([]byte, error) { return nil, nil }
