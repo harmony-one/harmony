@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
+	"github.com/harmony-one/harmony/consensus/misc/eip1559"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
@@ -368,6 +369,11 @@ func (w *Worker) UpdateCurrent() (Environment, error) {
 		Time(big.NewInt(timestamp)).
 		ShardID(w.chain.ShardID()).
 		Header()
+
+	if w.chain.Config().IsLondon(header.Epoch()) {
+		header.SetBaseFee(eip1559.CalcBaseFee(w.chain.Config(), parent))
+	}
+
 	return w.makeCurrent(parent, header)
 }
 
