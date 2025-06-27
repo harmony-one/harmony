@@ -94,7 +94,7 @@ const (
 	// DefaultDialTimeout dial timeout
 	DefaultDialTimeout = time.Minute
 	// DefaultMuxerType P2P multiplexer type
-	DefaultMuxer = "mplexC6, yamux"
+	DefaultMuxer = "yamux, mplexC6"
 	// DefaultNoRelay disables p2p host relay
 	DefaultNoRelay = true
 )
