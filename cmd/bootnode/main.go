@@ -125,7 +125,7 @@ func main() {
 	resourceManagerMemoryLimitBytes := flag.Uint64("resmgr-memory-limit-bytes", 0, "memory limit for p2p resource manager")
 	resourceManagerFileDescriptorsLimit := flag.Uint64("resmgr-file-descriptor-limit", 0, "file descriptor limit for p2p resource manager")
 	noTransportSecurity := flag.Bool("no_transport_security", false, "disable TLS encrypted transport")
-	muxer := flag.String("muxer", "mplexC6, yamux", "protocol muxer to mux per-protocol streams (mplex, mplexC6, yamux)")
+	muxer := flag.String("muxer", "yamux, mplexC6", "protocol muxer to mux per-protocol streams (yamux, mplex, mplexC6)")
 	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
 	noRelay := flag.Bool("no_relay", true, "no relay services, direct connections between peers only")
 	networkType := flag.String("network", "mainnet", "network type (mainnet, testnet, pangaea, partner, stressnet, devnet, localnet)")
