@@ -89,10 +89,10 @@ func (c *stakingPrecompile) RequiredGas(
 			// otherwise charge similar to a regular staking tx
 			if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {
 				// charge per delegation to migrate
-				return evm.CalculateMigrationGas(evm.StateDB,
+				return evm.Context.CalculateMigrationGas(evm.StateDB,
 					migrationMsg,
-					evm.ChainConfig().IsS3(evm.EpochNumber),
-					evm.ChainConfig().IsIstanbul(evm.EpochNumber),
+					evm.ChainConfig().IsS3(evm.Context.EpochNumber),
+					evm.ChainConfig().IsIstanbul(evm.Context.EpochNumber),
 				)
 			} else if encoded, err := rlp.EncodeToBytes(stakeMsg); err == nil {
 				payload = encoded
@@ -101,9 +101,9 @@ func (c *stakingPrecompile) RequiredGas(
 	}
 	if gas, err := IntrinsicGas(
 		payload,
-		false,                                   // contractCreation
-		evm.ChainConfig().IsS3(evm.EpochNumber), // homestead
-		evm.ChainConfig().IsIstanbul(evm.EpochNumber), // istanbul
+		false, // contractCreation
+		evm.ChainConfig().IsS3(evm.Context.EpochNumber),       // homestead
+		evm.ChainConfig().IsIstanbul(evm.Context.EpochNumber), // istanbul
 		false, // isValidatorCreation
 	); err != nil {
 		return 0, err // ErrOutOfGas occurs when gas payable > uint64
@@ -132,7 +132,7 @@ func (c *stakingPrecompile) RunWriteCapable(
 	}
 
 	if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
-		if err := evm.Delegate(evm.StateDB, rosettaBlockTracer, delegate); err != nil {
+		if err := evm.Context.Delegate(evm.StateDB, rosettaBlockTracer, delegate); err != nil {
 			return nil, err
 		} else {
 			evm.StakeMsgs = append(evm.StakeMsgs, delegate)
@@ -140,10 +140,10 @@ func (c *stakingPrecompile) RunWriteCapable(
 		}
 	}
 	if undelegate, ok := stakeMsg.(*stakingTypes.Undelegate); ok {
-		return nil, evm.Undelegate(evm.StateDB, rosettaBlockTracer, undelegate)
+		return nil, evm.Context.Undelegate(evm.StateDB, rosettaBlockTracer, undelegate)
 	}
 	if collectRewards, ok := stakeMsg.(*stakingTypes.CollectRewards); ok {
-		return nil, evm.CollectRewards(evm.StateDB, rosettaBlockTracer, collectRewards)
+		return nil, evm.Context.CollectRewards(evm.StateDB, rosettaBlockTracer, collectRewards)
 	}
 	// Migrate is not supported in precompile and will be done in a batch hard fork
 	//if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {
@@ -242,7 +242,7 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 		return nil, err
 	}
 	// validate not a contract (toAddress can still be a contract)
-	if len(evm.StateDB.GetCode(fromAddress)) > 0 && !evm.IsValidator(evm.StateDB, fromAddress) {
+	if len(evm.StateDB.GetCode(fromAddress)) > 0 && !evm.Context.IsValidator(evm.StateDB, fromAddress) {
 		return nil, errors.New("cross shard xfer not yet implemented for contracts")
 	}
 	// can't have too many shards
@@ -259,10 +259,10 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 	}
 	// now do the actual transfer
 	// step 1 -> remove funds from the precompile address
-	if !evm.CanTransfer(evm.StateDB, contract.Address(), value) {
+	if !evm.Context.CanTransfer(evm.StateDB, contract.Address(), value) {
 		return nil, errors.New("not enough balance received")
 	}
-	evm.Transfer(evm.StateDB, contract.Address(), toAddress, value, types.SubtractionOnly)
+	evm.Context.Transfer(evm.StateDB, contract.Address(), toAddress, value, types.SubtractionOnly)
 	// step 2 -> make a cross link
 	// note that the transaction hash is added by state_processor.go to this receipt
 	// and that the receiving shard does not care about the `From` but we use the original
@@ -301,5 +301,5 @@ func parseCrossShardXferData(evm *EVM, contract *Contract, input []byte) (
 	if err != nil {
 		return common.Address{}, common.Address{}, 0, 0, nil, err
 	}
-	return contract.Caller(), toAddress, evm.ShardID, toShardID, value, nil
+	return contract.Caller(), toAddress, evm.Context.ShardID, toShardID, value, nil
 }
