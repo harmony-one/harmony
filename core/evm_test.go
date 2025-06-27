@@ -67,7 +67,7 @@ func TestEVMStaking(t *testing.T) {
 	// transaction as message (chainId = 2)
 	msg, _ := tx.AsMessage(types.NewEIP155Signer(common.Big2))
 	// context
-	ctx := NewEVMContext(msg, header, chain, nil /* coinbase */)
+	ctx := NewEVMBlockContext(msg, header, chain, nil /* coinbase */)
 
 	// createValidator test
 	createValidator := sampleCreateValidator(*key)
@@ -105,7 +105,7 @@ func TestEVMStaking(t *testing.T) {
 		},
 	}
 	// redelegate using epoch1, so that we can cover the locked tokens use case as well
-	ctx2 := NewEVMContext(msg, blockfactory.ForTest.NewHeader(common.Big1), chain, nil)
+	ctx2 := NewEVMBlockContext(msg, blockfactory.ForTest.NewHeader(common.Big1), chain, nil)
 	err = db.UpdateValidatorWrapper(wrapper.Address, wrapper)
 	err = ctx2.Delegate(db, nil, &delegate)
 	if err != nil {
@@ -437,8 +437,8 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 	// gp := new(GasPool).AddGas(math.MaxUint64)
 	tx := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
 	msg, _ := tx.AsMessage(types.NewEIP155Signer(common.Big2))
-	ctx := NewEVMContext(msg, header, chain, nil /* coinbase */)
-	evm := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+	ctx := NewEVMBlockContext(msg, header, chain, nil /* coinbase */)
+	evm := vm.NewEVM(ctx, NewEVMTxContext(msg), db, params.TestChainConfig, vm.Config{})
 	// interpreter := vm.NewEVMInterpreter(evm, vm.Config{})
 	address := common.BytesToAddress([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 252})
 	// caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int)
@@ -466,7 +466,7 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 	// now without staking precompile
 	cfg := params.TestChainConfig
 	cfg.StakingPrecompileEpoch = big.NewInt(10000000)
-	evm = vm.NewEVM(ctx, db, cfg, vm.Config{})
+	evm = vm.NewEVM(ctx, NewEVMTxContext(msg), db, cfg, vm.Config{})
 	_, _, err = evm.Call(vm.AccountRef(common.Address{}),
 		createValidator.ValidatorAddress,
 		[]byte{},
