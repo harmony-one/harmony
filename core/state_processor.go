@@ -301,11 +301,11 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	}
 
 	// Create a new context to be used in the EVM environment
-	context := NewEVMContext(msg, header, bc, author)
+	context := NewEVMBlockContext(msg, header, bc, author)
 	context.TxType = txType
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
-	vmenv := vm.NewEVM(context, statedb, config, cfg)
+	vmenv := vm.NewEVM(context, NewEVMTxContext(msg), statedb, config, cfg)
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
@@ -337,7 +337,7 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	receipt.EffectiveGasPrice = tx.EffectiveGasPrice(big.NewInt(0), nil)
 	// if the transaction created a contract, store the creation address in the receipt.
 	if msg.To() == nil {
-		receipt.ContractAddress = crypto.CreateAddress(vmenv.Context.Origin, tx.Nonce())
+		receipt.ContractAddress = crypto.CreateAddress(vmenv.TxContext.Origin, tx.Nonce())
 	}
 
 	// Set the receipt logs and create a bloom for filtering
@@ -393,11 +393,11 @@ func ApplyStakingTransaction(
 	}
 
 	// Create a new context to be used in the EVM environment
-	context := NewEVMContext(msg, header, bc, author)
+	context := NewEVMBlockContext(msg, header, bc, author)
 
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
-	vmenv := vm.NewEVM(context, statedb, config, cfg)
+	vmenv := vm.NewEVM(context, NewEVMTxContext(msg), statedb, config, cfg)
 
 	// Apply the transaction to the current state (included in the env)
 	gas, err = ApplyStakingMessage(vmenv, msg, gp)
