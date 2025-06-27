@@ -44,7 +44,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	require.NoError(t, err)
 
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+		quorum.SuperMajorityVote, shard.BeaconChainShardID, false,
 	)
 	reg := registry.New().
 		SetBlockchain(blockchain).
