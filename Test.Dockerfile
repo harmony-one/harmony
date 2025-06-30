@@ -15,10 +15,8 @@ RUN echo "Cloning branch: ${ENV}" && \
     git clone -b ${ENV} https://github.com/harmony-one/harmony.git && \
     cd harmony && \
     go mod tidy && \
-    make deps || true
+    make deps
 
 WORKDIR /go/src/github.com/harmony-one/harmony
-
-RUN ls -la /app
 
 CMD ["make", "go-test"]
