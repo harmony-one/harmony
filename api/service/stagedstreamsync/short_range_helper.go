@@ -179,9 +179,10 @@ func (sh *srHelper) doGetBlocksByNumbersRequest(ctx context.Context, bns []uint6
 	blocks, stid, err := sh.syncProtocol.GetBlocksByNumber(ctx, bns)
 	if err != nil {
 		sh.logger.Warn().Err(err).
+			Interface("block numbers", bns).
 			Str("stream", string(stid)).
-			Msg(WrapStagedSyncMsg("failed to doGetBlockHashesRequest"))
-		return nil, stid, err
+			Msg(WrapStagedSyncMsg("failed to doGetBlocksByNumbersRequest"))
+		return blocks, stid, err
 	}
 	return blocks, stid, nil
 }
