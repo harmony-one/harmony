@@ -147,6 +147,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	n := 0
 	for _, block := range blocks {
 		if block == nil {
+			sr.configs.logger.Debug().Msg("Skipped a nil block during epoch sync")
 			continue
 		}
 		_, err := s.state.bc.InsertChain([]*types.Block{block}, true)
