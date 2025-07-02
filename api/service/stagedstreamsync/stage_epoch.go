@@ -2,6 +2,7 @@ package stagedstreamsync
 
 import (
 	"context"
+	"regexp"
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -21,6 +22,8 @@ type StageEpochCfg struct {
 	db     kv.RwDB
 	logger zerolog.Logger
 }
+
+var blockNotFoundPattern = regexp.MustCompile(`block (\d+) not found$`)
 
 func NewStageEpoch(cfg StageEpochCfg) *StageEpoch {
 	return &StageEpoch{
@@ -131,7 +134,11 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return 0, nil
 		}
-		return 0, errors.Wrap(err, "getBlocksChain")
+		// Check if the requested blocks are future blocks or the remote peer is not fully synced
+		matches := blockNotFoundPattern.FindStringSubmatch(err.Error())
+		if len(matches) == 0 {
+			return 0, errors.Wrap(err, "getBlocksChain")
+		}
 	}
 	if len(blocks) == 0 {
 		// short circuit for no sync is needed
@@ -140,6 +147,10 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 
 	n := 0
 	for _, block := range blocks {
+		if block == nil {
+			sr.configs.logger.Debug().Msg("Skipped a nil block during epoch sync")
+			continue
+		}
 		_, err := s.state.bc.InsertChain([]*types.Block{block}, true)
 		switch {
 		case errors.Is(err, core.ErrKnownBlock):
