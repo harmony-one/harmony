@@ -23,6 +23,8 @@ type StageEpochCfg struct {
 	logger zerolog.Logger
 }
 
+var blockNotFoundPattern = regexp.MustCompile(`block (\d+) not found$`)
+
 func NewStageEpoch(cfg StageEpochCfg) *StageEpoch {
 	return &StageEpoch{
 		configs: cfg,
@@ -133,7 +135,6 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 			return 0, nil
 		}
 		// Check if the requested blocks are future blocks or the remote peer is not fully synced
-		blockNotFoundPattern := regexp.MustCompile(`block (\d+) not found$`)
 		matches := blockNotFoundPattern.FindStringSubmatch(err.Error())
 		if len(matches) == 0 {
 			return 0, errors.Wrap(err, "getBlocksChain")
