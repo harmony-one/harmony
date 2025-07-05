@@ -814,6 +814,12 @@ func TestPrecompiledBLS12381PairingFail(t *testing.T) {
 	}
 }
 
+func TestPrecompiledBLS12381MapG1Fail(t *testing.T) {
+	for _, test := range blsMapG1FailTests {
+		testPrecompiledFailure("11", test, t)
+	}
+}
+
 var blsG1AddTests = []precompiledTest{
 	{
 		input: "0000000000000000000000000000000017f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb" +
@@ -6335,5 +6341,27 @@ var blsPairingFailTests = []precompiledFailureTest{
 			"0000000000000000000000000000000002d27e0ec3356299a346a09ad7dc4ef68a483c3aed53f9139d2f929a3eecebf72082e5e58c6da24ee32e03040c406d4f",
 		expectedError: errBLS12381G2PointSubgroup,
 		name:          "bls_pairing_g2_not_in_correct_subgroup",
+	},
+}
+var blsMapG1FailTests = []precompiledFailureTest{
+	{
+		input:         "",
+		expectedError: errBLS12381InvalidInputLength,
+		name:          "bls_mapg1_empty_input",
+	},
+	{
+		input:         "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+		expectedError: errBLS12381InvalidInputLength,
+		name:          "bls_mapg1_short_input",
+	},
+	{
+		input:         "00000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+		expectedError: errBLS12381InvalidFieldElementTopBytes,
+		name:          "bls_mapg1_top_bytes",
+	},
+	{
+		input:         "000000000000000000000000000000001a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaac",
+		expectedError: errBLS12381InvalidFieldElement,
+		name:          "bls_mapg1_invalid_fq_element",
 	},
 }
