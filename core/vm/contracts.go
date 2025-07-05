@@ -118,7 +118,7 @@ var PrecompiledContractsSHA3FIPS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
 }
 
-// PrecompiledContractsStaking contains the default set of pre-compiled Ethereum
+// PrecompiledContractsEIP2537 contains the default set of pre-compiled Ethereum
 // contracts used in the Istanbul release. plus VRF, SHA3FIPS-202 and staking precompiles
 // These are available in the EVM after the StakingPrecompileEpoch
 var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
@@ -140,9 +140,9 @@ var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{255}): &vrf{},
 }
 
-// PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
-// contracts used in the Berlin release.
-var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
+// PrecompiledContractsBerlin contains the default set of pre-compiled
+// contracts used in the EIP2537 release.
+var PrecompiledContractsEIP2537 = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
 	common.BytesToAddress([]byte{2}): &sha256hash{},
 	common.BytesToAddress([]byte{3}): &ripemd160hash{},
@@ -173,7 +173,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 
 func init() {
 	// check that there is no overlap, and panic if there is
-	readOnlyContracts := PrecompiledContractsStaking
+	readOnlyContracts := PrecompiledContractsEIP2537
 	writeCapableContracts := WriteCapablePrecompiledContractsStaking
 	for address, readOnlyContract := range readOnlyContracts {
 		if readOnlyContract != nil && writeCapableContracts[address] != nil {
