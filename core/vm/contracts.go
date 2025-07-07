@@ -32,7 +32,7 @@ import (
 
 	bls12381 "github.com/harmony-one/harmony/crypto/bls/bls12381"
 	"github.com/harmony-one/harmony/internal/params"
-	eth_bls12381 "github.com/kilic/bls12-381"
+
 	"golang.org/x/crypto/ripemd160"
 
 	//Needed for SHA3-256 FIPS202
@@ -732,7 +732,7 @@ func decodeBLS12381FieldElement(in []byte) ([]byte, error) {
 
 // decodeBLS12381G1Point decodes BLS12-381 elliptic curve G1 point.
 // Given encoded (x, y) coordinates in 128 bytes returns a valid G1 Point.
-func decodeBLS12381G1Point(g *eth_bls12381.G1, in []byte) (*eth_bls12381.PointG1, error) {
+func decodeBLS12381G1Point(g *bls12381.G1, in []byte) (*bls12381.PointG1, error) {
 	if len(in) != 128 {
 		return nil, errors.New("invalid g1 point length")
 	}
@@ -754,7 +754,7 @@ func decodeBLS12381G1Point(g *eth_bls12381.G1, in []byte) (*eth_bls12381.PointG1
 
 // decodeBLS12381G2Point decodes BLS12-381 elliptic curve G2 point.
 // Given encoded (x, y) coordinates in 256 bytes returns a valid G2 Point.
-func decodeBLS12381G2Point(g *eth_bls12381.G2, in []byte) (*eth_bls12381.PointG2, error) {
+func decodeBLS12381G2Point(g *bls12381.G2, in []byte) (*bls12381.PointG2, error) {
 	if len(in) != 256 {
 		return nil, errors.New("invalid g2 point length")
 	}
@@ -783,7 +783,7 @@ func decodeBLS12381G2Point(g *eth_bls12381.G2, in []byte) (*eth_bls12381.PointG2
 }
 
 // encodeBLS12381G1Point encodes given G1 point into 128 bytes.
-func encodeBLS12381G1Point(g *eth_bls12381.G1, p *eth_bls12381.PointG1) []byte {
+func encodeBLS12381G1Point(g *bls12381.G1, p *bls12381.PointG1) []byte {
 	outRaw := g.ToBytes(p)
 	out := make([]byte, 128)
 	// encode x
@@ -794,7 +794,7 @@ func encodeBLS12381G1Point(g *eth_bls12381.G1, p *eth_bls12381.PointG1) []byte {
 }
 
 // encodeBLS12381G2Point encodes given G2 point into 128 bytes.
-func encodeBLS12381G2Point(g *eth_bls12381.G2, p *eth_bls12381.PointG2) []byte {
+func encodeBLS12381G2Point(g *bls12381.G2, p *bls12381.PointG2) []byte {
 	// outRaw is 96 bytes
 	outRaw := g.ToBytes(p)
 	out := make([]byte, 256)
@@ -823,10 +823,10 @@ func (c *bls12381G1Add) Run(input []byte) ([]byte, error) {
 		return nil, errBLS12381InvalidInputLength
 	}
 	var err error
-	var p0, p1 *eth_bls12381.PointG1
+	var p0, p1 *bls12381.PointG1
 
 	// Initialize G1
-	g := eth_bls12381.NewG1()
+	g := bls12381.NewG1()
 
 	// Decode G1 point p_0
 	if p0, err = decodeBLS12381G1Point(g, input[:128]); err != nil {
@@ -861,17 +861,17 @@ func (c *bls12381G1Mul) Run(input []byte) ([]byte, error) {
 		return nil, errBLS12381InvalidInputLength
 	}
 	var err error
-	var p0 *eth_bls12381.PointG1
+	var p0 *bls12381.PointG1
 
 	// Initialize G1
-	g := eth_bls12381.NewG1()
+	g := bls12381.NewG1()
 
 	// Decode G1 point
 	if p0, err = decodeBLS12381G1Point(g, input[:128]); err != nil {
 		return nil, err
 	}
 	// Decode scalar value
-	e := eth_bls12381.NewFr().FromBytes(input[128:])
+	e := new(big.Int).SetBytes(input[128:])
 
 	// Compute r = p_0 + p_1
 	r := g.New()
@@ -904,11 +904,11 @@ func (c *bls12381G1MultiExp) Run(input []byte) ([]byte, error) {
 		return nil, errBLS12381InvalidInputLength
 	}
 	var err error
-	points := make([]*eth_bls12381.PointG1, k)
-	scalars := make([]*eth_bls12381.Fr, k)
+	points := make([]*bls12381.PointG1, k)
+	scalars := make([]*big.Int, k)
 
 	// Initialize G1
-	g := eth_bls12381.NewG1()
+	g := bls12381.NewG1()
 
 	// Decode point scalar pairs
 	for i := 0; i < k; i++ {
@@ -919,7 +919,7 @@ func (c *bls12381G1MultiExp) Run(input []byte) ([]byte, error) {
 			return nil, err
 		}
 		// Decode scalar value
-		scalars[i] = eth_bls12381.NewFr().FromBytes(input[t1:t2])
+		scalars[i] = new(big.Int).SetBytes(input[t1:t2])
 	}
 
 	// Compute r = e_0 * p_0 + e_0 * p_0 + ... + e_(k-1) * p_(k-1)
@@ -946,10 +946,10 @@ func (c *bls12381G2Add) Run(input []byte) ([]byte, error) {
 		return nil, errBLS12381InvalidInputLength
 	}
 	var err error
-	var p0, p1 *eth_bls12381.PointG2
+	var p0, p1 *bls12381.PointG2
 
 	// Initialize G2
-	g := eth_bls12381.NewG2()
+	g := bls12381.NewG2()
 	r := g.New()
 
 	// Decode G2 point p_0
@@ -984,17 +984,17 @@ func (c *bls12381G2Mul) Run(input []byte) ([]byte, error) {
 		return nil, errBLS12381InvalidInputLength
 	}
 	var err error
-	var p0 *eth_bls12381.PointG2
+	var p0 *bls12381.PointG2
 
 	// Initialize G2
-	g := eth_bls12381.NewG2()
+	g := bls12381.NewG2()
 
 	// Decode G2 point
 	if p0, err = decodeBLS12381G2Point(g, input[:256]); err != nil {
 		return nil, err
 	}
 	// Decode scalar value
-	e := eth_bls12381.NewFr().FromBytes(input[256:])
+	e := new(big.Int).SetBytes(input[256:])
 
 	// Compute r = p_0 + p_1
 	r := g.New()
@@ -1027,11 +1027,11 @@ func (c *bls12381G2MultiExp) Run(input []byte) ([]byte, error) {
 		return nil, errBLS12381InvalidInputLength
 	}
 	var err error
-	points := make([]*eth_bls12381.PointG2, k)
-	scalars := make([]*eth_bls12381.Fr, k)
+	points := make([]*bls12381.PointG2, k)
+	scalars := make([]*big.Int, k)
 
 	// Initialize G2
-	g := eth_bls12381.NewG2()
+	g := bls12381.NewG2()
 
 	// Decode point scalar pairs
 	for i := 0; i < k; i++ {
@@ -1042,7 +1042,7 @@ func (c *bls12381G2MultiExp) Run(input []byte) ([]byte, error) {
 			return nil, err
 		}
 		// Decode scalar value
-		scalars[i] = eth_bls12381.NewFr().FromBytes(input[t1:t2])
+		scalars[i] = new(big.Int).SetBytes(input[t1:t2])
 	}
 
 	// Compute r = e_0 * p_0 + e_0 * p_0 + ... + e_(k-1) * p_(k-1)
@@ -1139,7 +1139,7 @@ func (c *bls12381MapG1) Run(input []byte) ([]byte, error) {
 	}
 
 	// Initialize G1
-	g := eth_bls12381.NewG1()
+	g := bls12381.NewG1()
 
 	// Compute mapping
 	r, err := g.MapToCurve(fe)
@@ -1181,7 +1181,7 @@ func (c *bls12381MapG2) Run(input []byte) ([]byte, error) {
 	copy(fe[:48], c1)
 
 	// Initialize G2
-	g := eth_bls12381.NewG2()
+	g := bls12381.NewG2()
 
 	// Compute mapping
 	r, err := g.MapToCurve(fe)
