@@ -1,20 +1,28 @@
 // Copyright 2017 The go-ethereum Authors
-// This file is part of go-ethereum.
+// This file is part of the go-ethereum library.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// GNU Lesser General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package vm
+
+/*
+import (
+	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+)
+
 
 import (
 	"encoding/json"
@@ -26,7 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 )
 
-// JSONLogger ...
 type JSONLogger struct {
 	encoder *json.Encoder
 	cfg     *LogConfig
@@ -42,13 +49,12 @@ func NewJSONLogger(cfg *LogConfig, writer io.Writer) *JSONLogger {
 	return l
 }
 
-// CaptureStart ...
 func (l *JSONLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
 	return nil
 }
 
 // CaptureState outputs state information on the logger.
-func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) (HookAfter, error) {
+func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, rStack *ReturnStack, rData []byte, contract *Contract, depth int, err error) error {
 	log := StructLog{
 		Pc:              pc,
 		Op:              op,
@@ -66,13 +72,22 @@ func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint
 		log.Memory = memory.Data()
 	}
 	if !l.cfg.DisableStack {
-		log.Stack = stack.Data()
+		//TODO(@holiman) improve this
+		logstack := make([]*big.Int, len(stack.Data()))
+		for i, item := range stack.Data() {
+			logstack[i] = item.ToBig()
+		}
+		log.Stack = logstack
+		log.ReturnStack = rStack.data
 	}
-	return nil, l.encoder.Encode(log)
+	if !l.cfg.DisableReturnData {
+		log.ReturnData = rData
+	}
+	return l.encoder.Encode(log)
 }
 
 // CaptureFault outputs state information on the logger.
-func (l *JSONLogger) CaptureFault(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) error {
+func (l *JSONLogger) CaptureFault(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, rStack *ReturnStack, contract *Contract, depth int, err error) error {
 	return nil
 }
 
@@ -89,3 +104,4 @@ func (l *JSONLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, 
 	}
 	return l.encoder.Encode(endLog{common.Bytes2Hex(output), math.HexOrDecimal64(gasUsed), t, ""})
 }
+*/
