@@ -318,7 +318,7 @@ func (s *BlockAPI) getTransactionTrace(
 	var blockError *types.Error
 	var foundResult []*tracers.RosettaLogItem
 	var tracer = "RosettaBlockTracer"
-	err := s.hmy.ComputeTxEnvEachBlockWithoutApply(blk, defaultTraceReExec, func(txIndex int, tx *coreTypes.Transaction, msg core.Message, vmctx vm.Context, statedb *state.DB) bool {
+	err := s.hmy.ComputeTxEnvEachBlockWithoutApply(blk, defaultTraceReExec, func(txIndex int, tx *coreTypes.Transaction, msg core.Message, vmctx vm.BlockContext, statedb *state.DB) bool {
 		execResultInterface, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, &hmy.TraceConfig{
 			Tracer: &tracer,
 			LogConfig: &vm.LogConfig{
