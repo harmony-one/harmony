@@ -49,6 +49,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		DialTimeout:                     nodeconfig.DefaultDialTimeout,
 		Muxer:                           nodeconfig.DefaultMuxer,
 		NoRelay:                         nodeconfig.DefaultNoRelay,
+		DiscBootstrapTimeout:            nodeconfig.DefaultDiscBootstrapTimeout,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
