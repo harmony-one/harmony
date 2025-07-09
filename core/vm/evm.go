@@ -26,6 +26,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
+	"github.com/holiman/uint256"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
@@ -71,7 +72,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		precompiles := PrecompiledContractsHomestead
 		// assign empty write capable precompiles till they are available in the fork
 		var writeCapablePrecompiles map[common.Address]WriteCapablePrecompiledContract
-		if evm.ChainConfig().IsS3(evm.EpochNumber) {
+		if evm.ChainConfig().IsS3(evm.Context.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
 		if evm.chainRules.IsIstanbul {
@@ -94,13 +95,13 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 			if _, ok := p.(*vrf); ok {
 				if evm.chainRules.IsPrevVRF {
 					requestedBlockNum := big.NewInt(0).SetBytes(input)
-					minBlockNum := big.NewInt(0).Sub(evm.BlockNumber, common.Big257)
+					minBlockNum := big.NewInt(0).Sub(evm.Context.BlockNumber, common.Big257)
 
-					if requestedBlockNum.Cmp(evm.BlockNumber) == 0 {
+					if requestedBlockNum.Cmp(evm.Context.BlockNumber) == 0 {
 						input = evm.Context.VRF.Bytes()
-					} else if requestedBlockNum.Cmp(minBlockNum) > 0 && requestedBlockNum.Cmp(evm.BlockNumber) < 0 {
+					} else if requestedBlockNum.Cmp(minBlockNum) > 0 && requestedBlockNum.Cmp(evm.Context.BlockNumber) < 0 {
 						// requested block number is in range
-						input = evm.GetVRF(requestedBlockNum.Uint64()).Bytes()
+						input = evm.Context.GetVRF(requestedBlockNum.Uint64()).Bytes()
 					} else {
 						// else default to the current block's VRF
 						input = evm.Context.VRF.Bytes()
@@ -110,7 +111,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 					input = evm.Context.VRF.Bytes()
 				}
 			} else if _, ok := p.(*epoch); ok {
-				input = evm.EpochNumber.Bytes()
+				input = evm.Context.EpochNumber.Bytes()
 			}
 			return RunPrecompiledContract(p, input, contract)
 		}
@@ -131,7 +132,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 				evm.interpreter = interpreter
 			}
 
-			if evm.ChainConfig().IsDataCopyFixEpoch(evm.EpochNumber) {
+			if evm.ChainConfig().IsDataCopyFixEpoch(evm.Context.EpochNumber) {
 				contract.WithDataCopyFix = true
 			}
 			return interpreter.Run(contract, input, readOnly)
@@ -183,6 +184,53 @@ type Context struct {
 	NumShards uint32 // Used by cross shard transfer precompile
 }
 
+// BlockContext provides the EVM with auxiliary information. Once provided
+// it shouldn't be modified.
+type BlockContext struct {
+	// CanTransfer returns whether the account contains
+	// sufficient ether to transfer the value
+	CanTransfer CanTransferFunc
+	// Transfer transfers ether from one account to the other
+	Transfer TransferFunc
+	// GetHash returns the hash corresponding to n
+	GetHash GetHashFunc
+	// GetVRF returns the VRF corresponding to n
+	GetVRF GetVRFFunc
+
+	// IsValidator determines whether the address corresponds to a validator or a smart contract
+	// true: is a validator address; false: is smart contract address
+	IsValidator IsValidatorFunc
+
+	// Block information
+	Coinbase    common.Address // Provides information for COINBASE
+	GasLimit    uint64         // Provides information for GASLIMIT
+	BlockNumber *big.Int       // Provides information for NUMBER
+	EpochNumber *big.Int       // Provides information for EPOCH
+	Time        *big.Int       // Provides information for TIME
+	VRF         common.Hash    // Provides information for VRF
+
+	ShardID   uint32 // Used by staking and cross shard transfer precompile
+	NumShards uint32 // Used by cross shard transfer precompile
+
+	CreateValidator       CreateValidatorFunc
+	EditValidator         EditValidatorFunc
+	Delegate              DelegateFunc
+	Undelegate            UndelegateFunc
+	CollectRewards        CollectRewardsFunc
+	CalculateMigrationGas CalculateMigrationGasFunc
+
+	TxType types.TransactionType
+}
+
+// TxContext provides the EVM with information about a transaction.
+// All fields can change between transactions.
+type TxContext struct {
+	// Message information
+	Origin   common.Address // Provides information for ORIGIN
+	GasPrice *big.Int       // Provides information for GASPRICE
+
+}
+
 // EVM is the Ethereum Virtual Machine base object and provides
 // the necessary tools to run a contract on the given state with
 // the provided context. It should be noted that any error
@@ -194,8 +242,9 @@ type Context struct {
 // The EVM should never be reused and is not thread safe.
 type EVM struct {
 	// Context provides auxiliary blockchain related information
-	Context
-	// DB gives access to the underlying state
+	Context BlockContext
+	TxContext
+	// StateDB gives access to the underlying state
 	StateDB StateDB
 	// Depth is the current call stack
 	depth int
@@ -218,6 +267,7 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
+
 	// stored temporarily by stakingPrecompile and cleared immediately after return
 	// (although the EVM object itself is ephemeral)
 	StakeMsgs []stakingTypes.StakeMsg
@@ -226,13 +276,14 @@ type EVM struct {
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
 // only ever be used *once*.
-func NewEVM(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmConfig Config) *EVM {
+func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, vmConfig Config) *EVM {
 	evm := &EVM{
-		Context:      ctx,
+		Context:      blockCtx,
+		TxContext:    txCtx,
 		StateDB:      statedb,
 		vmConfig:     vmConfig,
 		chainConfig:  chainConfig,
-		chainRules:   chainConfig.Rules(ctx.EpochNumber),
+		chainRules:   chainConfig.Rules(blockCtx.EpochNumber),
 		interpreters: make([]Interpreter, 0, 1),
 	}
 
@@ -276,6 +327,15 @@ func (evm *EVM) Interpreter() Interpreter {
 	return evm.interpreter
 }
 
+// SetTxContext resets the EVM with a new transaction context.
+// This is not threadsafe and should only be done very cautiously.
+func (evm *EVM) SetTxContext(txCtx TxContext) {
+	//if evm.chainRules.IsEIP4762 {
+	//	txCtx.AccessEvents = state.NewAccessEvents(evm.StateDB.PointCache())
+	//}
+	evm.TxContext = txCtx
+}
+
 // Call executes the contract associated with the addr with the given input as
 // parameters. It also handles any necessary value transfer required and takes
 // the necessary steps to create accounts and reverses the state in case of an
@@ -304,7 +364,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	if !evm.StateDB.Exist(addr) && txType != types.SubtractionOnly {
 		precompiles := PrecompiledContractsHomestead
 		var writeCapablePrecompiles map[common.Address]WriteCapablePrecompiledContract
-		if evm.ChainConfig().IsS3(evm.EpochNumber) {
+		if evm.ChainConfig().IsS3(evm.Context.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
 		if evm.chainRules.IsIstanbul {
@@ -323,7 +383,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		if evm.chainRules.IsCrossShardXferPrecompile {
 			writeCapablePrecompiles = WriteCapablePrecompiledContractsCrossXfer
 		}
-		if (len(writeCapablePrecompiles) == 0 || writeCapablePrecompiles[addr] == nil) && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
+		if (len(writeCapablePrecompiles) == 0 || writeCapablePrecompiles[addr] == nil) && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.Context.EpochNumber) && value.Sign() == 0 {
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if evm.vmConfig.Debug && evm.depth == 0 {
 				evm.vmConfig.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value)
@@ -333,7 +393,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		}
 		evm.StateDB.CreateAccount(addr)
 	}
-	evm.Transfer(evm.StateDB, caller.Address(), to.Address(), value, txType)
+	evm.Context.Transfer(evm.StateDB, caller.Address(), to.Address(), value, txType)
 
 	codeHash := evm.StateDB.GetCodeHash(addr)
 	code := evm.StateDB.GetCode(addr)
@@ -390,7 +450,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		return nil, gas, ErrDepth
 	}
 	// Fail if we're trying to transfer more than the available balance
-	if !evm.CanTransfer(evm.StateDB, caller.Address(), value) {
+	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
 
@@ -508,7 +568,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, common.Address{}, gas, ErrDepth
 	}
-	if !evm.CanTransfer(evm.StateDB, caller.Address(), value) {
+	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
 	nonce := evm.StateDB.GetNonce(caller.Address())
@@ -522,14 +582,13 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()
 	evm.StateDB.CreateAccount(address)
-	if evm.ChainConfig().IsEIP155(evm.EpochNumber) {
+	if evm.chainRules.IsS3 {
 		evm.StateDB.SetNonce(address, 1)
 	}
-	evm.Transfer(evm.StateDB, caller.Address(), address, value, types.SameShardTx)
+	evm.Context.Transfer(evm.StateDB, caller.Address(), address, value, types.SameShardTx)
 
-	// initialise a new contract and set the code that is to be used by the
-	// EVM. The contract is a scoped environment for this execution context
-	// only.
+	// Initialise a new contract and set the code that is to be used by the EVM.
+	// The contract is a scoped environment for this execution context only.
 	contract := NewContract(caller, AccountRef(address), value, gas)
 	contract.SetCodeOptionalHash(&address, codeAndHash)
 
@@ -545,7 +604,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	ret, err := run(evm, contract, nil, false)
 
 	// check whether the max code size has been exceeded
-	maxCodeSizeExceeded := evm.ChainConfig().IsEIP155(evm.EpochNumber) && len(ret) > params.MaxCodeSize
+	maxCodeSizeExceeded := evm.ChainConfig().IsEIP155(evm.Context.EpochNumber) && len(ret) > params.MaxCodeSize
 	// if the contract creation ran successfully and no errors were returned
 	// calculate the gas required to store the code. If the code could not
 	// be stored due to not enough gas set an error and let it be handled
@@ -562,7 +621,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in homestead this also counts for code storage gas errors.
-	if maxCodeSizeExceeded || (err != nil && (evm.ChainConfig().IsS3(evm.EpochNumber) || err != ErrCodeStoreOutOfGas)) {
+	if maxCodeSizeExceeded || (err != nil && (evm.ChainConfig().IsS3(evm.Context.EpochNumber) || err != ErrCodeStoreOutOfGas)) {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
 			contract.UseGas(contract.Gas)
@@ -589,9 +648,9 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 //
 // The different between Create2 with Create is Create2 uses sha3(0xff ++ msg.sender ++ salt ++ sha3(init_code))[12:]
 // instead of the usual sender-and-nonce-hash as the address where the contract is initialized at.
-func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *big.Int, salt *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
+func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *big.Int, salt *uint256.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	codeAndHash := &codeAndHash{code: code}
-	contractAddr = crypto.CreateAddress2(caller.Address(), common.BigToHash(salt), codeAndHash.Hash().Bytes())
+	contractAddr = crypto.CreateAddress2(caller.Address(), salt.Bytes32(), codeAndHash.Hash().Bytes())
 	return evm.create(caller, codeAndHash, gas, endowment, contractAddr)
 }
 

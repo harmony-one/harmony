@@ -422,3 +422,15 @@ func (h *Header) Copy() blockif.Header {
 	cpy := *h
 	return &cpy
 }
+
+// BaseFee returns the base fee of the header.
+func (h *Header) BaseFee() *big.Int {
+	return nil
+}
+
+// SetBaseFee sets the base fee of the header.
+func (h *Header) SetBaseFee(newBaseFee *big.Int) {
+	h.Logger(utils.Logger()).Warn().
+		Str("baseFee", newBaseFee.String()).
+		Msg("cannot store BaseFee in V3 header")
+}
