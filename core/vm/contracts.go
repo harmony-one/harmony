@@ -140,7 +140,7 @@ var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{255}): &vrf{},
 }
 
-// PrecompiledContractsBerlin contains the default set of pre-compiled
+// PrecompiledContractsEIP2537 contains the default set of pre-compiled
 // contracts used in the EIP2537 release.
 var PrecompiledContractsEIP2537 = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
