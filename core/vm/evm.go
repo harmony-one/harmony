@@ -90,6 +90,10 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		if evm.chainRules.IsCrossShardXferPrecompile {
 			writeCapablePrecompiles = WriteCapablePrecompiledContractsCrossXfer
 		}
+		if evm.chainRules.IsEIP2537Precompile {
+			precompiles = PrecompiledContractsEIP2537
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsEIP2537
+		}
 		if p := precompiles[*contract.CodeAddr]; p != nil {
 			if _, ok := p.(*vrf); ok {
 				if evm.chainRules.IsPrevVRF {
@@ -322,6 +326,10 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		}
 		if evm.chainRules.IsCrossShardXferPrecompile {
 			writeCapablePrecompiles = WriteCapablePrecompiledContractsCrossXfer
+		}
+		if evm.chainRules.IsEIP2537Precompile {
+			precompiles = PrecompiledContractsEIP2537
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsEIP2537
 		}
 		if (len(writeCapablePrecompiles) == 0 || writeCapablePrecompiles[addr] == nil) && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
 			// Calling a non existing account, don't do anything, but ping the tracer
