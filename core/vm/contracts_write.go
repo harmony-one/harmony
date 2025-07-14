@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"bytes"
 	"errors"
 	"math/big"
 	"strings"
@@ -26,6 +27,15 @@ var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePre
 // It includes the staking precompile and the cross-shard transfer precompile
 var WriteCapablePrecompiledContractsCrossXfer = map[common.Address]WriteCapablePrecompiledContract{
 	// reserve 250 for read only staking precompile and 251 for epoch
+	common.BytesToAddress([]byte{249}): &crossShardXferPrecompile{},
+	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
+}
+
+// WriteCapablePrecompiledContractsEIP2537 lists out the write capable precompiled contracts
+// which are available after the EIP2537PrecompileEpoch
+// It includes the EIP-2537 precompiles
+var WriteCapablePrecompiledContractsEIP2537 = map[common.Address]WriteCapablePrecompiledContract{
+	common.BytesToAddress([]byte{252}): &eip2537Precompile{},
 	common.BytesToAddress([]byte{249}): &crossShardXferPrecompile{},
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 }
@@ -302,4 +312,107 @@ func parseCrossShardXferData(evm *EVM, contract *Contract, input []byte) (
 		return common.Address{}, common.Address{}, 0, 0, nil, err
 	}
 	return contract.Caller(), toAddress, evm.ShardID, toShardID, value, nil
+}
+
+type eip2537Precompile struct{}
+
+// Function signatures (first 4 bytes of keccak256 hash)
+var (
+	blsG1AddSig      = []byte{0x08, 0xc3, 0x79, 0xa0}
+	blsG1MulSig      = []byte{0x1b, 0x03, 0x40, 0x7c}
+	blsG1MultiExpSig = []byte{0x08, 0x73, 0xff, 0x83}
+	blsG2AddSig      = []byte{0x0e, 0x0f, 0xbb, 0x2a}
+	blsG2MulSig      = []byte{0x16, 0x24, 0x0f, 0x95}
+	blsG2MultiExpSig = []byte{0x2c, 0x3a, 0x5d, 0x46}
+	blsPairingSig    = []byte{0x08, 0x7e, 0x19, 0xf2}
+	blsMapG1Sig      = []byte{0x23, 0x4d, 0x95, 0x3f}
+	blsMapG2Sig      = []byte{0x13, 0xe0, 0x2b, 0x3a}
+)
+
+// RequiredGas delegates gas calculation to the appropriate precompile
+func (c *eip2537Precompile) RequiredGas(
+	evm *EVM,
+	contract *Contract,
+	input []byte,
+) (uint64, error) {
+	if len(input) < 4 {
+		return 0, errBLS12381InvalidInputLength
+	}
+
+	// Instantiate the appropriate precompile and delegate gas calculation
+	switch {
+	case bytes.Equal(input[:4], blsG1AddSig):
+		return (&bls12381G1Add{}).RequiredGas(input[4:]), nil
+
+	case bytes.Equal(input[:4], blsG1MulSig):
+		return (&bls12381G1Mul{}).RequiredGas(input[4:]), nil
+
+	case bytes.Equal(input[:4], blsG1MultiExpSig):
+		return (&bls12381G1MultiExp{}).RequiredGas(input[4:]), nil
+
+	case bytes.Equal(input[:4], blsG2AddSig):
+		return (&bls12381G2Add{}).RequiredGas(input[4:]), nil
+
+	case bytes.Equal(input[:4], blsG2MulSig):
+		return (&bls12381G2Mul{}).RequiredGas(input[4:]), nil
+
+	case bytes.Equal(input[:4], blsG2MultiExpSig):
+		return (&bls12381G2MultiExp{}).RequiredGas(input[4:]), nil
+
+	case bytes.Equal(input[:4], blsPairingSig):
+		return (&bls12381Pairing{}).RequiredGas(input[4:]), nil
+
+	case bytes.Equal(input[:4], blsMapG1Sig):
+		return (&bls12381MapG1{}).RequiredGas(input[4:]), nil
+
+	case bytes.Equal(input[:4], blsMapG2Sig):
+		return (&bls12381MapG2{}).RequiredGas(input[4:]), nil
+
+	default:
+		return 0, errors.New("invalid BLS12-381 operation")
+	}
+}
+
+// RunWriteCapable delegates execution to the appropriate precompile
+func (c *eip2537Precompile) RunWriteCapable(
+	evm *EVM,
+	contract *Contract,
+	input []byte,
+) ([]byte, error) {
+	if len(input) < 4 {
+		return nil, errBLS12381InvalidInputLength
+	}
+
+	// Instantiate and delegate to the appropriate precompile
+	switch {
+	case bytes.Equal(input[:4], blsG1AddSig):
+		return (&bls12381G1Add{}).Run(input[4:])
+
+	case bytes.Equal(input[:4], blsG1MulSig):
+		return (&bls12381G1Mul{}).Run(input[4:])
+
+	case bytes.Equal(input[:4], blsG1MultiExpSig):
+		return (&bls12381G1MultiExp{}).Run(input[4:])
+
+	case bytes.Equal(input[:4], blsG2AddSig):
+		return (&bls12381G2Add{}).Run(input[4:])
+
+	case bytes.Equal(input[:4], blsG2MulSig):
+		return (&bls12381G2Mul{}).Run(input[4:])
+
+	case bytes.Equal(input[:4], blsG2MultiExpSig):
+		return (&bls12381G2MultiExp{}).Run(input[4:])
+
+	case bytes.Equal(input[:4], blsPairingSig):
+		return (&bls12381Pairing{}).Run(input[4:])
+
+	case bytes.Equal(input[:4], blsMapG1Sig):
+		return (&bls12381MapG1{}).Run(input[4:])
+
+	case bytes.Equal(input[:4], blsMapG2Sig):
+		return (&bls12381MapG2{}).Run(input[4:])
+
+	default:
+		return nil, errors.New("invalid BLS12-381 operation")
+	}
 }
