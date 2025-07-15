@@ -499,7 +499,7 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 		if sm.coolDownCache.Has(pid) {
 			continue
 		}
-		newStreamID := sttypes.StreamID(peer.ID)
+		newStreamID := sttypes.StreamID(pid)
 		if _, ok := sm.streams.get(newStreamID); ok {
 			continue
 		}
@@ -520,9 +520,9 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 			// The ctx here is using the module context instead of discover context
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
 			if err != nil {
-				sm.coolDownCache.Add(id)
+				sm.coolDownCache.Add(pid)
 				sm.logger.Warn().Err(err).
-					Interface("peerID", id).
+					Interface("peerID", pid).
 					Msg("failed to setup stream with trusted peer")
 				return
 			}
