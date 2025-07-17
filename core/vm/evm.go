@@ -380,6 +380,13 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		ret, err = nil, nil // gas is unchanged
 	}
 
+	// If address is a validator address, then it's not a smart contract address
+	// we don't use its code and codeHash fields
+	if evm.Context.IsValidator(evm.StateDB, addr) {
+		codeHash = emptyCodeHash
+		code = nil
+	}
+
 	if isPrecompile {
 		addrCopy := addr
 		// If the account has no code, we can abort here
