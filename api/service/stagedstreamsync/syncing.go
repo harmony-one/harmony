@@ -361,8 +361,10 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 		s.status.SetPivotBlock(pivotBlock)
 	}
 
-	s.startSyncing()
-	defer s.finishSyncing()
+	if !s.isEpochChain {
+		s.startSyncing()
+		defer s.finishSyncing()
+	}
 
 	ctx, cancel := context.WithCancel(downloaderContext)
 	defer cancel()
