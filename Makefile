@@ -80,10 +80,9 @@ trace-pointer:
 	bash ./scripts/go_executable_build.sh -t
 
 debug:
-	rm -rf .dht-127.0.0.1*
 	# uncomment the following lines to enable debug logging for libp2p, it produces a lot of logs, so disabled by default
-	#export GOLOG_LOG_LEVEL=debug
-	#export GOLOG_OUTPUT=stdout
+	# export GOLOG_LOG_LEVEL=debug
+	# export GOLOG_OUTPUT=stdout
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	bash ./test/debug.sh ./test/configs/local-resharding.txt
@@ -128,6 +127,7 @@ debug-multi-bls-multi-ext-node:
 
 clean:
 	rm -rf ./tmp_log/*
+	rm -rf ./.ps*
 	rm -rf ./.dht*
 	rm -rf ./db-*
 	rm -rf ./latest
