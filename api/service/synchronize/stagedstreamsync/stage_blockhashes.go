@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	types "github.com/harmony-one/harmony/common/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -228,7 +229,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 		}
 
 		// Map to store block hashes fetched from peers
-		peerHashes := sttypes.NewSafeMap[sttypes.StreamID, []common.Hash]()
+		peerHashes := types.NewSafeMap[sttypes.StreamID, []common.Hash]()
 		var wg sync.WaitGroup
 
 		if bh.configs.protocol.NumStreams() < bh.configs.concurrency {
@@ -376,7 +377,7 @@ func (bh *StageBlockHashes) checkFinalHashes(batch []uint64, hashes map[uint64]c
 // calculateFinalBlockHashes Calculates the most frequent block hashes for a given batch and removes streams with invalid hashes.
 // note: final hashes could be zero hashes
 func (bh *StageBlockHashes) calculateFinalBlockHashes(
-	peerHashes *sttypes.SafeMap[sttypes.StreamID, []common.Hash],
+	peerHashes *types.SafeMap[sttypes.StreamID, []common.Hash],
 	batch []uint64,
 ) (map[uint64]common.Hash, map[sttypes.StreamID]struct{}, error) {
 

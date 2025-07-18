@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/internal/utils"
+	types "github.com/harmony-one/harmony/common/types"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
@@ -48,7 +49,7 @@ type streamManager struct {
 	// protocol ID (e.g. different version)
 	streams *streamSet
 	// tracks removed streams with cooldown
-	removedStreams *sttypes.SafeMap[sttypes.StreamID, *RemovalInfo]
+	removedStreams *types.SafeMap[sttypes.StreamID, *RemovalInfo]
 	// reserved streams
 	reservedStreams *streamSet
 	isTrustedPeer   func(libp2p_peer.ID) bool
@@ -83,7 +84,7 @@ type streamManager struct {
 	// trustedStreams tracks stream IDs of successfully established trusted peer streams
 	// and their location (main or reserved list) for efficient counting
 	// Value: true = main list, false = reserved list
-	trustedStreams *sttypes.SafeMap[sttypes.StreamID, bool]
+	trustedStreams *types.SafeMap[sttypes.StreamID, bool]
 	// Atomic counters for trusted streams - optimized for O(1) counting
 	numTrustedStreamsMain     int64 // Count of trusted streams in main list
 	numTrustedStreamsReserved int64 // Count of trusted streams in reserved list
@@ -187,7 +188,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		config:                c,
 		streams:               newStreamSet(),
 		reservedStreams:       newStreamSet(),
-		removedStreams:        sttypes.NewSafeMap[sttypes.StreamID, *RemovalInfo](),
+		removedStreams:        types.NewSafeMap[sttypes.StreamID, *RemovalInfo](),
 		isTrustedPeer:         c.IsTrustedPeer,
 		getTrustedPeers:       c.GetTrustedPeers,
 		host:                  host,
@@ -206,7 +207,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		setupSem:              make(chan struct{}, setupConcurrency),
 		trustedPeersInitiated: c.TrustedPeersInitiated,
 		trustedPeersProcessed: abool.New(),
-		trustedStreams:        sttypes.NewSafeMap[sttypes.StreamID, bool](),
+		trustedStreams:        types.NewSafeMap[sttypes.StreamID, bool](),
 	}
 
 	// Initialize all stream metrics with this protocol ID
