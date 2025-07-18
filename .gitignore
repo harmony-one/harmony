@@ -76,9 +76,11 @@ blspass.txt
 # local test db
 db-127.0.0.1-*
 
-# dht storage
+# dht and peer storage
 .dht
 .dht-*
+.ps
+.ps-*
 .tern-port
 
 # testdata

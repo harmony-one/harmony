@@ -142,10 +142,10 @@ func init() {
 // NewHost ..
 func NewHost(cfg HostConfig) (Host, error) {
 	var (
-		self   = cfg.Self
-		key    = cfg.BLSKey
-		pub    = cfg.BLSKey.GetPublic()
-		psPath = cfg.DataStoreFile
+		self          = cfg.Self
+		key           = cfg.BLSKey
+		pub           = cfg.BLSKey.GetPublic()
+		dataStorePath = cfg.DataStoreFile
 	)
 
 	pubKey := key.GetPublic()
@@ -159,6 +159,13 @@ func NewHost(cfg HostConfig) (Host, error) {
 	listenAddr := libp2p.ListenAddrStrings(
 		addr, // regular tcp connections
 	)
+
+	var psPath *string
+	if dataStorePath != nil {
+		newPath := fmt.Sprintf(".ps-%s", *dataStorePath)
+		psPath = &newPath
+	}
+
 	datastore, err := createDatastore(psPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create data store: %w", err)
@@ -246,8 +253,9 @@ func NewHost(cfg HostConfig) (Host, error) {
 		/*
 			libp2p.ConnectionGater(connGtr), // TODO use connection gater to monitor the connections
 			libp2p.ResourceManager(nil), // TODO use resource manager interface to manage resources per peer better
-			libp2p.Peerstore(ps), // TODO add extended peer store
 		*/
+		// LevelDB backed peerstore
+		libp2p.Peerstore(ps),
 		// Connection manager
 		connMngr,
 		// NAT manager
@@ -321,6 +329,12 @@ func NewHost(cfg HostConfig) (Host, error) {
 		DataStoreFile:   cfg.DataStoreFile,
 		DiscConcurrency: cfg.DiscConcurrency,
 	}
+
+	if dataStorePath != nil {
+		newPath := fmt.Sprintf(".dht-%s", *dataStorePath)
+		*opt.DataStoreFile = newPath
+	}
+
 	opts, err := opt.GetLibp2pRawOptions()
 	if err != nil {
 		cancel()
