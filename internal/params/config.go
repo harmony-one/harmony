@@ -82,6 +82,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		HIP32Epoch:                            big.NewInt(2152), // 2024-10-31 13:02 UTC
 		IsOneSecondEpoch:                      EpochTBD,
+		EIP2537PrecompileEpoch:                EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -131,6 +132,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  big.NewInt(3044),
 		IsOneSecondEpoch:                      EpochTBD,
+		EIP2537PrecompileEpoch:                EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -180,6 +182,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
+		EIP2537PrecompileEpoch:                EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -230,6 +233,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		DevnetExternalEpoch:                   big.NewInt(144),
 		IsOneSecondEpoch:                      big.NewInt(17436),
+		EIP2537PrecompileEpoch:                EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -280,6 +284,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
+		EIP2537PrecompileEpoch:                EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -329,6 +334,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      big.NewInt(4),
+		EIP2537PrecompileEpoch:                EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -381,6 +387,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
+		big.NewInt(0), // EIP2537PrecompileEpoch
 	}
 
 	// TestChainConfig ...
@@ -433,6 +440,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
+		big.NewInt(0), // EIP2537PrecompileEpoch
 	}
 
 	// TestRules ...
@@ -560,6 +568,9 @@ type ChainConfig struct {
 	// StakingPrecompileEpoch is the first epoch to support the staking precompiles
 	StakingPrecompileEpoch *big.Int `json:"staking-precompile-epoch,omitempty"`
 
+	// EIP2537PrecompileEpoch is the first epoch to support the EIP-2537 precompiles
+	EIP2537PrecompileEpoch *big.Int `json:"eip2537-precompile-epoch,omitempty"`
+
 	// ChainIdFixEpoch is the first epoch to return ethereum compatible chain id by ChainID() op code
 	ChainIdFixEpoch *big.Int `json:"chain-id-fix-epoch,omitempty"`
 
@@ -620,7 +631,7 @@ type ChainConfig struct {
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -632,6 +643,7 @@ func (c *ChainConfig) String() string {
 		c.StakingPrecompileEpoch,
 		c.ChainIdFixEpoch,
 		c.CrossShardXferPrecompileEpoch,
+		c.EIP2537PrecompileEpoch,
 	)
 }
 
@@ -684,6 +696,9 @@ func (c *ChainConfig) mustValid() {
 	// max rate (7%) fix is applied on or after hip30
 	require(c.MaxRateEpoch.Cmp(c.HIP30Epoch) >= 0,
 		"must satisfy: MaxRateEpoch >= HIP30Epoch")
+	// eip-2537 is applied on or after hip30
+	require(c.EIP2537PrecompileEpoch.Cmp(c.HIP30Epoch) >= 0,
+		"must satisfy: EIP2537PrecompileEpoch >= HIP30Epoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -844,6 +859,12 @@ func (c *ChainConfig) IsCrossShardXferPrecompile(epoch *big.Int) bool {
 	return isForked(c.CrossShardXferPrecompileEpoch, epoch)
 }
 
+// IsEIP2537Precompiles determines whether EIP-2537
+// precompiles are available in the EVM
+func (c *ChainConfig) IsEIP2537Precompile(epoch *big.Int) bool {
+	return isForked(c.EIP2537PrecompileEpoch, epoch)
+}
+
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
 func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
 	return isForked(c.ChainIdFixEpoch, epoch)
@@ -964,6 +985,7 @@ type Rules struct {
 	// precompiles
 	IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
 	IsStakingPrecompile, IsCrossShardXferPrecompile,
+	IsEIP2537Precompile,
 	// eip-155 chain id fix
 	IsChainIdFix bool
 	IsValidatorCodeFix bool
@@ -992,5 +1014,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsCrossShardXferPrecompile: c.IsCrossShardXferPrecompile(epoch),
 		IsChainIdFix:               c.IsChainIdFix(epoch),
 		IsValidatorCodeFix:         c.IsValidatorCodeFix(epoch),
+		IsEIP2537Precompile:        c.IsEIP2537Precompile(epoch),
 	}
 }
