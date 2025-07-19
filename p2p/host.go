@@ -328,18 +328,18 @@ func NewHost(cfg HostConfig) (Host, error) {
 	opts, err := opt.GetLibp2pRawOptions()
 	if err != nil {
 		cancel()
-		return nil, errors.Wrapf(err, "initialize libp2p raw options failed")
+		return nil, errors.WithMessage(err, "initialize libp2p raw options failed")
 	}
 	idht, errDHT := dht.New(ctx, p2pHost, opts...)
 	if errDHT != nil {
 		cancel()
-		return nil, errors.Wrapf(errDHT, "cannot initialize libp2p DHT")
+		return nil, errors.WithMessage(errDHT, "cannot initialize libp2p DHT")
 	}
 	disc, err := discovery.NewDHTDiscovery(ctx, cancel, p2pHost, idht, opt)
 	if err != nil {
 		cancel()
 		p2pHost.Close()
-		return nil, errors.Wrap(err, "cannot create DHT discovery")
+		return nil, errors.WithMessage(err, "cannot create DHT discovery")
 	}
 
 	// Gossip Pub Sub
