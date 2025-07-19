@@ -19,22 +19,18 @@ package vm
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex" //Needed for SHA3-256 FIPS202
 	"errors"
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/crypto/blake2b"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/blake2b"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
 	"github.com/harmony-one/harmony/internal/params"
 	"golang.org/x/crypto/ripemd160"
-
-	//Needed for SHA3-256 FIPS202
-	"encoding/hex"
-
 	"golang.org/x/crypto/sha3"
 )
 
@@ -249,10 +245,14 @@ func (c *dataCopy) Run(in []byte) ([]byte, error) {
 type bigModExp struct{}
 
 var (
+	big0      = big.NewInt(0)
 	big1      = big.NewInt(1)
+	big3      = big.NewInt(3)
 	big4      = big.NewInt(4)
+	big7      = big.NewInt(7)
 	big8      = big.NewInt(8)
 	big16     = big.NewInt(16)
+	big20     = big.NewInt(20)
 	big32     = big.NewInt(32)
 	big64     = big.NewInt(64)
 	big96     = big.NewInt(96)

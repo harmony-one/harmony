@@ -173,7 +173,7 @@ func TestBlockOverrides(t *testing.T) {
 		// Difficulty, PrevRandao, BaseFeePerGas, and BlobBaseFee are no-op
 	}
 
-	ctx := &vm.Context{
+	ctx := &vm.BlockContext{
 		BlockNumber: big.NewInt(0),
 		Time:        big.NewInt(0),
 		GasLimit:    0,
