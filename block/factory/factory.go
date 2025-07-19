@@ -9,6 +9,7 @@ import (
 	v1 "github.com/harmony-one/harmony/block/v1"
 	v2 "github.com/harmony-one/harmony/block/v2"
 	v3 "github.com/harmony-one/harmony/block/v3"
+	v4 "github.com/harmony-one/harmony/block/v4"
 	"github.com/harmony-one/harmony/internal/params"
 )
 
@@ -30,6 +31,8 @@ func NewFactory(chainConfig *params.ChainConfig) Factory {
 func (f *factory) NewHeader(epoch *big.Int) *block.Header {
 	var impl blockif.Header
 	switch {
+	case f.chainConfig.IsLondon(epoch):
+		impl = v4.NewHeader()
 	case f.chainConfig.IsPreStaking(epoch) || f.chainConfig.IsStaking(epoch):
 		impl = v3.NewHeader()
 	case f.chainConfig.IsCrossLink(epoch):

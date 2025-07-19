@@ -107,20 +107,23 @@ const (
 
 // 0x50 range - 'storage' and execution.
 const (
-	POP OpCode = 0x50 + iota
-	MLOAD
-	MSTORE
-	MSTORE8
-	SLOAD
-	SSTORE
-	JUMP
-	JUMPI
-	PC
-	MSIZE
-	GAS
-	JUMPDEST
-	TLOAD  // 0x5c
-	TSTORE // 0x5d
+	POP       OpCode = 0x50
+	MLOAD     OpCode = 0x51
+	MSTORE    OpCode = 0x52
+	MSTORE8   OpCode = 0x53
+	SLOAD     OpCode = 0x54
+	SSTORE    OpCode = 0x55
+	JUMP      OpCode = 0x56
+	JUMPI     OpCode = 0x57
+	PC        OpCode = 0x58
+	MSIZE     OpCode = 0x59
+	GAS       OpCode = 0x5a
+	JUMPDEST  OpCode = 0x5b
+	BEGINSUB  OpCode = 0x5c
+	RETURNSUB OpCode = 0x5d
+	JUMPSUB   OpCode = 0x5e
+	//TLOAD     OpCode = 0x5f // 0x5c
+	//TSTORE    OpCode = 0x60 // 0x5d
 )
 
 // 0x60 range.
@@ -299,8 +302,8 @@ var opCodeToString = map[OpCode]string{
 	MSIZE:    "MSIZE",
 	GAS:      "GAS",
 	JUMPDEST: "JUMPDEST",
-	TLOAD:    "TLOAD",
-	TSTORE:   "TSTORE",
+	//TLOAD:    "TLOAD",
+	//TSTORE:   "TSTORE",
 
 	// 0x60 range - push.
 	PUSH1:  "PUSH1",
@@ -466,84 +469,84 @@ var stringToOp = map[string]OpCode{
 	"MSIZE":          MSIZE,
 	"GAS":            GAS,
 	"JUMPDEST":       JUMPDEST,
-	"TLOAD":          TLOAD,
-	"TSTORE":         TSTORE,
-	"PUSH1":          PUSH1,
-	"PUSH2":          PUSH2,
-	"PUSH3":          PUSH3,
-	"PUSH4":          PUSH4,
-	"PUSH5":          PUSH5,
-	"PUSH6":          PUSH6,
-	"PUSH7":          PUSH7,
-	"PUSH8":          PUSH8,
-	"PUSH9":          PUSH9,
-	"PUSH10":         PUSH10,
-	"PUSH11":         PUSH11,
-	"PUSH12":         PUSH12,
-	"PUSH13":         PUSH13,
-	"PUSH14":         PUSH14,
-	"PUSH15":         PUSH15,
-	"PUSH16":         PUSH16,
-	"PUSH17":         PUSH17,
-	"PUSH18":         PUSH18,
-	"PUSH19":         PUSH19,
-	"PUSH20":         PUSH20,
-	"PUSH21":         PUSH21,
-	"PUSH22":         PUSH22,
-	"PUSH23":         PUSH23,
-	"PUSH24":         PUSH24,
-	"PUSH25":         PUSH25,
-	"PUSH26":         PUSH26,
-	"PUSH27":         PUSH27,
-	"PUSH28":         PUSH28,
-	"PUSH29":         PUSH29,
-	"PUSH30":         PUSH30,
-	"PUSH31":         PUSH31,
-	"PUSH32":         PUSH32,
-	"DUP1":           DUP1,
-	"DUP2":           DUP2,
-	"DUP3":           DUP3,
-	"DUP4":           DUP4,
-	"DUP5":           DUP5,
-	"DUP6":           DUP6,
-	"DUP7":           DUP7,
-	"DUP8":           DUP8,
-	"DUP9":           DUP9,
-	"DUP10":          DUP10,
-	"DUP11":          DUP11,
-	"DUP12":          DUP12,
-	"DUP13":          DUP13,
-	"DUP14":          DUP14,
-	"DUP15":          DUP15,
-	"DUP16":          DUP16,
-	"SWAP1":          SWAP1,
-	"SWAP2":          SWAP2,
-	"SWAP3":          SWAP3,
-	"SWAP4":          SWAP4,
-	"SWAP5":          SWAP5,
-	"SWAP6":          SWAP6,
-	"SWAP7":          SWAP7,
-	"SWAP8":          SWAP8,
-	"SWAP9":          SWAP9,
-	"SWAP10":         SWAP10,
-	"SWAP11":         SWAP11,
-	"SWAP12":         SWAP12,
-	"SWAP13":         SWAP13,
-	"SWAP14":         SWAP14,
-	"SWAP15":         SWAP15,
-	"SWAP16":         SWAP16,
-	"LOG0":           LOG0,
-	"LOG1":           LOG1,
-	"LOG2":           LOG2,
-	"LOG3":           LOG3,
-	"LOG4":           LOG4,
-	"CREATE":         CREATE,
-	"CREATE2":        CREATE2,
-	"CALL":           CALL,
-	"RETURN":         RETURN,
-	"CALLCODE":       CALLCODE,
-	"REVERT":         REVERT,
-	"SELFDESTRUCT":   SELFDESTRUCT,
+	//"TLOAD":          TLOAD,
+	//"TSTORE":         TSTORE,
+	"PUSH1":        PUSH1,
+	"PUSH2":        PUSH2,
+	"PUSH3":        PUSH3,
+	"PUSH4":        PUSH4,
+	"PUSH5":        PUSH5,
+	"PUSH6":        PUSH6,
+	"PUSH7":        PUSH7,
+	"PUSH8":        PUSH8,
+	"PUSH9":        PUSH9,
+	"PUSH10":       PUSH10,
+	"PUSH11":       PUSH11,
+	"PUSH12":       PUSH12,
+	"PUSH13":       PUSH13,
+	"PUSH14":       PUSH14,
+	"PUSH15":       PUSH15,
+	"PUSH16":       PUSH16,
+	"PUSH17":       PUSH17,
+	"PUSH18":       PUSH18,
+	"PUSH19":       PUSH19,
+	"PUSH20":       PUSH20,
+	"PUSH21":       PUSH21,
+	"PUSH22":       PUSH22,
+	"PUSH23":       PUSH23,
+	"PUSH24":       PUSH24,
+	"PUSH25":       PUSH25,
+	"PUSH26":       PUSH26,
+	"PUSH27":       PUSH27,
+	"PUSH28":       PUSH28,
+	"PUSH29":       PUSH29,
+	"PUSH30":       PUSH30,
+	"PUSH31":       PUSH31,
+	"PUSH32":       PUSH32,
+	"DUP1":         DUP1,
+	"DUP2":         DUP2,
+	"DUP3":         DUP3,
+	"DUP4":         DUP4,
+	"DUP5":         DUP5,
+	"DUP6":         DUP6,
+	"DUP7":         DUP7,
+	"DUP8":         DUP8,
+	"DUP9":         DUP9,
+	"DUP10":        DUP10,
+	"DUP11":        DUP11,
+	"DUP12":        DUP12,
+	"DUP13":        DUP13,
+	"DUP14":        DUP14,
+	"DUP15":        DUP15,
+	"DUP16":        DUP16,
+	"SWAP1":        SWAP1,
+	"SWAP2":        SWAP2,
+	"SWAP3":        SWAP3,
+	"SWAP4":        SWAP4,
+	"SWAP5":        SWAP5,
+	"SWAP6":        SWAP6,
+	"SWAP7":        SWAP7,
+	"SWAP8":        SWAP8,
+	"SWAP9":        SWAP9,
+	"SWAP10":       SWAP10,
+	"SWAP11":       SWAP11,
+	"SWAP12":       SWAP12,
+	"SWAP13":       SWAP13,
+	"SWAP14":       SWAP14,
+	"SWAP15":       SWAP15,
+	"SWAP16":       SWAP16,
+	"LOG0":         LOG0,
+	"LOG1":         LOG1,
+	"LOG2":         LOG2,
+	"LOG3":         LOG3,
+	"LOG4":         LOG4,
+	"CREATE":       CREATE,
+	"CREATE2":      CREATE2,
+	"CALL":         CALL,
+	"RETURN":       RETURN,
+	"CALLCODE":     CALLCODE,
+	"REVERT":       REVERT,
+	"SELFDESTRUCT": SELFDESTRUCT,
 }
 
 // StringToOp finds the opcode whose name is stored in `str`.
