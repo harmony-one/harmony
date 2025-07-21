@@ -720,109 +720,109 @@ func TestPrecompiledEcrecoverPublicKey(t *testing.T) {
 
 func TestPrecompiledBLS12381G1Add(t *testing.T) {
 	for _, test := range blsG1AddTests {
-		testPrecompiled("0a", test, t)
+		testPrecompiled("0b", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G1Mul(t *testing.T) {
 	for _, test := range blsG1MulTests {
-		testPrecompiled("0b", test, t)
+		testPrecompiled("0c", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G1MultiExp(t *testing.T) {
 	for _, test := range blsG1MultiExpTests {
-		testPrecompiled("0c", test, t)
+		testPrecompiled("0d", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G2Add(t *testing.T) {
 	for _, test := range blsG2AddTests {
-		testPrecompiled("0d", test, t)
+		testPrecompiled("0e", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G2Mul(t *testing.T) {
 	for _, test := range blsG2MulTests {
-		testPrecompiled("0e", test, t)
+		testPrecompiled("0f", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G2MultiExp(t *testing.T) {
 	for _, test := range blsG2MultiExpTests {
-		testPrecompiled("0f", test, t)
+		testPrecompiled("10", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381Pairing(t *testing.T) {
 	for _, test := range blsPairingTests {
-		testPrecompiled("10", test, t)
+		testPrecompiled("11", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381MapG1(t *testing.T) {
 	for _, test := range blsMapG1Tests {
-		testPrecompiled("11", test, t)
+		testPrecompiled("12", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381MapG2(t *testing.T) {
 	for _, test := range blsMapG2Tests {
-		testPrecompiled("12", test, t)
+		testPrecompiled("13", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G1AddFail(t *testing.T) {
 	for _, test := range blsG1AddFailTests {
-		testPrecompiledFailure("0a", test, t)
+		testPrecompiledFailure("0b", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G1MulFail(t *testing.T) {
 	for _, test := range blsG1MulFailTests {
-		testPrecompiledFailure("0b", test, t)
+		testPrecompiledFailure("0c", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G1MultiExpFail(t *testing.T) {
 	for _, test := range blsG1MultiExpFailTests {
-		testPrecompiledFailure("0c", test, t)
+		testPrecompiledFailure("0d", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G2AddFail(t *testing.T) {
 	for _, test := range blsG2AddFailTests {
-		testPrecompiledFailure("0d", test, t)
+		testPrecompiledFailure("0e", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G2MulFail(t *testing.T) {
 	for _, test := range blsG2MulFailTests {
-		testPrecompiledFailure("0e", test, t)
+		testPrecompiledFailure("0f", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381G2MultiExpFail(t *testing.T) {
 	for _, test := range blsG2MultiExpFailTests {
-		testPrecompiledFailure("0f", test, t)
+		testPrecompiledFailure("10", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381PairingFail(t *testing.T) {
 	for _, test := range blsPairingFailTests {
-		testPrecompiledFailure("10", test, t)
+		testPrecompiledFailure("11", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381MapG1Fail(t *testing.T) {
 	for _, test := range blsMapG1FailTests {
-		testPrecompiledFailure("11", test, t)
+		testPrecompiledFailure("12", test, t)
 	}
 }
 
 func TestPrecompiledBLS12381MapG2Fail(t *testing.T) {
 	for _, test := range blsMapG2FailTests {
-		testPrecompiledFailure("12", test, t)
+		testPrecompiledFailure("13", test, t)
 	}
 }
 
