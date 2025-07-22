@@ -156,7 +156,7 @@ func main() {
 	}
 
 	// For bootstrap nodes, we shall keep .dht file.
-	dataStorePath := fmt.Sprintf(".dht-%s-%s", *ip, *port)
+	dataStorePath := fmt.Sprintf("%s-%s", *ip, *port)
 	selfPeer := p2p.Peer{IP: *ip, Port: *port}
 
 	host, err := p2p.NewHost(p2p.HostConfig{
