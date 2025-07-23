@@ -333,6 +333,12 @@ func (a wrapper) IsWrite() bool {
 
 type eip2537Precompile struct{}
 
+func (c *eip2537Precompile) IsWrite() bool {
+	return false
+}
+
+var _ WriteCapablePrecompiledContract = (*eip2537Precompile)(nil)
+
 // Function signatures (first 4 bytes of keccak256 hash)
 var (
 	blsG1AddSig      = []byte{0x08, 0xc3, 0x79, 0xa0}
