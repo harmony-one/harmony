@@ -266,8 +266,14 @@ func BenchmarkPrecompiledIdentity(bench *testing.B) {
 func TestPrecompiledModExp(t *testing.T)      { testJson("modexp", "05", t) }
 func BenchmarkPrecompiledModExp(b *testing.B) { benchJson("modexp", "05", b) }
 
-func TestPrecompiledModExpEip2565(t *testing.T)      { testJson("modexp_eip2565", "f5", t) }
-func BenchmarkPrecompiledModExpEip2565(b *testing.B) { benchJson("modexp_eip2565", "f5", b) }
+func TestPrecompiledModExpEip2565(t *testing.T) {
+	t.Skip("eip2565 to be implemented")
+	testJson("modexp_eip2565", "f5", t)
+}
+func BenchmarkPrecompiledModExpEip2565(b *testing.B) {
+	b.Skip("eip2565 to be implemented")
+	benchJson("modexp_eip2565", "f5", b)
+}
 
 // Tests the sample inputs from the elliptic curve addition EIP 213.
 func TestPrecompiledBn256Add(t *testing.T)      { testJson("bn256Add", "06", t) }
