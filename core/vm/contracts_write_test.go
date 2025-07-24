@@ -515,7 +515,7 @@ func printByteArrayWithCommas(arr []byte) string {
 
 func TestEIP2537Precompile(t *testing.T) {
 	precompile := &eip2537Precompile{}
-	evm := NewEVM(Context{}, nil, params.TestChainConfig, Config{})
+	evm := NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 
 	for ti, tc := range bls12381TestCases {
 		inputs, fullInput := compileInputs(tc.input)
