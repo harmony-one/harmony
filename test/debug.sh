@@ -4,12 +4,18 @@ unset -v configfile
 configfile=$1
 Localnet_Blocks_Per_Epoch=$2
 Localnet_Blocks_Per_Epoch_V2=$3
+CLEAN_START=${4:-true}
 
-./test/kill_node.sh
-rm -rf tmp_log/* 2> /dev/null
-rm *.rlp 2> /dev/null
-rm -rf .dht* 2> /dev/null
-rm -rf .ps* 2> /dev/null
+if [ "${CLEAN_START}" != false ]; then
+  ./test/kill_node.sh
+  rm -rf tmp_log/* 2> /dev/null
+  rm *.rlp 2> /dev/null
+  rm -rf .dht* 2> /dev/null
+  rm -rf .ps* 2> /dev/null
+  CLEAN_START_OPT=(-X "true")
+else
+  CLEAN_START_OPT=(-X "false")
+fi
 scripts/go_executable_build.sh -S || exit 1  # dynamic builds are faster for debug iteration...
 LEGACY_SYNC=${LEGACY_SYNC:-"false"}
 if [ "${LEGACY_SYNC}" == "true" ]; then
@@ -31,7 +37,9 @@ fi
 
 if [ "${VERBOSE}" = "true" ]; then
     echo "[WARN] - running with verbose logs"
-    ./test/deploy.sh -v -B -D 600000 "${BLOCK_PER_EPOCH_OPT[@]}" "${BLOCK_PER_EPOCH_V2_OPT[@]}" "${SYNC_OPT[@]}" "${configfile}"
+    ./test/deploy.sh -v -B -D 600000 "${BLOCK_PER_EPOCH_OPT[@]}" "${BLOCK_PER_EPOCH_V2_OPT[@]}" \
+        "${SYNC_OPT[@]}" "${CLEAN_START_OPT[@]}"  "${configfile}"
 else
-    ./test/deploy.sh -B -D 600000 "${BLOCK_PER_EPOCH_OPT[@]}" "${BLOCK_PER_EPOCH_V2_OPT[@]}" "${SYNC_OPT[@]}" "${configfile}"
+    ./test/deploy.sh -B -D 600000 "${BLOCK_PER_EPOCH_OPT[@]}" "${BLOCK_PER_EPOCH_V2_OPT[@]}" \
+        "${SYNC_OPT[@]}" "${CLEAN_START_OPT[@]}" "${configfile}"
 fi

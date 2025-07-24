@@ -11,6 +11,8 @@ RELEASE?=$(shell git describe --long | cut -f2 -d-)
 RPMBUILD=$(HOME)/rpmbuild
 DEBBUILD=$(HOME)/debbuild
 SHELL := bash
+EPOCH_TO_WAIT ?=5
+EXTRA_NODES_FILE ?="./test/configs/local-extra-nodes.txt"
 
 .PHONY: all help libs exe race trace-pointer debug debug-ext debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker go-vet go-test docker build_localnet_validator protofiles travis_go_checker travis_rpc_checker travis_rosetta_checker debug-start-log debug-stop-log debug-restart-log debug-delete-log
 
@@ -57,6 +59,7 @@ help:
 	@echo "travis_rosetta_checker - run the Travis Rosetta checker script, defaulting the test branch to 'master' unless overridden by TEST_REPO_BRANCH"
 	@echo "debug_external - cleans up environment, rebuilds the binary, and deploys with external nodes"
 	@echo "debug-multi-bls - cleans up environment, rebuilds the binary, and deploys with external nodes in configuration 1 harmony process -> 2 validators"
+	@echo "debug-add-extra-nodes-to-the-running-network wait for EPOCH_TO_WAIT and add nodes from EXTRA_NODES_FILE file"
 	@echo "build_localnet_validator - imports validator keys, funds validator accounts, waits for the epoch, and creates external validators on a local network"
 	@echo "debug-start-log - start a docker compose Promtail->Loki->Grafana stack against localnet logs, creates"\
 		"persistent volume to store parsed logs between localnet runs, needs docker compose and started localnet"
@@ -116,6 +119,11 @@ debug-multi-bls-with-terminal:
 	sleep 10
 	bash ./test/build-localnet-validator.sh
 	screen -r localnet
+
+debug-add-extra-nodes-to-the-running-network:
+	echo waiting for the $(EPOCH_TO_WAIT) epoch on the localnet
+	bash ./test/wait_till_n_epoch.sh $(EPOCH_TO_WAIT)
+	./test/debug.sh $(EXTRA_NODES_FILE) 64 64 false &
 
 debug-multi-bls-multi-ext-node:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging

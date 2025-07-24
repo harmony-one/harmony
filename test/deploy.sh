@@ -14,7 +14,9 @@ OS=$(uname -s)
 . "${ROOT}/scripts/setup_bls_build_flags.sh"
 
 function cleanup() {
-  "${progdir}/kill_node.sh"
+  if [[ "${CLEAN_START}" == "true" ]]; then
+    "${progdir}/kill_node.sh"
+  fi
 }
 
 function build() {
@@ -54,14 +56,21 @@ function setup() {
 
 function launch_bootnode() {
   echo "launching boot node ..."
-  ${DRYRUN} ${ROOT}/bin/bootnode -port 19876 -rpc_http_port 8888 -rpc_ws_port 8889 -network "localnet" -max_conn_per_ip 100 -force_public true >"${log_folder}"/bootnode.log 2>&1 | tee -a "${LOG_FILE}" &
+  ${DRYRUN} ${ROOT}/bin/bootnode -port "${BOOTNODE_PORT}" -rpc_http_port 8888 -rpc_ws_port 8889 -network "localnet" \
+    -max_conn_per_ip 100 -force_public true >"${log_folder}"/bootnode.log 2>&1 | tee -a "${LOG_FILE}" &
   sleep 1
   BN_MA=$(grep "BN_MA" "${log_folder}"/bootnode.log | awk -F\= ' { print $2 } ')
   echo "bootnode launched." + " $BN_MA"
 }
 
 function launch_localnet() {
-  launch_bootnode
+  if [[ "${CLEAN_START}" == "true" ]]; then
+    launch_bootnode
+  else
+    # shellcheck disable=SC2009
+    # justification - we need the exact line part from the running nodes
+    BN_MA=$(ps axww -o pid,command | grep -Eo "/ip4/127\.0\.0\.1/tcp/${BOOTNODE_PORT}/p2p/Qm[a-zA-Z0-9]{44}" | head -n 1)
+  fi
 
   unset -v base_args sync_options
   declare -a base_args args sync_options
@@ -164,6 +173,7 @@ USAGE: $ME [OPTIONS] config_file_name [extra args to node]
    -v                         verbosity in log (default: $VERBOSE)
    -e                         expose WS & HTTP ip (default: $EXPOSEAPIS)
    -L                         start localnet in Legace sync mode(default: $LEGACY_SYNC)
+   -X                         DON'T start localnet completely from scratch, add more nodes to it
 
 This script will build all the binaries and start harmony and based on the configuration file.
 
@@ -174,6 +184,7 @@ EXAMPLES:
   exit 0
 }
 
+BOOTNODE_PORT=19876
 DURATION=60000
 MIN=4
 SHARDS=2
@@ -185,8 +196,9 @@ EXPOSEAPIS=false
 LEGACY_SYNC=false
 BLOCKS_PER_EPOCH=16
 BLOCKS_PER_EPOCH_V2=16
+CLEAN_START=true
 
-while getopts "hD:m:s:nBN:K:E:veL:" option; do
+while getopts "hD:m:s:nBN:K:E:veL:X:" option; do
   case ${option} in
   h) usage ;;
   D) DURATION=$OPTARG ;;
@@ -200,6 +212,7 @@ while getopts "hD:m:s:nBN:K:E:veL:" option; do
   v) VERBOSE=true ;;
   e) EXPOSEAPIS=true ;;
   L) LEGACY_SYNC=$OPTARG ;;
+  X) CLEAN_START=$OPTARG ;;
   *) usage ;;
   esac
 done
