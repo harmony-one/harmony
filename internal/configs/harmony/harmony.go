@@ -146,6 +146,12 @@ type P2pConfig struct {
 	Muxer string
 	// No relay services, direct connections between peers only
 	NoRelay bool
+	// EnableQuic enables QUIC transport
+	EnableQuic bool
+	// QuicPort is the port to listen for QUIC protocols
+	QuicPort int
+	// QuicPriority prioritizes QUIC transport over TCP
+	QuicPriority bool
 }
 
 type GeneralConfig struct {

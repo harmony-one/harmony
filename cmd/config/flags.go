@@ -701,6 +701,21 @@ var (
 		Usage:    "no relay services, direct connections between peers only",
 		DefValue: defaultConfig.P2P.NoRelay,
 	}
+	enableQuicFlag = cli.BoolFlag{
+		Name:     "p2p.enable-quic",
+		Usage:    "enable QUIC transport",
+		DefValue: defaultConfig.P2P.EnableQuic,
+	}
+	quicPortFlag = cli.IntFlag{
+		Name:     "p2p.quic-port",
+		Usage:    "port to listen for QUIC protocols",
+		DefValue: defaultConfig.P2P.QuicPort,
+	}
+	quicPriorityFlag = cli.BoolFlag{
+		Name:     "p2p.quic-priority",
+		Usage:    "prioritize QUIC transport over Tcp",
+		DefValue: defaultConfig.P2P.QuicPriority,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -779,6 +794,16 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, noRelayFlag) {
 		config.P2P.NoRelay = cli.GetBoolFlagValue(cmd, noRelayFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, enableQuicFlag) {
+		config.P2P.EnableQuic = cli.GetBoolFlagValue(cmd, enableQuicFlag)
+	}
+	if cli.IsFlagChanged(cmd, quicPortFlag) {
+		config.P2P.QuicPort = cli.GetIntFlagValue(cmd, quicPortFlag)
+	}
+	if cli.IsFlagChanged(cmd, quicPriorityFlag) {
+		config.P2P.QuicPriority = cli.GetBoolFlagValue(cmd, quicPriorityFlag)
 	}
 }
 

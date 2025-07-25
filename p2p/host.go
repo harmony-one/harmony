@@ -43,11 +43,13 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
 	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	libp2p_quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/pkg/errors"
+	quic "github.com/quic-go/quic-go"
 	"github.com/rs/zerolog"
 )
 
@@ -84,6 +86,8 @@ type Host interface {
 }
 
 // Peer is the object for a p2p peer (node)
+// todo(sun): does it need to differentiate between tcp and quic ports?
+// todo(sun): for self.peer, if QUIC is enabled, the port should be which port?
 type Peer struct {
 	IP              string         // IP address of the peer
 	Port            string         // Port number of the peer
@@ -127,6 +131,13 @@ type HostConfig struct {
 	DialTimeout                     time.Duration
 	Muxer                           string
 	NoRelay                         bool
+	QuicConfig                      QuicConfig
+}
+
+type QuicConfig struct {
+	Enabled  bool
+	Port     string
+	Priority bool
 }
 
 func init() {
@@ -144,12 +155,16 @@ func init() {
 }
 
 // NewHost ..
+// todo(sun): implement dialer prioritization
+// todo(sun): log the quic address
+// todo(sun): upon connection, log the transport type (conn.RemoteMultiaddr())
 func NewHost(cfg HostConfig) (Host, error) {
 	var (
 		self          = cfg.Self
 		key           = cfg.BLSKey
 		pub           = cfg.BLSKey.GetPublic()
 		dataStorePath = cfg.DataStoreFile
+		quicConfig    = cfg.QuicConfig
 	)
 
 	pubKey := key.GetPublic()
@@ -205,9 +220,11 @@ func NewHost(cfg HostConfig) (Host, error) {
 	connGtr = gating.AddMetering(connGtr)
 
 	// transporters
+	// todo: tcp.WithConnectionTimeout is the dial timeout, should be replaced with idle timeout
 	tcpTransport := libp2p.Transport(
 		tcp.NewTCPTransport,
-		tcp.WithConnectionTimeout(time.Minute*60)) // break unused connections
+		tcp.WithConnectionTimeout(time.Minute*60), // break unused connections
+	)
 
 	// create NAT Manager; it takes care of setting NAT port mappings, and discovering external addresses
 	var nat libp2p_config.NATManagerC // disabled if nil
@@ -239,6 +256,13 @@ func NewHost(cfg HostConfig) (Host, error) {
 	if dto <= 0 {
 		dto = time.Minute
 	}
+
+	// enable quic
+	var quicOpts libp2p.Option
+	if quicConfig.Enabled {
+		quicOpts = createQuicOption(self.IP, quicConfig)
+	}
+
 	// prepare host options
 	p2pHostConfig := []libp2p.Option{
 		libp2p.Identity(key),
@@ -274,6 +298,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.EnableNATService(),
 		// NAT Rate Limiter
 		libp2p.AutoNATServiceRateLimit(10, 5, time.Second*60),
+		// quic connections; nil if not enabled
+		quicOpts,
 	}
 	if cfg.ResourceMgrEnabled {
 		rmgr, err := makeResourceMgr(false, cfg.ResourceMgrMemoryLimitBytes, cfg.ResourceMgrFileDescriptorsLimit, cfg.ConnManagerHighWatermark)
@@ -442,6 +468,27 @@ func NewHost(cfg HostConfig) (Host, error) {
 		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
 		Msg("libp2p host ready")
 	return h, nil
+}
+
+// createQuicOption creates a quic option for the libp2p host
+func createQuicOption(ip string, quicCfg QuicConfig) libp2p.Option {
+	// todo(sun): derive the QUIC port from the base port ONLY when a legacy flag is used (port + 1)
+	// quic multiaddr
+	listenAddr := libp2p.ListenAddrStrings(
+		fmt.Sprintf("ip4/%s/udp/%s/quic-v1", ip, quicCfg.Port),
+	)
+
+	// quic transport
+	transport := libp2p.Transport(
+		libp2p_quic.NewTransport,
+		quic.Config{
+			MaxIdleTimeout:     time.Minute * 60,
+			MaxIncomingStreams: 256,
+			KeepAlivePeriod:    time.Minute * 30,
+		},
+	)
+
+	return libp2p.ChainOptions(listenAddr, transport)
 }
 
 func createDatastore(peerstorePath *string) (ds.Batching, error) {
@@ -620,6 +667,7 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 	return err
 }
 
+// todo(sun): add quic support
 // AddPeer add p2p.Peer into Peerstore
 func (host *HostV2) AddPeer(p *Peer) error {
 	if p.PeerID != "" && len(p.Addrs) != 0 {
@@ -658,11 +706,13 @@ func (host *HostV2) AddTrustedNodes() {
 	}
 }
 
+// todo(sun): add quic support
 func (host *HostV2) AddPeerByIP(IP string, port string) error {
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", IP, port)
 	return host.AddPeerByAddress(addr)
 }
 
+// todo(sun): add quic support
 // AddPeerByAddress adds a peer by address (ex: /ip4/127.0.0.1/tcp/9000/p2p/QmSomePeerID)
 func (host *HostV2) AddPeerByAddress(addrStr string) error {
 	peerAddr, err := multiaddr.NewMultiaddr(addrStr)
@@ -763,6 +813,7 @@ func (host *HostV2) Network() libp2p_network.Network {
 	return host.h.Network()
 }
 
+// todo(sun): add quic support
 // ConnectHostPeer connects to peer host
 func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	ctx := context.Background()

@@ -49,6 +49,9 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		DialTimeout:                     nodeconfig.DefaultDialTimeout,
 		Muxer:                           nodeconfig.DefaultMuxer,
 		NoRelay:                         nodeconfig.DefaultNoRelay,
+		EnableQuic:                      nodeconfig.DefaultEnableQuic,
+		QuicPort:                        nodeconfig.DefaultQuicPort,
+		QuicPriority:                    nodeconfig.DefaultQuicPriority,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
