@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rlp"
+	types "github.com/harmony-one/harmony/common/types"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 )
@@ -138,8 +139,8 @@ func makeDummyTestStreams(indexes []int) []sttypes.Stream {
 	return sts
 }
 
-func makeDummyStreamSets(indexes []int) *sttypes.SafeMap[sttypes.StreamID, *stream] {
-	m := sttypes.NewSafeMap[sttypes.StreamID, *stream]()
+func makeDummyStreamSets(indexes []int) *types.SafeMap[sttypes.StreamID, *stream] {
+	m := types.NewSafeMap[sttypes.StreamID, *stream]()
 
 	for _, index := range indexes {
 		st := &testStream{

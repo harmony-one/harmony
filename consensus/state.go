@@ -4,6 +4,8 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/harmony-one/harmony/common/types"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/rs/zerolog"
@@ -38,13 +40,16 @@ type State struct {
 
 	// ShardID of the consensus
 	ShardID uint32
+
+	quorumAchievedBlock *types.SafeMap[quorum.Phase, uint64]
 }
 
 func NewState(mode Mode, shardID uint32) State {
 	state := State{
-		mode:    uint32(mode),
-		ShardID: shardID,
-		phase:   atomic.Value{},
+		mode:                uint32(mode),
+		ShardID:             shardID,
+		phase:               atomic.Value{},
+		quorumAchievedBlock: types.NewSafeMap[quorum.Phase, uint64](),
 	}
 	state.phase.Store(FBFTAnnounce)
 	return state
@@ -54,12 +59,12 @@ func (pm *State) getBlockNum() uint64 {
 	return atomic.LoadUint64(&pm.blockNum)
 }
 
-// SetBlockNum sets the blockNum in consensus object, called at node bootstrap
+// setBlockNum sets the FBFT blockNum in consensus object, called at node bootstrap
 func (pm *State) setBlockNum(blockNum uint64) {
 	atomic.StoreUint64(&pm.blockNum, blockNum)
 }
 
-// SetBlockNum sets the blockNum in consensus object, called at node bootstrap
+// SetBlockNum sets the FBFT blockNum in consensus object, called at node bootstrap
 func (pm *State) SetBlockNum(blockNum uint64) {
 	pm.setBlockNum(blockNum)
 }
@@ -67,6 +72,23 @@ func (pm *State) SetBlockNum(blockNum uint64) {
 // GetBlockNum returns the block number
 func (pm *State) GetBlockNum() uint64 {
 	return pm.getBlockNum()
+}
+
+// GetLastQuorumAchievedBlock retrieves the block number of the last block
+// that achieved quorum for the specified phase.
+// If no quorum has been achieved for the given phase, it returns 0.
+func (pm *State) GetLastQuorumAchievedBlock(p quorum.Phase) uint64 {
+	lqab, exists := pm.quorumAchievedBlock.Get(p)
+	if !exists {
+		return 0
+	}
+	return lqab
+}
+
+// SetLastQuorumAchievedBlock updates the block number of the last block
+// that achieved quorum for the specified phase.
+func (pm *State) SetLastQuorumAchievedBlock(p quorum.Phase, blockNum uint64) {
+	pm.quorumAchievedBlock.Set(p, blockNum)
 }
 
 func (pm *State) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {

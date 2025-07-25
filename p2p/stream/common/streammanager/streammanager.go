@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/internal/utils"
+	types "github.com/harmony-one/harmony/common/types"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
@@ -47,7 +48,7 @@ type streamManager struct {
 	// protocol ID (e.g. different version)
 	streams *streamSet
 	// tracks removed streams with cooldown
-	removedStreams *sttypes.SafeMap[sttypes.StreamID, *RemovalInfo]
+	removedStreams *types.SafeMap[sttypes.StreamID, *RemovalInfo]
 	// reserved streams
 	reservedStreams *streamSet
 	trustedPeers    map[libp2p_peer.ID]struct{}
@@ -156,7 +157,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		config:          c,
 		streams:         newStreamSet(),
 		reservedStreams: newStreamSet(),
-		removedStreams:  sttypes.NewSafeMap[sttypes.StreamID, *RemovalInfo](),
+		removedStreams:  types.NewSafeMap[sttypes.StreamID, *RemovalInfo](),
 		trustedPeers:    c.TrustedPeers,
 		host:            host,
 		pf:              pf,
