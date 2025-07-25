@@ -111,6 +111,7 @@ type HostConfig struct {
 	TrustedNodes                    []string
 	DataStoreFile                   *string
 	DiscConcurrency                 int
+	DiscBootstrapTimeout            time.Duration
 	MaxConnPerIP                    int
 	DisablePrivateIPScan            bool
 	MaxPeers                        int64
@@ -329,9 +330,10 @@ func NewHost(cfg HostConfig) (Host, error) {
 
 	// DHT
 	opt := discovery.DHTConfig{
-		BootNodes:       cfg.BootNodes,
-		DataStoreFile:   cfg.DataStoreFile,
-		DiscConcurrency: cfg.DiscConcurrency,
+		BootNodes:        cfg.BootNodes,
+		DataStoreFile:    cfg.DataStoreFile,
+		DiscConcurrency:  cfg.DiscConcurrency,
+		BootstrapTimeout: cfg.DiscBootstrapTimeout,
 	}
 
 	if dataStorePath != nil {

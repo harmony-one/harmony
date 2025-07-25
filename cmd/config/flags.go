@@ -60,6 +60,7 @@ var (
 		p2pKeyFileFlag,
 		p2pDHTDataStoreFlag,
 		p2pDiscoveryConcurrencyFlag,
+		p2pDiscBootstrapTimeoutFlag,
 		legacyKeyFileFlag,
 		p2pDisablePrivateIPScanFlag,
 		maxConnPerIPFlag,
@@ -631,6 +632,11 @@ var (
 		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
 		DefValue: defaultConfig.P2P.DiscConcurrency,
 	}
+	p2pDiscBootstrapTimeoutFlag = cli.DurationFlag{
+		Name:     "p2p.disc.bootstrap-timeout",
+		Usage:    "timeout for the DHT bootstrap process",
+		DefValue: defaultConfig.P2P.DiscBootstrapTimeout,
+	}
 	p2pDisablePrivateIPScanFlag = cli.BoolFlag{
 		Name:     "p2p.no-private-ip-scan",
 		Usage:    "disable scanning of private ip4/6 addresses by DHT",
@@ -727,6 +733,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, p2pDiscoveryConcurrencyFlag) {
 		config.P2P.DiscConcurrency = cli.GetIntFlagValue(cmd, p2pDiscoveryConcurrencyFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, p2pDiscBootstrapTimeoutFlag) {
+		config.P2P.DiscBootstrapTimeout = cli.GetDurationFlagValue(cmd, p2pDiscBootstrapTimeoutFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, maxConnPerIPFlag) {
