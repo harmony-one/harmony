@@ -319,10 +319,8 @@ type eip2537Precompile struct{}
 // Function signatures (first 4 bytes of keccak256 hash)
 var (
 	blsG1AddSig      = []byte{0x08, 0xc3, 0x79, 0xa0}
-	blsG1MulSig      = []byte{0x1b, 0x03, 0x40, 0x7c}
 	blsG1MultiExpSig = []byte{0x08, 0x73, 0xff, 0x83}
 	blsG2AddSig      = []byte{0x0e, 0x0f, 0xbb, 0x2a}
-	blsG2MulSig      = []byte{0x16, 0x24, 0x0f, 0x95}
 	blsG2MultiExpSig = []byte{0x2c, 0x3a, 0x5d, 0x46}
 	blsPairingSig    = []byte{0x08, 0x7e, 0x19, 0xf2}
 	blsMapG1Sig      = []byte{0x23, 0x4d, 0x95, 0x3f}
@@ -344,17 +342,11 @@ func (c *eip2537Precompile) RequiredGas(
 	case bytes.Equal(input[:4], blsG1AddSig):
 		return (&bls12381G1Add{}).RequiredGas(input[4:]), nil
 
-	case bytes.Equal(input[:4], blsG1MulSig):
-		return (&bls12381G1Mul{}).RequiredGas(input[4:]), nil
-
 	case bytes.Equal(input[:4], blsG1MultiExpSig):
 		return (&bls12381G1MultiExp{}).RequiredGas(input[4:]), nil
 
 	case bytes.Equal(input[:4], blsG2AddSig):
 		return (&bls12381G2Add{}).RequiredGas(input[4:]), nil
-
-	case bytes.Equal(input[:4], blsG2MulSig):
-		return (&bls12381G2Mul{}).RequiredGas(input[4:]), nil
 
 	case bytes.Equal(input[:4], blsG2MultiExpSig):
 		return (&bls12381G2MultiExp{}).RequiredGas(input[4:]), nil
@@ -388,17 +380,11 @@ func (c *eip2537Precompile) RunWriteCapable(
 	case bytes.Equal(input[:4], blsG1AddSig):
 		return (&bls12381G1Add{}).Run(input[4:])
 
-	case bytes.Equal(input[:4], blsG1MulSig):
-		return (&bls12381G1Mul{}).Run(input[4:])
-
 	case bytes.Equal(input[:4], blsG1MultiExpSig):
 		return (&bls12381G1MultiExp{}).Run(input[4:])
 
 	case bytes.Equal(input[:4], blsG2AddSig):
 		return (&bls12381G2Add{}).Run(input[4:])
-
-	case bytes.Equal(input[:4], blsG2MulSig):
-		return (&bls12381G2Mul{}).Run(input[4:])
 
 	case bytes.Equal(input[:4], blsG2MultiExpSig):
 		return (&bls12381G2MultiExp{}).Run(input[4:])
