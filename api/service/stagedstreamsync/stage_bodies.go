@@ -127,7 +127,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	s.state.gbm = newDownloadManager(b.configs.bc, currProgress, targetHeight, BlocksPerRequest, s.state.logger)
 
 	// Identify available valid streams
-	whitelistStreams, err := b.identifySyncedStreams(context.Background(), targetHeight)
+	whitelistStreams, err := b.identifySyncedStreams(context.Background(), targetHeight, []sttypes.StreamID{})
 	if err != nil {
 		b.configs.logger.Error().
 			Err(err).
@@ -155,7 +155,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 }
 
 // IdentifySyncedStreams roughly find the synced streams.
-func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight uint64) (streams []sttypes.StreamID, err error) {
+func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight uint64, excludeIDs []sttypes.StreamID) (streams []sttypes.StreamID, err error) {
 	var (
 		synced = make(map[sttypes.StreamID]uint64)
 		lock   sync.Mutex
@@ -163,15 +163,24 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 	)
 
 	numStreams := b.configs.protocol.NumStreams()
+	streamIDs := b.configs.protocol.GetStreamIDs()
 
 	// ask all streams for height
 	for i := 0; i < numStreams; i++ {
+		// skip excluded streams
+		if len(excludeIDs) > 0 {
+			for _, excludedStreamID := range excludeIDs {
+				if excludedStreamID == streamIDs[i] {
+					continue
+				}
+			}
+		}
+		stID := []sttypes.StreamID{streamIDs[i]}
 		wg.Add(1)
-
 		go func() {
 			defer wg.Done()
 
-			bn, stid, err := b.configs.protocol.GetCurrentBlockNumber(ctx)
+			bn, stid, err := b.configs.protocol.GetCurrentBlockNumber(ctx, syncProto.WithWhitelist(stID))
 			if err != nil {
 				b.configs.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
@@ -471,8 +480,6 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 	maxRetries := b.configs.protocol.NumStreams()
 	retryDelay := 5 * time.Second
 
-badBlockDownloadLoop:
-
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		if b.configs.protocol.NumStreams() == 0 {
 			b.configs.logger.Error().
@@ -481,7 +488,16 @@ badBlockDownloadLoop:
 			return ErrNotEnoughStreams
 		}
 
-		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
+		whitelistStreams, err := b.identifySyncedStreams(context.Background(), s.state.invalidBlock.Number, s.state.invalidBlock.StreamID)
+		if len(whitelistStreams) == 0 {
+			b.configs.logger.Error().
+				Uint64("bad block number", s.state.invalidBlock.Number).
+				Interface("excluded streams", s.state.invalidBlock.StreamID).
+				Msg("[STAGED_STREAM_SYNC] All available streams have failed for this bad block")
+			return ErrNotEnoughStreams
+		}
+
+		blockBytes, sigBytes, stid, err := b.configs.protocol.GetRawBlocksByNumber(ctx, batch, syncProto.WithWhitelist(whitelistStreams))
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				b.configs.logger.Warn().Msg("[STAGED_STREAM_SYNC] Re-download canceled or timed out")
@@ -494,19 +510,9 @@ badBlockDownloadLoop:
 				Interface("stream ID", stid).
 				Msg("[STAGED_STREAM_SYNC] Failed to download bad block, marking stream as failed")
 			b.configs.protocol.StreamFailed(stid, "failed to re-download bad block")
-
+			s.state.invalidBlock.addBadStream(stid)
 			time.Sleep(retryDelay)
 			continue
-		}
-
-		// Verify the block isn't from a previously failing stream
-		for _, id := range s.state.invalidBlock.StreamID {
-			if id == stid {
-				// re-download from this stream failed
-				b.configs.protocol.RemoveStream(stid, "same stream failed to redownload bad block")
-				time.Sleep(retryDelay)
-				continue badBlockDownloadLoop
-			}
 		}
 
 		// Save block details and persist the re-downloaded data
@@ -552,10 +558,6 @@ func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 		}
 	}
 	return nil
-}
-
-func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
-	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
 }
 
 func (b *StageBodies) fetchBlockHashes(ctx context.Context, tx kv.RwTx, bns []uint64) ([]common.Hash, error) {
