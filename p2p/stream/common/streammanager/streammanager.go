@@ -411,6 +411,22 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 	if !ok {
 		return ErrStreamAlreadyRemoved
 	}
+
+	if criticalErr {
+		streamCriticalErrorCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+	}
+
+	if _, trusted := sm.trustedPeers[libp2p_peer.ID(id)]; trusted {
+		sm.logger.Info().
+			Int("NumStreams", sm.streams.size()).
+			Interface("StreamID", id).
+			Bool("trusted", true).
+			Str("reason", reason).
+			Bool("criticalErr", criticalErr).
+			Msg("[StreamManager] trusted peer got critical error but not removed")
+		return nil
+	}
+
 	sm.streams.deleteStream(st)
 	sm.reservedStreams.deleteStream(st)
 
@@ -418,27 +434,21 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 		Int("NumStreams", sm.streams.size()).
 		Interface("StreamID", id).
 		Str("reason", reason).
+		Bool("criticalErr", criticalErr).
 		Msg("[StreamManager] removed stream from main streams list")
 
-	if _, trusted := sm.trustedPeers[libp2p_peer.ID(id)]; !trusted {
-		info, exist := sm.removedStreams.Get(id)
-		if !exist {
-			info = &RemovalInfo{count: 0}
-			sm.removedStreams.Set(id, info)
-		}
-		info.MarkAsRemoved(criticalErr)
-	} else {
-		go sm.setupStreamWithPeer(sm.ctx, libp2p_peer.ID(id))
+	info, exist := sm.removedStreams.Get(id)
+	if !exist {
+		info = &RemovalInfo{count: 0}
+		sm.removedStreams.Set(id, info)
 	}
+	info.MarkAsRemoved(criticalErr)
 
 	// try to replace removed streams from reserved list
 	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
 	removedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
 	streamRemovalReasonCounterVec.With(prometheus.Labels{"reason": reason, "critical": strconv.FormatBool(criticalErr)}).Inc()
-	if criticalErr {
-		streamCriticalErrorCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
-	}
 
 	sm.tryToReplaceRemovedStream()
 
