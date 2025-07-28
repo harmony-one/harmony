@@ -146,7 +146,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 	}
 
 	n := 0
-	for _, block := range blocks {
+	for bn, block := range blocks {
 		if block == nil {
 			sr.configs.logger.Debug().Msg("Skipped a nil block during epoch sync")
 			continue
@@ -154,8 +154,15 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 		_, err := s.state.bc.InsertChain([]*types.Block{block}, true)
 		switch {
 		case errors.Is(err, core.ErrKnownBlock):
+			sr.configs.logger.Info().Msg("epoch block is a known block and is not inserted")
+
 		case err != nil:
-			sr.configs.logger.Info().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
+			sr.configs.logger.Error().
+				Err(err).
+				Int("block number", bn).
+				Interface("hash", block.Hash()).
+				Int("blocks inserted", n).
+				Msg("epoch block insertion failed")
 			sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
 			numBlocksInsertedEpochSyncHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 			return n, err
