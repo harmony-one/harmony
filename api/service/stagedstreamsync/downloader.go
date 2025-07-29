@@ -311,7 +311,7 @@ func (d *Downloader) handleDownload(trigger func()) {
 				Uint64("current height", d.bc.CurrentBlock().NumberU64()).
 				Bool("initSync", d.stagedSyncInstance.initSync).
 				Uint32("shard", d.bc.ShardID()).
-				Msg(WrapStagedSyncMsg("sync finished"))
+				Msg(WrapStagedSyncMsg("long-range sync completed"))
 		}
 
 		// If new blocks were added, trigger another sync and process last-mile blocks
@@ -322,17 +322,21 @@ func (d *Downloader) handleDownload(trigger func()) {
 			}
 		}
 
+		bnAfterSync := d.bc.CurrentBlock().NumberU64()
+		distanceBeforeSync := estimatedHeight - bnBeforeSync
+		distanceAfterSync := estimatedHeight - bnAfterSync
+
 		// Transition from long-range sync to short-range sync if nearing the latest height.
 		// This prevents staying in long-range mode when only a few blocks remain.
 		if d.stagedSyncInstance.initSync && addedBN > 0 {
-			bnAfterSync := d.bc.CurrentBlock().NumberU64()
-			distanceBeforeSync := estimatedHeight - bnBeforeSync
-			distanceAfterSync := estimatedHeight - bnAfterSync
-
 			// Switch to short-range sync if both before and after sync distances are small.
 			if distanceBeforeSync <= uint64(ShortRangeThreshold) &&
 				distanceAfterSync <= uint64(ShortRangeThreshold) {
 				d.stagedSyncInstance.initSync = false
+			}
+		} else if !d.stagedSyncInstance.initSync {
+			if distanceAfterSync > uint64(ShortRangeThreshold) {
+				d.stagedSyncInstance.initSync = true
 			}
 		}
 
@@ -345,6 +349,17 @@ func (d *Downloader) handleDownload(trigger func()) {
 		// Wait for enough available streams before retrying
 		d.waitForEnoughStreams(d.config.MinStreams)
 		trigger()
+
+	case ErrInvalidEarlySync:
+		if d.NumPeers() < d.config.Concurrency {
+			// Wait for enough available streams before retrying
+			d.waitForEnoughStreams(d.config.MinStreams)
+		}
+		// Retry sync after 10 seconds
+		go func() {
+			time.Sleep(10 * time.Second)
+			trigger()
+		}()
 
 	default:
 		if d.NumPeers() < d.config.Concurrency {
