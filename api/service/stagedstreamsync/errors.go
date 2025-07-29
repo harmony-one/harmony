@@ -20,6 +20,7 @@ var (
 	ErrVerifyHeaderFail                  = WrapStagedSyncError("verify header failed")
 	ErrInsertChainFail                   = WrapStagedSyncError("insert to chain failed")
 	ErrZeroBlockResponse                 = WrapStagedSyncError("zero block number response from remote nodes")
+	ErrInvalidEarlySync                  = WrapStagedSyncError("invalid early sync")
 	ErrEmptyWhitelist                    = WrapStagedSyncError("empty white list")
 	ErrWrongGetBlockNumberType           = WrapStagedSyncError("wrong type of getBlockNumber interface")
 	ErrSaveBlocksToDbFailed              = WrapStagedSyncError("saving downloaded blocks to db failed")

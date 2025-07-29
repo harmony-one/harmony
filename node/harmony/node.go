@@ -448,8 +448,14 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink_heartbeat"}).Inc()
 			// only non beacon chain processes cross link heartbeat
 			if node.IsRunningBeaconChain() {
+				utils.Logger().Debug().
+					Str("myShard", fmt.Sprintf("%d", node.Blockchain().ShardID())).
+					Msg("[P2P] beacon chain ignoring crosslink heartbeat message")
 				return nil, 0, errInvalidShard
 			}
+			utils.Logger().Debug().
+				Str("myShard", fmt.Sprintf("%d", node.Blockchain().ShardID())).
+				Msg("[P2P] processing crosslink heartbeat message")
 		case proto_node.Epoch:
 			if node.IsRunningBeaconChain() {
 				return nil, 0, errInvalidShard
@@ -588,6 +594,10 @@ func validateShardBoundMessage(consensus *consensus.Consensus, peer libp2p_peer.
 		copy(serializedKey[:], senderKey)
 		if !consensus.IsValidatorInCommittee(serializedKey) {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_committee"}).Inc()
+			utils.Logger().Warn().
+				Str("publicKey", serializedKey.Hex()).
+				Uint32("shardID", consensus.ShardID).
+				Msg("[P2P] validator not found in committee")
 			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 		}
 	} else {

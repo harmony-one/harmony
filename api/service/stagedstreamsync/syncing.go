@@ -343,9 +343,19 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 			s.status.SetTargetBN(estimatedHeight)
 		}
 		if curBN := s.CurrentBlockNumber(); estimatedHeight <= curBN {
-			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
-				Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
-			return estimatedHeight, 0, nil
+			// Don't exit early if both current and target are 0, as this indicates
+			// we haven't successfully synced yet
+			if curBN == 0 && estimatedHeight == 0 {
+				s.logger.Warn().
+					Uint64("current number", curBN).
+					Uint64("target number", estimatedHeight).
+					Msg(WrapStagedSyncMsg("both current and target heights are 0, continuing sync to discover peers"))
+				return 0, 0, ErrInvalidEarlySync
+			} else {
+				s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
+					Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
+				return estimatedHeight, 0, nil
+			}
 		} else if curBN < estimatedHeight && s.consensus != nil {
 			s.consensus.BlocksNotSynchronized("StagedStreamSync.doSync")
 		}
@@ -549,6 +559,11 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 	errChan := make(chan error, s.config.Concurrency)
 
 	numStreams := s.protocol.NumStreams()
+	if numStreams == 0 {
+		s.logger.Warn().Msg(WrapStagedSyncMsg("no streams available for estimating current number"))
+		return 0, ErrNotEnoughStreams
+	}
+
 	wg.Add(numStreams)
 
 	// ask all streams for height
@@ -589,11 +604,41 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 
 	// If no valid block number results were received, return an error
 	if len(cnResults) == 0 {
+		s.logger.Error().
+			Int("numStreams", numStreams).
+			Msg(WrapStagedSyncMsg("no valid responses received from any streams"))
 		return 0, ErrZeroBlockResponse
+	}
+
+	// Log the results for debugging
+	s.logger.Debug().
+		Int("numResponses", len(cnResults)).
+		Int("numStreams", numStreams).
+		Interface("results", cnResults).
+		Msg(WrapStagedSyncMsg("received block number responses"))
+
+	// Check if all responses are 0 (which might indicate a problem)
+	allZero := true
+	for _, bn := range cnResults {
+		if bn > 0 {
+			allZero = false
+			break
+		}
+	}
+
+	if allZero && len(cnResults) > 0 {
+		s.logger.Warn().
+			Int("numResponses", len(cnResults)).
+			Msg(WrapStagedSyncMsg("all streams returned block number 0, this might indicate a sync issue"))
 	}
 
 	// Compute block number by majority vote
 	bn := computeBlockNumberByMaxVote(cnResults)
+	s.logger.Info().
+		Uint64("estimatedBlockNumber", bn).
+		Int("numResponses", len(cnResults)).
+		Msg(WrapStagedSyncMsg("estimated current block number"))
+
 	return bn, nil
 }
 
