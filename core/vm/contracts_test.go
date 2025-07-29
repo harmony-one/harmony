@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
-	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -167,16 +166,10 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing.T) {
 	p := PrecompiledContractsEIP2537[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.Input)
-	gas, err := p.RequiredGas(nil, nil, in)
-	if err != nil {
-		t.Error(err)
-	}
-	contract := NewContract(AccountRef(common.HexToAddress("31337")),
-		nil, new(big.Int), gas)
-
+	gas, _ := p.RequiredGas(nil, nil, in)
 	t.Run(test.Name, func(t *testing.T) {
-		_, _, err := RunPrecompiledContract(p, nil, contract, in, gas, false)
-		if !reflect.DeepEqual(err, test.ExpectedError) {
+		_, _, err := RunPrecompiledContract(p, nil, nil, in, gas, false)
+		if err.Error() != test.ExpectedError {
 			t.Errorf("Expected error [%v], got [%v]", test.ExpectedError, err)
 		}
 		// Verify that the precompile did not touch the input buffer
