@@ -777,7 +777,7 @@ func (c *epoch) RunWriteCapable(_ *EVM, _ *Contract, input []byte) ([]byte, erro
 }
 
 func (c *epoch) IsWrite() bool {
-	return true
+	return false
 }
 
 // implements WriteCapablePrecompiledContract because if it is wrapped by wrapper it will hide ModifyInput method usage.
@@ -814,7 +814,7 @@ func (c *vrf) RunWriteCapable(_ *EVM, _ *Contract, input []byte) ([]byte, error)
 
 // IsWrite returns true if the pre-compiled contract is write capable.
 func (c *vrf) IsWrite() bool {
-	return true
+	return false
 }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
