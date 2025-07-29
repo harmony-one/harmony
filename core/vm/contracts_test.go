@@ -148,10 +148,11 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	gas := requiredGas - 1
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
-		nil, new(big.Int), requiredGas-1)
+		nil, new(big.Int), gas)
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.Name, contract.Gas), func(t *testing.T) {
-		_, _, err := RunPrecompiledContract(p, nil, contract, in, requiredGas, false)
+		_, _, err := RunPrecompiledContract(p, nil, contract, in, gas, false)
 		if err.Error() != "out of gas" {
 			t.Errorf("Expected error [out of gas], got [%v]", err)
 		}
