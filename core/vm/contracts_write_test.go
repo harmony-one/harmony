@@ -481,7 +481,7 @@ var bls12381TestCases = []struct {
 		input:             []BlsType{BLS_VALID_G1, BLS_SCALAR_ONE},
 		expectOutput:      BLS_OUTPUT_IS_FIRST_INPUT,
 		expectFixedOutput: nil,
-		expectedGas:       params.Bls12381G1MulGas * params.Bls12381MultiExpDiscountTable[0] / 1000,
+		expectedGas:       params.Bls12381G1MulGas * params.Bls12381G1MultiExpDiscountTable[0] / 1000,
 	},
 	{
 		name:              "G1MultiExp invalid point",
