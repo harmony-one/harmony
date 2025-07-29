@@ -21,3 +21,6 @@ func TestCrossShardXferPrecompile_IsWrite(t *testing.T) {
 func TestStakingPrecompile_IsWrite(t *testing.T) {
 	require.True(t, (&stakingPrecompile{}).IsWrite(), "stakingPrecompile should be a write operation")
 }
+
+var _ ModifyInput = (*epoch)(nil)
+var _ ModifyInput = (*vrf)(nil)
