@@ -322,21 +322,23 @@ func (d *Downloader) handleDownload(trigger func()) {
 			}
 		}
 
-		bnAfterSync := d.bc.CurrentBlock().NumberU64()
-		distanceBeforeSync := estimatedHeight - bnBeforeSync
-		distanceAfterSync := estimatedHeight - bnAfterSync
+		if !d.stagedSyncInstance.isEpochChain {
+			bnAfterSync := d.bc.CurrentBlock().NumberU64()
+			distanceBeforeSync := estimatedHeight - bnBeforeSync
+			distanceAfterSync := estimatedHeight - bnAfterSync
 
-		// Transition from long-range sync to short-range sync if nearing the latest height.
-		// This prevents staying in long-range mode when only a few blocks remain.
-		if d.stagedSyncInstance.initSync && addedBN > 0 {
-			// Switch to short-range sync if both before and after sync distances are small.
-			if distanceBeforeSync <= uint64(ShortRangeThreshold) &&
-				distanceAfterSync <= uint64(ShortRangeThreshold) {
-				d.stagedSyncInstance.initSync = false
-			}
-		} else if !d.stagedSyncInstance.initSync {
-			if distanceAfterSync > uint64(ShortRangeThreshold) {
-				d.stagedSyncInstance.initSync = true
+			// Transition from long-range sync to short-range sync if nearing the latest height.
+			// This prevents staying in long-range mode when only a few blocks remain.
+			if d.stagedSyncInstance.initSync && addedBN > 0 {
+				// Switch to short-range sync if both before and after sync distances are small.
+				if distanceBeforeSync <= uint64(ShortRangeThreshold) &&
+					distanceAfterSync <= uint64(ShortRangeThreshold) {
+					d.stagedSyncInstance.initSync = false
+				}
+			} else if !d.stagedSyncInstance.initSync {
+				if distanceAfterSync > uint64(ShortRangeThreshold) {
+					d.stagedSyncInstance.initSync = true
+				}
 			}
 		}
 
