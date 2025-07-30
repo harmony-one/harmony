@@ -28,7 +28,7 @@ fi
 if ! docker image inspect "$DOCKER_IMAGE" > /dev/null 2>&1; then
     echo "Building Docker image '$DOCKER_IMAGE'..."
     pushd "$PROJECT_ROOT/scripts/macos_docker"
-    docker build -t "$DOCKER_IMAGE" -f Dockerfile .
+    docker build --platform linux/amd64 -t "$DOCKER_IMAGE" -f Dockerfile .
     popd
 else
     echo "Docker image '$DOCKER_IMAGE' already exists. Skipping build."
@@ -36,7 +36,7 @@ fi
 
 # Run the container in the background
 echo "Running Docker container..."
-CONTAINER_ID=$(docker run -d "$DOCKER_IMAGE" tail -f /dev/null)
+CONTAINER_ID=$(docker run --platform linux/amd64 -d "$DOCKER_IMAGE" tail -f /dev/null)
 trap 'docker stop "$CONTAINER_ID" > /dev/null; docker rm "$CONTAINER_ID" > /dev/null' EXIT  # Ensure cleanup on exit
 
 # Copy project files into the container
