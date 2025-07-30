@@ -1,29 +1,29 @@
-# Shard 0 extra explorer nodes (ports 9301-9310)
+# Shard 0 extra explorer nodes (ports 4301-4310)
 # These ports calculate to:
-# 9301 -> RPC: 9801, Rosetta: 10001, WS: 10101, Prometheus: 10201
-# 9302 -> RPC: 9802, Rosetta: 10002, WS: 10102, Prometheus: 10202
-127.0.0.1 9301 explorer null 0
-127.0.0.1 9302 explorer null 0
-127.0.0.1 9303 explorer null 0
-127.0.0.1 9304 explorer null 0
-127.0.0.1 9305 explorer null 0
-127.0.0.1 9306 explorer null 0
-127.0.0.1 9307 explorer null 0
-127.0.0.1 9308 explorer null 0
-127.0.0.1 9309 explorer null 0
-127.0.0.1 9310 explorer null 0
+# 4301 -> RPC: 4801, Rosetta: 5001, WS: 5101, Prometheus: 5201
+# 4302 -> RPC: 4802, Rosetta: 5002, WS: 5102, Prometheus: 5202
+127.0.0.1 4301 explorer null 0
+127.0.0.1 4302 explorer null 0
+127.0.0.1 4303 explorer null 0
+127.0.0.1 4304 explorer null 0
+127.0.0.1 4305 explorer null 0
+127.0.0.1 4306 explorer null 0
+127.0.0.1 4307 explorer null 0
+127.0.0.1 4308 explorer null 0
+127.0.0.1 4309 explorer null 0
+127.0.0.1 4310 explorer null 0
 
-# Shard 1 extra explorer nodes (ports 9401-9410)
+# Shard 1 extra explorer nodes (ports 4401-4410)
 # These ports calculate to:
-# 9401 -> RPC: 9901, Rosetta: 10101, WS: 10201, Prometheus: 10301
-# 9402 -> RPC: 9902, Rosetta: 10102, WS: 10202, Prometheus: 10302
-127.0.0.1 9401 explorer null 1
-127.0.0.1 9402 explorer null 1
-127.0.0.1 9403 explorer null 1
-127.0.0.1 9404 explorer null 1
-127.0.0.1 9405 explorer null 1
-127.0.0.1 9406 explorer null 1
-127.0.0.1 9407 explorer null 1
-127.0.0.1 9408 explorer null 1
-127.0.0.1 9409 explorer null 1
-127.0.0.1 9410 explorer null 1
+# 4401 -> RPC: 4901, Rosetta: 5101, WS: 5201, Prometheus: 5301
+# 4402 -> RPC: 4902, Rosetta: 5102, WS: 5202, Prometheus: 5302
+127.0.0.1 4401 explorer null 1
+127.0.0.1 4402 explorer null 1
+127.0.0.1 4403 explorer null 1
+127.0.0.1 4404 explorer null 1
+127.0.0.1 4405 explorer null 1
+127.0.0.1 4406 explorer null 1
+127.0.0.1 4407 explorer null 1
+127.0.0.1 4408 explorer null 1
+127.0.0.1 4409 explorer null 1
+127.0.0.1 4410 explorer null 1
