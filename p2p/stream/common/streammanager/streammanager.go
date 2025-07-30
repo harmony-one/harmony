@@ -526,6 +526,10 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 					Msg("failed to setup stream with trusted peer")
 				return
 			}
+
+			sm.logger.Info().
+				Interface("peerID", pid).
+				Msg("new stream set up with trusted peer")
 		}(pid)
 	}
 
@@ -541,6 +545,10 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 
 	for peer := range peers {
 		if peer.ID == sm.host.ID() {
+			continue
+		}
+		if _, ok := sm.trustedPeers[peer.ID]; ok {
+			sm.logger.Info().Interface("peer", peer).Msg("skipping trusted peer")
 			continue
 		}
 		if sm.coolDownCache.Has(peer.ID) {
@@ -563,6 +571,9 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 					Msg("failed to setup stream with peer")
 				return
 			}
+			sm.logger.Info().
+				Interface("peerID", pid).
+				Msg("new stream set up with peer")
 		}(peer.ID)
 	}
 
