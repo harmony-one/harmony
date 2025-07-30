@@ -127,7 +127,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	s.state.gbm = newDownloadManager(b.configs.bc, currProgress, targetHeight, BlocksPerRequest, s.state.logger)
 
 	// Identify available valid streams
-	whitelistStreams, err := b.identifySyncedStreams(context.Background(), targetHeight)
+	whitelistStreams, err := b.identifySyncedStreams(context.Background(), targetHeight, []sttypes.StreamID{})
 	if err != nil {
 		b.configs.logger.Error().
 			Err(err).
@@ -155,7 +155,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 }
 
 // IdentifySyncedStreams roughly find the synced streams.
-func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight uint64) (streams []sttypes.StreamID, err error) {
+func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight uint64, excludeIDs []sttypes.StreamID) (streams []sttypes.StreamID, err error) {
 	var (
 		synced = make(map[sttypes.StreamID]uint64)
 		lock   sync.Mutex
@@ -163,15 +163,24 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 	)
 
 	numStreams := b.configs.protocol.NumStreams()
+	streamIDs := b.configs.protocol.GetStreamIDs()
 
 	// ask all streams for height
 	for i := 0; i < numStreams; i++ {
+		// skip excluded streams
+		if len(excludeIDs) > 0 {
+			for _, excludedStreamID := range excludeIDs {
+				if excludedStreamID == streamIDs[i] {
+					continue
+				}
+			}
+		}
+		stID := []sttypes.StreamID{streamIDs[i]}
 		wg.Add(1)
-
 		go func() {
 			defer wg.Done()
 
-			bn, stid, err := b.configs.protocol.GetCurrentBlockNumber(ctx)
+			bn, stid, err := b.configs.protocol.GetCurrentBlockNumber(ctx, syncProto.WithWhitelist(stID))
 			if err != nil {
 				b.configs.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
@@ -366,7 +375,9 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 	}
 
 	if err != nil {
-		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		// could be Protocol/decoding, Empty request, Remote error response, Exceeds cap, Length mismatch
+		// check if the error is due to context cancelation or deadline exceeded. if not, mark the stream as failed
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) && stid != "" {
 			b.configs.protocol.StreamFailed(stid, "downloadRawBlocks failed")
 		}
 		// try with other streams
@@ -384,7 +395,7 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 		err = errors.Wrap(err, "request error")
 		gbm.HandleRequestError(bns, err, stid)
 		return err
-	} else if blockBytes == nil {
+	} else if blockBytes == nil { // Protocol/decoding, Empty request, Remote error response, Exceeds cap, Length mismatch
 		utils.Logger().Warn().
 			Str("stream", string(stid)).
 			Interface("block numbers", bns).
@@ -393,7 +404,7 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 		gbm.HandleRequestError(bns, err, stid)
 		b.configs.protocol.StreamFailed(stid, "downloadRawBlocks received nil blockBytes")
 		return err
-	} else if len(blockBytes) == 0 {
+	} else if len(blockBytes) == 0 { // All blocks missing
 		utils.Logger().Warn().
 			Str("stream", string(stid)).
 			Interface("block numbers", bns).
@@ -402,7 +413,7 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 		gbm.HandleRequestError(bns, err, stid)
 		b.configs.protocol.RemoveStream(stid, "downloadRawBlocks received empty blockBytes")
 		return err
-	} else if len(blockBytes) != len(bns) {
+	} else if len(blockBytes) != len(bns) { // in this case, the blockBytes would be nil, So technically it should not happen
 		utils.Logger().Warn().
 			Str("stream", string(stid)).
 			Interface("block numbers", bns).
@@ -412,27 +423,40 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 		b.configs.protocol.RemoveStream(stid, "downloadRawBlocks received unexpected blockBytes")
 		return err
 	} else {
-		validBlocks := true
-		for _, bb := range blockBytes {
-			if len(bb) <= 1 {
-				validBlocks = false
-				break
-			}
+		// save valid blockBytes to db
+		invalidBlocks, failedToSaveBlocks, savedBlocks, err := b.saveBlocks(ctx, nil, bns, blockBytes, sigBytes, workerID, stid)
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Str("stream", string(stid)).
+				Interface("block numbers", bns).
+				Msg(WrapStagedSyncMsg("saveBlocks failed"))
+			panic(ErrSaveBlocksToDbFailed)
 		}
-		if !validBlocks {
+		if len(invalidBlocks) > 0 {
 			utils.Logger().Warn().
 				Str("stream", string(stid)).
 				Interface("block numbers", bns).
-				Msg(WrapStagedSyncMsg("downloadRawBlocks failed, some block Bytes are not valid"))
-			err := errors.New("downloadRawBlocks received blockBytes are not valid")
-			gbm.HandleRequestError(bns, err, stid)
-			b.configs.protocol.RemoveStream(stid, "downloadRawBlocks received blockBytes are not valid")
-			return err
+				Interface("invalid blocks", invalidBlocks).
+				Msg(WrapStagedSyncMsg("saveBlocks failed, there are some blocks that are not valid"))
+			if len(failedToSaveBlocks) == len(bns) { // all blocks are invalid
+				b.configs.protocol.RemoveStream(stid, "downloadRawBlocks received blockBytes are not valid")
+			} else { // some blocks are invalid
+				b.configs.protocol.StreamFailed(stid, "downloadRawBlocks received blockBytes are not valid")
+			}
+			gbm.HandleRequestError(invalidBlocks, err, stid)
 		}
-		if err = b.saveBlocks(ctx, nil, bns, blockBytes, sigBytes, workerID, stid); err != nil {
-			panic(ErrSaveBlocksToDbFailed)
+		if len(failedToSaveBlocks) > 0 {
+			utils.Logger().Warn().
+				Str("stream", string(stid)).
+				Interface("block numbers", bns).
+				Interface("failed to save blocks", failedToSaveBlocks).
+				Msg(WrapStagedSyncMsg("saveBlocks failed, it should be db issue"))
+			gbm.HandleRequestError(failedToSaveBlocks, err, sttypes.StreamID(""))
 		}
-		gbm.HandleRequestResult(bns, blockBytes, sigBytes, workerID, stid)
+		if len(savedBlocks) > 0 {
+			gbm.HandleRequestResult(savedBlocks, blockBytes, sigBytes, workerID, stid)
+		}
 		return nil
 	}
 }
@@ -471,8 +495,6 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 	maxRetries := b.configs.protocol.NumStreams()
 	retryDelay := 5 * time.Second
 
-badBlockDownloadLoop:
-
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		if b.configs.protocol.NumStreams() == 0 {
 			b.configs.logger.Error().
@@ -481,7 +503,16 @@ badBlockDownloadLoop:
 			return ErrNotEnoughStreams
 		}
 
-		blockBytes, sigBytes, stid, err := b.downloadRawBlocks(ctx, batch)
+		whitelistStreams, err := b.identifySyncedStreams(context.Background(), s.state.invalidBlock.Number, s.state.invalidBlock.StreamID)
+		if len(whitelistStreams) == 0 {
+			b.configs.logger.Error().
+				Uint64("bad block number", s.state.invalidBlock.Number).
+				Interface("excluded streams", s.state.invalidBlock.StreamID).
+				Msg("[STAGED_STREAM_SYNC] All available streams have failed for this bad block")
+			return ErrNotEnoughStreams
+		}
+
+		blockBytes, sigBytes, stid, err := b.configs.protocol.GetRawBlocksByNumber(ctx, batch, syncProto.WithWhitelist(whitelistStreams))
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				b.configs.logger.Warn().Msg("[STAGED_STREAM_SYNC] Re-download canceled or timed out")
@@ -490,28 +521,32 @@ badBlockDownloadLoop:
 			}
 
 			b.configs.logger.Error().
+				Err(err).
 				Uint64("bad block number", s.state.invalidBlock.Number).
 				Interface("stream ID", stid).
 				Msg("[STAGED_STREAM_SYNC] Failed to download bad block, marking stream as failed")
 			b.configs.protocol.StreamFailed(stid, "failed to re-download bad block")
-
+			s.state.invalidBlock.addBadStream(stid)
 			time.Sleep(retryDelay)
 			continue
 		}
 
-		// Verify the block isn't from a previously failing stream
-		for _, id := range s.state.invalidBlock.StreamID {
-			if id == stid {
-				// re-download from this stream failed
-				b.configs.protocol.RemoveStream(stid, "same stream failed to redownload bad block")
-				time.Sleep(retryDelay)
-				continue badBlockDownloadLoop
-			}
+		if len(blockBytes) <= 1 {
+			b.configs.logger.Error().
+				Err(errors.New("invalid block bytes")).
+				Uint64("bad block number", s.state.invalidBlock.Number).
+				Interface("stream ID", stid).
+				Msg("[STAGED_STREAM_SYNC] Bad block's blockBytes is invalid, marking stream as failed")
+			b.configs.protocol.StreamFailed(stid, "failed to re-download bad block")
+			s.state.invalidBlock.addBadStream(stid)
+			time.Sleep(retryDelay)
+			continue
 		}
 
 		// Save block details and persist the re-downloaded data
 		s.state.gbm.SetDownloadDetails(batch, 0, stid)
-		if err = b.saveBlocks(ctx, nil, batch, blockBytes, sigBytes, 0, stid); err != nil {
+		_, _, savedBlocks, err := b.saveBlocks(ctx, nil, batch, blockBytes, sigBytes, 0, stid)
+		if err != nil || len(savedBlocks) != len(batch) {
 			b.configs.logger.Error().
 				Err(err).
 				Uint64("bad block number", s.state.invalidBlock.Number).
@@ -552,10 +587,6 @@ func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 		}
 	}
 	return nil
-}
-
-func (b *StageBodies) downloadRawBlocks(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
-	return b.configs.protocol.GetRawBlocksByNumber(ctx, bns)
 }
 
 func (b *StageBodies) fetchBlockHashes(ctx context.Context, tx kv.RwTx, bns []uint64) ([]common.Hash, error) {
@@ -629,21 +660,27 @@ func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx,
 }
 
 // saveBlocks saves the blocks into db
-func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, workerID int, stid sttypes.StreamID) error {
+func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, blockBytes [][]byte, sigBytes [][]byte, workerID int, stid sttypes.StreamID) ([]uint64, []uint64, []uint64, error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
 		tx, err = b.configs.blockDBs[workerID].BeginRw(ctx)
 		if err != nil {
-			return err
+			return nil, nil, nil, err
 		}
 		defer tx.Rollback()
 	}
+
+	var invalidBlocks []uint64
+	var failedToSaveBlocks []uint64
+	var savedBlocks []uint64
+
 	// The blocks array is sorted by block number
 	for i := uint64(0); i < uint64(len(blockBytes)); i++ {
 		block := blockBytes[i]
 		sig := sigBytes[i]
-		if block == nil {
+		if block == nil || len(block) <= 1 || sig == nil || len(sig) <= 1 {
+			invalidBlocks = append(invalidBlocks, bns[i])
 			continue
 		}
 
@@ -654,7 +691,8 @@ func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, 
 				Err(err).
 				Uint64("block height", bns[i]).
 				Msg("[STAGED_STREAM_SYNC] adding block to db failed")
-			return err
+			failedToSaveBlocks = append(failedToSaveBlocks, bns[i])
+			continue
 		}
 		// sigKey := []byte("s" + string(bns[i]))
 		if err := tx.Put(BlockSignaturesBucket, blkKey, sig); err != nil {
@@ -662,17 +700,20 @@ func (b *StageBodies) saveBlocks(ctx context.Context, tx kv.RwTx, bns []uint64, 
 				Err(err).
 				Uint64("block height", bns[i]).
 				Msg("[STAGED_STREAM_SYNC] adding block sig to db failed")
-			return err
+			failedToSaveBlocks = append(failedToSaveBlocks, bns[i])
+			continue
 		}
+
+		savedBlocks = append(savedBlocks, bns[i])
 	}
 
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
-			return err
+			return nil, nil, nil, err
 		}
 	}
 
-	return nil
+	return invalidBlocks, failedToSaveBlocks, savedBlocks, nil
 }
 
 func (b *StageBodies) saveProgress(ctx context.Context, s *StageState, progress uint64, tx kv.RwTx) (err error) {

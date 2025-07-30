@@ -85,7 +85,7 @@ func (m *getBlocksByHashManager) handleResultError(hashes []common.Hash, stid st
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.removeStreamID(stid)
+	m.removeStreamFromWhitelist(stid)
 
 	for _, hash := range hashes {
 		delete(m.pendings, hash)
@@ -115,7 +115,7 @@ func (m *getBlocksByHashManager) isDone() bool {
 	return len(m.results) == len(m.hashes)
 }
 
-func (m *getBlocksByHashManager) removeStreamID(target sttypes.StreamID) {
+func (m *getBlocksByHashManager) removeStreamFromWhitelist(target sttypes.StreamID) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 

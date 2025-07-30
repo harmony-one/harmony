@@ -431,6 +431,16 @@ func (p *Protocol) NumStreams() int {
 	return res
 }
 
+// GetStreamIDs returns the stream IDs of the streams with minimum version.
+func (p *Protocol) GetStreamIDs() []sttypes.StreamID {
+	ids := make([]sttypes.StreamID, 0, p.NumStreams())
+	sts := p.sm.GetStreams()
+	for _, st := range sts {
+		ids = append(ids, st.ID())
+	}
+	return ids
+}
+
 // GetStreamManager get the underlying stream manager for upper level stream operations
 func (p *Protocol) GetStreamManager() streammanager.StreamManager {
 	return p.sm

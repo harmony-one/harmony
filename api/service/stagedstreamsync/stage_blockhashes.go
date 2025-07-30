@@ -232,14 +232,33 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 
 				// Download block hashes
 				hashes, stid, err := bh.downloadBlockHashes(ctx, batch)
+
+				// could be Protocol/decoding error
 				if err != nil {
+					bh.configs.logger.Warn().
+						Err(err).
+						Interface("stid", stid).
+						Msgf("[STAGED_STREAM_SYNC] downloadBlockHashes failed")
+					if stid != "" {
+						bh.configs.protocol.StreamFailed(stid, "downloadBlockHashes failed")
+					}
+					return
+				}
+
+				// No error but nil response could be Protocol/decoding error
+				if hashes == nil {
+					bh.configs.protocol.StreamFailed(stid, "nil block hashes")
 					return
 				}
 
 				// Check if any hash is zero
-				if bh.containsZeroHash(hashes) {
-					bh.configs.protocol.RemoveStream(stid, "stream response contains zero hashes") // Remove immediately
+				allZero, containsZero := bh.containsZeroHash(hashes)
+				if allZero {
+					bh.configs.protocol.RemoveStream(stid, "stream response contains all zero hashes") // Remove immediately
 					return
+				} else if containsZero {
+					bh.configs.logger.Warn().
+						Msgf("[STAGED_STREAM_SYNC] stream response contains zero hashes")
 				}
 
 				// Store valid hashes
@@ -264,6 +283,14 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 			panic(ErrFinalBlockHashesCalculationFailed)
 		}
 		peerHashes.Clear()
+
+		// check if the final hashes contain zero hashes and if any block number is missing
+		if validHashes, err := bh.checkFinalHashes(batch, finalBlockHashes); !validHashes {
+			hdm.HandleRequestError(batch, errors.New("invalid final hashes"), sttypes.StreamID(""))
+			bh.configs.logger.Warn().
+				Err(err).
+				Msgf("[STAGED_STREAM_SYNC] final hashes are invalid")
+		}
 
 		// save block hashes in db
 		if err := bh.saveBlockHashes(ctx, tx, finalBlockHashes); err != nil {
@@ -307,16 +334,34 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 	return nil
 }
 
-func (bh *StageBlockHashes) containsZeroHash(hashes []common.Hash) bool {
+// containsZeroHash checks if the hashes contain zero hashes and if all hashes are zero
+func (bh *StageBlockHashes) containsZeroHash(hashes []common.Hash) (bool, bool) {
+	containsZero := false
+	allZero := true
 	for _, h := range hashes {
 		if h == (common.Hash{}) { // Check if hash is all zeros
-			return true
+			containsZero = true
+		} else {
+			allZero = false
 		}
 	}
-	return false
+	return allZero, containsZero
+}
+
+// checkFinalHashes checks if the final hashes contain zero hashes and if any block number is missing
+func (bh *StageBlockHashes) checkFinalHashes(batch []uint64, hashes map[uint64]common.Hash) (bool, error) {
+	for _, bn := range batch {
+		if h, ok := hashes[bn]; !ok {
+			return false, errors.New("final hashes are missing")
+		} else if h == (common.Hash{}) {
+			return false, errors.New("final hashes contain zero hashes")
+		}
+	}
+	return true, nil
 }
 
 // calculateFinalBlockHashes Calculates the most frequent block hashes for a given batch and removes streams with invalid hashes.
+// note: final hashes could be zero hashes
 func (bh *StageBlockHashes) calculateFinalBlockHashes(
 	peerHashes *sttypes.SafeMap[sttypes.StreamID, []common.Hash],
 	batch []uint64,

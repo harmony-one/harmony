@@ -63,9 +63,7 @@ func (sh *srHelper) getBlocksChain(ctx context.Context, bns []uint64) ([]*types.
 	return sh.doGetBlocksByNumbersRequest(ctx, bns)
 }
 
-func (sh *srHelper) getBlocksByHashes(ctx context.Context, hashes []common.Hash, whitelist []sttypes.StreamID) ([]*types.Block, []sttypes.StreamID, error) {
-
-	m := newGetBlocksByHashManager(hashes, whitelist)
+func (sh *srHelper) getBlocksByHashes(ctx context.Context, m *getBlocksByHashManager) ([]*types.Block, []sttypes.StreamID, error) {
 
 	var (
 		wg      sync.WaitGroup
@@ -203,22 +201,8 @@ func (sh *srHelper) doGetBlocksByHashesRequest(ctx context.Context, hashes []com
 	return blocks, stid, nil
 }
 
-func (sh *srHelper) removeStreams(sts []sttypes.StreamID, reason string) {
-	for _, st := range sts {
-		sh.syncProtocol.RemoveStream(st, reason)
-	}
-}
-
 func (sh *srHelper) streamsFailed(sts []sttypes.StreamID, reason string) {
 	for _, st := range sts {
 		sh.syncProtocol.StreamFailed(st, reason)
 	}
-}
-
-// blameAllStreams only not to blame all whitelisted streams when the it's not the last block signature verification failed.
-func (sh *srHelper) blameAllStreams(blocks types.Blocks, errIndex int, err error) bool {
-	if errors.As(err, &emptySigVerifyErr) && errIndex == len(blocks)-1 {
-		return false
-	}
-	return true
 }
