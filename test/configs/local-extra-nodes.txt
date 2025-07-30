@@ -2,8 +2,6 @@
 # These ports calculate to:
 # 9301 -> RPC: 9801, Rosetta: 10001, WS: 10101, Prometheus: 10201
 # 9302 -> RPC: 9802, Rosetta: 10002, WS: 10102, Prometheus: 10202
-# etc.
-# This avoids conflicts with existing shard 0 nodes (9000, 9004, 9008, 9120)
 127.0.0.1 9301 explorer null 0
 127.0.0.1 9302 explorer null 0
 127.0.0.1 9303 explorer null 0
@@ -19,8 +17,6 @@
 # These ports calculate to:
 # 9401 -> RPC: 9901, Rosetta: 10101, WS: 10201, Prometheus: 10301
 # 9402 -> RPC: 9902, Rosetta: 10102, WS: 10202, Prometheus: 10302
-# etc.
-# This avoids conflicts with existing shard 1 nodes (9002, 9006, 9010, 9122)
 127.0.0.1 9401 explorer null 1
 127.0.0.1 9402 explorer null 1
 127.0.0.1 9403 explorer null 1
