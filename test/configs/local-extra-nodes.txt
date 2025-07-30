@@ -1,21 +1,33 @@
-127.0.0.1 9021 explorer null 0
-127.0.0.1 9022 explorer null 0
-127.0.0.1 9023 explorer null 0
-127.0.0.1 9024 explorer null 0
-127.0.0.1 9025 explorer null 0
-127.0.0.1 9026 explorer null 0
-127.0.0.1 9027 explorer null 0
-127.0.0.1 9028 explorer null 0
-127.0.0.1 9029 explorer null 0
-127.0.0.1 9030 explorer null 0
+# Shard 0 extra explorer nodes (ports 9301-9310)
+# These ports calculate to:
+# 9301 -> RPC: 9801, Rosetta: 10001, WS: 10101, Prometheus: 10201
+# 9302 -> RPC: 9802, Rosetta: 10002, WS: 10102, Prometheus: 10202
+# etc.
+# This avoids conflicts with existing shard 0 nodes (9000, 9004, 9008, 9120)
+127.0.0.1 9301 explorer null 0
+127.0.0.1 9302 explorer null 0
+127.0.0.1 9303 explorer null 0
+127.0.0.1 9304 explorer null 0
+127.0.0.1 9305 explorer null 0
+127.0.0.1 9306 explorer null 0
+127.0.0.1 9307 explorer null 0
+127.0.0.1 9308 explorer null 0
+127.0.0.1 9309 explorer null 0
+127.0.0.1 9310 explorer null 0
 
-127.0.0.1 9101 explorer null 1
-127.0.0.1 9102 explorer null 1
-127.0.0.1 9103 explorer null 1
-127.0.0.1 9104 explorer null 1
-127.0.0.1 9105 explorer null 1
-127.0.0.1 9106 explorer null 1
-127.0.0.1 9107 explorer null 1
-127.0.0.1 9108 explorer null 1
-127.0.0.1 9109 explorer null 1
-127.0.0.1 9110 explorer null 1
+# Shard 1 extra explorer nodes (ports 9401-9410)
+# These ports calculate to:
+# 9401 -> RPC: 9901, Rosetta: 10101, WS: 10201, Prometheus: 10301
+# 9402 -> RPC: 9902, Rosetta: 10102, WS: 10202, Prometheus: 10302
+# etc.
+# This avoids conflicts with existing shard 1 nodes (9002, 9006, 9010, 9122)
+127.0.0.1 9401 explorer null 1
+127.0.0.1 9402 explorer null 1
+127.0.0.1 9403 explorer null 1
+127.0.0.1 9404 explorer null 1
+127.0.0.1 9405 explorer null 1
+127.0.0.1 9406 explorer null 1
+127.0.0.1 9407 explorer null 1
+127.0.0.1 9408 explorer null 1
+127.0.0.1 9409 explorer null 1
+127.0.0.1 9410 explorer null 1
