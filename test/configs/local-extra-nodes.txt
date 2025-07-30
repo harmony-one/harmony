@@ -1,21 +1,29 @@
-127.0.0.1 9021 explorer null 0
-127.0.0.1 9022 explorer null 0
-127.0.0.1 9023 explorer null 0
-127.0.0.1 9024 explorer null 0
-127.0.0.1 9025 explorer null 0
-127.0.0.1 9026 explorer null 0
-127.0.0.1 9027 explorer null 0
-127.0.0.1 9028 explorer null 0
-127.0.0.1 9029 explorer null 0
-127.0.0.1 9030 explorer null 0
+# Shard 0 extra explorer nodes (ports 4301-4310)
+# These ports calculate to:
+# 4301 -> RPC: 4801, Rosetta: 5001, WS: 5101, Prometheus: 5201
+# 4302 -> RPC: 4802, Rosetta: 5002, WS: 5102, Prometheus: 5202
+127.0.0.1 4301 explorer null 0
+127.0.0.1 4302 explorer null 0
+127.0.0.1 4303 explorer null 0
+127.0.0.1 4304 explorer null 0
+127.0.0.1 4305 explorer null 0
+127.0.0.1 4306 explorer null 0
+127.0.0.1 4307 explorer null 0
+127.0.0.1 4308 explorer null 0
+127.0.0.1 4309 explorer null 0
+127.0.0.1 4310 explorer null 0
 
-127.0.0.1 9101 explorer null 1
-127.0.0.1 9102 explorer null 1
-127.0.0.1 9103 explorer null 1
-127.0.0.1 9104 explorer null 1
-127.0.0.1 9105 explorer null 1
-127.0.0.1 9106 explorer null 1
-127.0.0.1 9107 explorer null 1
-127.0.0.1 9108 explorer null 1
-127.0.0.1 9109 explorer null 1
-127.0.0.1 9110 explorer null 1
+# Shard 1 extra explorer nodes (ports 4401-4410)
+# These ports calculate to:
+# 4401 -> RPC: 4901, Rosetta: 5101, WS: 5201, Prometheus: 5301
+# 4402 -> RPC: 4902, Rosetta: 5102, WS: 5202, Prometheus: 5302
+127.0.0.1 4401 explorer null 1
+127.0.0.1 4402 explorer null 1
+127.0.0.1 4403 explorer null 1
+127.0.0.1 4404 explorer null 1
+127.0.0.1 4405 explorer null 1
+127.0.0.1 4406 explorer null 1
+127.0.0.1 4407 explorer null 1
+127.0.0.1 4408 explorer null 1
+127.0.0.1 4409 explorer null 1
+127.0.0.1 4410 explorer null 1
