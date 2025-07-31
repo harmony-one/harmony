@@ -474,23 +474,6 @@ var bls12381TestCases = []struct {
 		expectFixedOutput: nil,
 		expectedGas:       params.Bls12381G1AddGas,
 	},
-	// G1Mul tests
-	{
-		name:              "G1Mul valid",
-		operation:         blsG1MulSig,
-		input:             []BlsType{BLS_G1_ZERO, BLS_RANDOM_SCALAR},
-		expectOutput:      BLS_OUTPUT_G1_ZERO,
-		expectFixedOutput: nil,
-		expectedGas:       params.Bls12381G1MulGas,
-	},
-	{
-		name:              "G1Mul invalid point",
-		operation:         blsG1MulSig,
-		input:             []BlsType{BLS_INVALID_G1, BLS_VALID_SCALAR},
-		expectOutput:      BLS_OUTPUT_EXPECT_FAIL,
-		expectFixedOutput: nil,
-		expectedGas:       params.Bls12381G1MulGas,
-	},
 	// G1MultiExp tests (simplified assumptions)
 	{
 		name:              "G1MultiExp valid single",
@@ -498,7 +481,7 @@ var bls12381TestCases = []struct {
 		input:             []BlsType{BLS_VALID_G1, BLS_SCALAR_ONE},
 		expectOutput:      BLS_OUTPUT_IS_FIRST_INPUT,
 		expectFixedOutput: nil,
-		expectedGas:       params.Bls12381G1MulGas * params.Bls12381MultiExpDiscountTable[0] / 1000,
+		expectedGas:       params.Bls12381G1MulGas * params.Bls12381G1MultiExpDiscountTable[0] / 1000,
 	},
 	{
 		name:              "G1MultiExp invalid point",
