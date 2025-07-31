@@ -19,10 +19,9 @@ package vm
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/numeric"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/numeric"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -59,8 +58,8 @@ type StateDB interface {
 	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
 
-	GetTransientState(addr common.Address, key common.Hash) common.Hash
-	SetTransientState(addr common.Address, key, value common.Hash)
+	//GetTransientState(addr common.Address, key common.Hash) common.Hash
+	//SetTransientState(addr common.Address, key, value common.Hash)
 
 	Suicide(common.Address) bool
 	HasSuicided(common.Address) bool
@@ -71,6 +70,15 @@ type StateDB interface {
 	// Empty returns whether the given account is empty. Empty
 	// is defined according to EIP161 (balance = nonce = code = 0).
 	Empty(common.Address) bool
+
+	AddressInAccessList(addr common.Address) bool
+	SlotInAccessList(addr common.Address, slot common.Hash) (addressOk bool, slotOk bool)
+	// AddAddressToAccessList adds the given address to the access list. This operation is safe to perform
+	// even if the feature/fork is not active yet
+	AddAddressToAccessList(addr common.Address)
+	// AddSlotToAccessList adds the given (address,slot) to the access list. This operation is safe to perform
+	// even if the feature/fork is not active yet
+	AddSlotToAccessList(addr common.Address, slot common.Hash)
 
 	Prepare()
 
