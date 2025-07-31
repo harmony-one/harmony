@@ -101,6 +101,7 @@ func printVersion(me string) {
 	fmt.Fprintf(os.Stderr, "Harmony (C) %d. %v, version %v-%v (%v %v)\n", currentYear, path.Base(me), version, commit, builtBy, builtAt)
 }
 
+// todo(sun): quic should be enabled but not prioritized?
 func main() {
 	timestamp := time.Now().Format("20060102150405")
 	defUserAgent := fmt.Sprintf("bootnode-%s", timestamp)
