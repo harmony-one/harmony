@@ -68,8 +68,7 @@ func NewDownloader(host p2p.Host,
 	logger := utils.Logger().With().
 		Str("module", "StagedStreamSync").
 		Uint32("ShardID", bc.ShardID()).
-		Uint64("currentHeight", bc.CurrentBlock().NumberU64()).
-		Interface("currentHeadHash", bc.CurrentBlock().Hash()).
+		Bool("isBeaconNode", isBeaconNode).
 		Logger()
 
 	var bh *beaconHelper
