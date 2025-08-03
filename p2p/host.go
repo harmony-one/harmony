@@ -801,7 +801,7 @@ func (host *HostV2) Connected(net libp2p_network.Network, conn libp2p_network.Co
 
 	// Log muxer being used for this connection if available.
 	if state := conn.ConnState(); state.StreamMultiplexer != "" {
-		host.logger.Info().
+		host.logger.Debug().
 			Interface("muxer", state.StreamMultiplexer).
 			Bool("UsedEarlyMuxerNegotiation", state.UsedEarlyMuxerNegotiation).
 			Str("peer", conn.RemotePeer().String()).
