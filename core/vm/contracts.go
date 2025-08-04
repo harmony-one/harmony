@@ -291,7 +291,7 @@ func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contrac
 		//return RunPrecompiledContract(p, evm, input, contract, readOnly)
 	}
 	// immediately error out if readOnly
-	if readOnly && !p.IsWrite() {
+	if readOnly && p.IsWrite() {
 		return nil, 0, errWriteProtection
 	}
 	gasCost, err := p.RequiredGas(evm, contract, input)
