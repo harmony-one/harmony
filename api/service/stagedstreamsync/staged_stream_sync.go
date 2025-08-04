@@ -59,6 +59,26 @@ func (ib *InvalidBlock) addBadStream(bsID sttypes.StreamID) {
 	ib.StreamID = append(ib.StreamID, bsID)
 }
 
+// CleanupStreamIDs removes old stream IDs to prevent memory leaks
+// Keeps only the most recent maxStreamIDs entries
+func (ib *InvalidBlock) CleanupStreamIDs(maxStreamIDs int) {
+	if len(ib.StreamID) <= maxStreamIDs {
+		return
+	}
+	// Keep only the most recent entries
+	ib.StreamID = ib.StreamID[len(ib.StreamID)-maxStreamIDs:]
+}
+
+// GetStreamIDCount returns the number of stream IDs stored
+func (ib *InvalidBlock) GetStreamIDCount() int {
+	return len(ib.StreamID)
+}
+
+// ClearStreamIDs removes all stream IDs to free memory
+func (ib *InvalidBlock) ClearStreamIDs() {
+	ib.StreamID = ib.StreamID[:0]
+}
+
 type StagedStreamSync struct {
 	bc                            core.BlockChain
 	consensus                     *consensus.Consensus
@@ -288,6 +308,10 @@ func (sss *StagedStreamSync) cleanUp(ctx context.Context, fromStage int, db kv.R
 			panic(err)
 		}
 	}
+
+	// Clear timings after logging - they're only needed per sync cycle
+	sss.ClearTimings()
+
 	return nil
 }
 
@@ -411,6 +435,9 @@ func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, fi
 	sss.prevRevertPoint = nil
 	sss.timings = sss.timings[:0]
 
+	// Clean up invalid block stream IDs to prevent memory leaks
+	sss.invalidBlock.CleanupStreamIDs(100) // Keep only last 100 stream IDs
+
 	for !sss.IsDone() {
 		if sss.revertPoint != nil {
 			sss.prevRevertPoint = sss.revertPoint
@@ -474,6 +501,12 @@ func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, fi
 	}
 	sss.currentStage = 0
 	return nil
+}
+
+// ClearTimings removes all timing entries to free memory
+// Timings are only needed per sync cycle for logging
+func (sss *StagedStreamSync) ClearTimings() {
+	sss.timings = sss.timings[:0]
 }
 
 func (sss *StagedStreamSync) addConsensusLastMile(bc core.BlockChain, cs *consensus.Consensus) ([]common.Hash, error) {
