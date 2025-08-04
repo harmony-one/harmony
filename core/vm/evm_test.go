@@ -20,16 +20,12 @@ func TestEpochPrecompile(t *testing.T) {
 		CodeAddr: &precompileAddr,
 		Gas:      GasQuickStep,
 	}
-	result, err := run(evm,
-		&contract,
-		input,
-		true,
-	)
+	result, _, err := RunPrecompiledContract(&epoch{}, evm, &contract, input, GasQuickStep, true)
 	if err != nil {
 		t.Fatalf("Got error%v\n", err)
 	}
 	resultingEpoch := new(big.Int).SetBytes(result)
 	if resultingEpoch.Cmp(targetEpoch) != 0 {
-		t.Error("Epoch did not match")
+		t.Errorf("Epoch did not match, expected %d, got %d", targetEpoch.Int64(), resultingEpoch.Int64())
 	}
 }
