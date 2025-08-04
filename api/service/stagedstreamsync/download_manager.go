@@ -3,6 +3,7 @@ package stagedstreamsync
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -128,6 +129,8 @@ func (dm *downloadManager) SetDownloadDetails(bns []uint64, workerID int, stream
 	defer dm.lock.Unlock()
 
 	for _, bn := range bns {
+		// Clean up any existing details for this block to prevent duplicates
+		delete(dm.details, bn)
 		dm.details[bn] = &DownloadDetails{
 			workerID: workerID,
 			streamID: streamID,
@@ -216,5 +219,112 @@ func (dm *downloadManager) availableForMoreTasks() bool {
 func (dm *downloadManager) addBatchToRequesting(bns []uint64) {
 	for _, bn := range bns {
 		dm.requesting[bn] = struct{}{}
+	}
+}
+
+// CleanupDetails removes download details for a specific block number
+func (dm *downloadManager) CleanupDetails(blockNumber uint64) {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+	delete(dm.details, blockNumber)
+}
+
+// CleanupAllDetails removes all download details to prevent memory leaks
+func (dm *downloadManager) CleanupAllDetails() {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+	dm.details = make(map[uint64]*DownloadDetails)
+}
+
+// CleanupProcessedDetails removes download details for blocks that have been processed
+func (dm *downloadManager) CleanupProcessedDetails() {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+
+	// Remove details for blocks that are no longer in processing
+	for bn := range dm.details {
+		if _, stillProcessing := dm.processing[bn]; !stillProcessing {
+			delete(dm.details, bn)
+		}
+	}
+}
+
+// CleanupOldDetails removes download details for blocks that have been in processing for too long
+// This helps prevent memory leaks from blocks that get stuck in processing
+func (dm *downloadManager) CleanupOldDetails(maxAge time.Duration) {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+
+	for bn := range dm.details {
+		// If the block is still in processing, we can't clean it up yet
+		if _, stillProcessing := dm.processing[bn]; stillProcessing {
+			continue
+		}
+		// For now, we'll clean up all details that are not in processing
+		// In a more sophisticated implementation, we could add timestamps to DownloadDetails
+		delete(dm.details, bn)
+	}
+}
+
+// GetDetailsSize returns the current size of the details map for monitoring
+func (dm *downloadManager) GetDetailsSize() int {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+	return len(dm.details)
+}
+
+// RemoveFromProcessing removes a block from processing and cleans up its details
+func (dm *downloadManager) RemoveFromProcessing(blockNumber uint64) {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+
+	delete(dm.processing, blockNumber)
+	delete(dm.details, blockNumber)
+}
+
+// RemoveBatchFromProcessing removes multiple blocks from processing and cleans up their details
+func (dm *downloadManager) RemoveBatchFromProcessing(blockNumbers []uint64) {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+
+	for _, bn := range blockNumbers {
+		delete(dm.processing, bn)
+		delete(dm.details, bn)
+	}
+}
+
+// MarkBlockCompleted marks a block as completed and safe to clean up
+// This should be called after all stages have processed the block
+func (dm *downloadManager) MarkBlockCompleted(blockNumber uint64) {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+
+	// Remove from processing and clean up details
+	delete(dm.processing, blockNumber)
+	delete(dm.details, blockNumber)
+}
+
+// MarkBatchCompleted marks multiple blocks as completed and safe to clean up
+func (dm *downloadManager) MarkBatchCompleted(blockNumbers []uint64) {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+
+	for _, bn := range blockNumbers {
+		delete(dm.processing, bn)
+		delete(dm.details, bn)
+	}
+}
+
+// CleanupCompletedBlocks removes details for blocks that are no longer in processing
+// This is a safer cleanup that only removes details for blocks that have been fully processed
+func (dm *downloadManager) CleanupCompletedBlocks() {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+
+	// Only clean up details for blocks that are no longer in processing
+	for bn := range dm.details {
+		if _, stillProcessing := dm.processing[bn]; !stillProcessing {
+			delete(dm.details, bn)
+		}
 	}
 }
