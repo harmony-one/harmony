@@ -135,6 +135,10 @@ func (sr *StageShortRange) doShortRangeSync(ctx context.Context, s *StageState) 
 
 	m := newGetBlocksByHashManager(hashChain, whitelist)
 	blocks, stids, err := sh.getBlocksByHashes(ctx, m)
+
+	// Clean up manager data after use to prevent memory leaks
+	defer m.ClearAllData()
+
 	if err != nil {
 		sr.configs.logger.Warn().Err(err).Msg("getBlocksByHashes failed")
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
