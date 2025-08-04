@@ -49,6 +49,12 @@ func (finish *StageFinish) Exec(ctx context.Context, firstCycle bool, invalidBlo
 		s.state.status.SetCycleSyncMode(FullSync)
 	}
 
+	// Clean up download details after all stages have completed
+	// This is the final stage, so it's safe to clean up all download details
+	if s.state.gbm != nil {
+		s.state.gbm.CleanupAllDetails()
+	}
+
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
@@ -107,6 +113,11 @@ func (finish *StageFinish) CleanUp(ctx context.Context, firstCycle bool, p *Clea
 			return err
 		}
 		defer tx.Rollback()
+	}
+
+	// Clean up download details during cleanup as well
+	if p.state != nil && p.state.gbm != nil {
+		p.state.gbm.CleanupAllDetails()
 	}
 
 	if useInternalTx {

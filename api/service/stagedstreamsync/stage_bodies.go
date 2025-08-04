@@ -789,6 +789,11 @@ func (b *StageBodies) Revert(ctx context.Context, firstCycle bool, u *RevertStat
 		return err
 	}
 
+	// Clean up download details during revert to prevent memory leaks
+	if s.state != nil && s.state.gbm != nil {
+		s.state.gbm.CleanupAllDetails()
+	}
+
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = b.configs.db.BeginRw(ctx)
@@ -822,6 +827,11 @@ func (b *StageBodies) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpSt
 	//clean all blocks DBs
 	if err := b.cleanAllBlockDBs(ctx); err != nil {
 		return err
+	}
+
+	// Clean up download details during cleanup to prevent memory leaks
+	if p.state != nil && p.state.gbm != nil {
+		p.state.gbm.CleanupAllDetails()
 	}
 
 	return nil
