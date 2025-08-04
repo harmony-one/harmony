@@ -138,6 +138,9 @@ func (bh *StageBlockHashes) Exec(ctx context.Context, firstCycle bool, invalidBl
 		return err
 	}
 
+	// Clean up download details to prevent memory leaks
+	hdm.CleanupAllDetails()
+
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err

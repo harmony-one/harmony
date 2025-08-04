@@ -95,6 +95,13 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 	pl := s.state.promLabels()
 	gbm := s.state.gbm
 
+	// Check if gbm is available (Stage Bodies might have returned early)
+	if gbm == nil {
+		stg.configs.logger.Error().
+			Msg("download manager is nil - Stage Bodies may have returned early")
+		return fmt.Errorf("download manager is nil - Stage Bodies may have returned early")
+	}
+
 	// prepare db transactions
 	txs := make([]kv.RwTx, stg.configs.concurrency)
 	for i := 0; i < stg.configs.concurrency; i++ {
@@ -185,8 +192,18 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			reverter.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), block.NumberU64(), invalidBlockHash, streamID)
 			pl["error"] = err.Error()
 			longRangeFailInsertedBlockCounterVec.With(pl).Inc()
+
+			// Clean up download details for the failed block to prevent memory leaks
+			if gbm != nil {
+				gbm.CleanupDetails(i)
+			}
+
 			return err
 		}
+
+		// Mark block as completed after successful insertion
+		// This allows safe cleanup of download details
+		gbm.MarkBlockCompleted(i)
 
 		if invalidBlockRevert {
 			if s.state.invalidBlock.Number == i {
