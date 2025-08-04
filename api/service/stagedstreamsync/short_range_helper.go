@@ -130,6 +130,10 @@ func (sh *srHelper) getBlocksByHashes(ctx context.Context, m *getBlocksByHashMan
 	default:
 	}
 
+	// Clean up stale data before returning results
+	m.CleanupStaleResults()
+	m.CleanupPendings()
+
 	return m.getResults()
 }
 
