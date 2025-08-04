@@ -127,3 +127,76 @@ func (m *getBlocksByHashManager) removeStreamFromWhitelist(target sttypes.Stream
 	}
 	m.whitelist = newWhitelist
 }
+
+// CleanupStaleResults removes stale results that are no longer needed
+// This prevents memory leaks from accumulating old block results
+func (m *getBlocksByHashManager) CleanupStaleResults() int {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	removed := 0
+	// Remove results for hashes that are no longer in the original hashes list
+	for hash := range m.results {
+		found := false
+		for _, originalHash := range m.hashes {
+			if hash == originalHash {
+				found = true
+				break
+			}
+		}
+		if !found {
+			delete(m.results, hash)
+			removed++
+		}
+	}
+	return removed
+}
+
+// CleanupPendings removes stale pending requests that are no longer needed
+func (m *getBlocksByHashManager) CleanupPendings() int {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	removed := 0
+	// Remove pending requests for hashes that are no longer in the original hashes list
+	for hash := range m.pendings {
+		found := false
+		for _, originalHash := range m.hashes {
+			if hash == originalHash {
+				found = true
+				break
+			}
+		}
+		if !found {
+			delete(m.pendings, hash)
+			removed++
+		}
+	}
+	return removed
+}
+
+// ClearAllData removes all data to free memory
+func (m *getBlocksByHashManager) ClearAllData() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	// Clear all maps
+	for k := range m.pendings {
+		delete(m.pendings, k)
+	}
+	for k := range m.results {
+		delete(m.results, k)
+	}
+
+	// Clear slices
+	m.whitelist = m.whitelist[:0]
+	m.hashes = m.hashes[:0]
+}
+
+// GetDataSize returns the total size of stored data for monitoring
+func (m *getBlocksByHashManager) GetDataSize() (pendings, results, whitelist int) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return len(m.pendings), len(m.results), len(m.whitelist)
+}
