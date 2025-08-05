@@ -244,7 +244,7 @@ func testCrossShardXferPrecompile(test writeCapablePrecompileTest, t *testing.T)
 		t.Fatalf("Error while initializing state %s", err)
 	}
 	var env = NewEVM(Context{
-		NumShards: 4,
+		NumShards: 2,
 		Transfer:  transfer,
 		CanTransfer: func(_ StateDB, _ common.Address, _ *big.Int) bool {
 			return true

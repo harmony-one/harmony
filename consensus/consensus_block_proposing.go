@@ -17,7 +17,7 @@ import (
 
 // Constants of proposing a new block
 const (
-	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
+	IncomingReceiptsLimit = 2000 // 2000 * (numShards - 1)
 	SleepPeriod           = 20 * time.Millisecond
 )
 
