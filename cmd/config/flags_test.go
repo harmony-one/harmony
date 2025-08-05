@@ -1941,7 +1941,7 @@ func TestSyncFlags(t *testing.T) {
 		expErr    error
 	}{
 		{
-			args: []string{"--sync", "--sync.downloader", "--sync.concurrency", "10", "--sync.min-peers", "10",
+			args: []string{"--sync", "--Sync.Client", "--sync.concurrency", "10", "--sync.min-peers", "10",
 				"--sync.init-peers", "10", "--sync.disc.soft-low-cap", "10",
 				"--sync.disc.hard-low-cap", "10", "--sync.disc.hi-cap", "10",
 				"--sync.disc.batch", "10",
@@ -1950,8 +1950,7 @@ func TestSyncFlags(t *testing.T) {
 			expConfig: func() harmonyconfig.SyncConfig {
 				cfgSync := defaultMainnetSyncConfig
 				cfgSync.Enabled = true
-				cfgSync.Downloader = true
-				cfgSync.StagedSync = false
+				cfgSync.Client = true
 				cfgSync.Concurrency = 10
 				cfgSync.MinPeers = 10
 				cfgSync.InitStreams = 10

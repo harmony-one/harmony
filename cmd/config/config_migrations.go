@@ -10,7 +10,7 @@ import (
 	goversion "github.com/hashicorp/go-version"
 	"github.com/pelletier/go-toml" // TODO support go-toml/v2
 
-	"github.com/harmony-one/harmony/api/service/legacysync"
+	"github.com/harmony-one/harmony/api/service/synchronize/legacysync"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -152,8 +152,19 @@ func init() {
 		}
 		confTree.Set("DNSSync.ServerPort", serverPort)
 
-		downloaderEnabledField := confTree.Get("Sync.Downloader")
-		if downloaderEnabled, ok := downloaderEnabledField.(bool); ok && downloaderEnabled {
+		// Check for both old "Downloader" and new "Client" field names
+		var downloaderEnabled bool
+		if downloaderEnabledField := confTree.Get("Sync.Downloader"); downloaderEnabledField != nil {
+			if enabled, ok := downloaderEnabledField.(bool); ok {
+				downloaderEnabled = enabled
+			}
+		} else if clientEnabledField := confTree.Get("Sync.Client"); clientEnabledField != nil {
+			if enabled, ok := clientEnabledField.(bool); ok {
+				downloaderEnabled = enabled
+			}
+		}
+
+		if downloaderEnabled {
 			// If we enabled downloader previously, run stream sync protocol.
 			confTree.Set("Sync.Enabled", true)
 		}
@@ -302,10 +313,7 @@ func init() {
 	}
 
 	migrations["2.5.8"] = func(confTree *toml.Tree) *toml.Tree {
-		if confTree.Get("Sync.StagedSync") == nil {
-			confTree.Set("Sync.StagedSync", defaultConfig.Sync.StagedSync)
-			confTree.Set("Sync.StagedSyncCfg", defaultConfig.Sync.StagedSyncCfg)
-		}
+		confTree.Set("Sync.StagedSyncCfg", defaultConfig.Sync.StagedSyncCfg)
 		confTree.Set("Version", "2.5.9")
 		return confTree
 	}
@@ -477,6 +485,23 @@ func init() {
 			confTree.Set("Sync.ResourceMgrFileDescriptorsLimit", defaultConfig.P2P.ResourceMgrFileDescriptorsLimit)
 		}
 		confTree.Set("Version", "2.6.5")
+		return confTree
+	}
+
+	migrations["2.6.5"] = func(confTree *toml.Tree) *toml.Tree {
+		// Rename Downloader to Client in Sync configs
+		if d := confTree.Get("Sync.Downloader"); d != nil {
+			// If old Downloader field exists, copy its value to Client
+			confTree.Set("Sync.Client", d)
+			confTree.Delete("Sync.Downloader")
+		} else if confTree.Get("Sync.Client") == nil {
+			// If neither field exists, set default
+			confTree.Set("Sync.Client", defaultConfig.Sync.Client)
+		}
+		confTree.Delete("Sync.StagedSync")
+		confTree.Delete("Sync.StagedSyncCfg.TurboMode")
+
+		confTree.Set("Version", "2.6.6")
 		return confTree
 	}
 
