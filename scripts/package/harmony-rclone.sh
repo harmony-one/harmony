@@ -12,7 +12,7 @@ This script will rclone the harmony db to datadir/archive directory.
 Usage: $ME [options] datadir shard
 
 datadir:    the root directory of the harmony db (default: /home/harmony)
-shard:      the shard number to sync (valid value: 0,1,2,3)
+shard:      the shard number to sync (valid value: 0,1)
 
 Options:
    -h       print this help message
@@ -49,7 +49,7 @@ if [ ! -d "$DATADIR" ]; then
 fi
 
 case "$SHARD" in
-   0|1|2|3) ;;
+   0|1) ;;
    *) usage "ERROR: invalid shard number: $SHARD" ;;
 esac
 
