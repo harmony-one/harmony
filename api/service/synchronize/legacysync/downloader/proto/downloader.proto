@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package downloader;
+option go_package="./;downloader";
+
+// Downloader is the service used for downloading/sycning blocks.
+service Downloader {
+  rpc Query(DownloaderRequest) returns (DownloaderResponse) {}
+}
+
+// DownloaderRequest is the generic download request.
+message DownloaderRequest {
+  enum RequestType {
+    BLOCKHASH = 0;
+    BLOCK = 1;
+    NEWBLOCK = 2;
+    BLOCKHEIGHT = 3;
+    REGISTER = 4;
+    REGISTERTIMEOUT = 5;
+    UNKNOWN = 6;
+    BLOCKHEADER = 7;
+    BLOCKBYHEIGHT = 8;
+  }
+
+  // Request type.
+  RequestType type = 1;
+
+  // The hashes of the blocks we want to download.
+  repeated bytes hashes = 2;
+  bytes peerHash = 3;
+  bytes blockHash = 4;
+  string ip = 5;
+  string port = 6;
+  uint32 size = 7;
+  bool registerWithSig = 8; // Expect to have NEWBLOCK response of block along with current signature
+  bool getBlocksWithSig = 9; // Have block along with signature for BLOCK request.
+  repeated uint64 heights = 10;
+}
+
+// DownloaderResponse is the generic response of DownloaderRequest.
+message DownloaderResponse {
+    enum RegisterResponseType {
+        SUCCESS = 0;
+        FAIL = 1;
+        INSYNC = 2;   // node is now in sync, remove it from the broadcast list
+    }
+  // payload of Block.
+  repeated bytes payload = 1;
+  // response of registration request
+  RegisterResponseType type = 2;
+  uint64 blockHeight = 3;
+}
