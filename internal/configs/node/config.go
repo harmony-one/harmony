@@ -106,9 +106,7 @@ type ConfigType struct {
 	RPCServer              RPCServerConfig     // RPC server port and ip
 	RosettaServer          RosettaServerConfig // rosetta server port and ip
 	IsOffline              bool
-	Downloader             bool // Whether stream downloader is running; TODO: remove this after sync up
-	StagedSync             bool // use staged sync
-	StagedSyncTurboMode    bool // use Turbo mode for staged sync
+	SyncClient             bool // Whether stream downloader client is running; TODO: remove this after sync up
 	UseMemDB               bool // use mem db for staged sync
 	DoubleCheckBlockHashes bool
 	MaxBlocksPerSyncCycle  uint64 // Maximum number of blocks per each cycle. if set to zero, all blocks will be  downloaded and synced in one full cycle.
