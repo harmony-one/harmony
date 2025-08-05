@@ -9,7 +9,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.6.5"
+const tomlConfigVersion = "2.6.6"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -193,7 +193,6 @@ var defaultPrometheusConfig = harmonyconfig.PrometheusConfig{
 }
 
 var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
-	TurboMode:              true,
 	DoubleCheckBlockHashes: false,
 	MaxBlocksPerSyncCycle:  512,   // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
 	MaxBackgroundBlocks:    512,   // max blocks to be downloaded at background process in turbo mode
@@ -208,10 +207,9 @@ var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
 
 var (
 	defaultMainnetSyncConfig = harmonyconfig.SyncConfig{
-		Enabled:              false,
+		Enabled:              true,
 		SyncMode:             0,
-		Downloader:           false,
-		StagedSync:           false,
+		Client:               false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          6,
 		MinPeers:             6,
@@ -226,8 +224,7 @@ var (
 	defaultTestNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
 		SyncMode:             0,
-		Downloader:           false,
-		StagedSync:           false,
+		Client:               false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          2,
 		MinPeers:             2,
@@ -242,8 +239,7 @@ var (
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
 		SyncMode:             0,
-		Downloader:           true,
-		StagedSync:           true,
+		Client:               true,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          4,
 		MinPeers:             4,
@@ -256,10 +252,9 @@ var (
 	}
 
 	defaultPartnerSyncConfig = harmonyconfig.SyncConfig{
-		Enabled:              false,
+		Enabled:              true,
 		SyncMode:             0,
-		Downloader:           false,
-		StagedSync:           false,
+		Client:               false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          3,
 		MinPeers:             3,
@@ -272,10 +267,9 @@ var (
 	}
 
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{
-		Enabled:              false,
+		Enabled:              true,
 		SyncMode:             0,
-		Downloader:           false,
-		StagedSync:           false,
+		Client:               false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          4,
 		MinPeers:             4,

@@ -392,7 +392,7 @@ func Test_migrateConf(t *testing.T) {
 			},
 			want: func() harmonyconfig.HarmonyConfig {
 				hc := defConf
-				hc.Sync.Downloader = true
+				hc.Sync.Client = true
 				hc.Sync.Enabled = true
 				return hc
 			}(),

@@ -93,6 +93,7 @@ Version = "1.0.4"
   PriceLimit = 100e9
 
 [Sync]
+  Enabled = true
   Downloader = false
   Concurrency = 6
   DiscBatch = 8

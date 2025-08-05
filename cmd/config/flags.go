@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/harmony-one/harmony/api/service/legacysync"
+	"github.com/harmony-one/harmony/api/service/synchronize/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -253,7 +253,6 @@ var (
 		syncStreamEnabledFlag,
 		syncModeFlag,
 		syncDownloaderFlag,
-		syncStagedSyncFlag,
 		syncConcurrencyFlag,
 		syncMinPeersFlag,
 		syncInitStreamsFlag,
@@ -1988,15 +1987,9 @@ var (
 
 	// TODO: Deprecate this flag, and always set to true after stream sync is fully up.
 	syncDownloaderFlag = cli.BoolFlag{
-		Name:     "sync.downloader",
+		Name:     "Sync.Client",
 		Usage:    "Enable the downloader module to sync through stream sync protocol",
 		Hidden:   true,
-		DefValue: false,
-	}
-	syncStagedSyncFlag = cli.BoolFlag{
-		Name:     "sync.stagedsync",
-		Usage:    "Enable the staged sync",
-		Hidden:   false,
 		DefValue: false,
 	}
 	syncConcurrencyFlag = cli.IntFlag{
@@ -2052,11 +2045,7 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	}
 
 	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
-		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
-	}
-
-	if cli.IsFlagChanged(cmd, syncStagedSyncFlag) {
-		config.Sync.StagedSync = cli.GetBoolFlagValue(cmd, syncStagedSyncFlag)
+		config.Sync.Client = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, syncConcurrencyFlag) {

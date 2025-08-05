@@ -51,9 +51,9 @@ func validateHarmonyConfig(config harmonyconfig.HarmonyConfig) error {
 		return fmt.Errorf("flag --run.offline must have p2p IP be %v", nodeconfig.DefaultLocalListenIP)
 	}
 
-	if !config.Sync.Downloader && !config.DNSSync.Client {
+	if !config.Sync.Client && !config.DNSSync.Client {
 		// There is no module up for sync
-		return errors.New("either --sync.downloader or --sync.legacy.client shall be enabled")
+		return errors.New("either --Sync.Client or --sync.legacy.client shall be enabled")
 	}
 
 	return nil
@@ -61,8 +61,8 @@ func validateHarmonyConfig(config harmonyconfig.HarmonyConfig) error {
 
 func sanityFixHarmonyConfig(hc *harmonyconfig.HarmonyConfig) {
 	// When running sync downloader, set sync.Enabled to true
-	if hc.Sync.Downloader && !hc.Sync.Enabled {
-		fmt.Println("Set Sync.Enabled to true when running stream downloader")
+	if hc.Sync.Client && !hc.Sync.Enabled {
+		fmt.Println("Set Sync.Enabled to true when running stream client")
 		hc.Sync.Enabled = true
 	}
 }
