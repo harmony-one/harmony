@@ -368,8 +368,7 @@ type SyncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
 	Enabled              bool             // enable the stream sync protocol
 	SyncMode             uint32           // sync mode (default:Full sync, 1: Fast Sync, 2: Snap Sync(not implemented yet))
-	Downloader           bool             // start the sync downloader client
-	StagedSync           bool             // use staged sync
+	Client               bool             // start the sync downloader client
 	StagedSyncCfg        StagedSyncConfig // staged sync configurations
 	Concurrency          int              // concurrency used for stream sync protocol
 	MinPeers             int              // minimum streams to start a sync task.
@@ -382,7 +381,6 @@ type SyncConfig struct {
 }
 
 type StagedSyncConfig struct {
-	TurboMode              bool   // turn on turbo mode
 	DoubleCheckBlockHashes bool   // double check all block hashes before download blocks
 	MaxBlocksPerSyncCycle  uint64 // max number of blocks per each sync cycle, if set to zero, all blocks will be synced in one full cycle
 	MaxBackgroundBlocks    uint64 // max number of background blocks in turbo mode
