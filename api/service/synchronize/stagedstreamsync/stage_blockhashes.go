@@ -30,7 +30,6 @@ type StageBlockHashesCfg struct {
 	db          kv.RwDB
 	concurrency int
 	protocol    syncProtocol
-	//bgProcRunning bool
 	cachedb     kv.RwDB
 	logProgress bool
 	logger      zerolog.Logger
