@@ -226,12 +226,12 @@ var (
 		SyncMode:             0,
 		Client:               false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
-		Concurrency:          2,
-		MinPeers:             2,
-		InitStreams:          2,
+		Concurrency:          3,
+		MinPeers:             3,
+		InitStreams:          3,
 		MaxAdvertiseWaitTime: 5, //minutes
-		DiscSoftLowCap:       2,
-		DiscHardLowCap:       2,
+		DiscSoftLowCap:       3,
+		DiscHardLowCap:       3,
 		DiscHighCap:          1024,
 		DiscBatch:            3,
 	}
