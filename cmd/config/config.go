@@ -53,7 +53,7 @@ func validateHarmonyConfig(config harmonyconfig.HarmonyConfig) error {
 
 	if !config.Sync.Client && !config.DNSSync.Client {
 		// There is no module up for sync
-		return errors.New("either --Sync.Client or --sync.legacy.client shall be enabled")
+		return errors.New("either --sync.client or --sync.legacy.client shall be enabled")
 	}
 
 	return nil

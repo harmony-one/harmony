@@ -158,7 +158,7 @@ func init() {
 			if enabled, ok := downloaderEnabledField.(bool); ok {
 				downloaderEnabled = enabled
 			}
-		} else if clientEnabledField := confTree.Get("Sync.Client"); clientEnabledField != nil {
+		} else if clientEnabledField := confTree.Get("sync.client"); clientEnabledField != nil {
 			if enabled, ok := clientEnabledField.(bool); ok {
 				downloaderEnabled = enabled
 			}
