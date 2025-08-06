@@ -86,9 +86,9 @@ function launch_localnet() {
     --verbosity "${verbosity}" "--p2p.security.max-conn-per-ip=100" \
     "--localnet.blocks_per_epoch=${BLOCKS_PER_EPOCH}" "--localnet.blocks_per_epoch_v2=${BLOCKS_PER_EPOCH_V2}")
   if [ "${LEGACY_SYNC}" == "true" ]; then
-    sync_options=("--dns=true" "--sync=false" "--dns.client=true" "--Sync.Client=false")
+    sync_options=("--dns=true" "--sync=false" "--dns.client=true" "--sync.client=false")
   else
-    sync_options=("--dns=false" "--sync=true" "--dns.client=false" "--Sync.Client=true")
+    sync_options=("--dns=false" "--sync=true" "--dns.client=false" "--sync.client=true")
   fi
 
   base_args+=("${sync_options[@]}")
