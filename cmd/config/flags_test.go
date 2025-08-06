@@ -1941,7 +1941,7 @@ func TestSyncFlags(t *testing.T) {
 		expErr    error
 	}{
 		{
-			args: []string{"--sync", "--Sync.Client", "--sync.concurrency", "10", "--sync.min-peers", "10",
+			args: []string{"--sync", "--sync.client", "--sync.concurrency", "10", "--sync.min-peers", "10",
 				"--sync.init-peers", "10", "--sync.disc.soft-low-cap", "10",
 				"--sync.disc.hard-low-cap", "10", "--sync.disc.hi-cap", "10",
 				"--sync.disc.batch", "10",

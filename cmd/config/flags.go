@@ -1987,7 +1987,7 @@ var (
 
 	// TODO: Deprecate this flag, and always set to true after stream sync is fully up.
 	syncDownloaderFlag = cli.BoolFlag{
-		Name:     "Sync.Client",
+		Name:     "sync.client",
 		Usage:    "Enable the downloader module to sync through stream sync protocol",
 		Hidden:   true,
 		DefValue: false,
