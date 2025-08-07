@@ -982,13 +982,19 @@ type Rules struct {
 	EthChainID *big.Int
 	// gas
 	IsS3,
+	IsEIP150, // is the same as IsS3
+	IsEIP155, // is the same as IsS3
+	IsEIP158, // is the same as IsS3
+	IsConstantinople, // is the same as IsS3
+	IsPetersburg, // is the same as IsS3
 	// precompiles
-	IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
+	IsIstanbul, IsByzantium, IsVRF, IsPrevVRF, IsSHA3,
 	IsStakingPrecompile, IsCrossShardXferPrecompile,
 	IsEIP2537Precompile,
 	// eip-155 chain id fix
 	IsChainIdFix bool
 	IsValidatorCodeFix bool
+	IsYoloV2           bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1006,7 +1012,12 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		ChainID:                    new(big.Int).Set(chainID),
 		EthChainID:                 new(big.Int).Set(ethChainID),
 		IsS3:                       c.IsS3(epoch),
-		IsIstanbul:                 c.IsIstanbul(epoch),
+		IsEIP150:                   c.IsS3(epoch),       // EIP150 is the same as S3
+		IsEIP155:                   c.IsEIP155(epoch),   // S3 and 155 both activated at big.NewInt(28),
+		IsEIP158:                   c.IsS3(epoch),       // EIP158 is the same as S3
+		IsConstantinople:           c.IsS3(epoch),       // Constantinople is the same as S3
+		IsPetersburg:               c.IsS3(epoch),       // Petersburg is the same as S3
+		IsIstanbul:                 c.IsIstanbul(epoch), // big.NewInt(314),
 		IsVRF:                      c.IsVRF(epoch),
 		IsPrevVRF:                  c.IsPrevVRF(epoch),
 		IsSHA3:                     c.IsSHA3(epoch),
