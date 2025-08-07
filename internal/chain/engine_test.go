@@ -46,7 +46,7 @@ const (
 	lastEpochInComm = 5
 	currentEpoch    = 5
 
-	numShard        = 4
+	numShard        = 2
 	numNodePerShard = 5
 
 	offenderShard      = doubleSignShardID
