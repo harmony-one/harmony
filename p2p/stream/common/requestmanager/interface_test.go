@@ -54,6 +54,10 @@ func (sm *testStreamManager) SubscribeRemoveStreamEvent(ch chan<- streammanager.
 	return sm.rmStreamFeed.Subscribe(ch)
 }
 
+func (sm *testStreamManager) SetEnoughStreamsCallback(callback func()) {
+	// No-op for test implementation
+}
+
 func (sm *testStreamManager) GetStreams() []sttypes.Stream {
 	sm.lock.Lock()
 	defer sm.lock.Unlock()
