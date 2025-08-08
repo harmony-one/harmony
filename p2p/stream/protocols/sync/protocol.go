@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -54,6 +53,8 @@ type (
 
 		lastAdvertiseDuration    time.Duration // last advertise duration to adjust it dynamically
 		recentPeerDiscoveryCount int           // recent peer discovery count
+		startupMode              bool          // true during first 10 minutes for faster advertisement
+		startupStartTime         time.Time     // when startup mode began
 
 		config Config
 		logger zerolog.Logger
@@ -89,12 +90,14 @@ func NewProtocol(config Config) *Protocol {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sp := &Protocol{
-		chain:  config.Chain,
-		disc:   config.Discovery,
-		config: config,
-		ctx:    ctx,
-		cancel: cancel,
-		closeC: make(chan struct{}),
+		chain:            config.Chain,
+		disc:             config.Discovery,
+		config:           config,
+		ctx:              ctx,
+		cancel:           cancel,
+		closeC:           make(chan struct{}),
+		startupMode:      true,
+		startupStartTime: time.Now(),
 	}
 	smConfig := streammanager.Config{
 		SoftLoCap: config.SmSoftLowCap,
@@ -112,6 +115,11 @@ func NewProtocol(config Config) *Protocol {
 	}
 	sp.sm = streammanager.NewStreamManager(sp.ProtoID(), config.Host.GetP2PHost(), config.Discovery,
 		sp.HandleStream, smConfig)
+
+	// Set callback to exit startup mode when enough streams are found
+	sp.sm.SetEnoughStreamsCallback(func() {
+		sp.ExitStartupMode()
+	})
 
 	sp.rl = ratelimiter.NewRateLimiter(sp.sm, rateLimiterGlobalRequestPerSecond, rateLimiterSingleRequestsPerSecond)
 
@@ -222,36 +230,126 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream) {
 }
 
 func (p *Protocol) advertiseLoop() {
-	minSleepTime := 30 * time.Second
-	maxSleepTime := time.Duration(p.config.MaxAdvertiseWaitTime) * time.Minute
+	// Use constants for sleep time boundaries
+	var minSleepTime, maxSleepTime time.Duration
+	if p.startupMode {
+		minSleepTime = MinSleepTimeStartup
+		maxSleepTime = MaxSleepTimeStartup
+	} else {
+		minSleepTime = MinSleepTimeNormal
+		maxSleepTime = MaxSleepTimeNormal
+	}
 
 	for {
 		sleep := p.advertise()
 
 		// Adaptive sleep: Increase if new peers were found, decrease otherwise
 		if p.recentPeerDiscoveryCount > 0 {
-			sleep += time.Duration(p.recentPeerDiscoveryCount) * time.Second
+			// Increase sleep time based on number of peers found
+			sleep += time.Duration(p.recentPeerDiscoveryCount) * SleepIncreasePerPeer
 		} else {
-			sleep /= 2
+			// Decrease sleep time by 30% when no peers found (better than /= 2)
+			sleep = time.Duration(float64(sleep) * SleepDecreaseRatio)
 		}
 
-		// Enforce sleep boundaries
+		// Enforce sleep boundaries based on startup mode
 		if sleep < minSleepTime {
 			sleep = minSleepTime
 		} else if sleep > maxSleepTime {
 			sleep = maxSleepTime
 		}
 
-		// Add jitter to prevent synchronized advertisements
-		jitter := time.Duration(rand.Intn(30)) * time.Second
-		sleep += jitter
+		p.logger.Debug().
+			Dur("sleep", sleep).
+			Int("peersFound", p.recentPeerDiscoveryCount).
+			Bool("startupMode", p.startupMode).
+			Msg("[Protocol] advertisement loop sleeping")
 
 		select {
+		case <-time.After(sleep):
+			// Continue to next iteration
 		case <-p.closeC:
 			return
-		case <-time.After(sleep):
 		}
 	}
+}
+
+// isValidPeer checks if a discovered peer is valid for our use case
+// TODO: Implement more sophisticated validation logic
+func (p *Protocol) isValidPeer(peer libp2p_peer.AddrInfo) bool {
+	// For now, consider all non-self peers as potentially valid
+	// In the future, we could add validation for:
+	// - Same network type (mainnet vs testnet)
+	// - Same shard ID
+	// - Active status (not banned/offline)
+	// - Protocol compatibility
+	// - Geographic location (for latency optimization)
+	// - Node type (validator vs non-validator)
+
+	// Basic validation: peer should have addresses
+	if len(peer.Addrs) == 0 {
+		return false
+	}
+
+	// TODO: Add more validation logic here
+	// Example validations:
+	// - Check if peer is from same network
+	// - Check if peer is from same shard
+	// - Check if peer is active (not banned)
+	// - Check protocol compatibility
+
+	return true
+}
+
+// getDHTRequestLimit returns how many peers to request from DHT
+// This should be higher than target because DHT may return invalid peers
+func (p *Protocol) getDHTRequestLimit() int {
+	switch p.config.Network {
+	case nodeconfig.Mainnet:
+		return DHTRequestLimitMainnet
+	case nodeconfig.Testnet:
+		return DHTRequestLimitTestnet
+	case nodeconfig.Pangaea:
+		return DHTRequestLimitPangaea
+	case nodeconfig.Partner:
+		return DHTRequestLimitPartner
+	case nodeconfig.Stressnet:
+		return DHTRequestLimitStressnet
+	case nodeconfig.Devnet:
+		return DHTRequestLimitDevnet
+	case nodeconfig.Localnet:
+		return DHTRequestLimitLocalnet
+	default:
+		return DHTRequestLimitDevnet
+	}
+}
+
+// getTargetValidPeers returns how many valid peers we want to find
+func (p *Protocol) getTargetValidPeers() int {
+	switch p.config.Network {
+	case nodeconfig.Mainnet:
+		return TargetValidPeersMainnet
+	case nodeconfig.Testnet:
+		return TargetValidPeersTestnet
+	case nodeconfig.Pangaea:
+		return TargetValidPeersPangaea
+	case nodeconfig.Partner:
+		return TargetValidPeersPartner
+	case nodeconfig.Stressnet:
+		return TargetValidPeersStressnet
+	case nodeconfig.Devnet:
+		return TargetValidPeersDevnet
+	case nodeconfig.Localnet:
+		return TargetValidPeersLocalnet
+	default:
+		return TargetValidPeersDevnet
+	}
+}
+
+// getPeerDiscoveryLimit returns the appropriate peer discovery limit based on network type
+// DEPRECATED: Use getDHTRequestLimit() and getTargetValidPeers() instead
+func (p *Protocol) getPeerDiscoveryLimit() int {
+	return p.getDHTRequestLimit()
 }
 
 // advertise will advertise all compatible protocol versions for helping nodes running low version
@@ -260,79 +358,38 @@ func (p *Protocol) advertise() time.Duration {
 	newPeersDiscovered := false
 	maxRetries := 3
 
-	// Constants for timeout adjustments
-	baseTimeout := 300 * time.Second         // Initial timeout for the advertise call
-	timeoutIncrementStep := 30 * time.Second // Increase timeout if context deadline is exceeded
-	maxTimeout := 600 * time.Second          // Maximum allowed timeout
-	backoffTimeRatio := 5 * time.Second      // Base time for exponential backoff
-	maxBackoff := 30 * time.Second           // Cap for the exponential backoff delay
-
-	timeout := baseTimeout
-
-	// Adjust timeout if the last advertise call took longer
-	if p.lastAdvertiseDuration > timeout {
-		timeout = p.lastAdvertiseDuration + timeoutIncrementStep
+	// Check if we should exit startup mode (after 10 minutes)
+	if p.startupMode && time.Since(p.startupStartTime) > StartupModeDuration {
+		p.startupMode = false
+		p.logger.Info().Msg("Exiting startup mode, switching to normal advertisement timing")
 	}
 
+	// Use timing constants based on startup mode
+	var baseTimeout, timeoutIncrementStep, maxTimeout, backoffTimeRatio, maxBackoff time.Duration
+	if p.startupMode {
+		baseTimeout = BaseTimeoutStartup
+		timeoutIncrementStep = TimeoutIncrementStepStartup
+		maxTimeout = MaxTimeoutStartup
+		backoffTimeRatio = BackoffTimeRatioStartup
+		maxBackoff = MaxBackoffStartup
+	} else {
+		baseTimeout = BaseTimeoutNormal
+		timeoutIncrementStep = TimeoutIncrementStepNormal
+		maxTimeout = MaxTimeoutNormal
+		backoffTimeRatio = BackoffTimeRatioNormal
+		maxBackoff = MaxBackoffNormal
+	}
+
+	// First, advertise our service for each supported protocol version
 	for _, pid := range p.supportedProtoIDs() {
-		retries := 0
-		var err error
-		var w time.Duration
-
-		for retries < maxRetries {
-			ctx, cancel := context.WithTimeout(p.ctx, timeout)
-			start := time.Now()
-			w, err = p.disc.Advertise(ctx, string(pid))
-			elapsed := time.Since(start)
-			cancel()
-
-			// Store the last advertisement duration
-			p.lastAdvertiseDuration = elapsed
-
-			if err == nil {
-				newPeersDiscovered = true
-				p.logger.Debug().
-					Str("protocol", string(pid)).
-					Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
-					Int("retry", retries).
-					Msg("Advertise call completed")
-				break
-			}
-
-			p.logger.Debug().Err(err).
-				Str("protocol", string(pid)).
-				Int("retry", retries).
-				Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
-				Msg("Advertise failed, retrying")
-
-			// If the error is a timeout, increase the timeout duration
-			if errors.Is(err, context.DeadlineExceeded) {
-				p.logger.Debug().
-					Str("protocol", string(pid)).
-					Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
-					Msg("Advertise failed due to timeout, increasing timeout")
-
-				timeout += timeoutIncrementStep
-				if timeout > maxTimeout {
-					timeout = maxTimeout
-				}
-			}
-
-			retries++
-
-			// Dynamic backoff to avoid excessive retries
-			backoff := time.Duration(retries) * backoffTimeRatio
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-			time.Sleep(backoff)
-		}
+		ctx, cancel := context.WithTimeout(p.ctx, baseTimeout)
+		w, err := p.disc.Advertise(ctx, string(pid))
+		cancel()
 
 		if err != nil {
-			p.logger.Debug().Err(err).
-				Str("protocol", string(pid)).
-				Msg("Advertise failed after retries")
-			continue
+			p.logger.Debug().Err(err).Str("protocol", string(pid)).Msg("[Protocol] advertise failed")
+		} else {
+			p.logger.Debug().Str("protocol", string(pid)).Msg("[Protocol] advertise successful")
 		}
 
 		// Set the next wait time based on the response
@@ -341,19 +398,81 @@ func (p *Protocol) advertise() time.Duration {
 		}
 	}
 
-	// Ensure a minimum advertise interval
-	if nextWait < minAdvertiseInterval {
-		nextWait = minAdvertiseInterval
+	// Then try to find peers with exponential backoff
+	for i := 0; i < maxRetries; i++ {
+		timeout := baseTimeout + time.Duration(i)*timeoutIncrementStep
+		if timeout > maxTimeout {
+			timeout = maxTimeout
+		}
+
+		ctx, cancel := context.WithTimeout(p.ctx, timeout)
+		peers, err := p.disc.FindPeers(ctx, string(p.ProtoID()), p.getDHTRequestLimit())
+		cancel()
+
+		if err != nil {
+			p.logger.Warn().Err(err).Msg("[Protocol] failed to find peers")
+			nextWait = backoffTimeRatio + time.Duration(i)*timeoutIncrementStep
+			if nextWait > maxBackoff {
+				nextWait = maxBackoff
+			}
+			continue
+		}
+
+		// Count new peers discovered and filter for valid peers
+		newPeersCount := 0
+		validPeersFound := 0
+		targetValidPeers := p.getTargetValidPeers()
+
+		for peer := range peers {
+			// Skip self if host is available (nil check for test scenarios)
+			if p.config.Host != nil && p.config.Host.GetP2PHost() != nil {
+				if peer.ID == p.config.Host.GetP2PHost().ID() {
+					continue // Skip self
+				}
+			}
+
+			newPeersCount++
+
+			// TODO: Add more sophisticated peer validation here
+			// For now, we consider all non-self peers as potentially valid
+			// In the future, we could add validation for:
+			// - Same network type
+			// - Same shard
+			// - Active status
+			// - Protocol compatibility
+			if p.isValidPeer(peer) {
+				validPeersFound++
+			}
+		}
+
+		// Log discovery results
+		p.logger.Debug().
+			Int("totalPeers", newPeersCount).
+			Int("validPeers", validPeersFound).
+			Int("targetValid", targetValidPeers).
+			Msg("[Protocol] peer discovery results")
+
+		if validPeersFound >= targetValidPeers {
+			newPeersDiscovered = true
+			p.recentPeerDiscoveryCount = validPeersFound
+			p.logger.Info().Int("validPeers", validPeersFound).Msg("[Protocol] found sufficient valid peers")
+			break
+		} else if newPeersCount > 0 {
+			// Found some peers but not enough valid ones
+			p.recentPeerDiscoveryCount = validPeersFound
+			p.logger.Debug().Int("validPeers", validPeersFound).Int("target", targetValidPeers).Msg("[Protocol] found peers but not enough valid ones")
+		}
+
+		// No peers found, use exponential backoff
+		nextWait = backoffTimeRatio + time.Duration(i)*timeoutIncrementStep
+		if nextWait > maxBackoff {
+			nextWait = maxBackoff
+		}
 	}
 
-	// Adjust next wait time based on success/failure
-	if newPeersDiscovered {
-		nextWait += 10 * time.Second
-	} else {
-		nextWait /= 2
-		if nextWait < minAdvertiseInterval {
-			nextWait = minAdvertiseInterval
-		}
+	if !newPeersDiscovered {
+		p.recentPeerDiscoveryCount = 0
+		p.logger.Debug().Msg("[Protocol] no new peers found during advertisement")
 	}
 
 	return nextWait
@@ -449,4 +568,17 @@ func (p *Protocol) GetStreamManager() streammanager.StreamManager {
 // SubscribeAddStreamEvent subscribe the stream add event
 func (p *Protocol) SubscribeAddStreamEvent(ch chan<- streammanager.EvtStreamAdded) event.Subscription {
 	return p.sm.SubscribeAddStreamEvent(ch)
+}
+
+// ExitStartupMode exits startup mode early when enough peers are found
+func (p *Protocol) ExitStartupMode() {
+	if p.startupMode {
+		p.startupMode = false
+		p.logger.Info().Msg("Exiting startup mode early - sufficient peers found")
+	}
+}
+
+// IsInStartupMode returns true if the protocol is in startup mode
+func (p *Protocol) IsInStartupMode() bool {
+	return p.startupMode
 }
