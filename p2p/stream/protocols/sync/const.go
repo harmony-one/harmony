@@ -75,4 +75,62 @@ const (
 	// rateLimiterSingleRequestsPerSecond is the request per second limit for a single stream in the sync protocol.
 	// This constant helps prevent the node resource from exhausting from a single remote node.
 	rateLimiterSingleRequestsPerSecond = 10
+
+	// Advertisement timing constants for startup mode optimization
+	// Normal mode timings
+	BaseTimeoutNormal          = 300 * time.Second // 5 minutes base timeout
+	TimeoutIncrementStepNormal = 30 * time.Second  // 30 seconds increment
+	MaxTimeoutNormal           = 600 * time.Second // 10 minutes max timeout
+	BackoffTimeRatioNormal     = 5 * time.Second   // 5 seconds base backoff
+	MaxBackoffNormal           = 30 * time.Second  // 30 seconds max backoff
+
+	// Startup mode timings (faster for initial peer discovery)
+	BaseTimeoutStartup          = 30 * time.Second  // 30 seconds base timeout
+	TimeoutIncrementStepStartup = 10 * time.Second  // 10 seconds increment
+	MaxTimeoutStartup           = 120 * time.Second // 2 minutes max timeout
+	BackoffTimeRatioStartup     = 2 * time.Second   // 2 seconds base backoff
+	MaxBackoffStartup           = 15 * time.Second  // 15 seconds max backoff
+
+	// Advertisement loop timing constants
+	MinSleepTimeNormal  = 30 * time.Second // Minimum sleep time in normal mode
+	MaxSleepTimeNormal  = 60 * time.Minute // Maximum sleep time in normal mode
+	MinSleepTimeStartup = 10 * time.Second // Minimum sleep time in startup mode
+	MaxSleepTimeStartup = 2 * time.Minute  // Maximum sleep time in startup mode
+
+	// Startup mode duration
+	StartupModeDuration = 10 * time.Minute // How long to stay in startup mode
+
+	// Adaptive timing constants
+	SleepIncreasePerPeer = 1 * time.Second // Increase sleep time per peer found
+	SleepDecreaseRatio   = 0.7             // Decrease sleep time by 30% when no peers found
+
+	// DHT Request Limits - How many peers to request from DHT
+	// These should be higher than target limits because DHT may return invalid peers
+	// Based on stream sync configuration and realistic peer discovery ratios:
+	// - Mainnet: Request 20, expect ~8 valid (40% success rate)
+	// - Testnet: Request 8, expect ~2 valid (25% success rate)
+	// - Devnet: Request 12, expect ~4 valid (33% success rate)
+	DHTRequestLimitMainnet   = 20 // Request 20, expect ~8 valid
+	DHTRequestLimitTestnet   = 10 // Request 10, expect ~3 valid
+	DHTRequestLimitPangaea   = 10 // Request 10, expect ~3 valid
+	DHTRequestLimitPartner   = 10 // Request 10, expect ~3 valid
+	DHTRequestLimitStressnet = 12 // Request 12, expect ~4 valid
+	DHTRequestLimitDevnet    = 12 // Request 12, expect ~4 valid
+	DHTRequestLimitLocalnet  = 12 // Request 12, expect ~4 valid
+
+	// Target Valid Peer Counts - How many valid peers we want to find
+	// These are the actual peer counts we aim for after filtering
+	// Based on stream sync configuration requirements:
+	// - Mainnet: InitStreams=8, DiscSoftLowCap=8, DiscHardLowCap=6
+	// - Testnet: InitStreams=3, DiscSoftLowCap=3, DiscHardLowCap=3
+	// - Localnet: InitStreams=4, DiscSoftLowCap=4, DiscHardLowCap=4
+	// - Partner: InitStreams=3, DiscSoftLowCap=3, DiscHardLowCap=3
+	// - Else: InitStreams=4, DiscSoftLowCap=4, DiscHardLowCap=4
+	TargetValidPeersMainnet   = 8 // Target 8 valid peers (matches InitStreams)
+	TargetValidPeersTestnet   = 3 // Target 3 valid peers (matches InitStreams)
+	TargetValidPeersPangaea   = 3 // Target 3 valid peers (testnet-like)
+	TargetValidPeersPartner   = 3 // Target 3 valid peers (matches InitStreams)
+	TargetValidPeersStressnet = 4 // Target 4 valid peers (else config)
+	TargetValidPeersDevnet    = 4 // Target 4 valid peers (else config)
+	TargetValidPeersLocalnet  = 4 // Target 4 valid peers (matches InitStreams)
 )
