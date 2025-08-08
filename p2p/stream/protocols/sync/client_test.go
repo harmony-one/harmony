@@ -807,6 +807,10 @@ func (sm *testStreamManager) SubscribeRemoveStreamEvent(chan<- streammanager.Evt
 	return nil
 }
 
+func (sm *testStreamManager) SetEnoughStreamsCallback(callback func()) {
+	// No-op for test implementation
+}
+
 func (sm *testStreamManager) NewStream(stream sttypes.Stream) error {
 	stid := stream.ID()
 	for _, id := range sm.streamIDs {

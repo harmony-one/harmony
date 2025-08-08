@@ -41,6 +41,10 @@ func (sm *testStreamManager) SubscribeRemoveStreamEvent(ch chan<- streammanager.
 	return sm.removeFeed.Subscribe(ch)
 }
 
+func (sm *testStreamManager) SetEnoughStreamsCallback(callback func()) {
+	// No-op for test implementation
+}
+
 func (sm *testStreamManager) removeStream(stid sttypes.StreamID) {
 	sm.removeFeed.Send(streammanager.EvtStreamRemoved{ID: stid})
 }

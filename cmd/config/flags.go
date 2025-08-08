@@ -2004,7 +2004,7 @@ var (
 	}
 	syncInitStreamsFlag = cli.IntFlag{
 		Name:   "sync.init-peers",
-		Usage:  "Initial shard-wise number of peers to start syncing",
+		Usage:  "Initial shard-wise number of peers to start syncing (lower values reduce startup time)",
 		Hidden: true,
 	}
 	syncMaxAdvertiseWaitTimeFlag = cli.IntFlag{
@@ -2014,12 +2014,12 @@ var (
 	}
 	syncDiscSoftLowFlag = cli.IntFlag{
 		Name:   "sync.disc.soft-low-cap",
-		Usage:  "Soft low cap for sync stream management",
+		Usage:  "Soft low cap for sync stream management (triggers discovery every 30s when below this)",
 		Hidden: true,
 	}
 	syncDiscHardLowFlag = cli.IntFlag{
 		Name:   "sync.disc.hard-low-cap",
-		Usage:  "Hard low cap for sync stream management",
+		Usage:  "Hard low cap for sync stream management (triggers immediate discovery when below this)",
 		Hidden: true,
 	}
 	syncDiscHighFlag = cli.IntFlag{
@@ -2029,7 +2029,7 @@ var (
 	}
 	syncDiscBatchFlag = cli.IntFlag{
 		Name:   "sync.disc.batch",
-		Usage:  "batch size of the sync discovery",
+		Usage:  "batch size of the sync discovery (higher values can reduce startup time)",
 		Hidden: true,
 	}
 )

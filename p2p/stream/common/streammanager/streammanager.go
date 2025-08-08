@@ -72,6 +72,9 @@ type streamManager struct {
 
 	// limit concurrent setup of streams
 	setupSem chan struct{}
+
+	// callback for when enough streams are found
+	enoughStreamsCallback func()
 }
 
 type RemovalInfo struct {
@@ -134,6 +137,11 @@ func (rm *RemovalInfo) ResetCount() {
 	defer rm.mu.Unlock()
 
 	rm.count = 0
+}
+
+// SetEnoughStreamsCallback sets the callback function to be called when enough streams are found
+func (sm *streamManager) SetEnoughStreamsCallback(callback func()) {
+	sm.enoughStreamsCallback = callback
 }
 
 // NewStreamManager creates a new stream manager for the given proto ID
@@ -379,6 +387,12 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	sm.addStreamFeed.Send(EvtStreamAdded{st})
 	addedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
+
+	// Call callback if enough streams are found
+	if sm.enoughStreamsCallback != nil && sm.softHaveEnoughStreams() {
+		sm.enoughStreamsCallback()
+	}
+
 	return nil
 }
 
