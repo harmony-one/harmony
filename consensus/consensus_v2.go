@@ -398,7 +398,9 @@ func (consensus *Consensus) syncReadyChan(reason string) {
 
 func (consensus *Consensus) syncNotReadyChan(reason string) {
 	mode := consensus.current.Mode()
-	consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
+	header := consensus.Blockchain().CurrentHeader()
+	consensus.setBlockNum(header.Number().Uint64() + 1)
+	consensus.setViewIDs(header.ViewID().Uint64() + 1)
 	consensus.current.SetMode(Syncing)
 	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] syncNotReadyChan, prev %s, reason %s", mode.String(), reason)
 	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] Node is OUT OF SYNC, reason: %s", reason)
