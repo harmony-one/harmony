@@ -269,3 +269,6 @@ debug-delete-log:
 	@echo "[WARN] - it needs sudo to remove folder created with loki docker image user"
 	sudo rm -rf test/logs_aggregator/loki
 
+
+docker-go-test:
+	docker run --rm -it -v "$PWD":/go/src/github.com/harmony-one/harmony frozen621/harmony-test bash -c 'make go-test'

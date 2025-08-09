@@ -76,7 +76,7 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T, e
 			t.Error(err)
 		}
 		contract.Gas = gas
-		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false); err != nil {
+		if res, _, err := RunPrecompiledContract(p, env, contract, test.input, gas, false); err != nil {
 			if test.expectedError != nil {
 				if test.expectedError.Error() != err.Error() {
 					t.Errorf("Expected error %v, got %v", test.expectedError, err)
@@ -96,7 +96,7 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T, e
 }
 
 func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
-	var env = NewEVM(Context{CollectRewards: CollectRewardsFn(),
+	var env = NewEVM(BlockContext{CollectRewards: CollectRewardsFn(),
 		Delegate:        DelegateFn(),
 		Undelegate:      UndelegateFn(),
 		CreateValidator: CreateValidatorFn(),
@@ -104,7 +104,7 @@ func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
 		ShardID:         0,
 		//MigrateDelegations:    MigrateDelegationsFn(),
 		CalculateMigrationGas: CalculateMigrationGasFn(),
-	}, nil, params.TestChainConfig, Config{})
+	}, TxContext{}, nil, params.TestChainConfig, Config{})
 	p := &stakingPrecompile{}
 	testWriteCapablePrecompile(test, t, env, p)
 }
@@ -210,9 +210,12 @@ func TestStakingPrecompiles(t *testing.T) {
 }
 
 func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
-	p := &stakingPrecompile{}
-	expectedError := errWriteProtection
-	res, err := RunWriteCapablePrecompiledContract(p, nil, nil, []byte{}, true)
+	var (
+		p             = &stakingPrecompile{}
+		expectedError = errWriteProtection
+		env           = NewEVM(BlockContext{ShardID: 1}, TxContext{}, nil, params.TestChainConfig, Config{})
+		res, _, err   = RunPrecompiledContract(p, env, nil, []byte{}, 0, true)
+	)
 	if err != nil {
 		if err.Error() != expectedError.Error() {
 			t.Errorf("Expected error %v, got %v", expectedError, err)
@@ -243,13 +246,13 @@ func testCrossShardXferPrecompile(test writeCapablePrecompileTest, t *testing.T)
 	if err != nil {
 		t.Fatalf("Error while initializing state %s", err)
 	}
-	var env = NewEVM(Context{
+	var env = NewEVM(BlockContext{
 		NumShards: 4,
 		Transfer:  transfer,
 		CanTransfer: func(_ StateDB, _ common.Address, _ *big.Int) bool {
 			return true
 		},
-	}, state, params.TestChainConfig, Config{})
+	}, TxContext{}, state, params.TestChainConfig, Config{})
 	p := &crossShardXferPrecompile{}
 	testWriteCapablePrecompile(test, t, env, p)
 }
@@ -515,7 +518,7 @@ func printByteArrayWithCommas(arr []byte) string {
 
 func TestEIP2537Precompile(t *testing.T) {
 	precompile := &eip2537Precompile{}
-	evm := NewEVM(Context{}, nil, params.TestChainConfig, Config{})
+	evm := NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 
 	for ti, tc := range bls12381TestCases {
 		inputs, fullInput := compileInputs(tc.input)
