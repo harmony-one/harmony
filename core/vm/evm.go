@@ -23,8 +23,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/holiman/uint256"
 )
@@ -187,53 +187,6 @@ type TxContext struct {
 	GasPrice *big.Int       // Provides information for GASPRICE
 }
 
-// BlockContext provides the EVM with auxiliary information. Once provided
-// it shouldn't be modified.
-type BlockContext struct {
-	// CanTransfer returns whether the account contains
-	// sufficient ether to transfer the value
-	CanTransfer CanTransferFunc
-	// Transfer transfers ether from one account to the other
-	Transfer TransferFunc
-	// GetHash returns the hash corresponding to n
-	GetHash GetHashFunc
-	// GetVRF returns the VRF corresponding to n
-	GetVRF GetVRFFunc
-
-	// IsValidator determines whether the address corresponds to a validator or a smart contract
-	// true: is a validator address; false: is smart contract address
-	IsValidator IsValidatorFunc
-
-	// Block information
-	Coinbase    common.Address // Provides information for COINBASE
-	GasLimit    uint64         // Provides information for GASLIMIT
-	BlockNumber *big.Int       // Provides information for NUMBER
-	EpochNumber *big.Int       // Provides information for EPOCH
-	Time        *big.Int       // Provides information for TIME
-	VRF         common.Hash    // Provides information for VRF
-
-	ShardID   uint32 // Used by staking and cross shard transfer precompile
-	NumShards uint32 // Used by cross shard transfer precompile
-
-	CreateValidator       CreateValidatorFunc
-	EditValidator         EditValidatorFunc
-	Delegate              DelegateFunc
-	Undelegate            UndelegateFunc
-	CollectRewards        CollectRewardsFunc
-	CalculateMigrationGas CalculateMigrationGasFunc
-
-	TxType types.TransactionType
-}
-
-// TxContext provides the EVM with information about a transaction.
-// All fields can change between transactions.
-type TxContext struct {
-	// Message information
-	Origin   common.Address // Provides information for ORIGIN
-	GasPrice *big.Int       // Provides information for GASPRICE
-
-}
-
 // EVM is the Ethereum Virtual Machine base object and provides
 // the necessary tools to run a contract on the given state with
 // the provided context. It should be noted that any error
@@ -329,7 +282,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		StateDB:     statedb,
 		Config:      config,
 		chainConfig: chainConfig,
-		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
+		chainRules:  chainConfig.Rules(blockCtx.EpochNumber),
 	}
 	evm.interpreter = NewEVMInterpreter(evm, config)
 	return evm
