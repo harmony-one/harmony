@@ -705,9 +705,16 @@ func generateOneMigrationMessage(
 
 // ProcessParentBlockHash stores the parent block hash in the history storage contract
 // as per EIP-2935.
-func ProcessParentBlockHash(statedb *state.DB, prevHash common.Hash, prevNumber uint64) {
-	ringIndex := prevNumber % params.HistoryServeWindow
+func ProcessParentBlockHash(statedb *state.DB, prevHash common.Hash, blockNumber uint64) {
+	// For now, implement a simple version that directly stores the hash in state
+	// This avoids the complex EVM dependencies that are missing from this codebase
+	// TODO: Implement full EVM-based version when all dependencies are available
+
+	// Calculate the ring index for the history storage based on block number
+	ringIndex := blockNumber % params.HistoryServeWindow
 	var key common.Hash
 	binary.BigEndian.PutUint64(key[24:], ringIndex)
+
+	// Store the hash directly in the state
 	statedb.SetState(params.HistoryStorageAddress, key, prevHash)
 }
