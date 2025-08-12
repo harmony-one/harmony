@@ -134,7 +134,7 @@ func (p *StateProcessor) Process(
 
 	if p.bc.Config().IsPrague(block.Epoch()) {
 		// This should not underflow as genesis block is not processed.
-		ProcessParentBlockHash(statedb, block.ParentHash(), block.NumberU64()-1)
+		ProcessBlockHashHistory(statedb, block.Header(), p.bc.Config(), p.bc)
 	}
 
 	processTxsAndStxs := true
@@ -701,6 +701,41 @@ func generateOneMigrationMessage(
 		}
 	}
 	return nil, nil
+}
+
+// ProcessBlockHashHistory is called at every block to insert the parent block hash
+// in the history storage contract as per EIP-2935. At the EIP-2935 fork block, it
+// populates the whole buffer with block hashes.
+func ProcessBlockHashHistory(statedb *state.DB, header *block.Header, chainConfig *params.ChainConfig, chain BlockChain) {
+	var (
+		prevHash   = header.ParentHash()
+		parent     = chain.GetHeaderByHash(prevHash)
+		number     = header.Number().Uint64()
+		prevNumber = parent.Number().Uint64()
+	)
+
+	// Store the immediate parent hash
+	ProcessParentBlockHash(statedb, prevHash, prevNumber)
+
+	// If this is the EIP-2935 fork block or genesis, populate the entire history buffer
+	if chainConfig.IsPrague(parent.Epoch()) || prevNumber == 0 {
+		return
+	}
+
+	// Populate the history buffer with all available block hashes
+	var low uint64
+	if number > params.HistoryServeWindow {
+		low = number - params.HistoryServeWindow
+	}
+
+	// Walk backwards through the chain to populate the history buffer
+	for i := prevNumber; i > low; i-- {
+		ProcessParentBlockHash(statedb, parent.ParentHash(), i-1)
+		parent = chain.GetHeader(parent.ParentHash(), i-1)
+		if parent == nil {
+			break // Stop if we can't find the parent
+		}
+	}
 }
 
 // ProcessParentBlockHash stores the parent block hash in the history storage contract
