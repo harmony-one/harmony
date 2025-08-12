@@ -10,7 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/state"
 	hmyState "github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -272,19 +273,15 @@ func TestPrepare(t *testing.T) {
 }
 
 func TestProcessBlockHashHistory(t *testing.T) {
-	key, _ := crypto.GenerateKey()
-	_, statedb, header, _ := getTestEnvironment(*key)
+	// Create a simple state database for testing
+	database := rawdb.NewMemoryDatabase()
+	statedb, err := state.New(common.Hash{}, state.NewDatabase(database), nil)
+	if err != nil {
+		t.Fatal("Failed to create state database:", err)
+	}
+
 	hashA := common.Hash{0x01}
 	hashB := common.Hash{0x02}
-
-	header.SetNumber(big.NewInt(2))
-	header.SetParentHash(hashA)
-	parent := &block.Header{}
-	parent.SetNumber(big.NewInt(1))
-	parent.SetParentHash(hashB)
-	genesis := &block.Header{}
-	genesis.SetNumber(big.NewInt(0))
-	genesis.SetParentHash(common.Hash{})
 
 	// Store the hashes directly in the state to test the basic functionality
 	storeParentBlockHash(statedb, 1, hashA)
