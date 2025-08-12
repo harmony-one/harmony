@@ -333,7 +333,13 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
-		ret, gas, err = RunPrecompiledContract(p, input, gas)
+		addrCopy := addr
+		// If the account has no code, we can abort here
+		// The depth-check is already done, and precompiles handled above
+		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
+		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
+
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
@@ -401,9 +407,27 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		}(gas)
 	}
 
+	//codeHash := evm.StateDB.GetCodeHash(addr)
+	code := evm.StateDB.GetCode(addr)
+	if len(code) == 0 {
+		ret, err = nil, nil // gas is unchanged
+	}
+
+	// If address is a validator address, then it's not a smart contract address
+	// we don't use its code and codeHash fields
+	if evm.Context.IsValidator(evm.StateDB, addr) {
+		//codeHash = emptyCodeHash
+		code = nil
+	}
+
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = RunPrecompiledContract(p, input, gas)
+		addrCopy := addr
+		// If the account has no code, we can abort here
+		// The depth-check is already done, and precompiles handled above
+		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
+		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -444,7 +468,12 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = RunPrecompiledContract(p, input, gas)
+		addrCopy := addr
+		// If the account has no code, we can abort here
+		// The depth-check is already done, and precompiles handled above
+		contract := NewContract(caller, AccountRef(addrCopy), nil, gas).AsDelegate()
+		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addr))
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and make initialise the delegate values
@@ -493,7 +522,12 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	}
 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = RunPrecompiledContract(p, input, gas)
+		addrCopy := addr
+		// Initialise a new contract and set the code that is to be used by the EVM.
+		// The contract is a scoped environment for this execution context only.
+		contract := NewContract(caller, AccountRef(addrCopy), new(big.Int), gas)
+		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, true)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'
