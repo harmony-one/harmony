@@ -91,6 +91,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -150,6 +151,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -208,6 +210,7 @@ var (
 		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -268,6 +271,7 @@ var (
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              big.NewInt(47190),
 		TimestampValidationEpoch:              big.NewInt(47190),
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -327,6 +331,7 @@ var (
 		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -385,6 +390,7 @@ var (
 		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -446,6 +452,7 @@ var (
 		big.NewInt(0),                      // EIP6780Epoch
 		big.NewInt(0),                      // NTPEpoch
 		big.NewInt(0),                      // TimestampValidationEpoch
+		big.NewInt(0),                      // PragueEpoch
 	}
 
 	// TestChainConfig ...
@@ -507,6 +514,7 @@ var (
 		big.NewInt(0),        // EIP6780Epoch
 		big.NewInt(0),        // NTPEpoch
 		big.NewInt(0),        // TimestampValidationEpoch
+		big.NewInt(0),        // PragueEpoch
 	}
 
 	// TestRules ...
@@ -717,11 +725,13 @@ type ChainConfig struct {
 	// TimestampValidationEpoch is the first epoch to enforce strict monotonic
 	// and future-bounded block timestamp checks during header verification.
 	TimestampValidationEpoch *big.Int `json:"timestamp-validation-epoch,omitempty"`
+	// PragueEpoch is the first epoch to support the Prague feature
+	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v EIP1153TransientStorageEpoch: %v EIP7939CLZEpoch: %v EIP5656McopyEpoch: %v EIP3860Epoch: %v EIP6780Epoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v EIP1153TransientStorageEpoch: %v EIP7939CLZEpoch: %v EIP5656McopyEpoch: %v EIP3860Epoch: %v EIP6780Epoch: %v PragueEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -739,6 +749,7 @@ func (c *ChainConfig) String() string {
 		c.EIP5656McopyEpoch,
 		c.EIP3860Epoch,
 		c.EIP6780Epoch,
+		c.PragueEpoch,
 	)
 }
 
@@ -1058,6 +1069,10 @@ func (c *ChainConfig) IsMaxRate(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 	return isForked(c.TopMaxRateEpoch, epoch)
+}
+
+func (c *ChainConfig) IsPrague(epoch *big.Int) bool {
+	return isForked(c.PragueEpoch, epoch)
 }
 
 // During this epoch, shards 2 and 3 will start sending
