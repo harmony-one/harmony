@@ -117,6 +117,7 @@ func (evm *EVM) precompile(addr common.Address) (WriteCapablePrecompiledContract
 	//return p, ok || ok2
 }
 
+/*
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
 func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
 	for _, interpreter := range evm.interpreters {
@@ -140,6 +141,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 	p, ok := precompiles[addr]
 	return p, ok
 }
+*/
 
 // BlockContext provides the EVM with auxiliary information. Once provided
 // it shouldn't be modified.
