@@ -2,6 +2,7 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/block"
+	hmyState "github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
@@ -266,4 +269,40 @@ func TestPrepare(t *testing.T) {
 	if value != (common.Hash{}) {
 		t.Fatal("value should be empty")
 	}
+}
+
+func TestProcessBlockHashHistory(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	_, statedb, header, _ := getTestEnvironment(*key)
+	hashA := common.Hash{0x01}
+	hashB := common.Hash{0x02}
+
+	header.SetNumber(big.NewInt(2))
+	header.SetParentHash(hashA)
+	parent := &block.Header{}
+	parent.SetNumber(big.NewInt(1))
+	parent.SetParentHash(hashB)
+	parentParent := &block.Header{}
+	parentParent.SetNumber(big.NewInt(0))
+	parentParent.SetParentHash(common.Hash{})
+
+	// Test the core functionality directly by calling ProcessParentBlockHash
+	// This avoids the need to implement the full BlockChain interface
+	ProcessParentBlockHash(statedb, 1, hashA)
+	ProcessParentBlockHash(statedb, 0, hashB)
+
+	// make sure that the state is correct
+	if have := getParentBlockHash(statedb, 1); have != hashA {
+		t.Fail()
+	}
+	if have := getParentBlockHash(statedb, 0); have != hashB {
+		t.Fail()
+	}
+}
+
+func getParentBlockHash(statedb *hmyState.DB, number uint64) common.Hash {
+	ringIndex := number % params.HistoryServeWindow
+	var key common.Hash
+	binary.BigEndian.PutUint64(key[24:], ringIndex)
+	return statedb.GetState(params.HistoryStorageAddress, key)
 }
