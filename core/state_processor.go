@@ -133,7 +133,8 @@ func (p *StateProcessor) Process(
 	}
 
 	if p.bc.Config().IsPrague(block.Epoch()) {
-		ProcessParentBlockHash(statedb, block.NumberU64()-1, block.ParentHash())
+		// This should not underflow as genesis block is not processed.
+		ProcessParentBlockHash(statedb, block.ParentHash(), block.NumberU64()-1)
 	}
 
 	processTxsAndStxs := true
@@ -702,34 +703,9 @@ func generateOneMigrationMessage(
 	return nil, nil
 }
 
-// ProcessBlockHashHistory is called at every block to insert the parent block hash
-// in the history storage contract as per EIP-2935. At the EIP-2935 fork block, it
-// populates the whole buffer with block hashes.
-func ProcessBlockHashHistory(statedb *state.DB, header *block.Header, chainConfig *params.ChainConfig, chain BlockChain) {
-	var (
-		prevHash   = header.ParentHash()
-		parent     = chain.GetHeaderByHash(prevHash)
-		number     = header.Number().Uint64()
-		prevNumber = parent.Number().Uint64()
-	)
-	ProcessParentBlockHash(statedb, prevNumber, prevHash)
-	// History already inserted.
-	if chainConfig.IsPrague(parent.Epoch()) || prevNumber == 0 {
-		return
-	}
-	var low uint64
-	if number > params.HistoryServeWindow {
-		low = number - params.HistoryServeWindow
-	}
-	for i := prevNumber; i > low; i-- {
-		ProcessParentBlockHash(statedb, i-1, parent.ParentHash())
-		parent = chain.GetHeader(parent.ParentHash(), i-1)
-	}
-}
-
 // ProcessParentBlockHash stores the parent block hash in the history storage contract
 // as per EIP-2935.
-func ProcessParentBlockHash(statedb *state.DB, prevNumber uint64, prevHash common.Hash) {
+func ProcessParentBlockHash(statedb *state.DB, prevHash common.Hash, prevNumber uint64) {
 	ringIndex := prevNumber % params.HistoryServeWindow
 	var key common.Hash
 	binary.BigEndian.PutUint64(key[24:], ringIndex)
