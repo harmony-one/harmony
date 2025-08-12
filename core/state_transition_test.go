@@ -282,14 +282,12 @@ func TestProcessBlockHashHistory(t *testing.T) {
 	parent := &block.Header{}
 	parent.SetNumber(big.NewInt(1))
 	parent.SetParentHash(hashB)
-	parentParent := &block.Header{}
-	parentParent.SetNumber(big.NewInt(0))
-	parentParent.SetParentHash(common.Hash{})
+	genesis := &block.Header{}
+	genesis.SetNumber(big.NewInt(0))
+	genesis.SetParentHash(common.Hash{})
 
-	// Test the core functionality directly by calling ProcessParentBlockHash
-	// This avoids the need to implement the full BlockChain interface
-	ProcessParentBlockHash(statedb, 1, hashA)
-	ProcessParentBlockHash(statedb, 0, hashB)
+	ProcessParentBlockHash(statedb, header.ParentHash(), parent.Number().Uint64())
+	ProcessParentBlockHash(statedb, parent.ParentHash(), genesis.Number().Uint64())
 
 	// make sure that the state is correct
 	if have := getParentBlockHash(statedb, 1); have != hashA {
