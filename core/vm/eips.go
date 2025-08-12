@@ -171,8 +171,8 @@ func enable3198(jt *JumpTable) {
 
 // opBaseFee implements BASEFEE opcode
 func opBaseFee(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	baseFee, _ := uint256.FromBig(interpreter.evm.Context.BaseFee)
-	scope.Stack.push(baseFee)
+	//baseFee, _ := uint256.FromBig(interpreter.evm.Context.BaseFee) // TODO implement
+	//scope.Stack.push(baseFee)
 	return nil, nil
 }
 
