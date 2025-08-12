@@ -988,7 +988,7 @@ type Rules struct {
 	IsConstantinople, // is the same as IsS3
 	IsPetersburg, // is the same as IsS3
 	// precompiles
-	IsIstanbul, IsByzantium, IsBerlin, IsVRF, IsPrevVRF, IsSHA3,
+	IsIstanbul, IsByzantium, IsBerlin, IsLondon, IsVRF, IsPrevVRF, IsSHA3,
 	IsStakingPrecompile, IsCrossShardXferPrecompile,
 	IsEIP2537Precompile,
 	// eip-155 chain id fix
