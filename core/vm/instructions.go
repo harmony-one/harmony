@@ -595,6 +595,7 @@ func opGasprice(pc *uint64, interpreter *EVMInterpreter, contract *Contract, mem
 
 func opBlockhash(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	num := stack.pop()
+	num64 := num.Uint64()
 
 	n := interpreter.intPool.get().Sub(interpreter.evm.BlockNumber, common.Big257)
 	if num.Cmp(n) > 0 && num.Cmp(interpreter.evm.BlockNumber) < 0 {
@@ -602,6 +603,21 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, contract *Contract, me
 	} else {
 		stack.push(interpreter.intPool.getZero())
 	}
+
+	var upper, lower uint64
+	upper = interpreter.evm.Context.BlockNumber.Uint64()
+	if upper < 257 {
+		lower = 0
+	} else {
+		lower = upper - 256
+	}
+
+	if num64 >= lower && num64 < upper {
+		num.SetBytes(interpreter.evm.Context.GetHash(num64).Bytes())
+	} else {
+		num.SetUint64(0)
+	}
+
 	interpreter.intPool.put(num, n)
 	return nil, nil
 }

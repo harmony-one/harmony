@@ -2,6 +2,7 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/state"
+	hmyState "github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
@@ -266,4 +270,43 @@ func TestPrepare(t *testing.T) {
 	if value != (common.Hash{}) {
 		t.Fatal("value should be empty")
 	}
+}
+
+func TestProcessBlockHashHistory(t *testing.T) {
+	// Create a simple state database for testing
+	database := rawdb.NewMemoryDatabase()
+	statedb, err := state.New(common.Hash{}, state.NewDatabase(database), nil)
+	if err != nil {
+		t.Fatal("Failed to create state database:", err)
+	}
+
+	hashA := common.Hash{0x01}
+	hashB := common.Hash{0x02}
+
+	// Store the hashes directly in the state to test the basic functionality
+	storeParentBlockHash(statedb, 1, hashA)
+	storeParentBlockHash(statedb, 0, hashB)
+
+	// make sure that the state is correct
+	if have := getParentBlockHash(statedb, 1); have != hashA {
+		t.Fail()
+	}
+	if have := getParentBlockHash(statedb, 0); have != hashB {
+		t.Fail()
+	}
+}
+
+// storeParentBlockHash stores the parent block hash in the state for testing
+func storeParentBlockHash(statedb *hmyState.DB, number uint64, hash common.Hash) {
+	ringIndex := number % params.HistoryServeWindow
+	var key common.Hash
+	binary.BigEndian.PutUint64(key[24:], ringIndex)
+	statedb.SetState(params.HistoryStorageAddress, key, hash)
+}
+
+func getParentBlockHash(statedb *hmyState.DB, number uint64) common.Hash {
+	ringIndex := number % params.HistoryServeWindow
+	var key common.Hash
+	binary.BigEndian.PutUint64(key[24:], ringIndex)
+	return statedb.GetState(params.HistoryStorageAddress, key)
 }

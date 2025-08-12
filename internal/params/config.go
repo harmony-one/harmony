@@ -83,6 +83,7 @@ var (
 		HIP32Epoch:                            big.NewInt(2152), // 2024-10-31 13:02 UTC
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -133,6 +134,7 @@ var (
 		TestnetExternalEpoch:                  big.NewInt(3044),
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -183,6 +185,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -234,6 +237,7 @@ var (
 		DevnetExternalEpoch:                   big.NewInt(144),
 		IsOneSecondEpoch:                      big.NewInt(17436),
 		EIP2537PrecompileEpoch:                EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -285,6 +289,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -335,6 +340,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      big.NewInt(4),
 		EIP2537PrecompileEpoch:                EpochTBD,
+		PragueEpoch:                           EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -388,6 +394,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0), // EIP2537PrecompileEpoch
+		big.NewInt(0), // PragueEpoch
 	}
 
 	// TestChainConfig ...
@@ -441,6 +448,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0), // EIP2537PrecompileEpoch
+		big.NewInt(0), // PragueEpoch
 	}
 
 	// TestRules ...
@@ -627,6 +635,8 @@ type ChainConfig struct {
 	HIP32Epoch *big.Int `json:"hip32-epoch,omitempty"`
 
 	IsOneSecondEpoch *big.Int `json:"is-one-second-epoch,omitempty"`
+
+	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -922,6 +932,10 @@ func (c *ChainConfig) IsMaxRate(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 	return isForked(c.TopMaxRateEpoch, epoch)
+}
+
+func (c *ChainConfig) IsPrague(epoch *big.Int) bool {
+	return isForked(c.PragueEpoch, epoch)
 }
 
 // During this epoch, shards 2 and 3 will start sending
