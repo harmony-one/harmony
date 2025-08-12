@@ -58,8 +58,9 @@ type Contract struct {
 	CodeAddr *common.Address
 	Input    []byte
 
-	Gas   uint64
-	value *big.Int
+	Gas             uint64
+	value           *big.Int
+	WithDataCopyFix bool // with fix for https://github.com/ethereum/go-ethereum/pull/23446
 }
 
 // NewContract returns a new contract environment for the execution of EVM.
