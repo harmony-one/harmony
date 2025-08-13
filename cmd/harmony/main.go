@@ -613,6 +613,7 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		DialTimeout:                     hc.P2P.DialTimeout,
 		Muxer:                           hc.P2P.Muxer,
 		NoRelay:                         hc.P2P.NoRelay,
+		IsBootNode:                      false,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")

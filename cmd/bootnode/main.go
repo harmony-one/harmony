@@ -176,6 +176,7 @@ func main() {
 		DialTimeout:                     time.Minute,
 		Muxer:                           *muxer,
 		NoRelay:                         *noRelay,
+		IsBootNode:                      true,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")
