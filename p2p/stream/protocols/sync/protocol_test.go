@@ -107,6 +107,8 @@ func (disc *testDiscovery) FindPeers(ctx context.Context, ns string, peerLimit i
 	return nil, nil
 }
 
-func (disc *testDiscovery) GetRawDiscovery() discovery.Discovery {
+// todo(sun): revert in phase 2
+// func (disc *testDiscovery) GetRawDiscovery() discovery.Discovery {
+func (disc *testDiscovery) GetRawDiscovery() []discovery.Discovery {
 	return nil
 }

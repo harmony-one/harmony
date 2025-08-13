@@ -101,6 +101,8 @@ const (
 	MaxMessageHandlers = SetAsideForConsensus + SetAsideOtherwise
 	// MaxMessageSize is 2Mb
 	MaxMessageSize = 1 << 21
+	// Harmony specific kad-dht protocol
+	HarmonyKadPrefix = "/harmony/kad/1.0.0"
 )
 
 // HostConfig is the config structure to create a new host
@@ -127,6 +129,7 @@ type HostConfig struct {
 	DialTimeout                     time.Duration
 	Muxer                           string
 	NoRelay                         bool
+	IsBootNode                      bool
 }
 
 func init() {
@@ -150,6 +153,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		key           = cfg.BLSKey
 		pub           = cfg.BLSKey.GetPublic()
 		dataStorePath = cfg.DataStoreFile
+		isBootNode    = cfg.IsBootNode
 	)
 
 	pubKey := key.GetPublic()
@@ -344,12 +348,32 @@ func NewHost(cfg HostConfig) (Host, error) {
 		cancel()
 		return nil, errors.Wrapf(err, "initialize libp2p raw options failed")
 	}
-	idht, errDHT := dht.New(ctx, p2pHost, opts...)
-	if errDHT != nil {
-		cancel()
-		return nil, errors.Wrapf(errDHT, "cannot initialize libp2p DHT")
+
+	// todo(sun): for now, bootnodes should support both ipfs and harmony kad protocol
+	// todo(sun): all other nodes should only support harmony kad protocol
+	// bootnode supports both ipfs and harmony kad protocol during transition period
+	dhts := []*dht.IpfsDHT{}
+	if isBootNode {
+		utils.Logger().Info().Msg("Bootnode is configured to support the legacy IPFS KAD protocol for transition.")
+		legacyOpts := append(opts, dht.ProtocolPrefix(protocol.ID("/ipfs/kad/1.0.0")))
+		legacyDht, err := dht.New(ctx, p2pHost, legacyOpts...)
+		if err != nil {
+			cancel()
+			return nil, errors.Wrapf(err, "cannot initialize legacy libp2p DHT")
+		}
+		dhts = append(dhts, legacyDht)
 	}
-	disc, err := discovery.NewDHTDiscovery(ctx, cancel, p2pHost, idht, opt)
+
+	// all other nodes should only support harmony kad protocol
+	harmonyOpts := append(opts, dht.ProtocolPrefix(protocol.ID(HarmonyKadPrefix)))
+	harmonyDht, err := dht.New(ctx, p2pHost, harmonyOpts...)
+	if err != nil {
+		cancel()
+		return nil, errors.Wrapf(err, "cannot initialize harmony libp2p DHT")
+	}
+	dhts = append(dhts, harmonyDht)
+
+	disc, err := discovery.NewDHTDiscovery(ctx, cancel, p2pHost, opt, dhts...)
 	if err != nil {
 		cancel()
 		p2pHost.Close()
