@@ -97,6 +97,12 @@ const (
 	DefaultMuxer = "yamux, mplexC6"
 	// DefaultNoRelay disables p2p host relay
 	DefaultNoRelay = true
+	// DefaultEnableQuic enables QUIC transport
+	DefaultEnableQuic = false
+	// DefaultQuicPort is the default port for QUIC transport
+	DefaultQuicPort = 9001
+	// DefaultQuicPriority prioritizes QUIC transport over TCP
+	DefaultQuicPriority = false
 )
 
 const (
