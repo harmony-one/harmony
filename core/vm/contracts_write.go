@@ -129,7 +129,7 @@ func (c *stakingPrecompile) RunWriteCapable(
 	}
 
 	var rosettaBlockTracer RosettaTracer
-	if tmpTracker, ok := evm.vmConfig.Tracer.(RosettaTracer); ok {
+	if tmpTracker, ok := evm.Config.Tracer.(RosettaTracer); ok {
 		rosettaBlockTracer = tmpTracker
 	}
 
