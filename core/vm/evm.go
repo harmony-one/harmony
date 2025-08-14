@@ -269,6 +269,15 @@ func (evm *EVM) Interpreter() *EVMInterpreter {
 	return evm.interpreter
 }
 
+// SetTxContext resets the EVM with a new transaction context.
+// This is not threadsafe and should only be done very cautiously.
+func (evm *EVM) SetTxContext(txCtx TxContext) {
+	//if evm.chainRules.IsEIP4762 {
+	//	txCtx.AccessEvents = state.NewAccessEvents(evm.StateDB.PointCache())
+	//}
+	evm.TxContext = txCtx
+}
+
 // Call executes the contract associated with the addr with the given input as
 // parameters. It also handles any necessary value transfer required and takes
 // the necessary steps to create accounts and reverses the state in case of an
