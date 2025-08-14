@@ -400,14 +400,13 @@ func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode,
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
-func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error {
+func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) {
 	jst.cur.output = output
 	jst.cur.gasUsed = gasUsed
 	if err != nil {
 		jst.cur.err = err
 	}
 	jst.tracers = append(jst.tracers, jst.cur)
-	return nil
 }
 
 // get TraceBlockStorage from tracer, then store it to db
