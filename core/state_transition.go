@@ -232,7 +232,7 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 
 	// Execute the preparatory steps for state transition which includes:
 	// - reset transient storage(eip 1153)
-	st.evm.StateDB.Prepare()
+	// st.evm.StateDB.Prepare() TODO eip 1153
 	evm := st.evm
 
 	var ret []byte
@@ -339,7 +339,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	// Execute the preparatory steps for state transition which includes:
 	// - reset transient storage(eip 1153)
-	st.evm.StateDB.Prepare()
+	// st.evm.StateDB.Prepare() TODO eip 1153
 
 	// Increment the nonce for the next transaction
 	st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
