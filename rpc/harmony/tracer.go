@@ -205,7 +205,7 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 
 	// Execute the trace
 	msg := args.ToMessage(s.hmy.RPCGasCap)
-	vmctx := core.NewEVMContext(msg, header, s.hmy.BlockChain, nil)
+	vmctx := core.NewEVMBlockContext(msg, header, s.hmy.BlockChain, nil)
 
 	// Apply overrides customization if required
 	if config != nil {
@@ -216,14 +216,13 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 		// This is different than the behavior of `eth_call (doCall())`, which simulates the call with updated precompiles.
 		if config.Stateoverrides != nil {
 			// need a copy to prevent altering the original precompiles
-			precompiles := make(map[common.Address]vm.PrecompiledContract)
+			precompiles := make(map[common.Address]vm.WriteCapablePrecompiledContract)
 			for addr, contract := range vm.PrecompiledContractsStaking {
 				precompiles[addr] = contract
 			}
 			config.Stateoverrides.Apply(statedb, precompiles)
 		}
 	}
-
 	// Trace the transaction and return
 	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 }
