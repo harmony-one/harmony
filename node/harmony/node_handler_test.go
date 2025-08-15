@@ -39,7 +39,7 @@ func TestAddNewBlock(t *testing.T) {
 		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
 	)
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+		quorum.SuperMajorityVote, shard.BeaconChainShardID, false,
 	)
 	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
@@ -97,7 +97,7 @@ func TestVerifyNewBlock(t *testing.T) {
 		nil, testDBFactory, &core.GenesisInitializer{NetworkType: nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType()}, engine, &chainconfig,
 	)
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+		quorum.SuperMajorityVote, shard.BeaconChainShardID, false,
 	)
 	blockchain, err := collection.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
@@ -161,7 +161,7 @@ func TestVerifyVRF(t *testing.T) {
 		t.Fatal("cannot get blockchain")
 	}
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+		quorum.SuperMajorityVote, shard.BeaconChainShardID, false,
 	)
 	reg := registry.New().
 		SetBlockchain(blockchain).

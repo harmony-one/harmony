@@ -23,6 +23,8 @@ type uniformVoteWeight struct {
 
 	lastPowerSignersCountCache map[Phase]int64
 	lastParticipantsCount      int64
+
+	useGTforQuorumChecking bool
 }
 
 // Policy ..
@@ -60,7 +62,11 @@ func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	}
 	threshold := v.TwoThirdsSignersCount()
 	currentTotalPower := utils.CountOneBits(mask.Bitmap)
-	if currentTotalPower < threshold {
+	enoughVotingPower := currentTotalPower >= threshold
+	if v.useGTforQuorumChecking {
+		enoughVotingPower = currentTotalPower > threshold
+	}
+	if !enoughVotingPower {
 		const msg = "[IsQuorumAchievedByMask] Not enough voting power: need %+v, have %+v"
 		utils.Logger().Warn().Msgf(msg, threshold, currentTotalPower)
 		return false
