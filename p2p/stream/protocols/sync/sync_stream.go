@@ -62,6 +62,7 @@ func (st *syncStream) run() {
 
 	go st.handleReqLoop()
 	go st.handleRespLoop()
+	go st.monitorStreamHealth()
 	st.readMsgLoop()
 }
 
@@ -439,8 +440,15 @@ func (st *syncStream) handleResp(resp *syncpb.Response) {
 }
 
 func (st *syncStream) readMsg() (*syncpb.Message, error) {
-	b, err := st.ReadBytes()
+	// Use progress-based reading with the tracker from BaseStream
+	b, err := st.ReadBytesWithProgress(st.GetProgressTracker())
 	if err != nil {
+		// Log progress timeout specifically
+		if err.Error() == "progress timeout" {
+			st.logger.Warn().
+				Str("streamID", string(st.ID())).
+				Msg("stream timeout due to lack of progress")
+		}
 		return nil, err
 	}
 	if b == nil || len(b) == 0 {
@@ -649,4 +657,45 @@ func bytesToHashes(bs [][]byte) []common.Hash {
 		hs = append(hs, h)
 	}
 	return hs
+}
+
+// monitorStreamHealth monitors the stream health and implements progress-based timeout
+func (st *syncStream) monitorStreamHealth() {
+	config := st.GetTimeoutConfig()
+	if config == nil {
+		config = sttypes.DefaultStreamTimeoutConfig()
+	}
+
+	ticker := time.NewTicker(config.HealthCheckInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			progressTracker := st.GetProgressTracker()
+			if progressTracker != nil {
+				if progressTracker.ShouldTimeout() {
+					st.logger.Warn().
+						Str("streamID", string(st.ID())).
+						Msg("stream timeout due to lack of progress")
+					if err := st.Close("progress timeout", false); err != nil {
+						st.logger.Err(err).Msg("failed to close stream on progress timeout")
+					}
+					return
+				}
+
+				if progressTracker.ShouldIdleTimeout() {
+					st.logger.Warn().
+						Str("streamID", string(st.ID())).
+						Msg("stream timeout due to inactivity")
+					if err := st.Close("idle timeout", false); err != nil {
+						st.logger.Err(err).Msg("failed to close stream on idle timeout")
+					}
+					return
+				}
+			}
+		case <-st.closeC:
+			return
+		}
+	}
 }
