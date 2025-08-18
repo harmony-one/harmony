@@ -216,6 +216,26 @@ type ParityBlockTracer struct {
 	tracers []*ParityTxTracer
 }
 
+func (jst *ParityBlockTracer) CaptureTxStart(gasLimit uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (jst *ParityBlockTracer) CaptureTxEnd(restGas uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (jst *ParityBlockTracer) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (jst *ParityBlockTracer) CaptureExit(output []byte, gasUsed uint64, err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (ptt *ParityTxTracer) push(ac *action) {
 	ptt.calls = append(ptt.calls, ac)
 }
@@ -236,7 +256,7 @@ func (ptt *ParityTxTracer) len() int {
 }
 
 // CaptureStart implements the ParityBlockTracer interface to initialize the tracing operation.
-func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
+func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	jst.cur = &ParityTxTracer{}
 	jst.cur.op = vm.CALL // vritual call
 	if create {
@@ -254,7 +274,7 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 	jst.cur.blockNumber = env.Context.BlockNumber.Uint64()
 	jst.cur.descended = false
 	jst.cur.push(&jst.cur.action)
-	return nil
+	return
 }
 
 // CaptureState implements the ParityBlockTracer interface to trace a single step of VM execution.
