@@ -449,10 +449,20 @@ func (st *syncStream) readMsg() (*syncpb.Message, error) {
 				Str("streamID", string(st.ID())).
 				Msg("stream timeout due to lack of progress")
 		}
+		// Log stream closure specifically
+		if err.Error() == "stream closed" {
+			st.logger.Debug().
+				Str("streamID", string(st.ID())).
+				Msg("stream closed by remote peer")
+		}
 		return nil, err
 	}
 	if b == nil || len(b) == 0 {
-		return nil, nil
+		// This should not happen
+		st.logger.Warn().
+			Str("streamID", string(st.ID())).
+			Msg("received empty message data")
+		return nil, errors.New("empty message data")
 	}
 	var msg = &syncpb.Message{}
 	if err := protobuf.Unmarshal(b, msg); err != nil {

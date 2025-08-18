@@ -266,8 +266,8 @@ func (st *BaseStream) ReadBytes() (content []byte, err error) {
 		if err == io.EOF {
 			utils.Logger().Debug().
 				Str("streamID", string(st.ID())).
-				Msg("clean stream closure")
-			return nil, nil
+				Msg("stream closed by remote peer")
+			return nil, errors.Wrap(err, "stream closed")
 		}
 		// Log network errors specifically
 		if netErr, ok := err.(net.Error); ok {
@@ -362,8 +362,8 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 		if err == io.EOF {
 			utils.Logger().Debug().
 				Str("streamID", string(st.ID())).
-				Msg("clean stream closure")
-			return nil, nil
+				Msg("stream closed by remote peer")
+			return nil, errors.Wrap(err, "stream closed")
 		}
 		// Log network errors specifically
 		if netErr, ok := err.(net.Error); ok {
@@ -467,7 +467,7 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 				Int("read", totalRead).
 				Int("expected", size).
 				Msg("no data read from chunk, possible end of stream")
-			break
+			return nil, errors.Wrap(io.EOF, "unexpected end of stream during chunk read")
 		}
 
 		totalRead += n
