@@ -15,6 +15,7 @@ type ProgressTracker struct {
 	maxIdleTime      time.Duration
 	totalBytesRead   int64
 	lastActivityTime time.Time
+	lastCheckedSize  int64
 }
 
 // NewProgressTracker creates a new progress tracker with the given configuration
@@ -40,17 +41,23 @@ func (pt *ProgressTracker) UpdateProgress(newSize int) {
 	// Check if we made significant progress
 	if newSize >= int(pt.resetThreshold) {
 		pt.lastProgressTime = time.Now()
-		pt.lastDataSize = int64(newSize)
+		pt.lastDataSize = pt.totalBytesRead
 	}
 }
 
 // HasProgress checks if the stream has made progress since last check
 func (pt *ProgressTracker) HasProgress(newSize int) bool {
-	pt.mu.RLock()
-	defer pt.mu.RUnlock()
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
 
-	progress := newSize - int(pt.lastDataSize)
-	return progress >= int(pt.resetThreshold)
+	progress := int64(newSize) - pt.lastCheckedSize
+	hasProgress := progress >= pt.resetThreshold
+
+	if hasProgress {
+		pt.lastCheckedSize = int64(newSize)
+	}
+
+	return hasProgress
 }
 
 // ResetTimeout resets the progress timeout
@@ -60,6 +67,7 @@ func (pt *ProgressTracker) ResetTimeout() {
 
 	pt.lastProgressTime = time.Now()
 	pt.lastDataSize = 0
+	pt.lastCheckedSize = 0
 }
 
 // ShouldTimeout checks if the stream should timeout due to lack of progress
@@ -96,6 +104,6 @@ func (pt *ProgressTracker) IsHealthy() bool {
 	timeSinceProgress := time.Since(pt.lastProgressTime)
 	timeSinceActivity := time.Since(pt.lastActivityTime)
 
-	// Stream is healthy if it's made progress recently or had activity recently
-	return timeSinceProgress <= pt.timeoutDuration || timeSinceActivity <= pt.maxIdleTime
+	// Stream is healthy if it's made progress recently AND had activity recently
+	return timeSinceProgress <= pt.timeoutDuration && timeSinceActivity <= pt.maxIdleTime
 }
