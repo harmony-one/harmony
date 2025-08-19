@@ -42,7 +42,7 @@ type action struct {
 	gasUsed  uint64
 	outOff   int64
 	outLen   int64
-	value    *uint256.Int
+	value    *big.Int
 	err      error
 	revert   []byte
 	subCalls []*action
@@ -65,7 +65,7 @@ func (c *action) fromStorage(blockStorage *TraceBlockStorage, acStorage *ActionS
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
 		fromIndex := int(acStorage.readNumber().Int64())
 		toIndex := int(acStorage.readNumber().Int64())
-		c.value, _ = uint256.FromBig(acStorage.readNumber())
+		c.value = acStorage.readNumber()
 		inputIndex := int(acStorage.readNumber().Int64())
 		outputIndex := int(acStorage.readNumber().Int64())
 		c.gas = acStorage.readNumber().Uint64()
@@ -79,7 +79,7 @@ func (c *action) fromStorage(blockStorage *TraceBlockStorage, acStorage *ActionS
 	if c.op == vm.CALL || c.op == vm.CALLCODE || c.op == vm.DELEGATECALL || c.op == vm.STATICCALL {
 		fromIndex := int(acStorage.readNumber().Int64())
 		toIndex := int(acStorage.readNumber().Int64())
-		c.value, _ = uint256.FromBig(acStorage.readNumber())
+		c.value = acStorage.readNumber()
 		inputIndex := int(acStorage.readNumber().Int64())
 		outputIndex := int(acStorage.readNumber().Int64())
 		c.gas = acStorage.readNumber().Uint64()
@@ -95,7 +95,7 @@ func (c *action) fromStorage(blockStorage *TraceBlockStorage, acStorage *ActionS
 		toIndex := int(acStorage.readNumber().Int64())
 		c.from = blockStorage.getAddress(fromIndex)
 		c.to = blockStorage.getAddress(toIndex)
-		c.value, _ = uint256.FromBig(acStorage.readNumber())
+		c.value = acStorage.readNumber()
 	}
 }
 
@@ -112,44 +112,44 @@ func (c action) toStorage(blockStorage *TraceBlockStorage) *ActionStorage {
 	acStorage.appendByte(errByte)
 	if errByte != 0 {
 		revertIndex := blockStorage.indexData(c.revert)
-		acStorage.appendNumber(uint256.NewInt(uint64(revertIndex)))
+		acStorage.appendNumber(big.NewInt(int64(revertIndex)))
 	}
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
 		fromIndex := blockStorage.indexAddress(c.from)
 		toIndex := blockStorage.indexAddress(c.to)
 		inputIndex := blockStorage.indexData(c.input)
 		outputIndex := blockStorage.indexData(c.output)
-		acStorage.appendNumber(uint256.NewInt(uint64(fromIndex)))
-		acStorage.appendNumber(uint256.NewInt(uint64(toIndex)))
+		acStorage.appendNumber(big.NewInt(int64(fromIndex)))
+		acStorage.appendNumber(big.NewInt(int64(toIndex)))
 		acStorage.appendNumber(c.value)
-		acStorage.appendNumber(uint256.NewInt(uint64(inputIndex)))
-		acStorage.appendNumber(uint256.NewInt(uint64(outputIndex)))
-		acStorage.appendNumber((&uint256.Int{}).SetUint64(c.gas))
-		acStorage.appendNumber((&uint256.Int{}).SetUint64(c.gasUsed))
+		acStorage.appendNumber(big.NewInt(int64(inputIndex)))
+		acStorage.appendNumber(big.NewInt(int64(outputIndex)))
+		acStorage.appendNumber((&big.Int{}).SetUint64(c.gas))
+		acStorage.appendNumber((&big.Int{}).SetUint64(c.gasUsed))
 		return acStorage
 	}
 	if c.op == vm.CALL || c.op == vm.CALLCODE || c.op == vm.DELEGATECALL || c.op == vm.STATICCALL {
 		if c.value == nil {
-			c.value = uint256.NewInt(0)
+			c.value = big.NewInt(0)
 		}
 		fromIndex := blockStorage.indexAddress(c.from)
 		toIndex := blockStorage.indexAddress(c.to)
 		inputIndex := blockStorage.indexData(c.input)
 		outputIndex := blockStorage.indexData(c.output)
-		acStorage.appendNumber(uint256.NewInt(uint64((fromIndex))))
-		acStorage.appendNumber(uint256.NewInt(uint64(toIndex)))
+		acStorage.appendNumber(big.NewInt(int64(fromIndex)))
+		acStorage.appendNumber(big.NewInt(int64(toIndex)))
 		acStorage.appendNumber(c.value)
-		acStorage.appendNumber(uint256.NewInt(uint64(inputIndex)))
-		acStorage.appendNumber(uint256.NewInt(uint64(outputIndex)))
-		acStorage.appendNumber((&uint256.Int{}).SetUint64(c.gas))
-		acStorage.appendNumber((&uint256.Int{}).SetUint64(c.gasUsed))
+		acStorage.appendNumber(big.NewInt(int64(inputIndex)))
+		acStorage.appendNumber(big.NewInt(int64(outputIndex)))
+		acStorage.appendNumber((&big.Int{}).SetUint64(c.gas))
+		acStorage.appendNumber((&big.Int{}).SetUint64(c.gasUsed))
 		return acStorage
 	}
 	if c.op == vm.SELFDESTRUCT {
 		fromIndex := blockStorage.indexAddress(c.from)
 		toIndex := blockStorage.indexAddress(c.to)
-		acStorage.appendNumber(uint256.NewInt(uint64(fromIndex)))
-		acStorage.appendNumber(uint256.NewInt(uint64(toIndex)))
+		acStorage.appendNumber(big.NewInt(int64(fromIndex)))
+		acStorage.appendNumber(big.NewInt(int64(toIndex)))
 		acStorage.appendNumber(c.value)
 		return acStorage
 	}
@@ -160,8 +160,8 @@ func (c action) toJsonStr() (string, *string, *string) {
 	callType := strings.ToLower(c.op.String())
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
 		action := fmt.Sprintf(
-			`{"from":"0x%x","gas":"0x%x","init":"0x%x","value":"%s"}`,
-			c.from, c.gas, c.input, c.value.Hex(),
+			`{"from":"0x%x","gas":"0x%x","init":"0x%x","value":"0x%s"}`,
+			c.from, c.gas, c.input, c.value.Text(16),
 		)
 		output := fmt.Sprintf(
 			`{"address":"0x%x","code":"0x%x","gasUsed":"0x%x"}`,
@@ -171,12 +171,12 @@ func (c action) toJsonStr() (string, *string, *string) {
 	}
 	if c.op == vm.CALL || c.op == vm.CALLCODE || c.op == vm.DELEGATECALL || c.op == vm.STATICCALL {
 		if c.value == nil {
-			c.value = uint256.NewInt(0)
+			c.value = big.NewInt(0)
 		}
 
 		var valueStr string
 		if c.op != vm.STATICCALL && c.op != vm.DELEGATECALL {
-			valueStr = fmt.Sprintf(`,"value":"%s"`, c.value.Hex())
+			valueStr = fmt.Sprintf(`,"value":"0x%s"`, c.value.Text(16))
 		}
 
 		action := fmt.Sprintf(
@@ -192,8 +192,8 @@ func (c action) toJsonStr() (string, *string, *string) {
 	}
 	if c.op == vm.SELFDESTRUCT {
 		action := fmt.Sprintf(
-			`{"refundAddress":"0x%x","balance":"%s","address":"0x%x"}`,
-			c.to, c.value.Hex(), c.from,
+			`{"refundAddress":"0x%x","balance":"0x%s","address":"0x%x"}`,
+			c.to, c.value.Text(16), c.from,
 		)
 		return "suicide", &action, nil
 	}
@@ -218,22 +218,22 @@ type ParityBlockTracer struct {
 
 func (jst *ParityBlockTracer) CaptureTxStart(gasLimit uint64) {
 	//TODO implement me
-	panic("implement me")
+	//panic("implement me")
 }
 
 func (jst *ParityBlockTracer) CaptureTxEnd(restGas uint64) {
 	//TODO implement me
-	panic("implement me")
+	//panic("implement me")
 }
 
 func (jst *ParityBlockTracer) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
 	//TODO implement me
-	panic("implement me")
+	//panic("implement me")
 }
 
 func (jst *ParityBlockTracer) CaptureExit(output []byte, gasUsed uint64, err error) {
 	//TODO implement me
-	panic("implement me")
+	//panic("implement me")
 }
 
 func (ptt *ParityTxTracer) push(ac *action) {
@@ -262,12 +262,11 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 	if create {
 		jst.cur.op = vm.CREATE // virtual create
 	}
-	vv, _ := uint256.FromBig(value)
 	jst.cur.from = from
 	jst.cur.to = to
 	jst.cur.input = input
 	jst.cur.gas = gas
-	jst.cur.value = vv
+	jst.cur.value = (&big.Int{}).Set(value)
 	jst.cur.blockHash = env.StateDB.BlockHash()
 	jst.cur.transactionPosition = uint64(env.StateDB.TxIndex())
 	jst.cur.transactionHash = env.StateDB.TxHashETH()
@@ -278,9 +277,9 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 }
 
 // CaptureState implements the ParityBlockTracer interface to trace a single step of VM execution.
-func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, returnStack *vm.ReturnStack, bts []byte, contract *vm.Contract, depth int, err error) error {
+func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) (vm.HookAfter, error) {
 	if err != nil {
-		return jst.CaptureFault(env, pc, op, gas, cost, memory, stack, nil, contract, depth, err)
+		return nil, jst.CaptureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
 	}
 	var retErr error
 	stackPeek := func(n int) *uint256.Int {
@@ -308,27 +307,26 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			input:   memoryCopy(inOff, inSize),
 			gasIn:   gas,
 			gasCost: cost,
-			value:   stackPeek(0),
+			value:   stackPeek(0).ToBig(),
 		})
 		jst.cur.descended = true
-		return retErr
+		return nil, retErr
 	case vm.SELFDESTRUCT:
 		ac := jst.cur.last()
-		value, _ := uint256.FromBig(env.StateDB.GetBalance(contract.Address()))
 		ac.push(&action{
 			op:      op,
 			from:    contract.Address(),
-			to:      stackPeek(0).Bytes20(),
+			to:      common.BigToAddress(stackPeek(0).ToBig()),
 			gasIn:   gas,
 			gasCost: cost,
-			value:   value,
+			value:   env.StateDB.GetBalance(contract.Address()),
 		})
-		return retErr
+		return nil, retErr
 	case vm.CALL, vm.CALLCODE, vm.DELEGATECALL, vm.STATICCALL:
-		to := stackPeek(1).Bytes20()
+		to := common.BigToAddress(stackPeek(1).ToBig())
 		precompiles := vm.PrecompiledContractsVRF
 		if _, exist := precompiles[to]; exist {
-			return nil
+			return nil, nil
 		}
 		off := 1
 		if op == vm.DELEGATECALL || op == vm.STATICCALL {
@@ -347,11 +345,11 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			outLen:  stackPeek(5 + off).ToBig().Int64(),
 		}
 		if op != vm.DELEGATECALL && op != vm.STATICCALL {
-			callObj.value = stackPeek(2).Clone()
+			callObj.value = (&big.Int{}).Set(stackPeek(2).ToBig())
 		}
 		jst.cur.push(callObj)
 		jst.cur.descended = true
-		return retErr
+		return nil, retErr
 	}
 
 	if jst.cur.descended {
@@ -366,7 +364,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		revertOff := int64(stackPeek(0).Uint64())
 		revertLen := int64(stackPeek(1).Uint64())
 		last.revert = memoryCopy(revertOff, revertLen)
-		return retErr
+		return nil, retErr
 	}
 	if depth == jst.cur.len()-1 { // depth == len - 1
 		call := jst.cur.pop()
@@ -375,7 +373,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 
 			ret := stackPeek(0)
 			if ret.Sign() != 0 {
-				call.to = ret.Bytes20()
+				call.to = common.BigToAddress(ret.ToBig())
 				call.output = env.StateDB.GetCode(call.to)
 			} else if call.err == nil {
 				call.err = errors.New("internal failure")
@@ -393,12 +391,12 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		}
 		jst.cur.last().push(call)
 	}
-	return retErr
+	return nil, retErr
 }
 
 // CaptureFault implements the ParityBlockTracer interface to trace an execution fault
 // while running an opcode.
-func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, returnStack *vm.ReturnStack, contract *vm.Contract, depth int, err error) error {
+func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
 	if jst.cur.last().err != nil {
 		return nil
 	}
@@ -420,13 +418,14 @@ func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode,
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
-func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) {
+func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error {
 	jst.cur.output = output
 	jst.cur.gasUsed = gasUsed
 	if err != nil {
 		jst.cur.err = err
 	}
 	jst.tracers = append(jst.tracers, jst.cur)
+	return nil
 }
 
 // get TraceBlockStorage from tracer, then store it to db
