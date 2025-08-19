@@ -25,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/holiman/uint256"
 )
 
 type ActionStorage struct {
@@ -41,7 +40,7 @@ func (storage *ActionStorage) appendByte(byt byte) {
 func (storage *ActionStorage) appendFixed(data []byte) {
 	storage.TraceData = append(storage.TraceData, data...)
 }
-func (storage *ActionStorage) appendNumber(num *uint256.Int) {
+func (storage *ActionStorage) appendNumber(num *big.Int) {
 	bytes, _ := rlp.EncodeToBytes(num)
 	storage.appendByte(uint8(len(bytes)))
 	storage.appendFixed(bytes)
