@@ -41,6 +41,11 @@ const (
 	// Never triggers during normal slow progress and lower layers decide when to timeout
 	ShortRangeTimeout time.Duration = 10 * time.Minute
 
+	// EpochSyncTimeout is the timeout for epoch sync operations
+	// This should be longer than ShortRangeTimeout since epoch sync deals with larger blocks
+	// and should not interfere with the progress-based timeout system
+	EpochSyncTimeout time.Duration = 15 * time.Minute
+
 	// pivot block distance ranges
 	MinPivotDistanceToHead uint64 = 1024
 	MaxPivotDistanceToHead uint64 = 2048
