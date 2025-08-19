@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/holiman/uint256"
 	duktape "gopkg.in/olebedev/go-duktape.v3"
 )
 
@@ -61,6 +62,12 @@ func popSlice(ctx *duktape.Context) []byte {
 
 // pushBigInt create a JavaScript BigInteger in the VM.
 func pushBigInt(n *big.Int, ctx *duktape.Context) {
+	ctx.GetGlobalString("bigInt")
+	ctx.PushString(n.String())
+	ctx.Call(1)
+}
+
+func pushBigIntUint256(n *uint256.Int, ctx *duktape.Context) {
 	ctx.GetGlobalString("bigInt")
 	ctx.PushString(n.String())
 	ctx.Call(1)
@@ -155,14 +162,15 @@ type stackWrapper struct {
 }
 
 // peek returns the nth-from-the-top element of the stack.
-func (sw *stackWrapper) peek(idx int) *big.Int {
+func (sw *stackWrapper) peek(idx int) *uint256.Int {
 	if len(sw.stack.Data()) <= idx || idx < 0 {
 		// TODO(karalabe): We can't js-throw from Go inside duktape inside Go. The Go
 		// runtime goes belly up https://github.com/golang/go/issues/15639.
 		log.Warn("Tracer accessed out of bound stack", "size", len(sw.stack.Data()), "index", idx)
-		return new(big.Int)
+		return uint256.NewInt(0)
 	}
-	return sw.stack.Data()[len(sw.stack.Data())-idx-1].ToBig()
+	out := sw.stack.Data()[len(sw.stack.Data())-idx-1]
+	return &out
 }
 
 // pushObject assembles a JSVM object wrapping a swappable stack and pushes it
@@ -178,7 +186,7 @@ func (sw *stackWrapper) pushObject(vm *duktape.Context) {
 		offset := ctx.GetInt(-1)
 		ctx.Pop()
 
-		pushBigInt(sw.peek(offset), ctx)
+		pushBigIntUint256(sw.peek(offset), ctx)
 		return 1
 	})
 	vm.PutPropString(obj, "peek")
@@ -543,7 +551,7 @@ func (jst *Tracer) CaptureStart(env *vm.EVM, from common.Address, to common.Addr
 }
 
 // CaptureState implements the Tracer interface to trace a single step of VM execution.
-func (jst *Tracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, returnStack *vm.ReturnStack, bts []byte, contract *vm.Contract, depth int, err error) error {
+func (jst *Tracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) (vm.HookAfter, error) {
 	if jst.err == nil {
 		// Initialize the context if it wasn't done yet
 		if !jst.inited {
@@ -553,7 +561,7 @@ func (jst *Tracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost 
 		// If tracing was interrupted, set the error and stop
 		if atomic.LoadUint32(&jst.interrupt) > 0 {
 			jst.err = jst.reason
-			return nil
+			return nil, nil
 		}
 		jst.opWrapper.op = op
 		jst.stackWrapper.stack = stack
@@ -577,12 +585,12 @@ func (jst *Tracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost 
 			jst.err = wrapError("step", err)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // CaptureFault implements the Tracer interface to trace an execution fault
 // while running an opcode.
-func (jst *Tracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, returnStack *vm.ReturnStack, contract *vm.Contract, depth int, err error) error {
+func (jst *Tracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
 	if jst.err == nil {
 		// Apart from the error, everything matches the previous invocation
 		jst.errorValue = new(string)
