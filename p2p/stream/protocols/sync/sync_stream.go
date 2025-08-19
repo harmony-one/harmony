@@ -684,9 +684,19 @@ func (st *syncStream) monitorStreamHealth() {
 		case <-ticker.C:
 			progressTracker := st.GetProgressTracker()
 			if progressTracker != nil {
+				// Check for stalled streams first (early warning)
+				if progressTracker.IsStalled() {
+					st.logger.Warn().
+						Str("streamID", string(st.ID())).
+						Float64("progressRate", progressTracker.GetProgressRate()).
+						Msg("stream appears stalled - monitoring closely")
+				}
+
+				// Check for timeout due to lack of progress
 				if progressTracker.ShouldTimeout() {
 					st.logger.Warn().
 						Str("streamID", string(st.ID())).
+						Float64("progressRate", progressTracker.GetProgressRate()).
 						Msg("stream timeout due to lack of progress")
 					if err := st.Close("progress timeout", false); err != nil {
 						st.logger.Err(err).Msg("failed to close stream on progress timeout")
@@ -694,14 +704,24 @@ func (st *syncStream) monitorStreamHealth() {
 					return
 				}
 
+				// Check for timeout due to inactivity
 				if progressTracker.ShouldIdleTimeout() {
 					st.logger.Warn().
 						Str("streamID", string(st.ID())).
+						Float64("progressRate", progressTracker.GetProgressRate()).
 						Msg("stream timeout due to inactivity")
 					if err := st.Close("idle timeout", false); err != nil {
 						st.logger.Err(err).Msg("failed to close stream on idle timeout")
 					}
 					return
+				}
+
+				// Log health status periodically
+				if progressTracker.IsHealthy() {
+					st.logger.Debug().
+						Str("streamID", string(st.ID())).
+						Float64("progressRate", progressTracker.GetProgressRate()).
+						Msg("stream health check - healthy")
 				}
 			}
 		case <-st.closeC:
