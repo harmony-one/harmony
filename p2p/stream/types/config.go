@@ -19,11 +19,11 @@ type StreamTimeoutConfig struct {
 // DefaultStreamTimeoutConfig returns the default timeout configuration
 func DefaultStreamTimeoutConfig() *StreamTimeoutConfig {
 	return &StreamTimeoutConfig{
-		ProgressTimeout:     60 * time.Second,  // 1 minute without progress
-		MaxIdleTime:         120 * time.Second, // 2 minutes without activity
-		ProgressThreshold:   4096,              // 4KB progress threshold
-		HealthCheckInterval: 10 * time.Second,  // Check every 10 seconds
-		ChunkReadTimeout:    30 * time.Second,  // 30s per 4KB chunk
+		ProgressTimeout:     30 * time.Second, // 30 seconds without progress (more aggressive)
+		MaxIdleTime:         60 * time.Second, // 1 minute without activity (more aggressive)
+		ProgressThreshold:   2048,             // 2KB progress threshold (more sensitive)
+		HealthCheckInterval: 5 * time.Second,  // Check every 5 seconds (more frequent)
+		ChunkReadTimeout:    15 * time.Second, // 15s per 4KB chunk (more aggressive)
 	}
 }
 
