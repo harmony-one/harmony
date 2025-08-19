@@ -90,7 +90,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 
 	numShortRangeCounterVec.With(s.state.promLabels()).Inc()
 
-	ctx, cancel := context.WithTimeout(ctx, ShortRangeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, EpochSyncTimeout)
 	defer cancel()
 
 	//TODO: merge srHelper with StageEpochConfig
@@ -163,7 +163,7 @@ func (sr *StageEpoch) doShortRangeSyncForEpochSync(ctx context.Context, s *Stage
 				Interface("hash", block.Hash()).
 				Int("blocks inserted", n).
 				Msg("epoch block insertion failed")
-			sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted data")
+			sh.streamsFailed([]sttypes.StreamID{streamID}, "corrupted epoch block data")
 			numBlocksInsertedEpochSyncHistogramVec.With(s.state.promLabels()).Observe(float64(n))
 			return n, err
 		default:
