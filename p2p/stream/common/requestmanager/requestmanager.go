@@ -479,8 +479,21 @@ func (rm *requestManager) setStreamAvailability(stID sttypes.StreamID, available
 	}
 }
 
+// pickAvailableStream picks an available stream for the request.
+// The stream is selected based on the failure count (lowest failures first).
+// This helps distribute load across healthy streams and prevents rapid deletion.
+// Particularly important for epoch sync which depends on cross-shard streams.
 func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
 	availableStreamIDs := rm.available.Keys()
+
+	// Find all eligible streams and their failure counts
+	type streamCandidate struct {
+		stream   *stream
+		failures int32
+	}
+
+	var candidates []streamCandidate
+
 	for _, id := range availableStreamIDs {
 		if !req.isStreamAllowed(id) {
 			continue
@@ -494,10 +507,64 @@ func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
 		}
 		spec, _ := st.ProtoSpec()
 		if req.Request.IsSupportedByProto(spec) {
-			return st, nil
+			candidates = append(candidates, streamCandidate{
+				stream:   st,
+				failures: st.Failures(),
+			})
 		}
 	}
-	return nil, errors.New("no more available streams")
+
+	if len(candidates) == 0 {
+		return nil, errors.New("no more available streams")
+	}
+
+	// Sort candidates by failure count (lowest first)
+	// This helps distribute load and prevent rapid stream deletion
+	for i := 0; i < len(candidates)-1; i++ {
+		for j := i + 1; j < len(candidates); j++ {
+			if candidates[i].failures > candidates[j].failures {
+				candidates[i], candidates[j] = candidates[j], candidates[i]
+			}
+		}
+	}
+
+	// Return the stream with the lowest failure count
+	selectedStream := candidates[0].stream
+	rm.logger.Debug().
+		Str("streamID", string(selectedStream.ID())).
+		Int32("failures", selectedStream.Failures()).
+		Int("totalCandidates", len(candidates)).
+		Msg("selected stream with lowest failure count")
+
+	return selectedStream, nil
+}
+
+// GetStreamHealthStats returns statistics about stream health for monitoring
+func (rm *requestManager) GetStreamHealthStats() map[string]interface{} {
+	stats := make(map[string]interface{})
+
+	var totalStreams, availableStreams int
+	var totalFailures int32
+	var failureDistribution map[int32]int = make(map[int32]int)
+
+	rm.streams.Iterate(func(id sttypes.StreamID, st *stream) {
+		totalStreams++
+		failures := st.Failures()
+		totalFailures += failures
+		failureDistribution[failures]++
+	})
+
+	rm.available.Iterate(func(id sttypes.StreamID, _ struct{}) {
+		availableStreams++
+	})
+
+	stats["totalStreams"] = totalStreams
+	stats["availableStreams"] = availableStreams
+	stats["totalFailures"] = totalFailures
+	stats["failureDistribution"] = failureDistribution
+	stats["averageFailures"] = float64(totalFailures) / float64(totalStreams)
+
+	return stats
 }
 
 func (rm *requestManager) refreshStreams() {
