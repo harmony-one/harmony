@@ -124,7 +124,7 @@ func TestProgressTracker_IsHealthy(t *testing.T) {
 		t.Error("Should not be healthy after progress timeout")
 	}
 
-	// Test idle timeout
+	// Test idle timeout with a fresh tracker
 	pt2 := NewProgressTracker(60*time.Second, 100*time.Millisecond, 1024)
 
 	// Should be healthy initially
@@ -138,5 +138,63 @@ func TestProgressTracker_IsHealthy(t *testing.T) {
 	// Should not be healthy now (idle timeout exceeded)
 	if pt2.IsHealthy() {
 		t.Error("Should not be healthy after idle timeout")
+	}
+}
+
+func TestProgressTracker_IsStalled(t *testing.T) {
+	pt := NewProgressTracker(100*time.Millisecond, 200*time.Millisecond, 1024)
+
+	// Should not be stalled initially
+	if pt.IsStalled() {
+		t.Error("Should not be stalled initially")
+	}
+
+	// Wait for half the timeout duration
+	time.Sleep(60 * time.Millisecond)
+
+	// Should be stalled now (no progress for half timeout, no activity for half idle)
+	if !pt.IsStalled() {
+		t.Error("Should be stalled after waiting")
+	}
+
+	// Test that UpdateProgress resets stalled state
+	pt.UpdateProgress(2048)
+
+	// Should not be stalled after progress
+	if pt.IsStalled() {
+		t.Error("Should not be stalled after progress update")
+	}
+}
+
+func TestProgressTracker_GetProgressRate(t *testing.T) {
+	pt := NewProgressTracker(30*time.Second, 60*time.Second, 1024)
+
+	// Initial rate should be 0 (no updates yet)
+	if rate := pt.GetProgressRate(); rate != 0 {
+		t.Errorf("Expected initial rate 0, got %v", rate)
+	}
+
+	// Update with some data
+	pt.UpdateProgress(2048)
+
+	// Rate should still be 0 with only one update (need at least 2)
+	if rate := pt.GetProgressRate(); rate != 0 {
+		t.Errorf("Expected rate 0 with one update, got %v", rate)
+	}
+
+	// Update again to have 2 updates
+	pt.UpdateProgress(1024)
+
+	// Now we should have a rate
+	rate := pt.GetProgressRate()
+	if rate <= 0 {
+		t.Errorf("Expected positive rate, got %v", rate)
+	}
+
+	// The rate should be approximately (2048 + 1024) bytes / 0.2 seconds = 15360 bytes/sec
+	// Allow some tolerance for timing variations
+	expectedRate := float64(3072) / 0.2 // bytes per second
+	if rate < expectedRate*0.5 || rate > expectedRate*1.5 {
+		t.Errorf("Expected rate around %v, got %v", expectedRate, rate)
 	}
 }
