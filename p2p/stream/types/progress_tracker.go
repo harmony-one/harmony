@@ -16,6 +16,8 @@ type ProgressTracker struct {
 	totalBytesRead   int64
 	lastActivityTime time.Time
 	lastCheckedSize  int64
+	rateWindow       []int64 // Sliding window for rate calculation
+	rateWindowSize   int     // Size of the rate calculation window
 }
 
 // NewProgressTracker creates a new progress tracker with the given configuration
@@ -27,6 +29,8 @@ func NewProgressTracker(timeoutDuration, maxIdleTime time.Duration, resetThresho
 		timeoutDuration:  timeoutDuration,
 		maxIdleTime:      maxIdleTime,
 		resetThreshold:   resetThreshold,
+		rateWindowSize:   10, // Track last 10 updates for rate calculation
+		rateWindow:       make([]int64, 0, 10),
 	}
 }
 
@@ -36,7 +40,17 @@ func (pt *ProgressTracker) UpdateProgress(newSize int) {
 	defer pt.mu.Unlock()
 
 	pt.totalBytesRead += int64(newSize)
-	pt.lastActivityTime = time.Now()
+
+	// Only update activity time if we actually received data
+	if newSize > 0 {
+		pt.lastActivityTime = time.Now()
+
+		// Add to rate window
+		pt.rateWindow = append(pt.rateWindow, int64(newSize))
+		if len(pt.rateWindow) > pt.rateWindowSize {
+			pt.rateWindow = pt.rateWindow[1:] // Remove oldest entry
+		}
+	}
 
 	// Check if we made significant progress
 	if newSize >= int(pt.resetThreshold) {
@@ -105,5 +119,41 @@ func (pt *ProgressTracker) IsHealthy() bool {
 	timeSinceActivity := time.Since(pt.lastActivityTime)
 
 	// Stream is healthy if it's made progress recently AND had activity recently
+	// Both conditions must be met for the stream to be considered healthy
 	return timeSinceProgress <= pt.timeoutDuration && timeSinceActivity <= pt.maxIdleTime
+}
+
+// IsStalled checks if the stream appears to be stalled (no progress for a while)
+func (pt *ProgressTracker) IsStalled() bool {
+	pt.mu.RLock()
+	defer pt.mu.RUnlock()
+
+	timeSinceProgress := time.Since(pt.lastProgressTime)
+	timeSinceActivity := time.Since(pt.lastActivityTime)
+
+	// Consider stalled if no progress for half the timeout duration OR no activity for half the idle time
+	return timeSinceProgress > pt.timeoutDuration/2 || timeSinceActivity > pt.maxIdleTime/2
+}
+
+// GetProgressRate calculates the current progress rate in bytes per second
+func (pt *ProgressTracker) GetProgressRate() float64 {
+	pt.mu.RLock()
+	defer pt.mu.RUnlock()
+
+	if len(pt.rateWindow) < 2 {
+		return 0 // Need at least 2 updates to calculate rate
+	}
+
+	// Calculate rate based on recent updates in the window
+	// This gives us a more accurate picture of current transfer rate
+	totalBytes := int64(0)
+	for _, bytes := range pt.rateWindow {
+		totalBytes += bytes
+	}
+
+	// Assume updates happen roughly every 100ms for rate calculation
+	// This is a reasonable assumption for stream sync
+	timeWindow := time.Duration(len(pt.rateWindow)) * 100 * time.Millisecond
+
+	return float64(totalBytes) / timeWindow.Seconds()
 }
