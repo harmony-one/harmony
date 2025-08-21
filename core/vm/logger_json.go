@@ -16,14 +16,6 @@
 
 package vm
 
-/*
-import (
-	"time"
-
-	"github.com/ethereum/go-ethereum/common"
-)
-
-
 import (
 	"encoding/json"
 	"io"
@@ -32,6 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/holiman/uint256"
 )
 
 type JSONLogger struct {
@@ -73,9 +66,9 @@ func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint
 	}
 	if !l.cfg.DisableStack {
 		//TODO(@holiman) improve this
-		logstack := make([]*big.Int, len(stack.Data()))
+		logstack := make([]uint256.Int, len(stack.Data()))
 		for i, item := range stack.Data() {
-			logstack[i] = item.ToBig()
+			logstack[i] = item
 		}
 		log.Stack = logstack
 		log.ReturnStack = rStack.data
@@ -104,4 +97,3 @@ func (l *JSONLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, 
 	}
 	return l.encoder.Encode(endLog{common.Bytes2Hex(output), math.HexOrDecimal64(gasUsed), t, ""})
 }
-*/
