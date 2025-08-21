@@ -39,6 +39,7 @@ import (
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/holiman/uint256"
 )
 
 const (
@@ -883,8 +884,8 @@ type StructLogRes struct {
 	Memory          []string          `json:"memory,omitempty"`
 	Storage         map[string]string `json:"storage,omitempty"`
 
-	rawStack         []*big.Int
-	rawAfterStack    []*big.Int
+	rawStack         []uint256.Int
+	rawAfterStack    []uint256.Int
 	rawMemory        []byte
 	rawStorage       map[common.Hash]common.Hash
 	rawOperatorEvent map[string]string
@@ -898,7 +899,7 @@ func (r *StructLogRes) FormatStack() []string {
 	if r.rawStack != nil {
 		stack := make([]string, len(r.rawStack))
 		for i, stackValue := range r.rawStack {
-			stack[i] = hex.EncodeToString(math.PaddedBigBytes(stackValue, 32))
+			stack[i] = hex.EncodeToString(math.PaddedBigBytes(stackValue.ToBig(), 32))
 		}
 		r.Stack = stack
 	}
@@ -914,7 +915,7 @@ func (r *StructLogRes) FormatAfterStack() []string {
 	if r.rawAfterStack != nil {
 		stack := make([]string, len(r.rawAfterStack))
 		for i, stackValue := range r.rawAfterStack {
-			stack[i] = hex.EncodeToString(math.PaddedBigBytes(stackValue, 32))
+			stack[i] = hex.EncodeToString(math.PaddedBigBytes(stackValue.ToBig(), 32))
 		}
 		r.AfterStack = stack
 	}
