@@ -966,7 +966,7 @@ func (r *StructLogRes) GetOperatorEvent(key string) string {
 }
 
 // FormatLogs formats EVM returned structured logs for json output
-func FormatLogs(logs []vm.StructLog, conf *TraceConfig) []StructLogRes {
+func FormatLogs(logs []*vm.StructLog, conf *TraceConfig) []StructLogRes {
 	formatted := make([]StructLogRes, len(logs))
 	for index, trace := range logs {
 		formatted[index] = StructLogRes{

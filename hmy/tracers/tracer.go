@@ -321,6 +321,12 @@ type Tracer struct {
 	reason    error  // Textual reason for the interruption
 }
 
+func (jst *Tracer) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
+}
+
+func (jst *Tracer) CaptureExit(output []byte, gasUsed uint64, err error) {
+}
+
 // New instantiates a new tracer instance. code specifies a Javascript snippet,
 // which must evaluate to an expression returning an object with 'step', 'fault'
 // and 'result' functions.
