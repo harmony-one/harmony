@@ -256,7 +256,7 @@ func (ptt *ParityTxTracer) len() int {
 }
 
 // CaptureStart implements the ParityBlockTracer interface to initialize the tracing operation.
-func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
+func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
 	jst.cur = &ParityTxTracer{}
 	jst.cur.op = vm.CALL // vritual call
 	if create {
@@ -273,7 +273,7 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 	jst.cur.blockNumber = env.Context.BlockNumber.Uint64()
 	jst.cur.descended = false
 	jst.cur.push(&jst.cur.action)
-	return
+	return nil
 }
 
 // CaptureState implements the ParityBlockTracer interface to trace a single step of VM execution.
