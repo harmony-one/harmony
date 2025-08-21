@@ -20,7 +20,6 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/holiman/uint256"
 )
 
 type RosettaLogItem struct {
@@ -52,7 +51,7 @@ func (rbt *RosettaBlockTracer) formatAction(depth []int, parentErr error, ac *ac
 		Depth:     depth,
 		From:      &vm.RosettaLogAddressItem{Account: &ac.from},
 		To:        &vm.RosettaLogAddressItem{Account: &ac.to},
-		Value:     val.ToBig(),
+		Value:     val,
 	}
 }
 
