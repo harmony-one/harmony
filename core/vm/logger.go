@@ -280,7 +280,7 @@ func WriteTrace(writer io.Writer, logs []StructLog) {
 		if len(log.Stack) > 0 {
 			fmt.Fprintln(writer, "Stack:")
 			for i := len(log.Stack) - 1; i >= 0; i-- {
-				fmt.Fprintf(writer, "%08d  %x\n", len(log.Stack)-i-1, math.PaddedBigBytes(log.Stack[i], 32))
+				fmt.Fprintf(writer, "%08d  %x\n", len(log.Stack)-i-1, math.PaddedBigBytes(log.Stack[i].ToBig(), 32))
 			}
 		}
 		if len(log.Memory) > 0 {
@@ -295,17 +295,6 @@ func WriteTrace(writer io.Writer, logs []StructLog) {
 		}
 		fmt.Fprintln(writer)
 	}
-}
-
-// PaddedBigBytes encodes a big integer as a big-endian byte slice. The length
-// of the slice is at least n bytes.
-func PaddedBytes(bigint *uint256.Int, n int) []byte {
-	if bigint.BitLen()/8 >= n {
-		return bigint.Bytes()
-	}
-	ret := make([]byte, n)
-	math.ReadBits(bigint, ret)
-	return ret
 }
 
 // WriteLogs writes vm logs in a readable format to the given writer
