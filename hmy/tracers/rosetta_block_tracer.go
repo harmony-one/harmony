@@ -42,7 +42,7 @@ type RosettaBlockTracer struct {
 func (rbt *RosettaBlockTracer) formatAction(depth []int, parentErr error, ac *action) *RosettaLogItem {
 	val := ac.value
 	if val == nil {
-		val = uint256.NewInt(0)
+		val = big.NewInt(0)
 	}
 
 	return &RosettaLogItem{
