@@ -403,8 +403,8 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 	totalRead := 0
 
 	for totalRead < size {
-		// Read a chunk with a short timeout
-		chunkSize := min(4096, size-totalRead) // Read in 4KB chunks
+		// Read a chunk with a short timeout using configurable chunk size
+		chunkSize := min(int(st.timeoutConfig.ChunkSize), size-totalRead)
 		chunk := content[totalRead : totalRead+chunkSize]
 
 		// Set a short deadline for this chunk read using config
