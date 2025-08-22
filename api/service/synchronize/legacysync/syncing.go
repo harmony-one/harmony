@@ -1171,7 +1171,8 @@ const (
 	// syncStatusExpiration is the expiration time out of a sync status.
 	// If last sync result in memory is before the expiration, the sync status
 	// will be updated.
-	syncStatusExpiration = 6 * time.Second
+	// Reduced from 6 seconds to 2 seconds for validators to make sync detection more responsive
+	syncStatusExpiration = 2 * time.Second
 
 	// syncStatusExpirationNonValidator is the expiration of sync cache for non-validators.
 	// Compared with non-validator, the sync check is not as strict as validator nodes.
@@ -1333,22 +1334,68 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	}
 	currentHeight := ss.blockChain.CurrentBlock().NumberU64()
 
-	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
+	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
+	// A node can be actively syncing and still be out of sync. The original logic was flawed.
+	// We should consider a node out of sync if it's behind the target height, regardless of progress.
+	heightDiff := otherHeight2 - lastHeight
+	if otherHeight2 < lastHeight {
+		heightDiff = 0 // overflow
+	}
+
+	// A node is out of sync if it's behind the target height by more than the threshold
+	// Progress during sync doesn't change the fact that it's still out of sync
+	isStillOutOfSync := currentHeight+inSyncThreshold < otherHeight2
+
 	utils.Logger().Info().
 		Uint64("OtherHeight1", otherHeight1).
 		Uint64("OtherHeight2", otherHeight2).
 		Uint64("lastHeight", lastHeight).
 		Uint64("currentHeight", currentHeight).
-		Bool("isOutOfSync", isOutOfSync).
+		Bool("wasOutOfSync", wasOutOfSync).
+		Bool("isStillOutOfSync", isStillOutOfSync).
+		Uint64("heightDiff", heightDiff).
 		Msg("[SYNC] Double checking sync status")
-	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
-	heightDiff := otherHeight2 - lastHeight
-	if otherHeight2 < lastHeight {
-		heightDiff = 0 // overflow
-	}
+
 	return SyncCheckResult{
-		IsSynchronized: !(wasOutOfSync && isOutOfSync && lastHeight == currentHeight),
+		IsSynchronized: !isStillOutOfSync,
 		OtherHeight:    otherHeight2,
 		HeightDiff:     heightDiff,
 	}
+}
+
+// ForceSyncStatusRefresh forces an immediate refresh of the sync status by clearing the cache
+// This is useful when consensus detects the node is out of sync and we need immediate detection
+func (ss *StateSync) ForceSyncStatusRefresh() {
+	ss.syncStatus.lock.Lock()
+	defer ss.syncStatus.lock.Unlock()
+
+	// Clear the cached result to force immediate refresh
+	ss.syncStatus.lastResult = SyncCheckResult{}
+	ss.syncStatus.lastUpdateTime = time.Time{} // Zero time to force expiration
+
+	utils.Logger().Info().Msg("[SYNC] Forced sync status refresh - cache cleared")
+}
+
+// GetSyncStatusImmediate forces an immediate sync status check without using cache
+// This is useful for critical operations that need real-time sync status
+func (ss *StateSync) GetSyncStatusImmediate() SyncCheckResult {
+	result := ss.isSynchronized(false)
+	utils.Logger().Info().
+		Bool("IsSynchronized", result.IsSynchronized).
+		Uint64("OtherHeight", result.OtherHeight).
+		Uint64("HeightDiff", result.HeightDiff).
+		Msg("[SYNC] Immediate sync status check performed")
+	return result
+}
+
+// GetParsedSyncStatusImmediate forces an immediate sync status check and returns parsed results
+// This matches the interface requirement for (bool, uint64, uint64) return type
+func (ss *StateSync) GetParsedSyncStatusImmediate() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
+	result := ss.isSynchronized(false)
+	utils.Logger().Info().
+		Bool("IsSynchronized", result.IsSynchronized).
+		Uint64("OtherHeight", result.OtherHeight).
+		Uint64("HeightDiff", result.HeightDiff).
+		Msg("[SYNC] Immediate parsed sync status check performed")
+	return ParseResult(result)
 }
