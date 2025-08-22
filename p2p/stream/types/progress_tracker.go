@@ -123,18 +123,6 @@ func (pt *ProgressTracker) IsHealthy() bool {
 	return timeSinceProgress <= pt.timeoutDuration && timeSinceActivity <= pt.maxIdleTime
 }
 
-// IsStalled checks if the stream appears to be stalled (no progress for a while)
-func (pt *ProgressTracker) IsStalled() bool {
-	pt.mu.RLock()
-	defer pt.mu.RUnlock()
-
-	timeSinceProgress := time.Since(pt.lastProgressTime)
-	timeSinceActivity := time.Since(pt.lastActivityTime)
-
-	// Consider stalled if no progress for half the timeout duration OR no activity for half the idle time
-	return timeSinceProgress > pt.timeoutDuration/2 || timeSinceActivity > pt.maxIdleTime/2
-}
-
 // GetProgressRate calculates the current progress rate in bytes per second
 func (pt *ProgressTracker) GetProgressRate() float64 {
 	pt.mu.RLock()

@@ -684,14 +684,6 @@ func (st *syncStream) monitorStreamHealth() {
 		case <-ticker.C:
 			progressTracker := st.GetProgressTracker()
 			if progressTracker != nil {
-				// Check for stalled streams first (early warning)
-				if progressTracker.IsStalled() {
-					st.logger.Warn().
-						Str("streamID", string(st.ID())).
-						Float64("progressRate", progressTracker.GetProgressRate()).
-						Msg("stream appears stalled - monitoring closely")
-				}
-
 				// Check for timeout due to lack of progress
 				if progressTracker.ShouldTimeout() {
 					st.logger.Warn().
