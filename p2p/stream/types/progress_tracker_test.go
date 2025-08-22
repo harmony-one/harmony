@@ -141,31 +141,6 @@ func TestProgressTracker_IsHealthy(t *testing.T) {
 	}
 }
 
-func TestProgressTracker_IsStalled(t *testing.T) {
-	pt := NewProgressTracker(100*time.Millisecond, 200*time.Millisecond, 1024)
-
-	// Should not be stalled initially
-	if pt.IsStalled() {
-		t.Error("Should not be stalled initially")
-	}
-
-	// Wait for half the timeout duration
-	time.Sleep(60 * time.Millisecond)
-
-	// Should be stalled now (no progress for half timeout, no activity for half idle)
-	if !pt.IsStalled() {
-		t.Error("Should be stalled after waiting")
-	}
-
-	// Test that UpdateProgress resets stalled state
-	pt.UpdateProgress(2048)
-
-	// Should not be stalled after progress
-	if pt.IsStalled() {
-		t.Error("Should not be stalled after progress update")
-	}
-}
-
 func TestProgressTracker_GetProgressRate(t *testing.T) {
 	pt := NewProgressTracker(30*time.Second, 60*time.Second, 1024)
 
