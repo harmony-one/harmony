@@ -17,11 +17,14 @@ import (
 func getMaxPeerHeight(syncConfig *SyncConfig) (uint64, error) {
 	maxHeight := uint64(math.MaxUint64)
 	var (
-		wg   sync.WaitGroup
-		lock sync.Mutex
+		wg                sync.WaitGroup
+		lock              sync.Mutex
+		successfulQueries int
+		totalPeers        int
 	)
 
 	syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
+		totalPeers++
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -36,6 +39,7 @@ func getMaxPeerHeight(syncConfig *SyncConfig) (uint64, error) {
 
 			if response != nil {
 				lock.Lock()
+				successfulQueries++
 				utils.Logger().Info().
 					Str("peerIP", peerConfig.peer.IP).
 					Uint64("blockHeight", response.BlockHeight).
@@ -53,8 +57,24 @@ func getMaxPeerHeight(syncConfig *SyncConfig) (uint64, error) {
 	})
 	wg.Wait()
 
+	// Better error handling to prevent false "in sync" status
 	if maxHeight == uint64(math.MaxUint64) {
-		return 0, fmt.Errorf("get max peer height failed")
+		utils.Logger().Error().
+			Int("totalPeers", totalPeers).
+			Int("successfulQueries", successfulQueries).
+			Msg("[SYNC] getMaxPeerHeight failed - no valid responses from any peers")
+		return 0, fmt.Errorf("get max peer height failed - no valid responses from %d peers (successful: %d)", totalPeers, successfulQueries)
+	}
+
+	// Log success rate for monitoring
+	if totalPeers > 0 {
+		successRate := float64(successfulQueries) / float64(totalPeers) * 100
+		utils.Logger().Info().
+			Int("totalPeers", totalPeers).
+			Int("successfulQueries", successfulQueries).
+			Float64("successRate", successRate).
+			Uint64("maxHeight", maxHeight).
+			Msg("[SYNC] getMaxPeerHeight completed successfully")
 	}
 
 	return maxHeight, nil
