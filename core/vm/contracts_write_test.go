@@ -212,7 +212,7 @@ func TestStakingPrecompiles(t *testing.T) {
 func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
 	var (
 		p             = &stakingPrecompile{}
-		expectedError = errWriteProtection
+		expectedError = ErrWriteProtection
 		env           = NewEVM(BlockContext{ShardID: 1}, TxContext{}, nil, params.TestChainConfig, Config{})
 		res, _, err   = RunPrecompiledContract(p, env, nil, []byte{}, 0, true)
 	)
