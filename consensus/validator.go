@@ -40,6 +40,19 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		}
 		return
 	}
+
+	// Check if we're out of sync and should not process announce messages
+	if recvMsg.BlockNum > consensus.BlockNum() {
+		consensus.getLogger().Warn().
+			Uint64("myBlockNum", consensus.BlockNum()).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Hex("myBlockHash", consensus.current.blockHash[:]).
+			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
+			Msg("[OnAnnounce] low consensus block number. Spin sync")
+		consensus.spinUpStateSync()
+		// Return early to prevent processing consensus messages while syncing
+		return
+	}
 	consensus.StartFinalityCount()
 
 	consensus.getLogger().Info().
@@ -212,6 +225,8 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
 			Msgf("[OnPrepared] low consensus block number. Spin sync")
 		consensus.spinUpStateSync()
+		// Return early to prevent processing consensus messages while syncing
+		return
 	}
 
 	// check validity of prepared signature
@@ -318,6 +333,8 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
 			Msg("[OnCommitted] low consensus block number. Spin up state sync")
 		consensus.spinUpStateSync()
+		// Return early to prevent processing consensus messages while syncing
+		return
 	}
 
 	// Optimistically add committedMessage in case of receiving committed before prepared
