@@ -168,8 +168,7 @@ type BlockContext struct {
 	Time        *big.Int       // Provides information for TIME
 	VRF         common.Hash    // Provides information for VRF
 
-	ShardID   uint32 // Used by staking and cross shard transfer precompile
-	NumShards uint32 // Used by cross shard transfer precompile
+	TxType types.TransactionType
 
 	CreateValidator       CreateValidatorFunc
 	EditValidator         EditValidatorFunc
@@ -178,7 +177,8 @@ type BlockContext struct {
 	CollectRewards        CollectRewardsFunc
 	CalculateMigrationGas CalculateMigrationGasFunc
 
-	TxType types.TransactionType
+	ShardID   uint32 // Used by staking and cross shard transfer precompile
+	NumShards uint32 // Used by cross shard transfer precompile
 }
 
 // TxContext provides the EVM with information about a transaction.
