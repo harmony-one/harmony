@@ -59,7 +59,7 @@ const (
 const (
 	maxBroadcastNodes       = 10              // broadcast at most maxBroadcastNodes peers that need in sync
 	broadcastTimeout  int64 = 60 * 1000000000 // 1 mins
-	//SyncIDLength is the length of bytes for syncID
+	//SyncIDLengthis the length of bytes for syncID
 	SyncIDLength = 20
 )
 
@@ -83,6 +83,9 @@ type ISync interface {
 	RegisterNodeInfo() int
 	GetParsedSyncStatus() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
 	GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
+	// Added methods for immediate sync detection
+	ForceSyncStatusRefresh()
+	GetParsedSyncStatusImmediate() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
 }
 
 // Node represents a protocol-participating node in the network
