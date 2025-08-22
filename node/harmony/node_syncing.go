@@ -304,6 +304,29 @@ func (node *Node) doSync(syncInstance ISync, syncingPeerProvider SyncingPeerProv
 			node.IsSynchronized.Set()
 			consensus.BlocksSynchronized("doSync")
 		}
+	} else {
+		// Use immediate sync detection to bypass cache delays
+		// This ensures we get real-time sync status for critical operations
+		if isSynchronizedImmediate, _, _ := syncInstance.GetParsedSyncStatusImmediate(); !isSynchronizedImmediate {
+			utils.Logger().Info().
+				Msg("[SYNC] Cache indicated in sync, but immediate check shows out of sync - forcing sync")
+			if consensus.IsLeader() {
+				return
+			}
+			node.IsSynchronized.UnSet()
+			if willJoinConsensus {
+				consensus.BlocksNotSynchronized("node.doSync.immediate")
+			}
+			isBeacon := bc.ShardID() == shard.BeaconChainShardID
+			heightBeforeSync := bc.CurrentBlock().NumberU64()
+			syncInstance.SyncLoop(bc, isBeacon, consensus, legacysync.LoopMinTime)
+			heightAfterSync := bc.CurrentBlock().NumberU64()
+			addedBlocks := heightAfterSync - heightBeforeSync
+			if willJoinConsensus && addedBlocks > 0 {
+				node.IsSynchronized.Set()
+				consensus.BlocksSynchronized("doSync.immediate")
+			}
+		}
 	}
 	node.IsSynchronized.Set()
 }
