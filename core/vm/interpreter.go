@@ -44,6 +44,15 @@ type ScopeContext struct {
 	Contract *Contract
 }
 
+// callCtx contains the things that are per-call, such as stack and memory,
+// but not transients like pc and gas
+type callCtx struct {
+	memory   *Memory
+	stack    *Stack
+	rstack   *ReturnStack
+	contract *Contract
+}
+
 // keccakState wraps sha3.state. In addition to the usual hash methods, it also supports
 // Read to get a variable amount of data from the hash state. Read is faster than Sum
 // because it doesn't copy the internal state, but also modifies the internal state.
