@@ -432,21 +432,21 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 		if err != nil {
 			// Check if this is a timeout
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				// Check if we made progress
-				if progressTracker != nil && progressTracker.HasProgress(totalRead) {
+				// Check if we made progress recently (not in this failed read)
+				if progressTracker != nil && progressTracker.IsHealthy() {
 					progressTracker.ResetTimeout()
 					utils.Logger().Debug().
 						Str("streamID", string(st.ID())).
 						Int("read", totalRead).
 						Int("expected", size).
-						Msg("progress detected, continuing read")
+						Msg("recent progress detected, continuing read")
 					continue
 				} else {
 					utils.Logger().Warn().
 						Str("streamID", string(st.ID())).
 						Int("read", totalRead).
 						Int("expected", size).
-						Msg("no progress detected, timeout")
+						Msg("no recent progress detected, timeout")
 					return nil, errors.Wrap(err, "progress timeout")
 				}
 			}
