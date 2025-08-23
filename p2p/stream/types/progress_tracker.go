@@ -5,57 +5,38 @@ import (
 	"time"
 )
 
-// ProgressTracker monitors data transfer progress and implements progress-based timeouts
+// ProgressTracker monitors data transfer progress during content reading operations
+// It implements a simple, focused approach that only tracks reading progress
+// and provides timeout functionality when no progress is made
 type ProgressTracker struct {
 	mu               sync.RWMutex
-	lastDataSize     int64
 	lastProgressTime time.Time
 	timeoutDuration  time.Duration
 	resetThreshold   int64
-	maxIdleTime      time.Duration
 	totalBytesRead   int64
-	lastActivityTime time.Time
 	lastCheckedSize  int64
-	rateWindow       []int64 // Sliding window for rate calculation
-	rateWindowSize   int     // Size of the rate calculation window
 }
 
 // NewProgressTracker creates a new progress tracker with the given configuration
-func NewProgressTracker(timeoutDuration, maxIdleTime time.Duration, resetThreshold int64) *ProgressTracker {
+func NewProgressTracker(timeoutDuration time.Duration, resetThreshold int64) *ProgressTracker {
 	now := time.Now()
 	return &ProgressTracker{
 		lastProgressTime: now,
-		lastActivityTime: now,
 		timeoutDuration:  timeoutDuration,
-		maxIdleTime:      maxIdleTime,
 		resetThreshold:   resetThreshold,
-		rateWindowSize:   10, // Track last 10 updates for rate calculation
-		rateWindow:       make([]int64, 0, 10),
 	}
 }
 
-// UpdateProgress updates the progress tracker with new data received
+// UpdateProgress updates the progress tracker with new data received during content reading
 func (pt *ProgressTracker) UpdateProgress(newSize int) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
 
 	pt.totalBytesRead += int64(newSize)
 
-	// Only update activity time if we actually received data
-	if newSize > 0 {
-		pt.lastActivityTime = time.Now()
-
-		// Add to rate window
-		pt.rateWindow = append(pt.rateWindow, int64(newSize))
-		if len(pt.rateWindow) > pt.rateWindowSize {
-			pt.rateWindow = pt.rateWindow[1:] // Remove oldest entry
-		}
-	}
-
 	// Check if we made significant progress
 	if newSize >= int(pt.resetThreshold) {
 		pt.lastProgressTime = time.Now()
-		pt.lastDataSize = pt.totalBytesRead
 	}
 }
 
@@ -74,17 +55,16 @@ func (pt *ProgressTracker) HasProgress(newSize int) bool {
 	return hasProgress
 }
 
-// ResetTimeout resets the progress timeout
+// ResetTimeout resets the progress timeout - called when progress is detected
 func (pt *ProgressTracker) ResetTimeout() {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
 
 	pt.lastProgressTime = time.Now()
-	pt.lastDataSize = 0
 	pt.lastCheckedSize = 0
 }
 
-// ShouldTimeout checks if the stream should timeout due to lack of progress
+// ShouldTimeout checks if the stream should timeout due to lack of progress during content reading
 func (pt *ProgressTracker) ShouldTimeout() bool {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
@@ -93,55 +73,54 @@ func (pt *ProgressTracker) ShouldTimeout() bool {
 	return timeSinceProgress > pt.timeoutDuration
 }
 
-// ShouldIdleTimeout checks if the stream should timeout due to inactivity
-func (pt *ProgressTracker) ShouldIdleTimeout() bool {
-	pt.mu.RLock()
-	defer pt.mu.RUnlock()
-
-	timeSinceActivity := time.Since(pt.lastActivityTime)
-	return timeSinceActivity > pt.maxIdleTime
-}
-
 // GetStats returns current progress statistics
-func (pt *ProgressTracker) GetStats() (totalBytes int64, lastProgress time.Time, lastActivity time.Time) {
+func (pt *ProgressTracker) GetStats() (totalBytes int64, lastProgress time.Time) {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
 
-	return pt.totalBytesRead, pt.lastProgressTime, pt.lastActivityTime
+	return pt.totalBytesRead, pt.lastProgressTime
 }
 
-// IsHealthy checks if the stream is healthy based on progress
+// IsHealthy checks if the stream is healthy based on reading progress
 func (pt *ProgressTracker) IsHealthy() bool {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
 
 	timeSinceProgress := time.Since(pt.lastProgressTime)
-	timeSinceActivity := time.Since(pt.lastActivityTime)
-
-	// Stream is healthy if it's made progress recently AND had activity recently
-	// Both conditions must be met for the stream to be considered healthy
-	return timeSinceProgress <= pt.timeoutDuration && timeSinceActivity <= pt.maxIdleTime
+	return timeSinceProgress <= pt.timeoutDuration
 }
 
 // GetProgressRate calculates the current progress rate in bytes per second
+// This is a simple calculation based on total bytes read and time since creation
 func (pt *ProgressTracker) GetProgressRate() float64 {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
 
-	if len(pt.rateWindow) < 2 {
-		return 0 // Need at least 2 updates to calculate rate
+	if pt.totalBytesRead == 0 {
+		return 0
 	}
 
-	// Calculate rate based on recent updates in the window
-	// This gives us a more accurate picture of current transfer rate
-	totalBytes := int64(0)
-	for _, bytes := range pt.rateWindow {
-		totalBytes += bytes
+	timeSinceCreation := time.Since(pt.lastProgressTime.Add(-pt.timeoutDuration))
+	if timeSinceCreation <= 0 {
+		return 0
 	}
 
-	// Assume updates happen roughly every 100ms for rate calculation
-	// This is a reasonable assumption for stream sync
-	timeWindow := time.Duration(len(pt.rateWindow)) * 100 * time.Millisecond
+	return float64(pt.totalBytesRead) / timeSinceCreation.Seconds()
+}
 
-	return float64(totalBytes) / timeWindow.Seconds()
+// GetHealthSummary returns a simple health summary focused on reading progress
+func (pt *ProgressTracker) GetHealthSummary() map[string]interface{} {
+	pt.mu.RLock()
+	defer pt.mu.RUnlock()
+
+	now := time.Now()
+	return map[string]interface{}{
+		"totalBytesRead":    pt.totalBytesRead,
+		"lastProgressTime":  pt.lastProgressTime,
+		"timeSinceProgress": now.Sub(pt.lastProgressTime).String(),
+		"timeoutDuration":   pt.timeoutDuration.String(),
+		"resetThreshold":    pt.resetThreshold,
+		"isHealthy":         pt.IsHealthy(),
+		"shouldTimeout":     pt.ShouldTimeout(),
+	}
 }

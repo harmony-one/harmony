@@ -35,6 +35,7 @@ type Stream interface {
 	Failures() int32
 	AddFailedTimes(faultRecoveryThreshold time.Duration)
 	ResetFailedTimes()
+	GetProgressTracker() *ProgressTracker
 }
 
 // BaseStream is the wrapper around
@@ -70,7 +71,7 @@ func NewBaseStream(st libp2p_network.Stream) *BaseStream {
 		writeTimeout:    streamWriteTimeout,
 		failures:        0,
 		lastFailureTime: time.Now(),
-		progressTracker: NewProgressTracker(config.ProgressTimeout, config.MaxIdleTime, config.ProgressThreshold),
+		progressTracker: NewProgressTracker(config.ProgressTimeout, config.ProgressThreshold),
 		timeoutConfig:   config,
 	}
 }
@@ -88,7 +89,7 @@ func NewBaseStreamWithConfig(st libp2p_network.Stream, config *StreamTimeoutConf
 		writeTimeout:    streamWriteTimeout,
 		failures:        0,
 		lastFailureTime: time.Now(),
-		progressTracker: NewProgressTracker(config.ProgressTimeout, config.MaxIdleTime, config.ProgressThreshold),
+		progressTracker: NewProgressTracker(config.ProgressTimeout, config.ProgressThreshold),
 		timeoutConfig:   config,
 	}
 }
@@ -157,6 +158,16 @@ func (st *BaseStream) ResetFailedTimes() {
 	st.failureLock.Lock()
 	defer st.failureLock.Unlock()
 	st.failures = 0
+}
+
+// GetProgressTracker returns the progress tracker for this stream
+func (st *BaseStream) GetProgressTracker() *ProgressTracker {
+	return st.progressTracker
+}
+
+// GetTimeoutConfig returns the timeout configuration for this stream
+func (st *BaseStream) GetTimeoutConfig() *StreamTimeoutConfig {
+	return st.timeoutConfig
 }
 
 func (st *BaseStream) IsHealthy() bool {
@@ -538,19 +549,9 @@ func min(a, b int) int {
 	return b
 }
 
-// GetProgressTracker returns the progress tracker for this stream
-func (st *BaseStream) GetProgressTracker() *ProgressTracker {
-	return st.progressTracker
-}
-
 // SetProgressTracker sets a custom progress tracker for this stream
 func (st *BaseStream) SetProgressTracker(tracker *ProgressTracker) {
 	st.progressTracker = tracker
-}
-
-// GetTimeoutConfig returns the timeout configuration for this stream
-func (st *BaseStream) GetTimeoutConfig() *StreamTimeoutConfig {
-	return st.timeoutConfig
 }
 
 // SetTimeoutConfig sets a custom timeout configuration for this stream
@@ -558,6 +559,6 @@ func (st *BaseStream) SetTimeoutConfig(config *StreamTimeoutConfig) {
 	st.timeoutConfig = config
 	// Update the progress tracker with new configuration
 	if st.progressTracker != nil && config != nil {
-		st.progressTracker = NewProgressTracker(config.ProgressTimeout, config.MaxIdleTime, config.ProgressThreshold)
+		st.progressTracker = NewProgressTracker(config.ProgressTimeout, config.ProgressThreshold)
 	}
 }
