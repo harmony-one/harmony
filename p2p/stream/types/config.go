@@ -9,8 +9,6 @@ import (
 type StreamTimeoutConfig struct {
 	// ProgressTimeout is the maximum time without progress before timeout
 	ProgressTimeout time.Duration
-	// MaxIdleTime is the maximum time without any activity before timeout
-	MaxIdleTime time.Duration
 	// ProgressThreshold is the minimum bytes to consider as progress
 	ProgressThreshold int64
 	// HealthCheckInterval is how often to check stream health
@@ -22,22 +20,19 @@ type StreamTimeoutConfig struct {
 }
 
 // DefaultStreamTimeoutConfig returns the default timeout configuration
-// Note: ChunkSize should ideally equal ProgressThreshold for optimal progress detection
 func DefaultStreamTimeoutConfig() *StreamTimeoutConfig {
 	return &StreamTimeoutConfig{
-		ProgressTimeout:     30 * time.Second, // 30 seconds without progress (more aggressive)
-		MaxIdleTime:         60 * time.Second, // 1 minute without activity (more aggressive)
-		ProgressThreshold:   2048,             // 2KB progress threshold (more sensitive)
-		HealthCheckInterval: 5 * time.Second,  // Check every 5 seconds (more frequent)
-		ChunkReadTimeout:    15 * time.Second, // 15s per chunk read (more aggressive)
-		ChunkSize:           2048,             // 2KB chunk size (aligned with ProgressThreshold)
+		ProgressTimeout:     5 * time.Minute,  // 5 minutes without progress (was 30s - too aggressive)
+		ProgressThreshold:   512,              // 512 bytes progress threshold (was 2KB - too high)
+		HealthCheckInterval: 15 * time.Second, // Check every 15 seconds (was 5s - too frequent)
+		ChunkReadTimeout:    2 * time.Minute,  // 2 minutes per chunk read (was 15s - too aggressive)
+		ChunkSize:           512,              // 512 bytes chunk size (aligned with ProgressThreshold)
 	}
 }
 
 // NewStreamTimeoutConfig creates a new timeout configuration with custom values
 func NewStreamTimeoutConfig(
 	progressTimeout time.Duration,
-	maxIdleTime time.Duration,
 	progressThreshold int64,
 	healthCheckInterval time.Duration,
 	chunkReadTimeout time.Duration,
@@ -45,7 +40,6 @@ func NewStreamTimeoutConfig(
 ) *StreamTimeoutConfig {
 	return &StreamTimeoutConfig{
 		ProgressTimeout:     progressTimeout,
-		MaxIdleTime:         maxIdleTime,
 		ProgressThreshold:   progressThreshold,
 		HealthCheckInterval: healthCheckInterval,
 		ChunkReadTimeout:    chunkReadTimeout,
@@ -66,9 +60,6 @@ func (c *StreamTimeoutConfig) Validate() error {
 	}
 	if c.ProgressTimeout <= 0 {
 		return errors.New("ProgressTimeout must be positive")
-	}
-	if c.MaxIdleTime <= 0 {
-		return errors.New("MaxIdleTime must be positive")
 	}
 	if c.HealthCheckInterval <= 0 {
 		return errors.New("HealthCheckInterval must be positive")
