@@ -22,10 +22,10 @@ type StreamTimeoutConfig struct {
 // DefaultStreamTimeoutConfig returns the default timeout configuration
 func DefaultStreamTimeoutConfig() *StreamTimeoutConfig {
 	return &StreamTimeoutConfig{
-		ProgressTimeout:     5 * time.Minute,  // 5 minutes without progress (was 30s - too aggressive)
-		ProgressThreshold:   512,              // 512 bytes progress threshold (was 2KB - too high)
-		HealthCheckInterval: 15 * time.Second, // Check every 15 seconds (was 5s - too frequent)
-		ChunkReadTimeout:    2 * time.Minute,  // 2 minutes per chunk read (was 15s - too aggressive)
+		ProgressTimeout:     5 * time.Minute,  // 5 minutes without progress
+		ProgressThreshold:   512,              // 512 bytes progress threshold
+		HealthCheckInterval: 15 * time.Second, // Check every 15 seconds
+		ChunkReadTimeout:    2 * time.Minute,  // 2 minutes per chunk read
 		ChunkSize:           512,              // 512 bytes chunk size (aligned with ProgressThreshold)
 	}
 }
