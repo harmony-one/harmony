@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/holiman/uint256"
 )
 
 // Storage represents a contract's storage.
@@ -67,12 +68,12 @@ type StructLog struct {
 	GasCost         uint64                      `json:"gasCost"`
 	Memory          []byte                      `json:"memory"`
 	MemorySize      int                         `json:"memSize"`
-	Stack           []*big.Int                  `json:"stack"`
+	Stack           []uint256.Int               `json:"stack"`
 	Storage         map[common.Hash]common.Hash `json:"-"`
 	Depth           int                         `json:"depth"`
 	RefundCounter   uint64                      `json:"refund"`
 	Err             error                       `json:"-"`
-	AfterStack      []*big.Int                  `json:"afterStack"`
+	AfterStack      []uint256.Int               `json:"afterStack"`
 	AfterMemory     []byte                      `json:"afterMemory"`
 	OperatorEvent   map[string]string           `json:"operatorEvent"`
 }
@@ -112,6 +113,9 @@ type Tracer interface {
 	CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) (HookAfter, error)
 	CaptureFault(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) error
 	CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error
+
+	CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int)
+	CaptureExit(output []byte, gasUsed uint64, err error)
 }
 
 // StructLogger is an EVM state logger and implements Tracer.
@@ -126,6 +130,9 @@ type StructLogger struct {
 	changedValues map[common.Address]Storage
 	output        []byte
 	err           error
+}
+
+func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
 }
 
 // NewStructLogger returns a new logger
@@ -143,6 +150,10 @@ func NewStructLogger(cfg *LogConfig) *StructLogger {
 func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
 	return nil
 }
+
+// BigToHash sets byte representation of b to hash.
+// If b is larger than len(h), b will be cropped from the left.
+func uint256ToHash(b uint256.Int) common.Hash { return common.BytesToHash(b.Bytes()) }
 
 // CaptureState logs a new structured log message and pushes it out to the environment
 //
@@ -169,8 +180,8 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 	// it in the local storage container.
 	if op == SSTORE && stack.len() >= 2 {
 		var (
-			value   = common.BigToHash(stack.data[stack.len()-2])
-			address = common.BigToHash(stack.data[stack.len()-1])
+			value   = uint256ToHash(stack.data[stack.len()-2])
+			address = uint256ToHash(stack.data[stack.len()-1])
 		)
 		l.changedValues[contract.Address()][address] = value
 	}
@@ -181,11 +192,11 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 		copy(mem, memory.Data())
 	}
 	// Copy a snapshot of the current stack state to a new buffer
-	var stck []*big.Int
+	var stck []uint256.Int
 	if !l.cfg.DisableStack {
-		stck = make([]*big.Int, len(stack.Data()))
-		for i, item := range stack.Data() {
-			stck[i] = new(big.Int).Set(item)
+		stck = make([]uint256.Int, 0, len(stack.Data()))
+		for _, item := range stack.Data() {
+			stck = append(stck, item) //new(big.Int).Set(item)
 		}
 	}
 	// Copy a snapshot of the current storage to a new container
@@ -213,11 +224,11 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 		}
 
 		// Copy a snapshot of the current stack state to a new buffer
-		var stck []*big.Int
+		var stck []uint256.Int
 		if !l.cfg.DisableStack {
-			stck = make([]*big.Int, len(stack.Data()))
-			for i, item := range stack.Data() {
-				stck[i] = new(big.Int).Set(item)
+			stck = make([]uint256.Int, 0, len(stack.Data()))
+			for _, item := range stack.Data() {
+				stck = append(stck, item)
 			}
 		}
 
@@ -248,6 +259,9 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration
 	return nil
 }
 
+func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
+}
+
 // StructLogs returns the captured log entries.
 func (l *StructLogger) StructLogs() []*StructLog { return l.logs }
 
@@ -269,7 +283,7 @@ func WriteTrace(writer io.Writer, logs []StructLog) {
 		if len(log.Stack) > 0 {
 			fmt.Fprintln(writer, "Stack:")
 			for i := len(log.Stack) - 1; i >= 0; i-- {
-				fmt.Fprintf(writer, "%08d  %x\n", len(log.Stack)-i-1, math.PaddedBigBytes(log.Stack[i], 32))
+				fmt.Fprintf(writer, "%08d  %x\n", len(log.Stack)-i-1, math.PaddedBigBytes(log.Stack[i].ToBig(), 32))
 			}
 		}
 		if len(log.Memory) > 0 {

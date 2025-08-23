@@ -39,6 +39,9 @@ const (
 	// CallStipend ...
 	CallStipend uint64 = 2300 // Free gas given at beginning of call.
 
+	Keccak256Gas     uint64 = 30 // Once per KECCAK256 operation.
+	Keccak256WordGas uint64 = 6  // Once per word of the KECCAK256 operation's data.
+
 	// Sha3Gas ...
 	Sha3Gas uint64 = 30 // Once per SHA3 operation.
 	// Sha3WordGas ...
@@ -62,12 +65,9 @@ const (
 	// NetSstoreDirtyGas ...
 	NetSstoreDirtyGas uint64 = 200 // Once per SSTORE operation from dirty.
 
-	// NetSstoreClearRefund ...
-	NetSstoreClearRefund uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
-	// NetSstoreResetRefund ...
-	NetSstoreResetRefund uint64 = 4800 // Once per SSTORE operation for resetting to the original non-zero value
-	// NetSstoreResetClearRefund ...
-	NetSstoreResetClearRefund uint64 = 19800 // Once per SSTORE operation for resetting to the original zero value
+	SstoreSetGasEIP2200               uint64 = 20000 // Once per SSTORE operation from clean zero to non-zero
+	SstoreResetGasEIP2200             uint64 = 5000  // Once per SSTORE operation from clean non-zero to something else
+	SstoreClearsScheduleRefundEIP2200 uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
 
 	// SstoreSentryGasEIP2200 ...
 	SstoreSentryGasEIP2200 uint64 = 2300 // Minimum gas required to be present for an SSTORE call, not consumed
@@ -85,6 +85,10 @@ const (
 	SstoreCleanRefundEIP2200 uint64 = 4200 // Once per SSTORE operation for resetting to the original non-zero value
 	// SstoreClearRefundEIP2200 ...
 	SstoreClearRefundEIP2200 uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
+
+	NetSstoreClearRefund      uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
+	NetSstoreResetRefund      uint64 = 4800  // Once per SSTORE operation for resetting to the original non-zero value
+	NetSstoreResetClearRefund uint64 = 19800 // Once per SSTORE operation for resetting to the original zero value
 
 	// todo(sun): implement eip2929
 	ColdAccountAccessCostEIP2929 uint64 = 2600 // COLD_ACCOUNT_ACCESS_COST
@@ -137,6 +141,7 @@ const (
 	SloadGasFrontier             uint64 = 50
 	SloadGasEIP150               uint64 = 200
 	SloadGasEIP1884              uint64 = 800  // Cost of SLOAD after EIP 1884 (part of Istanbul)
+	SloadGasEIP2200              uint64 = 800  // Cost of SLOAD after EIP 2200 (part of Istanbul)
 	ExtcodeHashGasConstantinople uint64 = 400  // Cost of EXTCODEHASH (introduced in Constantinople)
 	ExtcodeHashGasEIP1884        uint64 = 700  // Cost of EXTCODEHASH after EIP 1884 (part in Istanbul)
 	SelfdestructGasEIP150        uint64 = 5000 // Cost of SELFDESTRUCT post EIP 150 (Tangerine)
@@ -191,6 +196,9 @@ const (
 	Bls12381MapG1Gas          uint64 = 5500  // Gas price for BLS12-381 mapping field element to G1 operation
 	Bls12381MapG2Gas          uint64 = 23800 // Gas price for BLS12-381 mapping field element to G2 operation
 )
+
+// Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations
+var Bls12381MultiExpDiscountTable = [128]uint64{1200, 888, 764, 641, 594, 547, 500, 453, 438, 423, 408, 394, 379, 364, 349, 334, 330, 326, 322, 318, 314, 310, 306, 302, 298, 294, 289, 285, 281, 277, 273, 269, 268, 266, 265, 263, 262, 260, 259, 257, 256, 254, 253, 251, 250, 248, 247, 245, 244, 242, 241, 239, 238, 236, 235, 233, 232, 231, 229, 228, 226, 225, 223, 222, 221, 220, 219, 219, 218, 217, 216, 216, 215, 214, 213, 213, 212, 211, 211, 210, 209, 208, 208, 207, 206, 205, 205, 204, 203, 202, 202, 201, 200, 199, 199, 198, 197, 196, 196, 195, 194, 193, 193, 192, 191, 191, 190, 189, 188, 188, 187, 186, 185, 185, 184, 183, 182, 182, 181, 180, 179, 179, 178, 177, 176, 176, 175, 174}
 
 // nolint
 var (

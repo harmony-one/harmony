@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/holiman/uint256"
 )
 
 type action struct {
@@ -215,6 +216,26 @@ type ParityBlockTracer struct {
 	tracers []*ParityTxTracer
 }
 
+func (jst *ParityBlockTracer) CaptureTxStart(gasLimit uint64) {
+	//TODO implement me
+	//panic("implement me")
+}
+
+func (jst *ParityBlockTracer) CaptureTxEnd(restGas uint64) {
+	//TODO implement me
+	//panic("implement me")
+}
+
+func (jst *ParityBlockTracer) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
+	//TODO implement me
+	//panic("implement me")
+}
+
+func (jst *ParityBlockTracer) CaptureExit(output []byte, gasUsed uint64, err error) {
+	//TODO implement me
+	//panic("implement me")
+}
+
 func (ptt *ParityTxTracer) push(ac *action) {
 	ptt.calls = append(ptt.calls, ac)
 }
@@ -249,7 +270,7 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 	jst.cur.blockHash = env.StateDB.BlockHash()
 	jst.cur.transactionPosition = uint64(env.StateDB.TxIndex())
 	jst.cur.transactionHash = env.StateDB.TxHashETH()
-	jst.cur.blockNumber = env.BlockNumber.Uint64()
+	jst.cur.blockNumber = env.Context.BlockNumber.Uint64()
 	jst.cur.descended = false
 	jst.cur.push(&jst.cur.action)
 	return nil
@@ -261,10 +282,10 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		return nil, jst.CaptureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
 	}
 	var retErr error
-	stackPeek := func(n int) *big.Int {
+	stackPeek := func(n int) *uint256.Int {
 		if n >= len(stack.Data()) {
 			retErr = errors.New("tracer bug:stack overflow")
-			return big.NewInt(0)
+			return uint256.NewInt(0)
 		}
 		return stack.Back(n)
 	}
@@ -278,15 +299,15 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 
 	switch op {
 	case vm.CREATE, vm.CREATE2:
-		inOff := stackPeek(1).Int64()
-		inSize := stackPeek(2).Int64()
+		inOff := int64(stackPeek(1).Uint64())
+		inSize := int64(stackPeek(2).Uint64())
 		jst.cur.push(&action{
 			op:      op,
 			from:    contract.Address(),
 			input:   memoryCopy(inOff, inSize),
 			gasIn:   gas,
 			gasCost: cost,
-			value:   (&big.Int{}).Set(stackPeek(0)),
+			value:   stackPeek(0).ToBig(),
 		})
 		jst.cur.descended = true
 		return nil, retErr
@@ -295,14 +316,14 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		ac.push(&action{
 			op:      op,
 			from:    contract.Address(),
-			to:      common.BigToAddress(stackPeek(0)),
+			to:      common.BigToAddress(stackPeek(0).ToBig()),
 			gasIn:   gas,
 			gasCost: cost,
 			value:   env.StateDB.GetBalance(contract.Address()),
 		})
 		return nil, retErr
 	case vm.CALL, vm.CALLCODE, vm.DELEGATECALL, vm.STATICCALL:
-		to := common.BigToAddress(stackPeek(1))
+		to := common.BigToAddress(stackPeek(1).ToBig())
 		precompiles := vm.PrecompiledContractsVRF
 		if _, exist := precompiles[to]; exist {
 			return nil, nil
@@ -311,8 +332,8 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		if op == vm.DELEGATECALL || op == vm.STATICCALL {
 			off = 0
 		}
-		inOff := stackPeek(2 + off).Int64()
-		inSize := stackPeek(3 + off).Int64()
+		inOff := int64(stackPeek(2 + off).Uint64())
+		inSize := int64(stackPeek(3 + off).Uint64())
 		callObj := &action{
 			op:      op,
 			from:    contract.Address(),
@@ -320,11 +341,11 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			input:   memoryCopy(inOff, inSize),
 			gasIn:   gas,
 			gasCost: cost,
-			outOff:  stackPeek(4 + off).Int64(),
-			outLen:  stackPeek(5 + off).Int64(),
+			outOff:  stackPeek(4 + off).ToBig().Int64(),
+			outLen:  stackPeek(5 + off).ToBig().Int64(),
 		}
 		if op != vm.DELEGATECALL && op != vm.STATICCALL {
-			callObj.value = (&big.Int{}).Set(stackPeek(2))
+			callObj.value = (&big.Int{}).Set(stackPeek(2).ToBig())
 		}
 		jst.cur.push(callObj)
 		jst.cur.descended = true
@@ -340,8 +361,8 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 	if op == vm.REVERT {
 		last := jst.cur.last()
 		last.err = errors.New("execution reverted")
-		revertOff := stackPeek(0).Int64()
-		revertLen := stackPeek(1).Int64()
+		revertOff := int64(stackPeek(0).Uint64())
+		revertLen := int64(stackPeek(1).Uint64())
 		last.revert = memoryCopy(revertOff, revertLen)
 		return nil, retErr
 	}
@@ -352,7 +373,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 
 			ret := stackPeek(0)
 			if ret.Sign() != 0 {
-				call.to = common.BigToAddress(ret)
+				call.to = common.BigToAddress(ret.ToBig())
 				call.output = env.StateDB.GetCode(call.to)
 			} else if call.err == nil {
 				call.err = errors.New("internal failure")
@@ -459,7 +480,7 @@ func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 		)
 		var resultPiece string
 		if ac.err != nil {
-			resultPiece = fmt.Sprintf(`,"error":"Reverted","revert":"0x%x"`, ac.revert)
+			resultPiece = fmt.Sprintf(`,"error":"Reverted","revert":"%x"`, ac.revert)
 
 		} else if outStr != nil {
 			resultPiece = fmt.Sprintf(`,"result":%s`, *outStr)
