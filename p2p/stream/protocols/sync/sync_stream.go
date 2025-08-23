@@ -670,6 +670,7 @@ func bytesToHashes(bs [][]byte) []common.Hash {
 }
 
 // monitorStreamHealth monitors the stream health and implements progress-based timeout
+// that focuses solely on content reading progress
 func (st *syncStream) monitorStreamHealth() {
 	config := st.GetTimeoutConfig()
 	if config == nil {
@@ -684,26 +685,18 @@ func (st *syncStream) monitorStreamHealth() {
 		case <-ticker.C:
 			progressTracker := st.GetProgressTracker()
 			if progressTracker != nil {
-				// Check for timeout due to lack of progress
+				// Get health summary
+				healthSummary := progressTracker.GetHealthSummary()
+
+				// Check for timeout due to lack of progress during content reading
 				if progressTracker.ShouldTimeout() {
 					st.logger.Warn().
 						Str("streamID", string(st.ID())).
 						Float64("progressRate", progressTracker.GetProgressRate()).
-						Msg("stream timeout due to lack of progress")
+						Interface("health", healthSummary).
+						Msg("stream timeout due to lack of progress during content reading")
 					if err := st.Close("progress timeout", false); err != nil {
 						st.logger.Err(err).Msg("failed to close stream on progress timeout")
-					}
-					return
-				}
-
-				// Check for timeout due to inactivity
-				if progressTracker.ShouldIdleTimeout() {
-					st.logger.Warn().
-						Str("streamID", string(st.ID())).
-						Float64("progressRate", progressTracker.GetProgressRate()).
-						Msg("stream timeout due to inactivity")
-					if err := st.Close("idle timeout", false); err != nil {
-						st.logger.Err(err).Msg("failed to close stream on idle timeout")
 					}
 					return
 				}
@@ -713,7 +706,13 @@ func (st *syncStream) monitorStreamHealth() {
 					st.logger.Debug().
 						Str("streamID", string(st.ID())).
 						Float64("progressRate", progressTracker.GetProgressRate()).
+						Interface("health", healthSummary).
 						Msg("stream health check - healthy")
+				} else {
+					st.logger.Debug().
+						Str("streamID", string(st.ID())).
+						Interface("health", healthSummary).
+						Msg("stream health check - monitoring closely")
 				}
 			}
 		case <-st.closeC:
