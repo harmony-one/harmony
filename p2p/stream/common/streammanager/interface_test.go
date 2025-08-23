@@ -103,6 +103,14 @@ func (st *testStream) ProtoSpec() (sttypes.ProtoSpec, error) {
 	return sttypes.ProtoIDToProtoSpec(st.ProtoID())
 }
 
+func (st *testStream) GetProgressTracker() *sttypes.ProgressTracker {
+	return nil
+}
+
+func (st *testStream) GetTimeoutConfig() *sttypes.StreamTimeoutConfig {
+	return nil
+}
+
 type testHost struct {
 	sm      *streamManager
 	streams map[sttypes.StreamID]*testStream
