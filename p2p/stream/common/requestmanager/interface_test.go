@@ -127,6 +127,14 @@ func (st *testStream) ResetFailedTimes() {
 	return
 }
 
+func (st *testStream) GetProgressTracker() *sttypes.ProgressTracker {
+	return nil
+}
+
+func (st *testStream) GetTimeoutConfig() *sttypes.StreamTimeoutConfig {
+	return nil
+}
+
 func makeDummyTestStreams(indexes []int) []sttypes.Stream {
 	sts := make([]sttypes.Stream, 0, len(indexes))
 
