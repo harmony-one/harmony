@@ -14,7 +14,6 @@ type ProgressTracker struct {
 	timeoutDuration  time.Duration
 	resetThreshold   int64
 	totalBytesRead   int64
-	lastCheckedSize  int64
 }
 
 // NewProgressTracker creates a new progress tracker with the given configuration
@@ -40,28 +39,12 @@ func (pt *ProgressTracker) UpdateProgress(newSize int) {
 	}
 }
 
-// HasProgress checks if the stream has made progress since last check
-func (pt *ProgressTracker) HasProgress(newSize int) bool {
-	pt.mu.Lock()
-	defer pt.mu.Unlock()
-
-	progress := int64(newSize) - pt.lastCheckedSize
-	hasProgress := progress >= pt.resetThreshold
-
-	if hasProgress {
-		pt.lastCheckedSize = int64(newSize)
-	}
-
-	return hasProgress
-}
-
 // ResetTimeout resets the progress timeout - called when progress is detected
 func (pt *ProgressTracker) ResetTimeout() {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
 
 	pt.lastProgressTime = time.Now()
-	pt.lastCheckedSize = 0
 }
 
 // ShouldTimeout checks if the stream should timeout due to lack of progress during content reading
