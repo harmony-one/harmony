@@ -702,15 +702,10 @@ func (st *syncStream) monitorStreamHealth() {
 				}
 
 				// Log health status periodically
-				if progressTracker.IsHealthy() {
+				if !progressTracker.IsHealthy() {
 					st.logger.Debug().
 						Str("streamID", string(st.ID())).
 						Float64("progressRate", progressTracker.GetProgressRate()).
-						Interface("health", healthSummary).
-						Msg("stream health check - healthy")
-				} else {
-					st.logger.Debug().
-						Str("streamID", string(st.ID())).
 						Interface("health", healthSummary).
 						Msg("stream health check - monitoring closely")
 				}
