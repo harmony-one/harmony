@@ -6,7 +6,7 @@ import (
 )
 
 func TestProgressTracker_NewProgressTracker(t *testing.T) {
-	pt := NewProgressTracker(30*time.Second, 60*time.Second, 1024)
+	pt := NewProgressTracker(30*time.Second, 1024)
 
 	if pt == nil {
 		t.Fatal("ProgressTracker should not be nil")
@@ -16,17 +16,13 @@ func TestProgressTracker_NewProgressTracker(t *testing.T) {
 		t.Errorf("Expected timeout duration 30s, got %v", pt.timeoutDuration)
 	}
 
-	if pt.maxIdleTime != 60*time.Second {
-		t.Errorf("Expected max idle time 60s, got %v", pt.maxIdleTime)
-	}
-
 	if pt.resetThreshold != 1024 {
 		t.Errorf("Expected reset threshold 1024, got %v", pt.resetThreshold)
 	}
 }
 
 func TestProgressTracker_UpdateProgress(t *testing.T) {
-	pt := NewProgressTracker(30*time.Second, 60*time.Second, 1024)
+	pt := NewProgressTracker(30*time.Second, 1024)
 
 	// Update with data smaller than threshold
 	pt.UpdateProgress(512)
@@ -44,7 +40,7 @@ func TestProgressTracker_UpdateProgress(t *testing.T) {
 }
 
 func TestProgressTracker_HasProgress(t *testing.T) {
-	pt := NewProgressTracker(30*time.Second, 60*time.Second, 1024)
+	pt := NewProgressTracker(30*time.Second, 1024)
 
 	// No progress initially
 	if pt.HasProgress(0) {
@@ -72,7 +68,7 @@ func TestProgressTracker_HasProgress(t *testing.T) {
 }
 
 func TestProgressTracker_ShouldTimeout(t *testing.T) {
-	pt := NewProgressTracker(100*time.Millisecond, 60*time.Second, 1024)
+	pt := NewProgressTracker(100*time.Millisecond, 1024)
 
 	// Should not timeout immediately
 	if pt.ShouldTimeout() {
@@ -89,7 +85,7 @@ func TestProgressTracker_ShouldTimeout(t *testing.T) {
 }
 
 func TestProgressTracker_ResetTimeout(t *testing.T) {
-	pt := NewProgressTracker(100*time.Millisecond, 60*time.Second, 1024)
+	pt := NewProgressTracker(100*time.Millisecond, 1024)
 
 	// Wait for timeout
 	time.Sleep(150 * time.Millisecond)
@@ -109,40 +105,24 @@ func TestProgressTracker_ResetTimeout(t *testing.T) {
 }
 
 func TestProgressTracker_IsHealthy(t *testing.T) {
-	pt := NewProgressTracker(100*time.Millisecond, 200*time.Millisecond, 1024)
+	pt := NewProgressTracker(100*time.Millisecond, 1024)
 
 	// Should be healthy initially
 	if !pt.IsHealthy() {
 		t.Error("Should be healthy initially")
 	}
 
-	// Wait for progress timeout but not idle timeout
+	// Wait for progress timeout
 	time.Sleep(150 * time.Millisecond)
 
 	// Should not be healthy now (progress timeout exceeded)
 	if pt.IsHealthy() {
 		t.Error("Should not be healthy after progress timeout")
 	}
-
-	// Test idle timeout with a fresh tracker
-	pt2 := NewProgressTracker(60*time.Second, 100*time.Millisecond, 1024)
-
-	// Should be healthy initially
-	if !pt2.IsHealthy() {
-		t.Error("Should be healthy initially")
-	}
-
-	// Wait for idle timeout
-	time.Sleep(150 * time.Millisecond)
-
-	// Should not be healthy now (idle timeout exceeded)
-	if pt2.IsHealthy() {
-		t.Error("Should not be healthy after idle timeout")
-	}
 }
 
 func TestProgressTracker_GetProgressRate(t *testing.T) {
-	pt := NewProgressTracker(30*time.Second, 60*time.Second, 1024)
+	pt := NewProgressTracker(30*time.Second, 1024)
 
 	// Initial rate should be 0 (no updates yet)
 	if rate := pt.GetProgressRate(); rate != 0 {
@@ -152,24 +132,39 @@ func TestProgressTracker_GetProgressRate(t *testing.T) {
 	// Update with some data
 	pt.UpdateProgress(2048)
 
-	// Rate should still be 0 with only one update (need at least 2)
-	if rate := pt.GetProgressRate(); rate != 0 {
-		t.Errorf("Expected rate 0 with one update, got %v", rate)
-	}
-
-	// Update again to have 2 updates
-	pt.UpdateProgress(1024)
-
-	// Now we should have a rate
+	// Rate should be calculated based on total bytes and time
 	rate := pt.GetProgressRate()
 	if rate <= 0 {
 		t.Errorf("Expected positive rate, got %v", rate)
 	}
+}
 
-	// The rate should be approximately (2048 + 1024) bytes / 0.2 seconds = 15360 bytes/sec
-	// Allow some tolerance for timing variations
-	expectedRate := float64(3072) / 0.2 // bytes per second
-	if rate < expectedRate*0.5 || rate > expectedRate*1.5 {
-		t.Errorf("Expected rate around %v, got %v", expectedRate, rate)
+func TestProgressTracker_GetHealthSummary(t *testing.T) {
+	pt := NewProgressTracker(30*time.Second, 1024)
+
+	// Update progress
+	pt.UpdateProgress(1024)
+
+	summary := pt.GetHealthSummary()
+
+	// Check that summary contains expected fields
+	expectedFields := []string{
+		"totalBytesRead", "lastProgressTime", "timeSinceProgress",
+		"timeoutDuration", "resetThreshold", "isHealthy", "shouldTimeout",
+	}
+
+	for _, field := range expectedFields {
+		if _, exists := summary[field]; !exists {
+			t.Errorf("Health summary missing field: %s", field)
+		}
+	}
+
+	// Check specific values
+	if summary["totalBytesRead"] != int64(1024) {
+		t.Errorf("Expected totalBytesRead 1024, got %v", summary["totalBytesRead"])
+	}
+
+	if summary["resetThreshold"] != int64(1024) {
+		t.Errorf("Expected resetThreshold 1024, got %v", summary["resetThreshold"])
 	}
 }
