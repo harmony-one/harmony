@@ -37,7 +37,14 @@ const (
 
 	// ShortRangeTimeout is the timeout for each short range sync, which allow short range sync
 	// to restart automatically when stuck in `getBlockHashes`
-	ShortRangeTimeout time.Duration = 1 * time.Minute
+	// This is EMERGENCY ONLY - Only triggers if lower layers completely fail
+	// Never triggers during normal slow progress and lower layers decide when to timeout
+	ShortRangeTimeout time.Duration = 10 * time.Minute
+
+	// EpochSyncTimeout is the timeout for epoch sync operations
+	// This should be longer than ShortRangeTimeout since epoch sync deals with larger blocks
+	// and should not interfere with the progress-based timeout system
+	EpochSyncTimeout time.Duration = 15 * time.Minute
 
 	// pivot block distance ranges
 	MinPivotDistanceToHead uint64 = 1024

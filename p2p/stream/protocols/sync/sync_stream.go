@@ -62,6 +62,7 @@ func (st *syncStream) run() {
 
 	go st.handleReqLoop()
 	go st.handleRespLoop()
+	go st.monitorStreamHealth()
 	st.readMsgLoop()
 }
 
@@ -439,12 +440,29 @@ func (st *syncStream) handleResp(resp *syncpb.Response) {
 }
 
 func (st *syncStream) readMsg() (*syncpb.Message, error) {
-	b, err := st.ReadBytes()
+	// Use progress-based reading with the tracker from BaseStream
+	b, err := st.ReadBytesWithProgress(st.GetProgressTracker())
 	if err != nil {
+		// Log progress timeout specifically
+		if err.Error() == "progress timeout" {
+			st.logger.Warn().
+				Str("streamID", string(st.ID())).
+				Msg("stream timeout due to lack of progress")
+		}
+		// Log stream closure specifically
+		if err.Error() == "stream closed" {
+			st.logger.Debug().
+				Str("streamID", string(st.ID())).
+				Msg("stream closed by remote peer")
+		}
 		return nil, err
 	}
 	if b == nil || len(b) == 0 {
-		return nil, nil
+		// This should not happen
+		st.logger.Warn().
+			Str("streamID", string(st.ID())).
+			Msg("received empty message data")
+		return nil, errors.New("empty message data")
 	}
 	var msg = &syncpb.Message{}
 	if err := protobuf.Unmarshal(b, msg); err != nil {
@@ -649,4 +667,51 @@ func bytesToHashes(bs [][]byte) []common.Hash {
 		hs = append(hs, h)
 	}
 	return hs
+}
+
+// monitorStreamHealth monitors the stream health and implements progress-based timeout
+// that focuses solely on content reading progress
+func (st *syncStream) monitorStreamHealth() {
+	config := st.GetTimeoutConfig()
+	if config == nil {
+		config = sttypes.DefaultStreamTimeoutConfig()
+	}
+
+	ticker := time.NewTicker(config.HealthCheckInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			progressTracker := st.GetProgressTracker()
+			if progressTracker != nil {
+				// Get health summary
+				healthSummary := progressTracker.GetHealthSummary()
+
+				// Check for timeout due to lack of progress during content reading
+				if progressTracker.ShouldTimeout() {
+					st.logger.Warn().
+						Str("streamID", string(st.ID())).
+						Float64("progressRate", progressTracker.GetProgressRate()).
+						Interface("health", healthSummary).
+						Msg("stream timeout due to lack of progress during content reading")
+					if err := st.Close("progress timeout", false); err != nil {
+						st.logger.Err(err).Msg("failed to close stream on progress timeout")
+					}
+					return
+				}
+
+				// Log health status periodically
+				if !progressTracker.IsHealthy() {
+					st.logger.Debug().
+						Str("streamID", string(st.ID())).
+						Float64("progressRate", progressTracker.GetProgressRate()).
+						Interface("health", healthSummary).
+						Msg("stream health check - monitoring closely")
+				}
+			}
+		case <-st.closeC:
+			return
+		}
+	}
 }

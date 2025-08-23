@@ -1067,7 +1067,19 @@ const (
 func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
 	timer := DoMetricRPCRequest(InSync)
 	defer DoRPCRequestDuration(InSync, timer)
+
+	// First check with cached sync status
 	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
+
+	// If cached status shows in sync but difference is significant,
+	// log a warning about potential cache staleness
+	if inSync && diff > inSyncTolerance*2 {
+		utils.Logger().Warn().
+			Uint64("cachedDiff", diff).
+			Int("tolerance", inSyncTolerance).
+			Msg("[RPC] Cached sync status shows in sync but with large difference - cache may be stale")
+	}
+
 	if !inSync && diff <= inSyncTolerance {
 		inSync = true
 	}

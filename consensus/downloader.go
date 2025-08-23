@@ -105,7 +105,25 @@ func (consensus *Consensus) AddConsensusLastMile() error {
 }
 
 func (consensus *Consensus) spinUpStateSync() {
+	// CRITICAL: Immediate consensus mode change to "Syncing" is essential to prevent race conditions.
+	//
+	// Here's why this is needed:
+	// 1. When consensus detects the node is out of sync (e.g., receives block with higher number),
+	//    it calls spinUpStateSync() immediately
+	// 2. However, the sync detection loop only runs every 60 seconds (SyncFrequency)
+	// 3. During this 60-second window, the node continues to participate in consensus with mode "Normal"
+	// 4. This leads to "unknown ancestor" errors because the node tries to verify blocks it can't handle
+	// 5. The event system (DownloadAsync -> startSyncing -> evtDownloadStarted) eventually changes the mode,
+	//    but there's a race condition where consensus messages are processed before the mode changes
+	//
+	// By immediately setting the mode to "Syncing", we prevent the node from participating in consensus
+	// while it's out of sync, eliminating the race condition and preventing "unknown ancestor" errors.
+	consensus.BlocksNotSynchronized("spinUpStateSync")
+
+	// Start the download process
 	consensus.dHelper.DownloadAsync()
+
+	// Stop all consensus timeouts since we're syncing
 	for _, v := range consensus.consensusTimeout {
 		v.Stop()
 	}
