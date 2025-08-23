@@ -325,6 +325,12 @@ func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint6
 // For each iteration, estimate the current block number, then fetch block & insert to blockchain
 func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, int, error) {
 
+	if !s.isEpochChain {
+		// finish syncing in the end of the sync
+		// it may SpinUpStateSync have set the syncing flag
+		defer s.finishSyncing()
+	}
+
 	startedNumber := s.bc.CurrentBlock().NumberU64()
 
 	var totalInserted int
@@ -373,7 +379,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 
 	if !s.isEpochChain {
 		s.startSyncing()
-		defer s.finishSyncing()
 	}
 
 	ctx, cancel := context.WithCancel(downloaderContext)
