@@ -55,10 +55,41 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	if err != nil {
 		return errors.WithMessagef(err, "cannot decode crosslink heartbeat message, len: %d", len(msgPayload))
 	}
+
+	// Check if the heartbeat is for the current shard
 	cur := node.Blockchain().CurrentBlock()
 	shardID := cur.ShardID()
 	if hb.ShardID != shardID {
-		return errors.Errorf("invalid shard id: expected %d, got %d", shardID, hb.ShardID)
+		utils.Logger().Debug().
+			Uint32("expectedShard", shardID).
+			Uint32("heartbeatShard", hb.ShardID).
+			Msg("[ProcessCrossLinkHeartbeatMessage] heartbeat for different shard, ignoring")
+		return nil
+	}
+
+	// Check if epoch chain is synced to at least hb.Epoch before processing crosslink heartbeat
+	epochChain := node.EpochChain()
+	if epochChain == nil {
+		utils.Logger().Warn().Msg("[ProcessCrossLinkHeartbeatMessage] epoch chain not available, ignoring heartbeat")
+		return errors.New("epoch chain not available")
+	}
+
+	// Check if epoch chain current block is available
+	epochCurrentBlock := epochChain.CurrentBlock()
+	if epochCurrentBlock == nil {
+		utils.Logger().Warn().Msg("[ProcessCrossLinkHeartbeatMessage] epoch chain current block not available, ignoring heartbeat")
+		return errors.New("epoch chain current block not available")
+	}
+
+	// Check if epoch chain is synced to at least the heartbeat epoch
+	currentEpoch := epochCurrentBlock.Epoch()
+	currentEpochU64 := currentEpoch.Uint64()
+	if currentEpochU64 < hb.Epoch {
+		utils.Logger().Warn().
+			Uint64("currentEpoch", currentEpochU64).
+			Uint64("heartbeatEpoch", hb.Epoch).
+			Msg("[ProcessCrossLinkHeartbeatMessage] epoch chain not synced to heartbeat epoch, ignoring heartbeat")
+		return errors.Errorf("epoch chain not synced to heartbeat epoch: current=%d, heartbeat=%d", currentEpochU64, hb.Epoch)
 	}
 
 	// Outdated signal.
@@ -89,7 +120,7 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return errors.New("invalid signature")
 	}
 
-	state, err := node.EpochChain().ReadShardState(cur.Epoch())
+	state, err := epochChain.ReadShardState(cur.Epoch())
 	if err != nil {
 		return errors.WithMessagef(err, "cannot read shard state for epoch %d", cur.Epoch())
 	}
