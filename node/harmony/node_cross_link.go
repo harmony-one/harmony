@@ -246,16 +246,13 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			localEpoch := node.Blockchain().CurrentBlock().Header().Epoch().Uint64()
 			crossLinkEpoch := cl.Epoch().Uint64()
 
-			// Allow processing cross-links from current epoch and up to 1 epoch ahead
-			// This provides some tolerance for minor sync delays while preventing processing of far-future cross-links
-			maxAllowedEpoch := localEpoch + 1
-
-			if crossLinkEpoch > maxAllowedEpoch {
+			// Allow processing cross-links from current epoch and earlier
+			// Cross-links from future epochs should not exist and may be malicious or maybe it is not fully synced
+			if crossLinkEpoch > localEpoch {
 				utils.Logger().Debug().
 					Str("crossLinkHash", cl.Hash().Hex()).
 					Uint64("crossLinkEpoch", crossLinkEpoch).
 					Uint64("localEpoch", localEpoch).
-					Uint64("maxAllowedEpoch", maxAllowedEpoch).
 					Uint32("shardID", cl.ShardID()).
 					Msg("[ProcessingCrossLink] Skipping cross-link - node not synced to this epoch yet (epoch gap too large)")
 				// Add to failed list to be deleted since we can't process it
