@@ -120,7 +120,7 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return errors.New("invalid signature")
 	}
 
-	state, err := node.EpochChain().ReadShardState(cur.Epoch())
+	state, err := epochChain.ReadShardState(cur.Epoch())
 	if err != nil {
 		return errors.WithMessagef(err, "cannot read shard state for epoch %d", cur.Epoch())
 	}
