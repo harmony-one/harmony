@@ -158,7 +158,7 @@ func (bh *StageBlockHashes) downloadBlockHashes(ctx context.Context, bns []uint6
 		bh.configs.protocol.RemoveStream(stid, "nil block hashes")
 		return []common.Hash{}, stid, errors.New("nil response for hashes")
 	}
-	bh.configs.logger.Info().
+	bh.configs.logger.Debug().
 		Int("request size", len(bns)).
 		Int("received size", len(hashes)).
 		Interface("stid", stid).
