@@ -325,9 +325,9 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			if !globalRetryTracker.recordFailure(&cl) {
 				utils.Logger().Warn().
 					Str("crossLinkHash", cl.Hash().Hex()).
-					Uint64("epoch", cl.Epoch().Uint64()).
 					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
 					Uint64("crossLinkNumber", cl.Number().Uint64()).
+					Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
 					Uint32("crossLinkShardID", cl.ShardID()).
 					Msg("[ProcessingCrossLink] Skipping cross-link after max retries - will be deleted")
 				// Add to failed list to be deleted
@@ -341,9 +341,9 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				utils.Logger().Error().
 					Err(err).
 					Str("crossLinkHash", cl.Hash().Hex()).
-					Uint64("epoch", cl.Epoch().Uint64()).
 					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
 					Uint64("crossLinkNumber", cl.Number().Uint64()).
+					Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
 					Uint32("crossLinkShardID", cl.ShardID()).
 					Int("retryCount", globalRetryTracker.getRetryCount(&cl)).
 					Msg("[ProcessingCrossLink] Failed to verify cross-link - will retry")
