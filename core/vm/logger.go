@@ -126,6 +126,7 @@ type Tracer interface {
 type StructLogger struct {
 	cfg LogConfig
 
+	storage       map[common.Address]Storage
 	logs          []*StructLog
 	changedValues map[common.Address]Storage
 	output        []byte
