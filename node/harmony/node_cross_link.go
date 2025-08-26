@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var CrosslinkOutdatedErr = errors.New("crosslink signal is outdated")
@@ -273,6 +274,25 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				break
 			}
 
+			// Check if cross-link already exists in pending queue
+			if _, exists := existingCLs[cl.Hash()]; exists {
+				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
+				utils.Logger().Debug().
+					Str("crossLinkHash", cl.Hash().Hex()).
+					Msg("[ProcessingCrossLink] Cross-link already exists in pending queue, skipping")
+				continue
+			}
+
+			// Check if cross-link already exists in blockchain
+			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
+			if err == nil && exist != nil {
+				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
+				utils.Logger().Debug().
+					Str("crossLinkHash", cl.Hash().Hex()).
+					Msg("[ProcessingCrossLink] Cross-link already exists in blockchain, skipping")
+				continue
+			}
+
 			// Check if node is synced enough to handle this cross-link
 			localEpoch := node.Blockchain().CurrentBlock().Header().Epoch().Uint64()
 			crossLinkEpoch := cl.Epoch().Uint64()
@@ -305,6 +325,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 
 			// Try to verify the cross-link
 			if err := node.Blockchain().Engine().VerifyCrossLink(node.Blockchain(), cl); err != nil {
+				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "invalid_crosslink"}).Inc()
 				utils.Logger().Error().
 					Err(err).
 					Str("crossLinkHash", cl.Hash().Hex()).
@@ -321,16 +342,9 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			// Success! Clean up the retry tracker (if it has been retried)
 			globalRetryTracker.cleanupFailed(&cl)
 
-			// Check if cross-link already exists
-			if _, exists := existingCLs[cl.Hash()]; exists {
-				utils.Logger().Debug().
-					Str("crossLinkHash", cl.Hash().Hex()).
-					Msg("[ProcessingCrossLink] Cross-link already exists, skipping")
-				continue
-			}
-
 			// Add to candidates for processing
 			candidates = append(candidates, cl)
+			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "new_crosslink"}).Inc()
 		}
 
 		// Log summary of processing results
