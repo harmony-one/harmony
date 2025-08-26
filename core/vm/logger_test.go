@@ -72,8 +72,24 @@ func TestStoreCapture(t *testing.T) {
 }
 
 func TestBigToHash(t *testing.T) {
-	var value = common.BigToHash(big.NewInt(1))
-	if common.BigToHash(big.NewInt(0)) == uint256ToHash(*uint256.NewInt(0)) {
-		t.Errorf("expected %x, got %x", value, uint256ToHash(*uint256.NewInt(0)))
-	}
+	t.Run("test_0", func(t *testing.T) {
+		const value = 0
+		var (
+			x1 = common.BigToHash(big.NewInt(value))
+			x2 = uint256ToHash(*uint256.NewInt(value))
+		)
+		if x1 != x2 {
+			t.Errorf("expected %x, got %x", x1, x2)
+		}
+	})
+	t.Run("test_1", func(t *testing.T) {
+		const value = 1
+		var (
+			x1 = common.BigToHash(big.NewInt(value))
+			x2 = uint256ToHash(*uint256.NewInt(value))
+		)
+		if x1 != x2 {
+			t.Errorf("expected %x, got %x", x1, x2)
+		}
+	})
 }
