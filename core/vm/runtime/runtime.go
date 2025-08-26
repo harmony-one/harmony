@@ -111,8 +111,8 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 		sender  = vm.AccountRef(cfg.Origin)
 	)
 
-	if rules := cfg.ChainConfig.Rules(vmenv.Context.BlockNumber, vmenv.Context.Random != nil); rules.IsBerlin {
-		cfg.State.PrepareAccessList(cfg.Origin, &address, vm.ActivePrecompiles(rules), nil)
+	if rules := cfg.ChainConfig.Rules(vmenv.Context.EpochNumber /*vmenv.Context.Random != nil*/, false); rules.IsBerlin {
+		//cfg.State.PrepareAccessList(cfg.Origin, &address, vm.ActivePrecompiles(rules), nil)
 	}
 
 	cfg.State.CreateAccount(address)
