@@ -111,7 +111,7 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 		sender  = vm.AccountRef(cfg.Origin)
 	)
 
-	if rules := cfg.ChainConfig.Rules(vmenv.Context.EpochNumber /*vmenv.Context.Random != nil*/, false); rules.IsBerlin {
+	if rules := cfg.ChainConfig.Rules(vmenv.Context.EpochNumber); rules.IsBerlin {
 		//cfg.State.PrepareAccessList(cfg.Origin, &address, vm.ActivePrecompiles(rules), nil)
 	}
 

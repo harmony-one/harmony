@@ -54,7 +54,7 @@ var (
 	istanbulInstructionSet         = newIstanbulInstructionSet()
 	berlinInstructionSet           = newBerlinInstructionSet()
 	londonInstructionSet           = newLondonInstructionSet()
-	mergeInstructionSet            = newMergeInstructionSet()
+	//mergeInstructionSet            = newMergeInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -78,6 +78,7 @@ func validate(jt JumpTable) JumpTable {
 	return jt
 }
 
+/*
 func newMergeInstructionSet() JumpTable {
 	instructionSet := newLondonInstructionSet()
 	instructionSet[RANDOM] = &operation{
@@ -88,6 +89,7 @@ func newMergeInstructionSet() JumpTable {
 	}
 	return validate(instructionSet)
 }
+*/
 
 // newLondonInstructionSet returns the frontier, homestead, byzantium,
 // contantinople, istanbul, petersburg, berlin and london instructions.
