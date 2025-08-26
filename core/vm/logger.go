@@ -154,7 +154,7 @@ func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Add
 
 // BigToHash sets byte representation of b to hash.
 // If b is larger than len(h), b will be cropped from the left.
-func uint256ToHash(b uint256.Int) common.Hash { return common.BytesToHash(b.Bytes()) }
+func uint256ToHash(b uint256.Int) common.Hash { return common.BigToHash(b.ToBig()) }
 
 // CaptureState logs a new structured log message and pushes it out to the environment
 //
