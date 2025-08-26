@@ -279,6 +279,10 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
 				utils.Logger().Debug().
 					Str("crossLinkHash", cl.Hash().Hex()).
+					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+					Uint64("crossLinkNumber", cl.Number().Uint64()).
+					Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
+					Uint32("crossLinkShardID", cl.ShardID()).
 					Msg("[ProcessingCrossLink] Cross-link already exists in pending queue, skipping")
 				continue
 			}
@@ -289,6 +293,10 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
 				utils.Logger().Debug().
 					Str("crossLinkHash", cl.Hash().Hex()).
+					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+					Uint64("crossLinkNumber", cl.Number().Uint64()).
+					Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
+					Uint32("crossLinkShardID", cl.ShardID()).
 					Msg("[ProcessingCrossLink] Cross-link already exists in blockchain, skipping")
 				continue
 			}
@@ -304,7 +312,9 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 					Str("crossLinkHash", cl.Hash().Hex()).
 					Uint64("crossLinkEpoch", crossLinkEpoch).
 					Uint64("localEpoch", localEpoch).
-					Uint32("shardID", cl.ShardID()).
+					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+					Uint64("crossLinkNumber", cl.Number().Uint64()).
+					Uint32("crossLinkShardID", cl.ShardID()).
 					Msg("[ProcessingCrossLink] Skipping cross-link - node not synced to this epoch yet (epoch gap too large)")
 				// Add to failed list to be deleted since we can't process it
 				failedCrossLinks = append(failedCrossLinks, cl)
@@ -316,7 +326,9 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				utils.Logger().Warn().
 					Str("crossLinkHash", cl.Hash().Hex()).
 					Uint64("epoch", cl.Epoch().Uint64()).
-					Uint32("shardID", cl.ShardID()).
+					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+					Uint64("crossLinkNumber", cl.Number().Uint64()).
+					Uint32("crossLinkShardID", cl.ShardID()).
 					Msg("[ProcessingCrossLink] Skipping cross-link after max retries - will be deleted")
 				// Add to failed list to be deleted
 				failedCrossLinks = append(failedCrossLinks, cl)
@@ -330,7 +342,9 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 					Err(err).
 					Str("crossLinkHash", cl.Hash().Hex()).
 					Uint64("epoch", cl.Epoch().Uint64()).
-					Uint32("shardID", cl.ShardID()).
+					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+					Uint64("crossLinkNumber", cl.Number().Uint64()).
+					Uint32("crossLinkShardID", cl.ShardID()).
 					Int("retryCount", globalRetryTracker.getRetryCount(&cl)).
 					Msg("[ProcessingCrossLink] Failed to verify cross-link - will retry")
 
@@ -353,6 +367,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			Int("processedCrossLinks", len(candidates)).
 			Int("failedCrossLinks", len(failedCrossLinks)).
 			Int("filteredBySyncStatus", len(crosslinks)-len(candidates)-len(failedCrossLinks)).
+			Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
 			Msg("[ProcessingCrossLink] Cross-link processing summary")
 
 		// Delete failed cross-links from pending queue
@@ -361,10 +376,12 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				utils.Logger().Error().
 					Err(err).
 					Int("failedCount", len(failedCrossLinks)).
+					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
 					Msg("[ProcessingCrossLink] Failed to delete failed cross-links from pending queue")
 			} else {
 				utils.Logger().Info().
 					Int("deletedCount", len(failedCrossLinks)).
+					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
 					Msg("[ProcessingCrossLink] Successfully deleted failed cross-links from pending queue")
 			}
 		}
@@ -373,6 +390,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 		if len(candidates) > 0 {
 			utils.Logger().Info().
 				Int("count", len(candidates)).
+				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
 				Msg("[ProcessingCrossLink] Processing valid cross-links")
 
 			// Add to pending cross-links queue
@@ -380,6 +398,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				utils.Logger().Error().
 					Err(err).
 					Int("count", len(candidates)).
+					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
 					Msg("[ProcessingCrossLink] Failed to add cross-links to pending queue")
 			}
 		}
