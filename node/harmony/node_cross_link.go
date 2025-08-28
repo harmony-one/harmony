@@ -230,179 +230,182 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 
 // ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
 func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
-	if node.IsRunningBeaconChain() {
-		pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
-		if err == nil && len(pendingCLs) >= maxPendingCrossLinkSize {
-			utils.Logger().Debug().
-				Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
-			return
-		}
-		if err != nil {
-			utils.Logger().Debug().
-				Err(err).
-				Int("num crosslinks", len(pendingCLs)).
-				Msg("[ProcessingCrossLink] Read Pending Crosslink failed")
+	// Only process cross-link messages on beacon chain
+	if !node.IsRunningBeaconChain() {
+		return
+	}
+
+	pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
+	if err != nil {
+		utils.Logger().Debug().
+			Err(err).
+			Int("num crosslinks", len(pendingCLs)).
+			Msg("[ProcessingCrossLink] Read Pending Crosslink failed")
+	} else if len(pendingCLs) >= maxPendingCrossLinkSize {
+		utils.Logger().Debug().
+			Msgf("[ProcessingCrossLink] Pending Crosslink reach maximum size: %d", len(pendingCLs))
+		return
+	}
+
+	existingCLs := map[common2.Hash]struct{}{}
+	for _, pending := range pendingCLs {
+		existingCLs[pending.Hash()] = struct{}{}
+	}
+
+	var crosslinks []types.CrossLink
+	if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
+		return
+	}
+
+	var candidates []types.CrossLink
+	var failedCrossLinks []types.CrossLink
+
+	utils.Logger().Debug().
+		Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks))
+
+	for i, cl := range crosslinks {
+		// limit processing to prevent spam
+		if i > crossLinkBatchSize*2 { // A sanity check to prevent spamming
+			utils.Logger().Warn().
+				Int("processed", i).
+				Int("total", len(crosslinks)).
+				Int("limit", crossLinkBatchSize*2).
+				Msg("[ProcessingCrossLink] Batch size limit reached, stopping processing")
+			break
 		}
 
-		existingCLs := map[common2.Hash]struct{}{}
-		for _, pending := range pendingCLs {
-			existingCLs[pending.Hash()] = struct{}{}
+		// Check if cross-link already exists in pending queue
+		if _, exists := existingCLs[cl.Hash()]; exists {
+			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
+			utils.Logger().Debug().
+				Str("crossLinkHash", cl.Hash().Hex()).
+				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+				Uint64("crossLinkNumber", cl.Number().Uint64()).
+				Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
+				Uint32("crossLinkShardID", cl.ShardID()).
+				Msg("[ProcessingCrossLink] Cross-link already exists in pending queue, skipping")
+			continue
 		}
 
-		var crosslinks []types.CrossLink
-		if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
+		// Check if cross-link already exists in blockchain
+		exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
+		if err == nil && exist != nil {
+			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
+			utils.Logger().Debug().
+				Str("crossLinkHash", cl.Hash().Hex()).
+				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+				Uint64("crossLinkNumber", cl.Number().Uint64()).
+				Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
+				Uint32("crossLinkShardID", cl.ShardID()).
+				Msg("[ProcessingCrossLink] Cross-link already exists in blockchain, skipping")
+			continue
+		}
+
+		// Check if node is synced enough to handle this cross-link
+		localEpoch := node.Blockchain().CurrentBlock().Header().Epoch().Uint64()
+		crossLinkEpoch := cl.Epoch().Uint64()
+
+		// Allow processing cross-links from current epoch and earlier
+		// Cross-links from future epochs should not exist and may be malicious or maybe it is not fully synced
+		if crossLinkEpoch > localEpoch {
+			utils.Logger().Debug().
+				Str("crossLinkHash", cl.Hash().Hex()).
+				Uint64("crossLinkEpoch", crossLinkEpoch).
+				Uint64("localEpoch", localEpoch).
+				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+				Uint64("crossLinkNumber", cl.Number().Uint64()).
+				Uint32("crossLinkShardID", cl.ShardID()).
+				Msg("[ProcessingCrossLink] Skipping cross-link - node not synced to this epoch yet (epoch gap too large)")
+			// Add to failed list to be deleted since we can't process it
+			failedCrossLinks = append(failedCrossLinks, cl)
+			continue
+		}
+
+		// Check if we should retry this cross-link
+		if !globalRetryTracker.recordFailure(&cl) {
+			utils.Logger().Warn().
+				Str("crossLinkHash", cl.Hash().Hex()).
+				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+				Uint64("crossLinkNumber", cl.Number().Uint64()).
+				Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
+				Uint32("crossLinkShardID", cl.ShardID()).
+				Msg("[ProcessingCrossLink] Skipping cross-link after max retries - will be deleted")
+			// Add to failed list to be deleted
+			failedCrossLinks = append(failedCrossLinks, cl)
+			continue
+		}
+
+		// Try to verify the cross-link
+		if err := node.Blockchain().Engine().VerifyCrossLink(node.Blockchain(), cl); err != nil {
+			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "invalid_crosslink"}).Inc()
 			utils.Logger().Error().
 				Err(err).
-				Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
-			return
-		}
-
-		var candidates []types.CrossLink
-		var failedCrossLinks []types.CrossLink
-
-		utils.Logger().Debug().
-			Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks))
-
-		for i, cl := range crosslinks {
-			// limit processing to prevent spam
-			if i > crossLinkBatchSize*2 { // A sanity check to prevent spamming
-				utils.Logger().Warn().
-					Int("processed", i).
-					Int("total", len(crosslinks)).
-					Int("limit", crossLinkBatchSize*2).
-					Msg("[ProcessingCrossLink] Batch size limit reached, stopping processing")
-				break
-			}
-
-			// Check if cross-link already exists in pending queue
-			if _, exists := existingCLs[cl.Hash()]; exists {
-				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
-				utils.Logger().Debug().
-					Str("crossLinkHash", cl.Hash().Hex()).
-					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-					Uint64("crossLinkNumber", cl.Number().Uint64()).
-					Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
-					Uint32("crossLinkShardID", cl.ShardID()).
-					Msg("[ProcessingCrossLink] Cross-link already exists in pending queue, skipping")
-				continue
-			}
-
-			// Check if cross-link already exists in blockchain
-			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
-			if err == nil && exist != nil {
-				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
-				utils.Logger().Debug().
-					Str("crossLinkHash", cl.Hash().Hex()).
-					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-					Uint64("crossLinkNumber", cl.Number().Uint64()).
-					Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
-					Uint32("crossLinkShardID", cl.ShardID()).
-					Msg("[ProcessingCrossLink] Cross-link already exists in blockchain, skipping")
-				continue
-			}
-
-			// Check if node is synced enough to handle this cross-link
-			localEpoch := node.Blockchain().CurrentBlock().Header().Epoch().Uint64()
-			crossLinkEpoch := cl.Epoch().Uint64()
-
-			// Allow processing cross-links from current epoch and earlier
-			// Cross-links from future epochs should not exist and may be malicious or maybe it is not fully synced
-			if crossLinkEpoch > localEpoch {
-				utils.Logger().Debug().
-					Str("crossLinkHash", cl.Hash().Hex()).
-					Uint64("crossLinkEpoch", crossLinkEpoch).
-					Uint64("localEpoch", localEpoch).
-					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-					Uint64("crossLinkNumber", cl.Number().Uint64()).
-					Uint32("crossLinkShardID", cl.ShardID()).
-					Msg("[ProcessingCrossLink] Skipping cross-link - node not synced to this epoch yet (epoch gap too large)")
-				// Add to failed list to be deleted since we can't process it
-				failedCrossLinks = append(failedCrossLinks, cl)
-				continue
-			}
-
-			// Check if we should retry this cross-link
-			if !globalRetryTracker.recordFailure(&cl) {
-				utils.Logger().Warn().
-					Str("crossLinkHash", cl.Hash().Hex()).
-					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-					Uint64("crossLinkNumber", cl.Number().Uint64()).
-					Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
-					Uint32("crossLinkShardID", cl.ShardID()).
-					Msg("[ProcessingCrossLink] Skipping cross-link after max retries - will be deleted")
-				// Add to failed list to be deleted
-				failedCrossLinks = append(failedCrossLinks, cl)
-				continue
-			}
-
-			// Try to verify the cross-link
-			if err := node.Blockchain().Engine().VerifyCrossLink(node.Blockchain(), cl); err != nil {
-				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "invalid_crosslink"}).Inc()
-				utils.Logger().Error().
-					Err(err).
-					Str("crossLinkHash", cl.Hash().Hex()).
-					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-					Uint64("crossLinkNumber", cl.Number().Uint64()).
-					Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
-					Uint32("crossLinkShardID", cl.ShardID()).
-					Int("retryCount", globalRetryTracker.getRetryCount(&cl)).
-					Msg("[ProcessingCrossLink] Failed to verify cross-link - will retry")
-
-				// Sleep before retry to avoid hammering the system
-				time.Sleep(retryDelay)
-				continue
-			}
-
-			// Success! Clean up the retry tracker (if it has been retried)
-			globalRetryTracker.cleanupFailed(&cl)
-
-			// Add to candidates for processing
-			candidates = append(candidates, cl)
-			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "new_crosslink"}).Inc()
-		}
-
-		// Log summary of processing results
-		utils.Logger().Info().
-			Int("totalCrossLinks", len(crosslinks)).
-			Int("processedCrossLinks", len(candidates)).
-			Int("failedCrossLinks", len(failedCrossLinks)).
-			Int("filteredBySyncStatus", len(crosslinks)-len(candidates)-len(failedCrossLinks)).
-			Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-			Msg("[ProcessingCrossLink] Cross-link processing summary")
-
-		// Delete failed cross-links from pending queue
-		if len(failedCrossLinks) > 0 {
-			if _, err := node.Blockchain().DeleteFromPendingCrossLinks(failedCrossLinks); err != nil {
-				utils.Logger().Error().
-					Err(err).
-					Int("failedCount", len(failedCrossLinks)).
-					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-					Msg("[ProcessingCrossLink] Failed to delete failed cross-links from pending queue")
-			} else {
-				utils.Logger().Info().
-					Int("deletedCount", len(failedCrossLinks)).
-					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-					Msg("[ProcessingCrossLink] Successfully deleted failed cross-links from pending queue")
-			}
-		}
-
-		// Process valid cross-links by adding them to pending queue
-		if len(candidates) > 0 {
-			utils.Logger().Info().
-				Int("count", len(candidates)).
+				Str("crossLinkHash", cl.Hash().Hex()).
 				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-				Msg("[ProcessingCrossLink] Processing valid cross-links")
+				Uint64("crossLinkNumber", cl.Number().Uint64()).
+				Uint64("crossLinkEpoch", cl.Epoch().Uint64()).
+				Uint32("crossLinkShardID", cl.ShardID()).
+				Int("retryCount", globalRetryTracker.getRetryCount(&cl)).
+				Msg("[ProcessingCrossLink] Failed to verify cross-link - will retry")
 
-			// Add to pending cross-links queue
-			if _, err := node.Blockchain().AddPendingCrossLinks(candidates); err != nil {
-				utils.Logger().Error().
-					Err(err).
-					Int("count", len(candidates)).
-					Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
-					Msg("[ProcessingCrossLink] Failed to add cross-links to pending queue")
-			}
+			// Sleep before retry to avoid hammering the system
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// Success! Clean up the retry tracker (if it has been retried)
+		globalRetryTracker.cleanupFailed(&cl)
+
+		// Add to candidates for processing
+		candidates = append(candidates, cl)
+		nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "new_crosslink"}).Inc()
+	}
+
+	// Log summary of processing results
+	utils.Logger().Info().
+		Int("totalCrossLinks", len(crosslinks)).
+		Int("processedCrossLinks", len(candidates)).
+		Int("failedCrossLinks", len(failedCrossLinks)).
+		Int("filteredBySyncStatus", len(crosslinks)-len(candidates)-len(failedCrossLinks)).
+		Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+		Msg("[ProcessingCrossLink] Cross-link processing summary")
+
+	// Delete failed cross-links from pending queue
+	if len(failedCrossLinks) > 0 {
+		if _, err := node.Blockchain().DeleteFromPendingCrossLinks(failedCrossLinks); err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Int("failedCount", len(failedCrossLinks)).
+				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+				Msg("[ProcessingCrossLink] Failed to delete failed cross-links from pending queue")
+		} else {
+			utils.Logger().Info().
+				Int("deletedCount", len(failedCrossLinks)).
+				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+				Msg("[ProcessingCrossLink] Successfully deleted failed cross-links from pending queue")
 		}
 	}
+
+	// Process valid cross-links by adding them to pending queue
+	if len(candidates) > 0 {
+		utils.Logger().Info().
+			Int("count", len(candidates)).
+			Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+			Msg("[ProcessingCrossLink] Processing valid cross-links")
+
+		// Add to pending cross-links queue
+		if _, err := node.Blockchain().AddPendingCrossLinks(candidates); err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Int("count", len(candidates)).
+				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
+				Msg("[ProcessingCrossLink] Failed to add cross-links to pending queue")
+		}
+	}
+
 }
 
 // VerifyCrossLink verifies the header is valid
