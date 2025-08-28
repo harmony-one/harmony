@@ -49,7 +49,8 @@ func NewDownloader(host p2p.Host,
 	consensus *consensus.Consensus,
 	dbDir string,
 	isBeaconNode bool,
-	config Config) *Downloader {
+	config Config,
+	setNodeSyncStatus func(bool)) *Downloader {
 
 	config.fixValues()
 
@@ -79,7 +80,7 @@ func NewDownloader(host p2p.Host,
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// create an instance of staged sync for the downloader
-	stagedSyncInstance, err := CreateStagedSync(ctx, bc, nodeConfig, consensus, dbDir, sp, config, isBeaconNode, logger)
+	stagedSyncInstance, err := CreateStagedSync(ctx, bc, nodeConfig, consensus, dbDir, sp, config, isBeaconNode, logger, setNodeSyncStatus)
 	if err != nil {
 		cancel()
 		return nil
@@ -99,6 +100,9 @@ func NewDownloader(host p2p.Host,
 
 		config: config,
 		logger: logger,
+
+		syncMutex: sync.Mutex{},
+		lock:      sync.Mutex{},
 	}
 }
 
@@ -129,6 +133,10 @@ func protocolConfig(host p2p.Host,
 
 // Start starts the downloader
 func (d *Downloader) Start() {
+	if d.nodeConfig.IsOffline {
+		return
+	}
+
 	go func() {
 		d.waitForBootFinish()
 		d.loop()

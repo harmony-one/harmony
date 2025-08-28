@@ -111,6 +111,7 @@ type StagedStreamSync struct {
 	evtDownloadFinishedSubscribed bool
 	evtDownloadStarted            event.Feed // channel for each download has started
 	evtDownloadStartedSubscribed  bool
+	setNodeSyncStatus             func(bool) // function to set node's IsSynchronized status
 }
 
 type Timing struct {
@@ -330,6 +331,7 @@ func New(
 	joinConsensus bool,
 	config Config,
 	logger zerolog.Logger,
+	setNodeSyncStatus func(bool),
 ) *StagedStreamSync {
 
 	forwardStages := make([]*Stage, len(StagesForwardOrder))
@@ -392,6 +394,7 @@ func New(
 		pruningOrder:      pruneStages,
 		logPrefixes:       logPrefixes,
 		UseMemDB:          config.UseMemDB,
+		setNodeSyncStatus: setNodeSyncStatus,
 	}
 }
 
@@ -432,6 +435,11 @@ func (sss *StagedStreamSync) checkHaveEnoughStreams() error {
 
 // Run runs a full cycle of stages
 func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
+	// Check if we have enough streams
+	if err := sss.checkHaveEnoughStreams(); err != nil {
+		return err
+	}
+
 	sss.prevRevertPoint = nil
 	sss.timings = sss.timings[:0]
 
@@ -821,6 +829,16 @@ func (sss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Bl
 				Err(err).
 				Uint64("block number", block.NumberU64()).
 				Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block")
+
+			if !verifyAllSig {
+				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
+				for i := uint64(0); i < VerifyHeaderBatchSize-1; i++ {
+					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
+						utils.Logger().Err(rbErr).Msg("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed to rollback")
+						return err
+					}
+				}
+			}
 			return err
 		}
 	}
@@ -828,6 +846,13 @@ func (sss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Bl
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
 	switch {
 	case errors.Is(err, core.ErrKnownBlock):
+		utils.Logger().Info().
+			Uint64("blockHeight", block.NumberU64()).
+			Uint64("blockEpoch", block.Epoch().Uint64()).
+			Str("blockHex", block.Hash().Hex()).
+			Uint32("ShardID", block.ShardID()).
+			Msg("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: Block exists")
+		return nil
 	case err != nil:
 		sss.logger.Error().
 			Err(err).

@@ -908,7 +908,14 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 		}
 	}
 	//Setup sync service
-	s := syncService.NewService(host, blockchains, node.NodeConfig, node.Consensus, sConfig, hc.General.DataDir)
+	setNodeSyncStatus := func(synced bool) {
+		if synced {
+			node.IsSynchronized.Set()
+		} else {
+			node.IsSynchronized.UnSet()
+		}
+	}
+	s := syncService.NewService(host, blockchains, node.NodeConfig, node.Consensus, sConfig, hc.General.DataDir, setNodeSyncStatus)
 
 	node.RegisterService(service.Synchronize, s)
 

@@ -14,9 +14,9 @@ type StagedStreamSyncService struct {
 
 // NewService creates a new downloader service
 func NewService(host p2p.Host, bcs []core.BlockChain, nodeConfig *nodeconfig.ConfigType,
-	consensus *consensus.Consensus, config Config, dbDir string) *StagedStreamSyncService {
+	consensus *consensus.Consensus, config Config, dbDir string, setNodeSyncStatus func(bool)) *StagedStreamSyncService {
 	return &StagedStreamSyncService{
-		Downloaders: NewDownloaders(host, bcs, nodeConfig, consensus, dbDir, config),
+		Downloaders: NewDownloaders(host, bcs, nodeConfig, consensus, dbDir, config, setNodeSyncStatus),
 	}
 }
 

@@ -51,6 +51,7 @@ func CreateStagedSync(ctx context.Context,
 	config Config,
 	isBeaconNode bool,
 	logger zerolog.Logger,
+	setNodeSyncStatus func(bool),
 ) (*StagedStreamSync, error) {
 
 	logger.Info().
@@ -167,6 +168,7 @@ func CreateStagedSync(ctx context.Context,
 		joinConsensus,
 		config,
 		logger,
+		setNodeSyncStatus,
 	), nil
 }
 
@@ -340,7 +342,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 	}
 
 	var estimatedHeight uint64
-	if s.initSync {
+	if s.initSync && !s.isEpochChain {
 		if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
 			return 0, 0, err
 		} else {
@@ -363,8 +365,18 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 				return estimatedHeight, 0, nil
 			}
 		} else if curBN < estimatedHeight && s.consensus != nil && !s.isEpochChain {
-			s.consensus.BlocksNotSynchronized("StagedStreamSync.doSync")
+			if s.setNodeSyncStatus != nil {
+				s.setNodeSyncStatus(false)
+			}
+			if s.joinConsensus {
+				s.consensus.BlocksNotSynchronized("stagedstreamsync.doSync")
+			}
 		}
+	}
+
+	// if it's leader, skip syncing
+	if s.consensus != nil && s.consensus.IsLeader() {
+		return estimatedHeight, 0, nil
 	}
 
 	// We are probably in full sync, but we might have rewound to before the
@@ -440,9 +452,14 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 			s.consensus.UpdateConsensusInformation("stream sync is explorer")
 		}
 
-		if s.initSync && totalInserted > 0 {
+		if s.initSync && totalInserted > 0 && s.joinConsensus {
+			// Set node synchronization status back to true after successful sync
+			if s.setNodeSyncStatus != nil {
+				s.setNodeSyncStatus(true)
+			}
 			s.consensus.BlocksSynchronized("StagedStreamSync block synchronized")
 		}
+
 	}
 
 	return estimatedHeight, totalInserted, nil
