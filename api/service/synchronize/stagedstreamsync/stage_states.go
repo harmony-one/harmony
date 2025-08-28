@@ -183,7 +183,7 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			}
 		}
 
-		if err := verifyAndInsertBlock(stg.configs.bc, block); err != nil {
+		if err := s.state.UpdateBlockAndStatus(block, stg.configs.bc, false); err != nil {
 			stg.configs.logger.Warn().Err(err).Uint64("cycle target block", targetHeight).
 				Uint64("block number", block.NumberU64()).
 				Msg(WrapStagedSyncMsg("insert blocks failed in long range"))
