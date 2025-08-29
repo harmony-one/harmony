@@ -374,11 +374,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 		}
 	}
 
-	// if it's leader, skip syncing
-	if s.consensus != nil && s.consensus.IsLeader() {
-		return estimatedHeight, 0, nil
-	}
-
 	// We are probably in full sync, but we might have rewound to before the
 	// fast/snap sync pivot, check if we should reenable
 	if pivotBlock, cycleSyncMode, err := s.checkPivot(downloaderContext, estimatedHeight); err != nil {

@@ -304,6 +304,11 @@ func (d *Downloader) handleDownload(trigger func()) {
 	d.syncMutex.Lock()
 	defer d.syncMutex.Unlock()
 
+	// if it's leader, skip syncing for now
+	if d.stagedSyncInstance.consensus != nil && d.stagedSyncInstance.consensus.IsLeader() {
+		return
+	}
+
 	bnBeforeSync := d.bc.CurrentBlock().NumberU64()
 
 	// Perform sync and get estimated height and blocks added
