@@ -830,15 +830,15 @@ func (sss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Bl
 				Uint64("block number", block.NumberU64()).
 				Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block")
 
-			if !verifyAllSig {
-				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
-				for i := uint64(0); i < VerifyHeaderBatchSize-1; i++ {
-					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
-						utils.Logger().Err(rbErr).Msg("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed to rollback")
-						return err
-					}
-				}
-			}
+			// if !verifyAllSig {
+			// 	utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
+			// 	for i := uint64(0); i < VerifyHeaderBatchSize-1; i++ {
+			// 		if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
+			// 			utils.Logger().Err(rbErr).Msg("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed to rollback")
+			// 			return err
+			// 		}
+			// 	}
+			// }
 			return err
 		}
 	}
