@@ -83,9 +83,6 @@ type ISync interface {
 	RegisterNodeInfo() int
 	GetParsedSyncStatus() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
 	GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
-	// Added methods for immediate sync detection
-	ForceSyncStatusRefresh()
-	GetParsedSyncStatusImmediate() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
 }
 
 // Node represents a protocol-participating node in the network
