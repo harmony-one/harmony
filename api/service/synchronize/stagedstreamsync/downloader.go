@@ -186,10 +186,17 @@ func (d *Downloader) NumPeers() int {
 // SyncStatus returns the current sync status
 func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
 	syncing, target := d.stagedSyncInstance.status.Get()
-	if !syncing {
-		target = d.bc.CurrentBlock().NumberU64()
+	current := d.bc.CurrentBlock().NumberU64()
+
+	// Calculate the actual difference
+	var diff uint64
+	if target > current {
+		diff = target - current
 	}
-	return syncing, target, 0
+
+	// Return (isSynchronized, targetHeight, heightDifference)
+	// where isSynchronized = !syncing (true when not syncing, false when syncing)
+	return !syncing, target, diff
 }
 
 // SubscribeDownloadStarted subscribes download started
@@ -309,23 +316,19 @@ func (d *Downloader) handleDownload(trigger func()) {
 		return
 	}
 
-	bnBeforeSync := d.bc.CurrentBlock().NumberU64()
+	var estimatedHeight uint64
+	var addedBN int
+	var err error
 
 	// Perform sync and get estimated height and blocks added
-	estimatedHeight, addedBN, err := d.stagedSyncInstance.doSync(d.ctx)
+	if d.stagedSyncInstance.isEpochChain {
+		addedBN, err = d.stagedSyncInstance.doEpochSync(d.ctx)
+	} else {
+		estimatedHeight, addedBN, err = d.stagedSyncInstance.doSync(d.ctx)
+	}
 
 	switch err {
 	case nil:
-		// Log completion when finishing initial long-range sync
-		if d.stagedSyncInstance.initSync {
-			d.logger.Info().
-				Int("block added", addedBN).
-				Uint64("current height", d.bc.CurrentBlock().NumberU64()).
-				Bool("initSync", d.stagedSyncInstance.initSync).
-				Uint32("shard", d.bc.ShardID()).
-				Msg(WrapStagedSyncMsg("long-range sync completed"))
-		}
-
 		// If new blocks were added, trigger another sync and process last-mile blocks
 		if addedBN != 0 {
 			trigger()
@@ -334,35 +337,17 @@ func (d *Downloader) handleDownload(trigger func()) {
 			}
 		}
 
-		if !d.stagedSyncInstance.isEpochChain {
-			bnAfterSync := d.bc.CurrentBlock().NumberU64()
-			distanceBeforeSync := estimatedHeight - bnBeforeSync
-			distanceAfterSync := estimatedHeight - bnAfterSync
-
-			// Transition from long-range sync to short-range sync if nearing the latest height.
-			// This prevents staying in long-range mode when only a few blocks remain.
-			if d.stagedSyncInstance.initSync && addedBN > 0 {
-				// Switch to short-range sync if both before and after sync distances are small.
-				if distanceBeforeSync <= uint64(ShortRangeThreshold) &&
-					distanceAfterSync <= uint64(ShortRangeThreshold) {
-					d.stagedSyncInstance.initSync = false
-				}
-			} else if !d.stagedSyncInstance.initSync {
-				if distanceAfterSync > uint64(ShortRangeThreshold) {
-					d.stagedSyncInstance.initSync = true
-				}
-			}
-		}
-
 	case ErrNotEnoughStreams:
 		// Log sync failure and retry after a short delay
 		d.logger.Error().
 			Err(err).
 			Bool("initSync", d.stagedSyncInstance.initSync).
+			Uint64("estimated height", estimatedHeight).
 			Msg(WrapStagedSyncMsg("sync loop failed"))
 		// Wait for enough available streams before retrying
 		d.waitForEnoughStreams(d.config.MinStreams)
 		trigger()
+		return
 
 	case ErrInvalidEarlySync:
 		if d.NumPeers() < d.config.Concurrency {
@@ -400,6 +385,7 @@ func (d *Downloader) handleDownload(trigger func()) {
 		d.logger.Error().
 			Err(err).
 			Bool("initSync", d.stagedSyncInstance.initSync).
+			Uint64("estimated height", estimatedHeight).
 			Msg(WrapStagedSyncMsg("sync loop failed"))
 
 		// Retry sync after 5 seconds

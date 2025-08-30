@@ -70,7 +70,7 @@ func CreateStagedSync(ctx context.Context,
 	isBeaconValidator := isBeaconNode && isValidator
 	isBeaconExplorer := isBeaconNode && isExplorer
 	joinConsensus := false
-	if isValidator {
+	if isValidator && consensus != nil {
 		joinConsensus = true
 	}
 
@@ -322,18 +322,80 @@ func (s *StagedStreamSync) checkPivot(ctx context.Context, estimatedHeight uint6
 	return nil, FullSync, nil
 }
 
+// switchToLongRangeSync switches to long range sync
+func (s *StagedStreamSync) switchToLongRangeSync() {
+	s.initSync = true
+	s.currentCycle.SetCycleNumber(0)
+	s.status.SetPivotBlock(nil)
+	s.status.SetTargetBN(0)
+	// s.status.SetStatesSynced(false) TODO: for Fast Sync Mode
+}
+
+// switchToShortRangeSync switches to short range sync
+func (s *StagedStreamSync) switchToShortRangeSync() {
+	s.initSync = false
+	s.currentCycle.SetCycleNumber(0)
+	s.status.SetPivotBlock(nil)
+	s.status.SetTargetBN(0)
+	// s.status.SetStatesSynced(false)  TODO: for Fast Sync Mode
+}
+
+// setSyncingStatus sets the consensus syncing status
+// if isSynced is true, it means the consensus is synced, so it sets the node sync status to true
+// if isSynced is false, it means the consensus is not synced, and it sets the node sync status to false
+func (s *StagedStreamSync) setSyncingStatus(isSynced bool) {
+	if s.isEpochChain {
+		return
+	}
+
+	hasToSetNodeSyncStatus := false
+
+	if s.initSync && !isSynced {
+		// for long range sync, only set node sync status if it's the first cycle
+		if s.currentCycle.GetCycleNumber() == 0 {
+			hasToSetNodeSyncStatus = true
+		}
+	} else {
+		hasToSetNodeSyncStatus = true
+	}
+
+	if !hasToSetNodeSyncStatus {
+		return
+	}
+
+	if isSynced {
+		s.finishSyncing()
+		if s.setNodeSyncStatus != nil {
+			s.setNodeSyncStatus(true)
+		}
+		if s.joinConsensus {
+			s.consensus.BlocksSynchronized("stagedstreamsync.synchronized")
+		}
+	} else {
+		s.startSyncing()
+		if s.setNodeSyncStatus != nil {
+			s.setNodeSyncStatus(false)
+		}
+		if s.joinConsensus {
+			s.consensus.BlocksNotSynchronized("stagedstreamsync.syncing")
+		}
+	}
+}
+
 // doSync does the long range sync.
 // One LongRangeSync consists of several iterations.
 // For each iteration, estimate the current block number, then fetch block & insert to blockchain
 func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, int, error) {
 
-	if !s.isEpochChain {
-		// finish syncing in the end of the sync
-		// it may SpinUpStateSync have set the syncing flag
-		defer s.finishSyncing()
+	if s.isEpochChain {
+		return 0, 0, nil
 	}
 
-	startedNumber := s.bc.CurrentBlock().NumberU64()
+	// // finish syncing in the end of the sync
+	// // it may SpinUpStateSync have set the syncing flag, so even with error, it has to finish syncing
+	// defer s.finishSyncing()
+
+	bnBeforeSync := s.bc.CurrentBlock().NumberU64()
 
 	var totalInserted int
 
@@ -342,50 +404,171 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 	}
 
 	var estimatedHeight uint64
-	if s.initSync && !s.isEpochChain {
-		if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
-			return 0, 0, err
+	if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
+		return 0, 0, err
+	} else {
+		estimatedHeight = h
+		//TODO: use directly currentCycle var
+		s.status.SetTargetBN(estimatedHeight)
+	}
+
+	if curBN := s.CurrentBlockNumber(); estimatedHeight <= curBN {
+		// Don't exit early if both current and target are 0, as this indicates
+		// we haven't successfully synced yet
+		if curBN == 0 && estimatedHeight == 0 {
+			s.logger.Warn().
+				Uint64("current number", curBN).
+				Uint64("target number", estimatedHeight).
+				Msg(WrapStagedSyncMsg("both current and target heights are 0, continuing sync to discover peers"))
+			return 0, 0, ErrInvalidEarlySync
 		} else {
-			estimatedHeight = h
-			//TODO: use directly currentCycle var
-			s.status.SetTargetBN(estimatedHeight)
+			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
+				Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
+			return estimatedHeight, 0, nil
 		}
-		if curBN := s.CurrentBlockNumber(); estimatedHeight <= curBN {
-			// Don't exit early if both current and target are 0, as this indicates
-			// we haven't successfully synced yet
-			if curBN == 0 && estimatedHeight == 0 {
-				s.logger.Warn().
-					Uint64("current number", curBN).
-					Uint64("target number", estimatedHeight).
-					Msg(WrapStagedSyncMsg("both current and target heights are 0, continuing sync to discover peers"))
-				return 0, 0, ErrInvalidEarlySync
-			} else {
-				s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
-					Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
-				return estimatedHeight, 0, nil
-			}
-		} else if curBN < estimatedHeight && s.consensus != nil && !s.isEpochChain {
-			if s.setNodeSyncStatus != nil {
-				s.setNodeSyncStatus(false)
-			}
-			if s.joinConsensus {
-				s.consensus.BlocksNotSynchronized("stagedstreamsync.doSync")
-			}
-		}
+	} else if curBN < estimatedHeight {
+		s.setSyncingStatus(false)
 	}
 
 	// We are probably in full sync, but we might have rewound to before the
 	// fast/snap sync pivot, check if we should reenable
-	if pivotBlock, cycleSyncMode, err := s.checkPivot(downloaderContext, estimatedHeight); err != nil {
-		s.logger.Error().Err(err).Msg(WrapStagedSyncMsg("check pivot failed"))
-		return 0, 0, err
-	} else {
-		s.status.SetCycleSyncMode(cycleSyncMode)
-		s.status.SetPivotBlock(pivotBlock)
+	if s.initSync {
+		if pivotBlock, cycleSyncMode, err := s.checkPivot(downloaderContext, estimatedHeight); err != nil {
+			s.logger.Error().Err(err).Msg(WrapStagedSyncMsg("check pivot failed"))
+			return 0, 0, err
+		} else {
+			s.status.SetCycleSyncMode(cycleSyncMode)
+			s.status.SetPivotBlock(pivotBlock)
+		}
 	}
 
+	ctx, cancel := context.WithCancel(downloaderContext)
+	defer cancel()
+
+	for {
+
+		n, err := s.doSyncCycle(ctx)
+		if err != nil {
+			if errors.Is(err, core.ErrKnownBlock) {
+				continue
+			}
+			s.logger.Error().
+				Err(err).
+				Bool("initSync", s.initSync).
+				Bool("isValidator", s.isValidator).
+				Bool("isExplorer", s.isExplorer).
+				Uint32("shard", s.bc.ShardID()).
+				Msg(WrapStagedSyncMsg("sync cycle failed"))
+
+			pl := s.promLabels()
+			pl["error"] = err.Error()
+			numFailedDownloadCounterVec.With(pl).Inc()
+
+			numStreams := s.protocol.NumStreams()
+			if numStreams < s.config.MinStreams {
+				s.logger.Error().
+					Int("numStreams", numStreams).
+					Int("minStreams", s.config.MinStreams).
+					Msg(WrapStagedSyncMsg("not enough streams to continue sync cycle"))
+				return estimatedHeight, totalInserted + n, ErrNotEnoughStreams
+			}
+			//cancel()
+			return estimatedHeight, totalInserted + n, err
+		}
+		//cancel()
+
+		totalInserted += n
+
+		// if there is no more blocks to add, skip loop
+		if n == 0 {
+			break
+		}
+	}
+
+	if totalInserted > 0 {
+		s.logger.Debug().
+			Bool("initSync", s.initSync).
+			Bool("isBeaconShard", s.isBeaconShard).
+			Uint32("shard", s.bc.ShardID()).
+			Int("blocks", totalInserted).
+			Uint64("startedNumber", bnBeforeSync).
+			Uint64("currentNumber", s.bc.CurrentBlock().NumberU64()).
+			Msg(WrapStagedSyncMsg("sync cycle blocks inserted successfully"))
+	}
+
+	longRangeCompleted := false
+	shortRangeCompleted := false
+	bnAfterSync := s.bc.CurrentBlock().NumberU64()
+	distanceBeforeSync := estimatedHeight - bnBeforeSync
+	distanceAfterSync := estimatedHeight - bnAfterSync
+
+	// Transition from long-range sync to short-range sync if nearing the latest height.
+	// This prevents staying in long-range mode when only a few blocks remain.
+	if s.initSync && totalInserted > 0 {
+		// Switch to short-range sync if both before and after sync distances are small.
+		if distanceBeforeSync <= uint64(ShortRangeThreshold) &&
+			distanceAfterSync <= uint64(ShortRangeThreshold) {
+			s.switchToShortRangeSync()
+			longRangeCompleted = true
+		}
+	} else if !s.initSync {
+		if distanceAfterSync < uint64(ShortRangeThreshold) {
+			shortRangeCompleted = true
+		} else {
+			s.switchToLongRangeSync()
+		}
+	}
+
+	// Log completion when finishing initial long-range sync
+	if longRangeCompleted {
+		s.logger.Info().
+			Int("blocks added", totalInserted).
+			Bool("isBeaconShard", s.isBeaconShard).
+			Uint32("shard", s.bc.ShardID()).
+			Uint64("start height", bnBeforeSync).
+			Uint64("current height", s.bc.CurrentBlock().NumberU64()).
+			Uint64("estimated height", estimatedHeight).
+			Msg(WrapStagedSyncMsg("long-range sync completed"))
+	}
+
+	if s.consensus != nil && (longRangeCompleted || shortRangeCompleted) {
+		// add consensus last mile blocks
+		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
+			s.logger.Error().Err(err).
+				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
+			// s.RollbackLastMileBlocks(downloaderContext, hashes)
+			return estimatedHeight, totalInserted, err
+		} else {
+			totalInserted += len(hashes)
+		}
+
+		// TODO: move this to explorer handler code.
+		if s.isExplorer {
+			s.consensus.UpdateConsensusInformation("stream sync updates explorer")
+		}
+	}
+
+	if longRangeCompleted || shortRangeCompleted {
+		// Set node synchronization status back to true after successful sync
+		s.setSyncingStatus(true)
+	}
+
+	return estimatedHeight, totalInserted, nil
+}
+
+// doEpochSync does the epoch sync.
+func (s *StagedStreamSync) doEpochSync(downloaderContext context.Context) (int, error) {
+
 	if !s.isEpochChain {
-		s.startSyncing()
+		return 0, nil
+	}
+
+	bnBeforeSync := s.bc.CurrentBlock().NumberU64()
+
+	var totalInserted int
+
+	if err := s.checkPrerequisites(); err != nil {
+		return 0, err
 	}
 
 	ctx, cancel := context.WithCancel(downloaderContext)
@@ -401,14 +584,22 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 				Bool("isValidator", s.isValidator).
 				Bool("isExplorer", s.isExplorer).
 				Uint32("shard", s.bc.ShardID()).
-				Msg(WrapStagedSyncMsg("sync cycle failed"))
+				Msg(WrapStagedSyncMsg("epoch sync cycle failed"))
 
 			pl := s.promLabels()
 			pl["error"] = err.Error()
 			numFailedDownloadCounterVec.With(pl).Inc()
 
+			numStreams := s.protocol.NumStreams()
+			if numStreams < s.config.MinStreams {
+				s.logger.Error().
+					Int("numStreams", numStreams).
+					Int("minStreams", s.config.MinStreams).
+					Msg(WrapStagedSyncMsg("not enough streams to continue epoch sync cycle"))
+				return totalInserted + n, ErrNotEnoughStreams
+			}
 			//cancel()
-			return estimatedHeight, totalInserted + n, err
+			return totalInserted + n, err
 		}
 		//cancel()
 
@@ -421,48 +612,26 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 	}
 
 	if totalInserted > 0 {
-		s.logger.Info().
+		s.logger.Debug().
 			Bool("initSync", s.initSync).
 			Bool("isBeaconShard", s.isBeaconShard).
 			Uint32("shard", s.bc.ShardID()).
 			Int("blocks", totalInserted).
-			Uint64("startedNumber", startedNumber).
+			Uint64("startedNumber", bnBeforeSync).
 			Uint64("currentNumber", s.bc.CurrentBlock().NumberU64()).
-			Msg(WrapStagedSyncMsg("sync cycle blocks inserted successfully"))
+			Msg(WrapStagedSyncMsg("epoch sync cycle blocks inserted successfully"))
 	}
 
-	if s.consensus != nil && !s.isEpochChain {
-		// add consensus last mile blocks
-		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
-			s.logger.Error().Err(err).
-				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
-			s.RollbackLastMileBlocks(downloaderContext, hashes)
-			return estimatedHeight, totalInserted, err
-		} else {
-			totalInserted += len(hashes)
-		}
-
-		// TODO: move this to explorer handler code.
-		if s.isExplorer {
-			s.consensus.UpdateConsensusInformation("stream sync is explorer")
-		}
-
-		if s.initSync && totalInserted > 0 && s.joinConsensus {
-			// Set node synchronization status back to true after successful sync
-			if s.setNodeSyncStatus != nil {
-				s.setNodeSyncStatus(true)
-			}
-			s.consensus.BlocksSynchronized("StagedStreamSync block synchronized")
-		}
-
-	}
-
-	return estimatedHeight, totalInserted, nil
+	return totalInserted, nil
 }
 
 func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 
 	// TODO: initSync=true means currentCycleNumber==0, so we can remove initSync
+
+	defer func() {
+		s.currentCycle.AddCycleNumber(1)
+	}()
 
 	var totalInserted int
 
@@ -495,8 +664,6 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 
 	totalInserted += s.inserted
 
-	s.currentCycle.AddCycleNumber(1)
-
 	// calculating sync speed (blocks/second)
 	if s.config.LogProgress && s.inserted > 0 {
 		dt := time.Since(startTime).Seconds()
@@ -513,16 +680,16 @@ func (s *StagedStreamSync) doSyncCycle(ctx context.Context) (int, error) {
 
 func (s *StagedStreamSync) startSyncing() {
 	s.status.StartSyncing()
-	if s.evtDownloadStartedSubscribed {
-		s.evtDownloadStarted.Send(struct{}{})
-	}
+	// if s.evtDownloadStartedSubscribed {
+	// 	s.evtDownloadStarted.Send(struct{}{})
+	// }
 }
 
 func (s *StagedStreamSync) finishSyncing() {
 	s.status.FinishSyncing()
-	if s.evtDownloadFinishedSubscribed {
-		s.evtDownloadFinished.Send(struct{}{})
-	}
+	// if s.evtDownloadFinishedSubscribed {
+	// 	s.evtDownloadFinished.Send(struct{}{})
+	// }
 }
 
 func (s *StagedStreamSync) checkPrerequisites() error {
