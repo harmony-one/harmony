@@ -755,7 +755,7 @@ func (node *Node) getCommitSigFromDB(block *types.Block) ([]byte, error) {
 	return node.Blockchain().ReadCommitSig(block.NumberU64())
 }
 
-// SyncStatus return the syncing status, including whether node is syncing
+// SyncStatus return the syncing status, including whether node is in sync
 // and the target block number, and the difference between current block
 // and target block.
 func (node *Node) SyncStatus(shardID uint32) (bool, uint64, uint64) {
