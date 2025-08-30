@@ -435,11 +435,6 @@ func (sss *StagedStreamSync) checkHaveEnoughStreams() error {
 
 // Run runs a full cycle of stages
 func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
-	// Check if we have enough streams
-	if err := sss.checkHaveEnoughStreams(); err != nil {
-		return err
-	}
-
 	sss.prevRevertPoint = nil
 	sss.timings = sss.timings[:0]
 
