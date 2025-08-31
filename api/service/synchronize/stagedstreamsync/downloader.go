@@ -361,7 +361,7 @@ func (d *Downloader) handleDownload(trigger func()) {
 		}()
 
 	default:
-		if d.NumPeers() < d.config.Concurrency {
+		if d.NumPeers() < d.config.MinStreams {
 			// Wait for enough available streams before retrying
 			d.waitForEnoughStreams(d.config.MinStreams)
 		}
