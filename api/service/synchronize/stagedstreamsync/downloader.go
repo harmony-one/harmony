@@ -318,19 +318,20 @@ func (d *Downloader) handleDownload(trigger func()) {
 
 	var estimatedHeight uint64
 	var addedBN int
+	var rangeSwitched bool
 	var err error
 
 	// Perform sync and get estimated height and blocks added
 	if d.stagedSyncInstance.isEpochChain {
 		addedBN, err = d.stagedSyncInstance.doEpochSync(d.ctx)
 	} else {
-		estimatedHeight, addedBN, err = d.stagedSyncInstance.doSync(d.ctx)
+		estimatedHeight, addedBN, rangeSwitched, err = d.stagedSyncInstance.doSync(d.ctx)
 	}
 
 	switch err {
 	case nil:
 		// If new blocks were added, trigger another sync and process last-mile blocks
-		if addedBN != 0 {
+		if addedBN != 0 || rangeSwitched {
 			trigger()
 			if d.bh != nil {
 				d.bh.insertSync()
@@ -390,7 +391,10 @@ func (d *Downloader) handleDownload(trigger func()) {
 
 		// Retry sync after 5 seconds
 		go func() {
-			time.Sleep(5 * time.Second)
+			// if rangeSwitched, don't wait for 5 seconds
+			if !rangeSwitched {
+				time.Sleep(5 * time.Second)
+			}
 			trigger()
 		}()
 	}

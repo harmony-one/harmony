@@ -385,11 +385,13 @@ func (s *StagedStreamSync) setSyncingStatus(isSynced bool) {
 // doSync does the long range sync.
 // One LongRangeSync consists of several iterations.
 // For each iteration, estimate the current block number, then fetch block & insert to blockchain
-func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, int, error) {
+func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, int, bool, error) {
 
 	if s.isEpochChain {
-		return 0, 0, nil
+		return 0, 0, false, nil
 	}
+
+	rangeSwitched := false
 
 	// // finish syncing in the end of the sync
 	// // it may SpinUpStateSync have set the syncing flag, so even with error, it has to finish syncing
@@ -400,12 +402,12 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 	var totalInserted int
 
 	if err := s.checkPrerequisites(); err != nil {
-		return 0, 0, err
+		return 0, 0, false, err
 	}
 
 	var estimatedHeight uint64
 	if h, err := s.estimateCurrentNumber(downloaderContext); err != nil {
-		return 0, 0, err
+		return 0, 0, false, err
 	} else {
 		estimatedHeight = h
 		//TODO: use directly currentCycle var
@@ -420,11 +422,14 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 				Uint64("current number", curBN).
 				Uint64("target number", estimatedHeight).
 				Msg(WrapStagedSyncMsg("both current and target heights are 0, continuing sync to discover peers"))
-			return 0, 0, ErrInvalidEarlySync
+			return 0, 0, false, ErrInvalidEarlySync
+		} else if curBN > 0 && estimatedHeight == 0 {
+			return 0, 0, false, ErrInvalidEarlySync
 		} else {
 			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
 				Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
-			return estimatedHeight, 0, nil
+			s.setSyncingStatus(true)
+			return estimatedHeight, 0, false, nil
 		}
 	} else if curBN < estimatedHeight {
 		s.setSyncingStatus(false)
@@ -435,7 +440,7 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 	if s.initSync {
 		if pivotBlock, cycleSyncMode, err := s.checkPivot(downloaderContext, estimatedHeight); err != nil {
 			s.logger.Error().Err(err).Msg(WrapStagedSyncMsg("check pivot failed"))
-			return 0, 0, err
+			return 0, 0, false, err
 		} else {
 			s.status.SetCycleSyncMode(cycleSyncMode)
 			s.status.SetPivotBlock(pivotBlock)
@@ -445,9 +450,12 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 	ctx, cancel := context.WithCancel(downloaderContext)
 	defer cancel()
 
+	var err error
+	var n int
+
 	for {
 
-		n, err := s.doSyncCycle(ctx)
+		n, err = s.doSyncCycle(ctx)
 		if err != nil {
 			if errors.Is(err, core.ErrKnownBlock) {
 				continue
@@ -470,12 +478,11 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 					Int("numStreams", numStreams).
 					Int("minStreams", s.config.MinStreams).
 					Msg(WrapStagedSyncMsg("not enough streams to continue sync cycle"))
-				return estimatedHeight, totalInserted + n, ErrNotEnoughStreams
+				err = ErrNotEnoughStreams
 			}
-			//cancel()
-			return estimatedHeight, totalInserted + n, err
+			break
+			// return estimatedHeight, totalInserted + n, err
 		}
-		//cancel()
 
 		totalInserted += n
 
@@ -483,17 +490,6 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 		if n == 0 {
 			break
 		}
-	}
-
-	if totalInserted > 0 {
-		s.logger.Debug().
-			Bool("initSync", s.initSync).
-			Bool("isBeaconShard", s.isBeaconShard).
-			Uint32("shard", s.bc.ShardID()).
-			Int("blocks", totalInserted).
-			Uint64("startedNumber", bnBeforeSync).
-			Uint64("currentNumber", s.bc.CurrentBlock().NumberU64()).
-			Msg(WrapStagedSyncMsg("sync cycle blocks inserted successfully"))
 	}
 
 	longRangeCompleted := false
@@ -509,13 +505,15 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 		if distanceBeforeSync <= uint64(ShortRangeThreshold) &&
 			distanceAfterSync <= uint64(ShortRangeThreshold) {
 			s.switchToShortRangeSync()
+			rangeSwitched = true
 			longRangeCompleted = true
 		}
 	} else if !s.initSync {
-		if distanceAfterSync < uint64(ShortRangeThreshold) {
+		if distanceAfterSync <= uint64(ShortRangeThreshold) {
 			shortRangeCompleted = true
 		} else {
 			s.switchToLongRangeSync()
+			rangeSwitched = true
 		}
 	}
 
@@ -529,15 +527,26 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 			Uint64("current height", s.bc.CurrentBlock().NumberU64()).
 			Uint64("estimated height", estimatedHeight).
 			Msg(WrapStagedSyncMsg("long-range sync completed"))
+	} else if totalInserted > 0 {
+		s.logger.Debug().
+			Bool("initSync", s.initSync).
+			Bool("isBeaconShard", s.isBeaconShard).
+			Uint32("shard", s.bc.ShardID()).
+			Int("blocks", totalInserted).
+			Uint64("startedNumber", bnBeforeSync).
+			Uint64("currentNumber", s.bc.CurrentBlock().NumberU64()).
+			Bool("shortRangeCompleted", shortRangeCompleted).
+			Bool("longRangeCompleted", longRangeCompleted).
+			Msg(WrapStagedSyncMsg("sync cycle blocks inserted successfully"))
 	}
 
-	if s.consensus != nil && (longRangeCompleted || shortRangeCompleted) {
+	if s.consensus != nil { //&& (longRangeCompleted || shortRangeCompleted) {
 		// add consensus last mile blocks
 		if hashes, err := s.addConsensusLastMile(s.Blockchain(), s.consensus); err != nil {
 			s.logger.Error().Err(err).
 				Msg("[STAGED_STREAM_SYNC] Add consensus last mile failed")
 			// s.RollbackLastMileBlocks(downloaderContext, hashes)
-			return estimatedHeight, totalInserted, err
+			// return estimatedHeight, totalInserted, err
 		} else {
 			totalInserted += len(hashes)
 		}
@@ -548,12 +557,14 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 		}
 	}
 
-	if longRangeCompleted || shortRangeCompleted {
-		// Set node synchronization status back to true after successful sync
+	//if longRangeCompleted || shortRangeCompleted {
+	// Set node synchronization status back to true after successful sync
+	if totalInserted > 0 {
 		s.setSyncingStatus(true)
 	}
+	//}
 
-	return estimatedHeight, totalInserted, nil
+	return estimatedHeight, totalInserted, rangeSwitched, err
 }
 
 // doEpochSync does the epoch sync.
