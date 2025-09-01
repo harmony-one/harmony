@@ -19,6 +19,11 @@ func TestProgressTracker_NewProgressTracker(t *testing.T) {
 	if pt.resetThreshold != 1024 {
 		t.Errorf("Expected reset threshold 1024, got %v", pt.resetThreshold)
 	}
+
+	// Initially not tracking
+	if pt.IsTracking() {
+		t.Error("Should not be tracking initially")
+	}
 }
 
 func TestProgressTracker_UpdateProgress(t *testing.T) {
@@ -42,9 +47,17 @@ func TestProgressTracker_UpdateProgress(t *testing.T) {
 func TestProgressTracker_ShouldTimeout(t *testing.T) {
 	pt := NewProgressTracker(100*time.Millisecond, 1024)
 
-	// Should not timeout immediately
+	// Should not timeout when not tracking (default state)
 	if pt.ShouldTimeout() {
-		t.Error("Should not timeout immediately")
+		t.Error("Should not timeout when not tracking")
+	}
+
+	// Start tracking
+	pt.StartTracking()
+
+	// Should not timeout immediately after starting
+	if pt.ShouldTimeout() {
+		t.Error("Should not timeout immediately after starting")
 	}
 
 	// Wait for timeout
@@ -58,6 +71,9 @@ func TestProgressTracker_ShouldTimeout(t *testing.T) {
 
 func TestProgressTracker_ResetTimeout(t *testing.T) {
 	pt := NewProgressTracker(100*time.Millisecond, 1024)
+
+	// Start tracking first
+	pt.StartTracking()
 
 	// Wait for timeout
 	time.Sleep(150 * time.Millisecond)
@@ -79,9 +95,17 @@ func TestProgressTracker_ResetTimeout(t *testing.T) {
 func TestProgressTracker_IsHealthy(t *testing.T) {
 	pt := NewProgressTracker(100*time.Millisecond, 1024)
 
-	// Should be healthy initially
+	// Should be healthy initially when not tracking (default state)
 	if !pt.IsHealthy() {
-		t.Error("Should be healthy initially")
+		t.Error("Should be healthy initially when not tracking")
+	}
+
+	// Start tracking
+	pt.StartTracking()
+
+	// Should be healthy immediately after starting
+	if !pt.IsHealthy() {
+		t.Error("Should be healthy immediately after starting")
 	}
 
 	// Wait for progress timeout
@@ -138,5 +162,76 @@ func TestProgressTracker_GetHealthSummary(t *testing.T) {
 
 	if summary["resetThreshold"] != int64(1024) {
 		t.Errorf("Expected resetThreshold 1024, got %v", summary["resetThreshold"])
+	}
+}
+
+func TestProgressTracker_StartTracking(t *testing.T) {
+	pt := NewProgressTracker(30*time.Second, 1024)
+
+	// Initially not tracking
+	if pt.IsTracking() {
+		t.Error("Should not be tracking initially")
+	}
+
+	// Start tracking
+	pt.StartTracking()
+
+	// Should be tracking now
+	if !pt.IsTracking() {
+		t.Error("Should be tracking after StartTracking")
+	}
+
+	// Should be healthy immediately after starting
+	if !pt.IsHealthy() {
+		t.Error("Should be healthy immediately after starting tracking")
+	}
+}
+
+func TestProgressTracker_StopTracking(t *testing.T) {
+	pt := NewProgressTracker(30*time.Second, 1024)
+
+	// Start tracking first
+	pt.StartTracking()
+	if !pt.IsTracking() {
+		t.Error("Should be tracking after StartTracking")
+	}
+
+	// Stop tracking
+	pt.StopTracking()
+
+	// Should not be tracking now
+	if pt.IsTracking() {
+		t.Error("Should not be tracking after StopTracking")
+	}
+
+	// Should always be healthy when not tracking
+	if !pt.IsHealthy() {
+		t.Error("Should be healthy when not tracking")
+	}
+
+	// Should never timeout when not tracking
+	if pt.ShouldTimeout() {
+		t.Error("Should never timeout when not tracking")
+	}
+}
+
+func TestProgressTracker_IsTracking(t *testing.T) {
+	pt := NewProgressTracker(30*time.Second, 1024)
+
+	// Initially not tracking
+	if pt.IsTracking() {
+		t.Error("Should not be tracking initially")
+	}
+
+	// Start tracking
+	pt.StartTracking()
+	if !pt.IsTracking() {
+		t.Error("Should be tracking after StartTracking")
+	}
+
+	// Stop tracking
+	pt.StopTracking()
+	if pt.IsTracking() {
+		t.Error("Should not be tracking after StopTracking")
 	}
 }
