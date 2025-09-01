@@ -348,12 +348,16 @@ func (st *BaseStream) ReadBytes() (content []byte, err error) {
 }
 
 // ReadBytesWithProgress reads bytes from the stream with progress-based timeout.
-// It will continue reading as long as progress is being made, preventing partial data issues.
+// Progress tracking only starts after reading size prefix and stops when read completes/errors.
 func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (content []byte, err error) {
 	defer func() {
 		msgReadCounter.Inc()
 		if err != nil {
 			msgReadFailedCounterVec.With(prometheus.Labels{"error": err.Error()}).Inc()
+		}
+		// Always stop tracking when function exits (success or error)
+		if progressTracker != nil {
+			progressTracker.StopTracking()
 		}
 	}()
 
@@ -366,7 +370,7 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 		return nil, errors.Wrap(err, "failed to disable read deadline")
 	}
 
-	// 1. Read message length prefix (blocking)
+	// 1. Read message length prefix (blocking, no timeout - wait indefinitely for size)
 	lengthBuf := make([]byte, sizeBytes)
 	_, err = io.ReadFull(st.reader, lengthBuf)
 	if err != nil {
@@ -409,7 +413,12 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 		return nil, errors.Errorf("message size %d exceeds max %d", size, maxMsgBytes)
 	}
 
-	// 3. Read message content with progress tracking and chunked reading
+	// 3. NOW start progress tracking (only after size is read successfully)
+	if progressTracker != nil {
+		progressTracker.StartTracking()
+	}
+
+	// 4. Read message content with progress tracking and chunked reading
 	content = make([]byte, size)
 	totalRead := 0
 

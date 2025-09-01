@@ -14,6 +14,7 @@ type ProgressTracker struct {
 	timeoutDuration  time.Duration
 	resetThreshold   int64
 	totalBytesRead   int64
+	isTracking       bool // New field: only track when actively reading
 }
 
 // NewProgressTracker creates a new progress tracker with the given configuration
@@ -47,10 +48,40 @@ func (pt *ProgressTracker) ResetTimeout() {
 	pt.lastProgressTime = time.Now()
 }
 
-// ShouldTimeout checks if the stream should timeout due to lack of progress during content reading
+// StartTracking begins progress tracking - call when starting to read content
+func (pt *ProgressTracker) StartTracking() {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+
+	pt.isTracking = true
+	pt.lastProgressTime = time.Now()
+}
+
+// StopTracking ends progress tracking - call when read completes or errors
+func (pt *ProgressTracker) StopTracking() {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+
+	pt.isTracking = false
+}
+
+// IsTracking returns whether progress tracking is currently active
+func (pt *ProgressTracker) IsTracking() bool {
+	pt.mu.RLock()
+	defer pt.mu.RUnlock()
+
+	return pt.isTracking
+}
+
+// ShouldTimeout checks if timeout should occur (only when tracking)
 func (pt *ProgressTracker) ShouldTimeout() bool {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
+
+	// Only timeout if we're actively tracking progress
+	if !pt.isTracking {
+		return false
+	}
 
 	timeSinceProgress := time.Since(pt.lastProgressTime)
 	return timeSinceProgress > pt.timeoutDuration
@@ -64,10 +95,15 @@ func (pt *ProgressTracker) GetStats() (totalBytes int64, lastProgress time.Time)
 	return pt.totalBytesRead, pt.lastProgressTime
 }
 
-// IsHealthy checks if the stream is healthy based on reading progress
+// IsHealthy checks if stream is healthy (only applies when tracking)
 func (pt *ProgressTracker) IsHealthy() bool {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
+
+	// Always healthy when not tracking
+	if !pt.isTracking {
+		return true
+	}
 
 	timeSinceProgress := time.Since(pt.lastProgressTime)
 	return timeSinceProgress <= pt.timeoutDuration
