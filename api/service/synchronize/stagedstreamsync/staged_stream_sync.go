@@ -112,6 +112,7 @@ type StagedStreamSync struct {
 	evtDownloadStarted            event.Feed // channel for each download has started
 	evtDownloadStartedSubscribed  bool
 	setNodeSyncStatus             func(bool) // function to set node's IsSynchronized status
+	bnCache                       *BlockNumberCache
 }
 
 type Timing struct {
@@ -379,6 +380,7 @@ func New(
 	}
 
 	status := NewStatus()
+	bnCache := NewBlockNumberCache(protocol, nil) // Use default config
 
 	return &StagedStreamSync{
 		bc:                bc,
@@ -404,6 +406,7 @@ func New(
 		logPrefixes:       logPrefixes,
 		UseMemDB:          config.UseMemDB,
 		setNodeSyncStatus: setNodeSyncStatus,
+		bnCache:           bnCache,
 	}
 }
 

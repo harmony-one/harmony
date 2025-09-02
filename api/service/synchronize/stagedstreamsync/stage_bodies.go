@@ -153,7 +153,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	s.state.gbm = newDownloadManager(b.configs.bc, currProgress, targetHeight, BlocksPerRequest, s.state.logger)
 
 	// Identify available valid streams
-	whitelistStreams, err := b.identifySyncedStreams(context.Background(), targetHeight, []sttypes.StreamID{})
+	whitelistStreams, err := b.identifySyncedStreams(context.Background(), s, targetHeight, []sttypes.StreamID{})
 	if err != nil {
 		b.configs.logger.Error().
 			Err(err).
@@ -181,7 +181,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 }
 
 // IdentifySyncedStreams roughly find the synced streams.
-func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight uint64, excludeIDs []sttypes.StreamID) (streams []sttypes.StreamID, err error) {
+func (b *StageBodies) identifySyncedStreams(ctx context.Context, s *StageState, targetHeight uint64, excludeIDs []sttypes.StreamID) (streams []sttypes.StreamID, err error) {
 	var (
 		synced = make(map[sttypes.StreamID]uint64)
 		lock   sync.Mutex
@@ -206,12 +206,12 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 		if excluded {
 			continue
 		}
-		streamID := []sttypes.StreamID{streamIDs[i]}
+		stID := streamIDs[i]
 		wg.Add(1)
-		go func(streamID []sttypes.StreamID) {
+		go func(stid sttypes.StreamID, targetHeight uint64) {
 			defer wg.Done()
 
-			bn, stid, err := b.configs.protocol.GetCurrentBlockNumber(ctx, syncProto.WithWhitelist(streamID))
+			bn, err := s.state.bnCache.GetBlockNumber(ctx, stid, targetHeight)
 			if err != nil {
 				b.configs.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
@@ -232,7 +232,7 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 			lock.Lock()
 			synced[stid] = bn
 			lock.Unlock()
-		}(streamID)
+		}(stID, targetHeight)
 	}
 
 	// Wait for all goroutines to finish
@@ -535,7 +535,7 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 			return ErrNotEnoughStreams
 		}
 
-		whitelistStreams, err := b.identifySyncedStreams(context.Background(), s.state.invalidBlock.Number, s.state.invalidBlock.StreamID)
+		whitelistStreams, err := b.identifySyncedStreams(context.Background(), s, s.state.invalidBlock.Number, s.state.invalidBlock.StreamID)
 		if len(whitelistStreams) == 0 {
 			b.configs.logger.Error().
 				Uint64("bad block number", s.state.invalidBlock.Number).
