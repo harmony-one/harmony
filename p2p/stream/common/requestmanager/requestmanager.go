@@ -484,8 +484,6 @@ func (rm *requestManager) setStreamAvailability(stID sttypes.StreamID, available
 // This helps distribute load across healthy streams and prevents rapid deletion.
 // Particularly important for epoch sync which depends on cross-shard streams.
 func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
-	availableStreamIDs := rm.available.Keys()
-
 	// Find all eligible streams and their failure counts
 	type streamCandidate struct {
 		stream   *stream
@@ -493,8 +491,20 @@ func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
 	}
 
 	var candidates []streamCandidate
+	var streamIDs []sttypes.StreamID
 
-	for _, id := range availableStreamIDs {
+	// Determine which streams to consider
+	if req.hasWhiteList() {
+		streamIDs = req.whitelistIDs()
+	} else {
+		streamIDs = rm.available.Keys()
+	}
+
+	// Find all eligible streams and their failure counts
+	for _, id := range streamIDs {
+		if !rm.available.Exists(id) {
+			continue
+		}
 		if !req.isStreamAllowed(id) {
 			continue
 		}
@@ -515,6 +525,9 @@ func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
 	}
 
 	if len(candidates) == 0 {
+		if req.hasWhiteList() {
+			return nil, errors.New("no more available whitelisted streams")
+		}
 		return nil, errors.New("no more available streams")
 	}
 
@@ -534,6 +547,7 @@ func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
 		Str("streamID", string(selectedStream.ID())).
 		Int32("failures", selectedStream.Failures()).
 		Int("totalCandidates", len(candidates)).
+		Bool("whitelist", req.hasWhiteList()).
 		Msg("selected stream with lowest failure count")
 
 	return selectedStream, nil
