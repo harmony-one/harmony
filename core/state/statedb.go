@@ -368,9 +368,9 @@ func (db *DB) GetCodeHash(addr common.Address) common.Hash {
 
 // GetState retrieves a value from the given account's storage trie.
 func (db *DB) GetState(addr common.Address, hash common.Hash) common.Hash {
-	Object := db.getStateObject(addr)
-	if Object != nil {
-		return Object.GetState(db.db, hash)
+	stateObject := db.getStateObject(addr)
+	if stateObject != nil {
+		return stateObject.GetState(db.db, hash)
 	}
 	return common.Hash{}
 }
