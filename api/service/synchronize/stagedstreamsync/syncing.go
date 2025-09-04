@@ -151,7 +151,6 @@ func CreateStagedSync(ctx context.Context,
 		Str("SyncMode", config.SyncMode.String()).
 		Bool("serverOnly", config.ServerOnly).
 		Int("minStreams", config.MinStreams).
-		Str("dbDir", dbDir).
 		Msg(WrapStagedSyncMsg("staged stream sync created successfully"))
 
 	return New(
@@ -159,6 +158,94 @@ func CreateStagedSync(ctx context.Context,
 		consensus,
 		mainDB,
 		defaultStages,
+		protocol,
+		isEpochChain,
+		isBeaconShard,
+		isBeaconValidator,
+		isExplorer,
+		isValidator,
+		joinConsensus,
+		config,
+		logger,
+		setNodeSyncStatus,
+	), nil
+}
+
+// CreateStagedEpochSync creates an instance of staged sync for epoch chain
+func CreateStagedEpochSync(ctx context.Context,
+	bc core.BlockChain,
+	nodeConfig *nodeconfig.ConfigType,
+	consensus *consensus.Consensus,
+	dbDir string,
+	protocol syncProtocol,
+	config Config,
+	isBeaconNode bool,
+	logger zerolog.Logger,
+	setNodeSyncStatus func(bool),
+) (*StagedStreamSync, error) {
+
+	logger.Info().
+		Uint32("shard", bc.ShardID()).
+		Bool("isBeaconNode", isBeaconNode).
+		Bool("memdb", config.UseMemDB).
+		Str("dbDir", dbDir).
+		Bool("serverOnly", config.ServerOnly).
+		Int("minStreams", config.MinStreams).
+		Msg(WrapStagedSyncMsg("creating staged epoch sync"))
+
+	isExplorer := nodeConfig.Role() == nodeconfig.ExplorerNode
+	isValidator := nodeConfig.Role() == nodeconfig.Validator
+	isBeaconShard := true
+	isEpochChain := true
+	isBeaconValidator := false
+	joinConsensus := false
+
+	var mainDB kv.RwDB
+	if config.UseMemDB {
+		mdbPath := getEpochDbPath(dbDir)
+		logger.Info().
+			Str("path", mdbPath).
+			Msg(WrapStagedSyncMsg("creating epoch main db in memory"))
+		mainDB = mdbx.NewMDBX(log.New()).InMem(mdbPath).MustOpen()
+	} else {
+		mdbPath := getEpochDbPath(dbDir)
+		logger.Info().
+			Str("path", mdbPath).
+			Msg(WrapStagedSyncMsg("creating epoch main db in disk"))
+		mainDB = mdbx.NewMDBX(log.New()).Path(mdbPath).MustOpen()
+	}
+
+	stageSyncEpochCfg := NewStageEpochCfg(bc, nil, logger)
+	stageFinishCfg := NewStageFinishCfg(nil, logger)
+
+	// init stages order based on sync mode
+	initStagesOrder(config.SyncMode)
+
+	epochStages := EpochStages(ctx,
+		stageSyncEpochCfg,
+		stageFinishCfg,
+	)
+
+	logger.Info().
+		Uint32("shard", bc.ShardID()).
+		Bool("isEpochChain", isEpochChain).
+		Bool("isExplorer", isExplorer).
+		Bool("isValidator", isValidator).
+		Bool("isBeaconShard", isBeaconShard).
+		Bool("isBeaconValidator", isBeaconValidator).
+		Bool("joinConsensus", joinConsensus).
+		Bool("memdb", config.UseMemDB).
+		Str("dbDir", dbDir).
+		Str("SyncMode", config.SyncMode.String()).
+		Bool("serverOnly", config.ServerOnly).
+		Int("minStreams", config.MinStreams).
+		Msg(WrapStagedSyncMsg("staged stream epoch sync created successfully"))
+
+	return New(
+		bc,
+		consensus,
+		mainDB,
+		epochStages,
 		protocol,
 		isEpochChain,
 		isBeaconShard,
@@ -234,6 +321,11 @@ func getBlockDbPath(shardID uint32, beacon bool, workerID int, dbDir string) str
 			return fmt.Sprintf("%s_%d", filepath.Join(dbDir, "cache/blocks_db_main"), shardID)
 		}
 	}
+}
+
+// getEpochDbPath returns the path of the cache database which stores epoch blocks
+func getEpochDbPath(dbDir string) string {
+	return filepath.Join(dbDir, "cache/epoch_db_main")
 }
 
 func (s *StagedStreamSync) Debug(source string, msg interface{}) {

@@ -189,3 +189,29 @@ func DefaultStages(ctx context.Context,
 		},
 	}
 }
+
+func EpochStages(ctx context.Context,
+	seCfg StageEpochCfg,
+	finishCfg StageFinishCfg,
+) []*Stage {
+
+	handlerStageEpochSync := NewStageEpoch(seCfg)
+	handlerStageFinish := NewStageFinish(finishCfg)
+
+	return []*Stage{
+		{
+			ID:                 SyncEpoch,
+			Description:        "Sync only Last Block of Epoch",
+			Handler:            handlerStageEpochSync,
+			RangeMode:          OnlyShortRange,
+			ChainExecutionMode: OnlyEpochChain,
+		},
+		{
+			ID:                 Finish,
+			Description:        "Finalize Changes",
+			Handler:            handlerStageFinish,
+			RangeMode:          LongRangeAndShortRange,
+			ChainExecutionMode: AllChains,
+		},
+	}
+}
