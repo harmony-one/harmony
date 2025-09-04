@@ -53,6 +53,7 @@ func NewDownloader(host p2p.Host,
 	setNodeSyncStatus func(bool)) *Downloader {
 
 	config.fixValues()
+	isEpochChain := !isBeaconNode && bc.ShardID() == shard.BeaconChainShardID
 
 	protoCfg := protocolConfig(host, bc, nodeConfig, isBeaconNode, config)
 	sp := streamSyncProtocol.NewProtocol(*protoCfg)
@@ -80,7 +81,13 @@ func NewDownloader(host p2p.Host,
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// create an instance of staged sync for the downloader
-	stagedSyncInstance, err := CreateStagedSync(ctx, bc, nodeConfig, consensus, dbDir, sp, config, isBeaconNode, logger, setNodeSyncStatus)
+	var stagedSyncInstance *StagedStreamSync
+	var err error
+	if isEpochChain {
+		stagedSyncInstance, err = CreateStagedEpochSync(ctx, bc, nodeConfig, consensus, dbDir, sp, config, isBeaconNode, logger, setNodeSyncStatus)
+	} else {
+		stagedSyncInstance, err = CreateStagedSync(ctx, bc, nodeConfig, consensus, dbDir, sp, config, isBeaconNode, logger, setNodeSyncStatus)
+	}
 	if err != nil {
 		cancel()
 		return nil

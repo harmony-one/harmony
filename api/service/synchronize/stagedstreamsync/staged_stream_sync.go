@@ -335,30 +335,36 @@ func New(
 ) *StagedStreamSync {
 
 	forwardStages := make([]*Stage, len(StagesForwardOrder))
-	for i, stageIndex := range StagesForwardOrder {
+	fwdID := int(0)
+	for _, stageID := range StagesForwardOrder {
 		for _, s := range stagesList {
-			if s.ID == stageIndex {
-				forwardStages[i] = s
+			if s.ID == stageID {
+				forwardStages[fwdID] = s
+				fwdID++
 				break
 			}
 		}
 	}
 
 	revertStages := make([]*Stage, len(StagesRevertOrder))
-	for i, stageIndex := range StagesRevertOrder {
+	rvtID := int(0)
+	for _, stageID := range StagesRevertOrder {
 		for _, s := range stagesList {
-			if s.ID == stageIndex {
-				revertStages[i] = s
+			if s.ID == stageID {
+				revertStages[rvtID] = s
+				rvtID++
 				break
 			}
 		}
 	}
 
 	pruneStages := make([]*Stage, len(StagesCleanUpOrder))
-	for i, stageIndex := range StagesCleanUpOrder {
+	pruneID := int(0)
+	for _, stageID := range StagesCleanUpOrder {
 		for _, s := range stagesList {
-			if s.ID == stageIndex {
-				pruneStages[i] = s
+			if s.ID == stageID {
+				pruneStages[pruneID] = s
+				pruneID++
 				break
 			}
 		}
@@ -466,6 +472,14 @@ func (sss *StagedStreamSync) Run(ctx context.Context, db kv.RwDB, tx kv.RwTx, fi
 		}
 
 		stage := sss.stages[sss.currentStage]
+
+		if stage == nil {
+			sss.logger.Error().
+				Uint("currentStage", sss.currentStage).
+				Int("totalStages", len(sss.stages)).
+				Msg(WrapStagedSyncMsg("stage is nil, skipping to next stage"))
+			return fmt.Errorf("stage is nil")
+		}
 
 		if stage.Disabled {
 			sss.logger.Trace().
