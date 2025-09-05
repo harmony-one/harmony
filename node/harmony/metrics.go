@@ -58,6 +58,7 @@ var (
 	)
 
 	// nodeCrossLinkMessageCounterVec is used to keep track of node new/invalid/duplicate crosslink messages received
+	// Types: new_crosslink, invalid_crosslink, duplicate_crosslink_pending_queue, duplicate_crosslink_already_processed
 	nodeCrossLinkMessageCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
