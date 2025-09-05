@@ -279,7 +279,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 
 		// Check if cross-link already exists in pending queue
 		if _, exists := existingCLs[cl.Hash()]; exists {
-			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
+			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink_pending_queue"}).Inc()
 			utils.Logger().Debug().
 				Str("crossLinkHash", cl.Hash().Hex()).
 				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
@@ -293,7 +293,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 		// Check if cross-link already exists in blockchain
 		exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 		if err == nil && exist != nil {
-			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()
+			nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink_already_processed"}).Inc()
 			utils.Logger().Debug().
 				Str("crossLinkHash", cl.Hash().Hex()).
 				Uint64("beaconEpoch", node.Blockchain().CurrentHeader().Epoch().Uint64()).
