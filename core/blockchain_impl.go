@@ -69,6 +69,9 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 	goleveldb "github.com/syndtr/goleveldb/leveldb"
+
+	// Import for crosslink metrics
+	crosslinkmetrics "github.com/harmony-one/harmony/internal/metrics"
 )
 
 var (
@@ -2558,7 +2561,12 @@ func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
 
-	return bc.readPendingCrossLinks()
+	cls, err := bc.readPendingCrossLinks()
+	if err == nil {
+		// Update pending queue gauge with current size
+		crosslinkmetrics.UpdatePendingCrossLinkQueueGauge(len(cls))
+	}
+	return cls, err
 }
 
 func (bc *BlockChainImpl) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error) {
@@ -2568,10 +2576,18 @@ func (bc *BlockChainImpl) AddPendingCrossLinks(pendingCLs []types.CrossLink) (in
 	cls, err := bc.readPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		err := bc.CachePendingCrossLinks(pendingCLs)
+		if err == nil {
+			// Update pending queue gauge with new size
+			crosslinkmetrics.UpdatePendingCrossLinkQueueGauge(len(pendingCLs))
+		}
 		return len(pendingCLs), err
 	}
 	cls = append(cls, pendingCLs...)
 	err = bc.CachePendingCrossLinks(cls)
+	if err == nil {
+		// Update pending queue gauge with new size
+		crosslinkmetrics.UpdatePendingCrossLinkQueueGauge(len(cls))
+	}
 	return len(cls), err
 }
 
@@ -2603,6 +2619,10 @@ func (bc *BlockChainImpl) DeleteFromPendingCrossLinks(crossLinks []types.CrossLi
 		pendingCLs = append(pendingCLs, cl)
 	}
 	err = bc.CachePendingCrossLinks(pendingCLs)
+	if err == nil {
+		// Update pending queue gauge with new size after deletion
+		crosslinkmetrics.UpdatePendingCrossLinkQueueGauge(len(pendingCLs))
+	}
 	return len(pendingCLs), err
 }
 
