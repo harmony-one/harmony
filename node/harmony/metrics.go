@@ -71,6 +71,16 @@ var (
 		},
 	)
 
+	// CrossLinkPendingQueueGauge is used to monitor the current size of pending crosslink queue
+	CrossLinkPendingQueueGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "p2p",
+			Name:      "crosslink_pending_queue_size",
+			Help:      "current number of crosslinks in pending queue",
+		},
+	)
+
 	onceMetrics sync.Once
 )
 
@@ -82,6 +92,7 @@ func initMetrics() {
 			nodeConsensusMessageCounterVec,
 			nodeNodeMessageCounterVec,
 			nodeCrossLinkMessageCounterVec,
+			CrossLinkPendingQueueGauge,
 		)
 	})
 }
