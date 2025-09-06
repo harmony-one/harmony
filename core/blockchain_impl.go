@@ -69,9 +69,6 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 	goleveldb "github.com/syndtr/goleveldb/leveldb"
-
-	// Import for crosslink metrics
-	crosslinkmetrics "github.com/harmony-one/harmony/internal/metrics"
 )
 
 var (
@@ -93,6 +90,10 @@ var (
 	blockValidationTimer = metrics.NewRegisteredTimer("chain/validation", nil)
 	blockExecutionTimer  = metrics.NewRegisteredTimer("chain/execution", nil)
 	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
+
+	// CrossLinkPendingQueueGauge is used to monitor the current size of pending crosslink queue
+	CrossLinkPendingQueueGauge = metrics.NewRegisteredGauge("chain/crosslink/pending_queue_size", nil)
+
 	// ErrCrosslinkNotFound is the error when no crosslink found
 	ErrCrosslinkNotFound = errors.New("crosslink not found")
 	// ErrZeroBytes is the error when it reads empty crosslink
@@ -2564,7 +2565,7 @@ func (bc *BlockChainImpl) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 	cls, err := bc.readPendingCrossLinks()
 	if err == nil {
 		// Update pending queue gauge with current size
-		crosslinkmetrics.UpdatePendingCrossLinkQueueGauge(len(cls))
+		bc.updatePendingCrossLinkQueueGauge(len(cls))
 	}
 	return cls, err
 }
@@ -2578,7 +2579,7 @@ func (bc *BlockChainImpl) AddPendingCrossLinks(pendingCLs []types.CrossLink) (in
 		err := bc.CachePendingCrossLinks(pendingCLs)
 		if err == nil {
 			// Update pending queue gauge with new size
-			crosslinkmetrics.UpdatePendingCrossLinkQueueGauge(len(pendingCLs))
+			bc.updatePendingCrossLinkQueueGauge(len(pendingCLs))
 		}
 		return len(pendingCLs), err
 	}
@@ -2586,7 +2587,7 @@ func (bc *BlockChainImpl) AddPendingCrossLinks(pendingCLs []types.CrossLink) (in
 	err = bc.CachePendingCrossLinks(cls)
 	if err == nil {
 		// Update pending queue gauge with new size
-		crosslinkmetrics.UpdatePendingCrossLinkQueueGauge(len(cls))
+		bc.updatePendingCrossLinkQueueGauge(len(cls))
 	}
 	return len(cls), err
 }
@@ -2621,9 +2622,14 @@ func (bc *BlockChainImpl) DeleteFromPendingCrossLinks(crossLinks []types.CrossLi
 	err = bc.CachePendingCrossLinks(pendingCLs)
 	if err == nil {
 		// Update pending queue gauge with new size after deletion
-		crosslinkmetrics.UpdatePendingCrossLinkQueueGauge(len(pendingCLs))
+		bc.updatePendingCrossLinkQueueGauge(len(pendingCLs))
 	}
 	return len(pendingCLs), err
+}
+
+// updatePendingCrossLinkQueueGauge updates the pending crosslink queue size gauge
+func (bc *BlockChainImpl) updatePendingCrossLinkQueueGauge(size int) {
+	CrossLinkPendingQueueGauge.Update(int64(size))
 }
 
 func (bc *BlockChainImpl) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
