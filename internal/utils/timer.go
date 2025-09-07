@@ -43,13 +43,14 @@ func (timeout *Timeout) Start(reason string) {
 
 // Stop stops the timeout clock
 func (timeout *Timeout) Stop() {
+	// Only log warning if we're stopping an active timeout without a reason
+	if timeout.state == Active && timeout.reason == "" {
+		Logger().Warn().
+			Dur("duration", timeout.d).
+			Msg("stopping active timeout without reason")
+	}
 	timeout.state = Inactive
 	timeout.start = time.Now()
-	if timeout.reason == "" {
-		Logger().Warn().
-			Str("reason", timeout.reason).
-			Msg("timeout reason was empty")
-	}
 	timeout.reason = ""
 }
 
