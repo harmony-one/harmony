@@ -22,7 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-//go:generate go run github.com/fjl/gencodec -type AccessTuple -out gen_access_tuple.go
+//go:generate go run github.com/fjl/gencodec@v0.1.0 -type AccessTuple -out gen_access_tuple.go
 
 // AccessList is an EIP-2930 access list.
 type AccessList []AccessTuple
