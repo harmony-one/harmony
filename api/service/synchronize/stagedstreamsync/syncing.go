@@ -215,8 +215,15 @@ func CreateStagedEpochSync(ctx context.Context,
 		mainDB = mdbx.NewMDBX(log.New()).Path(mdbPath).MustOpen()
 	}
 
-	stageSyncEpochCfg := NewStageEpochCfg(bc, nil, logger)
-	stageFinishCfg := NewStageFinishCfg(nil, logger)
+	// Initialize database buckets for epoch sync
+	// Epoch sync doesn't need sub-databases, so we pass an empty slice
+	if errInitDB := initDB(ctx, mainDB, []kv.RwDB{}); errInitDB != nil {
+		logger.Error().Err(errInitDB).Msg("create staged epoch sync instance failed")
+		return nil, errInitDB
+	}
+
+	stageSyncEpochCfg := NewStageEpochCfg(bc, mainDB, logger)
+	stageFinishCfg := NewStageFinishCfg(mainDB, logger)
 
 	// init stages order based on sync mode
 	initStagesOrder(config.SyncMode)
