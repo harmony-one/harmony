@@ -334,40 +334,39 @@ func New(
 	setNodeSyncStatus func(bool),
 ) *StagedStreamSync {
 
-	forwardStages := make([]*Stage, len(StagesForwardOrder))
-	fwdID := int(0)
+	var forwardStages []*Stage
 	for _, stageID := range StagesForwardOrder {
 		for _, s := range stagesList {
 			if s.ID == stageID {
-				forwardStages[fwdID] = s
-				fwdID++
+				forwardStages = append(forwardStages, s)
 				break
 			}
 		}
 	}
 
-	revertStages := make([]*Stage, len(StagesRevertOrder))
-	rvtID := int(0)
+	var revertStages []*Stage
 	for _, stageID := range StagesRevertOrder {
 		for _, s := range stagesList {
 			if s.ID == stageID {
-				revertStages[rvtID] = s
-				rvtID++
+				revertStages = append(revertStages, s)
 				break
 			}
 		}
 	}
 
-	pruneStages := make([]*Stage, len(StagesCleanUpOrder))
-	pruneID := int(0)
+	var pruneStages []*Stage
 	for _, stageID := range StagesCleanUpOrder {
 		for _, s := range stagesList {
 			if s.ID == stageID {
-				pruneStages[pruneID] = s
-				pruneID++
+				pruneStages = append(pruneStages, s)
 				break
 			}
 		}
+	}
+
+	// Validate that we have at least one stage
+	if len(forwardStages) == 0 {
+		logger.Error().Msg(WrapStagedSyncMsg("no valid stages found - this will cause sync failures"))
 	}
 
 	logPrefixes := make([]string, len(stagesList))
