@@ -158,15 +158,15 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return errors.New("epoch chain current block not available")
 	}
 
-	// Check if epoch chain is synced to at least the heartbeat epoch
-	currentEpoch := epochCurrentBlock.Epoch()
-	currentEpochU64 := currentEpoch.Uint64()
-	if currentEpochU64 < hb.Epoch {
+	epochChainEpoch := epochCurrentBlock.Epoch().Uint64()
+
+	// epoch chain should be at least at the previous epoch
+	if epochChainEpoch < hb.Epoch-1 {
 		utils.Logger().Warn().
-			Uint64("currentEpoch", currentEpochU64).
+			Uint64("epochChainEpoch", epochChainEpoch).
 			Uint64("heartbeatEpoch", hb.Epoch).
 			Msg("[ProcessCrossLinkHeartbeatMessage] epoch chain not synced to heartbeat epoch, ignoring heartbeat")
-		return errors.Errorf("epoch chain not synced to heartbeat epoch: current=%d, heartbeat=%d", currentEpochU64, hb.Epoch)
+		return errors.Errorf("epoch chain not synced to heartbeat epoch: current=%d, heartbeat=%d", epochChainEpoch, hb.Epoch)
 	}
 
 	// Outdated signal.
@@ -199,7 +199,12 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 
 	state, err := epochChain.ReadShardState(cur.Epoch())
 	if err != nil {
-		return errors.WithMessagef(err, "cannot read shard state for epoch %d", cur.Epoch())
+		utils.Logger().Warn().
+			Err(err).
+			Uint64("heartbeatEpoch", hb.Epoch).
+			Uint64("epochChainEpoch", epochChainEpoch).
+			Msg("[ProcessCrossLinkHeartbeatMessage] cannot read shard state for heartbeat epoch from beacon chain")
+		return errors.WithMessagef(err, "cannot read shard state for epoch %d from beacon chain", hb.Epoch)
 	}
 	committee, err := state.FindCommitteeByID(shard.BeaconChainShardID)
 	if err != nil {
@@ -310,7 +315,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 
 		// Allow processing cross-links from current epoch and earlier
 		// Cross-links from future epochs should not exist and may be malicious or maybe it is not fully synced
-		if crossLinkEpoch > localEpoch {
+		if crossLinkEpoch > localEpoch+1 {
 			utils.Logger().Debug().
 				Str("crossLinkHash", cl.Hash().Hex()).
 				Uint64("crossLinkEpoch", crossLinkEpoch).
