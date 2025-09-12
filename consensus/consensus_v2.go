@@ -318,7 +318,7 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 	defer consensus.mutex.Unlock()
 	if err != nil ||
 		len(lastCommits) < bls.BLSSignatureSizeInBytes {
-		msgs := consensus.FBFTLog().GetMessagesByTypeSeq(
+		msgs := consensus.fBFTLog.GetMessagesByTypeSeq(
 			msg_pb.MessageType_COMMITTED, blockNum,
 		)
 		if len(msgs) != 1 {
