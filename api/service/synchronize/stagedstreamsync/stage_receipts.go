@@ -267,10 +267,19 @@ func (r *StageReceipts) runReceiptWorkerLoop(ctx context.Context, rdm *receiptDo
 				return
 			}
 			var block *types.Block
-			if err := rlp.DecodeBytes(blockBytes, &block); err != nil {
-				return
-			}
-			if sigBytes != nil {
+			var decodeErr error
+			// Try to decode as *types.Block first (extblock format)
+			if decodeErr = rlp.DecodeBytes(blockBytes, &block); decodeErr != nil {
+				// Fallback: try to decode as BlockWithSig format
+				var bws core.BlockWithSig
+				if decodeErr = rlp.DecodeBytes(blockBytes, &bws); decodeErr != nil {
+					return
+				}
+				block = bws.Block
+				if block != nil {
+					block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
+				}
+			} else if sigBytes != nil {
 				block.SetCurrentCommitSig(sigBytes)
 			}
 			if block.NumberU64() != bn {

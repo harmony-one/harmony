@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
@@ -378,11 +379,24 @@ func (req *getBlocksByNumberRequest) getBlocksFromResponse(resp sttypes.Response
 	blocks := make([]*types.Block, 0, len(blockBytes))
 	for i, bb := range blockBytes {
 		var block *types.Block
-		if err := rlp.DecodeBytes(bb, &block); err != nil {
-			return nil, errors.Wrap(err, "[GetBlocksByNumResponse]")
-		}
-		if block != nil {
-			block.SetCurrentCommitSig(sigs[i])
+		var err error
+
+		// Try to decode as *types.Block first (extblock format)
+		if err = rlp.DecodeBytes(bb, &block); err != nil {
+			// Fallback: try to decode as BlockWithSig format
+			var bws core.BlockWithSig
+			if err = rlp.DecodeBytes(bb, &bws); err != nil {
+				return nil, errors.Wrap(err, "[GetBlocksByNumResponse]")
+			}
+			block = bws.Block
+			if block != nil {
+				block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
+			}
+		} else {
+			// Successfully decoded as *types.Block, set signature from response
+			if block != nil {
+				block.SetCurrentCommitSig(sigs[i])
+			}
 		}
 		blocks = append(blocks, block)
 	}
@@ -567,11 +581,24 @@ func (req *getBlocksByHashesRequest) getBlocksFromResponse(resp sttypes.Response
 	blocks := make([]*types.Block, 0, len(blockBytes))
 	for i, bb := range blockBytes {
 		var block *types.Block
-		if err := rlp.DecodeBytes(bb, &block); err != nil {
-			return nil, errors.Wrap(err, "[GetBlocksByHashesResponse]")
-		}
-		if block != nil {
-			block.SetCurrentCommitSig(sigs[i])
+		var err error
+
+		// Try to decode as *types.Block first (extblock format)
+		if err = rlp.DecodeBytes(bb, &block); err != nil {
+			// Fallback: try to decode as BlockWithSig format
+			var bws core.BlockWithSig
+			if err = rlp.DecodeBytes(bb, &bws); err != nil {
+				return nil, errors.Wrap(err, "[GetBlocksByHashesResponse]")
+			}
+			block = bws.Block
+			if block != nil {
+				block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
+			}
+		} else {
+			// Successfully decoded as *types.Block, set signature from response
+			if block != nil {
+				block.SetCurrentCommitSig(sigs[i])
+			}
 		}
 		blocks = append(blocks, block)
 	}

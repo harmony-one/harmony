@@ -469,14 +469,27 @@ func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte
 		if blockBytes == nil {
 			continue
 		}
-		if err := rlp.DecodeBytes(blockBytes, &block); err != nil {
-			b.configs.logger.Error().
-				Uint64("block number", i).
-				Msg("block size invalid")
-			return ErrInvalidBlockBytes
-		}
-		if sigBytes != nil {
-			block.SetCurrentCommitSig(sigBytes)
+		var err error
+		// Try to decode as *types.Block first (extblock format)
+		if err = rlp.DecodeBytes(blockBytes, &block); err != nil {
+			// Fallback: try to decode as BlockWithSig format
+			var bws core.BlockWithSig
+			if err = rlp.DecodeBytes(blockBytes, &bws); err != nil {
+				b.configs.logger.Error().
+					Uint64("block number", i).
+					Err(err).
+					Msg("block RLP decode failed")
+				return ErrInvalidBlockBytes
+			}
+			block = bws.Block
+			if block != nil {
+				block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
+			}
+		} else {
+			// Successfully decoded as *types.Block, set signature from response if available
+			if sigBytes != nil {
+				block.SetCurrentCommitSig(sigBytes)
+			}
 		}
 
 		// if block.NumberU64() != i {

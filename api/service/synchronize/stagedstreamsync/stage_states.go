@@ -151,16 +151,26 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 		}
 
 		var block *types.Block
-		if err := rlp.DecodeBytes(blockBytes, &block); err != nil {
-			stg.configs.logger.Error().
-				Uint64("block number", i).
-				Msg("block size invalid")
-			s.state.protocol.StreamFailed(streamID, "invalid block is received from stream")
-			invalidBlockHash := common.Hash{}
-			reverter.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), i, invalidBlockHash, streamID)
-			return ErrInvalidBlockBytes
-		}
-		if sigBytes != nil {
+		var decodeErr error
+		// Try to decode as *types.Block first (extblock format)
+		if decodeErr = rlp.DecodeBytes(blockBytes, &block); decodeErr != nil {
+			// Fallback: try to decode as BlockWithSig format
+			var bws core.BlockWithSig
+			if decodeErr = rlp.DecodeBytes(blockBytes, &bws); decodeErr != nil {
+				stg.configs.logger.Error().
+					Uint64("block number", i).
+					Err(decodeErr).
+					Msg("block RLP decode failed")
+				s.state.protocol.StreamFailed(streamID, "invalid block is received from stream")
+				invalidBlockHash := common.Hash{}
+				reverter.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), i, invalidBlockHash, streamID)
+				return ErrInvalidBlockBytes
+			}
+			block = bws.Block
+			if block != nil {
+				block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
+			}
+		} else if sigBytes != nil {
 			block.SetCurrentCommitSig(sigBytes)
 		}
 
