@@ -66,18 +66,24 @@ type Processor interface {
 // Return the block with commitSig if set.
 func RlpDecodeBlockOrBlockWithSig(payload []byte) (*types.Block, error) {
 	var block *types.Block
+	var blockErr error
 	if err := rlp.DecodeBytes(payload, &block); err == nil {
 		// received payload as *types.Block
 		return block, nil
+	} else {
+		blockErr = err
 	}
 
 	var bws BlockWithSig
+	var bwsErr error
 	if err := rlp.DecodeBytes(payload, &bws); err == nil {
 		block := bws.Block
 		block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
 		return block, nil
+	} else {
+		bwsErr = err
 	}
-	return nil, errors.New("failed to decode to either types.Block or BlockWithSig")
+	return nil, errors.Errorf("failed to decode to either types.Block or BlockWithSig: block error: %s, bws error: %s", blockErr, bwsErr)
 }
 
 // BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
