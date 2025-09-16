@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/rs/zerolog"
 )
@@ -150,27 +148,19 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			return ErrInvalidBlockBytes
 		}
 
-		var block *types.Block
-		var decodeErr error
-		// Try to decode as *types.Block first (extblock format)
-		if decodeErr = rlp.DecodeBytes(blockBytes, &block); decodeErr != nil {
-			// Fallback: try to decode as BlockWithSig format
-			var bws core.BlockWithSig
-			if decodeErr = rlp.DecodeBytes(blockBytes, &bws); decodeErr != nil {
-				stg.configs.logger.Error().
-					Uint64("block number", i).
-					Err(decodeErr).
-					Msg("block RLP decode failed")
-				s.state.protocol.StreamFailed(streamID, "invalid block is received from stream")
-				invalidBlockHash := common.Hash{}
-				reverter.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), i, invalidBlockHash, streamID)
-				return ErrInvalidBlockBytes
-			}
-			block = bws.Block
-			if block != nil {
-				block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
-			}
-		} else if sigBytes != nil {
+		block, decodeErr := core.RlpDecodeBlockOrBlockWithSig(blockBytes)
+		if decodeErr != nil {
+			stg.configs.logger.Error().
+				Uint64("block number", i).
+				Err(decodeErr).
+				Msg("block RLP decode failed")
+			s.state.protocol.StreamFailed(streamID, "invalid block is received from stream")
+			invalidBlockHash := common.Hash{}
+			reverter.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), i, invalidBlockHash, streamID)
+			return ErrInvalidBlockBytes
+		}
+		// Set signature from response if available
+		if sigBytes != nil {
 			block.SetCurrentCommitSig(sigBytes)
 		}
 

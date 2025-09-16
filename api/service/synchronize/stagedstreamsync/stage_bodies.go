@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -462,34 +461,23 @@ func (b *StageBodies) runBlockWorker(ctx context.Context,
 }
 
 func (b *StageBodies) verifyBlockAndExtractReceiptsData(batchBlockBytes [][]byte, batchSigBytes [][]byte, s *StageState) error {
-	var block *types.Block
 	for i := uint64(0); i < uint64(len(batchBlockBytes)); i++ {
 		blockBytes := batchBlockBytes[i]
 		sigBytes := batchSigBytes[i]
 		if blockBytes == nil {
 			continue
 		}
-		var err error
-		// Try to decode as *types.Block first (extblock format)
-		if err = rlp.DecodeBytes(blockBytes, &block); err != nil {
-			// Fallback: try to decode as BlockWithSig format
-			var bws core.BlockWithSig
-			if err = rlp.DecodeBytes(blockBytes, &bws); err != nil {
-				b.configs.logger.Error().
-					Uint64("block number", i).
-					Err(err).
-					Msg("block RLP decode failed")
-				return ErrInvalidBlockBytes
-			}
-			block = bws.Block
-			if block != nil {
-				block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
-			}
-		} else {
-			// Successfully decoded as *types.Block, set signature from response if available
-			if sigBytes != nil {
-				block.SetCurrentCommitSig(sigBytes)
-			}
+		block, err := core.RlpDecodeBlockOrBlockWithSig(blockBytes)
+		if err != nil {
+			b.configs.logger.Error().
+				Uint64("block number", i).
+				Err(err).
+				Msg("block RLP decode failed")
+			return ErrInvalidBlockBytes
+		}
+		// Set signature from response if available
+		if sigBytes != nil {
+			block.SetCurrentCommitSig(sigBytes)
 		}
 
 		// if block.NumberU64() != i {
