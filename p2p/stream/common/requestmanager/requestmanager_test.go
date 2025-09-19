@@ -142,8 +142,11 @@ func TestRequestManager_RemoveStream(t *testing.T) {
 		t.Errorf("unexpected error: %v", errors.New("stream removed when doing request"))
 	}
 
-	if ts.rm.streams.Length() != 2 || ts.rm.available.Length() != 2 {
-		t.Errorf("unexpected stream size")
+	if l := ts.rm.streams.Length(); l != 2 {
+		t.Errorf("unexpected stream size, expected 2, got %d", l)
+	}
+	if l := ts.rm.available.Length(); l != 2 {
+		t.Errorf("unexpected stream size, expected 2, got %d", l)
 	}
 }
 
