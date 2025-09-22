@@ -144,7 +144,7 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 	var (
 		vmenv  = NewEnv(cfg)
 		sender = vm.AccountRef(cfg.Origin)
-		rules  = cfg.ChainConfig.Rules(vmenv.Context.BlockNumber, vmenv.Context.Random != nil)
+		rules  = cfg.ChainConfig.Rules(vmenv.Context.EpochNumber)
 	)
 
 	// Execute the preparatory steps for state transition which includes:

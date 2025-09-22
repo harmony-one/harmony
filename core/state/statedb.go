@@ -1200,24 +1200,6 @@ func (s *DB) Prepare(rules params.Rules, sender common.Address, dst *common.Addr
 	s.transientStorage = newTransientStorage()
 }
 
-/*
-
-// Prepare handles the preparatory steps for executing a state transition with.
-// This method must be invoked before state transition.
-//
-// - reset transient storage (1153)
-//
-// todo(sun): berlin fork
-// - add sender to access list (2929)
-// - add destination to access list (2929)
-// - add precompiles to access list (2929)
-// - add the contents of the optional tx access list (2930)
-func (db *DB) Prepare() {
-	// reset transient storage prior to transaction execution
-	db.transientStorage = newTransientStorage()
-}
-*/
-
 // AddAddressToAccessList adds the given address to the access list
 func (db *DB) AddAddressToAccessList(addr common.Address) {
 	if db.accessList.AddAddress(addr) {
