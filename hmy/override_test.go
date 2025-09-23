@@ -24,22 +24,8 @@ import (
 // dummy version of vm.PrecompiledContract
 type dummyPrecompile struct{}
 
-func (d dummyPrecompile) IsWrite() bool {
-	return false
-}
-
-var _ vm.WriteCapablePrecompiledContract = dummyPrecompile{}
-
 func (d dummyPrecompile) Run(input []byte) ([]byte, error) { return nil, nil }
-
-// func (d dummyPrecompile) RequiredGas(input []byte) uint64  { return 0 }
-func (d dummyPrecompile) RequiredGas(evm *vm.EVM, contract *vm.Contract, input []byte) (uint64, error) {
-	return 0, nil
-}
-
-func (d dummyPrecompile) RunWriteCapable(evm *vm.EVM, contract *vm.Contract, input []byte) ([]byte, error) {
-	return nil, nil
-}
+func (d dummyPrecompile) RequiredGas(input []byte) uint64  { return 0 }
 
 func TestStateOverrides(t *testing.T) {
 	key, _ := crypto.GenerateKey()
@@ -48,12 +34,12 @@ func TestStateOverrides(t *testing.T) {
 	addr2 := common.HexToAddress("0x2222") // precompile
 	addr3 := common.HexToAddress("0x3333") // MovePreCompileTo
 
-	dummyPrecompiles := map[common.Address]vm.WriteCapablePrecompiledContract{
+	dummyPrecompiles := map[common.Address]vm.PrecompiledContract{
 		addr2: dummyPrecompile{},
 	}
 
-	reset := func(precompiles *map[common.Address]vm.WriteCapablePrecompiledContract) {
-		*precompiles = map[common.Address]vm.WriteCapablePrecompiledContract{
+	reset := func(precompiles *map[common.Address]vm.PrecompiledContract) {
+		*precompiles = map[common.Address]vm.PrecompiledContract{
 			addr2: dummyPrecompile{},
 		}
 	}
@@ -73,7 +59,7 @@ func TestStateOverrides(t *testing.T) {
 		name          string
 		expectedError error
 		overrides     StateOverrides
-		precompiles   map[common.Address]vm.WriteCapablePrecompiledContract
+		precompiles   map[common.Address]vm.PrecompiledContract
 	}{
 		{
 			name:          "ValidOverride",
@@ -187,7 +173,7 @@ func TestBlockOverrides(t *testing.T) {
 		// Difficulty, PrevRandao, BaseFeePerGas, and BlobBaseFee are no-op
 	}
 
-	ctx := &vm.BlockContext{
+	ctx := &vm.Context{
 		BlockNumber: big.NewInt(0),
 		Time:        big.NewInt(0),
 		GasLimit:    0,

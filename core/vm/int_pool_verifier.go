@@ -1,4 +1,4 @@
-// Copyright 2014 The go-ethereum Authors
+// Copyright 2017 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,17 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
+//go:build VERIFY_EVM_INTEGER_POOL
+
 package vm
 
-import "errors"
+import "fmt"
 
-// List execution errors
-var (
-	ErrOutOfGas                 = errors.New("out of gas")
-	ErrCodeStoreOutOfGas        = errors.New("contract creation code storage out of gas")
-	ErrDepth                    = errors.New("max call depth exceeded")
-	ErrTraceLimitReached        = errors.New("the number of logs reached the specified limit")
-	ErrInsufficientBalance      = errors.New("insufficient balance for transfer")
-	ErrContractAddressCollision = errors.New("contract address collision")
-	ErrNoCompatibleInterpreter  = errors.New("no compatible interpreter")
-)
+const verifyPool = true
+
+func verifyIntegerPool(ip *intPool) {
+	for i, item := range ip.pool.data {
+		if item.Cmp(checkVal) != 0 {
+			panic(fmt.Sprintf("%d'th item failed aggressive pool check. Value was modified", i))
+		}
+	}
+}

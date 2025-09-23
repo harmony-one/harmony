@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 	"strconv"
+
 	"strings"
 	"testing"
 
@@ -94,7 +95,6 @@ func initFromJson(ts *TraceBlockStorage, bytes []byte) {
 			}
 			ac.from = callAc.From
 			ac.to = callAc.To
-			ac.value = new(big.Int)
 			ac.value, _ = new(big.Int).SetString(callAc.Value[2:], 16)
 			ac.gas, _ = strconv.ParseUint(callAc.Gas, 0, 64)
 			ac.input = utils.FromHex(callAc.Input)
@@ -188,7 +188,7 @@ func TestStorage(t *testing.T) {
 			t.Error(err)
 		}
 		if !bytes.Equal(jsonRaw, testJson) {
-			t.Fatalf("restroe failed!, expected: %s, got %s", testJson, jsonRaw)
+			t.Fatal("restroe failed!")
 		}
 		block.ToDB(func(key, data []byte) {
 			for _, kv := range memDB {

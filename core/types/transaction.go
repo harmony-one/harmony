@@ -38,13 +38,6 @@ import (
 
 // no go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
 
-// Transaction types.
-const (
-	LegacyTxType = iota
-	AccessListTxType
-	DynamicFeeTxType
-)
-
 // Errors constants for Transaction.
 var (
 	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
@@ -847,13 +840,4 @@ func (s InternalTransactions) ToShardID(i int) uint32 {
 // MaxToShardID returns 0, arbitrary value, NOT use
 func (s InternalTransactions) MaxToShardID() uint32 {
 	return 0
-}
-
-// copyAddressPtr copies an address.
-func copyAddressPtr(a *common.Address) *common.Address {
-	if a == nil {
-		return nil
-	}
-	cpy := *a
-	return &cpy
 }
