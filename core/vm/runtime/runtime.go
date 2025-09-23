@@ -171,14 +171,16 @@ func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, er
 	setDefaults(cfg)
 
 	var (
-		vmenv  = NewEnv(cfg)
-		sender = cfg.State.GetOrNewStateObject(cfg.Origin)
-		rules  = cfg.ChainConfig.Rules(vmenv.Context.EpochNumber)
+		vmenv   = NewEnv(cfg)
+		sender  = cfg.State.GetOrNewStateObject(cfg.Origin)
+		statedb = cfg.State
+		rules   = cfg.ChainConfig.Rules(vmenv.Context.EpochNumber)
 	)
 
 	// Execute the preparatory steps for state transition which includes:
+	// - prepare accessList(post-berlin)
 	// - reset transient storage(eip 1153)
-	// vmenv.StateDB.Prepare() eip 1153
+	statedb.Prepare(rules, cfg.Origin, &address, vm.ActivePrecompiles(rules), nil)
 
 	// Call the code with the given configuration.
 	ret, leftOverGas, err := vmenv.Call(
