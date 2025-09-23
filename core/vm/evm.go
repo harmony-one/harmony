@@ -69,12 +69,17 @@ type (
 // ActivePrecompiles returns the addresses of the precompiles enabled with the current
 // configuration
 func (evm *EVM) ActivePrecompiles() []common.Address {
+	return ActivePrecompiles(evm.chainRules)
+}
+
+// ActivePrecompiles returns the precompiles enabled with the current configuration.
+func ActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
-	case evm.chainRules.IsYoloV2:
+	case rules.IsYoloV2:
 		return PrecompiledAddressesYoloV2
-	case evm.chainRules.IsIstanbul:
+	case rules.IsIstanbul:
 		return PrecompiledAddressesIstanbul
-	case evm.chainRules.IsByzantium:
+	case rules.IsByzantium:
 		return PrecompiledAddressesByzantium
 	default:
 		return PrecompiledAddressesHomestead
