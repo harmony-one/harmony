@@ -109,7 +109,7 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 		address = common.BytesToAddress([]byte("contract"))
 		vmenv   = NewEnv(cfg)
 		sender  = vm.AccountRef(cfg.Origin)
-		rules   = cfg.ChainConfig.Rules(vmenv.Context.EpochNumber, vmenv.Context.Random != nil)
+		rules   = cfg.ChainConfig.Rules(vmenv.Context.EpochNumber)
 	)
 	// Execute the preparatory steps for state transition which includes:
 	// - prepare accessList(post-berlin)
@@ -173,7 +173,7 @@ func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, er
 	var (
 		vmenv  = NewEnv(cfg)
 		sender = cfg.State.GetOrNewStateObject(cfg.Origin)
-		rules  = cfg.ChainConfig.Rules(vmenv.Context.EpochNumber, vmenv.Context.Random != nil)
+		rules  = cfg.ChainConfig.Rules(vmenv.Context.EpochNumber)
 	)
 
 	// Execute the preparatory steps for state transition which includes:
