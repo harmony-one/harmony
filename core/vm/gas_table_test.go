@@ -41,8 +41,8 @@ func TestMemoryGasCost(t *testing.T) {
 	}
 	for i, tt := range tests {
 		v, err := memoryGasCost(&Memory{}, tt.size)
-		if (err == errGasUintOverflow) != tt.overflow {
-			t.Errorf("test %d: overflow mismatch: have %v, want %v", i, err == errGasUintOverflow, tt.overflow)
+		if (err == ErrGasUintOverflow) != tt.overflow {
+			t.Errorf("test %d: overflow mismatch: have %v, want %v", i, err == ErrGasUintOverflow, tt.overflow)
 		}
 		if v != tt.cost {
 			t.Errorf("test %d: gas cost mismatch: have %v, want %v", i, v, tt.cost)
@@ -89,12 +89,12 @@ func TestEIP2200(t *testing.T) {
 		statedb.SetState(address, common.Hash{}, common.BytesToHash([]byte{tt.original}))
 		statedb.Finalise(true) // Push the state into the "original" slot
 
-		vmctx := Context{
+		vmctx := BlockContext{
 			CanTransfer: func(StateDB, common.Address, *big.Int) bool { return true },
 			Transfer:    func(StateDB, common.Address, common.Address, *big.Int, types.TransactionType) {},
 			IsValidator: func(StateDB, common.Address) bool { return false },
 		}
-		vmenv := NewEVM(vmctx, statedb, params.AllProtocolChanges, Config{ExtraEips: []int{2200}})
+		vmenv := NewEVM(vmctx, TxContext{}, statedb, params.AllProtocolChanges, Config{ExtraEips: []int{2200}})
 
 		_, gas, err := vmenv.Call(AccountRef(common.Address{}), address, nil, tt.gaspool, new(big.Int))
 		if err != tt.failure {

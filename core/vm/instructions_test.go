@@ -20,16 +20,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math/big"
+	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/holiman/uint256"
 )
 
 type TwoOperandTestcase struct {
@@ -93,49 +91,29 @@ func init() {
 }
 
 func testTwoOperandOp(t *testing.T, tests []TwoOperandTestcase, opFn executionFunc, name string) {
-
 	var (
-		env            = NewEVM(Context{}, nil, params.TestChainConfig, Config{})
+		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
 		pc             = uint64(0)
-		evmInterpreter = env.interpreter.(*EVMInterpreter)
+		evmInterpreter = env.interpreter
 	)
-	// Stuff a couple of nonzero bigints into pool, to ensure that ops do not rely on pooled integers to be zero
-	evmInterpreter.intPool = poolOfIntPools.get()
-	evmInterpreter.intPool.put(big.NewInt(-1337))
-	evmInterpreter.intPool.put(big.NewInt(-1337))
-	evmInterpreter.intPool.put(big.NewInt(-1337))
 
 	for i, test := range tests {
-		x := new(big.Int).SetBytes(common.Hex2Bytes(test.X))
-		y := new(big.Int).SetBytes(common.Hex2Bytes(test.Y))
-		expected := new(big.Int).SetBytes(common.Hex2Bytes(test.Expected))
+		x := new(uint256.Int).SetBytes(common.Hex2Bytes(test.X))
+		y := new(uint256.Int).SetBytes(common.Hex2Bytes(test.Y))
+		expected := new(uint256.Int).SetBytes(common.Hex2Bytes(test.Expected))
 		stack.push(x)
 		stack.push(y)
-		opFn(&pc, evmInterpreter, nil, nil, stack)
+		opFn(&pc, evmInterpreter, &ScopeContext{nil, stack, nil})
+		if len(stack.data) != 1 {
+			t.Errorf("Expected one item on stack after %v, got %d: ", name, len(stack.data))
+		}
 		actual := stack.pop()
 
 		if actual.Cmp(expected) != 0 {
 			t.Errorf("Testcase %v %d, %v(%x, %x): expected  %x, got %x", name, i, name, x, y, expected, actual)
 		}
-		// Check pool usage
-		// 1.pool is not allowed to contain anything on the stack
-		// 2.pool is not allowed to contain the same pointers twice
-		if evmInterpreter.intPool.pool.len() > 0 {
-
-			poolvals := make(map[*big.Int]struct{})
-			poolvals[actual] = struct{}{}
-
-			for evmInterpreter.intPool.pool.len() > 0 {
-				key := evmInterpreter.intPool.get()
-				if _, exist := poolvals[key]; exist {
-					t.Errorf("Testcase %v %d, pool contains double-entry", name, i)
-				}
-				poolvals[key] = struct{}{}
-			}
-		}
 	}
-	poolOfIntPools.put(evmInterpreter.intPool)
 }
 
 func TestByteOp(t *testing.T) {
@@ -211,32 +189,69 @@ func TestSAR(t *testing.T) {
 	testTwoOperandOp(t, tests, opSAR, "sar")
 }
 
-// getResult is a convenience function to generate the expected values
-func getResult(args []*twoOperandParams, opFn executionFunc) []TwoOperandTestcase {
+func TestAddMod(t *testing.T) {
 	var (
-		env         = NewEVM(Context{}, nil, params.TestChainConfig, Config{})
-		stack       = newstack()
-		pc          = uint64(0)
-		interpreter = env.interpreter.(*EVMInterpreter)
+		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
+		stack          = newstack()
+		evmInterpreter = NewEVMInterpreter(env, env.Config)
+		pc             = uint64(0)
 	)
-	interpreter.intPool = poolOfIntPools.get()
-	result := make([]TwoOperandTestcase, len(args))
-	for i, param := range args {
-		x := new(big.Int).SetBytes(common.Hex2Bytes(param.x))
-		y := new(big.Int).SetBytes(common.Hex2Bytes(param.y))
-		stack.push(x)
-		stack.push(y)
-		opFn(&pc, interpreter, nil, nil, stack)
-		actual := stack.pop()
-		result[i] = TwoOperandTestcase{param.x, param.y, fmt.Sprintf("%064x", actual)}
+	tests := []struct {
+		x        string
+		y        string
+		z        string
+		expected string
+	}{
+		{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe",
+			"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe",
+		},
 	}
-	return result
+	// x + y = 0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd
+	// in 256 bit repr, fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd
+
+	for i, test := range tests {
+		x := new(uint256.Int).SetBytes(common.Hex2Bytes(test.x))
+		y := new(uint256.Int).SetBytes(common.Hex2Bytes(test.y))
+		z := new(uint256.Int).SetBytes(common.Hex2Bytes(test.z))
+		expected := new(uint256.Int).SetBytes(common.Hex2Bytes(test.expected))
+		stack.push(z)
+		stack.push(y)
+		stack.push(x)
+		opAddmod(&pc, evmInterpreter, &ScopeContext{nil, stack, nil})
+		actual := stack.pop()
+		if actual.Cmp(expected) != 0 {
+			t.Errorf("Testcase %d, expected  %x, got %x", i, expected, actual)
+		}
+	}
 }
 
 // utility function to fill the json-file with testcases
 // Enable this test to generate the 'testcases_xx.json' files
 func TestWriteExpectedValues(t *testing.T) {
 	t.Skip("Enable this test to create json test cases.")
+
+	// getResult is a convenience function to generate the expected values
+	getResult := func(args []*twoOperandParams, opFn executionFunc) []TwoOperandTestcase {
+		var (
+			env         = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
+			stack       = newstack()
+			pc          = uint64(0)
+			interpreter = env.interpreter
+		)
+		result := make([]TwoOperandTestcase, len(args))
+		for i, param := range args {
+			x := new(uint256.Int).SetBytes(common.Hex2Bytes(param.x))
+			y := new(uint256.Int).SetBytes(common.Hex2Bytes(param.y))
+			stack.push(x)
+			stack.push(y)
+			opFn(&pc, interpreter, &ScopeContext{nil, stack, nil})
+			actual := stack.pop()
+			result[i] = TwoOperandTestcase{param.x, param.y, fmt.Sprintf("%064x", actual)}
+		}
+		return result
+	}
 
 	for name, method := range twoOpMethods {
 		data, err := json.Marshal(getResult(commonParams, method))
@@ -253,7 +268,7 @@ func TestWriteExpectedValues(t *testing.T) {
 // TestJsonTestcases runs through all the testcases defined as json-files
 func TestJsonTestcases(t *testing.T) {
 	for name := range twoOpMethods {
-		data, err := os.ReadFile(fmt.Sprintf("testdata/testcases_%v.json", name))
+		data, err := ioutil.ReadFile(fmt.Sprintf("testdata/testcases_%v.json", name))
 		if err != nil {
 			t.Fatal("Failed to read file", err)
 		}
@@ -263,31 +278,37 @@ func TestJsonTestcases(t *testing.T) {
 	}
 }
 
-func opBenchmark(bench *testing.B, op func(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error), args ...string) {
+func opBenchmark(bench *testing.B, op executionFunc, args ...string) {
 	var (
-		env            = NewEVM(Context{}, nil, params.TestChainConfig, Config{})
+		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
-		evmInterpreter = NewEVMInterpreter(env, env.vmConfig)
+		scope          = &ScopeContext{nil, stack, nil}
+		evmInterpreter = NewEVMInterpreter(env, env.Config)
 	)
 
 	env.interpreter = evmInterpreter
-	evmInterpreter.intPool = poolOfIntPools.get()
 	// convert args
-	byteArgs := make([][]byte, len(args))
+	intArgs := make([]*uint256.Int, len(args))
 	for i, arg := range args {
-		byteArgs[i] = common.Hex2Bytes(arg)
+		intArgs[i] = new(uint256.Int).SetBytes(common.Hex2Bytes(arg))
 	}
 	pc := uint64(0)
 	bench.ResetTimer()
 	for i := 0; i < bench.N; i++ {
-		for _, arg := range byteArgs {
-			a := new(big.Int).SetBytes(arg)
-			stack.push(a)
+		for _, arg := range intArgs {
+			stack.push(arg)
 		}
-		op(&pc, evmInterpreter, nil, nil, stack)
+		op(&pc, evmInterpreter, scope)
 		stack.pop()
 	}
-	poolOfIntPools.put(evmInterpreter.intPool)
+	bench.StopTimer()
+
+	for i, arg := range args {
+		want := new(uint256.Int).SetBytes(common.Hex2Bytes(arg))
+		if have := intArgs[i]; !want.Eq(have) {
+			bench.Fatalf("input #%d mutated, have %x want %x", i, have, want)
+		}
+	}
 }
 
 func BenchmarkOpAdd64(b *testing.B) {
@@ -500,73 +521,72 @@ func BenchmarkOpIsZero(b *testing.B) {
 
 func TestOpMstore(t *testing.T) {
 	var (
-		env            = NewEVM(Context{}, nil, params.TestChainConfig, Config{})
+		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
 		mem            = NewMemory()
-		evmInterpreter = NewEVMInterpreter(env, env.vmConfig)
+		evmInterpreter = NewEVMInterpreter(env, env.Config)
 	)
 
 	env.interpreter = evmInterpreter
-	evmInterpreter.intPool = poolOfIntPools.get()
 	mem.Resize(64)
 	pc := uint64(0)
 	v := "abcdef00000000000000abba000000000deaf000000c0de00100000000133700"
-	stack.pushN(new(big.Int).SetBytes(common.Hex2Bytes(v)), big.NewInt(0))
-	opMstore(&pc, evmInterpreter, nil, mem, stack)
+	stack.push(new(uint256.Int).SetBytes(common.Hex2Bytes(v)))
+	stack.push(new(uint256.Int))
+	opMstore(&pc, evmInterpreter, &ScopeContext{mem, stack, nil})
 	if got := common.Bytes2Hex(mem.GetCopy(0, 32)); got != v {
 		t.Fatalf("Mstore fail, got %v, expected %v", got, v)
 	}
-	stack.pushN(big.NewInt(0x1), big.NewInt(0))
-	opMstore(&pc, evmInterpreter, nil, mem, stack)
+	stack.push(new(uint256.Int).SetUint64(0x1))
+	stack.push(new(uint256.Int))
+	opMstore(&pc, evmInterpreter, &ScopeContext{mem, stack, nil})
 	if common.Bytes2Hex(mem.GetCopy(0, 32)) != "0000000000000000000000000000000000000000000000000000000000000001" {
 		t.Fatalf("Mstore failed to overwrite previous value")
 	}
-	poolOfIntPools.put(evmInterpreter.intPool)
 }
 
 func BenchmarkOpMstore(bench *testing.B) {
 	var (
-		env            = NewEVM(Context{}, nil, params.TestChainConfig, Config{})
+		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
 		mem            = NewMemory()
-		evmInterpreter = NewEVMInterpreter(env, env.vmConfig)
+		evmInterpreter = NewEVMInterpreter(env, env.Config)
 	)
 
 	env.interpreter = evmInterpreter
-	evmInterpreter.intPool = poolOfIntPools.get()
 	mem.Resize(64)
 	pc := uint64(0)
-	memStart := big.NewInt(0)
-	value := big.NewInt(0x1337)
+	memStart := new(uint256.Int)
+	value := new(uint256.Int).SetUint64(0x1337)
 
 	bench.ResetTimer()
 	for i := 0; i < bench.N; i++ {
-		stack.pushN(value, memStart)
-		opMstore(&pc, evmInterpreter, nil, mem, stack)
+		stack.push(value)
+		stack.push(memStart)
+		opMstore(&pc, evmInterpreter, &ScopeContext{mem, stack, nil})
 	}
-	poolOfIntPools.put(evmInterpreter.intPool)
 }
 
+/*
 func BenchmarkOpSHA3(bench *testing.B) {
 	var (
-		env            = NewEVM(Context{}, nil, params.TestChainConfig, Config{})
-		stack          = newstack()
+		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
+		stack, rstack  = newstack(), newReturnStack()
 		mem            = NewMemory()
-		evmInterpreter = NewEVMInterpreter(env, env.vmConfig)
+		evmInterpreter = NewEVMInterpreter(env, env.Config)
 	)
 	env.interpreter = evmInterpreter
-	evmInterpreter.intPool = poolOfIntPools.get()
 	mem.Resize(32)
 	pc := uint64(0)
-	start := big.NewInt(0)
+	start := uint256.NewInt(0)
 
 	bench.ResetTimer()
 	for i := 0; i < bench.N; i++ {
-		stack.pushN(big.NewInt(32), start)
-		opSha3(&pc, evmInterpreter, nil, mem, stack)
+		stack.pushN(*uint256.NewInt(0).SetUint64(32), *start)
+		opSha3(&pc, evmInterpreter, &ScopeContext{mem, stack, rstack, nil})
 	}
-	poolOfIntPools.put(evmInterpreter.intPool)
 }
+*/
 
 func TestCreate2Addreses(t *testing.T) {
 	type testcase struct {
@@ -639,52 +659,5 @@ func TestCreate2Addreses(t *testing.T) {
 		if !bytes.Equal(expected.Bytes(), address.Bytes()) {
 			t.Errorf("test %d: expected %s, got %s", i, expected.String(), address.String())
 		}
-
-	}
-}
-
-func TestOpTstoreAndTload(t *testing.T) {
-	// initialize context, evm, statedb, etc.
-	var (
-		stateDB, _     = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-		env            = NewEVM(Context{}, stateDB, params.TestChainConfig, Config{})
-		stack          = newstack()
-		memory         = NewMemory()
-		evmInterpreter = NewEVMInterpreter(env, env.vmConfig)
-		caller         = common.Address{}
-		to             = common.Address{1}
-		contractRef    = vm.AccountRef(caller)
-		contract       = NewContract(contractRef, vm.AccountRef(to), new(big.Int), 0)
-		value          = common.Hex2Bytes("12345")
-	)
-
-	stateDB.CreateAccount(caller)
-	stateDB.CreateAccount(to)
-	env.interpreter = evmInterpreter
-	pc := uint64(0)
-
-	// push to value then location to the stack
-	stack.push(new(big.Int).SetBytes(value))
-	stack.push(new(big.Int))
-
-	// call tstore and ensure stack length is 0
-	opTstore(&pc, evmInterpreter, contract, memory, stack)
-	if stack.len() != 0 {
-		t.Fatal("stack should be empty")
-	}
-
-	// push location to the stack
-	stack.push(new(big.Int))
-
-	// call tload and ensure stack length is 1
-	opTload(&pc, evmInterpreter, contract, memory, stack)
-	if stack.len() != 1 {
-		t.Fatal("stack should have a single element")
-	}
-
-	// ensure the value read is same as the original value
-	val := stack.peek()
-	if !bytes.Equal(value, val.Bytes()) {
-		t.Fatalf("wrong value loaded to the stack")
 	}
 }

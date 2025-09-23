@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/holiman/uint256"
 	duktape "gopkg.in/olebedev/go-duktape.v3"
 )
 
@@ -61,6 +62,12 @@ func popSlice(ctx *duktape.Context) []byte {
 
 // pushBigInt create a JavaScript BigInteger in the VM.
 func pushBigInt(n *big.Int, ctx *duktape.Context) {
+	ctx.GetGlobalString("bigInt")
+	ctx.PushString(n.String())
+	ctx.Call(1)
+}
+
+func pushBigIntUint256(n *uint256.Int, ctx *duktape.Context) {
 	ctx.GetGlobalString("bigInt")
 	ctx.PushString(n.String())
 	ctx.Call(1)
@@ -155,14 +162,15 @@ type stackWrapper struct {
 }
 
 // peek returns the nth-from-the-top element of the stack.
-func (sw *stackWrapper) peek(idx int) *big.Int {
+func (sw *stackWrapper) peek(idx int) *uint256.Int {
 	if len(sw.stack.Data()) <= idx || idx < 0 {
 		// TODO(karalabe): We can't js-throw from Go inside duktape inside Go. The Go
 		// runtime goes belly up https://github.com/golang/go/issues/15639.
 		log.Warn("Tracer accessed out of bound stack", "size", len(sw.stack.Data()), "index", idx)
-		return new(big.Int)
+		return uint256.NewInt(0)
 	}
-	return sw.stack.Data()[len(sw.stack.Data())-idx-1]
+	out := sw.stack.Data()[len(sw.stack.Data())-idx-1]
+	return &out
 }
 
 // pushObject assembles a JSVM object wrapping a swappable stack and pushes it
@@ -178,7 +186,7 @@ func (sw *stackWrapper) pushObject(vm *duktape.Context) {
 		offset := ctx.GetInt(-1)
 		ctx.Pop()
 
-		pushBigInt(sw.peek(offset), ctx)
+		pushBigIntUint256(sw.peek(offset), ctx)
 		return 1
 	})
 	vm.PutPropString(obj, "peek")
@@ -311,6 +319,12 @@ type Tracer struct {
 
 	interrupt uint32 // Atomic flag to signal execution interruption
 	reason    error  // Textual reason for the interruption
+}
+
+func (jst *Tracer) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
+}
+
+func (jst *Tracer) CaptureExit(output []byte, gasUsed uint64, err error) {
 }
 
 // New instantiates a new tracer instance. code specifies a Javascript snippet,
@@ -547,7 +561,7 @@ func (jst *Tracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost 
 	if jst.err == nil {
 		// Initialize the context if it wasn't done yet
 		if !jst.inited {
-			jst.ctx["block"] = env.BlockNumber.Uint64()
+			jst.ctx["block"] = env.Context.BlockNumber.Uint64()
 			jst.inited = true
 		}
 		// If tracing was interrupted, set the error and stop

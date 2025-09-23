@@ -240,8 +240,8 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 // GetEVM returns a new EVM entity
 func (hmy *Harmony) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *block.Header) (*vm.EVM, error) {
 	state.SetBalance(msg.From(), math.MaxBig256)
-	vmCtx := core.NewEVMContext(msg, header, hmy.BlockChain, nil)
-	return vm.NewEVM(vmCtx, state, hmy.BlockChain.Config(), *hmy.BlockChain.GetVMConfig()), nil
+	vmCtx := core.NewEVMBlockContext(msg, header, hmy.BlockChain, nil)
+	return vm.NewEVM(vmCtx, core.NewEVMTxContext(msg), state, hmy.BlockChain.Config(), *hmy.BlockChain.GetVMConfig()), nil
 }
 
 // ChainDb ..
