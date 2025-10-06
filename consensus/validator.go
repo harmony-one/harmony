@@ -216,12 +216,12 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 
 	// check validity of prepared signature
 	blockHash := recvMsg.BlockHash
-	aggSig, mask, err := readSignatureBitmapPayload(recvMsg.Payload, 0, consensus.decider.Participants())
+	aggSig, mask, err := readSignatureBitmapPayload(recvMsg.Payload, 0, consensus.decider().Participants())
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!")
 		return
 	}
-	if !consensus.decider.IsQuorumAchievedByMask(mask) {
+	if !consensus.decider().IsQuorumAchievedByMask(mask) {
 		consensus.getLogger().Warn().Msgf("[OnPrepared] Quorum Not achieved.")
 		return
 	}
@@ -352,7 +352,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 		return
 	}
 
-	aggSig, mask, err := chain.DecodeSigBitmap(sigBytes, bitmap, consensus.decider.Participants())
+	aggSig, mask, err := chain.DecodeSigBitmap(sigBytes, bitmap, consensus.decider().Participants())
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
 		return

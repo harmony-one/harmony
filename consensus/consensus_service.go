@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -75,7 +76,7 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 }
 
 func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
-	consensus.decider.UpdateParticipants(pubKeys, allowlist)
+	consensus.decider().UpdateParticipants(pubKeys, allowlist)
 	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
 		consensus.getLogger().Info().
@@ -84,7 +85,7 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 			Msg("Member")
 	}
 
-	allKeys := consensus.decider.Participants()
+	allKeys := consensus.decider().Participants()
 	if len(allKeys) != 0 {
 		consensus.setLeaderPubKey(&allKeys[0])
 		consensus.getLogger().Info().
@@ -108,7 +109,7 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	if !consensus.isViewChangingMode() {
 		consensus.resetViewChangeState()
 	}
-	return consensus.decider.ParticipantsCount()
+	return consensus.decider().ParticipantsCount()
 }
 
 // Sign on the hash of the message
@@ -136,7 +137,7 @@ func signConsensusMessage(message *msg_pb.Message,
 func (consensus *Consensus) updateBitmaps() {
 	consensus.getLogger().Debug().
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
-	members := consensus.decider.Participants()
+	members := consensus.decider().Participants()
 	prepareBitmap := bls_cosi.NewMask(members)
 	commitBitmap := bls_cosi.NewMask(members)
 	multiSigBitmap := bls_cosi.NewMask(members)
@@ -153,9 +154,9 @@ func (consensus *Consensus) sendLastSignPower() {
 			consensus.getLogger().Err(err).Msg("Leader not found in the committee")
 			return
 		}
-		comm := getOrZero(consensus.decider.CurrentTotalPower(quorum.Commit))
-		prep := getOrZero(consensus.decider.CurrentTotalPower(quorum.Prepare))
-		view := consensus.decider.ComputeTotalPowerByMask(consensus.vc.GetViewIDBitmap(consensus.current.viewChangingID)).Int64()
+		comm := getOrZero(consensus.decider().CurrentTotalPower(quorum.Commit))
+		prep := getOrZero(consensus.decider().CurrentTotalPower(quorum.Prepare))
+		view := consensus.decider().ComputeTotalPowerByMask(consensus.vc.GetViewIDBitmap(consensus.current.viewChangingID)).Int64()
 		for view > 100 {
 			view /= 10
 		}
@@ -199,7 +200,7 @@ func (consensus *Consensus) resetState() {
 
 	consensus.current.blockHash = [32]byte{}
 	consensus.current.block = []byte{}
-	consensus.decider.ResetPrepareAndCommitVotes()
+	consensus.decider().ResetPrepareAndCommitVotes()
 	if consensus.prepareBitmap != nil {
 		consensus.prepareBitmap.Clear()
 	}
@@ -216,7 +217,7 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 }
 
 func (consensus *Consensus) isValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
-	return consensus.decider.IndexOf(pubKey) != -1
+	return consensus.decider().IndexOf(pubKey) != -1
 }
 
 // SetMode sets the mode of consensus
@@ -304,7 +305,7 @@ func (consensus *Consensus) setBlockNum(blockNum uint64) {
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
 func (consensus *Consensus) ReadSignatureBitmapPayload(recvPayload []byte, offset int) (*bls_core.Sign, *bls_cosi.Mask, error) {
 	consensus.mutex.RLock()
-	members := consensus.decider.Participants()
+	members := consensus.decider().Participants()
 	consensus.mutex.RUnlock()
 	return readSignatureBitmapPayload(recvPayload, offset, members)
 }
@@ -370,12 +371,12 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 	isFirstTimeStaking := consensus.Blockchain().Config().IsStaking(nextEpoch) &&
 		curHeader.IsLastBlockInEpoch() && !consensus.Blockchain().Config().IsStaking(curEpoch)
 	haventUpdatedDecider := consensus.Blockchain().Config().IsStaking(curEpoch) &&
-		consensus.decider.Policy() != quorum.SuperMajorityStake
+		consensus.decider().Policy() != quorum.SuperMajorityStake
 
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
-		consensus.decider = decider
+		decider := quorum.NewThreadSafeDecider(quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID), &sync.RWMutex{})
+		consensus.registry.SetQuorum(decider)
 	}
 
 	var committeeToSet *shard.Committee
@@ -448,7 +449,7 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 	consensus.updatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(nextEpoch).ExternalAllowlist())
 
 	// Update voters in the committee
-	if _, err := consensus.decider.SetVoters(
+	if _, err := consensus.decider().SetVoters(
 		committeeToSet, epochToSet,
 	); err != nil {
 		consensus.getLogger().Error().
@@ -619,7 +620,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 		return errGetPreparedBlock
 	}
 
-	aggSig, mask, err := readSignatureBitmapPayload(payload, 32, consensus.decider.Participants())
+	aggSig, mask, err := readSignatureBitmapPayload(payload, 32, consensus.decider().Participants())
 	if err != nil {
 		return errReadBitmapPayload
 	}
@@ -643,7 +644,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 			continue
 		}
 
-		if _, err := consensus.decider.AddNewVote(
+		if _, err := consensus.decider().AddNewVote(
 			quorum.Commit,
 			[]*bls_cosi.PublicKeyWrapper{key.Pub},
 			key.Pri.SignHash(commitPayload),
@@ -665,7 +666,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 // Method is thread safe.
 func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uint32 {
 	count := uint32(0)
-	members := consensus.decider.Participants()
+	members := consensus.decider().Participants()
 	pubKeys := consensus.getPublicKeys()
 
 	// TODO(audit): do not reconstruct the Mask

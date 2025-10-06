@@ -1708,6 +1708,8 @@ func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (i
 }
 
 func (bc *BlockChainImpl) LeaderRotationMeta() LeaderRotationMeta {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 	return bc.leaderRotationMeta.Clone()
 }
 

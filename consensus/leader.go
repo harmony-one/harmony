@@ -62,7 +62,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 			continue
 		}
 
-		if _, err := consensus.decider.AddNewVote(
+		if _, err := consensus.decider().AddNewVote(
 			quorum.Prepare,
 			[]*bls.PublicKeyWrapper{key.Pub},
 			key.Pri.SignHash(consensus.current.blockHash[:]),
@@ -100,7 +100,7 @@ func (consensus *Consensus) checkFirstReceivedSignature(signerCount int64, phase
 		for _, key := range consensus.priKey {
 			myPubkeys = append(myPubkeys, key.Pub.Bytes)
 		}
-		mySignsCount := consensus.decider.GetBallotsCount(phase, myPubkeys)
+		mySignsCount := consensus.decider().GetBallotsCount(phase, myPubkeys)
 		return true, signerCount == mySignsCount
 	}
 	return false, false
@@ -125,7 +125,7 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	prepareBitmap := consensus.prepareBitmap
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
-		signed := consensus.decider.ReadBallot(quorum.Prepare, signer.Bytes)
+		signed := consensus.decider().ReadBallot(quorum.Prepare, signer.Bytes)
 		if signed != nil {
 			consensus.getLogger().Debug().
 				Str("validatorPubKey", signer.Bytes.Hex()).
@@ -134,13 +134,13 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 		}
 	}
 
-	signerCount := consensus.decider.SignersCount(quorum.Prepare)
+	signerCount := consensus.decider().SignersCount(quorum.Prepare)
 
 	// check if it is first received signatures
 	// it may multi bls key validators can achieve quorum on first signature
 	hasMultiBlsKeys, isFirstReceivedSignature := consensus.checkFirstReceivedSignature(signerCount, quorum.Prepare)
 
-	quorumPreExisting := consensus.decider.IsQuorumAchieved(quorum.Prepare)
+	quorumPreExisting := consensus.decider().IsQuorumAchieved(quorum.Prepare)
 	//// Read - End
 
 	if quorumPreExisting {
@@ -183,11 +183,11 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 
 	consensus.getLogger().Debug().
 		Int64("NumReceivedSoFar", signerCount).
-		Int64("PublicKeys", consensus.decider.ParticipantsCount()).
+		Int64("PublicKeys", consensus.decider().ParticipantsCount()).
 		Msg("[OnPrepare] Received New Prepare Signature")
 
 	//// Write - Start
-	if _, err := consensus.decider.AddNewVote(
+	if _, err := consensus.decider().AddNewVote(
 		quorum.Prepare, recvMsg.SenderPubkeys,
 		&sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
@@ -204,7 +204,7 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 
 	//// Read - Start
 	quorumFromInitialSignature := hasMultiBlsKeys && isFirstReceivedSignature && quorumPreExisting
-	quorumPostNewSignatures := consensus.decider.IsQuorumAchieved(quorum.Prepare)
+	quorumPostNewSignatures := consensus.decider().IsQuorumAchieved(quorum.Prepare)
 	quorumFromNewSignatures := !quorumPreExisting && quorumPostNewSignatures
 
 	if quorumFromInitialSignature || quorumFromNewSignatures {
@@ -225,7 +225,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	}
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
-		signed := consensus.decider.ReadBallot(quorum.Commit, signer.Bytes)
+		signed := consensus.decider().ReadBallot(quorum.Commit, signer.Bytes)
 		if signed != nil {
 			consensus.getLogger().Debug().
 				Str("validatorPubKey", signer.Bytes.Hex()).
@@ -237,9 +237,9 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	commitBitmap := consensus.commitBitmap
 
 	// has to be called before verifying signature
-	quorumWasMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
+	quorumWasMet := consensus.decider().IsQuorumAchieved(quorum.Commit)
 
-	signerCount := consensus.decider.SignersCount(quorum.Commit)
+	signerCount := consensus.decider().SignersCount(quorum.Commit)
 
 	// check if it is first received commit
 	// it may multi bls key validators can achieve quorum on first commit
@@ -298,7 +298,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			return
 		}
 	*/
-	if _, err := consensus.decider.AddNewVote(
+	if _, err := consensus.decider().AddNewVote(
 		quorum.Commit, recvMsg.SenderPubkeys,
 		&sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
@@ -316,7 +316,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	//// Read - Start
 	viewID := consensus.getCurBlockViewID()
 
-	quorumIsMet := consensus.decider.IsQuorumAchieved(quorum.Commit)
+	quorumIsMet := consensus.decider().IsQuorumAchieved(quorum.Commit)
 	//// Read - End
 
 	quorumAchievedByFirstCommit := hasMultiBlsKeys && isFirstReceivedSignature && quorumWasMet

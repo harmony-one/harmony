@@ -56,7 +56,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			continue
 		}
 
-		if _, err := consensus.decider.AddNewVote(
+		if _, err := consensus.decider().AddNewVote(
 			quorum.Commit,
 			[]*bls.PublicKeyWrapper{key.Pub},
 			key.Pri.SignHash(commitPayload),
