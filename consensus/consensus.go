@@ -61,7 +61,6 @@ type DownloadAsync interface {
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	decider quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	fBFTLog *FBFTLog
 	// current indicates what state a node is in
@@ -147,6 +146,10 @@ func (consensus *Consensus) Blockchain() core.BlockChain {
 	return consensus.registry.GetBlockchain()
 }
 
+func (consensus *Consensus) decider() quorum.Decider {
+	return consensus.registry.GetQuorum()
+}
+
 func (consensus *Consensus) FBFTLog() FBFT {
 	return threadsafeFBFTLog{
 		log: consensus.fBFTLog,
@@ -217,7 +220,7 @@ func (consensus *Consensus) BlocksNotSynchronized(reason string) {
 func (consensus *Consensus) VdfSeedSize() int {
 	consensus.mutex.RLock()
 	defer consensus.mutex.RUnlock()
-	return int(consensus.decider.ParticipantsCount()) * 2 / 3
+	return int(consensus.decider().ParticipantsCount()) * 2 / 3
 }
 
 // GetPublicKeys returns the public keys
@@ -285,11 +288,11 @@ func New(
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
 	consensus := Consensus{
-		mutex:        &sync.RWMutex{},
-		ShardID:      shard,
-		fBFTLog:      NewFBFTLog(),
-		current:      NewState(Normal, shard),
-		decider:      Decider,
+		mutex:   &sync.RWMutex{},
+		ShardID: shard,
+		fBFTLog: NewFBFTLog(),
+		current: NewState(Normal, shard),
+		//decider:      Decider,
 		registry:     registry,
 		MinPeers:     minPeers,
 		AggregateSig: aggregateSig,
@@ -300,6 +303,7 @@ func New(
 		dHelper:           downloadAsync{},
 		pendingCXReceipts: make(map[utils.CXKey]*types.CXReceiptsProof), // All the receipts received but not yet processed for Consensus
 	}
+	registry.SetQuorum(Decider)
 
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey
@@ -338,7 +342,7 @@ func (consensus *Consensus) Registry() *registry.Registry {
 }
 
 func (consensus *Consensus) Decider() quorum.Decider {
-	return quorum.NewThreadSafeDecider(consensus.decider, consensus.mutex)
+	return consensus.registry.GetQuorum()
 }
 
 // InitConsensusWithValidators initialize shard state

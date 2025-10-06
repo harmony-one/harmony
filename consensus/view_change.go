@@ -246,7 +246,7 @@ func (consensus *Consensus) startViewChange() {
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
 	consensus.setLeaderPubKey(
-		consensus.current.getNextLeaderKey(consensus.Blockchain(), consensus.decider, nextViewID, committee))
+		consensus.current.getNextLeaderKey(consensus.Blockchain(), consensus.decider(), nextViewID, committee))
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).
@@ -260,7 +260,7 @@ func (consensus *Consensus) startViewChange() {
 	defer consensus.consensusTimeout[timeoutViewChange].Start("start view change")
 
 	// update the dictionary key if the viewID is first time received
-	members := consensus.decider.Participants()
+	members := consensus.decider().Participants()
 	consensus.vc.AddViewIDKeyIfNotExist(nextViewID, members)
 
 	// init my own payload
@@ -365,10 +365,10 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 		return
 	}
 
-	if consensus.decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
+	if consensus.decider().IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
 		consensus.getLogger().Info().
-			Int64("have", consensus.decider.SignersCount(quorum.ViewChange)).
-			Int64("need", consensus.decider.TwoThirdsSignersCount()).
+			Int64("have", consensus.decider().SignersCount(quorum.ViewChange)).
+			Int64("need", consensus.decider().TwoThirdsSignersCount()).
 			Interface("SenderPubkeys", recvMsg.SenderPubkeys).
 			Str("newLeaderKey", newLeaderKey.Bytes.Hex()).
 			Msg("[onViewChange] Received Enough View Change Messages")
@@ -383,7 +383,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	senderKey := recvMsg.SenderPubkeys[0]
 
 	// update the dictionary key if the viewID is first time received
-	members := consensus.decider.Participants()
+	members := consensus.decider().Participants()
 	consensus.vc.AddViewIDKeyIfNotExist(recvMsg.ViewID, members)
 
 	// do it once only per viewID/Leader
@@ -399,7 +399,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 		return
 	}
 
-	err = consensus.vc.ProcessViewChangeMsg(consensus.fBFTLog, consensus.decider, recvMsg, consensus.verifyBlock)
+	err = consensus.vc.ProcessViewChangeMsg(consensus.fBFTLog, consensus.decider(), recvMsg, consensus.verifyBlock)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Uint64("viewID", recvMsg.ViewID).
@@ -411,7 +411,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	consensus.sendLastSignPower()
 
 	// received enough view change messages, change state to normal consensus
-	if consensus.decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) && consensus.isViewChangingMode() {
+	if consensus.decider().IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) && consensus.isViewChangingMode() {
 		// no previous prepared message, go straight to normal mode
 		// and start proposing new block
 		if consensus.vc.IsM1PayloadEmpty() {
@@ -475,7 +475,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	}
 
 	m3Mask := recvMsg.M3Bitmap
-	if !consensus.decider.IsQuorumAchievedByMask(m3Mask) {
+	if !consensus.decider().IsQuorumAchievedByMask(m3Mask) {
 		consensus.getLogger().Warn().
 			Msgf("[onNewView] Quorum Not achieved")
 		return
@@ -487,7 +487,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 			utils.CountOneBits(m3Mask.Bitmap) > utils.CountOneBits(m2Mask.Bitmap)) {
 		// m1 is not empty, check it's valid
 		blockHash := recvMsg.Payload[:32]
-		aggSig, mask, err := readSignatureBitmapPayload(recvMsg.Payload, 32, consensus.decider.Participants())
+		aggSig, mask, err := readSignatureBitmapPayload(recvMsg.Payload, 32, consensus.decider().Participants())
 		if err != nil {
 			consensus.getLogger().Error().Err(err).
 				Msg("[onNewView] ReadSignatureBitmapPayload Failed")
@@ -563,5 +563,5 @@ func (consensus *Consensus) resetViewChangeState() {
 		Msg("[ResetViewChangeState] Resetting view change state")
 	consensus.current.SetMode(Normal)
 	consensus.vc.Reset()
-	consensus.decider.ResetViewChangeVotes()
+	consensus.decider().ResetViewChangeVotes()
 }

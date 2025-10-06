@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -30,6 +31,7 @@ type Registry struct {
 	nodeConfig      *nodeconfig.ConfigType
 	addressToBLSKey AddressToBLSKey
 	worker          *worker.Worker
+	quorum          quorum.Decider
 }
 
 // New creates a new registry.
@@ -216,6 +218,21 @@ func (r *Registry) GetWorker() *worker.Worker {
 	defer r.mu.Unlock()
 
 	return r.worker
+}
+
+func (r *Registry) SetQuorum(q quorum.Decider) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.quorum = q
+	return r
+}
+
+func (r *Registry) GetQuorum() quorum.Decider {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.quorum
 }
 
 type FindCommitteeByID interface {

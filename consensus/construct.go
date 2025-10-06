@@ -79,7 +79,7 @@ func (consensus *Consensus) construct(
 		)
 	} else {
 		// TODO: use a persistent bitmap to report bitmap
-		mask := bls.NewMask(consensus.decider.Participants())
+		mask := bls.NewMask(consensus.decider().Participants())
 		for _, key := range priKeys {
 			mask.SetKey(key.Pub.Bytes, true)
 		}
@@ -158,7 +158,7 @@ func (consensus *Consensus) construct(
 func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.Phase) []byte {
 	buffer := bytes.Buffer{}
 	// 96 bytes aggregated signature
-	aggSig := consensus.decider.AggregateVotes(p)
+	aggSig := consensus.decider().AggregateVotes(p)
 	buffer.Write(aggSig.Serialize())
 	// Bitmap
 	if p == quorum.Prepare {
