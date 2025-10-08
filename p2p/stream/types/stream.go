@@ -315,7 +315,9 @@ func (st *BaseStream) ReadBytes() (content []byte, err error) {
 
 	// 3. Read message content (blocking)
 	content = make([]byte, size)
+	st.lock.Lock()
 	bytesRead, err := io.ReadFull(st.reader, content)
+	st.lock.Unlock()
 	if err != nil {
 		// Log network errors specifically
 		if netErr, ok := err.(net.Error); ok {
@@ -372,7 +374,9 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 
 	// 1. Read message length prefix (blocking, no timeout - wait indefinitely for size)
 	lengthBuf := make([]byte, sizeBytes)
+	st.lock.Lock()
 	_, err = io.ReadFull(st.reader, lengthBuf)
+	st.lock.Unlock()
 	if err != nil {
 		if err == io.EOF {
 			utils.Logger().Debug().
