@@ -105,20 +105,31 @@ func (bh *StageBlockHashes) Exec(ctx context.Context, firstCycle bool, invalidBl
 			return err
 		}
 		currProgress = currentHead
-	} else if currProgress >= targetHeight {
-		//TODO: validate hashes (from currentHead+1 to targetHeight)
+		// update progress in db
+		if err := s.Update(tx, currProgress); err != nil {
+			return err
+		}
+	} else if currProgress > currentHead {
+		// Validate that hashes from currentHead+1 to currProgress actually exist in DB
+		if err := bh.validateHashesExist(ctx, tx, currentHead+1, currProgress); err != nil {
+			bh.configs.logger.Warn().
+				Err(err).
+				Uint64("currentHead", currentHead).
+				Uint64("currProgress", currProgress).
+				Msg("[STAGED_STREAM_SYNC] hashes validation failed, resetting progress to currentHead")
+			if err := bh.clearBlockHashesBucket(tx); err != nil {
+				return err
+			}
+			currProgress = currentHead
+			// update progress in db
+			if err := s.Update(tx, currProgress); err != nil {
+				return err
+			}
+		}
+	}
+	// if all hashes are exist and validated, return
+	if currProgress >= targetHeight {
 		return nil
-	} else if currProgress > currentHead && currProgress < targetHeight {
-		// TODO: validate hashes (from currentHead to currProgress)
-
-		// key := strconv.FormatUint(currProgress, 10)
-		// bucketName := bh.configs.blockDBs
-		// currHash := []byte{}
-		// if currHash, err = etx.GetOne(bucketName, []byte(key)); err != nil || len(currHash[:]) == 0 {
-		// 	//TODO: currProgress and DB don't match. Either re-download all or verify db and set currProgress to last
-		// 	return err
-		// }
-		// startHash.SetBytes(currHash[:])
 	}
 
 	startTime := time.Now()
@@ -505,6 +516,35 @@ func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx) error {
 
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateHashesExist checks if block hashes exist in the database for the given range
+func (bh *StageBlockHashes) validateHashesExist(ctx context.Context, tx kv.Tx, startBlock, endBlock uint64) error {
+	useInternalTx := tx == nil
+	var err error
+	if useInternalTx {
+		tx, err = bh.configs.db.BeginRw(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+	for blockNum := startBlock; blockNum <= endBlock; blockNum++ {
+		blkKey := marshalData(blockNum)
+		hash, err := tx.GetOne(BlockHashesBucket, blkKey)
+		if err != nil {
+			return fmt.Errorf("[STAGED_STREAM_SYNC] validateHashesExist: failed to get hash for block %d: %w", blockNum, err)
+		}
+		if len(hash) == 0 {
+			return fmt.Errorf("[STAGED_STREAM_SYNC] validateHashesExist: hash not found for block %d", blockNum)
+		}
+	}
+	if useInternalTx {
+		if err = tx.Commit(); err != nil {
 			return err
 		}
 	}
