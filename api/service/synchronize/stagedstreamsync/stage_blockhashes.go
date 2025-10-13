@@ -30,7 +30,6 @@ type StageBlockHashesCfg struct {
 	db          kv.RwDB
 	concurrency int
 	protocol    syncProtocol
-	cachedb     kv.RwDB
 	logProgress bool
 	logger      zerolog.Logger
 }
@@ -512,24 +511,6 @@ func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx) error {
 	return nil
 }
 
-// clearCache removes block hashes from cache db
-func (bh *StageBlockHashes) clearCache() error {
-	tx, err := bh.configs.cachedb.BeginRw(context.Background())
-	if err != nil {
-		return nil
-	}
-	defer tx.Rollback()
-	if err := tx.ClearBucket(BlockHashesBucket); err != nil {
-		return nil
-	}
-
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (bh *StageBlockHashes) Revert(ctx context.Context, firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
@@ -545,14 +526,6 @@ func (bh *StageBlockHashes) Revert(ctx context.Context, firstCycle bool, u *Reve
 		bh.configs.logger.Error().
 			Err(err).
 			Msgf("[STAGED_STREAM_SYNC] clear block hashes bucket after revert failed")
-		return err
-	}
-
-	// clean cache db as well
-	if err := bh.clearCache(); err != nil {
-		bh.configs.logger.Error().
-			Err(err).
-			Msgf("[STAGED_STREAM_SYNC] clear block hashes cache failed")
 		return err
 	}
 
