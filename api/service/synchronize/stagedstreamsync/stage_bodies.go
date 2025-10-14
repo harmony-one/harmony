@@ -105,11 +105,27 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return errV
 	}
 
-	if currProgress <= currentHead {
+	// if currProgress is not equal to currentHead, clean all block DBs
+	// because it means stage was interrupted and we need to start from scratch
+	// this is to prevent the case where the block bodies are not saved in the cache databases or are corrupted
+	// we can't validate the block bodies from currentHead+1 to currProgress because the block bodies are per stream and
+	// download details are not available
+	if currProgress > 0 && currProgress != currentHead {
+		b.configs.logger.Info().
+			Uint64("currProgress", currProgress).
+			Uint64("currentHead", currentHead).
+			Msg("[STAGED_STREAM_SYNC] block bodies validation failed, clearing all block DBs and resetting progress to currentHead")
 		if err := b.cleanAllBlockDBs(ctx); err != nil {
+			b.configs.logger.Error().
+				Err(err).
+				Msg("[STAGED_STREAM_SYNC] clear all block DBs failed")
 			return err
 		}
 		currProgress = currentHead
+		// update progress in db
+		if err := s.Update(tx, currProgress); err != nil {
+			return err
+		}
 	}
 
 	if currProgress >= targetHeight {
@@ -787,6 +803,9 @@ func (b *StageBodies) Revert(ctx context.Context, firstCycle bool, u *RevertStat
 
 	//clean all blocks DBs
 	if err := b.cleanAllBlockDBs(ctx); err != nil {
+		b.configs.logger.Error().
+			Err(err).
+			Msgf("[STAGED_STREAM_SYNC] StageBodies Revert: clean all block DBs after revert failed")
 		return err
 	}
 
@@ -827,6 +846,9 @@ func (b *StageBodies) Revert(ctx context.Context, firstCycle bool, u *RevertStat
 func (b *StageBodies) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	//clean all blocks DBs
 	if err := b.cleanAllBlockDBs(ctx); err != nil {
+		b.configs.logger.Error().
+			Err(err).
+			Msgf("[STAGED_STREAM_SYNC] StageBodies CleanUp: clean all block DBs after cleanup failed")
 		return err
 	}
 
