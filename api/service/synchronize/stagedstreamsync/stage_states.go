@@ -178,6 +178,12 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			if blk := stg.configs.bc.GetBlock(block.Hash(), block.NumberU64()); blk != nil {
 				if blk.NumberU64() == block.NumberU64() && blk.Hash() == block.Hash() {
 					stg.configs.bc.CurrentHeader().SetNumber(block.Number())
+					gbm.MarkBlockCompleted(i)
+					if invalidBlockRevert {
+						if s.state.invalidBlock.Number == i {
+							s.state.invalidBlock.resolve()
+						}
+					}
 					continue
 				}
 			}
