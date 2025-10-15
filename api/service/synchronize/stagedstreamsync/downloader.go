@@ -320,6 +320,11 @@ func (d *Downloader) handleDownload(trigger func()) {
 
 	// if it's leader, skip syncing for now
 	if d.stagedSyncInstance.consensus != nil && d.stagedSyncInstance.consensus.IsLeader() {
+		// Retry sync after 1 seconds
+		go func() {
+			time.Sleep(1 * time.Second)
+			trigger()
+		}()
 		return
 	}
 
