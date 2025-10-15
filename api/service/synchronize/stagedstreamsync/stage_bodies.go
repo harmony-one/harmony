@@ -105,12 +105,21 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		return errV
 	}
 
+	// if currProgress is 0, reset to currentHead
+	if currProgress == 0 {
+		currProgress = currentHead
+		// update progress in db
+		if err := s.Update(tx, currProgress); err != nil {
+			return err
+		}
+	}
+
 	// if currProgress is not equal to currentHead, clean all block DBs
 	// because it means stage was interrupted and we need to start from scratch
 	// this is to prevent the case where the block bodies are not saved in the cache databases or are corrupted
 	// we can't validate the block bodies from currentHead+1 to currProgress because the block bodies are per stream and
 	// download details are not available
-	if currProgress > 0 && currProgress != currentHead {
+	if currProgress != currentHead {
 		b.configs.logger.Info().
 			Uint64("currProgress", currProgress).
 			Uint64("currentHead", currentHead).
@@ -128,6 +137,8 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 		}
 	}
 
+	// currProgress is already equal to currentHead
+	// so if it's already caught up to targetHeight, it must skip the download loop
 	if currProgress >= targetHeight {
 		return nil
 	}
