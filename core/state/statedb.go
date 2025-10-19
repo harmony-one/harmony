@@ -31,9 +31,9 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state/snapshot"
-
 	types2 "github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/staking"
@@ -1165,52 +1165,40 @@ func (db *DB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 	return root, nil
 }
 
-// PrepareAccessList handles the preparatory steps for executing a state transition with
-// regards to both EIP-2929 and EIP-2930:
+// Prepare handles the preparatory steps for executing a state transition with.
+// This method must be invoked before state transition.
 //
+// Berlin fork:
 // - Add sender to access list (2929)
 // - Add destination to access list (2929)
 // - Add precompiles to access list (2929)
 // - Add the contents of the optional tx access list (2930)
 //
-// This method should only be called if Berlin/2929+2930 is applicable at the current number.
-func (s *DB) PrepareAccessList(sender common.Address, dst *common.Address, precompiles []common.Address, list types2.AccessList) {
-	// Clear out any leftover from previous executions
-	s.accessList = newAccessList()
+// Potential EIPs:
+// - Reset transient storage(1153)
+func (s *DB) Prepare(rules params.Rules, sender common.Address, dst *common.Address, precompiles []common.Address, list types2.AccessList) {
+	if rules.IsBerlin {
+		// Clear out any leftover from previous executions
+		s.accessList = newAccessList()
 
-	s.AddAddressToAccessList(sender)
-	if dst != nil {
-		s.AddAddressToAccessList(*dst)
-		// If it's a create-tx, the destination will be added inside evm.create
-	}
-	for _, addr := range precompiles {
-		s.AddAddressToAccessList(addr)
-	}
-	for _, el := range list {
-		s.AddAddressToAccessList(el.Address)
-		for _, key := range el.StorageKeys {
-			s.AddSlotToAccessList(el.Address, key)
+		s.AddAddressToAccessList(sender)
+		if dst != nil {
+			s.AddAddressToAccessList(*dst)
+			// If it's a create-tx, the destination will be added inside evm.create
+		}
+		for _, addr := range precompiles {
+			s.AddAddressToAccessList(addr)
+		}
+		for _, el := range list {
+			s.AddAddressToAccessList(el.Address)
+			for _, key := range el.StorageKeys {
+				s.AddSlotToAccessList(el.Address, key)
+			}
 		}
 	}
+	// Reset transient storage at the beginning of transaction execution
+	s.transientStorage = newTransientStorage()
 }
-
-/*
-
-// Prepare handles the preparatory steps for executing a state transition with.
-// This method must be invoked before state transition.
-//
-// - reset transient storage (1153)
-//
-// todo(sun): berlin fork
-// - add sender to access list (2929)
-// - add destination to access list (2929)
-// - add precompiles to access list (2929)
-// - add the contents of the optional tx access list (2930)
-func (db *DB) Prepare() {
-	// reset transient storage prior to transaction execution
-	db.transientStorage = newTransientStorage()
-}
-*/
 
 // AddAddressToAccessList adds the given address to the access list
 func (db *DB) AddAddressToAccessList(addr common.Address) {
