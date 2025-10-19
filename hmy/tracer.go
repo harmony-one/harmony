@@ -855,7 +855,7 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(vmctx, txContext, statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 	// Call Prepare to clear out the statedb access list
-	statedb.Prepare(txctx.TxHash, txctx.TxIndex)
+	statedb.SetTxContext(txctx.TxHash, txctx.BlockHash, txctx.TxIndex)
 	if _, err = core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas())); err != nil {
 		return nil, fmt.Errorf("tracing failed: %w", err)
 	}
