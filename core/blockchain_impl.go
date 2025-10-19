@@ -31,8 +31,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -60,14 +58,13 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-
-	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/pkg/errors"
 	goleveldb "github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -1848,19 +1845,20 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			return i, events, coalescedLogs, err
 		}
 		vmConfig := bc.vmConfig
-		if bc.trace {
-			ev := TraceEvent{
-				Tracer: &tracers.ParityBlockTracer{
-					Hash:   block.Hash(),
-					Number: block.NumberU64(),
-				},
-			}
-			vmConfig = vm.Config{
-				Debug:  true,
-				Tracer: ev.Tracer,
-			}
-			events = append(events, ev)
-		}
+		/*
+			if bc.trace {
+				ev := TraceEvent{
+					Tracer: &tracers.ParityBlockTracer{
+						Hash:   block.Hash(),
+						Number: block.NumberU64(),
+					},
+				}
+				vmConfig = vm.Config{
+					Debug:  true,
+					Tracer: ev.Tracer,
+				}
+				events = append(events, ev)
+			}*/
 		// Process block using the parent state as reference point.
 		substart := time.Now()
 		receipts, cxReceipts, stakeMsgs, logs, usedGas, payout, newState, err := bc.processor.Process(
@@ -2033,8 +2031,8 @@ func (bc *BlockChainImpl) PostChainEvents(events []interface{}, logs []*types.Lo
 		case ChainSideEvent:
 			bc.chainSideFeed.Send(ev)
 
-		case TraceEvent:
-			bc.traceFeed.Send(ev)
+			//case TraceEvent:
+			//	bc.traceFeed.Send(ev)
 		}
 	}
 }
@@ -2172,10 +2170,10 @@ func (bc *BlockChainImpl) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) 
 	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))
 }
 
-func (bc *BlockChainImpl) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
-	bc.trace = true
-	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
-}
+//func (bc *BlockChainImpl) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+//	bc.trace = true
+//	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
+//}
 
 func (bc *BlockChainImpl) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription {
 	return bc.scope.Track(bc.chainFeed.Subscribe(ch))

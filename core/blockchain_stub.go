@@ -180,9 +180,9 @@ func (a Stub) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscr
 	return nil
 }
 
-func (a Stub) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
-	return nil
-}
+//func (a Stub) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+//	return nil
+//}
 
 func (a Stub) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription {
 	return nil
