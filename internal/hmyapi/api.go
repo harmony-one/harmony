@@ -1,6 +1,5 @@
-package hmy
+package hmyapi
 
-/*
 import (
 	"fmt"
 	"math/big"
@@ -140,4 +139,3 @@ func (b *BlockOverrides) Apply(blockCtx *vm.BlockContext) {
 		blockCtx.Coinbase = *b.FeeRecipient
 	}
 }
-*/

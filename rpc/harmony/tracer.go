@@ -31,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/hmy/tracers"
 )
 
 const (
@@ -72,7 +73,7 @@ func NewPublicTraceAPI(hmy *hmy.Harmony, version Version) rpc.API {
 
 // TraceChain returns the structured logs created during the execution of EVM
 // between two blocks (excluding start) and returns them as a JSON object.
-func (s *PublicTracerService) TraceChain(ctx context.Context, start, end rpc.BlockNumber, config *hmy.TraceConfig) (*rpc.Subscription, error) {
+func (s *PublicTracerService) TraceChain(ctx context.Context, start, end rpc.BlockNumber, config *tracers.TraceConfig) (*rpc.Subscription, error) {
 	timer := DoMetricRPCRequest(TraceChain)
 	defer DoRPCRequestDuration(TraceChain, timer)
 
@@ -104,7 +105,7 @@ func (s *PublicTracerService) TraceChain(ctx context.Context, start, end rpc.Blo
 
 // TraceBlockByNumber returns the structured logs created during the execution of
 // EVM and returns them as a JSON object.
-func (s *PublicTracerService) TraceBlockByNumber(ctx context.Context, number rpc.BlockNumber, config *hmy.TraceConfig) ([]*hmy.TxTraceResult, error) {
+func (s *PublicTracerService) TraceBlockByNumber(ctx context.Context, number rpc.BlockNumber, config *tracers.TraceConfig) ([]*hmy.TxTraceResult, error) {
 	timer := DoMetricRPCRequest(TraceBlockByNumber)
 	defer DoRPCRequestDuration(TraceBlockByNumber, timer)
 
@@ -116,7 +117,7 @@ func (s *PublicTracerService) TraceBlockByNumber(ctx context.Context, number rpc
 
 // TraceBlockByHash returns the structured logs created during the execution of
 // EVM and returns them as a JSON object.
-func (s *PublicTracerService) TraceBlockByHash(ctx context.Context, hash common.Hash, config *hmy.TraceConfig) ([]*hmy.TxTraceResult, error) {
+func (s *PublicTracerService) TraceBlockByHash(ctx context.Context, hash common.Hash, config *tracers.TraceConfig) ([]*hmy.TxTraceResult, error) {
 	timer := DoMetricRPCRequest(TraceBlockByHash)
 	defer DoRPCRequestDuration(TraceBlockByHash, timer)
 
@@ -130,7 +131,7 @@ func (s *PublicTracerService) TraceBlockByHash(ctx context.Context, hash common.
 
 // TraceBlock returns the structured logs created during the execution of EVM
 // and returns them as a JSON object.
-func (s *PublicTracerService) TraceBlock(ctx context.Context, blob []byte, config *hmy.TraceConfig) ([]*hmy.TxTraceResult, error) {
+func (s *PublicTracerService) TraceBlock(ctx context.Context, blob []byte, config *tracers.TraceConfig) ([]*hmy.TxTraceResult, error) {
 	timer := DoMetricRPCRequest(TraceBlock)
 	defer DoRPCRequestDuration(TraceBlock, timer)
 
@@ -144,7 +145,7 @@ func (s *PublicTracerService) TraceBlock(ctx context.Context, blob []byte, confi
 
 // TraceTransaction returns the structured logs created during the execution of EVM
 // and returns them as a JSON object.
-func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.Hash, config *hmy.TraceConfig) (interface{}, error) {
+func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.Hash, config *tracers.TraceConfig) (interface{}, error) {
 	timer := DoMetricRPCRequest(TraceTransaction)
 	defer DoRPCRequestDuration(TraceTransaction, timer)
 
@@ -171,14 +172,19 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 	}
 	// Trace the transaction and return
 	statedb.SetTxContext(tx.ConvertToEth().Hash(), block.Hash(), int(index))
-	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
+	txctx := &tracers.Context{
+		BlockHash: blockHash,
+		TxIndex:   int(index),
+		TxHash:    hash,
+	}
+	return s.hmy.TraceTx(ctx, msg, txctx, vmctx, statedb, config)
 }
 
 // TraceCall lets you trace a given eth_call. It collects the structured logs created during the execution of EVM
 // if the given transaction was added on top of the provided block and returns them as a JSON object.
 // You can provide -2 as a block number to trace on top of the pending block.
 // NOTE: Our version only supports block number as an input
-func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber, config *hmy.TraceConfig) (interface{}, error) {
+func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber, config *tracers.TraceCallConfig) (interface{}, error) {
 	timer := DoMetricRPCRequest(TraceCall)
 	defer DoRPCRequestDuration(TraceCall, timer)
 
@@ -214,15 +220,29 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 		// Precompile overrides in `StateOverrides.Apply()` don't affect execution in `TraceCall`
 		// because the EVM uses precompiles from canonical chain rules, ensuring consistent tracing.
 		// This is different than the behavior of `eth_call (doCall())`, which simulates the call with updated precompiles.
-		if config.Stateoverrides != nil {
+		if config.StateOverrides != nil {
 			// need a copy to prevent altering the original precompiles
 			precompiles := make(map[common.Address]vm.WriteCapablePrecompiledContract)
 			for addr, contract := range vm.PrecompiledContractsStaking {
 				precompiles[addr] = contract
 			}
-			config.Stateoverrides.Apply(statedb, precompiles)
+			config.StateOverrides.Apply(statedb, precompiles)
+		}
+	}
+	txctx := &tracers.Context{
+		BlockHash: header.Hash(),
+		TxIndex:   0,
+		//TxHash:    txs[task.index].Hash(),
+	}
+	var traceConfig *tracers.TraceConfig
+	if config != nil {
+		traceConfig = &tracers.TraceConfig{
+			Config:  config.Config,
+			Tracer:  config.Tracer,
+			Timeout: config.Timeout,
+			Reexec:  config.Reexec,
 		}
 	}
 	// Trace the transaction and return
-	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
+	return s.hmy.TraceTx(ctx, msg, txctx, vmctx, statedb, traceConfig)
 }

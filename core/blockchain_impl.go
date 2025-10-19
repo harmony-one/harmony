@@ -2170,10 +2170,10 @@ func (bc *BlockChainImpl) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) 
 	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))
 }
 
-//func (bc *BlockChainImpl) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
-//	bc.trace = true
-//	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
-//}
+func (bc *BlockChainImpl) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+	bc.trace = true
+	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
+}
 
 func (bc *BlockChainImpl) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription {
 	return bc.scope.Track(bc.chainFeed.Subscribe(ch))

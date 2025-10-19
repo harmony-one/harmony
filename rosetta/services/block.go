@@ -9,6 +9,7 @@ import (
 
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy/tracers"
+	"github.com/harmony-one/harmony/hmy/tracers/logger"
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
@@ -273,8 +274,8 @@ var (
 	// defaultTraceTimeout is the amount of time a transaction can execute
 	defaultTraceTimeout = (10 * time.Second).String()
 	// defaultTraceLogConfig is the log config of all traces
-	defaultTraceLogConfig = vm.LogConfig{
-		DisableMemory:  false,
+	defaultTraceLogConfig = logger.Config{
+		EnableMemory:   true,
 		DisableStack:   false,
 		DisableStorage: false,
 		Debug:          false,
@@ -319,10 +320,10 @@ func (s *BlockAPI) getTransactionTrace(
 	var foundResult []*tracers.RosettaLogItem
 	var tracer = "RosettaBlockTracer"
 	err := s.hmy.ComputeTxEnvEachBlockWithoutApply(blk, defaultTraceReExec, func(txIndex int, tx *coreTypes.Transaction, msg core.Message, vmctx vm.BlockContext, statedb *state.DB) bool {
-		execResultInterface, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, &hmy.TraceConfig{
+		execResultInterface, err := s.hmy.TraceTx(ctx, msg, new(tracers.Context), vmctx, statedb, &tracers.TraceConfig{
 			Tracer: &tracer,
-			LogConfig: &vm.LogConfig{
-				DisableMemory:  true,
+			Config: &logger.Config{
+				EnableMemory:   false,
 				DisableStack:   false,
 				DisableStorage: true,
 				Debug:          false,

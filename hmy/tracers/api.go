@@ -25,10 +25,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/hmy/tracers/logger"
+	"github.com/harmony-one/harmony/internal/hmyapi"
 	//"github.com/harmony-one/harmony/eth"
 )
 
@@ -168,6 +169,14 @@ type TraceConfig struct {
 	// Config specific to given tracer. Note struct logger
 	// config are historically embedded in main object.
 	TracerConfig json.RawMessage
+}
+
+// TraceCallConfig is the config for traceCall API. It holds one more
+// field to override the state for tracing.
+type TraceCallConfig struct {
+	TraceConfig
+	StateOverrides *hmyapi.StateOverrides
+	BlockOverrides *hmyapi.BlockOverrides
 }
 
 //// TraceCallConfig is the config for traceCall API. It holds one more

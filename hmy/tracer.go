@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -66,17 +65,6 @@ const (
 //	Stateoverrides *StateOverrides
 //}
 
-// TraceConfig holds extra parameters to trace functions.
-type TraceConfig struct {
-	*logger.Config
-	Tracer  *string
-	Timeout *string
-	Reexec  *uint64
-	// Config specific to given tracer. Note struct logger
-	// config are historically embedded in main object.
-	TracerConfig json.RawMessage
-}
-
 // StdTraceConfig holds extra parameters to standard-json trace functions.
 type StdTraceConfig struct {
 	*logger.Config
@@ -117,7 +105,7 @@ type txTraceTask struct {
 // TraceChain configures a new tracer according to the provided configuration, and
 // executes all the transactions contained within. The return value will be one item
 // per transaction, dependent on the requested tracer.
-func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, config *TraceConfig) (*rpc.Subscription, error) {
+func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, config *tracers.TraceConfig) (*rpc.Subscription, error) {
 	// Tracing a chain is a **long** operation, only do with subscriptions
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
@@ -363,7 +351,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 }
 
 // same as TraceBlock, but only use 1 thread
-func (hmy *Harmony) traceBlockNoThread(ctx context.Context, block *types.Block, config *TraceConfig) ([]*TxTraceResult, error) {
+func (hmy *Harmony) traceBlockNoThread(ctx context.Context, block *types.Block, config *tracers.TraceConfig) ([]*TxTraceResult, error) {
 	// Create the parent state database
 	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
 		return nil, err
@@ -434,7 +422,7 @@ traceLoop:
 // TraceBlock configures a new tracer according to the provided configuration, and
 // executes all the transactions contained within. The return value will be one item
 // per transaction, dependent on the requested tracer.
-func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *TraceConfig) ([]*TxTraceResult, error) {
+func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *tracers.TraceConfig) ([]*TxTraceResult, error) {
 	select {
 	case <-ctx.Done():
 		return nil, errors.New("canceled!")
@@ -737,7 +725,7 @@ func (hmy *Harmony) ComputeStateDB(block *types.Block, reexec uint64) (*state.DB
 // executes the given message in the provided environment. The return value will
 // be tracer dependent.
 // NOTE: Only support default StructLogger tracer
-func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, txctx *tracers.Context, vmctx vm.BlockContext, statedb *state.DB, config *TraceConfig) (interface{}, error) {
+func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, txctx *tracers.Context, vmctx vm.BlockContext, statedb *state.DB, config *tracers.TraceConfig) (interface{}, error) {
 	//txctx := &Context{
 	//	BlockHash: task.block.Hash(),
 	//	TxIndex:   i,
@@ -819,7 +807,7 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, txctx *tr
 // traceTx configures a new tracer according to the provided configuration, and
 // executes the given message in the provided environment. The return value will
 // be tracer dependent.
-func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tracers.Context, vmctx vm.BlockContext, statedb *state.DB, config *TraceConfig) (interface{}, error) {
+func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tracers.Context, vmctx vm.BlockContext, statedb *state.DB, config *tracers.TraceConfig) (interface{}, error) {
 	var (
 		tracer    tracers.Tracer
 		err       error
@@ -827,7 +815,7 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 		txContext = core.NewEVMTxContext(message)
 	)
 	if config == nil {
-		config = &TraceConfig{}
+		config = &tracers.TraceConfig{}
 	}
 	// Default tracer is the struct logger
 	tracer = logger.NewStructLogger(config.Config)
@@ -1048,7 +1036,7 @@ func (r *StructLogRes) GetOperatorEvent(key string) string {
 }
 
 // FormatLogs formats EVM returned structured logs for json output
-func FormatLogs(logs []*vm.StructLog, conf *TraceConfig) []StructLogRes {
+func FormatLogs(logs []*vm.StructLog, conf *tracers.TraceConfig) []StructLogRes {
 	formatted := make([]StructLogRes, len(logs))
 	for index, trace := range logs {
 		formatted[index] = StructLogRes{

@@ -1,4 +1,4 @@
-package hmy
+package hmyapi
 
 import (
 	"crypto/ecdsa"

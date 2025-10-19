@@ -157,7 +157,7 @@ type BlockChain interface {
 	// SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 	SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription
 	// SubscribeTraceEvent registers a subscription of ChainEvent.
-	//SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription
+	SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription
 	// SubscribeChainEvent registers a subscription of ChainEvent.
 	SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription
 	// SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
