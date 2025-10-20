@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/harmony-one/harmony/core/events"
 	"github.com/harmony-one/harmony/internal/tikv"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -144,7 +145,7 @@ func (node *Node) TraceLoopForExplorer() {
 	if !node.HarmonyConfig.General.TraceEnable {
 		return
 	}
-	ch := make(chan core.TraceEvent)
+	ch := make(chan events.TraceEvent)
 	subscribe := node.Blockchain().SubscribeTraceEvent(ch)
 	go func() {
 	loop:

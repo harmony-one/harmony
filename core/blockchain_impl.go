@@ -45,6 +45,7 @@ import (
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/consensus/votepower"
+	"github.com/harmony-one/harmony/core/events"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/state/snapshot"
@@ -2170,7 +2171,7 @@ func (bc *BlockChainImpl) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) 
 	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))
 }
 
-func (bc *BlockChainImpl) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+func (bc *BlockChainImpl) SubscribeTraceEvent(ch chan<- events.TraceEvent) event.Subscription {
 	bc.trace = true
 	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
 }

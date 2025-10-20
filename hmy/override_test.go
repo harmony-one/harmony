@@ -1,4 +1,4 @@
-package hmyapi
+package hmy
 
 import (
 	"crypto/ecdsa"
@@ -18,6 +18,8 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
 	chain2 "github.com/harmony-one/harmony/internal/chain"
+	"github.com/harmony-one/harmony/internal/hmyapi"
+	. "github.com/harmony-one/harmony/internal/hmyapi"
 	"github.com/harmony-one/harmony/internal/params"
 )
 
@@ -72,14 +74,14 @@ func TestStateOverrides(t *testing.T) {
 	tests := []struct {
 		name          string
 		expectedError error
-		overrides     StateOverrides
+		overrides     hmyapi.StateOverrides
 		precompiles   map[common.Address]vm.WriteCapablePrecompiledContract
 	}{
 		{
 			name:          "ValidOverride",
 			expectedError: nil,
-			overrides: StateOverrides{
-				addr1: OverrideAccount{
+			overrides: hmyapi.StateOverrides{
+				addr1: hmyapi.OverrideAccount{
 					Nonce:   &nonce,
 					Code:    &code,
 					Balance: &balance,
