@@ -46,6 +46,10 @@ const (
 
 	downloadTaskBatch = 5
 
+	// tooFarBehindThreshold is the threshold for skipping double check when node is too far behind
+	// If node is more than this many blocks behind, it won't catch up in 1 second
+	tooFarBehindThreshold = 10
+
 	//LoopMinTime sync loop must take at least as this value, otherwise it waits for it
 	LoopMinTime = 0
 )
@@ -1308,11 +1312,12 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	}
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
+	heightDiff := otherHeight1 - lastHeight
+	if otherHeight1 < lastHeight {
+		heightDiff = 0 // overflow protection
+	}
+
 	if !doubleCheck {
-		heightDiff := otherHeight1 - lastHeight
-		if otherHeight1 < lastHeight {
-			heightDiff = 0 //
-		}
 		utils.Logger().Info().
 			Uint64("OtherHeight", otherHeight1).
 			Uint64("lastHeight", lastHeight).
@@ -1325,25 +1330,43 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 			HeightDiff:     heightDiff,
 		}
 	}
-	// double check the sync status after 1 second to confirm (avoid false alarm)
-	time.Sleep(1 * time.Second)
+
+	// If node is too far behind, skip double check since it won't catch up in 1 second
+	if heightDiff > tooFarBehindThreshold {
+		utils.Logger().Info().
+			Uint64("OtherHeight", otherHeight1).
+			Uint64("lastHeight", lastHeight).
+			Uint64("heightDiff", heightDiff).
+			Uint64("threshold", tooFarBehindThreshold).
+			Msg("[SYNC] Node too far behind, skipping double check")
+		return SyncCheckResult{
+			IsSynchronized: false,
+			OtherHeight:    otherHeight1,
+			HeightDiff:     heightDiff,
+		}
+	}
+
+	// Double check the sync status after a short delay to confirm (avoid false alarm)
+	time.Sleep(1000 * time.Millisecond)
 
 	otherHeight2, errMaxHeight2 := getMaxPeerHeight(ss.syncConfig)
 	if errMaxHeight2 != nil {
+		// If second query fails, use first result but log the issue
+		utils.Logger().Warn().Err(errMaxHeight2).Msg("[SYNC] Second height query failed, using first result")
 		otherHeight2 = otherHeight1
 	}
 	currentHeight := ss.blockChain.CurrentBlock().NumberU64()
 
-	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
-	// A node can be actively syncing and still be out of sync. The original logic was flawed.
-	// We should consider a node out of sync if it's behind the target height, regardless of progress.
-	heightDiff := otherHeight2 - lastHeight
-	if otherHeight2 < lastHeight {
-		heightDiff = 0 // overflow
+	// Check if the node made progress during the wait period
+	progressMade := currentHeight > lastHeight
+
+	// Calculate height difference using current height (after the wait period)
+	heightDiff = otherHeight2 - currentHeight
+	if otherHeight2 < currentHeight {
+		heightDiff = 0 // overflow protection
 	}
 
 	// A node is out of sync if it's behind the target height by more than the threshold
-	// Progress during sync doesn't change the fact that it's still out of sync
 	isStillOutOfSync := currentHeight+inSyncThreshold < otherHeight2
 
 	utils.Logger().Info().
@@ -1353,6 +1376,7 @@ func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 		Uint64("currentHeight", currentHeight).
 		Bool("wasOutOfSync", wasOutOfSync).
 		Bool("isStillOutOfSync", isStillOutOfSync).
+		Bool("progressMade", progressMade).
 		Uint64("heightDiff", heightDiff).
 		Msg("[SYNC] Double checking sync status")
 
