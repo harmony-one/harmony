@@ -1283,16 +1283,13 @@ func (ss *StateSync) GetParsedSyncStatus() (IsSynchronized bool, OtherHeight uin
 	return ParseResult(res)
 }
 
-// GetSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
+// GetParsedSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
 // with a double check to avoid false alarm.
-func (ss *StateSync) GetSyncStatusDoubleChecked() SyncCheckResult {
-	result := ss.isSynchronized(true)
-	return result
-}
-
 func (ss *StateSync) GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
-	result := ss.isSynchronized(true)
-	return ParseResult(result)
+	res := ss.syncStatus.Get(func() SyncCheckResult {
+		return ss.isSynchronized(true)
+	})
+	return ParseResult(res)
 }
 
 // isSynchronized query the remote DNS node for the latest height to check what is the current

@@ -287,7 +287,13 @@ func (node *Node) doSync(syncInstance ISync, syncingPeerProvider SyncingPeerProv
 		utils.Logger().Debug().Int("len", syncInstance.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 	}
 	// TODO: treat fake maximum height
-	if isSynchronized, _, _ := syncInstance.GetParsedSyncStatusDoubleChecked(); !isSynchronized {
+	var isSynchronized bool
+	if consensus.IsLeader() {
+		isSynchronized, _, _ = syncInstance.GetParsedSyncStatus()
+	} else {
+		isSynchronized, _, _ = syncInstance.GetParsedSyncStatusDoubleChecked()
+	}
+	if !isSynchronized {
 		if consensus.IsLeader() {
 			return
 		}
