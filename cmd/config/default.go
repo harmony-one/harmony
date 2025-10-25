@@ -224,7 +224,7 @@ var (
 	defaultTestNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
 		SyncMode:             0,
-		Client:               false,
+		Client:               true,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          3,
 		MinPeers:             3,
@@ -254,7 +254,7 @@ var (
 	defaultPartnerSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
 		SyncMode:             0,
-		Client:               false,
+		Client:               true,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          3,
 		MinPeers:             3,
@@ -269,7 +269,7 @@ var (
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:              true,
 		SyncMode:             0,
-		Client:               false,
+		Client:               true,
 		StagedSyncCfg:        defaultStagedSyncConfig,
 		Concurrency:          4,
 		MinPeers:             4,
