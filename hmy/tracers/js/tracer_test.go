@@ -19,6 +19,7 @@ package js
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"testing"
@@ -74,6 +75,8 @@ func runTrace(tracer tracers.Tracer, vmctx *vmContext, chaincfg *params.ChainCon
 	}
 
 	tracer.CaptureTxStart(gasLimit)
+	aa, err := tracer.GetResult()
+	fmt.Printf("tracer.GetResult() %s %s\n", aa, err)
 	tracer.CaptureStart(env, contract.Caller(), contract.Address(), false, []byte{}, startGas, value)
 	ret, err := env.Interpreter().Run(contract, []byte{}, false)
 	tracer.CaptureEnd(ret, startGas-contract.Gas, 1, err)
@@ -155,7 +158,15 @@ func TestTracer(t *testing.T) {
 		},*/
 	} {
 		if have, err := execTracer(tt.code, tt.contract); tt.want != string(have) || tt.fail != err {
-			t.Errorf("testcase %d: expected return value to be \n'%s'\n\tgot\n'%s'\nerror to be\n'%s'\n\tgot\n'%s'\n\tcode: %v", i, tt.want, string(have), tt.fail, err, tt.code)
+			switch true {
+			case tt.want != string(have):
+				t.Errorf("testcase %d: expected return value to be \n'%s'\n\tgot\n'%s'\n\tcode: %v", i, tt.want, string(have), tt.code)
+			case tt.fail != err:
+				t.Errorf("testcase %d: expected error to be\n'%s'\n\tgot\n'%s'\n\tcode: %v", i, tt.fail, err, tt.code)
+			default:
+				panic("unreachable")
+			}
+			//t.Errorf("testcase %d: expected return value to be \n'%s'\n\tgot\n'%s'\nerror to be\n'%s'\n\tgot\n'%s'\n\tcode: %v", i, tt.want, string(have), tt.fail, err, tt.code)
 		}
 	}
 }
