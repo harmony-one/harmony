@@ -160,7 +160,7 @@ func TestTracer(t *testing.T) {
 		if have, err := execTracer(tt.code, tt.contract); tt.want != string(have) || tt.fail != err {
 			switch true {
 			case tt.want != string(have):
-				t.Errorf("testcase %d: expected return value to be \n'%s'\n\tgot\n'%s'\n\tcode: %v", i, tt.want, string(have), tt.code)
+				t.Errorf("testcase %d: expected return value to be '%s' got '%s' code: %v", i, tt.want, string(have), tt.code)
 			case tt.fail != err:
 				t.Errorf("testcase %d: expected error to be\n'%s'\n\tgot\n'%s'\n\tcode: %v", i, tt.fail, err, tt.code)
 			default:
