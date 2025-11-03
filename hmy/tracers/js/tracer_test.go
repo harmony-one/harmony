@@ -19,6 +19,7 @@ package js
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"testing"
@@ -82,7 +83,9 @@ func runTrace(tracer tracers.Tracer, vmctx *vmContext, chaincfg *params.ChainCon
 	if err != nil {
 		return nil, err
 	}
-	return tracer.GetResult()
+	rs, err := tracer.GetResult()
+	fmt.Println("rs+err: ", rs, err)
+	return rs, err
 }
 
 func TestTracer(t *testing.T) {
