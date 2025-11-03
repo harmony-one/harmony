@@ -69,20 +69,34 @@ func runTrace(tracer tracers.Tracer, vmctx *vmContext, chaincfg *params.ChainCon
 		value           = big.NewInt(0)
 		contract        = vm.NewContract(account{}, account{}, value, startGas)
 	)
-	contract.Code = []byte{byte(vm.PUSH1), 0x1, byte(vm.PUSH1), 0x1, 0x0}
+	contract.Code = []byte{byte(vm.PUSH1), 0x1, byte(vm.PUSH1), 0x1, byte(vm.ADD)}
 	if contractCode != nil {
 		contract.Code = contractCode
 	}
+	aa, err := tracer.GetResult()
+	fmt.Printf("tracer.GetResult(1) %s %s\n", string(aa), err)
 
 	tracer.CaptureTxStart(gasLimit)
+
+	aa, err = tracer.GetResult()
+	fmt.Printf("tracer.GetResult(2) %s %s\n", string(aa), err)
 	tracer.CaptureStart(env, contract.Caller(), contract.Address(), false, []byte{}, startGas, value)
+
 	ret, err := env.Interpreter().Run(contract, []byte{}, false)
+	aa, err = tracer.GetResult()
+	fmt.Printf("tracer.GetResult(3) %s %s %d %d\n", string(aa), err, startGas, contract.Gas)
+
 	tracer.CaptureEnd(ret, startGas-contract.Gas, 1, err)
+	aa, err = tracer.GetResult()
+	fmt.Printf("tracer.GetResult(4) %s %s\n", string(aa), err)
+
 	// Rest gas assumes no refund
 	tracer.CaptureTxEnd(startGas - contract.Gas)
 	if err != nil {
 		return nil, err
 	}
+	aa, err = tracer.GetResult()
+	fmt.Printf("tracer.GetResult(5) %s %s\n", string(aa), err)
 	rs, err := tracer.GetResult()
 	fmt.Println("rs+err: ", string(rs), err)
 	return rs, err
