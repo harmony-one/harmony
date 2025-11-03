@@ -84,7 +84,7 @@ func runTrace(tracer tracers.Tracer, vmctx *vmContext, chaincfg *params.ChainCon
 		return nil, err
 	}
 	rs, err := tracer.GetResult()
-	fmt.Println("rs+err: ", rs, err)
+	fmt.Println("rs+err: ", string(rs), err)
 	return rs, err
 }
 
