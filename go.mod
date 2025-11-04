@@ -1,6 +1,6 @@
 module github.com/harmony-one/harmony
 
-go 1.21.0
+go 1.22.0
 
 toolchain go1.24.2
 
