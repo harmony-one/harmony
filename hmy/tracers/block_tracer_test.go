@@ -323,7 +323,7 @@ type vmContext struct {
 	txCtx    vm.TxContext
 }
 
-func runTrace(tracer ITracer, vmctx *vmContext, chaincfg *params.ChainConfig) (json.RawMessage, error) {
+func runTrace(tracer vm.ITracer, vmctx *vmContext, chaincfg *params.ChainConfig) (json.RawMessage, error) {
 	var (
 		env = vm.NewEVM(vmctx.blockCtx, vmctx.txCtx, &dummyStatedb{}, chaincfg, vm.Config{Debug: true, Tracer: tracer})
 		//gasLimit uint64 = 31000

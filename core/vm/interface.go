@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -109,4 +110,13 @@ type CallContext interface {
 	DelegateCall(env *EVM, me ContractRef, addr common.Address, data []byte, gas *big.Int) ([]byte, error)
 	// Create a new contract
 	Create(env *EVM, me ContractRef, data []byte, gas, value *big.Int) ([]byte, common.Address, error)
+}
+
+// Tracer interface extends vm.EVMLogger and additionally
+// allows collecting the tracing result.
+type ITracer interface {
+	EVMLogger
+	GetResult() (json.RawMessage, error)
+	// Stop terminates execution of the tracer at the first opportune moment.
+	Stop(err error)
 }
