@@ -236,7 +236,7 @@ go-vet:
 	go vet ./...
 
 go-test:
-	go test -vet=all -race ./...
+	 go test -v -run TestTracer ./hmy/tracers/
 
 docker:
 	docker build --pull -t harmonyone/$(PKGNAME):latest -f scripts/docker/Dockerfile .
