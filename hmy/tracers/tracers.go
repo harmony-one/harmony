@@ -18,9 +18,11 @@
 package tracers
 
 import (
+	"encoding/json"
 	"strings"
 	"unicode"
 
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy/tracers/internal/tracers"
 )
 
@@ -50,4 +52,13 @@ func tracer(name string) (string, bool) {
 		return tracer, true
 	}
 	return "", false
+}
+
+// Tracer interface extends vm.EVMLogger and additionally
+// allows collecting the tracing result.
+type ITracer interface {
+	vm.EVMLogger
+	GetResult() (json.RawMessage, error)
+	// Stop terminates execution of the tracer at the first opportune moment.
+	Stop(err error)
 }

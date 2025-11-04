@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -11,7 +12,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -291,6 +294,134 @@ func TestActionMarshal(t *testing.T) {
 		_, acJsonStr, _ := ac.toJsonStr()
 		if jsonStr != *acJsonStr {
 			t.Errorf("expected %s got %s\n", jsonStr, *acJsonStr)
+		}
+	}
+}
+
+type account struct{}
+
+func (account) SubBalance(amount *big.Int)                          {}
+func (account) AddBalance(amount *big.Int)                          {}
+func (account) SetAddress(common.Address)                           {}
+func (account) Value() *big.Int                                     { return nil }
+func (account) SetBalance(*big.Int)                                 {}
+func (account) SetNonce(uint64)                                     {}
+func (account) Balance() *big.Int                                   { return nil }
+func (account) Address() common.Address                             { return common.Address{} }
+func (account) SetCode(common.Hash, []byte)                         {}
+func (account) ForEachStorage(cb func(key, value common.Hash) bool) {}
+
+type dummyStatedb struct {
+	state.DB
+}
+
+func (*dummyStatedb) GetRefund() uint64                       { return 1337 }
+func (*dummyStatedb) GetBalance(addr common.Address) *big.Int { return new(big.Int) }
+
+type vmContext struct {
+	blockCtx vm.BlockContext
+	txCtx    vm.TxContext
+}
+
+func runTrace(tracer ITracer, vmctx *vmContext, chaincfg *params.ChainConfig) (json.RawMessage, error) {
+	var (
+		env = vm.NewEVM(vmctx.blockCtx, vmctx.txCtx, &dummyStatedb{}, chaincfg, vm.Config{Debug: true, Tracer: tracer})
+		//gasLimit uint64 = 31000
+		startGas uint64 = 10000
+		value           = big.NewInt(0)
+		contract        = vm.NewContract(account{}, account{}, value, startGas)
+	)
+	//contract.Code = []byte{byte(vm.PUSH1), 0x1, byte(vm.PUSH1), 0x1, byte(vm.STOP)}
+	contract.Code = []byte{byte(vm.PUSH1), 0x1, byte(vm.PUSH1), 0x1, byte(vm.ADD)}
+
+	aa, err := tracer.GetResult()
+	fmt.Printf("tracer.GetResult(1) %s %s\n", string(aa), err)
+
+	//tracer.CaptureTxStart(gasLimit)
+	aa, err = tracer.GetResult()
+	fmt.Printf("tracer.GetResult(2) %s %s\n", string(aa), err)
+	tracer.CaptureStart(env, contract.Caller(), contract.Address(), false, []byte{}, startGas, value)
+	ret, err := env.Interpreter().Run(contract, []byte{}, false)
+	aa, err = tracer.GetResult()
+	fmt.Printf("tracer.GetResult(3) %s %s %d %d\n", string(aa), err, startGas, contract.Gas)
+	tracer.CaptureEnd(ret, startGas-contract.Gas, 1, err)
+	aa, err = tracer.GetResult()
+	fmt.Printf("tracer.GetResult(4) %s %s\n", string(aa), err)
+	// Rest gas assumes no refund
+	//tracer.CaptureTxEnd(startGas - contract.Gas)
+	aa, err = tracer.GetResult()
+	fmt.Printf("tracer.GetResult(5) %s %s\n", string(aa), err)
+	if err != nil {
+		return nil, err
+	}
+	return tracer.GetResult()
+}
+
+func testCtx() *vmContext {
+	return &vmContext{blockCtx: vm.BlockContext{BlockNumber: big.NewInt(1)}, txCtx: vm.TxContext{GasPrice: big.NewInt(100000)}}
+}
+
+func TestTracer(t *testing.T) {
+	execTracer := func(code string) ([]byte, string) {
+		t.Helper()
+		tracer, err := New(code)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ret, err := runTrace(tracer, testCtx(), params.TestChainConfig)
+		if err != nil {
+			return nil, err.Error() // Stringify to allow comparison without nil checks
+		}
+		return ret, ""
+	}
+	for i, tt := range []struct {
+		code string
+		want string
+		fail string
+	}{
+		/*{ // tests that we don't panic on bad arguments to memory access
+			code: "{depths: [], step: function(log) { this.depths.push(log.memory.slice(-1,-2)); }, fault: function() {}, result: function() { return this.depths; }}",
+			want: ``,
+			fail: "tracer accessed out of bound memory: offset -1, end -2 at step (<eval>:1:53(15))    in server-side tracer function 'step'",
+		}, { // tests that we don't panic on bad arguments to stack peeks
+			code: "{depths: [], step: function(log) { this.depths.push(log.stack.peek(-1)); }, fault: function() {}, result: function() { return this.depths; }}",
+			want: ``,
+			fail: "tracer accessed out of bound stack: size 0, index -1 at step (<eval>:1:53(13))    in server-side tracer function 'step'",
+		}, { //  tests that we don't panic on bad arguments to memory getUint
+			code: "{ depths: [], step: function(log, db) { this.depths.push(log.memory.getUint(-64));}, fault: function() {}, result: function() { return this.depths; }}",
+			want: ``,
+			fail: "tracer accessed out of bound memory: available 0, offset -64, size 32 at step (<eval>:1:58(13))    in server-side tracer function 'step'",
+		}, { // tests some general counting
+			code: "{count: 0, step: function() { this.count += 1; }, fault: function() {}, result: function() { return this.count; }}",
+			want: `3`,
+		}, { // tests that depth is reported correctly
+			code: "{depths: [], step: function(log) { this.depths.push(log.stack.length()); }, fault: function() {}, result: function() { return this.depths; }}",
+			want: `[0,1,2]`,
+		}, { // tests memory length
+			code: "{lengths: [], step: function(log) { this.lengths.push(log.memory.length()); }, fault: function() {}, result: function() { return this.lengths; }}",
+			want: `[0,0,0]`,
+		}, { // tests to-string of opcodes
+			code: "{opcodes: [], step: function(log) { this.opcodes.push(log.op.toString()); }, fault: function() {}, result: function() { return this.opcodes; }}",
+			want: `["PUSH1","PUSH1","STOP"]`,
+		},*/{ // tests intrinsic gas
+			code: "{depths: [], step: function() {}, fault: function() {}, result: function(ctx) { return ctx.gasPrice+'.'+ctx.gasUsed+'.'+ctx.intrinsicGas; }}",
+			want: `"100000.6.21000"`,
+		}, /* {
+			code: "{res: null, step: function(log) {}, fault: function() {}, result: function() { return toWord('0xffaa') }}",
+			want: `{"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0,"7":0,"8":0,"9":0,"10":0,"11":0,"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":0,"19":0,"20":0,"21":0,"22":0,"23":0,"24":0,"25":0,"26":0,"27":0,"28":0,"29":0,"30":255,"31":170}`,
+		}, { // test feeding a buffer back into go
+			code: "{res: null, step: function(log) { var address = log.contract.getAddress(); this.res = toAddress(address); }, fault: function() {}, result: function() { return this.res }}",
+			want: `{"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0,"7":0,"8":0,"9":0,"10":0,"11":0,"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":0,"19":0}`,
+		}, {
+			code: "{res: null, step: function(log) { var address = '0x0000000000000000000000000000000000000000'; this.res = toAddress(address); }, fault: function() {}, result: function() { return this.res }}",
+			want: `{"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0,"7":0,"8":0,"9":0,"10":0,"11":0,"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":0,"19":0}`,
+		}, {
+			code: "{res: null, step: function(log) { var address = Array.prototype.slice.call(log.contract.getAddress()); this.res = toAddress(address); }, fault: function() {}, result: function() { return this.res }}",
+			want: `{"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0,"7":0,"8":0,"9":0,"10":0,"11":0,"12":0,"13":0,"14":0,"15":0,"16":0,"17":0,"18":0,"19":0}`,
+		},*/
+	} {
+		if have, err := execTracer(tt.code); tt.want != string(have) || tt.fail != err {
+			t.Errorf("testcase %d: expected return value to be '%s' got '%s', error to be '%s' got '%s'\n\tcode: %v", i, tt.want, string(have), tt.fail, err, tt.code)
 		}
 	}
 }
