@@ -227,5 +227,5 @@ func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, bloc
 	rs, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 	fmt.Printf("%T rs:`%v`, err: %s\n", rs, rs, err)
 	// Trace the transaction and return
-	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
+	return rs, err
 }
