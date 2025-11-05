@@ -731,7 +731,9 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, txctx *tr
 	//	TxIndex:   i,
 	//	TxHash:    tx.Hash(),
 	//}
-	return hmy.traceTx(ctx, message, txctx, vmctx, statedb, config)
+	rs, err := hmy.traceTx(ctx, message, txctx, vmctx, statedb, config)
+	fmt.Printf("%T, rs: `%+v`, err: %s", rs, rs, err)
+	return rs, err
 	/*
 		// Assemble the structured logger or the JavaScript tracer
 		var (
