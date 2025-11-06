@@ -752,7 +752,7 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 	}
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(vmctx, core.NewEVMTxContext(message), statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer})
-
+	fmt.Printf("traceTx: tracer: %T, config.Tracer: `%v`\n", tracer, config.Tracer)
 	result, err := core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()))
 	if err != nil {
 		return nil, fmt.Errorf("tracing failed: %v", err)
