@@ -428,12 +428,16 @@ func NewHost(cfg HostConfig) (Host, error) {
 			subLogger.Error().Err(err).Str("addr", addr).Msg("invalid trusted node addr")
 			continue
 		}
+
 		info, err := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
 		if err != nil {
 			subLogger.Error().Err(err).Str("addr", addr).Msg("failed to parse trusted node")
 			continue
 		}
 		h.trustedPeerIDs[info.ID] = struct{}{}
+
+		ps.AddAddrs(info.ID, info.Addrs, libp2p_peerstore.PermanentAddrTTL)
+		subLogger.Info().Interface("peerAddr", peerAddr).Msg("trusted node added to peerstore")
 	}
 
 	utils.Logger().Info().
@@ -544,8 +548,6 @@ func (host *HostV2) Start() error {
 	for _, proto := range host.streamProtos {
 		proto.Start()
 	}
-	// add trusted nodes
-	host.AddTrustedNodes()
 	// start discovery
 	return host.discovery.Start()
 }
