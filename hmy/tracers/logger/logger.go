@@ -249,12 +249,14 @@ func (l *StructLogger) GetResult() (json.RawMessage, error) {
 	if failed && l.err != vm.ErrExecutionReverted {
 		returnVal = ""
 	}
-	return json.Marshal(&ExecutionResult{
+	rs := &ExecutionResult{
 		Gas:         l.usedGas,
 		Failed:      failed,
 		ReturnValue: returnVal,
 		StructLogs:  formatLogs(l.StructLogs()),
-	})
+	}
+	fmt.Printf("StructLogger*GetResult: %+v\n", rs)
+	return json.Marshal(rs)
 }
 
 // Stop terminates execution of the tracer at the first opportune moment.
