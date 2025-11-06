@@ -53,7 +53,7 @@ func TestPolicyStrings(t *testing.T) {
 }
 
 func TestAddingQuoromParticipants(t *testing.T) {
-	decider := NewDecider(SuperMajorityVote, shard.BeaconChainShardID)
+	decider := NewDecider(SuperMajorityVote, shard.BeaconChainShardID, false)
 
 	assert.Equal(t, int64(0), decider.ParticipantsCount())
 
@@ -77,7 +77,7 @@ func TestSubmitVote(test *testing.T) {
 	viewID := uint64(2)
 
 	decider := NewDecider(
-		SuperMajorityStake, shard.BeaconChainShardID,
+		SuperMajorityStake, shard.BeaconChainShardID, false,
 	)
 
 	message := "test string"
@@ -131,7 +131,7 @@ func TestSubmitVoteAggregateSig(test *testing.T) {
 	viewID := uint64(2)
 
 	decider := NewDecider(
-		SuperMajorityStake, shard.BeaconChainShardID,
+		SuperMajorityStake, shard.BeaconChainShardID, false,
 	)
 
 	blsPriKey1 := bls.RandPrivateKey()
@@ -203,7 +203,7 @@ func TestAddNewVote(test *testing.T) {
 	viewID := uint64(2)
 
 	decider := NewDecider(
-		SuperMajorityStake, shard.BeaconChainShardID,
+		SuperMajorityStake, shard.BeaconChainShardID, false,
 	)
 
 	slotList := shard.SlotList{}
@@ -305,7 +305,7 @@ func TestAddNewVoteAggregateSig(test *testing.T) {
 	viewID := uint64(2)
 
 	decider := NewDecider(
-		SuperMajorityStake, shard.BeaconChainShardID,
+		SuperMajorityStake, shard.BeaconChainShardID, false,
 	)
 
 	slotList := shard.SlotList{}
@@ -386,7 +386,7 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 	viewID := uint64(2)
 
 	decider := NewDecider(
-		SuperMajorityStake, shard.BeaconChainShardID,
+		SuperMajorityStake, shard.BeaconChainShardID, false,
 	)
 
 	slotList := shard.SlotList{}

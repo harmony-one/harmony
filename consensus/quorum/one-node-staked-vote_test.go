@@ -34,7 +34,7 @@ var (
 type secretKeyMap map[bls.SerializedPublicKey]bls_core.SecretKey
 
 func init() {
-	basicDecider = NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
+	basicDecider = NewDecider(SuperMajorityStake, shard.BeaconChainShardID, false)
 	shard.Schedule = shardingconfig.LocalnetSchedule
 }
 
@@ -71,7 +71,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 		pubKeys = append(pubKeys, wrapper)
 	}
 
-	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
+	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID, false)
 	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	tally, err := decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
@@ -100,7 +100,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 		pubKeys = append(pubKeys, wrapper)
 	}
 
-	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
+	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID, false)
 	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	tally, err := decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,

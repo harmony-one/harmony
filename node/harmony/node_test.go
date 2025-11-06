@@ -118,7 +118,7 @@ func TestNewNode(t *testing.T) {
 	}
 	engine := chain.NewEngine()
 	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+		quorum.SuperMajorityVote, shard.BeaconChainShardID, false,
 	)
 	chainconfig := nodeconfig.GetShardConfig(shard.BeaconChainShardID).GetNetworkType().ChainConfig()
 	collection := shardchain.NewCollection(
