@@ -590,6 +590,7 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		forceReachabilityPublic = true
 	}
 
+	// todo(sun): quic
 	myHost, err = p2p.NewHost(p2p.HostConfig{
 		Self:                            &selfPeer,
 		BLSKey:                          nodeConfig.P2PPriKey,
@@ -613,6 +614,11 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		DialTimeout:                     hc.P2P.DialTimeout,
 		Muxer:                           hc.P2P.Muxer,
 		NoRelay:                         hc.P2P.NoRelay,
+		QuicConfig: p2p.QuicConfig{
+			Enabled:  hc.P2P.EnableQuic,
+			Port:     strconv.Itoa(hc.P2P.QuicPort),
+			Priority: hc.P2P.QuicPriority,
+		},
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
