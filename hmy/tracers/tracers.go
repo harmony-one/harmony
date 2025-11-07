@@ -61,6 +61,7 @@ func RegisterLookup(wildcard bool, lookup lookupFunc) {
 	} else {
 		lookups = append([]lookupFunc{lookup}, lookups...)
 	}
+	fmt.Printf("RegisterLookup lookups %d", len(lookups))
 }
 
 // New returns a new instance of a tracer, by iterating through the
