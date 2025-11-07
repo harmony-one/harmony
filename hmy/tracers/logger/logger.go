@@ -76,6 +76,9 @@ type StructLog struct {
 	Depth         int                         `json:"depth"`
 	RefundCounter uint64                      `json:"refund"`
 	Err           error                       `json:"-"`
+
+	ContractAddress common.Address `json:"contractAddress"`
+	CallerAddress   common.Address `json:"callerAddress"`
 }
 
 // overrides for gencodec
@@ -210,7 +213,7 @@ func (l *StructLogger) CaptureState(vv *vm.EVM, pc uint64, op vm.OpCode, gas, co
 		copy(rdata, rData)
 	}
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err}
+	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err, contract.Address(), contract.CallerAddress}
 	l.logs = append(l.logs, log)
 }
 

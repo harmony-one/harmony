@@ -17,20 +17,22 @@ var _ = (*structLogMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (s StructLog) MarshalJSON() ([]byte, error) {
 	type StructLog struct {
-		Pc            uint64                      `json:"pc"`
-		Op            vm.OpCode                   `json:"op"`
-		Gas           math.HexOrDecimal64         `json:"gas"`
-		GasCost       math.HexOrDecimal64         `json:"gasCost"`
-		Memory        hexutil.Bytes               `json:"memory,omitempty"`
-		MemorySize    int                         `json:"memSize"`
-		Stack         []uint256.Int               `json:"stack"`
-		ReturnData    hexutil.Bytes               `json:"returnData,omitempty"`
-		Storage       map[common.Hash]common.Hash `json:"-"`
-		Depth         int                         `json:"depth"`
-		RefundCounter uint64                      `json:"refund"`
-		Err           error                       `json:"-"`
-		OpName        string                      `json:"opName"`
-		ErrorString   string                      `json:"error,omitempty"`
+		Pc              uint64                      `json:"pc"`
+		Op              vm.OpCode                   `json:"op"`
+		Gas             math.HexOrDecimal64         `json:"gas"`
+		GasCost         math.HexOrDecimal64         `json:"gasCost"`
+		Memory          hexutil.Bytes               `json:"memory,omitempty"`
+		MemorySize      int                         `json:"memSize"`
+		Stack           []uint256.Int               `json:"stack"`
+		ReturnData      hexutil.Bytes               `json:"returnData,omitempty"`
+		Storage         map[common.Hash]common.Hash `json:"-"`
+		Depth           int                         `json:"depth"`
+		RefundCounter   uint64                      `json:"refund"`
+		Err             error                       `json:"-"`
+		ContractAddress common.Address              `json:"contractAddress"`
+		CallerAddress   common.Address              `json:"callerAddress"`
+		OpName          string                      `json:"opName"`
+		ErrorString     string                      `json:"error,omitempty"`
 	}
 	var enc StructLog
 	enc.Pc = s.Pc
@@ -45,6 +47,8 @@ func (s StructLog) MarshalJSON() ([]byte, error) {
 	enc.Depth = s.Depth
 	enc.RefundCounter = s.RefundCounter
 	enc.Err = s.Err
+	enc.ContractAddress = s.ContractAddress
+	enc.CallerAddress = s.CallerAddress
 	enc.OpName = s.OpName()
 	enc.ErrorString = s.ErrorString()
 	return json.Marshal(&enc)
@@ -53,18 +57,20 @@ func (s StructLog) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (s *StructLog) UnmarshalJSON(input []byte) error {
 	type StructLog struct {
-		Pc            *uint64                     `json:"pc"`
-		Op            *vm.OpCode                  `json:"op"`
-		Gas           *math.HexOrDecimal64        `json:"gas"`
-		GasCost       *math.HexOrDecimal64        `json:"gasCost"`
-		Memory        *hexutil.Bytes              `json:"memory,omitempty"`
-		MemorySize    *int                        `json:"memSize"`
-		Stack         []uint256.Int               `json:"stack"`
-		ReturnData    *hexutil.Bytes              `json:"returnData,omitempty"`
-		Storage       map[common.Hash]common.Hash `json:"-"`
-		Depth         *int                        `json:"depth"`
-		RefundCounter *uint64                     `json:"refund"`
-		Err           error                       `json:"-"`
+		Pc              *uint64                     `json:"pc"`
+		Op              *vm.OpCode                  `json:"op"`
+		Gas             *math.HexOrDecimal64        `json:"gas"`
+		GasCost         *math.HexOrDecimal64        `json:"gasCost"`
+		Memory          *hexutil.Bytes              `json:"memory,omitempty"`
+		MemorySize      *int                        `json:"memSize"`
+		Stack           []uint256.Int               `json:"stack"`
+		ReturnData      *hexutil.Bytes              `json:"returnData,omitempty"`
+		Storage         map[common.Hash]common.Hash `json:"-"`
+		Depth           *int                        `json:"depth"`
+		RefundCounter   *uint64                     `json:"refund"`
+		Err             error                       `json:"-"`
+		ContractAddress *common.Address             `json:"contractAddress"`
+		CallerAddress   *common.Address             `json:"callerAddress"`
 	}
 	var dec StructLog
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -105,6 +111,12 @@ func (s *StructLog) UnmarshalJSON(input []byte) error {
 	}
 	if dec.Err != nil {
 		s.Err = dec.Err
+	}
+	if dec.ContractAddress != nil {
+		s.ContractAddress = *dec.ContractAddress
+	}
+	if dec.CallerAddress != nil {
+		s.CallerAddress = *dec.CallerAddress
 	}
 	return nil
 }
