@@ -36,6 +36,7 @@ import (
 var assetTracers = make(map[string]string)
 
 func init() {
+	panic("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	var err error
 	assetTracers, err = jsassets.Load()
 	if err != nil {
