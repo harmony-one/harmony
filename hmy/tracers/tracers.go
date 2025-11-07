@@ -71,7 +71,7 @@ func New(code string, ctx *Context, cfg json.RawMessage) (Tracer, error) {
 			return tracer, nil
 		}
 	}
-	return nil, errors.New("tracer not found")
+	return nil, errors.Errorf("tracer not found for code `%s`", code)
 }
 
 type ctorFn func(*Context, json.RawMessage) (Tracer, error)
