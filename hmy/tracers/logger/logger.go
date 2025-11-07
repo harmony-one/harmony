@@ -429,6 +429,9 @@ type StructLogRes struct {
 	Memory        *[]string          `json:"memory,omitempty"`
 	Storage       *map[string]string `json:"storage,omitempty"`
 	RefundCounter uint64             `json:"refund,omitempty"`
+
+	CallerAddress   common.Address `json:"callerAddress"`
+	ContractAddress common.Address `json:"contractAddress"`
 }
 
 // formatLogs formats EVM returned structured logs for json output
@@ -443,6 +446,9 @@ func formatLogs(logs []StructLog) []StructLogRes {
 			Depth:         trace.Depth,
 			Error:         trace.ErrorString(),
 			RefundCounter: trace.RefundCounter,
+
+			CallerAddress:   trace.CallerAddress,
+			ContractAddress: trace.ContractAddress,
 		}
 		if trace.Stack != nil {
 			stack := make([]string, len(trace.Stack))

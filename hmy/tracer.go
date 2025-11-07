@@ -1038,25 +1038,25 @@ func (r *StructLogRes) GetOperatorEvent(key string) string {
 }
 
 // FormatLogs formats EVM returned structured logs for json output
-func FormatLogs(logs []*vm.StructLog, conf *tracers.TraceConfig) []StructLogRes {
-	formatted := make([]StructLogRes, len(logs))
-	for index, trace := range logs {
-		formatted[index] = StructLogRes{
-			Pc:              trace.Pc,
-			Op:              trace.Op.String(),
-			CallerAddress:   trace.CallerAddress,
-			ContractAddress: trace.ContractAddress,
-			Gas:             trace.Gas,
-			GasCost:         trace.GasCost,
-			Depth:           trace.Depth,
-			Error:           trace.Err,
-
-			rawStack:         trace.Stack,
-			rawAfterStack:    trace.AfterStack,
-			rawMemory:        trace.Memory,
-			rawStorage:       trace.Storage,
-			rawOperatorEvent: trace.OperatorEvent,
-		}
-	}
-	return formatted
-}
+//func FormatLogs(logs []*vm.StructLog, conf *tracers.TraceConfig) []StructLogRes {
+//	formatted := make([]StructLogRes, len(logs))
+//	for index, trace := range logs {
+//		formatted[index] = StructLogRes{
+//			Pc:              trace.Pc,
+//			Op:              trace.Op.String(),
+//			CallerAddress:   trace.CallerAddress,
+//			ContractAddress: trace.ContractAddress,
+//			Gas:             trace.Gas,
+//			GasCost:         trace.GasCost,
+//			Depth:           trace.Depth,
+//			Error:           trace.Err,
+//
+//			rawStack:         trace.Stack,
+//			rawAfterStack:    trace.AfterStack,
+//			rawMemory:        trace.Memory,
+//			rawStorage:       trace.Storage,
+//			rawOperatorEvent: trace.OperatorEvent,
+//		}
+//	}
+//	return formatted
+//}
