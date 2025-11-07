@@ -41,7 +41,9 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
 	tracers.RegisterLookup(true, newJsTracer)
+	panic(fmt.Sprintf("JS tracer not registered %d", tracers.RegisterLookupCount()))
 }
 
 // bigIntProgram is compiled once and the exported function mostly invoked to convert
