@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	_ "github.com/harmony-one/harmony/hmy/tracers/js"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	commonRPC "github.com/harmony-one/harmony/rpc/harmony/common"
 	"github.com/harmony-one/harmony/shard"
