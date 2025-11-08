@@ -40,7 +40,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/eth/tracers"
+	"github.com/harmony-one/harmony/hmy/tracers"
 )
 
 // init registers itself this packages as a lookup for tracers.
