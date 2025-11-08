@@ -37,6 +37,8 @@ func EnableEIP(eipNum int, jt *JumpTable) error {
 		enable1344(jt)
 	case 1153:
 		enable1153(jt)
+	case 3855:
+		enable3855(jt)
 	default:
 		return fmt.Errorf("undefined eip %d", eipNum)
 	}
@@ -150,4 +152,16 @@ func opTstore(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memor
 
 	interpreter.evm.StateDB.SetTransientState(contract.Address(), key, val)
 	return nil, nil
+}
+
+// enable3855 applies EIP-3855 (PUSH0 opcode)
+// - Adds PUSH0 opcode that pushes the value 0 onto the stack
+func enable3855(jt *JumpTable) {
+	jt[PUSH0] = operation{
+		execute:     opPush0,
+		constantGas: GasQuickStep,
+		minStack:    minStack(0, 1),
+		maxStack:    maxStack(0, 1),
+		valid:       true,
+	}
 }

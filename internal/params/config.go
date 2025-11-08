@@ -83,6 +83,7 @@ var (
 		HIP32Epoch:                            big.NewInt(2152), // 2024-10-31 13:02 UTC
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -133,6 +134,7 @@ var (
 		TestnetExternalEpoch:                  big.NewInt(3044),
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -183,6 +185,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -285,6 +288,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -335,6 +339,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      big.NewInt(4),
 		EIP2537PrecompileEpoch:                EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -388,6 +393,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0), // EIP2537PrecompileEpoch
+		big.NewInt(0), // EIP3855Epoch
 	}
 
 	// TestChainConfig ...
@@ -441,6 +447,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0), // EIP2537PrecompileEpoch
+		big.NewInt(0), // EIP3855Epoch
 	}
 
 	// TestRules ...
@@ -570,6 +577,9 @@ type ChainConfig struct {
 
 	// EIP2537PrecompileEpoch is the first epoch to support the EIP-2537 precompiles
 	EIP2537PrecompileEpoch *big.Int `json:"eip2537-precompile-epoch,omitempty"`
+
+	// EIP3855Epoch is the first epoch to support EIP-3855 (PUSH0 opcode)
+	EIP3855Epoch *big.Int `json:"eip3855-epoch,omitempty"`
 
 	// ChainIdFixEpoch is the first epoch to return ethereum compatible chain id by ChainID() op code
 	ChainIdFixEpoch *big.Int `json:"chain-id-fix-epoch,omitempty"`
@@ -863,6 +873,12 @@ func (c *ChainConfig) IsCrossShardXferPrecompile(epoch *big.Int) bool {
 // precompiles are available in the EVM
 func (c *ChainConfig) IsEIP2537Precompile(epoch *big.Int) bool {
 	return isForked(c.EIP2537PrecompileEpoch, epoch)
+}
+
+// IsEIP3855 determines whether EIP-3855 (PUSH0 opcode)
+// is available in the EVM
+func (c *ChainConfig) IsEIP3855(epoch *big.Int) bool {
+	return isForked(c.EIP3855Epoch, epoch)
 }
 
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.

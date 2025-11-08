@@ -111,6 +111,18 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 		default:
 			jt = frontierInstructionSet
 		}
+		// Enable epoch-based EIPs
+		epochBasedEIPs := []int{}
+		if evm.ChainConfig().IsEIP3855(evm.EpochNumber) {
+			epochBasedEIPs = append(epochBasedEIPs, 3855)
+		}
+		// Enable all epoch-based EIPs
+		for _, eip := range epochBasedEIPs {
+			if err := EnableEIP(eip, &jt); err != nil {
+				utils.Logger().Error().Int("eip", eip).Err(err).Msg("Epoch-based EIP activation failed")
+			}
+		}
+		// Enable manually specified extra EIPs
 		for i, eip := range cfg.ExtraEips {
 			if err := EnableEIP(eip, &jt); err != nil {
 				// Disable it, so caller can check if it's activated or not
