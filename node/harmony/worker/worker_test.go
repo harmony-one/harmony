@@ -37,7 +37,7 @@ func TestNewWorker(t *testing.T) {
 			Config:  chainConfig,
 			Factory: blockFactory,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
-			ShardID: 10,
+			ShardID: 0,
 		}
 		engine = chain2.NewEngine()
 	)
@@ -45,10 +45,10 @@ func TestNewWorker(t *testing.T) {
 	genesis := gspec.MustCommit(database)
 	_ = genesis
 	cacheConfig := &core.CacheConfig{SnapshotLimit: 0}
-	chain, err := core.NewBlockChain(database, nil, &core.BlockChainImpl{}, cacheConfig, gspec.Config, engine, vm.Config{})
+	chain, err := core.NewBlockChain(database, nil, nil, cacheConfig, gspec.Config, engine, vm.Config{})
 
 	if err != nil {
-		t.Error(err)
+		t.Fatalf("failed to create blockchain: %v", err)
 	}
 	// Create a new worker
 	worker := New(chain, nil)

@@ -233,3 +233,15 @@ func opPush0(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 	scope.Stack.push(new(uint256.Int))
 	return nil, nil
 }
+
+// enable3855 applies EIP-3855 (PUSH0 opcode)
+// - Adds PUSH0 opcode that pushes the value 0 onto the stack
+func enable3855(jt *JumpTable) {
+	jt[PUSH0] = operation{
+		execute:     opPush0,
+		constantGas: GasQuickStep,
+		minStack:    minStack(0, 1),
+		maxStack:    maxStack(0, 1),
+		valid:       true,
+	}
+}

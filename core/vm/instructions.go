@@ -880,6 +880,13 @@ func makeLog(size int) executionFunc {
 	}
 }
 
+// opPush0 pushes the value 0 onto the stack
+func opPush0(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	stack.push(interpreter.intPool.getZero())
+	*pc++
+	return nil, nil
+}
+
 // opPush1 is a specialized version of pushN
 func opPush1(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	var (
