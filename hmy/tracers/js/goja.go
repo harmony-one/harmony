@@ -36,7 +36,6 @@ import (
 var assetTracers = make(map[string]string)
 
 func init() {
-	panic("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	var err error
 	assetTracers, err = jsassets.Load()
 	if err != nil {
@@ -44,7 +43,6 @@ func init() {
 	}
 
 	tracers.RegisterLookup(true, newJsTracer)
-	panic(fmt.Sprintf("JS tracer not registered %d", tracers.RegisterLookupCount()))
 }
 
 // bigIntProgram is compiled once and the exported function mostly invoked to convert
