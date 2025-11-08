@@ -25,9 +25,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/eth/tracers"
+	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/hmy/tracers"
 )
 
 func init() {
@@ -68,7 +68,7 @@ func (t *revertReasonTracer) CaptureEnd(output []byte, _ uint64, _ time.Duration
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
-func (t *revertReasonTracer) CaptureState(_ uint64, _ vm.OpCode, _, _ uint64, _ *vm.ScopeContext, _ []byte, _ int, _ error) {
+func (t *revertReasonTracer) CaptureState(env *vm.EVM, _ uint64, _ vm.OpCode, _, _ uint64, _ *vm.ScopeContext, _ []byte, _ int, _ error) {
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault.

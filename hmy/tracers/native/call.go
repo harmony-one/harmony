@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/eth/tracers"
+	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/hmy/tracers"
 )
 
 func init() {
@@ -103,7 +103,7 @@ func (t *callTracer) CaptureEnd(output []byte, gasUsed uint64, _ time.Duration, 
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
-func (t *callTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+func (t *callTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault.

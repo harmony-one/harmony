@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/eth/tracers"
+	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/hmy/tracers"
 )
 
 func init() {
@@ -84,7 +84,7 @@ func (t *fourByteTracer) CaptureStart(env *vm.EVM, from common.Address, to commo
 	t.env = env
 
 	// Update list of precompiles based on current block
-	rules := env.ChainConfig().Rules(env.Context.BlockNumber, env.Context.Random != nil)
+	rules := env.ChainConfig().Rules(env.Context.BlockNumber /*, env.Context.Random != nil*/)
 	t.activePrecompiles = vm.ActivePrecompiles(rules)
 
 	// Save the outer calldata also
@@ -94,7 +94,7 @@ func (t *fourByteTracer) CaptureStart(env *vm.EVM, from common.Address, to commo
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
-func (t *fourByteTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+func (t *fourByteTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 }
 
 // CaptureEnter is called when EVM enters a new scope (via call, create or selfdestruct).
