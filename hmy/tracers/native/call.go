@@ -45,6 +45,7 @@ type callFrame struct {
 	Output  string      `json:"output,omitempty"`
 	Error   string      `json:"error,omitempty"`
 	Calls   []callFrame `json:"calls,omitempty"`
+	Time    string      `json:"time"`
 }
 
 type callTracer struct {
