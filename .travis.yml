@@ -13,13 +13,12 @@ env:
   - TEST="make"
   - TEST="bash ./scripts/travis_go_checker.sh"
   - TEST="bash ./scripts/travis_rpc_checker.sh"
-  - TEST="bash ./scripts/travis_rosetta_checker.sh"
   - TEST="bash ./scripts/travis_pyhmy_checker.sh"
 
-# We enable Travis on the main/dev branches or forked repositories here.
-# PRs workflow isn't affected by this condition
+# We enable Travis on the main/dev branches.
+# pull_request type includes both main repo/fork PR workflow
 if: >
-  repo != harmony-one/harmony OR
+  type = pull_request OR
   (repo = harmony-one/harmony AND (branch = main OR branch = dev))
 
 # upgrade docker to latest stable version

@@ -16,6 +16,7 @@
 
 package vm
 
+/*
 import (
 	"encoding/json"
 	"io"
@@ -30,6 +31,36 @@ import (
 type JSONLogger struct {
 	encoder *json.Encoder
 	cfg     *LogConfig
+}
+
+func (l *JSONLogger) CaptureTxStart(gasLimit uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (l *JSONLogger) CaptureTxEnd(restGas uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (l *JSONLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (l *JSONLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (l *JSONLogger) CaptureFault(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, depth int, err error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (l *JSONLogger) CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
@@ -68,7 +99,7 @@ func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint
 		RefundCounter:   env.StateDB.GetRefund(),
 		Err:             err,
 	}
-	if !l.cfg.DisableMemory {
+	if l.cfg.EnableMemory {
 		log.Memory = memory.Data()
 	}
 	if !l.cfg.DisableStack {
@@ -95,3 +126,4 @@ func (l *JSONLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, 
 	}
 	return l.encoder.Encode(endLog{common.Bytes2Hex(output), math.HexOrDecimal64(gasUsed), t, ""})
 }
+*/

@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/eth/rpc"
-	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/hmy/tracers"
 )
 
 var (
@@ -21,7 +21,7 @@ type PublicParityTracerService struct {
 func (s *PublicParityTracerService) Transaction(ctx context.Context, hash common.Hash) (interface{}, error) {
 	timer := DoMetricRPCRequest(Transaction)
 	defer DoRPCRequestDuration(Transaction, timer)
-	return s.TraceTransaction(ctx, hash, &hmy.TraceConfig{Tracer: &parityTraceGO})
+	return s.TraceTransaction(ctx, hash, &tracers.TraceConfig{Tracer: &parityTraceGO})
 }
 
 // trace_block RPC
@@ -36,7 +36,7 @@ func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockN
 	if results, err := s.hmy.NodeAPI.GetTraceResultByHash(block.Hash()); err == nil {
 		return results, nil
 	}
-	results, err := s.hmy.TraceBlock(ctx, block, &hmy.TraceConfig{Tracer: &parityTraceGO})
+	results, err := s.hmy.TraceBlock(ctx, block, &tracers.TraceConfig{Tracer: &parityTraceGO})
 	if err != nil {
 		return results, err
 	}

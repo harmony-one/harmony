@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/core/events"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/state/snapshot"
@@ -157,7 +158,7 @@ type BlockChain interface {
 	// SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 	SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription
 	// SubscribeTraceEvent registers a subscription of ChainEvent.
-	SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription
+	SubscribeTraceEvent(ch chan<- events.TraceEvent) event.Subscription
 	// SubscribeChainEvent registers a subscription of ChainEvent.
 	SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription
 	// SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
