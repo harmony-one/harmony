@@ -217,8 +217,7 @@ type ParityBlockTracer struct {
 }
 
 func (jst *ParityBlockTracer) CaptureTxStart(gasLimit uint64) {
-	//TODO implement me
-	//panic("implement me")
+
 }
 
 func (jst *ParityBlockTracer) CaptureTxEnd(restGas uint64) {

@@ -215,6 +215,14 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 	if err := st.preCheck(); err != nil {
 		return ExecutionResult{}, err
 	}
+
+	if st.evm.Config.Debug {
+		st.evm.Config.Tracer.CaptureTxStart(st.initialGas)
+		defer func() {
+			st.evm.Config.Tracer.CaptureTxEnd(st.gas)
+		}()
+	}
+
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
 	homestead := st.evm.ChainConfig().IsS3(st.evm.Context.EpochNumber) // s3 includes homestead

@@ -3,6 +3,7 @@ package core
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/core/events"
 	"github.com/harmony-one/harmony/core/state/snapshot"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -180,7 +181,7 @@ func (a Stub) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscr
 	return nil
 }
 
-func (a Stub) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+func (a Stub) SubscribeTraceEvent(ch chan<- events.TraceEvent) event.Subscription {
 	return nil
 }
 
