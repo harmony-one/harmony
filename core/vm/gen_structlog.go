@@ -28,8 +28,8 @@ func (s StructLog) MarshalJSON() ([]byte, error) {
 		Depth           int                         `json:"depth"`
 		RefundCounter   uint64                      `json:"refund"`
 		Err             error                       `json:"-"`
-		CallerAddress   common.Address              `json:"callerAddress"`
-		ContractAddress common.Address              `json:"contractAddress"`
+		CallerAddress   common.Address              `json:"callerAddress,omitempty"`
+		ContractAddress common.Address              `json:"contractAddress,omitempty"`
 		AfterStack      []uint256.Int               `json:"afterStack"`
 		AfterMemory     []byte                      `json:"afterMemory"`
 		OperatorEvent   map[string]string           `json:"operatorEvent"`
@@ -74,8 +74,8 @@ func (s *StructLog) UnmarshalJSON(input []byte) error {
 		Depth           *int                        `json:"depth"`
 		RefundCounter   *uint64                     `json:"refund"`
 		Err             error                       `json:"-"`
-		CallerAddress   *common.Address             `json:"callerAddress"`
-		ContractAddress *common.Address             `json:"contractAddress"`
+		CallerAddress   *common.Address             `json:"callerAddress,omitempty"`
+		ContractAddress *common.Address             `json:"contractAddress,omitempty"`
 		AfterStack      []uint256.Int               `json:"afterStack"`
 		AfterMemory     []byte                      `json:"afterMemory"`
 		OperatorEvent   map[string]string           `json:"operatorEvent"`
