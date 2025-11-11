@@ -34,7 +34,6 @@ var _ vm.WriteCapablePrecompiledContract = dummyPrecompile{}
 
 func (d dummyPrecompile) Run(input []byte) ([]byte, error) { return nil, nil }
 
-// func (d dummyPrecompile) RequiredGas(input []byte) uint64  { return 0 }
 func (d dummyPrecompile) RequiredGas(evm *vm.EVM, contract *vm.Contract, input []byte) (uint64, error) {
 	return 0, nil
 }
