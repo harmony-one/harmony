@@ -159,7 +159,7 @@ func TestNewNode(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 
-	node := New(host, consensus, nil, nil, nil, nil, reg)
+	node := New(host, consensus, nil, nil, reg)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}

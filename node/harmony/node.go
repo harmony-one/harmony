@@ -967,8 +967,6 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(
 	host p2p.Host,
 	consensusObj *consensus.Consensus,
-	blacklist map[common.Address]struct{},
-	allowedTxs map[common.Address][]core.AllowedTxData,
 	localAccounts []common.Address,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
 	registry *registry.Registry,
@@ -1045,8 +1043,6 @@ func New(
 			txPoolConfig.PriceBump = 10
 		}
 
-		txPoolConfig.Blacklist = blacklist
-		txPoolConfig.AllowedTxs = allowedTxs
 		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
 		txPoolConfig.AddEvent = func(tx types.PoolTransaction, local bool) {
 			// in tikv mode, writer will publish tx pool update to all reader

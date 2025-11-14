@@ -92,8 +92,6 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		KMSConfigFile:    "",
 	},
 	TxPool: harmonyconfig.TxPoolConfig{
-		BlacklistFile:     "./.hmy/blacklist.txt",
-		AllowedTxsFile:    "./.hmy/allowedtxs.txt",
 		RosettaFixFile:    "",
 		AccountSlots:      core.DefaultTxPoolConfig.AccountSlots,
 		LocalAccountsFile: "./.hmy/locals.txt",

@@ -59,7 +59,7 @@ func TestAddNewBlock(t *testing.T) {
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Testnet)
 	var block *types.Block
-	node := node.New(host, consensus, nil, nil, nil, nil, reg)
+	node := node.New(host, consensus, nil, nil, reg)
 	commitSigs := make(chan []byte, 1)
 	commitSigs <- []byte{}
 	block, err = node.Worker.FinalizeNewBlock(

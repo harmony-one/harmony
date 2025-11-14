@@ -159,10 +159,7 @@ var (
 		tpGlobalQueueFlag,
 		tpLifetimeFlag,
 		rosettaFixFileFlag,
-		tpBlacklistFileFlag,
-		legacyTPBlacklistFileFlag,
 		localAccountsFileFlag,
-		allowedTxsFileFlag,
 		tpPriceLimitFlag,
 		tpPriceBumpFlag,
 	}
@@ -1292,31 +1289,15 @@ var (
 		Usage:    "number of executable transaction slots guaranteed per account",
 		DefValue: int(defaultConfig.TxPool.AccountSlots),
 	}
-	tpBlacklistFileFlag = cli.StringFlag{
-		Name:     "txpool.blacklist",
-		Usage:    "file of blacklisted wallet addresses",
-		DefValue: defaultConfig.TxPool.BlacklistFile,
-	}
 	rosettaFixFileFlag = cli.StringFlag{
 		Name:     "txpool.rosettafixfile",
 		Usage:    "file of rosetta fix file",
 		DefValue: defaultConfig.TxPool.RosettaFixFile,
 	}
-	legacyTPBlacklistFileFlag = cli.StringFlag{
-		Name:       "blacklist",
-		Usage:      "Path to newline delimited file of blacklisted wallet addresses",
-		DefValue:   defaultConfig.TxPool.BlacklistFile,
-		Deprecated: "use --txpool.blacklist",
-	}
 	localAccountsFileFlag = cli.StringFlag{
 		Name:     "txpool.locals",
 		Usage:    "file of local wallet addresses",
 		DefValue: defaultConfig.TxPool.LocalAccountsFile,
-	}
-	allowedTxsFileFlag = cli.StringFlag{
-		Name:     "txpool.allowedtxs",
-		Usage:    "file of allowed transactions",
-		DefValue: defaultConfig.TxPool.AllowedTxsFile,
 	}
 	tpGlobalSlotsFlag = cli.IntFlag{
 		Name:     "txpool.globalslots",
@@ -1382,16 +1363,8 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		}
 		config.TxPool.GlobalQueue = uint64(value)
 	}
-	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
-		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
-	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {
-		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, legacyTPBlacklistFileFlag)
-	}
 	if cli.IsFlagChanged(cmd, localAccountsFileFlag) {
 		config.TxPool.LocalAccountsFile = cli.GetStringFlagValue(cmd, localAccountsFileFlag)
-	}
-	if cli.IsFlagChanged(cmd, allowedTxsFileFlag) {
-		config.TxPool.AllowedTxsFile = cli.GetStringFlagValue(cmd, allowedTxsFileFlag)
 	}
 	if cli.IsFlagChanged(cmd, tpLifetimeFlag) {
 		value, err := time.ParseDuration(cli.GetStringFlagValue(cmd, tpLifetimeFlag))

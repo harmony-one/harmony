@@ -31,7 +31,7 @@ func TestHarmonyFlags(t *testing.T) {
 				"/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/13.113.101." +
 				"219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX,/ip4/99.81.170.167/tcp/12019/p" +
 				"2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj --ip 8.8.8.8 --port 9000 --network_type=mainn" +
-				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
+				"et --dns_zone=t.hmny.io --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
 				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5 -" +
 				"-localnet.blocks_per_epoch=64 --localnet.blocks_per_epoch_v2=64",
@@ -127,7 +127,6 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
-					BlacklistFile:     "./.hmy/blacklist.txt",
 					AllowedTxsFile:    "./.hmy/allowedtxs.txt",
 					RosettaFixFile:    "",
 					AccountSlots:      16,
@@ -1264,7 +1263,6 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
@@ -1278,9 +1276,8 @@ func TestTxPoolFlags(t *testing.T) {
 			},
 		},
 		{
-			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file", "--txpool.allowedtxs", "allowedtxs.txt"},
+			args: []string{"--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:     "blacklist.file",
 				AllowedTxsFile:    "allowedtxs.txt",
 				RosettaFixFile:    "rosettafix.file",
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
@@ -1294,9 +1291,8 @@ func TestTxPoolFlags(t *testing.T) {
 			},
 		},
 		{
-			args: []string{"--blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
+			args: []string{"--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:     "blacklist.file",
 				RosettaFixFile:    "rosettafix.file",
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
@@ -1310,10 +1306,9 @@ func TestTxPoolFlags(t *testing.T) {
 			},
 		},
 		{
-			args: []string{"--txpool.accountslots", "5", "--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
+			args: []string{"--txpool.accountslots", "5", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
 				AccountSlots:      5,
-				BlacklistFile:     "blacklist.file",
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    "rosettafix.file",
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
@@ -1328,7 +1323,6 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{"--txpool.locals", "locals.txt"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
@@ -1344,7 +1338,6 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{"--txpool.globalslots", "10240"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
@@ -1360,7 +1353,6 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{"--txpool.accountqueue", "128", "--txpool.globalqueue", "10240", "--txpool.lifetime", "15m", "--txpool.pricelimit", "100", "--txpool.pricebump", "2"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,

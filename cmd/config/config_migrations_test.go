@@ -70,7 +70,6 @@ Version = "1.0.2"
   RpcFilterFile = "./.hmy/rpc_filter.txt"
 
 [TxPool]
-  BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
   AccountQueue = 64
   GlobalQueue = 5120
@@ -145,7 +144,6 @@ Version = "1.0.3"
   RpcFilterFile = "./.hmy/rpc_filter.txt"
 
 [TxPool]
-  BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
   AccountQueue = 64
   GlobalQueue = 5120
@@ -232,7 +230,6 @@ Version = "1.0.4"
   MinPeers = 6
 
 [TxPool]
-  BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
   AccountQueue = 64
   GlobalQueue = 5120
@@ -326,7 +323,6 @@ Version = "1.0.4"
   CacheSize = 512
 
 [TxPool]
-  BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
   AllowedTxsFile = "./.hmy/allowedtxs.txt"
   AccountQueue = 64

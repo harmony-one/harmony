@@ -48,7 +48,6 @@ import (
 	node "github.com/harmony-one/harmony/node/harmony"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
-	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
 	rpc_common "github.com/harmony-one/harmony/rpc/harmony/common"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
@@ -721,15 +720,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		aggregateSig = defaultConsensusConfig.AggregateSig
 	}
 
-	blacklist, err := setupBlacklist(hc)
-	if err != nil {
-		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
-	}
-	allowedTxs, err := setupAllowedTxs(hc)
-	if err != nil {
-		utils.Logger().Warn().Msgf("AllowedTxs setup error: %s", err.Error())
-	}
-	localAccounts, err := setupLocalAccounts(hc, blacklist)
+	localAccounts, err := setupLocalAccounts(hc)
 	if err != nil {
 		utils.Logger().Warn().Msgf("local accounts setup error: %s", err.Error())
 	}
@@ -752,7 +743,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		os.Exit(1)
 	}
 
-	currentNode := node.New(myHost, currentConsensus, blacklist, allowedTxs, localAccounts, &hc, registry)
+	currentNode := node.New(myHost, currentConsensus, localAccounts, &hc, registry)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
@@ -936,28 +927,6 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 	}
 }
 
-func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struct{}, error) {
-	rosetta_common.InitRosettaFile(hc.TxPool.RosettaFixFile)
-
-	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", hc.TxPool.BlacklistFile)
-	dat, err := os.ReadFile(hc.TxPool.BlacklistFile)
-	if err != nil {
-		return nil, err
-	}
-	addrMap := make(map[ethCommon.Address]struct{})
-	for _, line := range strings.Split(string(dat), "\n") {
-		if len(line) != 0 { // blacklist file may have trailing empty string line
-			b32 := strings.TrimSpace(strings.Split(string(line), "#")[0])
-			addr, err := common.ParseAddr(b32)
-			if err != nil {
-				return nil, err
-			}
-			addrMap[addr] = struct{}{}
-		}
-	}
-	return addrMap, nil
-}
-
 func parseAllowedTxs(data []byte) (map[ethCommon.Address][]core.AllowedTxData, error) {
 	allowedTxs := make(map[ethCommon.Address][]core.AllowedTxData)
 	for _, line := range strings.Split(string(data), "\n") {
@@ -989,30 +958,7 @@ func parseAllowedTxs(data []byte) (map[ethCommon.Address][]core.AllowedTxData, e
 	return allowedTxs, nil
 }
 
-func setupAllowedTxs(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address][]core.AllowedTxData, error) {
-	// check if the file exists
-	if _, err := os.Stat(hc.TxPool.AllowedTxsFile); err == nil {
-		// read the file and parse allowed transactions
-		utils.Logger().Debug().Msgf("Using AllowedTxs file at `%s`", hc.TxPool.AllowedTxsFile)
-		data, err := os.ReadFile(hc.TxPool.AllowedTxsFile)
-		if err != nil {
-			return nil, err
-		}
-		return parseAllowedTxs(data)
-	} else if errors.Is(err, os.ErrNotExist) {
-		// file path does not exist
-		utils.Logger().Debug().
-			Str("AllowedTxsFile", hc.TxPool.AllowedTxsFile).
-			Msg("AllowedTxs file doesn't exist")
-		return make(map[ethCommon.Address][]core.AllowedTxData), nil
-	} else {
-		// some other errors happened
-		utils.Logger().Error().Err(err).Msg("setup allowedTxs failed")
-		return nil, err
-	}
-}
-
-func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.Address]struct{}) ([]ethCommon.Address, error) {
+func setupLocalAccounts(hc harmonyconfig.HarmonyConfig) ([]ethCommon.Address, error) {
 	file := hc.TxPool.LocalAccountsFile
 	// check if file exist
 	var fileData string
@@ -1043,11 +989,6 @@ func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.
 		addr, err := common.ParseAddr(addrPart)
 		if err != nil {
 			return nil, err
-		}
-		// skip the blacklisted addresses
-		if _, exists := blacklist[addr]; exists {
-			utils.Logger().Warn().Msgf("local account with address %s is blacklisted", addr.String())
-			continue
 		}
 		localAccounts[addr] = struct{}{}
 	}

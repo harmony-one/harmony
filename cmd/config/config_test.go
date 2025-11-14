@@ -83,7 +83,6 @@ Version = "1.0.4"
   ListenAddr = "127.0.0.1:6060"
 
 [TxPool]
-  BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
   AllowedTxsFile = "./.hmy/allowedtxs.txt"
   AccountQueue = 64

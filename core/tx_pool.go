@@ -17,7 +17,6 @@
 package core
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"math/big"
@@ -94,14 +93,6 @@ var (
 	// ErrInvalidMsgForStakingDirective is returned if a staking message does not
 	// match the related directive
 	ErrInvalidMsgForStakingDirective = errors.New("staking message does not match directive message")
-
-	// ErrBlacklistFrom is returned if a transaction's from/source address is blacklisted
-	ErrBlacklistFrom = errors.New("`from` address of transaction in blacklist and not in allowlist")
-
-	// ErrBlacklistTo is returned if a transaction's to/destination address is blacklisted
-	ErrBlacklistTo = errors.New("`to` address of transaction in blacklist")
-
-	ErrAllowedTxs = errors.New("transaction allowed whitelist check failed.")
 )
 
 var (
@@ -171,9 +162,6 @@ type TxPoolConfig struct {
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
 
 	AddEvent func(tx types.PoolTransaction, local bool) // Fire add event
-
-	Blacklist  map[common.Address]struct{}        // Set of accounts that cannot be a part of any transaction
-	AllowedTxs map[common.Address][]AllowedTxData // Set of allowed transactions can break the blocklist
 }
 
 // DefaultTxPoolConfig contains the default configurations for the transaction
@@ -191,9 +179,6 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	GlobalQueue:  5120, // --txpool.globalqueue
 
 	Lifetime: 30 * time.Minute, // --txpool.lifetime
-
-	Blacklist:  map[common.Address]struct{}{},
-	AllowedTxs: map[common.Address][]AllowedTxData{},
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -220,14 +205,6 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 			Uint64("updated", DefaultTxPoolConfig.PriceBump).
 			Msg("Sanitizing invalid txpool price bump")
 		conf.PriceBump = DefaultTxPoolConfig.PriceBump
-	}
-	if conf.Blacklist == nil {
-		utils.Logger().Warn().Msg("Sanitizing nil blacklist set")
-		conf.Blacklist = DefaultTxPoolConfig.Blacklist
-	}
-	if conf.AllowedTxs == nil {
-		utils.Logger().Warn().Msg("Sanitizing nil allowedTxs set")
-		conf.AllowedTxs = DefaultTxPoolConfig.AllowedTxs
 	}
 	if conf.AccountSlots == 0 {
 		utils.Logger().Warn().
@@ -752,42 +729,6 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 		return ErrInvalidSender
 	}
 
-	// do whitelist check first, if tx not in whitelist, do blacklist check
-	if allowedTxs, exists := pool.config.AllowedTxs[from]; exists {
-		txIsAllowed := false
-		to := tx.To()
-		toAddr := common.Address{}
-		if to != nil {
-			toAddr = *to
-			for _, allowedTx := range allowedTxs {
-				if toAddr == allowedTx.To && bytes.Equal(tx.Data(), allowedTx.Data) {
-					txIsAllowed = true
-					break
-				}
-			}
-		}
-		if !txIsAllowed {
-			return errors.WithMessagef(ErrAllowedTxs, "transaction sender: %x, receiver: %x, input: %x", tx.From(), toAddr, tx.Data())
-		}
-	} else {
-		// do blacklist check
-		// Make sure transaction does not have blacklisted addresses
-		if _, exists := (pool.config.Blacklist)[from]; exists {
-			if b32, err := hmyCommon.AddressToBech32(from); err == nil {
-				return errors.WithMessagef(ErrBlacklistFrom, "transaction sender is %s", b32)
-			}
-			return ErrBlacklistFrom
-		}
-		// Make sure transaction does not burn funds by sending funds to blacklisted address
-		if tx.To() != nil {
-			if _, exists := (pool.config.Blacklist)[*tx.To()]; exists {
-				if b32, err := hmyCommon.AddressToBech32(*tx.To()); err == nil {
-					return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s with data: %x", b32, tx.Data())
-				}
-				return ErrBlacklistTo
-			}
-		}
-	}
 	// Drop non-local transactions under our own minimal accepted gas price
 	local = local || pool.locals.contains(from) // account may be local even if the transaction arrived from the network
 	if !local && pool.gasPrice.Cmp(tx.GasPrice()) > 0 {

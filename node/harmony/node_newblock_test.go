@@ -58,7 +58,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 
-	node := New(host, consensusObj, nil, nil, nil, nil, reg)
+	node := New(host, consensusObj, nil, nil, reg)
 
 	node.Worker.UpdateCurrent()
 

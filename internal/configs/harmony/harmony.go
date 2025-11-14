@@ -225,7 +225,6 @@ type BlsConfig struct {
 }
 
 type TxPoolConfig struct {
-	BlacklistFile     string
 	AllowedTxsFile    string
 	RosettaFixFile    string
 	AccountSlots      uint64
