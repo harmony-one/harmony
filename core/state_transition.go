@@ -229,7 +229,7 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 		homestead        = st.evm.ChainConfig().IsS3(st.evm.Context.EpochNumber) // s3 includes homestead
 		istanbul         = st.evm.ChainConfig().IsIstanbul(st.evm.Context.EpochNumber)
 		rules            = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber)
-		contractCreation = msg.To == nil
+		contractCreation = msg.To() == nil
 	)
 
 	// Pay intrinsic gas
