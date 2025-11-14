@@ -84,7 +84,7 @@ Version = "1.0.4"
 
 [TxPool]
   LocalAccountsFile = "./.hmy/locals.txt"
-  AllowedTxsFile = "./.hmy/allowedtxs.txt"
+  AllowedTxsFile = ""
   AccountQueue = 64
   GlobalQueue = 5120
   Lifetime = "30m"

@@ -127,7 +127,7 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
-					AllowedTxsFile:    "./.hmy/allowedtxs.txt",
+					AllowedTxsFile:    "",
 					RosettaFixFile:    "",
 					AccountSlots:      16,
 					GlobalSlots:       4096,
@@ -1278,7 +1278,7 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{"--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				AllowedTxsFile:    "allowedtxs.txt",
+				AllowedTxsFile:    "",
 				RosettaFixFile:    "rosettafix.file",
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
