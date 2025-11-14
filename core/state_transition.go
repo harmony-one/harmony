@@ -223,11 +223,14 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 		}()
 	}
 
-	msg := st.msg
-	sender := vm.AccountRef(msg.From())
-	homestead := st.evm.ChainConfig().IsS3(st.evm.Context.EpochNumber) // s3 includes homestead
-	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.Context.EpochNumber)
-	contractCreation := msg.To() == nil
+	var (
+		msg              = st.msg
+		sender           = vm.AccountRef(msg.From())
+		homestead        = st.evm.ChainConfig().IsS3(st.evm.Context.EpochNumber) // s3 includes homestead
+		istanbul         = st.evm.ChainConfig().IsIstanbul(st.evm.Context.EpochNumber)
+		rules            = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber)
+		contractCreation = msg.To == nil
+	)
 
 	// Pay intrinsic gas
 	gas, err := vm.IntrinsicGas(st.data, contractCreation, homestead, istanbul, false)
@@ -239,14 +242,15 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 	}
 
 	// Execute the preparatory steps for state transition which includes:
+	// - prepare accessList(post-berlin)
 	// - reset transient storage(eip 1153)
-	// st.evm.StateDB.Prepare() TODO eip 1153
+	st.state.Prepare(rules, msg.From(), msg.To(), vm.ActivePrecompiles(rules), nil)
 	evm := st.evm
 
-	var ret []byte
-	// All VM errors are valid except for insufficient balance, therefore returned separately
-	var vmErr error
-
+	var (
+		ret   []byte
+		vmErr error // vm errors do not effect consensus and are therefore not assigned to err
+	)
 	if contractCreation {
 		ret, _, st.gas, vmErr = evm.Create(sender, st.data, st.gas, st.value)
 	} else {
