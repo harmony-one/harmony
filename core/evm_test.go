@@ -498,36 +498,45 @@ func (account) Address() common.Address                             { return com
 func (account) SetCode(common.Hash, []byte)                         {}
 func (account) ForEachStorage(cb func(key, value common.Hash) bool) {}
 
-func TestTransientStorgeOpcodes(t *testing.T) {
+func TestTransientStorageOpcodes(t *testing.T) {
+	var run = func(t *testing.T, ExtraEips []int) ([]byte, error) {
+		t.Helper()
+		key, _ := crypto.GenerateKey()
+		_, db, _, _ := getTestEnvironment(*key)
+		vmctx := testCtx()
+		chaincfg := params.TestChainConfig
 
-	key, _ := crypto.GenerateKey()
-	_, db, _, _ := getTestEnvironment(*key)
-	vmctx := testCtx()
-	chaincfg := params.TestChainConfig
+		var (
+			env = vm.NewEVM(vmctx.blockCtx, vmctx.txCtx, db, chaincfg, vm.Config{
+				ExtraEips: ExtraEips,
+			})
+			startGas uint64 = 10000
+			value           = big.NewInt(0)
+			contract        = vm.NewContract(account{}, account{}, value, startGas)
+		)
+		contract.Code = []byte{
+			byte(vm.PUSH1), 0x01, // key
+			byte(vm.PUSH1), 0x02, // value
+			byte(vm.TSTORE), // TSTORE(key, value)
 
-	var (
-		env = vm.NewEVM(vmctx.blockCtx, vmctx.txCtx, db, chaincfg, vm.Config{
-			ExtraEips: []int{1153},
-		})
-		//gasLimit uint64 = 31000
-		startGas uint64 = 10000
-		value           = big.NewInt(0)
-		contract        = vm.NewContract(account{}, account{}, value, startGas)
-	)
-	//contract.Code = []byte{byte(vm.TSTORE), 0x1, 0x2, byte(vm.TLOAD), 0x1, byte(vm.STOP)}
-	contract.Code = []byte{
-		byte(vm.PUSH1), 0x01, // key
-		byte(vm.PUSH1), 0x02, // value
-		byte(vm.TSTORE), // TSTORE(key, value)
+			byte(vm.PUSH1), 0x01, // key
+			byte(vm.TLOAD), // TLOAD(key) -> value на стеке
 
-		byte(vm.PUSH1), 0x01, // key
-		byte(vm.TLOAD), // TLOAD(key) -> value на стеке
-
-		byte(vm.STOP),
+			byte(vm.STOP),
+		}
+		return env.Interpreter().Run(contract, []byte{}, false)
 	}
-	//if contractCode != nil {
-	//	contract.Code = contractCode
-	//}
-	ret, err := env.Interpreter().Run(contract, []byte{}, false)
-	t.Log(ret, err)
+
+	t.Run("enabled-opcodes", func(t *testing.T) {
+		_, err := run(t, []int{1153})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("disabled-opcodes", func(t *testing.T) {
+		_, err := run(t, []int{})
+		if err == nil {
+			t.Fatal("expected error but got nil")
+		}
+	})
 }
