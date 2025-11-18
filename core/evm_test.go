@@ -475,3 +475,47 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 		t.Error(fmt.Sprintf("Got error %v in evm.Call", err))
 	}
 }
+
+type vmContext struct {
+	blockCtx vm.BlockContext
+	txCtx    vm.TxContext
+}
+
+func testCtx() *vmContext {
+	return &vmContext{blockCtx: vm.BlockContext{BlockNumber: big.NewInt(1)}, txCtx: vm.TxContext{GasPrice: big.NewInt(100000)}}
+}
+
+type account struct{}
+
+func (account) SubBalance(amount *big.Int)                          {}
+func (account) AddBalance(amount *big.Int)                          {}
+func (account) SetAddress(common.Address)                           {}
+func (account) Value() *big.Int                                     { return nil }
+func (account) SetBalance(*big.Int)                                 {}
+func (account) SetNonce(uint64)                                     {}
+func (account) Balance() *big.Int                                   { return nil }
+func (account) Address() common.Address                             { return common.Address{} }
+func (account) SetCode(common.Hash, []byte)                         {}
+func (account) ForEachStorage(cb func(key, value common.Hash) bool) {}
+
+func TestTransientStorgeOpcodes(t *testing.T) {
+
+	key, _ := crypto.GenerateKey()
+	_, db, _, _ := getTestEnvironment(*key)
+	vmctx := testCtx()
+	chaincfg := params.TestChainConfig
+
+	var (
+		env = vm.NewEVM(vmctx.blockCtx, vmctx.txCtx, db, chaincfg, vm.Config{})
+		//gasLimit uint64 = 31000
+		startGas uint64 = 10000
+		value           = big.NewInt(0)
+		contract        = vm.NewContract(account{}, account{}, value, startGas)
+	)
+	contract.Code = []byte{byte(vm.PUSH1), 0x1, byte(vm.PUSH1), 0x1, byte(vm.STOP)}
+	//if contractCode != nil {
+	//	contract.Code = contractCode
+	//}
+	ret, err := env.Interpreter().Run(contract, []byte{}, false)
+	t.Log(ret, err)
+}
