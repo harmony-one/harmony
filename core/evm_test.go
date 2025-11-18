@@ -514,7 +514,17 @@ func TestTransientStorgeOpcodes(t *testing.T) {
 		value           = big.NewInt(0)
 		contract        = vm.NewContract(account{}, account{}, value, startGas)
 	)
-	contract.Code = []byte{byte(vm.TSTORE), 0x1, 0x2, byte(vm.TLOAD), 0x1, byte(vm.STOP)}
+	//contract.Code = []byte{byte(vm.TSTORE), 0x1, 0x2, byte(vm.TLOAD), 0x1, byte(vm.STOP)}
+	contract.Code = []byte{
+		byte(vm.PUSH1), 0x01, // key
+		byte(vm.PUSH1), 0x02, // value
+		byte(vm.TSTORE), // TSTORE(key, value)
+
+		byte(vm.PUSH1), 0x01, // key
+		byte(vm.TLOAD), // TLOAD(key) -> value на стеке
+
+		byte(vm.STOP),
+	}
 	//if contractCode != nil {
 	//	contract.Code = contractCode
 	//}
