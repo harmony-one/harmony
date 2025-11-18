@@ -506,7 +506,9 @@ func TestTransientStorgeOpcodes(t *testing.T) {
 	chaincfg := params.TestChainConfig
 
 	var (
-		env = vm.NewEVM(vmctx.blockCtx, vmctx.txCtx, db, chaincfg, vm.Config{})
+		env = vm.NewEVM(vmctx.blockCtx, vmctx.txCtx, db, chaincfg, vm.Config{
+			ExtraEips: []int{1153},
+		})
 		//gasLimit uint64 = 31000
 		startGas uint64 = 10000
 		value           = big.NewInt(0)
