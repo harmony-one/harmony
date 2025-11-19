@@ -61,66 +61,21 @@ func (e StreamErrorType) String() string {
 }
 
 // ClassifyStreamError classifies stream errors to help with better error handling
+// It uses type assertions first for reliability, then falls back to string matching
 func ClassifyStreamError(err error) (StreamErrorType, string) {
 	if err == nil {
 		return ErrorTypeNoError, "no error"
 	}
 
-	errStr := err.Error()
-	errStrLower := strings.ToLower(errStr)
-
-	// Check for EOF (remote peer disconnect)
-	if err == io.EOF {
+	// 1. Check for EOF (remote peer disconnect) - use errors.Is to handle wrapped errors
+	if errors.Is(err, io.EOF) {
 		return ErrorTypeRemoteDisconnect, "remote peer disconnected"
 	}
 
-	// Check for progress timeout specifically
-	if strings.Contains(errStrLower, "progress timeout") {
-		return ErrorTypeProgressTimeout, "progress timeout due to lack of content reading progress"
-	}
-
-	// Check for deadline errors specifically
-	if strings.Contains(errStrLower, "read deadline") || strings.Contains(errStrLower, "setreaddeadline") {
-		return ErrorTypeReadDeadline, "read deadline exceeded or failed to set read deadline"
-	}
-	if strings.Contains(errStrLower, "write deadline") || strings.Contains(errStrLower, "setwritedeadline") {
-		return ErrorTypeWriteDeadline, "write deadline exceeded or failed to set write deadline"
-	}
-
-	// Check for network errors
-	if netErr, ok := err.(net.Error); ok {
-		if netErr.Timeout() {
-			return ErrorTypeTimeout, "network timeout"
-		}
-		// Check for specific network error types
-		if strings.Contains(errStrLower, "connection reset") {
-			return ErrorTypeConnectionReset, "connection reset by peer"
-		}
-		if strings.Contains(errStrLower, "broken pipe") {
-			return ErrorTypeBrokenPipe, "broken pipe"
-		}
-		return ErrorTypeLocalNetwork, "network error"
-	}
-
-	// Check for system call errors
-	if sysErr, ok := err.(*net.OpError); ok {
-		if sysErr.Err != nil {
-			sysErrStr := sysErr.Err.Error()
-			if strings.Contains(strings.ToLower(sysErrStr), "connection reset") {
-				return ErrorTypeConnectionReset, "connection reset by peer"
-			}
-			if strings.Contains(strings.ToLower(sysErrStr), "broken pipe") {
-				return ErrorTypeBrokenPipe, "broken pipe"
-			}
-			if strings.Contains(strings.ToLower(sysErrStr), "no buffer space") {
-				return ErrorTypeResourceExhaustion, "no buffer space available"
-			}
-		}
-	}
-
-	// Check for syscall errors
-	if sysErr, ok := err.(syscall.Errno); ok {
-		switch sysErr {
+	// 2. Check for syscall errors first (most specific)
+	var sysErrno syscall.Errno
+	if errors.As(err, &sysErrno) {
+		switch sysErrno {
 		case syscall.ECONNRESET:
 			return ErrorTypeConnectionReset, "connection reset by peer"
 		case syscall.EPIPE:
@@ -132,12 +87,86 @@ func ClassifyStreamError(err error) (StreamErrorType, string) {
 		}
 	}
 
+	// 3. Check for net.OpError (wrapped system errors)
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		if opErr.Err != nil {
+			// Check the underlying error for syscall errors
+			var innerSysErrno syscall.Errno
+			if errors.As(opErr.Err, &innerSysErrno) {
+				switch innerSysErrno {
+				case syscall.ECONNRESET:
+					return ErrorTypeConnectionReset, "connection reset by peer"
+				case syscall.EPIPE:
+					return ErrorTypeBrokenPipe, "broken pipe"
+				case syscall.ENOBUFS:
+					return ErrorTypeResourceExhaustion, "no buffer space available"
+				case syscall.ENOMEM:
+					return ErrorTypeResourceExhaustion, "out of memory"
+				}
+			}
+			// Check for resource exhaustion in error message
+			errStr := strings.ToLower(opErr.Err.Error())
+			if strings.Contains(errStr, "no buffer space") {
+				return ErrorTypeResourceExhaustion, "no buffer space available"
+			}
+		}
+	}
+
+	// 4. Check for net.Error (network errors)
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		if netErr.Timeout() {
+			return ErrorTypeTimeout, "network timeout"
+		}
+		// For non-timeout network errors, check underlying cause
+		if opErr, ok := netErr.(*net.OpError); ok && opErr.Err != nil {
+			var innerSysErrno syscall.Errno
+			if errors.As(opErr.Err, &innerSysErrno) {
+				switch innerSysErrno {
+				case syscall.ECONNRESET:
+					return ErrorTypeConnectionReset, "connection reset by peer"
+				case syscall.EPIPE:
+					return ErrorTypeBrokenPipe, "broken pipe"
+				}
+			}
+		}
+		return ErrorTypeLocalNetwork, "network error"
+	}
+
+	// 5. Fall back to string matching for application-specific errors
+	errStr := err.Error()
+	errStrLower := strings.ToLower(errStr)
+
+	// Check for progress timeout specifically (application-level error)
+	if strings.Contains(errStrLower, "progress timeout") {
+		return ErrorTypeProgressTimeout, "progress timeout due to lack of content reading progress"
+	}
+
+	// Check for deadline errors specifically (application-level error)
+	if strings.Contains(errStrLower, "read deadline") || strings.Contains(errStrLower, "setreaddeadline") {
+		return ErrorTypeReadDeadline, "read deadline exceeded or failed to set read deadline"
+	}
+	if strings.Contains(errStrLower, "write deadline") || strings.Contains(errStrLower, "setwritedeadline") {
+		return ErrorTypeWriteDeadline, "write deadline exceeded or failed to set write deadline"
+	}
+
+	// Check for connection reset in error message (fallback for wrapped errors)
+	if strings.Contains(errStrLower, "connection reset") {
+		return ErrorTypeConnectionReset, "connection reset by peer"
+	}
+
+	// Check for broken pipe in error message (fallback for wrapped errors)
+	if strings.Contains(errStrLower, "broken pipe") {
+		return ErrorTypeBrokenPipe, "broken pipe"
+	}
+
 	// Check for protocol-related errors
 	if strings.Contains(errStrLower, "invalid") || strings.Contains(errStrLower, "malformed") {
 		return ErrorTypeProtocol, "protocol error"
 	}
 
-	// Check for resource exhaustion
+	// Check for resource exhaustion (fallback)
 	if strings.Contains(errStrLower, "too many") || strings.Contains(errStrLower, "resource") {
 		return ErrorTypeResourceExhaustion, "resource exhaustion"
 	}
