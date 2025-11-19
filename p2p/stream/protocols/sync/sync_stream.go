@@ -84,6 +84,8 @@ func (st *syncStream) readMsgLoop() {
 
 				// Log error with classification
 				if shouldClose {
+					// Record critical error metric
+					sttypes.RecordCriticalError(errorType)
 					st.logger.Warn().
 						Str("streamID", string(st.ID())).
 						Str("errorType", errorType.String()).
@@ -92,6 +94,8 @@ func (st *syncStream) readMsgLoop() {
 						Msg("critical error, closing stream")
 				} else {
 					recoverableErrorCount++
+					// Record recoverable error metric
+					sttypes.RecordRecoverableError(errorType)
 					st.logger.Info().
 						Str("streamID", string(st.ID())).
 						Str("errorType", errorType.String()).
@@ -112,6 +116,8 @@ func (st *syncStream) readMsgLoop() {
 
 				// Check if we've exceeded max retries for recoverable errors
 				if recoverableErrorCount >= MaxRecoverableRetries {
+					// Record metric for stream closed due to too many recoverable errors
+					sttypes.RecordStreamClosedByRecoverableErrors()
 					st.logger.Warn().
 						Str("streamID", string(st.ID())).
 						Str("errorType", errorType.String()).
@@ -194,6 +200,9 @@ func (st *syncStream) handleReqLoop() {
 					Msg("handle request by sync stream failed")
 				// Use the centralized error handling to determine if stream should be closed
 				if sttypes.ShouldCloseStream(err) {
+					// Classify and record critical error metric
+					errorType, _ := sttypes.ClassifyStreamError(err)
+					sttypes.RecordCriticalError(errorType)
 					st.logger.Error().Err(err).Str("request", req.String()).
 						Msg("sync stream critical error. Closing stream")
 					if err := st.Close("stream error", false); err != nil {

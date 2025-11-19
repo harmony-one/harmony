@@ -13,6 +13,9 @@ func init() {
 		msgWriteCounter,
 		msgReadFailedCounterVec,
 		msgWriteFailedCounterVec,
+		recoverableErrorCounterVec,
+		criticalErrorCounterVec,
+		streamClosedByRecoverableErrorsCounter,
 	)
 }
 
@@ -72,4 +75,52 @@ var (
 		},
 		[]string{"error"},
 	)
+
+	recoverableErrorCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "stream",
+			Name:      "recoverable_errors_total",
+			Help:      "total number of recoverable errors encountered in stream operations",
+		},
+		[]string{"error_type"},
+	)
+
+	criticalErrorCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "stream",
+			Name:      "critical_errors_total",
+			Help:      "total number of critical errors that caused stream closure",
+		},
+		[]string{"error_type"},
+	)
+
+	streamClosedByRecoverableErrorsCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "stream",
+			Name:      "streams_closed_by_recoverable_errors_total",
+			Help:      "total number of streams closed due to exceeding max recoverable error retries",
+		},
+	)
 )
+
+// RecordRecoverableError records a recoverable error metric
+func RecordRecoverableError(errorType StreamErrorType) {
+	recoverableErrorCounterVec.With(prometheus.Labels{
+		"error_type": errorType.String(),
+	}).Inc()
+}
+
+// RecordCriticalError records a critical error metric
+func RecordCriticalError(errorType StreamErrorType) {
+	criticalErrorCounterVec.With(prometheus.Labels{
+		"error_type": errorType.String(),
+	}).Inc()
+}
+
+// RecordStreamClosedByRecoverableErrors records when a stream is closed due to too many recoverable errors
+func RecordStreamClosedByRecoverableErrors() {
+	streamClosedByRecoverableErrorsCounter.Inc()
+}
