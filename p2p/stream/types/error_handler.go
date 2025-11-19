@@ -148,9 +148,9 @@ func ClassifyStreamError(err error) (StreamErrorType, string) {
 // IsRecoverableError determines if an error type is potentially recoverable
 func IsRecoverableError(errorType StreamErrorType) bool {
 	switch errorType {
-	case ErrorTypeNoError, ErrorTypeTimeout, ErrorTypeProgressTimeout, ErrorTypeReadDeadline, ErrorTypeWriteDeadline, ErrorTypeLocalNetwork, ErrorTypeResourceExhaustion:
+	case ErrorTypeNoError, ErrorTypeTimeout, ErrorTypeProgressTimeout, ErrorTypeReadDeadline, ErrorTypeWriteDeadline, ErrorTypeLocalNetwork:
 		return true
-	case ErrorTypeRemoteDisconnect, ErrorTypeConnectionReset, ErrorTypeBrokenPipe,
+	case ErrorTypeResourceExhaustion, ErrorTypeRemoteDisconnect, ErrorTypeConnectionReset, ErrorTypeBrokenPipe,
 		ErrorTypeProtocol, ErrorTypeUnknown:
 		return false
 	default:
@@ -174,10 +174,10 @@ func IsRemoteDeadError(errorType StreamErrorType) bool {
 // IsCriticalError determines if an error is critical and should trigger immediate stream removal
 func IsCriticalError(errorType StreamErrorType) bool {
 	switch errorType {
-	case ErrorTypeRemoteDisconnect, ErrorTypeConnectionReset, ErrorTypeBrokenPipe,
+	case ErrorTypeResourceExhaustion, ErrorTypeRemoteDisconnect, ErrorTypeConnectionReset, ErrorTypeBrokenPipe,
 		ErrorTypeProtocol, ErrorTypeUnknown:
 		return true
-	case ErrorTypeNoError, ErrorTypeTimeout, ErrorTypeProgressTimeout, ErrorTypeReadDeadline, ErrorTypeWriteDeadline, ErrorTypeLocalNetwork, ErrorTypeResourceExhaustion:
+	case ErrorTypeNoError, ErrorTypeTimeout, ErrorTypeProgressTimeout, ErrorTypeReadDeadline, ErrorTypeWriteDeadline, ErrorTypeLocalNetwork:
 		return false
 	default:
 		return true // Default to critical for unknown error types
