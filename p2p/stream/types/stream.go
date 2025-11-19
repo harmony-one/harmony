@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"io"
-	"net"
 	"sync"
 	"time"
 
@@ -207,7 +206,7 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	}()
 
 	if len(b) > maxMsgBytes {
-		return errors.New("message too long")
+		return &MessageError{Err: errors.Wrapf(errors.New("message too long"), "message length %d exceeds max %d", len(b), maxMsgBytes)}
 	}
 
 	size := sizeBytes + len(b)
@@ -240,7 +239,7 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 
 	_, err = st.raw.Write(message[:size])
 	if err != nil {
-		return err
+		return &StreamWriteError{Err: err}
 	}
 	bytesWriteCounter.Add(float64(size))
 	return nil
@@ -283,31 +282,66 @@ func (st *BaseStream) ReadBytes() (content []byte, err error) {
 	lengthBuf := make([]byte, sizeBytes)
 	_, err = io.ReadFull(st.reader, lengthBuf)
 	if err != nil {
-		if err == io.EOF {
+		// Classify the error for better handling
+		errorType, errorDesc := ClassifyStreamError(err)
+
+		switch errorType {
+		case ErrorTypeRemoteDisconnect:
 			utils.Logger().Debug().
 				Str("streamID", string(st.ID())).
+				Str("errorType", "remote_disconnect").
 				Msg("stream closed by remote peer")
 			return nil, errors.Wrap(err, "stream closed")
-		}
-		// Log network errors specifically
-		if netErr, ok := err.(net.Error); ok {
-			if netErr.Timeout() {
-				utils.Logger().Debug().
-					Str("streamID", string(st.ID())).
-					Msg("timeout reading length prefix")
-			} else {
-				utils.Logger().Debug().
-					Str("streamID", string(st.ID())).
-					Err(err).
-					Msg("network error reading length prefix")
-			}
-		} else {
+
+		case ErrorTypeConnectionReset:
+			utils.Logger().Warn().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "connection_reset").
+				Str("description", errorDesc).
+				Msg("connection reset by peer during length prefix read")
+			return nil, errors.Wrap(err, "connection reset")
+
+		case ErrorTypeBrokenPipe:
+			utils.Logger().Warn().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "broken_pipe").
+				Str("description", errorDesc).
+				Msg("broken pipe during length prefix read")
+			return nil, errors.Wrap(err, "broken pipe")
+
+		case ErrorTypeTimeout:
 			utils.Logger().Debug().
 				Str("streamID", string(st.ID())).
+				Str("errorType", "timeout").
+				Msg("timeout reading length prefix")
+			return nil, errors.Wrap(err, "timeout")
+
+		case ErrorTypeResourceExhaustion:
+			utils.Logger().Error().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "resource_exhaustion").
+				Str("description", errorDesc).
+				Msg("resource exhaustion during length prefix read")
+			return nil, errors.Wrap(err, "resource exhaustion")
+
+		case ErrorTypeLocalNetwork:
+			utils.Logger().Warn().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "local_network").
+				Str("description", errorDesc).
+				Err(err).
+				Msg("local network error reading length prefix")
+			return nil, errors.Wrap(err, "network error")
+
+		default:
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "unknown").
+				Str("description", errorDesc).
 				Err(err).
 				Msg("failed reading length prefix")
+			return nil, errors.Wrap(err, "length prefix read failed")
 		}
-		return nil, errors.Wrap(err, "length prefix read failed")
 	}
 	bytesReadCounter.Add(sizeBytes)
 
@@ -319,28 +353,80 @@ func (st *BaseStream) ReadBytes() (content []byte, err error) {
 			Int("size", size).
 			Int("max", maxMsgBytes).
 			Msg("message size exceeds limit")
-		return nil, errors.Errorf("message size %d exceeds max %d", size, maxMsgBytes)
+		return nil, errors.Wrapf(errors.New("message size exceeds limit"), "message size %d exceeds max %d", size, maxMsgBytes)
 	}
 
 	// 3. Read message content (blocking)
 	content = make([]byte, size)
 	bytesRead, err := io.ReadFull(st.reader, content)
 	if err != nil {
-		// Log network errors specifically
-		if netErr, ok := err.(net.Error); ok {
+		// Classify the error for better handling
+		errorType, errorDesc := ClassifyStreamError(err)
+
+		switch errorType {
+		case ErrorTypeRemoteDisconnect:
 			utils.Logger().Debug().
 				Str("streamID", string(st.ID())).
-				Err(netErr).
+				Str("errorType", "remote_disconnect").
 				Int("expected", size).
-				Msg("network error reading message content")
-		} else {
+				Msg("stream closed by remote peer during content read")
+			return nil, errors.Wrap(err, "stream closed")
+
+		case ErrorTypeConnectionReset:
+			utils.Logger().Warn().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "connection_reset").
+				Str("description", errorDesc).
+				Int("expected", size).
+				Msg("connection reset by peer during content read")
+			return nil, errors.Wrap(err, "connection reset")
+
+		case ErrorTypeBrokenPipe:
+			utils.Logger().Warn().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "broken_pipe").
+				Str("description", errorDesc).
+				Int("expected", size).
+				Msg("broken pipe during content read")
+			return nil, errors.Wrap(err, "broken pipe")
+
+		case ErrorTypeTimeout:
 			utils.Logger().Debug().
 				Str("streamID", string(st.ID())).
+				Str("errorType", "timeout").
+				Int("expected", size).
+				Msg("timeout reading message content")
+			return nil, errors.Wrap(err, "timeout")
+
+		case ErrorTypeResourceExhaustion:
+			utils.Logger().Error().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "resource_exhaustion").
+				Str("description", errorDesc).
+				Int("expected", size).
+				Msg("resource exhaustion during content read")
+			return nil, errors.Wrap(err, "resource exhaustion")
+
+		case ErrorTypeLocalNetwork:
+			utils.Logger().Warn().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "local_network").
+				Str("description", errorDesc).
+				Err(err).
+				Int("expected", size).
+				Msg("local network error reading message content")
+			return nil, errors.Wrap(err, "network error")
+
+		default:
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "unknown").
+				Str("description", errorDesc).
 				Err(err).
 				Int("expected", size).
 				Msg("failed reading message content")
+			return nil, errors.Wrap(err, "content read failed")
 		}
-		return nil, errors.Wrap(err, "content read failed")
 	}
 	bytesReadCounter.Add(float64(bytesRead))
 
@@ -350,7 +436,7 @@ func (st *BaseStream) ReadBytes() (content []byte, err error) {
 			Int("read", bytesRead).
 			Int("expected", size).
 			Msg("incomplete message read")
-		return nil, errors.Errorf("read %d bytes but expected %d", bytesRead, size)
+		return nil, errors.Wrapf(errors.New("incomplete read"), "read %d bytes but expected %d", bytesRead, size)
 	}
 
 	return content, nil
@@ -383,31 +469,66 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 	lengthBuf := make([]byte, sizeBytes)
 	_, err = io.ReadFull(st.reader, lengthBuf)
 	if err != nil {
-		if err == io.EOF {
+		// Classify the error for better handling
+		errorType, errorDesc := ClassifyStreamError(err)
+
+		switch errorType {
+		case ErrorTypeRemoteDisconnect:
 			utils.Logger().Debug().
 				Str("streamID", string(st.ID())).
+				Str("errorType", "remote_disconnect").
 				Msg("stream closed by remote peer")
 			return nil, errors.Wrap(err, "stream closed")
-		}
-		// Log network errors specifically
-		if netErr, ok := err.(net.Error); ok {
-			if netErr.Timeout() {
-				utils.Logger().Debug().
-					Str("streamID", string(st.ID())).
-					Msg("timeout reading length prefix")
-			} else {
-				utils.Logger().Debug().
-					Str("streamID", string(st.ID())).
-					Err(err).
-					Msg("network error reading length prefix")
-			}
-		} else {
+
+		case ErrorTypeConnectionReset:
+			utils.Logger().Warn().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "connection_reset").
+				Str("description", errorDesc).
+				Msg("connection reset by peer during length prefix read")
+			return nil, errors.Wrap(err, "connection reset")
+
+		case ErrorTypeBrokenPipe:
+			utils.Logger().Warn().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "broken_pipe").
+				Str("description", errorDesc).
+				Msg("broken pipe during length prefix read")
+			return nil, errors.Wrap(err, "broken pipe")
+
+		case ErrorTypeTimeout:
 			utils.Logger().Debug().
 				Str("streamID", string(st.ID())).
+				Str("errorType", "timeout").
+				Msg("timeout reading length prefix")
+			return nil, errors.Wrap(err, "timeout")
+
+		case ErrorTypeResourceExhaustion:
+			utils.Logger().Error().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "resource_exhaustion").
+				Str("description", errorDesc).
+				Msg("resource exhaustion during length prefix read")
+			return nil, errors.Wrap(err, "resource exhaustion")
+
+		case ErrorTypeLocalNetwork:
+			utils.Logger().Warn().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "local_network").
+				Str("description", errorDesc).
+				Err(err).
+				Msg("local network error reading length prefix")
+			return nil, errors.Wrap(err, "network error")
+
+		default:
+			utils.Logger().Debug().
+				Str("streamID", string(st.ID())).
+				Str("errorType", "unknown").
+				Str("description", errorDesc).
 				Err(err).
 				Msg("failed reading length prefix")
+			return nil, errors.Wrap(err, "length prefix read failed")
 		}
-		return nil, errors.Wrap(err, "length prefix read failed")
 	}
 	bytesReadCounter.Add(sizeBytes)
 
@@ -419,7 +540,7 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 			Int("size", size).
 			Int("max", maxMsgBytes).
 			Msg("message size exceeds limit")
-		return nil, errors.Errorf("message size %d exceeds max %d", size, maxMsgBytes)
+		return nil, errors.Wrapf(errors.New("message size exceeds limit"), "message size %d exceeds max %d", size, maxMsgBytes)
 	}
 
 	// 3. NOW start progress tracking (only after size is read successfully)
@@ -448,13 +569,17 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 		// Read chunk with timeout - use single Read instead of ReadFull
 		n, err := st.reader.Read(chunk)
 		if err != nil {
-			// Check if this is a timeout
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			// Classify the error for better handling
+			errorType, errorDesc := ClassifyStreamError(err)
+
+			// Special handling for timeout errors with progress tracking
+			if errorType == ErrorTypeTimeout {
 				// Check if we made progress recently (not in this failed read)
 				if progressTracker != nil && progressTracker.IsHealthy() {
 					progressTracker.ResetTimeout()
 					utils.Logger().Debug().
 						Str("streamID", string(st.ID())).
+						Str("errorType", "timeout_recoverable").
 						Int("read", totalRead).
 						Int("expected", size).
 						Msg("recent progress detected, continuing read")
@@ -462,6 +587,7 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 				} else {
 					utils.Logger().Warn().
 						Str("streamID", string(st.ID())).
+						Str("errorType", "timeout_unrecoverable").
 						Int("read", totalRead).
 						Int("expected", size).
 						Msg("no recent progress detected, timeout")
@@ -469,23 +595,69 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 				}
 			}
 
-			// Log network errors specifically
-			if netErr, ok := err.(net.Error); ok {
+			// Handle other error types
+			switch errorType {
+			case ErrorTypeRemoteDisconnect:
 				utils.Logger().Debug().
 					Str("streamID", string(st.ID())).
-					Err(netErr).
+					Str("errorType", "remote_disconnect").
 					Int("read", totalRead).
 					Int("expected", size).
-					Msg("network error reading message content chunk")
-			} else {
+					Msg("stream closed by remote peer during chunk read")
+				return nil, errors.Wrap(err, "stream closed")
+
+			case ErrorTypeConnectionReset:
+				utils.Logger().Warn().
+					Str("streamID", string(st.ID())).
+					Str("errorType", "connection_reset").
+					Str("description", errorDesc).
+					Int("read", totalRead).
+					Int("expected", size).
+					Msg("connection reset by peer during chunk read")
+				return nil, errors.Wrap(err, "connection reset")
+
+			case ErrorTypeBrokenPipe:
+				utils.Logger().Warn().
+					Str("streamID", string(st.ID())).
+					Str("errorType", "broken_pipe").
+					Str("description", errorDesc).
+					Int("read", totalRead).
+					Int("expected", size).
+					Msg("broken pipe during chunk read")
+				return nil, errors.Wrap(err, "broken pipe")
+
+			case ErrorTypeResourceExhaustion:
+				utils.Logger().Error().
+					Str("streamID", string(st.ID())).
+					Str("errorType", "resource_exhaustion").
+					Str("description", errorDesc).
+					Int("read", totalRead).
+					Int("expected", size).
+					Msg("resource exhaustion during chunk read")
+				return nil, errors.Wrap(err, "resource exhaustion")
+
+			case ErrorTypeLocalNetwork:
+				utils.Logger().Warn().
+					Str("streamID", string(st.ID())).
+					Str("errorType", "local_network").
+					Str("description", errorDesc).
+					Err(err).
+					Int("read", totalRead).
+					Int("expected", size).
+					Msg("local network error reading message content chunk")
+				return nil, errors.Wrap(err, "network error")
+
+			default:
 				utils.Logger().Debug().
 					Str("streamID", string(st.ID())).
+					Str("errorType", "unknown").
+					Str("description", errorDesc).
 					Err(err).
 					Int("read", totalRead).
 					Int("expected", size).
 					Msg("failed reading message content chunk")
+				return nil, errors.Wrap(err, "content read failed")
 			}
-			return nil, errors.Wrap(err, "content read failed")
 		}
 
 		// Check if we got some data
@@ -533,7 +705,7 @@ func (st *BaseStream) ReadBytesWithProgress(progressTracker *ProgressTracker) (c
 			Int("read", totalRead).
 			Int("expected", size).
 			Msg("incomplete message read")
-		return nil, errors.Errorf("read %d bytes but expected %d", totalRead, size)
+		return nil, errors.Wrapf(errors.New("incomplete read"), "read %d bytes but expected %d", totalRead, size)
 	}
 
 	return content, nil
