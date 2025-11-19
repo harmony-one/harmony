@@ -77,12 +77,13 @@ func (st *syncStream) readMsgLoop() {
 		default:
 			msg, err := st.readMsg()
 			if err != nil {
-				// Classify error to determine appropriate handling
+				// Classify error for logging purposes
 				errorType, errorDesc := sttypes.ClassifyStreamError(err)
-				criticalErr := !sttypes.IsRecoverableError(errorType)
+				// Use centralized error handling to determine if stream should be closed
+				shouldClose := sttypes.ShouldCloseStream(err)
 
 				// Log error with classification
-				if criticalErr {
+				if shouldClose {
 					st.logger.Warn().
 						Str("streamID", string(st.ID())).
 						Str("errorType", errorType.String()).
@@ -101,9 +102,9 @@ func (st *syncStream) readMsgLoop() {
 						Msg("recoverable error, continuing stream")
 				}
 
-				// Only close stream for non-recoverable errors
-				if criticalErr {
-					if err := st.Close("read msg failed", criticalErr); err != nil {
+				// Only close stream for errors that require closure
+				if shouldClose {
+					if err := st.Close("read msg failed", shouldClose); err != nil {
 						st.logger.Err(err).Msg("failed to close sync stream")
 					}
 					return
