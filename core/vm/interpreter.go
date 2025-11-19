@@ -80,10 +80,12 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 		switch {
 		//case evm.chainRules.IsMerge:
 		//	cfg.JumpTable = &mergeInstructionSet
-		case evm.chainRules.IsLondon:
-			cfg.JumpTable = &londonInstructionSet
-		case evm.chainRules.IsBerlin:
-			cfg.JumpTable = &berlinInstructionSet
+		//case evm.chainRules.IsLondon:
+		//	cfg.JumpTable = &eip1153TransientStorage
+		//case evm.chainRules.IsBerlin:
+		//	cfg.JumpTable = &berlinInstructionSet
+		case evm.chainRules.Is1153TransientStorage:
+			cfg.JumpTable = &eip1153InstructionSet
 		case evm.chainRules.IsIstanbul:
 			cfg.JumpTable = &istanbulInstructionSet
 		case evm.chainRules.IsConstantinople:

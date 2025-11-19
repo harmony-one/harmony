@@ -388,6 +388,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0), // EIP2537PrecompileEpoch
+		big.NewInt(0), // 1153 transient storage
 	}
 
 	// TestChainConfig ...
@@ -441,6 +442,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0), // EIP2537PrecompileEpoch
+		big.NewInt(0), // 1153 transient storage
 	}
 
 	// TestRules ...
@@ -627,11 +629,14 @@ type ChainConfig struct {
 	HIP32Epoch *big.Int `json:"hip32-epoch,omitempty"`
 
 	IsOneSecondEpoch *big.Int `json:"is-one-second-epoch,omitempty"`
+
+	// EIP2537PrecompileEpoch is the first epoch to support the EIP-2537 precompiles
+	EIP1153TransientStorageEpoch *big.Int `json:"eip1153-transient-storage-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v EIP1153TransientStorageEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -644,6 +649,7 @@ func (c *ChainConfig) String() string {
 		c.ChainIdFixEpoch,
 		c.CrossShardXferPrecompileEpoch,
 		c.EIP2537PrecompileEpoch,
+		c.EIP1153TransientStorageEpoch,
 	)
 }
 
@@ -865,6 +871,11 @@ func (c *ChainConfig) IsEIP2537Precompile(epoch *big.Int) bool {
 	return isForked(c.EIP2537PrecompileEpoch, epoch)
 }
 
+// IsEIP1153TransientStorage determines whether EIP-1153 transient storage is available in the EVM
+func (c *ChainConfig) IsEIP1153TransientStorage(epoch *big.Int) bool {
+	return isForked(c.EIP1153TransientStorageEpoch, epoch)
+}
+
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
 func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
 	return isForked(c.ChainIdFixEpoch, epoch)
@@ -993,8 +1004,9 @@ type Rules struct {
 	IsEIP2537Precompile,
 	// eip-155 chain id fix
 	IsChainIdFix bool
-	IsValidatorCodeFix bool
-	IsYoloV2           bool
+	IsValidatorCodeFix     bool
+	IsYoloV2               bool
+	Is1153TransientStorage bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1026,5 +1038,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsChainIdFix:               c.IsChainIdFix(epoch),
 		IsValidatorCodeFix:         c.IsValidatorCodeFix(epoch),
 		IsEIP2537Precompile:        c.IsEIP2537Precompile(epoch),
+		Is1153TransientStorage:     c.IsEIP1153TransientStorage(epoch),
 	}
 }
