@@ -68,6 +68,8 @@ func (st *syncStream) run() {
 
 // readMsgLoop is the loop
 func (st *syncStream) readMsgLoop() {
+	recoverableErrorCount := 0
+
 	for {
 		select {
 		case <-st.closeC:
@@ -88,11 +90,14 @@ func (st *syncStream) readMsgLoop() {
 						Bool("critical", true).
 						Msg("critical error, closing stream")
 				} else {
+					recoverableErrorCount++
 					st.logger.Info().
 						Str("streamID", string(st.ID())).
 						Str("errorType", errorType.String()).
 						Str("description", errorDesc).
 						Bool("recoverable", true).
+						Int("consecutiveErrors", recoverableErrorCount).
+						Int("maxRetries", MaxRecoverableRetries).
 						Msg("recoverable error, continuing stream")
 				}
 
@@ -103,9 +108,33 @@ func (st *syncStream) readMsgLoop() {
 					}
 					return
 				}
+
+				// Check if we've exceeded max retries for recoverable errors
+				if recoverableErrorCount >= MaxRecoverableRetries {
+					st.logger.Warn().
+						Str("streamID", string(st.ID())).
+						Str("errorType", errorType.String()).
+						Str("description", errorDesc).
+						Int("consecutiveErrors", recoverableErrorCount).
+						Int("maxRetries", MaxRecoverableRetries).
+						Msg("too many consecutive recoverable errors, closing stream")
+					if err := st.Close("too many recoverable errors", false); err != nil {
+						st.logger.Err(err).Msg("failed to close sync stream")
+					}
+					return
+				}
+
+				// Add exponential backoff for recoverable errors
+				backoffDuration := time.Duration(recoverableErrorCount) * 100 * time.Millisecond
+				time.Sleep(backoffDuration)
+
 				// For recoverable errors, continue the loop
 				continue
 			}
+
+			// Successfully read a message, reset recoverable error counter
+			recoverableErrorCount = 0
+
 			if msg == nil {
 				if err := st.Close("remote closed stream", false); err != nil {
 					st.logger.Err(err).Msg("failed to close sync stream")

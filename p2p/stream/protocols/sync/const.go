@@ -61,6 +61,10 @@ const (
 	// MaxStreamFailures is the maximum allowed failures before stream gets removed
 	MaxStreamFailures = 5
 
+	// MaxRecoverableRetries is the maximum number of consecutive recoverable errors
+	// allowed in readMsgLoop before the stream is closed to prevent infinite loops
+	MaxRecoverableRetries = 5
+
 	// FaultRecoveryThreshold is the minimum duration before it resets the previous failures
 	// So, if stream hasn't had any issue for a certain amount of time since last failure, we can still trust it
 	FaultRecoveryThreshold = 30 * time.Minute
