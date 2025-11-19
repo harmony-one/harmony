@@ -475,3 +475,68 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 		t.Error(fmt.Sprintf("Got error %v in evm.Call", err))
 	}
 }
+
+type vmContext struct {
+	blockCtx vm.BlockContext
+	txCtx    vm.TxContext
+}
+
+func testCtx() *vmContext {
+	return &vmContext{blockCtx: vm.BlockContext{BlockNumber: big.NewInt(1)}, txCtx: vm.TxContext{GasPrice: big.NewInt(100000)}}
+}
+
+type account struct{}
+
+func (account) SubBalance(amount *big.Int)                          {}
+func (account) AddBalance(amount *big.Int)                          {}
+func (account) SetAddress(common.Address)                           {}
+func (account) Value() *big.Int                                     { return nil }
+func (account) SetBalance(*big.Int)                                 {}
+func (account) SetNonce(uint64)                                     {}
+func (account) Balance() *big.Int                                   { return nil }
+func (account) Address() common.Address                             { return common.Address{} }
+func (account) SetCode(common.Hash, []byte)                         {}
+func (account) ForEachStorage(cb func(key, value common.Hash) bool) {}
+
+func TestTransientStorageOpcodes(t *testing.T) {
+	var run = func(t *testing.T, ExtraEips []int) ([]byte, error) {
+		t.Helper()
+		key, _ := crypto.GenerateKey()
+		_, db, _, _ := getTestEnvironment(*key)
+		vmctx := testCtx()
+		chaincfg := params.TestChainConfig
+
+		var (
+			env = vm.NewEVM(vmctx.blockCtx, vmctx.txCtx, db, chaincfg, vm.Config{
+				ExtraEips: ExtraEips,
+			})
+			startGas uint64 = 10000
+			value           = big.NewInt(0)
+			contract        = vm.NewContract(account{}, account{}, value, startGas)
+		)
+		contract.Code = []byte{
+			byte(vm.PUSH1), 0x01, // key
+			byte(vm.PUSH1), 0x02, // value
+			byte(vm.TSTORE), // TSTORE(key, value)
+
+			byte(vm.PUSH1), 0x01, // key
+			byte(vm.TLOAD), // TLOAD(key) -> value на стеке
+
+			byte(vm.STOP),
+		}
+		return env.Interpreter().Run(contract, []byte{}, false)
+	}
+
+	t.Run("enabled-opcodes", func(t *testing.T) {
+		_, err := run(t, []int{1153})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("disabled-opcodes", func(t *testing.T) {
+		_, err := run(t, []int{})
+		if err == nil {
+			t.Fatal("expected error but got nil")
+		}
+	})
+}

@@ -21,11 +21,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/holiman/uint256"
 )
@@ -43,6 +46,14 @@ type twoOperandParams struct {
 
 var commonParams []*twoOperandParams
 var twoOpMethods map[string]executionFunc
+
+type contractRef struct {
+	addr common.Address
+}
+
+func (c contractRef) Address() common.Address {
+	return c.addr
+}
 
 func init() {
 
@@ -587,6 +598,49 @@ func BenchmarkOpSHA3(bench *testing.B) {
 	}
 }
 */
+
+func TestOpTstore(t *testing.T) {
+	var (
+		statedb, _     = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+		env            = NewEVM(BlockContext{}, TxContext{}, statedb, params.TestChainConfig, Config{})
+		stack          = newstack()
+		mem            = NewMemory()
+		evmInterpreter = NewEVMInterpreter(env, env.Config)
+		caller         = common.Address{}
+		to             = common.Address{1}
+		contractRef    = contractRef{caller}
+		contract       = NewContract(contractRef, AccountRef(to), new(big.Int), 0)
+		scopeContext   = ScopeContext{mem, stack, contract}
+		value          = common.Hex2Bytes("abcdef00000000000000abba000000000deaf000000c0de00100000000133700")
+	)
+
+	// Add a stateObject for the caller and the contract being called
+	statedb.CreateAccount(caller)
+	statedb.CreateAccount(to)
+
+	env.interpreter = evmInterpreter
+	pc := uint64(0)
+	// push the value to the stack
+	stack.push(new(uint256.Int).SetBytes(value))
+	// push the location to the stack
+	stack.push(new(uint256.Int))
+	opTstore(&pc, evmInterpreter, &scopeContext)
+	// there should be no elements on the stack after TSTORE
+	if stack.len() != 0 {
+		t.Fatal("stack wrong size")
+	}
+	// push the location to the stack
+	stack.push(new(uint256.Int))
+	opTload(&pc, evmInterpreter, &scopeContext)
+	// there should be one element on the stack after TLOAD
+	if stack.len() != 1 {
+		t.Fatal("stack wrong size")
+	}
+	val := stack.peek()
+	if !bytes.Equal(val.Bytes(), value) {
+		t.Fatal("incorrect element read from transient storage")
+	}
+}
 
 func TestCreate2Addreses(t *testing.T) {
 	type testcase struct {

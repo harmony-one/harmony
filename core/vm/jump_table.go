@@ -52,8 +52,9 @@ var (
 	byzantiumInstructionSet        = newByzantiumInstructionSet()
 	constantinopleInstructionSet   = newConstantinopleInstructionSet()
 	istanbulInstructionSet         = newIstanbulInstructionSet()
-	berlinInstructionSet           = newBerlinInstructionSet()
-	londonInstructionSet           = newLondonInstructionSet()
+	eip1153InstructionSet          = eip1153TransientStorage()
+	//berlinInstructionSet           = newBerlinInstructionSet()
+	//londonInstructionSet           = newLondonInstructionSet()
 	//mergeInstructionSet            = newMergeInstructionSet()
 )
 
@@ -91,6 +92,7 @@ func newMergeInstructionSet() JumpTable {
 }
 */
 
+/*
 // newLondonInstructionSet returns the frontier, homestead, byzantium,
 // contantinople, istanbul, petersburg, berlin and london instructions.
 func newLondonInstructionSet() JumpTable {
@@ -105,6 +107,13 @@ func newLondonInstructionSet() JumpTable {
 func newBerlinInstructionSet() JumpTable {
 	instructionSet := newIstanbulInstructionSet()
 	enable2929(&instructionSet) // Access lists for trie accesses https://eips.ethereum.org/EIPS/eip-2929
+	return validate(instructionSet)
+}*/
+
+// EIP 1153 Transient Storage
+func eip1153TransientStorage() JumpTable {
+	instructionSet := newIstanbulInstructionSet()
+	enable1153(&instructionSet) // Transient Storage - https://eips.ethereum.org/EIPS/eip-1153
 	return validate(instructionSet)
 }
 
