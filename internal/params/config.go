@@ -234,6 +234,7 @@ var (
 		DevnetExternalEpoch:                   big.NewInt(144),
 		IsOneSecondEpoch:                      big.NewInt(17436),
 		EIP2537PrecompileEpoch:                EpochTBD,
+		EIP1153TransientStorageEpoch:          big.NewInt(35626),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
