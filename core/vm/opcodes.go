@@ -307,7 +307,6 @@ var opCodeToString = map[OpCode]string{
 	GAS:      "GAS",
 	JUMPDEST: "JUMPDEST",
 	PUSH0:    "PUSH0",
-	PUSH0:    "PUSH0",
 
 	// 0x60 range - push.
 	PUSH1:  "PUSH1",
@@ -475,7 +474,6 @@ var stringToOp = map[string]OpCode{
 	"MSIZE":          MSIZE,
 	"GAS":            GAS,
 	"JUMPDEST":       JUMPDEST,
-	"PUSH0":          PUSH0,
 	"TLOAD":          TLOAD,
 	"TSTORE":         TSTORE,
 	"PUSH0":          PUSH0,
