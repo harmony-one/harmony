@@ -17,7 +17,6 @@
 package vm
 
 import (
-	"errors"
 	"math/big"
 	"sync/atomic"
 
@@ -461,15 +460,12 @@ func opGasprice(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 	return nil, nil
 }
 
-func opBlockhash(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	num := stack.pop()
-	num64 := num.Uint64()
-
-	n := interpreter.intPool.get().Sub(interpreter.evm.BlockNumber, common.Big257)
-	if num.Cmp(n) > 0 && num.Cmp(interpreter.evm.BlockNumber) < 0 {
-		stack.push(interpreter.evm.GetHash(num.Uint64()).Big())
-	} else {
-		stack.push(interpreter.intPool.getZero())
+func opBlockhash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	num := scope.Stack.peek()
+	num64, overflow := num.Uint64WithOverflow()
+	if overflow {
+		num.Clear()
+		return nil, nil
 	}
 
 	var upper, lower uint64
@@ -479,14 +475,12 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, contract *Contract, me
 	} else {
 		lower = upper - 256
 	}
-
 	if num64 >= lower && num64 < upper {
-		num.SetBytes(interpreter.evm.Context.GetHash(num64).Bytes())
+		res := interpreter.evm.Context.GetHash(num64)
+		num.SetBytes(res[:])
 	} else {
-		num.SetUint64(0)
+		num.Clear()
 	}
-
-	interpreter.intPool.put(num, n)
 	return nil, nil
 }
 

@@ -684,4 +684,4 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 // ChainConfig returns the environment's chain configuration
 func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
 
-func (evm *EVM) Config() Config { return evm.vmConfig }
+func (evm *EVM) GetConfig() Config { return evm.Config }
