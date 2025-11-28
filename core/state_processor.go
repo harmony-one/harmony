@@ -711,8 +711,21 @@ func ProcessBlockHashHistory(statedb *state.DB, header *block.Header, chainConfi
 		prevHash   = header.ParentHash()
 		parent     = chain.GetHeaderByHash(prevHash)
 		number     = header.Number().Uint64()
-		prevNumber = parent.Number().Uint64()
+		prevNumber uint64
 	)
+
+	// Handle genesis block case - parent will be nil
+	if parent == nil {
+		// Genesis block has no parent, so we can't store parent hash
+		// But we still need to check if this is the Prague fork block
+		if chainConfig.IsPrague(header.Epoch()) {
+			// At Prague fork block (which might be genesis), populate history buffer
+			// For genesis, there's nothing to populate, so just return
+		}
+		return
+	}
+
+	prevNumber = parent.Number().Uint64()
 
 	// Store the immediate parent hash
 	ProcessParentBlockHash(statedb, prevHash, prevNumber)
@@ -731,12 +744,18 @@ func ProcessBlockHashHistory(statedb *state.DB, header *block.Header, chainConfi
 	}
 
 	// Walk backwards through the chain to populate the history buffer
-	for i := prevNumber; i > low; i-- {
-		ProcessParentBlockHash(statedb, parent.ParentHash(), i-1)
+	// We already stored the hash of block prevNumber at slot prevNumber above
+	// Now we need to store hashes for blocks prevNumber-1 down to low+1
+	// Start by getting the header for block prevNumber-1
+	if prevNumber > 0 {
+		parent = chain.GetHeader(parent.ParentHash(), prevNumber-1)
+	}
+	for i := prevNumber - 1; i > low && parent != nil; i-- {
+		// Store the hash of block i at slot i
+		// parent is the header for block i, so parent.Hash() is the hash of block i
+		ProcessParentBlockHash(statedb, parent.Hash(), i)
+		// Get the header for block i-1 for the next iteration
 		parent = chain.GetHeader(parent.ParentHash(), i-1)
-		if parent == nil {
-			break // Stop if we can't find the parent
-		}
 	}
 }
 

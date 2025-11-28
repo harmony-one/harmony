@@ -493,8 +493,9 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 			historyLower = upper - hmyparams.HistoryServeWindow
 		}
 
-		// Check if the requested block is within the history window
-		if num64 >= historyLower && num64 < upper {
+		// Check if the requested block is within the history window but outside the 256-block window
+		// The history storage contract only serves blocks older than the 256-block window
+		if num64 >= historyLower && num64 < lower {
 			// Calculate the storage key for the history contract
 			ringIndex := num64 % hmyparams.HistoryServeWindow
 			var key common.Hash
