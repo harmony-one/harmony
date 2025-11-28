@@ -1151,6 +1151,7 @@ type Rules struct {
 	IsEIP5656Mcopy         bool
 	IsEIP6780              bool
 	Is3860                 bool
+	IsPrague               bool // EIP-2935: Serve historical block hashes from state
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1187,5 +1188,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsEIP5656Mcopy:             c.IsEIP5656Mcopy(epoch),
 		IsEIP6780:                  c.IsEIP6780(epoch),
 		Is3860:                     c.IsEIP3860(epoch),
+		IsPrague:                   c.IsPrague(epoch),
 	}
 }

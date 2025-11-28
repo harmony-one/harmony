@@ -717,8 +717,10 @@ func ProcessBlockHashHistory(statedb *state.DB, header *block.Header, chainConfi
 	// Store the immediate parent hash
 	ProcessParentBlockHash(statedb, prevHash, prevNumber)
 
-	// If this is the EIP-2935 fork block or genesis, populate the entire history buffer
-	if chainConfig.IsPrague(parent.Epoch()) || prevNumber == 0 {
+	// If this is NOT the EIP-2935 fork block and NOT genesis, we're done
+	// (only need to populate the entire buffer at the fork block or genesis)
+	isPragueForkBlock := chainConfig.IsPrague(header.Epoch()) && !chainConfig.IsPrague(parent.Epoch())
+	if !isPragueForkBlock && prevNumber != 0 {
 		return
 	}
 

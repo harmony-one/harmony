@@ -17,15 +17,17 @@
 package vm
 
 import (
+	"encoding/binary"
 	"math/big"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
+	hmyparams "github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
 
 	//"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )
@@ -475,12 +477,40 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 	} else {
 		lower = upper - 256
 	}
+
+	// First, check the traditional 256-block window
 	if num64 >= lower && num64 < upper {
 		res := interpreter.evm.Context.GetHash(num64)
 		num.SetBytes(res[:])
-	} else {
-		num.Clear()
+		return nil, nil
 	}
+
+	// If EIP-2935 (Prague) is active, check the history storage contract
+	// for blocks beyond the 256-block window (up to 8192 blocks)
+	if interpreter.evm.chainRules.IsPrague {
+		historyLower := uint64(0)
+		if upper > hmyparams.HistoryServeWindow {
+			historyLower = upper - hmyparams.HistoryServeWindow
+		}
+
+		// Check if the requested block is within the history window
+		if num64 >= historyLower && num64 < upper {
+			// Calculate the storage key for the history contract
+			ringIndex := num64 % hmyparams.HistoryServeWindow
+			var key common.Hash
+			binary.BigEndian.PutUint64(key[24:], ringIndex)
+
+			// Read from the history storage contract
+			hash := interpreter.evm.StateDB.GetState(hmyparams.HistoryStorageAddress, key)
+			if hash != (common.Hash{}) {
+				num.SetBytes(hash[:])
+				return nil, nil
+			}
+		}
+	}
+
+	// Block hash not available
+	num.Clear()
 	return nil, nil
 }
 
@@ -727,7 +757,7 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	// By using big0 here, we save an alloc for the most common case (non-ether-transferring contract calls),
 	// but it would make more sense to extend the usage of uint256.Int
 	if !value.IsZero() {
-		gas += params.CallStipend
+		gas += ethparams.CallStipend
 		bigVal = value.ToBig()
 	}
 
@@ -764,7 +794,7 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 	//TODO: use uint256.Int instead of converting with toBig()
 	var bigVal = big0
 	if !value.IsZero() {
-		gas += params.CallStipend
+		gas += ethparams.CallStipend
 		bigVal = value.ToBig()
 	}
 
