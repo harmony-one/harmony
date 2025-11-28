@@ -127,7 +127,6 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
-					AllowedTxsFile:    "",
 					RosettaFixFile:    "",
 					AccountSlots:      16,
 					GlobalSlots:       4096,
@@ -1263,7 +1262,6 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.TxPoolConfig{
-				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
@@ -1278,7 +1276,6 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{"--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				AllowedTxsFile:    "",
 				RosettaFixFile:    "rosettafix.file",
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
@@ -1294,7 +1291,6 @@ func TestTxPoolFlags(t *testing.T) {
 			args: []string{"--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
 				RosettaFixFile:    "rosettafix.file",
-				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
 				AccountQueue:      defaultConfig.TxPool.AccountQueue,
@@ -1309,7 +1305,6 @@ func TestTxPoolFlags(t *testing.T) {
 			args: []string{"--txpool.accountslots", "5", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
 				AccountSlots:      5,
-				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    "rosettafix.file",
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
@@ -1323,7 +1318,6 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{"--txpool.locals", "locals.txt"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: "locals.txt",
@@ -1338,7 +1332,6 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{"--txpool.globalslots", "10240"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
@@ -1353,7 +1346,6 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{"--txpool.accountqueue", "128", "--txpool.globalqueue", "10240", "--txpool.lifetime", "15m", "--txpool.pricelimit", "100", "--txpool.pricebump", "2"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
