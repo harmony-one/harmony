@@ -14,6 +14,7 @@ env:
   - TEST="bash ./scripts/travis_go_checker.sh"
   - TEST="bash ./scripts/travis_rpc_checker.sh"
   - TEST="bash ./scripts/travis_pyhmy_checker.sh"
+  - TEST="bash ./scripts/travis_rosetta_checker.sh"
 
 # We enable Travis on the main/dev branches.
 # pull_request type includes both main repo/fork PR workflow
