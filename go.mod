@@ -260,7 +260,7 @@ require (
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/securego/gosec v0.0.0-20191002120514-e680875ea14d // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
+	github.com/sirupsen/logrus v1.9.1 // indirect
 	github.com/sourcegraph/go-diff v0.5.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
