@@ -17,10 +17,26 @@
 package tracers
 
 import (
+	"encoding/json"
 	"math/big"
 
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/pkg/errors"
 )
+
+// init registers itself this packages as a lookup for tracers.
+func init() {
+	RegisterLookup(false, newPrestateTracer)
+}
+
+func newPrestateTracer(code string, ctx *Context, _ json.RawMessage) (Tracer, error) {
+	if code != "RosettaBlockTracer" {
+		return nil, errors.New("invalid code")
+	}
+	tracer := &RosettaBlockTracer{ParityBlockTracer: &ParityBlockTracer{}}
+	return tracer, nil
+	//return &prestateTracer{prestate: prestate{}}, nil
+}
 
 type RosettaLogItem struct {
 	IsSuccess bool
@@ -67,11 +83,11 @@ func (rbt *RosettaBlockTracer) AddRosettaLog(op vm.OpCode, from, to *vm.RosettaL
 	})
 }
 
-func (rbt *RosettaBlockTracer) GetResult() ([]*RosettaLogItem, error) {
+func (rbt *RosettaBlockTracer) GetResult() (json.RawMessage, error) {
 	root := &rbt.cur.action
 
 	var results = make([]*RosettaLogItem, 0)
-	var err error
+	//var err error
 	var finalize func(ac *action, parentErr error, traceAddress []int)
 	finalize = func(ac *action, parentErr error, traceAddress []int) {
 		results = append(results, rbt.formatAction(traceAddress, parentErr, ac))
@@ -90,5 +106,7 @@ func (rbt *RosettaBlockTracer) GetResult() ([]*RosettaLogItem, error) {
 		finalize(subAc, root.err, append(traceAddress[:], i))
 	}
 
-	return append(results, rbt.logs...), err
+	// TODO
+	return json.RawMessage{}, nil
+	//return append(results, rbt.logs...), err
 }

@@ -216,6 +216,10 @@ type ParityBlockTracer struct {
 	tracers []*ParityTxTracer
 }
 
+func (jst *ParityBlockTracer) Stop(err error) {
+
+}
+
 func (jst *ParityBlockTracer) CaptureTxStart(gasLimit uint64) {
 
 }
@@ -255,7 +259,11 @@ func (ptt *ParityTxTracer) len() int {
 }
 
 // CaptureStart implements the ParityBlockTracer interface to initialize the tracing operation.
-func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
+func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
+	jst.captureStart(env, from, to, create, input, gas, value)
+}
+
+func (jst *ParityBlockTracer) captureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
 	jst.cur = &ParityTxTracer{}
 	jst.cur.op = vm.CALL // vritual call
 	if create {
@@ -275,10 +283,14 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 	return nil
 }
 
+func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rdata []byte, depth int, err error) {
+	jst.captureState(env, pc, op, gas, cost, scope.Memory, scope.Stack, scope.Contract, depth, err)
+}
+
 // CaptureState implements the ParityBlockTracer interface to trace a single step of VM execution.
-func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) (vm.HookAfter, error) {
+func (jst *ParityBlockTracer) captureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) (vm.HookAfter, error) {
 	if err != nil {
-		return nil, jst.CaptureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
+		return nil, jst.captureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
 	}
 	var retErr error
 	stackPeek := func(n int) *uint256.Int {
@@ -393,9 +405,13 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 	return nil, retErr
 }
 
+func (jst *ParityBlockTracer) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, depth int, err error) {
+	jst.captureFault(nil, pc, op, gas, cost, scope.Memory, scope.Stack, scope.Contract, depth, err)
+}
+
 // CaptureFault implements the ParityBlockTracer interface to trace an execution fault
 // while running an opcode.
-func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
+func (jst *ParityBlockTracer) captureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
 	if jst.cur.last().err != nil {
 		return nil
 	}
@@ -417,7 +433,12 @@ func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode,
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
-func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error {
+func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) {
+	jst.captureEnd(output, gasUsed, t, err)
+	return
+}
+
+func (jst *ParityBlockTracer) captureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error {
 	jst.cur.output = output
 	jst.cur.gasUsed = gasUsed
 	if err != nil {
@@ -461,7 +482,7 @@ func (jst *ParityBlockTracer) GetStorage() *TraceBlockStorage {
 }
 
 // GetResult calls the Javascript 'result' function and returns its value, or any accumulated error
-func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
+func (jst *ParityBlockTracer) GetResult() (json.RawMessage, error) {
 	var results []json.RawMessage
 	var err error
 	var headPiece string
@@ -501,5 +522,6 @@ func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 		)
 		finalize(root, make([]int, 0))
 	}
-	return results, err
+	_ = err
+	return json.Marshal(results)
 }
