@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -136,7 +137,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, peer libp2p
 	return nil
 }
 
-func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64, isLeader bool) {
+func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64, isLeader bool, blockNumber uint64) {
 	consensus.GetLogger().Info().Str("waitTime", waitTime.String()).
 		Msg("[OnCommit] Starting Grace Period")
 	time.Sleep(waitTime)
@@ -146,13 +147,15 @@ func (consensus *Consensus) finalCommit(waitTime time.Duration, viewID uint64, i
 	defer consensus.mutex.Unlock()
 	consensus.transitions.finalCommit = false
 	if viewID == consensus.getCurBlockViewID() {
-		consensus._finalCommit(isLeader)
+		consensus._finalCommit(isLeader, blockNumber)
 	}
 }
 
-func (consensus *Consensus) _finalCommit(isLeader bool) {
+func (consensus *Consensus) _finalCommit(isLeader bool, blockNumber uint64) {
 	numCommits := consensus.decider().SignersCount(quorum.Commit)
-
+	FinalCommit.WithLabelValues(
+		fmt.Sprintf("%d", blockNumber),
+	).Set(float64(startTime.UnixMilli()))
 	consensus.getLogger().Info().
 		Int64("NumCommits", numCommits).
 		Msg("[finalCommit] Finalizing Consensus")
@@ -473,6 +476,9 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 
 		startTime = time.Now()
 		consensus.msgSender.Reset(newBlock.NumberU64())
+		BlockAnnounceStartedTime.WithLabelValues(
+			fmt.Sprintf("%d", newBlock.NumberU64()),
+		).Set(float64(startTime.UnixMilli()))
 
 		consensus.getLogger().Info().
 			Int("numTxs", len(newBlock.Transactions())).

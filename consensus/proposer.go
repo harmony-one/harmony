@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -38,11 +39,11 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 				consensus.GetLogger().Warn().
 					Msg("Consensus new block proposal: STOPPED!")
 				return
-			case proposal := <-consensus.GetReadySignal():
+			case proposal := <-consensus.readySignal:
 				for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
 					time.Sleep(SleepPeriod)
 					consensus.GetLogger().Info().
-						Uint64("blockNum", proposal.blockNum).
+						Uint64("blockNum", proposal.BlockNum).
 						Bool("asyncProposal", proposal.Type == AsyncProposal).
 						Str("called", proposal.Caller).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
@@ -77,6 +78,8 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 						}
 					}()
 					newBlock, err := consensus.ProposeNewBlock(newCommitSigsChan)
+					BlockProposalEndTime.WithLabelValues(fmt.Sprintf("%d", proposal.BlockNum)).
+						Set(float64(time.Now().UnixMilli()))
 					if err == nil {
 						consensus.GetLogger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).

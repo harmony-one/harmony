@@ -34,7 +34,7 @@ var errLeaderPriKeyNotFound = errors.New("leader private key not found locally")
 type Proposal struct {
 	Type     ProposalType
 	Caller   string
-	blockNum uint64
+	BlockNum uint64
 }
 
 // NewProposal creates a new proposal
@@ -42,7 +42,7 @@ func NewProposal(t ProposalType, blockNum uint64) Proposal {
 	return Proposal{
 		Type:     t,
 		Caller:   utils.GetCallStackInfo(2),
-		blockNum: blockNum,
+		BlockNum: blockNum,
 	}
 }
 
@@ -164,15 +164,14 @@ func (consensus *Consensus) ChainReader() engine.ChainReader {
 }
 
 func (consensus *Consensus) ReadySignal(p Proposal, signalSource string, signalReason string) {
+	BlockProposalStartTime.
+		WithLabelValues(fmt.Sprintf("%d", p.BlockNum)).
+		Set(float64(time.Now().UnixMilli()))
 	consensus.GetLogger().Info().
 		Str("signalSource", signalSource).
 		Str("signalReason", signalReason).
 		Msg("ReadySignal is called to propose new block")
 	consensus.readySignal <- p
-}
-
-func (consensus *Consensus) GetReadySignal() chan Proposal {
-	return consensus.readySignal
 }
 
 func (consensus *Consensus) GetCommitSigChannel() chan []byte {

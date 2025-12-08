@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -326,6 +327,10 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
 
+		QuorumWasMet.WithLabelValues(
+			fmt.Sprintf("%d", blockObj.NumberU64()),
+		).Set(float64(time.Now().UnixMilli()))
+
 		if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems
 			consensus.preCommitAndPropose(blockObj)
@@ -337,7 +342,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		if maxWaitTime > waitTime {
 			waitTime = maxWaitTime
 		}
-		go consensus.finalCommit(waitTime, viewID, consensus.isLeader())
+		go consensus.finalCommit(waitTime, viewID, consensus.isLeader(), blockObj.NumberU64())
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}

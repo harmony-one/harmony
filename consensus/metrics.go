@@ -132,9 +132,62 @@ var (
 
 	// TODO: add last consensus timestamp, add view ID
 	// add last view change timestamp
+
+	// BlockProposalStartTime is the gauge vector to record the time when the leader starts building the block
+	BlockProposalStartTime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "block_proposal_start_time",
+			Help: "Timestamp when the leader starts building the block",
+		},
+		[]string{"height"},
+	)
+
+	BlockProposalEndTime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "block_proposal_end_time",
+			Help: "Milliseconds when the leader finishes building the block",
+		},
+		[]string{"height"},
+	)
+
+	// BlockAnnounceStartedTime is the gauge vector to record the time when the block announce started
+	BlockAnnounceStartedTime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "block_announce_started_time",
+			Help: "Milliseconds when the block announced started",
+		},
+		[]string{"height"},
+	)
+
+	// VoteReceivedByLeaderTime
+	VoteReceivedByLeaderTime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "vote_received_by_leader_time",
+			Help: "Milliseconds when the leader received votes",
+		},
+		[]string{"height"},
+	)
+
+	// quorum_was_met
+	QuorumWasMet = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "quorum_was_met",
+			Help: "Indicates whether quorum was met (1 for yes, 0 for no)",
+		},
+		[]string{"height"},
+	)
+
+	// final_commit
+	FinalCommit = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "final_commit",
+			Help: "Indicates whether final commit was achieved (1 for yes, 0 for no)",
+		},
+		[]string{"height"},
+	)
 )
 
-// UpdateValidatorMetrics will udpate validator metrics
+// UpdateValidatorMetrics will update validator metrics
 func (consensus *Consensus) UpdateValidatorMetrics(numSig float64, blockNum float64) {
 	consensusCounterVec.With(prometheus.Labels{"consensus": "bingo"}).Inc()
 	consensusGaugeVec.With(prometheus.Labels{"consensus": "signatures"}).Set(numSig)
