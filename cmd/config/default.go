@@ -218,7 +218,10 @@ var (
 		DiscHighCap:          128,
 		DiscBatch:            8,
 		TrustedNodes:         []string{},
-		DNSStaticNodes:       []string{},
+		DNSStaticNodes: []string{
+			"/dnsaddr/trusted.s0.t.hmny.io",
+			"/dnsaddr/trusted.s1.t.hmny.io",
+		},
 	}
 
 	defaultTestNetSyncConfig = harmonyconfig.SyncConfig{
@@ -235,7 +238,10 @@ var (
 		DiscHighCap:          1024,
 		DiscBatch:            3,
 		TrustedNodes:         []string{},
-		DNSStaticNodes:       []string{},
+		DNSStaticNodes: []string{
+			"/dnsaddr/trusted.s0.b.hmny.io",
+			"/dnsaddr/trusted.s1.b.hmny.io",
+		},
 	}
 
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
@@ -269,7 +275,10 @@ var (
 		DiscHighCap:          1024,
 		DiscBatch:            5,
 		TrustedNodes:         []string{},
-		DNSStaticNodes:       []string{},
+		DNSStaticNodes: []string{
+			"/dnsaddr/trusted.s0.ps.hmny.io",
+			"/dnsaddr/trusted.s1.ps.hmny.io",
+		},
 	}
 
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{

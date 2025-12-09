@@ -149,6 +149,8 @@ func GetDefaultSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.SyncConfig {
 		return defaultLocalNetSyncConfig
 	case nodeconfig.Partner:
 		return defaultPartnerSyncConfig
+	case nodeconfig.Devnet:
+		return defaultPartnerSyncConfig
 	default:
 		return defaultElseSyncConfig
 	}
