@@ -35,7 +35,6 @@ var WriteCapablePrecompiledContractsCrossXfer = map[common.Address]WriteCapableP
 // which are available after the EIP2537PrecompileEpoch
 // It includes the EIP-2537 precompiles
 var WriteCapablePrecompiledContractsEIP2537 = map[common.Address]WriteCapablePrecompiledContract{
-	common.BytesToAddress([]byte{252}): &eip2537Precompile{},
 	common.BytesToAddress([]byte{249}): &crossShardXferPrecompile{},
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 }

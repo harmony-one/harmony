@@ -83,8 +83,8 @@ var PrecompiledContractsIstanbul = map[common.Address]WriteCapablePrecompiledCon
 	common.BytesToAddress([]byte{9}): wrapper{&blake2F{}},
 }
 
-// PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
-// contracts used in the Istanbul release.
+// PrecompiledContractsVRF contains the default set of pre-compiled Ethereum
+// contracts used in the Istanbul release plus VRF precompile.
 var PrecompiledContractsVRF = map[common.Address]WriteCapablePrecompiledContract{
 	common.BytesToAddress([]byte{1}):   wrapper{&ecrecover{}},
 	common.BytesToAddress([]byte{2}):   wrapper{&sha256hash{}},
@@ -209,7 +209,7 @@ func init() {
 		PrecompiledAddressesHomestead = append(PrecompiledAddressesHomestead, k)
 	}
 	for k := range PrecompiledContractsByzantium {
-		PrecompiledAddressesHomestead = append(PrecompiledAddressesByzantium, k)
+		PrecompiledAddressesByzantium = append(PrecompiledAddressesByzantium, k)
 	}
 	for k := range PrecompiledContractsIstanbul {
 		PrecompiledAddressesIstanbul = append(PrecompiledAddressesIstanbul, k)
