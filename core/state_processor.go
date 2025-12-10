@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -31,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/hmy/tracers/logger"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -303,6 +305,10 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	// Create a new context to be used in the EVM environment
 	context := NewEVMBlockContext(msg, header, bc, author)
 	context.TxType = txType
+
+	tracer := logger.NewStructLogger(nil)
+	cfg.Debug = true
+	cfg.Tracer = tracer
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(context, NewEVMTxContext(msg), statedb, config, cfg)
@@ -319,6 +325,17 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		}
 		return nil, nil, nil, 0, errors.Wrapf(err, "apply failed from='%s' to='%s' balance='%s'", msg.From().Hex(), to, balance)
 	}
+
+	// open file named as transaction
+	name := fmt.Sprintf("tx_%d_%s.log", utils.GetPort(), tx.Hash().Hex())
+	// write the trace logs to file
+	f, err := os.OpenFile(name, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	logger.WriteTrace(f, tracer.StructLogs())
 	// Update the state with pending changes
 	var root []byte
 	if config.IsS3(header.Epoch()) {

@@ -28,7 +28,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/holiman/uint256"
 )
 
 // Storage represents a contract's storage.
@@ -63,26 +62,26 @@ type LogConfig struct {
 
 // StructLog is emitted to the EVM each cycle and lists information about the current internal state
 // prior to the execution of the statement.
-type StructLog struct {
-	Pc            uint64                      `json:"pc"`
-	Op            OpCode                      `json:"op"`
-	Gas           uint64                      `json:"gas"`
-	GasCost       uint64                      `json:"gasCost"`
-	Memory        []byte                      `json:"memory,omitempty"`
-	MemorySize    int                         `json:"memSize"`
-	Stack         []uint256.Int               `json:"stack"`
-	ReturnData    []byte                      `json:"returnData,omitempty"`
-	Storage       map[common.Hash]common.Hash `json:"-"`
-	Depth         int                         `json:"depth"`
-	RefundCounter uint64                      `json:"refund"`
-	Err           error                       `json:"-"`
-
-	CallerAddress   common.Address    `json:"callerAddress,omitempty"`
-	ContractAddress common.Address    `json:"contractAddress,omitempty"`
-	AfterStack      []uint256.Int     `json:"afterStack"`
-	AfterMemory     []byte            `json:"afterMemory"`
-	OperatorEvent   map[string]string `json:"operatorEvent"`
-}
+//type StructLog struct {
+//	Pc            uint64                      `json:"pc"`
+//	Op            OpCode                      `json:"op"`
+//	Gas           uint64                      `json:"gas"`
+//	GasCost       uint64                      `json:"gasCost"`
+//	Memory        []byte                      `json:"memory,omitempty"`
+//	MemorySize    int                         `json:"memSize"`
+//	Stack         []uint256.Int               `json:"stack"`
+//	ReturnData    []byte                      `json:"returnData,omitempty"`
+//	Storage       map[common.Hash]common.Hash `json:"-"`
+//	Depth         int                         `json:"depth"`
+//	RefundCounter uint64                      `json:"refund"`
+//	Err           error                       `json:"-"`
+//
+//	CallerAddress   common.Address    `json:"callerAddress,omitempty"`
+//	ContractAddress common.Address    `json:"contractAddress,omitempty"`
+//	AfterStack      []uint256.Int     `json:"afterStack"`
+//	AfterMemory     []byte            `json:"afterMemory"`
+//	OperatorEvent   map[string]string `json:"operatorEvent"`
+//}
 
 // overrides for gencodec
 type structLogMarshaling struct {
@@ -95,17 +94,17 @@ type structLogMarshaling struct {
 }
 
 // OpName formats the operand name in a human-readable format.
-func (s *StructLog) OpName() string {
-	return s.Op.String()
-}
+//func (s *StructLog) OpName() string {
+//	return s.Op.String()
+//}
 
 // ErrorString formats the log's error as a string.
-func (s *StructLog) ErrorString() string {
-	if s.Err != nil {
-		return s.Err.Error()
-	}
-	return ""
-}
+//func (s *StructLog) ErrorString() string {
+//	if s.Err != nil {
+//		return s.Err.Error()
+//	}
+//	return ""
+//}
 
 type HookAfter = func(memory *Memory, stack *Stack)
 
@@ -313,33 +312,33 @@ func (l *StructLogger) Error() error { return l.err }
 func (l *StructLogger) Output() []byte { return l.output }
 */
 // WriteTrace writes a formatted trace to the given writer
-func WriteTrace(writer io.Writer, logs []StructLog) {
-	for _, log := range logs {
-		fmt.Fprintf(writer, "%-16spc=%08d gas=%v cost=%v", log.Op, log.Pc, log.Gas, log.GasCost)
-		if log.Err != nil {
-			fmt.Fprintf(writer, " ERROR: %v", log.Err)
-		}
-		fmt.Fprintln(writer)
-
-		if len(log.Stack) > 0 {
-			fmt.Fprintln(writer, "Stack:")
-			for i := len(log.Stack) - 1; i >= 0; i-- {
-				fmt.Fprintf(writer, "%08d  %x\n", len(log.Stack)-i-1, math.PaddedBigBytes(log.Stack[i].ToBig(), 32))
-			}
-		}
-		if len(log.Memory) > 0 {
-			fmt.Fprintln(writer, "Memory:")
-			fmt.Fprint(writer, hex.Dump(log.Memory))
-		}
-		if len(log.Storage) > 0 {
-			fmt.Fprintln(writer, "Storage:")
-			for h, item := range log.Storage {
-				fmt.Fprintf(writer, "%x: %x\n", h, item)
-			}
-		}
-		fmt.Fprintln(writer)
-	}
-}
+//func WriteTrace(writer io.Writer, logs []StructLog) {
+//	for _, log := range logs {
+//		fmt.Fprintf(writer, "%-16spc=%08d gas=%v cost=%v", log.Op, log.Pc, log.Gas, log.GasCost)
+//		if log.Err != nil {
+//			fmt.Fprintf(writer, " ERROR: %v", log.Err)
+//		}
+//		fmt.Fprintln(writer)
+//
+//		if len(log.Stack) > 0 {
+//			fmt.Fprintln(writer, "Stack:")
+//			for i := len(log.Stack) - 1; i >= 0; i-- {
+//				fmt.Fprintf(writer, "%08d  %x\n", len(log.Stack)-i-1, math.PaddedBigBytes(log.Stack[i].ToBig(), 32))
+//			}
+//		}
+//		if len(log.Memory) > 0 {
+//			fmt.Fprintln(writer, "Memory:")
+//			fmt.Fprint(writer, hex.Dump(log.Memory))
+//		}
+//		if len(log.Storage) > 0 {
+//			fmt.Fprintln(writer, "Storage:")
+//			for h, item := range log.Storage {
+//				fmt.Fprintf(writer, "%x: %x\n", h, item)
+//			}
+//		}
+//		fmt.Fprintln(writer)
+//	}
+//}
 
 // WriteLogs writes vm logs in a readable format to the given writer
 func WriteLogs(writer io.Writer, logs []*types.Log) {

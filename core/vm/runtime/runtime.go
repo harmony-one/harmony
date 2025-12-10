@@ -19,6 +19,7 @@ package runtime
 import (
 	"math"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -26,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/hmy/tracers/logger"
 	"github.com/harmony-one/harmony/internal/params"
 )
 
@@ -102,6 +104,9 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 	}
 	setDefaults(cfg)
 
+	cfg.EVMConfig.Debug = true
+	cfg.EVMConfig.Tracer = logger.NewStructLogger(nil)
+
 	if cfg.State == nil {
 		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	}
@@ -170,6 +175,9 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, error) {
 	setDefaults(cfg)
 
+	cfg.EVMConfig.Debug = true
+	cfg.EVMConfig.Tracer = logger.NewStructLogger(nil)
+
 	var (
 		vmenv   = NewEnv(cfg)
 		sender  = cfg.State.GetOrNewStateObject(cfg.Origin)
@@ -190,6 +198,12 @@ func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, er
 		cfg.GasLimit,
 		cfg.Value,
 	)
+
+	// open file
+
+	f, err := os.OpenFile()
+
+	vm.WriteLogs()
 
 	return ret, leftOverGas, err
 }
