@@ -78,26 +78,12 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	if cfg.JumpTable == nil {
 		switch {
-		//case evm.chainRules.IsMerge:
-		//	cfg.JumpTable = &mergeInstructionSet
-		//case evm.chainRules.IsLondon:
-		//	cfg.JumpTable = &eip1153TransientStorage
-		//case evm.chainRules.IsBerlin:
-		//	cfg.JumpTable = &berlinInstructionSet
 		case evm.chainRules.Is1153TransientStorage:
 			cfg.JumpTable = &eip1153InstructionSet
 		case evm.chainRules.IsIstanbul:
 			cfg.JumpTable = &istanbulInstructionSet
-		case evm.chainRules.IsConstantinople:
-			cfg.JumpTable = &constantinopleInstructionSet
-		case evm.chainRules.IsByzantium:
-			cfg.JumpTable = &byzantiumInstructionSet
-		case evm.chainRules.IsEIP158:
-			cfg.JumpTable = &spuriousDragonInstructionSet
-		case evm.chainRules.IsEIP150:
-			cfg.JumpTable = &tangerineWhistleInstructionSet
 		case evm.chainRules.IsS3:
-			cfg.JumpTable = &homesteadInstructionSet
+			cfg.JumpTable = &constantinopleInstructionSet
 		default:
 			cfg.JumpTable = &frontierInstructionSet
 		}
