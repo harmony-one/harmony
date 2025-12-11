@@ -525,10 +525,28 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 		} else if curBN > 0 && estimatedHeight == 0 {
 			return 0, 0, false, ErrInvalidEarlySync
 		} else {
-			s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
-				Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
-			s.setSyncingStatus(true)
-			return estimatedHeight, 0, false, nil
+			// If we're in short-range mode and estimatedHeight <= curBN, this likely means
+			// estimatedHeight is stale/wrong. The network has moved ahead but our estimate is old.
+			// We should switch back to long-range sync to get a fresh estimate, otherwise we'll be stuck
+			// in short-range mode with a stale estimate and never catch up.
+			if !s.initSync {
+				// We're in short-range mode but estimatedHeight <= curBN. This is a strong indicator
+				// that estimatedHeight is stale. Switch back to long-range to get a fresh estimate.
+				s.logger.Warn().
+					Uint64("current number", curBN).
+					Uint64("estimated height", estimatedHeight).
+					Msg(WrapStagedSyncMsg("detected stale estimatedHeight in short-range sync - switching back to long-range to refresh estimate"))
+				s.switchToLongRangeSync()
+				// Return early with rangeSwitched=true so the next sync cycle will run in long-range mode
+				// and get a fresh estimate. Don't continue with stale estimatedHeight.
+				return estimatedHeight, 0, true, nil
+			} else {
+				// In long-range mode, if estimatedHeight <= curBN, we're caught up
+				s.logger.Info().Uint64("current number", curBN).Uint64("target number", estimatedHeight).
+					Msg(WrapStagedSyncMsg("early return of long range sync (chain is already ahead of target height)"))
+				s.setSyncingStatus(true)
+				return estimatedHeight, 0, false, nil
+			}
 		}
 	} else if curBN < estimatedHeight {
 		s.setSyncingStatus(false)
@@ -606,11 +624,35 @@ func (s *StagedStreamSync) doSync(downloaderContext context.Context) (uint64, in
 			s.switchToShortRangeSync()
 			rangeSwitched = true
 			longRangeCompleted = true
+			s.logger.Info().
+				Uint64("distanceBeforeSync", distanceBeforeSync).
+				Uint64("distanceAfterSync", distanceAfterSync).
+				Uint64("currentHeight", bnAfterSync).
+				Uint64("estimatedHeight", estimatedHeight).
+				Int("totalInserted", totalInserted).
+				Msg(WrapStagedSyncMsg("switching from long-range to short-range sync"))
 		}
 	} else if !s.initSync {
-		if distanceAfterSync <= uint64(ShortRangeThreshold) {
+		if estimatedHeight < bnAfterSync {
+			// estimatedHeight is stale - we're ahead of the estimate, meaning the network has moved ahead.
+			// Switch back to long-range to get a fresh estimate.
+			s.logger.Warn().
+				Uint64("current number", bnAfterSync).
+				Uint64("estimated height", estimatedHeight).
+				Uint64("distance", bnAfterSync-estimatedHeight).
+				Msg(WrapStagedSyncMsg("detected stale estimatedHeight in short-range sync (current > estimate) - switching to long-range"))
+			s.switchToLongRangeSync()
+			rangeSwitched = true
+		} else if distanceAfterSync <= uint64(ShortRangeThreshold) {
 			shortRangeCompleted = true
 		} else {
+			// Distance is over threshold, switch back to long-range
+			s.logger.Info().
+				Uint64("distanceAfterSync", distanceAfterSync).
+				Uint64("currentHeight", bnAfterSync).
+				Uint64("estimatedHeight", estimatedHeight).
+				Uint64("threshold", uint64(ShortRangeThreshold)).
+				Msg(WrapStagedSyncMsg("switching from short-range to long-range sync (distance over threshold)"))
 			s.switchToLongRangeSync()
 			rangeSwitched = true
 		}
