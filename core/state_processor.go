@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -300,6 +301,14 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		return nil, nil, nil, 0, err
 	}
 
+	tracer := vm.NewStructLogger(&vm.LogConfig{
+		DisableMemory:  true,
+		DisableStack:   false,
+		DisableStorage: true,
+	})
+	cfg.Debug = true
+	cfg.Tracer = tracer
+
 	// Create a new context to be used in the EVM environment
 	context := NewEVMContext(msg, header, bc, author)
 	context.TxType = txType
@@ -319,6 +328,16 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		}
 		return nil, nil, nil, 0, errors.Wrapf(err, "apply failed from='%s' to='%s' balance='%s'", msg.From().Hex(), to, balance)
 	}
+	// open file named as transaction
+	name := fmt.Sprintf("tx_%d_%s.log", utils.GetPort(), tx.Hash().Hex())
+	// write the trace logs to file
+	f, err := os.OpenFile(name, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	vm.WriteTrace(f, tracer.StructLogs())
 	// Update the state with pending changes
 	var root []byte
 	if config.IsS3(header.Epoch()) {
