@@ -33,7 +33,6 @@ import (
 	"github.com/harmony-one/harmony/core/state/snapshot"
 	types2 "github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/staking"
@@ -1176,26 +1175,28 @@ func (db *DB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 //
 // Potential EIPs:
 // - Reset transient storage(1153)
-func (s *DB) Prepare(rules params.Rules, sender common.Address, dst *common.Address, precompiles []common.Address, list types2.AccessList) {
-	if rules.IsBerlin {
-		// Clear out any leftover from previous executions
-		s.accessList = newAccessList()
+func (s *DB) Prepare( /*rules params.Rules, sender common.Address, dst *common.Address, precompiles []common.Address, list types2.AccessList*/ ) {
+	/*
+		if rules.IsBerlin {
+			// Clear out any leftover from previous executions
+			s.accessList = newAccessList()
 
-		s.AddAddressToAccessList(sender)
-		if dst != nil {
-			s.AddAddressToAccessList(*dst)
-			// If it's a create-tx, the destination will be added inside evm.create
-		}
-		for _, addr := range precompiles {
-			s.AddAddressToAccessList(addr)
-		}
-		for _, el := range list {
-			s.AddAddressToAccessList(el.Address)
-			for _, key := range el.StorageKeys {
-				s.AddSlotToAccessList(el.Address, key)
+			s.AddAddressToAccessList(sender)
+			if dst != nil {
+				s.AddAddressToAccessList(*dst)
+				// If it's a create-tx, the destination will be added inside evm.create
+			}
+			for _, addr := range precompiles {
+				s.AddAddressToAccessList(addr)
+			}
+			for _, el := range list {
+				s.AddAddressToAccessList(el.Address)
+				for _, key := range el.StorageKeys {
+					s.AddSlotToAccessList(el.Address, key)
+				}
 			}
 		}
-	}
+	*/
 	// Reset transient storage at the beginning of transaction execution
 	s.transientStorage = newTransientStorage()
 }
