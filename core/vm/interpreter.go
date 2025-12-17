@@ -162,7 +162,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 
 	if in.cfg.Debug {
 		defer func() {
-			if err != nil {
+			if err != nil && in.cfg.Debug && in.cfg.Tracer != nil {
 				if !logged {
 					in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, callContext, in.returnData, in.evm.depth, err)
 				} else {
@@ -221,14 +221,14 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 				return nil, ErrOutOfGas
 			}
 			// Do tracing before memory expansion
-			if in.cfg.Debug {
+			if in.cfg.Debug && in.cfg.Tracer != nil {
 				in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, callContext, in.returnData, in.evm.depth, err)
 				logged = true
 			}
 			if memorySize > 0 {
 				mem.Resize(memorySize)
 			}
-		} else if in.cfg.Debug {
+		} else if in.cfg.Debug && in.cfg.Tracer != nil {
 			in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, callContext, in.returnData, in.evm.depth, err)
 			logged = true
 		}
