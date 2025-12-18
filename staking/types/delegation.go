@@ -162,17 +162,14 @@ func (d *Delegation) TotalInUndelegation() *big.Int {
 }
 
 // DeleteEntry - delete an entry from the undelegation
-// Opimize it
 func (d *Delegation) DeleteEntry(epoch *big.Int) {
 	entries := []Undelegation{}
-	for i, entry := range d.Undelegations {
-		if entry.Epoch.Cmp(epoch) == 0 {
-			entries = append(d.Undelegations[:i], d.Undelegations[i+1:]...)
+	for _, entry := range d.Undelegations {
+		if entry.Epoch.Cmp(epoch) != 0 {
+			entries = append(entries, entry)
 		}
 	}
-	if entries != nil {
-		d.Undelegations = entries
-	}
+	d.Undelegations = entries
 }
 
 // RemoveUnlockedUndelegations removes all fully unlocked
