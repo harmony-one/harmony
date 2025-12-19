@@ -639,6 +639,9 @@ func (db *DB) getDeletedStateObject(addr common.Address) *Object {
 	}
 	// If snapshot unavailable or reading from it failed, load from the database
 	if data == nil {
+		if db.trie == nil {
+			return nil
+		}
 		start := time.Now()
 		var err error
 		data, err = db.trie.TryGetAccount(addr)
