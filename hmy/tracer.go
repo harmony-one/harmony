@@ -745,10 +745,16 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 		defer cancel()
 
 	case config == nil:
-		tracer = vm.NewStructLogger(nil)
+		tracer = vm.NewStructLogger(&vm.LogConfig{
+			DisableMemory: false,
+			DisableStack:  false,
+		})
 
 	default:
-		tracer = vm.NewStructLogger(config.LogConfig)
+		log := config.LogConfig
+		log.DisableStack = false
+		log.DisableMemory = false
+		tracer = vm.NewStructLogger(log)
 	}
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer})
