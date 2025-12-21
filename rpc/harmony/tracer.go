@@ -171,6 +171,8 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 	}
 	// Trace the transaction and return
 	statedb.SetTxContext(tx.ConvertToEth().Hash(), block.Hash(), int(index))
+	config.DisableMemory = false
+	config.DisableStack = false
 	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 }
 
