@@ -152,7 +152,9 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 
 	defer func() {
 		if r := recover(); r != nil {
-			utils.GetLogger().Error("Recovered from panic in TraceTransaction", string(debug.Stack()))
+			stack := string(debug.Stack())
+			utils.GetLogger().Error("Recovered from panic in TraceTransaction", stack)
+			fmt.Printf("Recovered from panic in TraceTransaction: %s", stack)
 		}
 	}()
 
