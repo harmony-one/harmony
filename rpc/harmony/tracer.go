@@ -186,6 +186,9 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 	}
 	config.DisableMemory = false
 	config.DisableStack = false
+	if config.DisableMemory {
+		panic(321)
+	}
 	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 }
 
