@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -31,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
+	"runtime/debug"
 )
 
 const (
@@ -147,6 +149,16 @@ func (s *PublicTracerService) TraceBlock(ctx context.Context, blob []byte, confi
 func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.Hash, config *hmy.TraceConfig) (interface{}, error) {
 	timer := DoMetricRPCRequest(TraceTransaction)
 	defer DoRPCRequestDuration(TraceTransaction, timer)
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error(
+				"panic in debug_traceTransaction",
+				"panic", r,
+				"stack", string(debug.Stack()),
+			)
+		}
+	}()
 
 	// Retrieve the transaction and assemble its EVM context
 	tx, blockHash, _, index := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
