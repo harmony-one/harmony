@@ -167,6 +167,8 @@ func GetDefaultDNSZone(networkType NetworkType) string {
 		return pangaeaDNSZone
 	case Partner:
 		return partnerDNSZone
+	case Devnet:
+		return partnerDNSZone
 	case Stressnet:
 		return stressnetDNSZone
 	}
