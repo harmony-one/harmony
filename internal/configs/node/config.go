@@ -67,6 +67,8 @@ func (t NetworkType) ChainConfig() params.ChainConfig {
 		return *params.PangaeaChainConfig
 	case Partner:
 		return *params.PartnerChainConfig
+	case Devnet:
+		return *params.PartnerChainConfig
 	case Stressnet:
 		return *params.StressnetChainConfig
 	case Localnet:

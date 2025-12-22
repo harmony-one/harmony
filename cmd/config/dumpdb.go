@@ -70,6 +70,8 @@ func getShardSchedule(networkType nodeconfig.NetworkType) shardingconfig.Schedul
 		return shardingconfig.LocalnetSchedule
 	case nodeconfig.Partner:
 		return shardingconfig.PartnerSchedule
+	case nodeconfig.Devnet:
+		return shardingconfig.PartnerSchedule
 	case nodeconfig.Stressnet:
 		return shardingconfig.StressNetSchedule
 	}

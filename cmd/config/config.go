@@ -92,6 +92,12 @@ func GetDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 	case nodeconfig.Testnet:
 		dnsSync.Server = true
 		dnsSync.Client = true
+	case nodeconfig.Partner:
+		dnsSync.Server = true
+		dnsSync.Client = false
+	case nodeconfig.Devnet:
+		dnsSync.Server = true
+		dnsSync.Client = false
 	case nodeconfig.Localnet:
 		dnsSync.Server = true
 		dnsSync.Client = false
@@ -178,6 +184,10 @@ func GetDefaultCacheConfig(nt nodeconfig.NetworkType) harmonyconfig.CacheConfig 
 		cacheConfig.Preimages = true
 		cacheConfig.SnapshotLimit = 0
 	case nodeconfig.Partner:
+		cacheConfig.Disabled = true
+		cacheConfig.Preimages = true
+		cacheConfig.SnapshotLimit = 0
+	case nodeconfig.Devnet:
 		cacheConfig.Disabled = true
 		cacheConfig.Preimages = true
 		cacheConfig.SnapshotLimit = 0
