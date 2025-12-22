@@ -474,6 +474,8 @@ func (dl *diffLayer) flatten() snapshot {
 			comboData[storageHash] = data
 		}
 	}
+	// Mark the layer being flattened as stale so any external references will fail
+	atomic.StoreUint32(&dl.stale, 1)
 	// Return the combo parent
 	return &diffLayer{
 		parent:      parent.parent,
