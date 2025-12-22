@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime/debug"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,7 +31,6 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
@@ -150,13 +148,13 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 	timer := DoMetricRPCRequest(TraceTransaction)
 	defer DoRPCRequestDuration(TraceTransaction, timer)
 
-	defer func() {
-		if r := recover(); r != nil {
-			stack := string(debug.Stack())
-			utils.GetLogger().Error("Recovered from panic in TraceTransaction", stack)
-			fmt.Printf("Recovered from panic in TraceTransaction: %s", stack)
-		}
-	}()
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		stack := string(debug.Stack())
+	//		utils.GetLogger().Error("Recovered from panic in TraceTransaction", stack)
+	//		fmt.Printf("Recovered from panic in TraceTransaction: %s", stack)
+	//	}
+	//}()
 
 	// Retrieve the transaction and assemble its EVM context
 	tx, blockHash, _, index := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
@@ -181,12 +179,12 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 	}
 	// Trace the transaction and return
 	statedb.SetTxContext(tx.ConvertToEth().Hash(), block.Hash(), int(index))
-	config = new(hmy.TraceConfig)
-	config.DisableMemory = false
-	config.DisableStack = false
-	if config.DisableMemory {
-		panic(321)
-	}
+	//config = new(hmy.TraceConfig)
+	//config.DisableMemory = false
+	//config.DisableStack = false
+	//if config.DisableMemory {
+	//	panic(321)
+	//}
 	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 }
 
