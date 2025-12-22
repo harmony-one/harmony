@@ -713,13 +713,6 @@ func (hmy *Harmony) ComputeStateDB(block *types.Block, reexec uint64) (*state.DB
 // NOTE: Only support default StructLogger tracer
 func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.Context, statedb *state.DB, config *TraceConfig) (interface{}, error) {
 	// Assemble the structured logger or the JavaScript tracer
-	defer func() {
-		if r := recover(); r != nil {
-			stack := string(debug.Stack())
-			utils.GetLogger().Error("Recovered from panic in TraceTransaction", stack)
-			fmt.Printf("Recovered from panic in TraceTransaction: %s", stack)
-		}
-	}()
 	var (
 		tracer vm.Tracer
 		err    error
