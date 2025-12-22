@@ -778,6 +778,7 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 		return nil, fmt.Errorf("tracing failed: %v", err)
 	}
 	// Depending on the tracer type, format and return the output
+	fmt.Printf("Tracer: %T\n", tracer)
 	switch tracer := tracer.(type) {
 	case *vm.StructLogger:
 		return &ExecutionResult{
