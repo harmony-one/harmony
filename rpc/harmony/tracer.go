@@ -21,10 +21,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -32,7 +32,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
-	"runtime/debug"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
@@ -152,11 +152,7 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error(
-				"panic in debug_traceTransaction",
-				"panic", r,
-				"stack", string(debug.Stack()),
-			)
+			utils.GetLogger().Error("Recovered from panic in TraceTransaction", string(debug.Stack()))
 		}
 	}()
 
