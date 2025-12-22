@@ -990,6 +990,7 @@ func (r *StructLogRes) GetOperatorEvent(key string) string {
 func FormatLogs(logs []*vm.StructLog, conf *TraceConfig) []StructLogRes {
 	formatted := make([]StructLogRes, len(logs))
 	for index, trace := range logs {
+
 		formatted[index] = StructLogRes{
 			Pc:              trace.Pc,
 			Op:              trace.Op.String(),
@@ -999,13 +1000,37 @@ func FormatLogs(logs []*vm.StructLog, conf *TraceConfig) []StructLogRes {
 			GasCost:         trace.GasCost,
 			Depth:           trace.Depth,
 			Error:           trace.Err,
+			//Memory:          trace.Memory,
 
-			rawStack:         trace.Stack,
-			rawAfterStack:    trace.AfterStack,
-			rawMemory:        trace.Memory,
-			rawStorage:       trace.Storage,
-			rawOperatorEvent: trace.OperatorEvent,
+			//rawStack:         trace.Stack,
+			//rawAfterStack:    trace.AfterStack,
+			//rawMemory:        trace.Memory,
+			//rawStorage:       trace.Storage,
+			//rawOperatorEvent: trace.OperatorEvent,
 		}
+
+		if trace.Stack != nil {
+			stack := make([]string, len(trace.Stack))
+			for i, stackValue := range trace.Stack {
+				stack[i] = stackValue.Text(16)
+			}
+			formatted[index].Stack = stack
+		}
+		if trace.Memory != nil {
+			memory := make([]string, 0, (len(trace.Memory)+31)/32)
+			for i := 0; i+32 <= len(trace.Memory); i += 32 {
+				memory = append(memory, fmt.Sprintf("%x", trace.Memory[i:i+32]))
+			}
+			formatted[index].Memory = memory
+		}
+		if trace.Storage != nil {
+			storage := make(map[string]string)
+			for i, storageValue := range trace.Storage {
+				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
+			}
+			formatted[index].Storage = storage
+		}
+
 	}
 	return formatted
 }
