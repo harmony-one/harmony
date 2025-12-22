@@ -25,7 +25,6 @@ import (
 	"math/big"
 	"os"
 	"runtime"
-	"runtime/debug"
 	"sync"
 	"time"
 
