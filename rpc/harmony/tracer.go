@@ -184,6 +184,9 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 	if config == nil {
 		config = new(hmy.TraceConfig)
 	}
+	if config == nil {
+		panic("config is nil")
+	}
 	config.DisableMemory = false
 	config.DisableStack = false
 	if config.DisableMemory {
