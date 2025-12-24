@@ -17,7 +17,7 @@ func TestCheckLocalTimeAccurate(t *testing.T) {
 		t.Fatalf("query invalid ntp pool should return error\n")
 	}
 
-	response, err = CheckLocalTimeAccurate("0.pool.ntp.org")
+	response, err = CheckLocalTimeAccurate("0.pool.ntp.org,1.pool.ntp.org,2.pool.ntp.org,3.pool.ntp.org")
 	if !response.IsAccurate() || err != nil {
 		if response.AllNtpServersTimedOut() {
 			t.Skip(response.Message())
@@ -29,7 +29,7 @@ func TestCheckLocalTimeAccurate(t *testing.T) {
 	}
 
 	// test multiple ntp servers, the second one is a valid server
-	response, err = CheckLocalTimeAccurate("wrong.ip,0.pool.ntp.org")
+	response, err = CheckLocalTimeAccurate("wrong.ip,0.pool.ntp.org,1.pool.ntp.org,2.pool.ntp.org,3.pool.ntp.org")
 	if !response.IsAccurate() || err != nil {
 		if response.AllNtpServersTimedOut() {
 			t.Skip(response.Message())
