@@ -820,7 +820,13 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 		config = &tracers.TraceConfig{}
 	}
 	// Default tracer is the struct logger
-	tracer = logger.NewStructLogger(config.Config)
+	cfg := logger.Config{
+		EnableMemory:     true,
+		DisableStack:     false,
+		DisableStorage:   false,
+		EnableReturnData: false,
+	}
+	tracer = logger.NewStructLogger(&cfg)
 	if config.Tracer != nil {
 		tracer, err = tracers.New(*config.Tracer, txctx, config.TracerConfig)
 		if err != nil {
