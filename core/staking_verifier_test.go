@@ -1134,6 +1134,35 @@ func makeStateForRedelegate(t *testing.T) *state.DB {
 	return sdb
 }
 
+// makeStateForRedelegateCornerCases creates state with multiple undelegation entries for corner case testing
+func makeStateForRedelegateCornerCases(t *testing.T, validatorAddr common.Address, undelegations []struct {
+	amount *big.Int
+	epoch  *big.Int
+}) *state.DB {
+	sdb := makeStateDBForStake(t)
+
+	w, err := sdb.ValidatorWrapper(validatorAddr, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add delegation with multiple undelegation entries
+	delegation := staking.NewDelegation(delegatorAddr, new(big.Int).Set(twentyKOnes))
+	for _, undel := range undelegations {
+		if err := delegation.Undelegate(undel.epoch, undel.amount); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.Delegations = append(w.Delegations, delegation)
+
+	if err := sdb.UpdateValidatorWrapper(validatorAddr, w); err != nil {
+		t.Fatal(err)
+	}
+
+	sdb.IntermediateRoot(true)
+	return sdb
+}
+
 func addStateUndelegationForAddr(sdb *state.DB, addr common.Address, epoch *big.Int) error {
 	w, err := sdb.ValidatorWrapper(addr, false, true)
 	if err != nil {
@@ -1837,4 +1866,314 @@ func assertError(got, expect error) error {
 		return fmt.Errorf("unexpected error [%v] / [%v]", got, expect)
 	}
 	return nil
+}
+
+// TestRedelegationCornerCases tests corner cases in redelegation logic that demonstrate
+// bugs in the old implementation and fixes in Staking V2
+func TestRedelegationCornerCases(t *testing.T) {
+	epoch := big.NewInt(10) // Current epoch
+	epoch1 := big.NewInt(5) // Old undelegation epoch
+	epoch2 := big.NewInt(6) // Old undelegation epoch
+	epoch3 := big.NewInt(7) // Old undelegation epoch
+
+	tests := []struct {
+		name          string
+		undelegations []struct {
+			amount *big.Int
+			epoch  *big.Int
+		}
+		delegateAmount        *big.Int
+		stakingV2             bool
+		expectedUndelegations []struct {
+			amount *big.Int
+			epoch  *big.Int
+		}
+		expectedBalanceDeducted *big.Int
+		description             string
+	}{
+		{
+			name: "CornerCase1_FullyConsumeFirst_PartiallyConsumeSecond",
+			undelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				{amount: fiveKOnes, epoch: epoch1}, // 5000 - fully consumed
+				{amount: tenKOnes, epoch: epoch2},  // 10000 - partially consumed (need 5000, so 5000 remains)
+				{amount: fiveKOnes, epoch: epoch3}, // 5000 - untouched
+			},
+			delegateAmount: new(big.Int).Add(fiveKOnes, fiveKOnes), // 10000 total
+			stakingV2:      false,                                  // Test old logic
+			expectedUndelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				// Old logic bug: keeps partially consumed entry but may have issues with slice manipulation
+				{amount: fiveKOnes, epoch: epoch2}, // Partially consumed (should be 5000)
+				{amount: fiveKOnes, epoch: epoch3}, // Untouched
+			},
+			expectedBalanceDeducted: big.NewInt(0), // All from undelegations
+			description:             "Old logic: Fully consume first entry, partially consume second. May have slice manipulation issues.",
+		},
+		{
+			name: "CornerCase1_FullyConsumeFirst_PartiallyConsumeSecond_V2",
+			undelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				{amount: fiveKOnes, epoch: epoch1}, // 5000 - fully consumed
+				{amount: tenKOnes, epoch: epoch2},  // 10000 - partially consumed (need 5000, so 5000 remains)
+				{amount: fiveKOnes, epoch: epoch3}, // 5000 - untouched
+			},
+			delegateAmount: new(big.Int).Add(fiveKOnes, fiveKOnes), // 10000 total
+			stakingV2:      true,                                   // Test new logic
+			expectedUndelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				// New logic: correctly removes fully consumed, keeps partially consumed with correct amount
+				{amount: fiveKOnes, epoch: epoch2}, // Partially consumed (5000 remains)
+				{amount: fiveKOnes, epoch: epoch3}, // Untouched
+			},
+			expectedBalanceDeducted: big.NewInt(0), // All from undelegations
+			description:             "New logic: Correctly removes fully consumed entry, keeps partially consumed with correct amount.",
+		},
+		{
+			name: "CornerCase2_PartiallyConsumeFirst",
+			undelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				{amount: tenKOnes, epoch: epoch1},  // 10000 - partially consumed (need 3000, so 7000 remains)
+				{amount: fiveKOnes, epoch: epoch2}, // 5000 - untouched
+			},
+			delegateAmount: new(big.Int).Mul(big.NewInt(3000), oneBig), // 3000 ONE (meets minimum)
+			stakingV2:      false,                                      // Test old logic
+			expectedUndelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				// Old logic: modifies entry in place, then slices
+				{amount: new(big.Int).Sub(tenKOnes, new(big.Int).Mul(big.NewInt(3000), oneBig)), epoch: epoch1}, // 7000
+				{amount: fiveKOnes, epoch: epoch2}, // Untouched
+			},
+			expectedBalanceDeducted: big.NewInt(0),
+			description:             "Old logic: Partially consumes first entry. May work but uses error-prone slice manipulation.",
+		},
+		{
+			name: "CornerCase2_PartiallyConsumeFirst_V2",
+			undelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				{amount: tenKOnes, epoch: epoch1},  // 10000 - partially consumed (need 3000, so 7000 remains)
+				{amount: fiveKOnes, epoch: epoch2}, // 5000 - untouched
+			},
+			delegateAmount: new(big.Int).Mul(big.NewInt(3000), oneBig), // 3000 ONE (meets minimum)
+			stakingV2:      true,                                       // Test new logic
+			expectedUndelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				// New logic: creates new entry with correct remaining amount
+				{amount: new(big.Int).Sub(tenKOnes, new(big.Int).Mul(big.NewInt(3000), oneBig)), epoch: epoch1}, // 7000
+				{amount: fiveKOnes, epoch: epoch2}, // Untouched
+			},
+			expectedBalanceDeducted: big.NewInt(0),
+			description:             "New logic: Explicitly creates new entry with correct remaining amount.",
+		},
+		{
+			name: "CornerCase3_FullyConsumeAll",
+			undelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				{amount: fiveKOnes, epoch: epoch1}, // 5000 - fully consumed
+				{amount: fiveKOnes, epoch: epoch2}, // 5000 - fully consumed
+				{amount: fiveKOnes, epoch: epoch3}, // 5000 - fully consumed
+			},
+			delegateAmount: new(big.Int).Mul(big.NewInt(15000), oneBig), // 15000 ONE (all three, meets minimum)
+			stakingV2:      false,                                       // Test old logic
+			expectedUndelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				// Old logic: should remove all, but may have issues
+			},
+			expectedBalanceDeducted: big.NewInt(0),
+			description:             "Old logic: Fully consumes all entries. Should result in empty undelegations.",
+		},
+		{
+			name: "CornerCase3_FullyConsumeAll_V2",
+			undelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				{amount: fiveKOnes, epoch: epoch1}, // 5000 - fully consumed
+				{amount: fiveKOnes, epoch: epoch2}, // 5000 - fully consumed
+				{amount: fiveKOnes, epoch: epoch3}, // 5000 - fully consumed
+			},
+			delegateAmount: new(big.Int).Mul(big.NewInt(15000), oneBig), // 15000 ONE (all three, meets minimum)
+			stakingV2:      true,                                        // Test new logic
+			expectedUndelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				// New logic: correctly removes all fully consumed entries
+			},
+			expectedBalanceDeducted: big.NewInt(0),
+			description:             "New logic: Correctly removes all fully consumed entries, results in empty undelegations.",
+		},
+		{
+			name: "CornerCase4_MixedConsumption",
+			undelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				{amount: fiveKOnes, epoch: epoch1}, // 5000 - fully consumed
+				{amount: fiveKOnes, epoch: epoch2}, // 5000 - fully consumed
+				{amount: tenKOnes, epoch: epoch3},  // 10000 - partially consumed (need 2000, so 8000 remains)
+			},
+			delegateAmount: new(big.Int).Mul(big.NewInt(12000), oneBig), // 12000 ONE (meets minimum)
+			stakingV2:      false,                                       // Test old logic
+			expectedUndelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				// Old logic: may have issues with multiple full consumptions followed by partial
+				{amount: new(big.Int).Sub(tenKOnes, new(big.Int).Mul(big.NewInt(2000), oneBig)), epoch: epoch3}, // 8000
+			},
+			expectedBalanceDeducted: big.NewInt(0),
+			description:             "Old logic: Mixed full and partial consumption. May have slice manipulation issues.",
+		},
+		{
+			name: "CornerCase4_MixedConsumption_V2",
+			undelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				{amount: fiveKOnes, epoch: epoch1}, // 5000 - fully consumed
+				{amount: fiveKOnes, epoch: epoch2}, // 5000 - fully consumed
+				{amount: tenKOnes, epoch: epoch3},  // 10000 - partially consumed (need 2000, so 8000 remains)
+			},
+			delegateAmount: new(big.Int).Mul(big.NewInt(12000), oneBig), // 12000 ONE (meets minimum)
+			stakingV2:      true,                                        // Test new logic
+			expectedUndelegations: []struct {
+				amount *big.Int
+				epoch  *big.Int
+			}{
+				// New logic: correctly handles mixed consumption
+				{amount: new(big.Int).Sub(tenKOnes, new(big.Int).Mul(big.NewInt(2000), oneBig)), epoch: epoch3}, // 8000
+			},
+			expectedBalanceDeducted: big.NewInt(0),
+			description:             "New logic: Correctly handles mixed full and partial consumption.",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create state with undelegations
+			sdb := makeStateForRedelegateCornerCases(t, validatorAddr, test.undelegations)
+
+			// Create delegate message
+			msg := staking.Delegate{
+				DelegatorAddress: delegatorAddr,
+				ValidatorAddress: validatorAddr,
+				Amount:           new(big.Int).Set(test.delegateAmount),
+			}
+
+			// Get delegation index
+			w, err := sdb.ValidatorWrapper(validatorAddr, false, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			delegationIndex := []staking.DelegationIndex{
+				{
+					ValidatorAddress: validatorAddr,
+					Index:            uint64(len(w.Delegations) - 1), // Last delegation (the one with undelegations)
+					BlockNum:         big.NewInt(100),
+				},
+			}
+
+			// Configure chain config
+			config := &params.ChainConfig{}
+			config.MinDelegation100Epoch = big.NewInt(100)
+			config.RedelegationEpoch = epoch // Enable redelegation
+			if test.stakingV2 {
+				config.StakingV2Epoch = epoch // Enable Staking V2
+			} else {
+				config.StakingV2Epoch = big.NewInt(10000000) // EpochTBD - disable Staking V2
+			}
+
+			// Execute redelegation
+			ws, balanceDeducted, fromLockedTokens, err := VerifyAndDelegateFromMsg(
+				sdb, epoch, &msg, delegationIndex, config,
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// Verify balance deducted
+			if balanceDeducted.Cmp(test.expectedBalanceDeducted) != 0 {
+				t.Errorf("Balance deducted mismatch: got %v, expected %v", balanceDeducted, test.expectedBalanceDeducted)
+			}
+
+			// Verify fromLockedTokens
+			if test.expectedBalanceDeducted.Cmp(big.NewInt(0)) == 0 {
+				// All from locked tokens
+				if len(fromLockedTokens) == 0 {
+					t.Errorf("Expected fromLockedTokens to be non-empty")
+				} else if lockedAmt, ok := fromLockedTokens[validatorAddr]; !ok {
+					t.Errorf("Expected fromLockedTokens to contain validatorAddr")
+				} else if lockedAmt.Cmp(test.delegateAmount) != 0 {
+					t.Errorf("FromLockedTokens amount mismatch: got %v, expected %v", lockedAmt, test.delegateAmount)
+				}
+			}
+
+			// Verify undelegations in the result
+			if len(ws) == 0 {
+				t.Fatal("Expected at least one validator wrapper")
+			}
+
+			foundDelegation := false
+			for _, w := range ws {
+				if w.Address == validatorAddr {
+					for _, del := range w.Delegations {
+						if del.DelegatorAddress == delegatorAddr {
+							foundDelegation = true
+
+							// Verify undelegations
+							if len(del.Undelegations) != len(test.expectedUndelegations) {
+								t.Errorf("Undelegations count mismatch: got %d, expected %d. Description: %s",
+									len(del.Undelegations), len(test.expectedUndelegations), test.description)
+								t.Logf("Got undelegations: %+v", del.Undelegations)
+								t.Logf("Expected undelegations: %+v", test.expectedUndelegations)
+							} else {
+								for i, expectedUndel := range test.expectedUndelegations {
+									if i >= len(del.Undelegations) {
+										t.Errorf("Missing undelegation at index %d", i)
+										continue
+									}
+									actualUndel := del.Undelegations[i]
+									if actualUndel.Amount.Cmp(expectedUndel.amount) != 0 {
+										t.Errorf("Undelegation[%d] amount mismatch: got %v, expected %v. Description: %s",
+											i, actualUndel.Amount, expectedUndel.amount, test.description)
+									}
+									if actualUndel.Epoch.Cmp(expectedUndel.epoch) != 0 {
+										t.Errorf("Undelegation[%d] epoch mismatch: got %v, expected %v",
+											i, actualUndel.Epoch, expectedUndel.epoch)
+									}
+								}
+							}
+							break
+						}
+					}
+					break
+				}
+			}
+
+			if !foundDelegation {
+				t.Fatal("Could not find delegation in result")
+			}
+		})
+	}
 }
