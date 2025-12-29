@@ -330,24 +330,68 @@ func VerifyAndDelegateFromMsg(
 			startBalance := big.NewInt(0).Set(delegateBalance)
 			// Start from the oldest undelegated tokens
 			curIndex := 0
-			for ; curIndex < len(delegation.Undelegations); curIndex++ {
-				if delegation.Undelegations[curIndex].Epoch.Cmp(epoch) >= 0 {
-					break
+			isStakingV2 := chainConfig.IsStakingV2(epoch)
+
+			if isStakingV2 {
+				// Staking V2: Properly handle undelegation consumption with explicit entry removal
+				newUndelegations := []staking.Undelegation{}
+				for curIndex < len(delegation.Undelegations) {
+					entry := &delegation.Undelegations[curIndex]
+					if entry.Epoch.Cmp(epoch) >= 0 {
+						// Keep all remaining entries (not yet eligible for redelegation)
+						newUndelegations = append(newUndelegations, delegation.Undelegations[curIndex:]...)
+						break
+					}
+
+					if entry.Amount.Cmp(delegateBalance) <= 0 {
+						// Fully consume this entry
+						delegateBalance.Sub(delegateBalance, entry.Amount)
+						// Don't add to newUndelegations (fully consumed)
+					} else {
+						// Partially consume this entry
+						remainingAmount := big.NewInt(0).Sub(entry.Amount, delegateBalance)
+						newUndelegations = append(newUndelegations, staking.Undelegation{
+							Amount: remainingAmount,
+							Epoch:  entry.Epoch,
+						})
+						delegateBalance = big.NewInt(0)
+						curIndex++
+						// Keep all remaining entries
+						if curIndex < len(delegation.Undelegations) {
+							newUndelegations = append(newUndelegations, delegation.Undelegations[curIndex:]...)
+						}
+						break
+					}
+					curIndex++
 				}
-				if delegation.Undelegations[curIndex].Amount.Cmp(delegateBalance) <= 0 {
-					delegateBalance.Sub(delegateBalance, delegation.Undelegations[curIndex].Amount)
-				} else {
-					delegation.Undelegations[curIndex].Amount.Sub(
-						delegation.Undelegations[curIndex].Amount, delegateBalance,
-					)
-					delegateBalance = big.NewInt(0)
-					break
+				// Only update undelegations if something was consumed
+				if startBalance.Cmp(delegateBalance) > 0 {
+					delegation.Undelegations = newUndelegations
+				}
+			} else {
+				// Original logic (for backward compatibility)
+				for ; curIndex < len(delegation.Undelegations); curIndex++ {
+					if delegation.Undelegations[curIndex].Epoch.Cmp(epoch) >= 0 {
+						break
+					}
+					if delegation.Undelegations[curIndex].Amount.Cmp(delegateBalance) <= 0 {
+						delegateBalance.Sub(delegateBalance, delegation.Undelegations[curIndex].Amount)
+					} else {
+						delegation.Undelegations[curIndex].Amount.Sub(
+							delegation.Undelegations[curIndex].Amount, delegateBalance,
+						)
+						delegateBalance = big.NewInt(0)
+						break
+					}
 				}
 			}
 
 			if startBalance.Cmp(delegateBalance) > 0 {
 				// Used undelegated token for redelegation
-				delegation.Undelegations = delegation.Undelegations[curIndex:]
+				if !isStakingV2 {
+					// Original logic: slice undelegations array
+					delegation.Undelegations = delegation.Undelegations[curIndex:]
+				}
 				if err := wrapper.SanityCheck(); err != nil {
 					return nil, nil, nil, err
 				}
