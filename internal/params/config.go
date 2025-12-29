@@ -83,6 +83,7 @@ var (
 		HIP32Epoch:                            big.NewInt(2152), // 2024-10-31 13:02 UTC
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		StakingV2Epoch:                        EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -134,6 +135,7 @@ var (
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
+		StakingV2Epoch:                        EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -184,6 +186,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		StakingV2Epoch:                        EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -236,6 +239,7 @@ var (
 		IsOneSecondEpoch:                      big.NewInt(17436),
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(35626),
+		StakingV2Epoch:                        EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -287,6 +291,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
+		StakingV2Epoch:                        EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -337,6 +342,7 @@ var (
 		TestnetExternalEpoch:                  EpochTBD,
 		IsOneSecondEpoch:                      big.NewInt(4),
 		EIP2537PrecompileEpoch:                EpochTBD,
+		StakingV2Epoch:                        EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -391,6 +397,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0), // EIP2537PrecompileEpoch
 		big.NewInt(0), // 1153 transient storage
+		big.NewInt(0), // StakingV2Epoch
 	}
 
 	// TestChainConfig ...
@@ -445,6 +452,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0), // EIP2537PrecompileEpoch
 		big.NewInt(0), // 1153 transient storage
+		big.NewInt(0), // StakingV2Epoch
 	}
 
 	// TestRules ...
@@ -634,6 +642,10 @@ type ChainConfig struct {
 
 	// EIP2537PrecompileEpoch is the first epoch to support the EIP-2537 precompiles
 	EIP1153TransientStorageEpoch *big.Int `json:"eip1153-transient-storage-epoch,omitempty"`
+
+	// StakingV2Epoch is the epoch when Staking V2 is activated, which fixes critical
+	// issues in redelegation logic and other staking operations
+	StakingV2Epoch *big.Int `json:"staking-v2-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -935,6 +947,11 @@ func (c *ChainConfig) IsMaxRate(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 	return isForked(c.TopMaxRateEpoch, epoch)
+}
+
+// IsStakingV2 determines whether it is the epoch when Staking V2 is activated
+func (c *ChainConfig) IsStakingV2(epoch *big.Int) bool {
+	return isForked(c.StakingV2Epoch, epoch)
 }
 
 // During this epoch, shards 2 and 3 will start sending
