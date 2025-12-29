@@ -59,7 +59,7 @@ func (a threadSafeDeciderImpl) NthNextValidator(slotList shard.SlotList, pubKey 
 func (a threadSafeDeciderImpl) NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.decider.NthNextValidator(slotList, pubKey, next)
+	return a.decider.NthNextValidatorV2(slotList, pubKey, next)
 }
 
 func (a threadSafeDeciderImpl) NthNextHmy(instance shardingconfig.Instance, pubkey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {

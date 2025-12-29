@@ -802,10 +802,10 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 		members := consensus.decider().Participants()
 		mask := bls.NewMask(members)
 		skipped := 0
-		for i := 0; i < blocksCountAliveness; i++ {
-			header := bc.GetHeaderByNumber(curNumber - uint64(i))
+		for j := 0; j < blocksCountAliveness; j++ {
+			header := bc.GetHeaderByNumber(curNumber - uint64(j))
 			if header == nil {
-				consensus.getLogger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(i))
+				consensus.getLogger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(j))
 				return defaultKey
 			}
 			// if epoch is different, we should not check this block.
