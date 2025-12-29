@@ -273,7 +273,6 @@ func (l *StructLogger) CaptureTxStart(gasLimit uint64) {
 }
 
 func (l *StructLogger) CaptureTxEnd(restGas uint64) {
-	fmt.Printf("CaptureTxEnd: gasLimit=%d restGas=%d\n", l.gasLimit, restGas)
 	l.usedGas = l.gasLimit - restGas
 }
 

@@ -552,8 +552,12 @@ func (bc *BlockChainImpl) validateNewBlock(block *types.Block) error {
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
 	// Do not read cache from processor.
+	// Ensure Tracer is never set during normal block processing to avoid non-deterministic behavior
+	vmConfig := bc.vmConfig
+	vmConfig.Tracer = nil
+	vmConfig.Debug = false
 	receipts, cxReceipts, _, _, usedGas, _, _, err := bc.processor.Process(
-		block, state, bc.vmConfig, false,
+		block, state, vmConfig, false,
 	)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
@@ -1846,6 +1850,10 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			return i, events, coalescedLogs, err
 		}
 		vmConfig := bc.vmConfig
+		// Ensure Tracer is never set during normal block processing to avoid non-deterministic behavior
+		// Tracer should only be used during explicit tracing operations, not during consensus
+		vmConfig.Tracer = nil
+		vmConfig.Debug = false
 		/*
 			if bc.trace {
 				ev := TraceEvent{

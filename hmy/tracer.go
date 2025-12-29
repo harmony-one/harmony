@@ -841,7 +841,6 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 		}
 	}()
 	defer cancel()
-	fmt.Printf("traceTx: tracer: %T, config.Tracer: `%v`\n", tracer, config.Tracer)
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(vmctx, txContext, statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 	// Call Prepare to clear out the statedb access list
