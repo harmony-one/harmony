@@ -27,6 +27,12 @@ const (
 	DirectiveUndelegate
 	// DirectiveCollectRewards ...
 	DirectiveCollectRewards
+	// DirectiveBatchDelegate ...
+	DirectiveBatchDelegate
+	// DirectiveBatchUndelegate ...
+	DirectiveBatchUndelegate
+	// DirectiveUndelegateAll ...
+	DirectiveUndelegateAll
 )
 
 var (
@@ -36,6 +42,9 @@ var (
 		DirectiveDelegate:        "Delegate",
 		DirectiveUndelegate:      "Undelegate",
 		DirectiveCollectRewards:  "CollectRewards",
+		DirectiveBatchDelegate:   "BatchDelegate",
+		DirectiveBatchUndelegate: "BatchUndelegate",
+		DirectiveUndelegateAll:   "UndelegateAll",
 	}
 	// ErrInvalidStakingKind given when caller gives bad staking message kind
 	ErrInvalidStakingKind = errors.New("bad staking kind")
@@ -262,4 +271,154 @@ func (v MigrationMsg) Copy() MigrationMsg {
 
 func (v MigrationMsg) Equals(s MigrationMsg) bool {
 	return v.From == s.From && v.To == s.To
+}
+
+// DelegationAction represents a single delegation action in a batch operation
+type DelegationAction struct {
+	ValidatorAddress common.Address `json:"validator_address"`
+	Amount           *big.Int       `json:"amount"`
+}
+
+// BatchDelegate - type for delegating to multiple validators in one transaction
+type BatchDelegate struct {
+	DelegatorAddress common.Address     `json:"delegator_address"`
+	Delegations      []DelegationAction `json:"delegations"`
+}
+
+// Type of BatchDelegate
+func (v BatchDelegate) Type() Directive {
+	return DirectiveBatchDelegate
+}
+
+// Copy returns a deep copy of the BatchDelegate as a StakeMsg interface
+func (v BatchDelegate) Copy() StakeMsg {
+	cp := BatchDelegate{
+		DelegatorAddress: v.DelegatorAddress,
+		Delegations:      make([]DelegationAction, len(v.Delegations)),
+	}
+	for i, d := range v.Delegations {
+		cp.Delegations[i] = DelegationAction{
+			ValidatorAddress: d.ValidatorAddress,
+		}
+		if d.Amount != nil {
+			cp.Delegations[i].Amount = new(big.Int).Set(d.Amount)
+		}
+	}
+	return cp
+}
+
+// Equals returns if v and s are equal
+func (v BatchDelegate) Equals(s BatchDelegate) bool {
+	if !bytes.Equal(v.DelegatorAddress.Bytes(), s.DelegatorAddress.Bytes()) {
+		return false
+	}
+	if len(v.Delegations) != len(s.Delegations) {
+		return false
+	}
+	for i := range v.Delegations {
+		if !bytes.Equal(v.Delegations[i].ValidatorAddress.Bytes(), s.Delegations[i].ValidatorAddress.Bytes()) {
+			return false
+		}
+		if v.Delegations[i].Amount == nil {
+			if s.Delegations[i].Amount != nil {
+				return false
+			}
+		} else if s.Delegations[i].Amount == nil {
+			return false
+		} else if v.Delegations[i].Amount.Cmp(s.Delegations[i].Amount) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// BatchUndelegate - type for undelegating from multiple validators in one transaction
+type BatchUndelegate struct {
+	DelegatorAddress  common.Address    `json:"delegator_address"`
+	DelegationIndexes []DelegationIndex `json:"delegation_indexes"`
+	Amounts           []*big.Int        `json:"amounts"`
+}
+
+// Type of BatchUndelegate
+func (v BatchUndelegate) Type() Directive {
+	return DirectiveBatchUndelegate
+}
+
+// Copy returns a deep copy of the BatchUndelegate as a StakeMsg interface
+func (v BatchUndelegate) Copy() StakeMsg {
+	cp := BatchUndelegate{
+		DelegatorAddress:  v.DelegatorAddress,
+		DelegationIndexes: make([]DelegationIndex, len(v.DelegationIndexes)),
+		Amounts:           make([]*big.Int, len(v.Amounts)),
+	}
+	for i, idx := range v.DelegationIndexes {
+		cp.DelegationIndexes[i] = DelegationIndex{
+			ValidatorAddress: idx.ValidatorAddress,
+			Index:            idx.Index,
+		}
+		if idx.BlockNum != nil {
+			cp.DelegationIndexes[i].BlockNum = new(big.Int).Set(idx.BlockNum)
+		}
+	}
+	for i, amt := range v.Amounts {
+		if amt != nil {
+			cp.Amounts[i] = new(big.Int).Set(amt)
+		}
+	}
+	return cp
+}
+
+// Equals returns if v and s are equal
+func (v BatchUndelegate) Equals(s BatchUndelegate) bool {
+	if !bytes.Equal(v.DelegatorAddress.Bytes(), s.DelegatorAddress.Bytes()) {
+		return false
+	}
+	if len(v.DelegationIndexes) != len(s.DelegationIndexes) {
+		return false
+	}
+	if len(v.Amounts) != len(s.Amounts) {
+		return false
+	}
+	for i := range v.DelegationIndexes {
+		if !bytes.Equal(v.DelegationIndexes[i].ValidatorAddress.Bytes(), s.DelegationIndexes[i].ValidatorAddress.Bytes()) {
+			return false
+		}
+		if v.DelegationIndexes[i].Index != s.DelegationIndexes[i].Index {
+			return false
+		}
+	}
+	for i := range v.Amounts {
+		if v.Amounts[i] == nil {
+			if s.Amounts[i] != nil {
+				return false
+			}
+		} else if s.Amounts[i] == nil {
+			return false
+		} else if v.Amounts[i].Cmp(s.Amounts[i]) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// UndelegateAll - type for undelegating all from all validators
+type UndelegateAll struct {
+	DelegatorAddress common.Address `json:"delegator_address"`
+}
+
+// Type of UndelegateAll
+func (v UndelegateAll) Type() Directive {
+	return DirectiveUndelegateAll
+}
+
+// Copy returns a deep copy of the UndelegateAll as a StakeMsg interface
+func (v UndelegateAll) Copy() StakeMsg {
+	return UndelegateAll{
+		DelegatorAddress: v.DelegatorAddress,
+	}
+}
+
+// Equals returns if v and s are equal
+func (v UndelegateAll) Equals(s UndelegateAll) bool {
+	return bytes.Equal(v.DelegatorAddress.Bytes(), s.DelegatorAddress.Bytes())
 }
