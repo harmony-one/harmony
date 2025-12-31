@@ -982,7 +982,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if err != nil {
 			return err
 		}
-		_, err = VerifyAndUndelegateAllFromMsg(pool.currentState, pendingEpoch, stkMsg, delegations)
+		_, err = VerifyAndUndelegateAllFromMsg(pool.currentState, pendingEpoch, stkMsg, delegations, chain)
 		return err
 	default:
 		return staking.ErrInvalidStakingKind
