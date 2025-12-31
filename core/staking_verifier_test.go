@@ -2565,6 +2565,7 @@ func TestVerifyAndUndelegateAllFromMsg(t *testing.T) {
 		epoch       *big.Int
 		msg         staking.UndelegateAll
 		delegations []staking.DelegationIndex
+		chain       ChainContext
 		expErr      error
 	}{
 		{
@@ -2590,6 +2591,7 @@ func TestVerifyAndUndelegateAllFromMsg(t *testing.T) {
 					{ValidatorAddress: validatorAddr2, Index: 1, BlockNum: big.NewInt(100)},
 				}
 			}(),
+			chain: makeFakeChainContextForStake(),
 		},
 		{
 			name:  "nil state db",
@@ -2599,6 +2601,7 @@ func TestVerifyAndUndelegateAllFromMsg(t *testing.T) {
 				DelegatorAddress: delegatorAddr,
 			},
 			delegations: []staking.DelegationIndex{},
+			chain:       makeFakeChainContextForStake(),
 			expErr:      errStateDBIsMissing,
 		},
 		{
@@ -2609,17 +2612,36 @@ func TestVerifyAndUndelegateAllFromMsg(t *testing.T) {
 				DelegatorAddress: delegatorAddr,
 			},
 			delegations: []staking.DelegationIndex{},
+			chain:       makeFakeChainContextForStake(),
 			expErr:      errEpochMissing,
 		},
 		{
-			name:  "no delegations",
-			sdb:   makeDefaultStateForUndelegate(t),
+			name: "no delegations in list but found in state scan",
+			sdb: func() *state.DB {
+				sdb := makeDefaultStateForUndelegate(t)
+				return sdb
+			}(),
 			epoch: epoch,
 			msg: staking.UndelegateAll{
 				DelegatorAddress: delegatorAddr,
 			},
 			delegations: []staking.DelegationIndex{},
-			expErr:      errors.New("no delegations to undelegate"),
+			chain:       makeFakeChainContextForStake(),
+			expErr:      nil,
+		},
+		{
+			name: "no delegations at all",
+			sdb: func() *state.DB {
+				sdb := makeStateDBForStake(t)
+				return sdb
+			}(),
+			epoch: epoch,
+			msg: staking.UndelegateAll{
+				DelegatorAddress: delegatorAddr,
+			},
+			delegations: []staking.DelegationIndex{},
+			chain:       makeFakeChainContextForStake(),
+			expErr:      errors.New("no active delegations to undelegate"),
 		},
 		{
 			name: "no active delegations",
@@ -2638,13 +2660,14 @@ func TestVerifyAndUndelegateAllFromMsg(t *testing.T) {
 			delegations: []staking.DelegationIndex{
 				{ValidatorAddress: validatorAddr, Index: 1, BlockNum: big.NewInt(100)},
 			},
+			chain:  makeFakeChainContextForStake(),
 			expErr: errors.New("no active delegations to undelegate"),
 		},
 	}
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ws, err := VerifyAndUndelegateAllFromMsg(test.sdb, test.epoch, &test.msg, test.delegations)
+			ws, err := VerifyAndUndelegateAllFromMsg(test.sdb, test.epoch, &test.msg, test.delegations, test.chain)
 
 			if assErr := assertError(err, test.expErr); assErr != nil {
 				t.Errorf("Test %v: %v", i, assErr)

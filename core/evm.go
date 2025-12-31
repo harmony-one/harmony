@@ -485,7 +485,7 @@ func UndelegateAllFn(ref *block.Header, chain ChainContext) vm.UndelegateAllFunc
 		}
 
 		updatedValidatorWrappers, err := VerifyAndUndelegateAllFromMsg(
-			db, ref.Epoch(), undelegateAll, delegations,
+			db, ref.Epoch(), undelegateAll, delegations, chain,
 		)
 		if err != nil {
 			return err
