@@ -61,6 +61,9 @@ type (
 	DelegateFunc        func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Delegate) error
 	UndelegateFunc      func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Undelegate) error
 	CollectRewardsFunc  func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CollectRewards) error
+	BatchDelegateFunc   func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.BatchDelegate) error
+	BatchUndelegateFunc func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.BatchUndelegate) error
+	UndelegateAllFunc   func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.UndelegateAll) error
 	// Used for migrating delegations via the staking precompile
 	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
 	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
@@ -180,6 +183,9 @@ type BlockContext struct {
 	Delegate              DelegateFunc
 	Undelegate            UndelegateFunc
 	CollectRewards        CollectRewardsFunc
+	BatchDelegate         BatchDelegateFunc
+	BatchUndelegate       BatchUndelegateFunc
+	UndelegateAll         UndelegateAllFunc
 	CalculateMigrationGas CalculateMigrationGasFunc
 
 	ShardID   uint32 // Used by staking and cross shard transfer precompile

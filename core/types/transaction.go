@@ -63,12 +63,22 @@ const (
 	Delegate
 	Undelegate
 	CollectRewards
+	BatchDelegate
+	BatchUndelegate
+	UndelegateAll
 )
 
 // StakingTypeMap is the map from staking type to transactionType
-var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveCreateValidator: StakeCreateVal,
-	staking.DirectiveEditValidator: StakeEditVal, staking.DirectiveDelegate: Delegate,
-	staking.DirectiveUndelegate: Undelegate, staking.DirectiveCollectRewards: CollectRewards}
+var StakingTypeMap = map[staking.Directive]TransactionType{
+	staking.DirectiveCreateValidator: StakeCreateVal,
+	staking.DirectiveEditValidator:   StakeEditVal,
+	staking.DirectiveDelegate:        Delegate,
+	staking.DirectiveUndelegate:      Undelegate,
+	staking.DirectiveCollectRewards:  CollectRewards,
+	staking.DirectiveBatchDelegate:   BatchDelegate,
+	staking.DirectiveBatchUndelegate: BatchUndelegate,
+	staking.DirectiveUndelegateAll:   UndelegateAll,
+}
 
 // InternalTransaction defines the common interface for harmony and ethereum transactions.
 type InternalTransaction interface {

@@ -299,6 +299,12 @@ func RLPDecodeStakeMsg(payload []byte, d Directive) (interface{}, error) {
 			ds = &Undelegate{}
 		case DirectiveCollectRewards:
 			ds = &CollectRewards{}
+		case DirectiveBatchDelegate:
+			ds = &BatchDelegate{}
+		case DirectiveBatchUndelegate:
+			ds = &BatchUndelegate{}
+		case DirectiveUndelegateAll:
+			ds = &UndelegateAll{}
 		default:
 			return nil, nil
 		}
