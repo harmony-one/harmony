@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -187,6 +188,22 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber, config *tracers.TraceCallConfig) (interface{}, error) {
 	timer := DoMetricRPCRequest(TraceCall)
 	defer DoRPCRequestDuration(TraceCall, timer)
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("TraceCall panic",
+				"panic", r,
+				"from", args.From,
+				"to", args.To,
+				"block", blockNr,
+				"config", config,
+
+				string(debug.Stack()),
+				fmt.Errorf("TraceCall panic: %v", r),
+			)
+
+		}
+	}()
 
 	// First try to retrieve the state
 	statedb, header, err := s.hmy.StateAndHeaderByNumber(ctx, blockNr)
