@@ -1002,10 +1002,10 @@ func FormatLogs(logs []*vm.StructLog, conf *TraceConfig) []StructLogRes {
 			Error:           trace.Err,
 			//Memory:          trace.Memory,
 
-			//rawStack:         trace.Stack,
+			rawStack: trace.Stack,
 			//rawAfterStack:    trace.AfterStack,
-			//rawMemory:        trace.Memory,
-			//rawStorage:       trace.Storage,
+			rawMemory:  trace.Memory,
+			rawStorage: trace.Storage,
 			//rawOperatorEvent: trace.OperatorEvent,
 		}
 
