@@ -99,10 +99,22 @@ func enable1344(jt *JumpTable) {
 	}
 }
 
+//// opChainID implements CHAINID opcode
+//func opChainID(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+//	chainId, _ := uint256.FromBig(interpreter.evm.chainConfig.ChainID)
+//	scope.Stack.push(chainId)
+//	return nil, nil
+//}
+
 // opChainID implements CHAINID opcode
-func opChainID(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	chainId, _ := uint256.FromBig(interpreter.evm.chainConfig.ChainID)
-	scope.Stack.push(chainId)
+func opChainID(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	var chainID *uint256.Int
+	if interpreter.evm.chainConfig.IsChainIdFix(interpreter.evm.Context.EpochNumber) {
+		chainID, _ = uint256.FromBig(interpreter.evm.chainConfig.EthCompatibleChainID)
+	} else {
+		chainID, _ = uint256.FromBig(interpreter.evm.chainConfig.ChainID)
+	}
+	stack.push(chainID)
 	return nil, nil
 }
 
