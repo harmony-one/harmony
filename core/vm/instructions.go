@@ -18,13 +18,16 @@ package vm
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/status-im/keycard-go/hexutils"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -795,6 +798,20 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory 
 	if value.Sign() != 0 {
 		gas += params.CallStipend
 	}
+
+	if interpreter.evm.BlockNumber.Uint64() == 0x4ec7059 {
+
+		codeaddr := "<nil>"
+		if contract.CodeAddr != nil {
+			codeaddr = contract.CodeAddr.Hex()
+		}
+
+		fmt.Println("++block number hit:", interpreter.evm.BlockNumber.Uint64())
+		fmt.Printf("contract.CodeHash %s, codeadr: %s, hash2: %s, hex: %s ", contract.CodeHash, codeaddr, hash.Keccak256Hash(contract.Code), hexutils.BytesToHex(contract.Code))
+	} else {
+		fmt.Println("--block number hit:", interpreter.evm.BlockNumber.Uint64())
+	}
+
 	ret, returnGas, err := interpreter.evm.Call(contract, toAddr, args, gas, value)
 	if err != nil {
 		stack.push(interpreter.intPool.getZero())
@@ -984,6 +1001,17 @@ func makePush(size uint64, pushByteSize int) executionFunc {
 		if startMin+pushByteSize < endMin {
 			endMin = startMin + pushByteSize
 		}
+
+		//if interpreter.evm.BlockNumber.Uint64() == 0x4ec7059 {
+		//	codeaddr := "<nil>"
+		//	if contract.CodeAddr != nil {
+		//		codeaddr = contract.CodeAddr.Hex()
+		//	}
+		//	fmt.Println("++make push number hit:", interpreter.evm.BlockNumber.Uint64())
+		//	fmt.Printf("contract.CodeHash %s, codeadr: %s, hash2: %s, hex: %s ", contract.CodeHash, codeaddr, hash.Keccak256Hash(contract.Code))
+		//} else {
+		//	fmt.Println("--make push number hit:", interpreter.evm.BlockNumber.Uint64())
+		//}
 
 		integer := interpreter.intPool.get()
 		stack.push(integer.SetBytes(common.RightPadBytes(contract.Code[startMin:endMin], pushByteSize)))
