@@ -808,8 +808,6 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory 
 
 		fmt.Println("++block number hit:", interpreter.evm.BlockNumber.Uint64())
 		fmt.Printf("contract.CodeHash %s, codeadr: %s, hash2: %s, hex: %s ", contract.CodeHash, codeaddr, hash.Keccak256Hash(contract.Code), hexutils.BytesToHex(contract.Code))
-	} else {
-		fmt.Println("--block number hit:", interpreter.evm.BlockNumber.Uint64())
 	}
 
 	ret, returnGas, err := interpreter.evm.Call(contract, toAddr, args, gas, value)
