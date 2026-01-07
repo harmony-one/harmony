@@ -26,6 +26,7 @@ import (
 )
 
 var activators = map[int]func(*JumpTable){
+	5656: enable5656,
 	3855: enable3855,
 	3529: enable3529,
 	3198: enable3198,
@@ -255,4 +256,16 @@ func opCLZ(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte
 	x := scope.Stack.peek()
 	x.SetUint64(256 - uint64(x.BitLen()))
 	return nil, nil
+}
+
+// enable5656 applies EIP-5656 (MCOPY opcode)
+func enable5656(jt *JumpTable) {
+	jt[MCOPY] = &operation{
+		execute:     opMcopy,
+		constantGas: 0,
+		dynamicGas:  gasMcopy,
+		minStack:    minStack(3, 0),
+		maxStack:    maxStack(3, 0),
+		memorySize:  memoryMcopy,
+	}
 }

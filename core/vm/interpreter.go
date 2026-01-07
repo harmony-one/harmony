@@ -78,6 +78,8 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	if cfg.JumpTable == nil {
 		switch {
+		case evm.chainRules.IsEIP5656Mcopy:
+			cfg.JumpTable = &eip5656InstructionSet
 		case evm.chainRules.Is1153TransientStorage:
 			cfg.JumpTable = &eip1153InstructionSet
 		case evm.chainRules.IsIstanbul:

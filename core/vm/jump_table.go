@@ -53,6 +53,7 @@ var (
 	constantinopleInstructionSet   = newConstantinopleInstructionSet()
 	istanbulInstructionSet         = newIstanbulInstructionSet()
 	eip1153InstructionSet          = eip1153TransientStorage()
+	eip5656InstructionSet          = eip5656Mcopy()
 	//berlinInstructionSet           = newBerlinInstructionSet()
 	//londonInstructionSet           = newLondonInstructionSet()
 	//mergeInstructionSet            = newMergeInstructionSet()
@@ -109,6 +110,13 @@ func newBerlinInstructionSet() JumpTable {
 	enable2929(&instructionSet) // Access lists for trie accesses https://eips.ethereum.org/EIPS/eip-2929
 	return validate(instructionSet)
 }*/
+
+// EIP 5656 MCOPY
+func eip5656Mcopy() JumpTable {
+	instructionSet := eip1153TransientStorage()
+	enable5656(&instructionSet) // MCOPY - https://eips.ethereum.org/EIPS/eip-5656
+	return validate(instructionSet)
+}
 
 // EIP 1153 Transient Storage
 func eip1153TransientStorage() JumpTable {
