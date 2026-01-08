@@ -9,7 +9,7 @@ import (
 )
 
 func TestOpChainID(t *testing.T) {
-
+	const ethCompatibleChainID = 12345
 	t.Run("disabled-chainid-fix", func(t *testing.T) {
 		v := EVMInterpreter{
 			evm: &EVM{
@@ -18,7 +18,7 @@ func TestOpChainID(t *testing.T) {
 				},
 				chainConfig: &params.ChainConfig{
 					ChainIdFixEpoch:      big.NewInt(1323),
-					EthCompatibleChainID: big.NewInt(12345),
+					EthCompatibleChainID: big.NewInt(ethCompatibleChainID),
 					ChainID:              big.NewInt(1),
 				},
 			},
@@ -41,7 +41,7 @@ func TestOpChainID(t *testing.T) {
 				},
 				chainConfig: &params.ChainConfig{
 					ChainIdFixEpoch:      big.NewInt(1323),
-					EthCompatibleChainID: big.NewInt(12345),
+					EthCompatibleChainID: big.NewInt(ethCompatibleChainID),
 					ChainID:              big.NewInt(1),
 				},
 			},
@@ -53,6 +53,6 @@ func TestOpChainID(t *testing.T) {
 			t.Fatalf("opChainID error: %v", err)
 		}
 		rs := stack.pop()
-		require.Equal(t, rs.Uint64(), uint64(1))
+		require.Equal(t, rs.Uint64(), uint64(ethCompatibleChainID))
 	})
 }
