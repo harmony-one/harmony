@@ -56,7 +56,7 @@ func callGas(isEip150 bool, availableGas, base uint64, callCost *uint256.Int) (u
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, contractCreation, homestead, istanbul, isValidatorCreation bool) (uint64, error) {
+func IntrinsicGas(data []byte, contractCreation, homestead, istanbul, isValidatorCreation, isEIP3860 bool) (uint64, error) {
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if contractCreation && homestead {
@@ -66,8 +66,9 @@ func IntrinsicGas(data []byte, contractCreation, homestead, istanbul, isValidato
 	} else {
 		gas = params.TxGas
 	}
+	dataLen := uint64(len(data))
 	// Bump the required gas by the amount of transactional data
-	if len(data) > 0 {
+	if dataLen > 0 {
 		// Zero and non-zero bytes are priced differently
 		var nz uint64
 		for _, byt := range data {
@@ -85,11 +86,19 @@ func IntrinsicGas(data []byte, contractCreation, homestead, istanbul, isValidato
 		}
 		gas += nz * nonZeroGas
 
-		z := uint64(len(data)) - nz
+		z := dataLen - nz
 		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
 			return 0, ErrOutOfGas
 		}
 		gas += z * params.TxDataZeroGas
+
+		if contractCreation && isEIP3860 {
+			lenWords := toWordSize(dataLen)
+			if (math.MaxUint64-gas)/params.InitCodeWordGas < lenWords {
+				return 0, ErrGasUintOverflow
+			}
+			gas += lenWords * params.InitCodeWordGas
+		}
 	}
 	return gas, nil
 }

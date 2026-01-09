@@ -28,6 +28,7 @@ import (
 var activators = map[int]func(*JumpTable){
 	5656: enable5656,
 	6780: enable6780,
+	3860: enable3860,
 	3855: enable3855,
 	3529: enable3529,
 	3198: enable3198,
@@ -280,4 +281,13 @@ func enable5656(jt *JumpTable) {
 		maxStack:    maxStack(3, 0),
 		memorySize:  memoryMcopy,
 	}
+}
+
+// enable3860 applies EIP-3860 "Limit and Meter Initcode"
+// - Limits initcode size to 49152 bytes
+// - Charges 2 gas per 32-byte chunk of initcode
+// https://eips.ethereum.org/EIPS/eip-3860
+func enable3860(jt *JumpTable) {
+	jt[CREATE].dynamicGas = gasCreateEip3860
+	jt[CREATE2].dynamicGas = gasCreate2Eip3860
 }

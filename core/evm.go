@@ -358,7 +358,7 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 // - remainder when the tx inevitably is a no-op
 // i have followed the same logic here, this only produces an error if can't read from db
 func CalculateMigrationGasFn(chain ChainContext) vm.CalculateMigrationGasFunc {
-	return func(db vm.StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error) {
+	return func(db vm.StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool, isEIP3860 bool) (uint64, error) {
 		var gas uint64 = 0
 		delegations, err := chain.ReadDelegationsByDelegator(migrationMsg.From)
 		if err != nil {
@@ -398,6 +398,7 @@ func CalculateMigrationGasFn(chain ChainContext) vm.CalculateMigrationGasFunc {
 				homestead,
 				istanbul,
 				false, // isValidatorCreation
+				isEIP3860,
 			)
 			if err != nil {
 				return 0, err
@@ -421,6 +422,7 @@ func CalculateMigrationGasFn(chain ChainContext) vm.CalculateMigrationGasFunc {
 				homestead,
 				istanbul,
 				false, // isValidatorCreation
+				isEIP3860,
 			)
 		}
 	}

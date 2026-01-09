@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -228,17 +229,23 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 		sender           = vm.AccountRef(msg.From())
 		homestead        = st.evm.ChainConfig().IsS3(st.evm.Context.EpochNumber) // s3 includes homestead
 		istanbul         = st.evm.ChainConfig().IsIstanbul(st.evm.Context.EpochNumber)
+		isEIP3860        = st.evm.ChainConfig().IsEIP3860(st.evm.Context.EpochNumber)
 		rules            = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber)
 		contractCreation = msg.To() == nil
 	)
 
 	// Pay intrinsic gas
-	gas, err := vm.IntrinsicGas(st.data, contractCreation, homestead, istanbul, false)
+	gas, err := vm.IntrinsicGas(st.data, contractCreation, homestead, istanbul, false, isEIP3860)
 	if err != nil {
 		return ExecutionResult{}, err
 	}
 	if err = st.useGas(gas); err != nil {
 		return ExecutionResult{}, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas)
+	}
+
+	// Check whether the init code size has been exceeded.
+	if isEIP3860 && contractCreation && len(st.data) > params.MaxInitCodeSize {
+		return ExecutionResult{}, fmt.Errorf("%w: code size %v limit %v", ErrMaxInitCodeSizeExceeded, len(st.data), params.MaxInitCodeSize)
 	}
 
 	// Execute the preparatory steps for state transition which includes:
@@ -338,9 +345,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	sender := vm.AccountRef(msg.From())
 	homestead := st.evm.ChainConfig().IsS3(st.evm.Context.EpochNumber) // s3 includes homestead
 	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.Context.EpochNumber)
-
+	isEIP3860 := st.evm.ChainConfig().IsEIP3860(st.evm.Context.EpochNumber)
 	// Pay intrinsic gas
-	gas, err := vm.IntrinsicGas(st.data, false, homestead, istanbul, msg.Type() == types.StakeCreateVal)
+	gas, err := vm.IntrinsicGas(st.data, false, homestead, istanbul, msg.Type() == types.StakeCreateVal, isEIP3860)
 
 	if err != nil {
 		return 0, err

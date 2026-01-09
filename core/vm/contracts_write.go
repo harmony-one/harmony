@@ -94,6 +94,7 @@ func (c *stakingPrecompile) RequiredGas(
 					migrationMsg,
 					evm.ChainConfig().IsS3(evm.Context.EpochNumber),
 					evm.ChainConfig().IsIstanbul(evm.Context.EpochNumber),
+					evm.ChainConfig().IsEIP3860(evm.Context.EpochNumber),
 				)
 			} else if encoded, err := rlp.EncodeToBytes(stakeMsg); err == nil {
 				payload = encoded
@@ -106,6 +107,7 @@ func (c *stakingPrecompile) RequiredGas(
 		evm.ChainConfig().IsS3(evm.Context.EpochNumber),       // homestead
 		evm.ChainConfig().IsIstanbul(evm.Context.EpochNumber), // istanbul
 		false, // isValidatorCreation
+		evm.ChainConfig().IsEIP3860(evm.Context.EpochNumber),
 	); err != nil {
 		return 0, err // ErrOutOfGas occurs when gas payable > uint64
 	} else {

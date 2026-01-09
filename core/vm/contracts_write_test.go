@@ -63,7 +63,7 @@ func EditValidatorFn() EditValidatorFunc {
 //}
 
 func CalculateMigrationGasFn() CalculateMigrationGasFunc {
-	return func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error) {
+	return func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool, isEIP3860 bool) (uint64, error) {
 		return 0, nil
 	}
 }

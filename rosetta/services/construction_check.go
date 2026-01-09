@@ -241,7 +241,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 		}
 	} else {
 		estGasUsed, err = vm.IntrinsicGas(data, false, false,
-			false, options.OperationType == common.CreateValidatorOperation)
+			false, options.OperationType == common.CreateValidatorOperation, false)
 		estGasUsed *= 2
 
 	}

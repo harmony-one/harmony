@@ -34,4 +34,8 @@ var (
 
 	// ErrShardStateNotMatch is returned if the calculated shardState hash not equal that in the block header
 	ErrShardStateNotMatch = errors.New("shard state root hash not match")
+
+	// ErrMaxInitCodeSizeExceeded is returned if creation transaction provides the init code bigger
+	// than init code size limit.
+	ErrMaxInitCodeSizeExceeded = errors.New("max initcode size exceeded")
 )

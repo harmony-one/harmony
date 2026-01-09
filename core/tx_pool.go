@@ -282,6 +282,7 @@ type TxPool struct {
 
 	homestead bool
 	istanbul  bool
+	isEIP3860 bool
 }
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
@@ -367,6 +368,9 @@ func (pool *TxPool) loop() {
 				}
 				if pool.chainconfig.IsIstanbul(ev.Block.Epoch()) {
 					pool.istanbul = true
+				}
+				if pool.chainconfig.IsEIP3860(ev.Block.Epoch()) {
+					pool.isEIP3860 = true
 				}
 				pool.reset(head.Header(), ev.Block.Header())
 				head = ev.Block
@@ -761,9 +765,9 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	}
 	intrGas := uint64(0)
 	if isStakingTx {
-		intrGas, err = vm.IntrinsicGas(tx.Data(), false, pool.homestead, pool.istanbul, stakingTx.StakingType() == staking.DirectiveCreateValidator)
+		intrGas, err = vm.IntrinsicGas(tx.Data(), false, pool.homestead, pool.istanbul, stakingTx.StakingType() == staking.DirectiveCreateValidator, pool.isEIP3860)
 	} else {
-		intrGas, err = vm.IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, pool.istanbul, false)
+		intrGas, err = vm.IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, pool.istanbul, false, pool.isEIP3860)
 	}
 	if err != nil {
 		return err

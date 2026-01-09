@@ -37,6 +37,7 @@ var (
 	ErrInvalidCode              = errors.New("invalid code: must not begin with 0xef")
 	ErrNonceUintOverflow        = errors.New("nonce uint64 overflow")
 	ErrTraceLimitReached        = errors.New("the number of logs reached the specified limit") // harmony error
+	ErrMaxInitCodeSizeExceeded  = errors.New("max initcode size exceeded")
 
 	// errStopToken is an internal token indicating interpreter loop termination,
 	// never returned to outside callers.

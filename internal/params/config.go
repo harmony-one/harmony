@@ -86,7 +86,7 @@ var (
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
-		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 	}
@@ -143,7 +143,7 @@ var (
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
 		EIP7939CLZEpoch:                       EpochTBD,
-		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 	}
@@ -201,6 +201,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 	}
 
@@ -257,6 +258,7 @@ var (
 		EIP1153TransientStorageEpoch:          big.NewInt(35626),
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              big.NewInt(47190),
 		TimestampValidationEpoch:              big.NewInt(47190),
@@ -316,6 +318,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 	}
 
@@ -372,6 +375,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 	}
 
@@ -429,6 +433,7 @@ var (
 		big.NewInt(0),                      // EIP1153TransientStorageEpoch
 		big.NewInt(0),                      // EIP7939CLZEpoch
 		big.NewInt(0),                      // EIP5656McopyEpoch
+		big.NewInt(0),                      // EIP3860Epoch
 		big.NewInt(0),                      // EIP6780Epoch
 		big.NewInt(0),                      // NTPEpoch
 		big.NewInt(0),                      // TimestampValidationEpoch
@@ -488,6 +493,7 @@ var (
 		big.NewInt(0),        // EIP1153TransientStorageEpoch
 		big.NewInt(0),        // EIP7939CLZEpoch
 		big.NewInt(0),        // EIP5656McopyEpoch
+		big.NewInt(0),        // EIP3860Epoch
 		big.NewInt(0),        // EIP6780Epoch
 		big.NewInt(0),        // NTPEpoch
 		big.NewInt(0),        // TimestampValidationEpoch
@@ -687,6 +693,8 @@ type ChainConfig struct {
 	EIP7939CLZEpoch *big.Int `json:"eip7939-clz-epoch,omitempty"`
 	// EIP5656McopyEpoch is the first epoch to support the EIP-5656 MCOPY opcode
 	EIP5656McopyEpoch *big.Int `json:"eip5656-mcopy-epoch,omitempty"`
+	// EIP3860Epoch is the first epoch to support EIP-3860 (Limit and Meter Initcode)
+	EIP3860Epoch *big.Int `json:"eip3860-epoch,omitempty"`
 	// EIP6780Epoch is the first epoch to support EIP-6780 (deactivate SELFDESTRUCT)
 	EIP6780Epoch *big.Int `json:"eip6780-epoch,omitempty"`
 
@@ -700,7 +708,7 @@ type ChainConfig struct {
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v EIP1153TransientStorageEpoch: %v EIP7939CLZEpoch: %v EIP5656McopyEpoch: %v EIP6780Epoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v EIP1153TransientStorageEpoch: %v EIP7939CLZEpoch: %v EIP5656McopyEpoch: %v EIP3860Epoch: %v EIP6780Epoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -716,6 +724,7 @@ func (c *ChainConfig) String() string {
 		c.EIP1153TransientStorageEpoch,
 		c.EIP7939CLZEpoch,
 		c.EIP5656McopyEpoch,
+		c.EIP3860Epoch,
 		c.EIP6780Epoch,
 	)
 }
@@ -963,6 +972,11 @@ func (c *ChainConfig) IsEIP6780(epoch *big.Int) bool {
 	return isForked(c.EIP6780Epoch, epoch)
 }
 
+// IsEIP3860 determines whether EIP-3860 (Limit and Meter Initcode) is enabled
+func (c *ChainConfig) IsEIP3860(epoch *big.Int) bool {
+	return isForked(c.EIP3860Epoch, epoch)
+}
+
 // IsNTP determines whether NTP-corrected time should be used for block timestamps
 func (c *ChainConfig) IsNTP(epoch *big.Int) bool {
 	return isForked(c.NTPEpoch, epoch)
@@ -1102,6 +1116,7 @@ type Rules struct {
 	Is7939CLZ              bool
 	IsEIP5656Mcopy         bool
 	IsEIP6780              bool
+	Is3860                 bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1137,5 +1152,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		Is7939CLZ:                  c.IsEIP7939CLZ(epoch),
 		IsEIP5656Mcopy:             c.IsEIP5656Mcopy(epoch),
 		IsEIP6780:                  c.IsEIP6780(epoch),
+		Is3860:                     c.IsEIP3860(epoch),
 	}
 }
