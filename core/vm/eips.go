@@ -27,6 +27,7 @@ import (
 
 var activators = map[int]func(*JumpTable){
 	5656: enable5656,
+	6780: enable6780,
 	3855: enable3855,
 	3529: enable3529,
 	3198: enable3198,
@@ -164,6 +165,17 @@ func enable2929(jt *JumpTable) {
 func enable3529(jt *JumpTable) {
 	jt[SSTORE].dynamicGas = gasSStoreEIP3529
 	jt[SELFDESTRUCT].dynamicGas = gasSelfdestructEIP3529
+}
+
+// enable6780 applies EIP-6780 (deactivate SELFDESTRUCT)
+func enable6780(jt *JumpTable) {
+	jt[SELFDESTRUCT] = &operation{
+		execute:     opSelfdestruct6780,
+		dynamicGas:  gasSelfdestructEIP3529,
+		constantGas: params.SelfdestructGasEIP150,
+		minStack:    minStack(1, 0),
+		maxStack:    maxStack(1, 0),
+	}
 }
 
 // enable3198 applies EIP-3198 (BASEFEE Opcode)

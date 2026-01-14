@@ -525,6 +525,18 @@ func (db *DB) Suicide(addr common.Address) bool {
 	return true
 }
 
+// Selfdestruct6780 implements EIP-6780: only self-destructs if the contract was created in the current transaction.
+func (db *DB) Selfdestruct6780(addr common.Address) {
+	stateObject := db.getStateObject(addr)
+	if stateObject == nil {
+		return
+	}
+
+	if stateObject.created {
+		db.Suicide(addr)
+	}
+}
+
 // SetTransientState sets transient storage for a given account. It
 // adds the change to the journal so that it can be rolled back
 // to its previous value if there is a revert.
@@ -693,6 +705,9 @@ func (db *DB) createObject(addr common.Address) (newobj, prev *Object) {
 	} else {
 		db.journal.append(resetObjectChange{prev: prev, prevdestruct: prevdestruct})
 	}
+
+	newobj.created = true
+
 	db.setStateObject(newobj)
 	if prev != nil && !prev.deleted {
 		return newobj, prev
@@ -934,6 +949,7 @@ func (db *DB) Finalise(deleteEmptyObjects bool) {
 		} else {
 			obj.finalise(true) // Prefetch slots in the background
 		}
+		obj.created = false
 		db.stateObjectsPending[addr] = struct{}{}
 		db.stateObjectsDirty[addr] = struct{}{}
 
@@ -1201,6 +1217,10 @@ func (s *DB) Prepare(rules params.Rules, sender common.Address, dst *common.Addr
 	}
 	// Reset transient storage at the beginning of transaction execution
 	s.transientStorage = newTransientStorage()
+	// Reset created flags for all state objects at the beginning of transaction execution (EIP-6780)
+	for _, obj := range s.stateObjects {
+		obj.created = false
+	}
 }
 
 // AddAddressToAccessList adds the given address to the access list

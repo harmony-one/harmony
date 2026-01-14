@@ -89,6 +89,15 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 		default:
 			cfg.JumpTable = &frontierInstructionSet
 		}
+		// Automatically enable EIP-6780 if the chain rule is active
+		if evm.chainRules.IsEIP6780 {
+			copy := *cfg.JumpTable
+			if err := EnableEIP(6780, &copy); err != nil {
+				log.Error("EIP-6780 activation failed", "error", err)
+			} else {
+				cfg.JumpTable = &copy
+			}
+		}
 		for i, eip := range cfg.ExtraEips {
 			copy := *cfg.JumpTable
 			if err := EnableEIP(eip, &copy); err != nil {

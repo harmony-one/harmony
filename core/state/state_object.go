@@ -103,6 +103,7 @@ type Object struct {
 	dirtyCode        bool // true if the code was updated
 	suicided         bool
 	deleted          bool
+	created          bool // Flag whether the object was created in the current transaction (EIP-6780)
 }
 
 // empty returns whether the account is considered empty.
@@ -492,6 +493,7 @@ func (s *Object) deepCopy(db *DB) *Object {
 	stateObject.suicided = s.suicided
 	stateObject.dirtyCode = s.dirtyCode
 	stateObject.deleted = s.deleted
+	stateObject.created = s.created
 	return stateObject
 }
 

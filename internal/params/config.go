@@ -87,6 +87,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP6780Epoch:                          EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -142,6 +143,7 @@ var (
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP6780Epoch:                          EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -253,6 +255,7 @@ var (
 		EIP1153TransientStorageEpoch:          big.NewInt(35626),
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP6780Epoch:                          EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -421,6 +424,7 @@ var (
 		big.NewInt(0),                      // EIP1153TransientStorageEpoch
 		big.NewInt(0),                      // EIP7939CLZEpoch
 		big.NewInt(0),                      // EIP5656McopyEpoch
+		big.NewInt(0),                      // EIP6780Epoch
 	}
 
 	// TestChainConfig ...
@@ -478,6 +482,7 @@ var (
 		big.NewInt(0),        // EIP1153TransientStorageEpoch
 		big.NewInt(0),        // EIP7939CLZEpoch
 		big.NewInt(0),        // EIP5656McopyEpoch
+		big.NewInt(0),        // EIP6780Epoch
 	}
 
 	// TestRules ...
@@ -678,11 +683,13 @@ type ChainConfig struct {
 	EIP7939CLZEpoch *big.Int `json:"eip7939-clz-epoch,omitempty"`
 	// EIP5656McopyEpoch is the first epoch to support the EIP-5656 MCOPY opcode
 	EIP5656McopyEpoch *big.Int `json:"eip5656-mcopy-epoch,omitempty"`
+	// EIP6780Epoch is the first epoch to support EIP-6780 (deactivate SELFDESTRUCT)
+	EIP6780Epoch *big.Int `json:"eip6780-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v EIP1153TransientStorageEpoch: %v EIP7939CLZEpoch: %v EIP5656McopyEpoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v EIP1153TransientStorageEpoch: %v EIP7939CLZEpoch: %v EIP5656McopyEpoch: %v EIP6780Epoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -698,6 +705,7 @@ func (c *ChainConfig) String() string {
 		c.EIP1153TransientStorageEpoch,
 		c.EIP7939CLZEpoch,
 		c.EIP5656McopyEpoch,
+		c.EIP6780Epoch,
 	)
 }
 
@@ -939,6 +947,11 @@ func (c *ChainConfig) IsEIP5656Mcopy(epoch *big.Int) bool {
 	return isForked(c.EIP5656McopyEpoch, epoch)
 }
 
+// IsEIP6780 determines whether EIP-6780 (deactivate SELFDESTRUCT) is active
+func (c *ChainConfig) IsEIP6780(epoch *big.Int) bool {
+	return isForked(c.EIP6780Epoch, epoch)
+}
+
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
 func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
 	return isForked(c.ChainIdFixEpoch, epoch)
@@ -1072,6 +1085,7 @@ type Rules struct {
 	Is1153TransientStorage bool
 	Is7939CLZ              bool
 	IsEIP5656Mcopy         bool
+	IsEIP6780              bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1106,5 +1120,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		Is1153TransientStorage:     c.IsEIP1153TransientStorage(epoch),
 		Is7939CLZ:                  c.IsEIP7939CLZ(epoch),
 		IsEIP5656Mcopy:             c.IsEIP5656Mcopy(epoch),
+		IsEIP6780:                  c.IsEIP6780(epoch),
 	}
 }
