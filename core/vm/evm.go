@@ -75,8 +75,8 @@ func (evm *EVM) ActivePrecompiles() []common.Address {
 // ActivePrecompiles returns the precompiles enabled with the current configuration.
 func ActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
-	case rules.IsYoloV2:
-		return PrecompiledAddressesYoloV2
+	//case rules.IsYoloV2:
+	//	return PrecompiledAddressesYoloV2
 	case rules.IsIstanbul:
 		return PrecompiledAddressesIstanbul
 	case rules.IsByzantium:

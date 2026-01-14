@@ -44,11 +44,11 @@ func (s HeaderFieldSetter) ReceiptHash(newReceiptHash common.Hash) HeaderFieldSe
 	return s
 }
 
-// OutgoingReceiptHash sets the egress transaction receipt trie hash.
-func (s HeaderFieldSetter) OutgoingReceiptHash(newOutgoingReceiptHash common.Hash) HeaderFieldSetter {
-	s.h.SetOutgoingReceiptHash(newOutgoingReceiptHash)
-	return s
-}
+//// OutgoingReceiptHash sets the egress transaction receipt trie hash.
+//func (s HeaderFieldSetter) OutgoingReceiptHash(newOutgoingReceiptHash common.Hash) HeaderFieldSetter {
+//	s.h.SetOutgoingReceiptHash(newOutgoingReceiptHash)
+//	return s
+//}
 
 // IncomingReceiptHash sets the ingress transaction receipt trie hash.
 func (s HeaderFieldSetter) IncomingReceiptHash(newIncomingReceiptHash common.Hash) HeaderFieldSetter {
