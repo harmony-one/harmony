@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -346,12 +347,20 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		code = nil
 	}
 
+	if evm.Context.BlockNumber.Uint64()%10000 == 0 {
+		fmt.Printf("block number %d\n", evm.Context.BlockNumber.Uint64())
+	}
+
 	if isPrecompile {
 		addrCopy := addr
 		// If the account has no code, we can abort here
 		// The depth-check is already done, and precompiles handled above
 		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 		contract.SetCallCode(&addrCopy, codeHash, code)
+
+		if evm.Context.BlockNumber.Uint64() == 82732707 {
+			fmt.Printf("isPrecompile: true, p: %+v, evm: %+v, contract: %+v, gas: %+v, input: %s, readonly: false \n", p, evm, contract, gas, common.Bytes2Hex(input))
+		}
 
 		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
 	} else {
@@ -360,8 +369,12 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		// The depth-check is already done, and precompiles handled above
 		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 		contract.SetCallCode(&addrCopy, codeHash, code)
+
 		ret, err = evmInterpreterRun(evm, contract, input, false)
 		gas = contract.Gas
+		if evm.Context.BlockNumber.Uint64() == 82732707 {
+			fmt.Printf("isPrecompile: false, p: %+v, evm: %+v, contract: %+v, gas: %+v, input: %s, readonly: false \n", p, evm, contract, gas, common.Bytes2Hex(input))
+		}
 	}
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
