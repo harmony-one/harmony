@@ -302,6 +302,11 @@ func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contrac
 	}
 	suppliedGas -= gasCost
 	output, err := p.RunWriteCapable(evm, contract, input)
+
+	if evm.Context.BlockNumber.Uint64() == 82732707 {
+		outputHash := common.BytesToHash(output)
+		fmt.Printf("RunWriteCapable result: output: %s, err=%v\n", outputHash, err)
+	}
 	return output, suppliedGas, err
 }
 
