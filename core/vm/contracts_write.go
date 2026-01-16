@@ -2,6 +2,7 @@ package vm
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -61,7 +62,13 @@ func RunWriteCapablePrecompiledContract(
 	if !contract.UseGas(gas) {
 		return nil, ErrOutOfGas
 	}
-	return p.RunWriteCapable(evm, contract, input)
+	output, err := p.RunWriteCapable(evm, contract, input)
+	if evm.Context.BlockNumber.Uint64() == 82732707 {
+		outputHash := common.BytesToHash(output)
+		lenOutput := len(output)
+		fmt.Printf("RunWriteCapable result: output: %s, len: %d, err=%v\n", outputHash, lenOutput, err)
+	}
+	return output, err
 }
 
 type stakingPrecompile struct{}
