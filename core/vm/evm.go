@@ -373,7 +373,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		ret, err = evmInterpreterRun(evm, contract, input, false)
 		gas = contract.Gas
 		if evm.Context.BlockNumber.Uint64() == 82732707 {
-			fmt.Printf("isPrecompile: false, p: %+v, evm: %+v, contract: %+v, gas: %+v, input: %s, readonly: false \n", p, evm, contract, gas, common.Bytes2Hex(input))
+			fmt.Printf("isPrecompile: false, p(%T): %+v, evm: %+v, contract: %+v, gas: %+v, input: %s, readonly: false \n", p, p, evm, contract, gas, common.Bytes2Hex(input))
 		}
 	}
 	// When an error was returned by the EVM or when setting the creation code
