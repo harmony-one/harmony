@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -116,7 +117,11 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		}
 		if len(writeCapablePrecompiles) > 0 {
 			if p := writeCapablePrecompiles[*contract.CodeAddr]; p != nil {
-				return RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly)
+				ret, err := RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly)
+				if evm.Context.BlockNumber.Uint64() == 82732707 {
+					fmt.Printf("isPrecompile: true, p(%T): %+v, evm: %+v, contract: %+v,  input: %s, output: %s, readonly: false, err: %v \n", p, p, evm, contract, common.Bytes2Hex(input), common.Bytes2Hex(ret), err)
+				}
+				return ret, err
 			}
 		}
 	}

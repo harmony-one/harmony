@@ -66,7 +66,7 @@ func RunWriteCapablePrecompiledContract(
 	if evm.Context.BlockNumber.Uint64() == 82732707 {
 		outputHash := common.BytesToHash(output)
 		lenOutput := len(output)
-		fmt.Printf("RunWriteCapable result: output: %s, len: %d, err=%v\n", outputHash, lenOutput, err)
+		fmt.Printf("RunWriteCapable result: type p: %T, output: %s, len: %d, gas: %d, err=%v\n", p, outputHash, lenOutput, gas, err)
 	}
 	return output, err
 }
