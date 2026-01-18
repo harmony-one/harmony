@@ -375,6 +375,10 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		}
 	}
 
+	if header.NumberU64() == 82732707 {
+		fmt.Printf("ApplyTransaction %d: receipt, %s", header.NumberU64(), types.CXReceipts([]*types.CXReceipt{cxReceipt}).ComputeMerkleRoot())
+	}
+
 	return receipt, cxReceipt, vmenv.StakeMsgs, result.UsedGas, err
 }
 
