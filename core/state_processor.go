@@ -294,7 +294,9 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		signer = types.MakeSigner(config, header.Epoch())
 	}
 	msg, err := tx.AsMessage(signer)
-	fmt.Printf("ApplyTransaction1: msg: %+v\n", msg)
+	if header.NumberU64() == 82732707 {
+		fmt.Printf("ApplyTransaction1: msg: %+v\n", msg)
+	}
 
 	// skip signer err for additiononly tx
 	if err != nil {
