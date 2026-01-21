@@ -300,6 +300,9 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	if err != nil {
 		return nil, nil, nil, 0, err
 	}
+	if header.NumberU64() == 82732707 {
+		fmt.Printf("ApplyTransaction1: msg: %+v, signer: %T \n", msg, signer)
+	}
 
 	// Create a new context to be used in the EVM environment
 	context := NewEVMBlockContext(msg, header, bc, author)
