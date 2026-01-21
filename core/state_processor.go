@@ -298,9 +298,6 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	if err != nil {
 		return nil, nil, nil, 0, err
 	}
-	if header.NumberU64() == 82732707 {
-		fmt.Printf("ApplyTransaction1: msg: %+v, signer: %T \n", msg, signer)
-	}
 
 	if header.NumberU64() == 82732707 {
 		fmt.Printf("ApplyTransaction1: msg: %+v, from: %s\n", msg, msg.From())
@@ -393,7 +390,7 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	}
 
 	if header.NumberU64() == 82732707 {
-		fmt.Printf("ApplyTransaction %d: receipt hash, %s, receipt: %+v", header.NumberU64(), types.CXReceipts([]*types.CXReceipt{cxReceipt}).ComputeMerkleRoot(), cxReceipt)
+		fmt.Printf("ApplyTransaction %d: receipt hash, %s, receipt: %+v, msg: %+v, from: %s", header.NumberU64(), types.CXReceipts([]*types.CXReceipt{cxReceipt}).ComputeMerkleRoot(), cxReceipt, msg, msg.From())
 	}
 
 	return receipt, cxReceipt, vmenv.StakeMsgs, result.UsedGas, err
