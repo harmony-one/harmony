@@ -294,8 +294,6 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		signer = types.MakeSigner(config, header.Epoch())
 	}
 	msg, err := tx.AsMessage(signer)
-	fmt.Printf("ApplyTransaction1: msg: %+v\n", msg)
-
 	// skip signer err for additiononly tx
 	if err != nil {
 		return nil, nil, nil, 0, err
@@ -304,14 +302,26 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		fmt.Printf("ApplyTransaction1: msg: %+v, signer: %T \n", msg, signer)
 	}
 
+	if header.NumberU64() == 82732707 {
+		fmt.Printf("ApplyTransaction1: msg: %+v, from: %s\n", msg, msg.From())
+	}
 	// Create a new context to be used in the EVM environment
 	context := NewEVMBlockContext(msg, header, bc, author)
+	if header.NumberU64() == 82732707 {
+		fmt.Printf("ApplyTransaction2: msg: %+v, from: %s\n", msg, msg.From())
+	}
 	context.TxType = txType
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(context, NewEVMTxContext(msg), statedb, config, cfg)
+	if header.NumberU64() == 82732707 {
+		fmt.Printf("ApplyTransaction3: msg: %+v, from: %s\n", msg, msg.From())
+	}
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
+	if header.NumberU64() == 82732707 {
+		fmt.Printf("ApplyTransaction4: msg: %+v, from: %s\n", msg, msg.From())
+	}
 	if err != nil {
 		to := ""
 		if m := msg.To(); m != nil {
@@ -355,6 +365,9 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	if txType == types.SubtractionOnly && !failedExe {
 		if vmenv.CXReceipt != nil {
 			return nil, nil, nil, 0, errors.New("cannot have cross shard receipt via precompile and directly")
+		}
+		if header.NumberU64() == 82732707 {
+			fmt.Printf("ApplyTransaction5: msg: %+v, from: %s\n", msg, msg.From())
 		}
 		cxReceipt = &types.CXReceipt{
 			TxHash:    tx.Hash(),
