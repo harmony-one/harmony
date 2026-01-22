@@ -376,6 +376,9 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		}
 	} else {
 		if !failedExe {
+			if header.NumberU64() == 82732707 {
+				fmt.Printf("ApplyTransaction-5: msg: %+v, from: \n", vmenv.CXReceipt)
+			}
 			if vmenv.CXReceipt != nil {
 				cxReceipt = vmenv.CXReceipt
 				// this tx.Hash needs to be the "original" tx.Hash

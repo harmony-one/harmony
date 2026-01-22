@@ -3,6 +3,7 @@ package vm
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -246,6 +247,9 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 	}
 	fromAddress, toAddress, fromShardID, toShardID, value, err :=
 		parseCrossShardXferData(evm, contract.Address(), input)
+	if evm.Context.BlockNumber.Uint64() == 82732707 {
+		fmt.Printf("crossShardXferPrecompile::RunWriteCapable: fromAddress: %s, contractaddr: %s\n", fromAddress, contract.Address())
+	}
 	if err != nil {
 		return nil, err
 	}
