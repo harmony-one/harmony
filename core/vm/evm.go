@@ -119,7 +119,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 			if p := writeCapablePrecompiles[*contract.CodeAddr]; p != nil {
 				ret, err := RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly)
 				if evm.Context.BlockNumber.Uint64() == 82732707 {
-					fmt.Printf("isPrecompile: true, p(%T): %+v, evm: %+v, contract-addr: %s,  input: %s, output: %s, readonly: false, err: %v \n", p, p, contract.self.Address(), common.Bytes2Hex(input), common.Bytes2Hex(ret), err)
+					fmt.Printf("isPrecompile: true, p(%T): %+v, contract-addr: %s, input: %s, output: %s, readonly: false, err: %v \n", p, p, contract.self.Address(), common.Bytes2Hex(input), common.Bytes2Hex(ret), err)
 				}
 				return ret, err
 			}
