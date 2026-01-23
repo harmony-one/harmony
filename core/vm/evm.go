@@ -348,6 +348,10 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		codeHash = emptyCodeHash
 		code = nil
 	}
+
+	if evm.Context.BlockNumber.Uint64() == 82732707 {
+		fmt.Printf("contract creation: object: %+v\n", to)
+	}
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
 	contract := NewContract(caller, to, value, gas)
