@@ -347,6 +347,10 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		code = nil
 	}
 
+	if evm.Context.BlockNumber.Uint64() == 82732707 {
+		fmt.Printf("contract creation: object: %+v\n", addr)
+	}
+
 	if evm.Context.BlockNumber.Uint64()%10000 == 0 {
 		fmt.Printf("block number %d\n", evm.Context.BlockNumber.Uint64())
 	}

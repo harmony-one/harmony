@@ -17,13 +17,9 @@
 package runtime
 
 import (
-	"math"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
@@ -50,6 +46,7 @@ type Config struct {
 	GetHashFn func(n uint64) common.Hash
 }
 
+/*
 // sets defaults on the config
 func setDefaults(cfg *Config) {
 	if cfg.ChainConfig == nil {
@@ -90,7 +87,9 @@ func setDefaults(cfg *Config) {
 		}
 	}
 }
+*/
 
+/*
 // Execute executes the code using the input as call data during the execution.
 // It returns the EVM's return value, the new state and an error if it failed.
 //
@@ -130,7 +129,8 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 
 	return ret, cfg.State, err
 }
-
+*/
+/*
 // Create executes the code using the EVM create method
 func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 	if cfg == nil {
@@ -161,7 +161,9 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 	)
 	return code, address, leftOverGas, err
 }
+*/
 
+/*
 // Call executes the code given by the contract's address. It will return the
 // EVM's return value or an error if it failed.
 //
@@ -192,4 +194,4 @@ func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, er
 	)
 
 	return ret, leftOverGas, err
-}
+}*/
