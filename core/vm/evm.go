@@ -365,7 +365,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
 
 		if evm.Context.BlockNumber.Uint64() == 82732707 {
-			fmt.Printf("isPrecompile: true, p(%T): %+v, evm: %+v, contract: %+v, gas: %+v, input: %s, output: %s, readonly: false, gas: %d \n", p, p, evm, contract, gas, common.Bytes2Hex(input), common.Bytes2Hex(ret), gas)
+			fmt.Printf("isPrecompile: true, p(%T): %+v, contractaddr: %s, gas: %+v, input: %s, output: %s, readonly: false, gas: %d \n", p, p, contract.self.Address(), gas, common.Bytes2Hex(input), common.Bytes2Hex(ret), gas)
 		}
 
 	} else {
