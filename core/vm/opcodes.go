@@ -226,6 +226,12 @@ const (
 	SELFDESTRUCT OpCode = 0xff
 )
 
+const (
+	DUPN     OpCode = 0xe6
+	SWAPN    OpCode = 0xe7
+	EXCHANGE OpCode = 0xe8
+)
+
 // Since the opcodes aren't all in order we can't use a regular slice.
 var opCodeToString = map[OpCode]string{
 	// 0x0 range - arithmetic ops.
@@ -384,6 +390,11 @@ var opCodeToString = map[OpCode]string{
 	LOG3:   "LOG3",
 	LOG4:   "LOG4",
 
+	// 0xe0 range - EIP-8024.
+	DUPN:     "DUPN",
+	SWAPN:    "SWAPN",
+	EXCHANGE: "EXCHANGE",
+
 	// 0xf0 range.
 	CREATE:       "CREATE",
 	CALL:         "CALL",
@@ -478,6 +489,9 @@ var stringToOp = map[string]OpCode{
 	"TSTORE":         TSTORE,
 	"MCOPY":          MCOPY,
 	"PUSH0":          PUSH0,
+	"DUPN":           DUPN,
+	"SWAPN":          SWAPN,
+	"EXCHANGE":       EXCHANGE,
 	"PUSH1":          PUSH1,
 	"PUSH2":          PUSH2,
 	"PUSH3":          PUSH3,

@@ -98,6 +98,10 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 				cfg.JumpTable = &copy
 			}
 		}
+		// Automatically enable EIP-8024 if the epoch is reached
+		if evm.chainRules.Is8024 {
+			cfg.ExtraEips = append(cfg.ExtraEips, 8024)
+		}
 		for i, eip := range cfg.ExtraEips {
 			copy := *cfg.JumpTable
 			if err := EnableEIP(eip, &copy); err != nil {

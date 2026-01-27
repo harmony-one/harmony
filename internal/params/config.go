@@ -92,6 +92,7 @@ var (
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
+		EIP8024Epoch:                          EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -152,6 +153,7 @@ var (
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
+		EIP8024Epoch:                          EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -211,6 +213,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
+		EIP8024Epoch:                          EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -272,6 +275,7 @@ var (
 		NTPEpoch:                              big.NewInt(47190),
 		TimestampValidationEpoch:              big.NewInt(47190),
 		PragueEpoch:                           EpochTBD,
+		EIP8024Epoch:                          EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -332,6 +336,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
+		EIP8024Epoch:                          EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -391,6 +396,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
+		EIP8024Epoch:                          EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -453,6 +459,7 @@ var (
 		big.NewInt(0),                      // NTPEpoch
 		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // PragueEpoch
+		big.NewInt(0),                      // EIP8024Epoch
 	}
 
 	// TestChainConfig ...
@@ -515,6 +522,7 @@ var (
 		big.NewInt(0),        // NTPEpoch
 		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // PragueEpoch
+		big.NewInt(0),        // EIP8024Epoch
 	}
 
 	// TestRules ...
@@ -727,11 +735,13 @@ type ChainConfig struct {
 	TimestampValidationEpoch *big.Int `json:"timestamp-validation-epoch,omitempty"`
 	// PragueEpoch is the first epoch to support the Prague feature
 	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
+	// EIP8024Epoch is the first epoch to support EIP-8024 (DUPN, SWAPN, EXCHANGE opcodes)
+	EIP8024Epoch *big.Int `json:"eip8024-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v EIP1153TransientStorageEpoch: %v EIP7939CLZEpoch: %v EIP5656McopyEpoch: %v EIP3860Epoch: %v EIP6780Epoch: %v PragueEpoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v EIP2537PrecompileEpoch: %v EIP1153TransientStorageEpoch: %v EIP7939CLZEpoch: %v EIP5656McopyEpoch: %v EIP3860Epoch: %v EIP6780Epoch: %v PragueEpoch: %v EIP8024Epoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -750,6 +760,7 @@ func (c *ChainConfig) String() string {
 		c.EIP3860Epoch,
 		c.EIP6780Epoch,
 		c.PragueEpoch,
+		c.EIP8024Epoch,
 	)
 }
 
@@ -1007,6 +1018,11 @@ func (c *ChainConfig) IsEIP3860(epoch *big.Int) bool {
 	return isForked(c.EIP3860Epoch, epoch)
 }
 
+// IsEIP8024 determines whether EIP-8024 (DUPN, SWAPN, EXCHANGE) is available in the EVM
+func (c *ChainConfig) IsEIP8024(epoch *big.Int) bool {
+	return isForked(c.EIP8024Epoch, epoch)
+}
+
 // IsNTP determines whether NTP-corrected time should be used for block timestamps
 func (c *ChainConfig) IsNTP(epoch *big.Int) bool {
 	return isForked(c.NTPEpoch, epoch)
@@ -1152,6 +1168,7 @@ type Rules struct {
 	IsEIP6780              bool
 	Is3860                 bool
 	IsPrague               bool // EIP-2935: Serve historical block hashes from state
+	Is8024                 bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1189,5 +1206,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsEIP6780:                  c.IsEIP6780(epoch),
 		Is3860:                     c.IsEIP3860(epoch),
 		IsPrague:                   c.IsPrague(epoch),
+		Is8024:                     c.IsEIP8024(epoch),
 	}
 }
