@@ -308,6 +308,14 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		fmt.Printf("ApplyTransaction2: msg: %+v, from: %s\n", msg, msg.From())
 	}
 	context.TxType = txType
+
+	//vmenv := vm.NewEVM(vmctx, txContext, statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
+
+	cfg.Debug = true
+	cfg.Tracer = &vm.SimpleTracer{
+		Block: 83393122,
+	}
+
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(context, NewEVMTxContext(msg), statedb, config, cfg)
