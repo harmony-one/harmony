@@ -303,6 +303,11 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 		return nil, nil, nil, 0, err
 	}
 
+	cfg.Debug = true
+	cfg.Tracer = &vm.SimpleTracer{
+		Block: 83393122,
+	}
+
 	// Create a new context to be used in the EVM environment
 	context := NewEVMContext(msg, header, bc, author)
 	context.TxType = txType
