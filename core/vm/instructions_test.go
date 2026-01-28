@@ -854,6 +854,11 @@ func TestEIP8024_Execution(t *testing.T) {
 			codeHex: "e8",
 			wantErr: true,
 		},
+		{
+			name:     "PC_INCREMENT",
+			codeHex:  "600060006000e80115",
+			wantVals: []uint64{1, 0, 0},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -869,20 +874,17 @@ func TestEIP8024_Execution(t *testing.T) {
 					return
 				case 0x60:
 					_, err = opPush1(&pc, evmInterpreter, scope)
-					pc++
 				case 0x80:
 					dup1 := makeDup(1)
 					_, err = dup1(&pc, evmInterpreter, scope)
-					pc++
 				case 0x56:
 					_, err = opJump(&pc, evmInterpreter, scope)
-					pc++
 				case 0x5b:
 					_, err = opJumpdest(&pc, evmInterpreter, scope)
-					pc++
+				case 0x15:
+					_, err = opIszero(&pc, evmInterpreter, scope)
 				case 0x5f:
 					_, err = opPush0(&pc, evmInterpreter, scope)
-					pc++
 				case 0xe6:
 					_, err = opDupN(&pc, evmInterpreter, scope)
 				case 0xe7:
@@ -892,6 +894,7 @@ func TestEIP8024_Execution(t *testing.T) {
 				default:
 					err = &ErrInvalidOpCode{opcode: OpCode(op)}
 				}
+				pc++
 			}
 			if tc.wantErr {
 				if err == nil {
