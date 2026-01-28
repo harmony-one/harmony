@@ -51,6 +51,5 @@ func (t *SimpleTracer) CaptureState(evm *EVM, pc uint64, op OpCode, gas uint64, 
 
 // CaptureFault
 func (t *SimpleTracer) CaptureFault(pc uint64, op OpCode, gas uint64, cost uint64, scope *ScopeContext, depth int, err error) {
-	fmt.Printf("vm_fault pc=%d op=%v gas=%d cost=%d depth=%d error=%v\n",
-		pc, op, gas, cost, depth, err)
+
 }
