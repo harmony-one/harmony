@@ -45,7 +45,9 @@ func (t *SimpleTracer) CaptureState(evm *EVM, pc uint64, op OpCode, gas uint64, 
 	if scope != nil && scope.Stack != nil {
 		stackLen = scope.Stack.len()
 	}
-	fmt.Printf("vm_trace(%d) pc=%d op=%v gas=%d cost=%d stack_len=%d depth=%d err=%v\n",
+	memory := scope.Memory
+	memoryLen := int(memory.Len()) / 32
+	fmt.Printf("vm_trace(%d) pc=%d op=%v gas=%d cost=%d stack_len=%d memory_len=%d depth=%d err=%v\n",
 		evm.Context.BlockNumber.Uint64(), pc, op, gas, cost, stackLen, depth, err)
 
 	fmt.Printf("stack: ")
@@ -53,8 +55,8 @@ func (t *SimpleTracer) CaptureState(evm *EVM, pc uint64, op OpCode, gas uint64, 
 		fmt.Printf("%s, ", scope.Stack.data[stackLen-1-i].ToBig().String())
 	}
 	fmt.Printf("\nmemory: ")
-	memory := scope.Memory
-	for i := 0; i < int(memory.Len())/32; i++ {
+
+	for i := 0; i < memoryLen; i++ {
 		fmt.Printf("%s, ", new(big.Int).SetBytes(memory.GetPtr(int64(i*32), 32)).String())
 	}
 	fmt.Println()
