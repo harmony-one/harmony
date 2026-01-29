@@ -45,8 +45,17 @@ func (t *SimpleTracer) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 	if stack != nil {
 		stackLen = stack.len()
 	}
-	fmt.Printf("vm_trace(%d) pc=%d op=%v gas=%d cost=%d stack_len=%d depth=%d ret_len=? err=%v\n",
+	fmt.Printf("vm_trace(%d) pc=%d op=%v gas=%d cost=%d stack_len=%d depth=%d err=%v\n",
 		env.Context.BlockNumber.Uint64(), pc, op, gas, cost, stackLen, depth, err)
+	// print stack, memory
+
+	for i := 0; i < stackLen; i++ {
+		fmt.Printf("  stack[%d]: %s\n", i, stack.data[stackLen-1-i].String())
+	}
+	for i := 0; i < int(memory.Len())/32; i++ {
+		fmt.Printf("  memory[%d]: %s\n", i, new(big.Int).SetBytes(memory.GetPtr(int64(i*32), 32)).String())
+	}
+
 	return nil, nil
 }
 
