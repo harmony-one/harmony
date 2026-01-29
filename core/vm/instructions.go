@@ -22,6 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/shard"
 
 	//"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
@@ -344,9 +345,26 @@ func opReturnDataCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeConte
 	return nil, nil
 }
 
+//func opExtCodeSize(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+//	slot := scope.Stack.peek()
+//	slot.SetUint64(uint64(interpreter.evm.StateDB.GetCodeSize(slot.Bytes20())))
+//	return nil, nil
+//}
+
 func opExtCodeSize(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	slot := scope.Stack.peek()
+	address := common.BigToAddress(slot.ToBig())
+	fixValidatorCode := interpreter.evm.chainRules.IsValidatorCodeFix &&
+		interpreter.evm.Context.ShardID == shard.BeaconChainShardID &&
+		interpreter.evm.StateDB.IsValidator(address)
+	if fixValidatorCode {
+		// https://github.com/ethereum/solidity/blob/develop/Changelog.md#081-2021-01-27
+		// per this link, <address>.code.length calls extcodesize on the address so this fix will work
+		slot.SetUint64(0)
+		return nil, nil
+	}
 	slot.SetUint64(uint64(interpreter.evm.StateDB.GetCodeSize(slot.Bytes20())))
+
 	return nil, nil
 }
 
