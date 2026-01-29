@@ -50,7 +50,7 @@ func (t *SimpleTracer) CaptureState(evm *EVM, pc uint64, op OpCode, gas uint64, 
 
 	fmt.Printf("stack: ")
 	for i := 0; i < stackLen; i++ {
-		fmt.Printf("%s, ", scope.Stack.data[stackLen-1-i].String())
+		fmt.Printf("%s, ", scope.Stack.data[stackLen-1-i].ToBig().String())
 	}
 	fmt.Printf("\nmemory: ")
 	memory := scope.Memory
