@@ -776,8 +776,26 @@ func TestEIP8024_Execution(t *testing.T) {
 			},
 		},
 		{
+			name:    "DUPN_MISSING_IMMEDIATE",
+			codeHex: "60016000808080808080808080808080808080e6",
+			wantVals: []uint64{
+				1,
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				1,
+			},
+		},
+		{
 			name:    "SWAPN",
 			codeHex: "600160008080808080808080808080808080806002e700",
+			wantVals: []uint64{
+				1,
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				2,
+			},
+		},
+		{
+			name:    "SWAPN_MISSING_IMMEDIATE",
+			codeHex: "600160008080808080808080808080808080806002e7",
 			wantVals: []uint64{
 				1,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -790,6 +808,15 @@ func TestEIP8024_Execution(t *testing.T) {
 			wantVals: []uint64{2, 0, 1},
 		},
 		{
+			name:    "EXCHANGE_MISSING_IMMEDIATE",
+			codeHex: "600060006000600060006000600060006000600060006000600060006000600060006000600060006000600060006000600060006000600060016002e8",
+			wantVals: []uint64{
+				2,
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				1,
+			},
+		},
+		{
 			name:    "INVALID_SWAPN_LOW",
 			codeHex: "e75b",
 			wantErr: true,
@@ -799,6 +826,7 @@ func TestEIP8024_Execution(t *testing.T) {
 			codeHex: "600456e65b",
 			wantErr: false,
 		},
+		// Additional test cases
 		{
 			name:    "INVALID_DUPN_LOW",
 			codeHex: "e65b",
@@ -826,32 +854,17 @@ func TestEIP8024_Execution(t *testing.T) {
 		},
 		{
 			name:    "UNDERFLOW_DUPN",
-			codeHex: "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5fe600",
+			codeHex: "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5fe600", // (n=17, need 17 items, have 16)
 			wantErr: true,
 		},
 		{
 			name:    "UNDERFLOW_SWAPN",
-			codeHex: "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5fe700",
+			codeHex: "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5fe700", // (n=17, need 18 items, have 17)
 			wantErr: true,
 		},
 		{
 			name:    "UNDERFLOW_EXCHANGE",
-			codeHex: "60016002e801",
-			wantErr: true,
-		},
-		{
-			name:    "MISSING_IMMEDIATE_DUPN",
-			codeHex: "e6",
-			wantErr: true,
-		},
-		{
-			name:    "MISSING_IMMEDIATE_SWAPN",
-			codeHex: "e7",
-			wantErr: true,
-		},
-		{
-			name:    "MISSING_IMMEDIATE_EXCHANGE",
-			codeHex: "e8",
+			codeHex: "60016002e801", // (n,m)=(1,2), need 3 items, have 2
 			wantErr: true,
 		},
 		{
@@ -860,6 +873,7 @@ func TestEIP8024_Execution(t *testing.T) {
 			wantVals: []uint64{1, 0, 0},
 		},
 	}
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			code := common.FromHex(tc.codeHex)
@@ -869,27 +883,25 @@ func TestEIP8024_Execution(t *testing.T) {
 			var err error
 			for pc < uint64(len(code)) && err == nil {
 				op := code[pc]
-				switch op {
-				case 0x00:
+				switch OpCode(op) {
+				case STOP:
 					return
-				case 0x60:
+				case PUSH1:
 					_, err = opPush1(&pc, evmInterpreter, scope)
-				case 0x80:
+				case DUP1:
 					dup1 := makeDup(1)
 					_, err = dup1(&pc, evmInterpreter, scope)
-				case 0x56:
+				case JUMP:
 					_, err = opJump(&pc, evmInterpreter, scope)
-				case 0x5b:
+				case JUMPDEST:
 					_, err = opJumpdest(&pc, evmInterpreter, scope)
-				case 0x15:
+				case ISZERO:
 					_, err = opIszero(&pc, evmInterpreter, scope)
-				case 0x5f:
-					_, err = opPush0(&pc, evmInterpreter, scope)
-				case 0xe6:
+				case DUPN:
 					_, err = opDupN(&pc, evmInterpreter, scope)
-				case 0xe7:
+				case SWAPN:
 					_, err = opSwapN(&pc, evmInterpreter, scope)
-				case 0xe8:
+				case EXCHANGE:
 					_, err = opExchange(&pc, evmInterpreter, scope)
 				default:
 					err = &ErrInvalidOpCode{opcode: OpCode(op)}
