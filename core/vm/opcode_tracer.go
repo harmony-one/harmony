@@ -50,11 +50,13 @@ func (t *SimpleTracer) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 	// print stack, memory
 
 	for i := 0; i < stackLen; i++ {
-		fmt.Printf("  stack[%d]: %s\n", i, stack.data[stackLen-1-i].String())
+		fmt.Printf("  stack[%d]: %s, ", i, stack.data[stackLen-1-i].String())
 	}
+	fmt.Println()
 	for i := 0; i < int(memory.Len())/32; i++ {
-		fmt.Printf("  memory[%d]: %s\n", i, new(big.Int).SetBytes(memory.GetPtr(int64(i*32), 32)).String())
+		fmt.Printf("  memory[%d]: %s, ", i, new(big.Int).SetBytes(memory.GetPtr(int64(i*32), 32)).String())
 	}
+	fmt.Println()
 
 	return nil, nil
 }
