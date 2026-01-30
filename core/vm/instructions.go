@@ -443,13 +443,31 @@ func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext)
 //	(6) Caller tries to get the code hash for an account which is marked as deleted,
 //
 // this account should be regarded as a non-existent account and zero should be returned.
+//func opExtCodeHash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+//	slot := scope.Stack.peek()
+//	address := common.Address(slot.Bytes20())
+//	if interpreter.evm.StateDB.Empty(address) {
+//		slot.Clear()
+//	} else {
+//		slot.SetBytes(interpreter.evm.StateDB.GetCodeHash(address).Bytes())
+//	}
+//	return nil, nil
+//}
+
 func opExtCodeHash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	slot := scope.Stack.peek()
-	address := common.Address(slot.Bytes20())
+	address := common.BigToAddress(slot.ToBig())
 	if interpreter.evm.StateDB.Empty(address) {
-		slot.Clear()
+		slot.SetUint64(0)
 	} else {
-		slot.SetBytes(interpreter.evm.StateDB.GetCodeHash(address).Bytes())
+		fixValidatorCode := interpreter.evm.chainRules.IsValidatorCodeFix &&
+			interpreter.evm.Context.ShardID == shard.BeaconChainShardID &&
+			interpreter.evm.StateDB.IsValidator(address)
+		if fixValidatorCode {
+			slot.SetBytes(emptyCodeHash.Bytes())
+		} else {
+			slot.SetBytes(interpreter.evm.StateDB.GetCodeHash(address).Bytes())
+		}
 	}
 	return nil, nil
 }
@@ -481,6 +499,20 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 	}
 	return nil, nil
 }
+
+/*
+func opBlockhash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	num := scope.Stack.peek()
+
+	n := interpreter.intPool.get().Sub(interpreter.evm.BlockNumber, common.Big257)
+	if num.Cmp(n) > 0 && num.Cmp(interpreter.evm.BlockNumber) < 0 {
+		stack.push(interpreter.evm.GetHash(num.Uint64()).Big())
+	} else {
+		stack.push(interpreter.intPool.getZero())
+	}
+	interpreter.intPool.put(num, n)
+	return nil, nil
+}*/
 
 func opCoinbase(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	scope.Stack.push(new(uint256.Int).SetBytes(interpreter.evm.Context.Coinbase.Bytes()))
@@ -607,6 +639,53 @@ func opGas(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte
 	return nil, nil
 }
 
+/*
+func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if interpreter.readOnly {
+		return nil, ErrWriteProtection
+	}
+	var (
+		value        = scope.Stack.pop()
+		offset, size = scope.Stack.pop(), scope.Stack.pop()
+		input        = scope.Memory.GetCopy(int64(offset.Uint64()), int64(size.Uint64()))
+		gas          = scope.Contract.Gas
+	)
+	if interpreter.evm.chainRules.IsEIP150 {
+		gas -= gas / 64
+	}
+	// reuse size int for stackvalue
+	stackvalue := size
+
+	scope.Contract.UseGas(gas)
+	//TODO: use uint256.Int instead of converting with toBig()
+	var bigVal = big0
+	if !value.IsZero() {
+		bigVal = value.ToBig()
+	}
+
+	res, addr, returnGas, suberr := interpreter.evm.Create(scope.Contract, input, gas, bigVal)
+	// Push item on the stack based on the returned error. If the ruleset is
+	// homestead we must check for CodeStoreOutOfGasError (homestead only
+	// rule) and treat as an error, if the ruleset is frontier we must
+	// ignore this error and pretend the operation was successful.
+	if interpreter.evm.chainRules.IsS3 && suberr == ErrCodeStoreOutOfGas {
+		stackvalue.Clear()
+	} else if suberr != nil && suberr != ErrCodeStoreOutOfGas {
+		stackvalue.Clear()
+	} else {
+		stackvalue.SetBytes(addr.Bytes())
+	}
+	scope.Stack.push(&stackvalue)
+	scope.Contract.Gas += returnGas
+
+	if suberr == ErrExecutionReverted {
+		interpreter.returnData = res // set REVERT data to return data buffer
+		return res, nil
+	}
+	interpreter.returnData = nil // clear dirty return data buffer
+	return nil, nil
+}*/
+
 func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
@@ -653,6 +732,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	return nil, nil
 }
 
+/*
 func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
@@ -677,6 +757,46 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	}
 	res, addr, returnGas, suberr := interpreter.evm.Create2(scope.Contract, input, gas,
 		bigEndowment, &salt)
+	// Push item on the stack based on the returned error.
+	if suberr != nil {
+		stackvalue.Clear()
+	} else {
+		stackvalue.SetBytes(addr.Bytes())
+	}
+	scope.Stack.push(&stackvalue)
+	scope.Contract.Gas += returnGas
+
+	if suberr == ErrExecutionReverted {
+		interpreter.returnData = res // set REVERT data to return data buffer
+		return res, nil
+	}
+	interpreter.returnData = nil // clear dirty return data buffer
+	return nil, nil
+}*/
+
+func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if interpreter.readOnly {
+		return nil, ErrWriteProtection
+	}
+	var (
+		endowment    = scope.Stack.pop()
+		offset, size = scope.Stack.pop(), scope.Stack.pop()
+		salt         = scope.Stack.pop()
+		input        = scope.Memory.GetCopy(int64(offset.Uint64()), int64(size.Uint64()))
+		gas          = scope.Contract.Gas
+	)
+
+	// Apply EIP150
+	gas -= gas / 64
+	scope.Contract.UseGas(gas)
+	// reuse size int for stackvalue
+	stackvalue := size
+	//TODO: use uint256.Int instead of converting with toBig()
+	bigEndowment := big0
+	if !endowment.IsZero() {
+		bigEndowment = endowment.ToBig()
+	}
+	res, addr, returnGas, suberr := interpreter.evm.Create2(scope.Contract, input, gas, bigEndowment, &salt)
 	// Push item on the stack based on the returned error.
 	if suberr != nil {
 		stackvalue.Clear()
