@@ -22,6 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/shard"
 
 	//"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
@@ -346,6 +347,16 @@ func opReturnDataCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeConte
 
 func opExtCodeSize(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	slot := scope.Stack.peek()
+	address := common.BigToAddress(slot.ToBig())
+	fixValidatorCode := interpreter.evm.chainRules.IsValidatorCodeFix &&
+		interpreter.evm.Context.ShardID == shard.BeaconChainShardID &&
+		interpreter.evm.StateDB.IsValidator(address)
+	if fixValidatorCode {
+		// https://github.com/ethereum/solidity/blob/develop/Changelog.md#081-2021-01-27
+		// per this link, <address>.code.length calls extcodesize on the address so this fix will work
+		slot.SetUint64(0)
+		return nil, nil
+	}
 	slot.SetUint64(uint64(interpreter.evm.StateDB.GetCodeSize(slot.Bytes20())))
 	return nil, nil
 }
@@ -427,11 +438,18 @@ func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext)
 // this account should be regarded as a non-existent account and zero should be returned.
 func opExtCodeHash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	slot := scope.Stack.peek()
-	address := common.Address(slot.Bytes20())
+	address := common.BigToAddress(slot.ToBig())
 	if interpreter.evm.StateDB.Empty(address) {
-		slot.Clear()
+		slot.SetUint64(0)
 	} else {
-		slot.SetBytes(interpreter.evm.StateDB.GetCodeHash(address).Bytes())
+		fixValidatorCode := interpreter.evm.chainRules.IsValidatorCodeFix &&
+			interpreter.evm.Context.ShardID == shard.BeaconChainShardID &&
+			interpreter.evm.StateDB.IsValidator(address)
+		if fixValidatorCode {
+			slot.SetBytes(emptyCodeHash.Bytes())
+		} else {
+			slot.SetBytes(interpreter.evm.StateDB.GetCodeHash(address).Bytes())
+		}
 	}
 	return nil, nil
 }
@@ -657,8 +675,7 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	if !endowment.IsZero() {
 		bigEndowment = endowment.ToBig()
 	}
-	res, addr, returnGas, suberr := interpreter.evm.Create2(scope.Contract, input, gas,
-		bigEndowment, &salt)
+	res, addr, returnGas, suberr := interpreter.evm.Create2(scope.Contract, input, gas, bigEndowment, &salt)
 	// Push item on the stack based on the returned error.
 	if suberr != nil {
 		stackvalue.Clear()

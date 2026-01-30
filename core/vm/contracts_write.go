@@ -245,7 +245,7 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 		return nil, errors.New("cannot call cross shard precompile again in same tx")
 	}
 	fromAddress, toAddress, fromShardID, toShardID, value, err :=
-		parseCrossShardXferData(evm, contract.Address(), input)
+		parseCrossShardXferData(evm, contract, input)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 }
 
 // parseCrossShardXferData does a simple parse with only data types validation
-func parseCrossShardXferData(evm *EVM, address common.Address, input []byte) (
+func parseCrossShardXferData(evm *EVM, contract *Contract, input []byte) (
 	common.Address, common.Address, uint32, uint32, *big.Int, error) {
 	method, err := abiCrossShardXfer.MethodById(input)
 	if err != nil {
@@ -309,7 +309,7 @@ func parseCrossShardXferData(evm *EVM, address common.Address, input []byte) (
 	if err != nil {
 		return common.Address{}, common.Address{}, 0, 0, nil, err
 	}
-	return address, toAddress, evm.Context.ShardID, toShardID, value, nil
+	return contract.Caller(), toAddress, evm.Context.ShardID, toShardID, value, nil
 }
 
 // wrapper wraps a precompiled contract to run PrecompiledContract as WriteCapablePrecompiledContract.
