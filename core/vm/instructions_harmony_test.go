@@ -93,8 +93,8 @@ func TestOpExtCodeHash(t *testing.T) {
 			t.Fatalf("expected stack length 1, got %d", stack.len())
 		}
 		res := stack.pop()
-		if !res.IsZero() {
-			t.Fatalf("expected 0, got %s", res.String())
+		if res.IsZero() {
+			t.Fatalf("expected non-zero, got %s", res.String())
 		}
 	})
 }
