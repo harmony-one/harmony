@@ -171,6 +171,9 @@ func (sss *StagedStreamSync) LogPrefix() string {
 	if sss == nil {
 		return ""
 	}
+	if sss.currentStage >= uint(len(sss.logPrefixes)) {
+		return "Done"
+	}
 	return sss.logPrefixes[sss.currentStage]
 }
 func (sss *StagedStreamSync) PrevRevertPoint() *uint64 { return sss.prevRevertPoint }
@@ -369,9 +372,10 @@ func New(
 		logger.Error().Msg(WrapStagedSyncMsg("no valid stages found - this will cause sync failures"))
 	}
 
-	logPrefixes := make([]string, len(stagesList))
-	for i := range stagesList {
-		logPrefixes[i] = fmt.Sprintf("%d/%d %s", i+1, len(stagesList), stagesList[i].ID)
+	// logPrefixes must match sss.stages (forwardStages) since currentStage indexes into it
+	logPrefixes := make([]string, len(forwardStages))
+	for i := range forwardStages {
+		logPrefixes[i] = fmt.Sprintf("%d/%d %s", i+1, len(forwardStages), forwardStages[i].ID)
 	}
 
 	status := NewStatus()
