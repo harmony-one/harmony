@@ -194,25 +194,30 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 	// ask all streams for height
 	for i := 0; i < numStreams; i++ {
 		// skip excluded streams
+		excluded := false
 		if len(excludeIDs) > 0 {
 			for _, excludedStreamID := range excludeIDs {
 				if excludedStreamID == streamIDs[i] {
-					continue
+					excluded = true
+					break
 				}
 			}
 		}
-		stID := []sttypes.StreamID{streamIDs[i]}
+		if excluded {
+			continue
+		}
+		streamID := []sttypes.StreamID{streamIDs[i]}
 		wg.Add(1)
-		go func() {
+		go func(streamID []sttypes.StreamID) {
 			defer wg.Done()
 
-			bn, stid, err := b.configs.protocol.GetCurrentBlockNumber(ctx, syncProto.WithWhitelist(stID))
+			bn, stid, err := b.configs.protocol.GetCurrentBlockNumber(ctx, syncProto.WithWhitelist(streamID))
 			if err != nil {
 				b.configs.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
 
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					// Mark stream failure if it's not due to context cancelation or deadline
+					// Do not remove stream when failure is due to context cancelation or deadline; only mark as failed.
 					b.configs.protocol.StreamFailed(stid, "getCurrentNumber request failed")
 				} else {
 					b.configs.protocol.RemoveStream(stid, "getCurrentNumber request failed")
@@ -224,11 +229,10 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, targetHeight ui
 				return
 			}
 
-			// Safely update the cnResults map
 			lock.Lock()
 			synced[stid] = bn
 			lock.Unlock()
-		}()
+		}(streamID)
 	}
 
 	// Wait for all goroutines to finish

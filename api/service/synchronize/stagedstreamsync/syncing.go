@@ -891,9 +891,6 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 		wg        sync.WaitGroup
 	)
 
-	// Create a channel to propagate errors back if needed.
-	errChan := make(chan error, s.config.Concurrency)
-
 	numStreams := s.protocol.NumStreams()
 	if numStreams == 0 {
 		s.logger.Warn().Msg(WrapStagedSyncMsg("no streams available for estimating current number"))
@@ -928,7 +925,6 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 
 	// Wait for all goroutines to finish
 	wg.Wait()
-	close(errChan) // Close the error channel when done
 
 	// Check if the context was canceled and return an error accordingly
 	select {
