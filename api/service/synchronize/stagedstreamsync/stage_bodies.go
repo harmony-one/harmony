@@ -650,7 +650,7 @@ func (b *StageBodies) fetchBlockHashes(ctx context.Context, tx kv.RwTx, bns []ui
 	return hashes, err
 }
 
-func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, tx kv.RwTx, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
+func (b *StageBodies) downloadRawBlocksByHashes(ctx context.Context, bns []uint64) ([][]byte, [][]byte, sttypes.StreamID, error) {
 	if len(bns) == 0 {
 		return nil, nil, "", errors.New("empty batch of block numbers")
 	}
