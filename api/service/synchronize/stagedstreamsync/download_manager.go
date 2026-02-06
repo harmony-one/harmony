@@ -144,8 +144,8 @@ func (dm *downloadManager) GetDownloadDetails(blockNumber uint64) (workerID int,
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
-	if dm, exist := dm.details[blockNumber]; exist {
-		return dm.workerID, dm.streamID, nil
+	if details, exist := dm.details[blockNumber]; exist {
+		return details.workerID, details.streamID, nil
 	}
 	return 0, sttypes.StreamID(fmt.Sprint(0)), fmt.Errorf("there is no download details for the block number: %d", blockNumber)
 }
