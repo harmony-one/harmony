@@ -475,19 +475,6 @@ func (stg *StageFullStateSync) Revert(ctx context.Context, firstCycle bool, u *R
 }
 
 func (stg *StageFullStateSync) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
-	useInternalTx := tx == nil
-	if useInternalTx {
-		tx, err = stg.configs.db.BeginRw(ctx)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	}
-
-	if useInternalTx {
-		if err = tx.Commit(); err != nil {
-			return err
-		}
-	}
+	// No cleanup operations needed for this stage
 	return nil
 }

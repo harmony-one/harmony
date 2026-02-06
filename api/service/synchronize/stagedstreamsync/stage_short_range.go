@@ -64,22 +64,6 @@ func (sr *StageShortRange) Exec(ctx context.Context, firstCycle bool, invalidBlo
 		sr.configs.logger.Info().Int("blocks inserted", n).Msg("short range blocks inserted successfully")
 	}
 
-	useInternalTx := tx == nil
-	if useInternalTx {
-		var err error
-		tx, err = sr.configs.db.BeginRw(ctx)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	}
-
-	if useInternalTx {
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -187,19 +171,6 @@ func (sr *StageShortRange) Revert(ctx context.Context, firstCycle bool, u *Rever
 }
 
 func (sr *StageShortRange) CleanUp(ctx context.Context, firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
-	useInternalTx := tx == nil
-	if useInternalTx {
-		tx, err = sr.configs.db.BeginRw(ctx)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	}
-
-	if useInternalTx {
-		if err = tx.Commit(); err != nil {
-			return err
-		}
-	}
+	// No cleanup operations needed for this stage
 	return nil
 }
