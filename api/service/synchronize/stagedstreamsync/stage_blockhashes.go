@@ -302,6 +302,7 @@ func (bh *StageBlockHashes) runBlockHashWorkerLoop(ctx context.Context,
 			bh.configs.logger.Warn().
 				Err(err).
 				Msgf("[STAGED_STREAM_SYNC] final hashes are invalid")
+			continue
 		}
 
 		// save block hashes in db
@@ -523,11 +524,12 @@ func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx) error {
 }
 
 // validateHashesExist checks if block hashes exist in the database for the given range
-func (bh *StageBlockHashes) validateHashesExist(ctx context.Context, tx kv.Tx, startBlock, endBlock uint64) error {
+func (bh *StageBlockHashes) validateHashesExist(ctx context.Context, _tx kv.Tx, startBlock, endBlock uint64) error {
+	tx := _tx
 	useInternalTx := tx == nil
-	var err error
 	if useInternalTx {
-		tx, err = bh.configs.db.BeginRw(ctx)
+		// Use read-only transaction since we're only reading data
+		tx, err := bh.configs.db.BeginRo(ctx)
 		if err != nil {
 			return err
 		}
@@ -541,11 +543,6 @@ func (bh *StageBlockHashes) validateHashesExist(ctx context.Context, tx kv.Tx, s
 		}
 		if len(hash) == 0 {
 			return fmt.Errorf("[STAGED_STREAM_SYNC] validateHashesExist: hash not found for block %d", blockNum)
-		}
-	}
-	if useInternalTx {
-		if err = tx.Commit(); err != nil {
-			return err
 		}
 	}
 	return nil
