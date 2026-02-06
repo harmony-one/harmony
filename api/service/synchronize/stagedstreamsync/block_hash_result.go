@@ -35,6 +35,10 @@ func (res *blockHashResults) addResult(hashes []common.Hash, stid sttypes.Stream
 		if h == emptyHash {
 			return // nil block hash reached
 		}
+		// Bounds check to prevent index out of range panic
+		if i >= len(res.results) {
+			return // More hashes than expected, stop processing
+		}
 		res.results[i][stid] = h
 	}
 }
