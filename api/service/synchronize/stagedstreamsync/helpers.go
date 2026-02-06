@@ -135,7 +135,11 @@ func countHashMaxVote(m map[sttypes.StreamID]common.Hash, whitelist map[sttypes.
 	if res != emptyHash {
 		for st, h := range m {
 			if h == res {
-				if len(whitelist) == 0 || (len(whitelist) != 0 && whitelist[st] != struct{}{}) {
+				// Add to next whitelist if:
+				// 1. No whitelist is provided (all streams are allowed), OR
+				// 2. The stream is in the current whitelist
+				_, inWhitelist := whitelist[st]
+				if len(whitelist) == 0 || inWhitelist {
 					nextWl[st] = struct{}{}
 				}
 			}
