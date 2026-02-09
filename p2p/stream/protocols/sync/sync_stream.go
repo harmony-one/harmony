@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -184,7 +183,6 @@ func (st *syncStream) deliverMsg(msg protobuf.Message) {
 			}
 		}()
 	}
-	return
 }
 
 // handleReqLoop replies to incoming requests
@@ -699,7 +697,7 @@ func (st *syncStream) computeGetByteCodesRequest(rid uint64, hs []common.Hash, b
 	return syncpb.MakeGetByteCodesResponseMessage(rid, codes), nil
 }
 
-func (st *syncStream) computeGetTrieNodesRequest(rid uint64, root common.Hash, paths []*message.TrieNodePathSet, bytes uint64) (*syncpb.Message, error) {
+func (st *syncStream) computeGetTrieNodesRequest(rid uint64, root common.Hash, paths []*syncpb.TrieNodePathSet, bytes uint64) (*syncpb.Message, error) {
 	if bytes == 0 {
 		return nil, fmt.Errorf("zero trie node bytes requested")
 	}
