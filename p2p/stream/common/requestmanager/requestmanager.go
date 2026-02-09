@@ -562,7 +562,11 @@ func (rm *requestManager) GetStreamHealthStats() map[string]interface{} {
 	stats["availableStreams"] = availableStreams
 	stats["totalFailures"] = totalFailures
 	stats["failureDistribution"] = failureDistribution
-	stats["averageFailures"] = float64(totalFailures) / float64(totalStreams)
+	if totalStreams > 0 {
+		stats["averageFailures"] = float64(totalFailures) / float64(totalStreams)
+	} else {
+		stats["averageFailures"] = float64(0)
+	}
 
 	return stats
 }
@@ -666,6 +670,9 @@ func (rm *requestManager) addRequestToWaitings(req *request, priority reqPriorit
 }
 
 func (rm *requestManager) popRequestFromWaitings() *request {
-	numWaitingRequestsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
-	return rm.waitings.Pop()
+	req := rm.waitings.Pop()
+	if req != nil {
+		numWaitingRequestsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
+	}
+	return req
 }
