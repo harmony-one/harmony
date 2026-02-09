@@ -731,14 +731,6 @@ func bytesToInt(b []byte) int {
 	return int(val)
 }
 
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // SetProgressTracker sets a custom progress tracker for this stream
 func (st *BaseStream) SetProgressTracker(tracker *ProgressTracker) {
 	st.progressTracker = tracker
