@@ -733,6 +733,30 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	cxPool := core.NewCxPool(core.CxPoolSize)
 	registry.SetCxPool(cxPool)
 
+	go func() {
+
+		f, err := os.Create("/tmp/block_numbers.txt")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		defer f.Close()
+
+		for i := 0; i < 100_000; i++ {
+			blk := registry.GetBlockchain().GetBlockByNumber(uint64(84918515 - i))
+			if blk != nil {
+
+				timestamp := blk.Time().Int64()
+				t := time.Unix(timestamp/1000, (timestamp%1000)*1e6)
+
+				f.Write([]byte(fmt.Sprintf("number: %v view: %d ts: %d h: %s \n", blk.NumberU64(), blk.Header().ViewID().Int64(), timestamp, t.Format("2006-01-02 15:04:05.000"))))
+			}
+			time.Sleep(1 * time.Microsecond)
+		}
+
+	}()
+
 	// Consensus object.
 	registry.SetIsBackup(isBackup(hc))
 	currentConsensus, err := consensus.New(
