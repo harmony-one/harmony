@@ -114,6 +114,7 @@ func newBerlinInstructionSet() JumpTable {
 func eip1153TransientStorage() JumpTable {
 	instructionSet := newIstanbulInstructionSet()
 	enable1153(&instructionSet) // Transient Storage - https://eips.ethereum.org/EIPS/eip-1153
+	enable7939(&instructionSet) // EIP-7939 (CLZ opcode)
 	return validate(instructionSet)
 }
 
