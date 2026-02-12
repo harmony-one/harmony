@@ -83,8 +83,10 @@ func (bootnode *BootNode) ShutDown() {
 	}
 
 	utils.Logger().Info().Msg("stopping boot host")
-	if err := bootnode.host.Close(); err != nil {
-		utils.Logger().Error().Err(err).Msg("failed to stop boot p2p host")
+	if bootnode.host != nil {
+		if err := bootnode.host.Close(); err != nil {
+			utils.Logger().Error().Err(err).Msg("failed to stop boot p2p host")
+		}
 	}
 
 	const msg = "Successfully shut down boot!\n"
