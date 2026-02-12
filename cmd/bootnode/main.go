@@ -207,7 +207,11 @@ func main() {
 
 	if *pprof {
 		fmt.Printf("starting pprof on http://%s/debug/pprof/\n", *pprofAddr)
-		http.ListenAndServe(*pprofAddr, nil)
+		go func() {
+			if err := http.ListenAndServe(*pprofAddr, nil); err != nil {
+				utils.Logger().Error().Err(err).Msg("failed to start pprof server")
+			}
+		}()
 	}
 
 	currentBootNode := bootnode.New(host, &hc)
@@ -229,6 +233,7 @@ func main() {
 		utils.Logger().Error().
 			Err(err).
 			Msg("StartRPC failed")
+		panic(err)
 	}
 
 	utils.Logger().Info().
