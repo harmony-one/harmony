@@ -134,6 +134,12 @@ func NewProtocol(config Config) *Protocol {
 		fmt.Println("My proto id: ", sp.ProtoID())
 	}
 
+	sp.logger.Info().
+		Bool("epochChain", config.EpochChain).
+		Str("selfPeerID", config.Host.GetID().String()).
+		Str("selfProtoID", string(sp.ProtoID())).
+		Msg("sync protocol initialized")
+
 	sp.logger = utils.Logger().With().Str("Protocol", string(sp.ProtoID())).Logger()
 	return sp
 }
@@ -314,7 +320,7 @@ func (p *Protocol) advertise() time.Duration {
 				newPeersDiscovered = true
 				p.logger.Debug().
 					Str("protocol", string(pid)).
-					Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
+					Float64("elapsed(sec)", elapsed.Seconds()).
 					Int("retry", retries).
 					Msg("Advertise call completed")
 				break
@@ -323,14 +329,14 @@ func (p *Protocol) advertise() time.Duration {
 			p.logger.Debug().Err(err).
 				Str("protocol", string(pid)).
 				Int("retry", retries).
-				Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
+				Float64("elapsed(sec)", elapsed.Seconds()).
 				Msg("Advertise failed, retrying")
 
 			// If the error is a timeout, increase the timeout duration
 			if errors.Is(err, context.DeadlineExceeded) {
 				p.logger.Debug().
 					Str("protocol", string(pid)).
-					Dur("elapsed(sec)", time.Duration(elapsed.Seconds())).
+					Float64("elapsed(sec)", elapsed.Seconds()).
 					Msg("Advertise failed due to timeout, increasing timeout")
 
 				timeout += timeoutIncrementStep
