@@ -750,7 +750,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 				timestamp := blk.Time().Int64()
 				t := time.Unix(timestamp/1000, (timestamp%1000)*1e6)
 
-				f.Write([]byte(fmt.Sprintf("number: %v view: %d ts: %d h: %s \n", blk.NumberU64(), blk.Header().ViewID().Int64(), timestamp, t.Format("2006-01-02 15:04:05.000"))))
+				f.Write([]byte(fmt.Sprintf("i: %d, number: %v view: %d ts: %d h: %s \n", i, blk.NumberU64(), blk.Header().ViewID().Int64(), timestamp, t.Format("2006-01-02 15:04:05.000"))))
 			}
 			time.Sleep(1 * time.Microsecond)
 		}
