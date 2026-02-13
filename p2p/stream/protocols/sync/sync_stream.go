@@ -1,12 +1,14 @@
 package sync
 
 import (
+	stderrors "errors"
 	"fmt"
 	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	libp2p_network "github.com/libp2p/go-libp2p/core/network"
@@ -236,8 +238,13 @@ func (st *syncStream) Close(reason string, criticalErr bool) error {
 		return nil
 	}
 	if err := st.protocol.sm.RemoveStream(st.ID(), "force close: "+reason, criticalErr); err != nil {
-		st.logger.Err(err).Str("stream ID", string(st.ID())).
-			Msg("failed to remove sync stream on close")
+		// ErrStreamAlreadyRemoved is benign - it means the stream was either never added
+		// to the stream manager (e.g., rejected on HandleStream) or was already cleaned up
+		// through another path. Only log unexpected errors.
+		if !stderrors.Is(err, streammanager.ErrStreamAlreadyRemoved) {
+			st.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
+				Msg("failed to remove sync stream on close")
+		}
 	}
 	close(st.closeC)
 	return st.BaseStream.Close()
