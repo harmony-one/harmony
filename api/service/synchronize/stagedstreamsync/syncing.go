@@ -913,6 +913,7 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) && stid != "" {
 					// Mark stream failure if it's not due to context cancelation or deadline
+					s.bnCache.InvalidateStream(stid)
 					s.protocol.StreamFailed(stid, "getCurrentNumber request failed")
 				}
 				return
