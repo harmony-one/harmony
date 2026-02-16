@@ -109,8 +109,12 @@ func (c *BlockNumberCache) GetBlockNumber(ctx context.Context, streamID sttypes.
 	}
 	c.mu.RUnlock()
 
-	// Fetch fresh block number from protocol
-	blockNumber, _, err := c.protocol.GetCurrentBlockNumber(ctx)
+	c.mu.Lock()
+	c.stats.Misses++
+	c.mu.Unlock()
+
+	// Fetch fresh block number from protocol for the specific stream
+	blockNumber, _, err := c.protocol.GetCurrentBlockNumber(ctx, syncproto.WithWhitelist([]sttypes.StreamID{streamID}))
 	if err != nil {
 		return 0, err
 	}
@@ -309,4 +313,5 @@ func (c *BlockNumberCache) updateAccessStats(streamID sttypes.StreamID) {
 		info.LastUsed = time.Now()
 		c.cache[streamID] = info
 	}
+	c.stats.Hits++
 }
