@@ -94,12 +94,13 @@ func TestGetBlockNumber_CacheHitWithMinBlockThreshold(t *testing.T) {
 	defer cache.Stop()
 
 	streamID := sttypes.StreamID("test-stream")
-	targetBlock := uint64(1000)
+	targetBlock := uint64(1500)
 
-	// Pre-populate cache with block number within MinBlockThreshold
+	// Pre-populate cache with block number below target but within MinBlockThreshold (1000)
+	// Gap = 1500 - 1000 = 500, which is <= 1000 threshold
 	cache.mu.Lock()
 	cache.cache[streamID] = &BlockInfo{
-		BlockNumber: 1050, // 50 blocks within threshold of 1000
+		BlockNumber: 1000,
 		Timestamp:   time.Now(),
 		LastUsed:    time.Now(),
 		AccessCount: 1,
@@ -107,10 +108,13 @@ func TestGetBlockNumber_CacheHitWithMinBlockThreshold(t *testing.T) {
 	}
 	cache.mu.Unlock()
 
-	// Test cache hit due to MinBlockThreshold
+	// Should return cached value without re-querying because gap is within threshold
 	blockNumber, err := cache.GetBlockNumber(context.Background(), streamID, targetBlock)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(1050), blockNumber)
+	assert.Equal(t, uint64(1000), blockNumber)
+
+	// Verify mock was NOT called (cache hit via threshold)
+	mockProtocol.AssertNotCalled(t, "GetCurrentBlockNumber", mock.Anything, mock.Anything)
 }
 
 func TestGetBlockNumber_CacheMiss(t *testing.T) {
@@ -204,26 +208,26 @@ func TestEvictOldestEntries(t *testing.T) {
 	}
 	cache.mu.Unlock()
 
-	// Trigger eviction
+	// Trigger eviction (evicts enough to make room for 1 new entry)
 	cache.mu.Lock()
 	cache.evictOldestEntries()
 	cache.mu.Unlock()
 
-	// Should have evicted exactly 2 entries (4+1-3=2) to get back to MaxSize
-	assert.Equal(t, 3, len(cache.cache))
+	// Should have evicted 3 entries (5-3+1=3) to make room for a new entry
+	assert.Equal(t, 2, len(cache.cache))
 
 	// Verify oldest entries were removed
 	cache.mu.RLock()
-	_, exists1 := cache.cache["stream1"] // oldest
-	_, exists2 := cache.cache["stream2"] // second oldest
-	_, exists3 := cache.cache["stream3"] // should remain
+	_, exists1 := cache.cache["stream1"] // oldest - removed
+	_, exists2 := cache.cache["stream2"] // second oldest - removed
+	_, exists3 := cache.cache["stream3"] // third oldest - removed
 	_, exists4 := cache.cache["stream4"] // should remain
 	_, exists5 := cache.cache["stream5"] // newest, should remain
 	cache.mu.RUnlock()
 
 	assert.False(t, exists1) // oldest removed
 	assert.False(t, exists2) // second oldest removed
-	assert.True(t, exists3)  // kept
+	assert.False(t, exists3) // third oldest removed
 	assert.True(t, exists4)  // kept
 	assert.True(t, exists5)  // kept
 }
@@ -370,6 +374,105 @@ func TestRemoveStream(t *testing.T) {
 
 	// Verify it's gone
 	assert.Equal(t, 0, len(cache.cache))
+}
+
+func TestDoGetCurrentNumberRequest(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+	defer cache.Stop()
+
+	streamID := sttypes.StreamID("test-stream")
+
+	// Mock protocol response
+	mockProtocol.On("GetCurrentBlockNumber", mock.Anything, mock.Anything).Return(uint64(5000), streamID, nil)
+
+	// Call doGetCurrentNumberRequest
+	bn, stid, err := cache.doGetCurrentNumberRequest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, uint64(5000), bn)
+	assert.Equal(t, streamID, stid)
+
+	// Verify it was cached
+	cache.mu.RLock()
+	info, exists := cache.cache[streamID]
+	cache.mu.RUnlock()
+	assert.True(t, exists)
+	assert.Equal(t, uint64(5000), info.BlockNumber)
+	assert.True(t, info.IsValid)
+
+	mockProtocol.AssertExpectations(t)
+}
+
+func TestDoGetCurrentNumberRequest_Error(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+	defer cache.Stop()
+
+	streamID := sttypes.StreamID("test-stream")
+
+	// Mock protocol response with error
+	mockProtocol.On("GetCurrentBlockNumber", mock.Anything, mock.Anything).Return(uint64(0), streamID, fmt.Errorf("network error"))
+
+	// Call doGetCurrentNumberRequest
+	_, _, err := cache.doGetCurrentNumberRequest(context.Background())
+	require.Error(t, err)
+
+	// Verify nothing was cached
+	cache.mu.RLock()
+	_, exists := cache.cache[streamID]
+	cache.mu.RUnlock()
+	assert.False(t, exists)
+
+	mockProtocol.AssertExpectations(t)
+}
+
+func TestGetBlockNumber_InvalidatedStreamRequery(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+	defer cache.Stop()
+
+	streamID := sttypes.StreamID("test-stream")
+	targetBlock := uint64(1000)
+
+	// Pre-populate cache with invalidated entry
+	cache.mu.Lock()
+	cache.cache[streamID] = &BlockInfo{
+		BlockNumber: 1200,
+		Timestamp:   time.Now(),
+		LastUsed:    time.Now(),
+		AccessCount: 1,
+		IsValid:     false, // invalidated
+	}
+	cache.mu.Unlock()
+
+	// Mock protocol response for re-query
+	mockProtocol.On("GetCurrentBlockNumber", mock.Anything, mock.Anything).Return(uint64(1500), streamID, nil)
+
+	// Should re-query because entry is invalidated
+	blockNumber, err := cache.GetBlockNumber(context.Background(), streamID, targetBlock)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(1500), blockNumber)
+
+	// Verify the cache was updated with fresh data
+	cache.mu.RLock()
+	info := cache.cache[streamID]
+	cache.mu.RUnlock()
+	assert.Equal(t, uint64(1500), info.BlockNumber)
+	assert.True(t, info.IsValid)
+
+	mockProtocol.AssertExpectations(t)
+}
+
+func TestStopMultipleCalls(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+
+	// Should not panic on multiple Stop calls
+	assert.NotPanics(t, func() {
+		cache.Stop()
+		cache.Stop()
+		cache.Stop()
+	})
 }
 
 func TestReset(t *testing.T) {
