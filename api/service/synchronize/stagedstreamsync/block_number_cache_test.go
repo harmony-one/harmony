@@ -36,21 +36,18 @@ func TestNewBlockNumberCache(t *testing.T) {
 	require.NotNil(t, cache)
 	assert.Equal(t, 1000, cache.config.MaxSize)
 	assert.Equal(t, 24*time.Hour, cache.config.MaxAge)
-	assert.Equal(t, uint64(1000), cache.config.MinBlockThreshold)
 
 	// Test with custom config
 	customConfig := &CacheConfig{
-		MaxSize:           500,
-		MaxAge:            12 * time.Hour,
-		MinBlockThreshold: 500,
-		CleanupInterval:   30 * time.Minute,
+		MaxSize:         500,
+		MaxAge:          12 * time.Hour,
+		CleanupInterval: 30 * time.Minute,
 	}
 
 	cache2 := NewBlockNumberCache(mockProtocol, customConfig)
 	require.NotNil(t, cache2)
 	assert.Equal(t, 500, cache2.config.MaxSize)
 	assert.Equal(t, 12*time.Hour, cache2.config.MaxAge)
-	assert.Equal(t, uint64(500), cache2.config.MinBlockThreshold)
 
 	// Cleanup
 	cache.Stop()
@@ -88,7 +85,7 @@ func TestGetBlockNumber_CacheHit(t *testing.T) {
 	assert.Equal(t, uint64(2), info.AccessCount)
 }
 
-func TestGetBlockNumber_CacheHitWithMinBlockThreshold(t *testing.T) {
+func TestGetBlockNumber_CachedBelowTarget_MustRequery(t *testing.T) {
 	mockProtocol := &MockProtocolProvider{}
 	cache := NewBlockNumberCache(mockProtocol, nil)
 	defer cache.Stop()
@@ -96,8 +93,7 @@ func TestGetBlockNumber_CacheHitWithMinBlockThreshold(t *testing.T) {
 	streamID := sttypes.StreamID("test-stream")
 	targetBlock := uint64(1500)
 
-	// Pre-populate cache with block number below target but within MinBlockThreshold (1000)
-	// Gap = 1500 - 1000 = 500, which is <= 1000 threshold
+	// Pre-populate cache with block number below target
 	cache.mu.Lock()
 	cache.cache[streamID] = &BlockInfo{
 		BlockNumber: 1000,
@@ -108,13 +104,22 @@ func TestGetBlockNumber_CacheHitWithMinBlockThreshold(t *testing.T) {
 	}
 	cache.mu.Unlock()
 
-	// Should return cached value without re-querying because gap is within threshold
+	// Mock protocol returns updated block number (peer has advanced)
+	mockProtocol.On("GetCurrentBlockNumber", mock.Anything, mock.Anything).Return(uint64(2000), streamID, nil)
+
+	// Must re-query even though gap is small - peer may have advanced
 	blockNumber, err := cache.GetBlockNumber(context.Background(), streamID, targetBlock)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(1000), blockNumber)
+	assert.Equal(t, uint64(2000), blockNumber)
 
-	// Verify mock was NOT called (cache hit via threshold)
-	mockProtocol.AssertNotCalled(t, "GetCurrentBlockNumber", mock.Anything, mock.Anything)
+	// Verify the protocol was called (cache miss, re-queried)
+	mockProtocol.AssertCalled(t, "GetCurrentBlockNumber", mock.Anything, mock.Anything)
+
+	// Verify cache was updated with fresh value
+	cache.mu.RLock()
+	info := cache.cache[streamID]
+	cache.mu.RUnlock()
+	assert.Equal(t, uint64(2000), info.BlockNumber)
 }
 
 func TestGetBlockNumber_CacheMiss(t *testing.T) {
@@ -172,10 +177,9 @@ func TestGetBlockNumber_CacheMissInsufficientBlocks(t *testing.T) {
 func TestEvictOldestEntries(t *testing.T) {
 	mockProtocol := &MockProtocolProvider{}
 	config := &CacheConfig{
-		MaxSize:           3,
-		MaxAge:            1 * time.Hour,
-		MinBlockThreshold: 100,
-		CleanupInterval:   1 * time.Minute,
+		MaxSize:         3,
+		MaxAge:          1 * time.Hour,
+		CleanupInterval: 1 * time.Minute,
 	}
 	cache := NewBlockNumberCache(mockProtocol, config)
 	defer cache.Stop()
@@ -235,10 +239,9 @@ func TestEvictOldestEntries(t *testing.T) {
 func TestCleanupExpiredEntries(t *testing.T) {
 	mockProtocol := &MockProtocolProvider{}
 	config := &CacheConfig{
-		MaxSize:           100,
-		MaxAge:            1 * time.Hour,
-		MinBlockThreshold: 100,
-		CleanupInterval:   1 * time.Minute,
+		MaxSize:         100,
+		MaxAge:          1 * time.Hour,
+		CleanupInterval: 1 * time.Minute,
 	}
 	cache := NewBlockNumberCache(mockProtocol, config)
 	defer cache.Stop()

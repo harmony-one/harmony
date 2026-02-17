@@ -220,6 +220,7 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, s *StageState, 
 					// Do not remove stream when failure is due to context cancelation or deadline; only mark as failed.
 					b.configs.protocol.StreamFailed(stid, "getCurrentNumber request failed")
 				} else {
+					// Clear cache entry before removing the stream from the protocol
 					s.state.bnCache.RemoveStream(stid)
 					b.configs.protocol.RemoveStream(stid, "getCurrentNumber request failed")
 				}

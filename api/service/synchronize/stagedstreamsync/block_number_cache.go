@@ -30,7 +30,9 @@ type CacheStats struct {
 	LastCleanup time.Time
 }
 
-// BlockNumberCache caches block numbers per stream with improved memory management
+// BlockNumberCache caches block numbers per stream to avoid redundant protocol queries.
+// A cache hit occurs only when the cached block number >= the requested target,
+// ensuring stale entries never prevent re-querying peers that may have advanced.
 type BlockNumberCache struct {
 	mu            sync.RWMutex
 	cache         map[sttypes.StreamID]*BlockInfo
@@ -42,26 +44,26 @@ type BlockNumberCache struct {
 	stopOnce      sync.Once
 }
 
-// ProtocolProvider defines interface to get block number
+// ProtocolProvider abstracts the sync protocol for querying remote block numbers
 type ProtocolProvider interface {
 	GetCurrentBlockNumber(ctx context.Context, opts ...syncproto.Option) (uint64, sttypes.StreamID, error)
 }
 
 // CacheConfig holds configuration for the cache
 type CacheConfig struct {
-	MaxSize           int           // Maximum number of entries in cache
-	CleanupInterval   time.Duration // How often to run cleanup
-	MaxAge            time.Duration // Maximum age of cached entries
-	MinBlockThreshold uint64        // Minimum block number to consider for caching
+	MaxSize         int           // Maximum number of entries in cache
+	CleanupInterval time.Duration // How often to run cleanup
+	MaxAge          time.Duration // Maximum age of cached entries
 }
 
-// DefaultCacheConfig returns a default cache configuration
+// DefaultCacheConfig returns a default cache configuration.
+// MaxAge is long because a cache hit requires cached >= target, so stale entries
+// are naturally bypassed and re-queried without relying on time-based expiration.
 func DefaultCacheConfig() *CacheConfig {
 	return &CacheConfig{
-		MaxSize:           1000,           // Increased from 100 to handle more peers
-		MaxAge:            24 * time.Hour, // Much longer since we're syncing long ranges
-		MinBlockThreshold: 1000,           // Only cache if peer has 1000+ blocks more than target
-		CleanupInterval:   1 * time.Hour,  // Cleanup every hour instead of every minute
+		MaxSize:         1000,
+		MaxAge:          24 * time.Hour,
+		CleanupInterval: 1 * time.Hour,
 	}
 }
 
@@ -88,8 +90,8 @@ func NewBlockNumberCache(protocol ProtocolProvider, config *CacheConfig) *BlockN
 	return cache
 }
 
-// GetBlockNumber retrieves the cached block number for a stream
-// If not cached or expired, it fetches from the protocol provider
+// GetBlockNumber returns the block number for a stream.
+// Returns a cached value if it is >= targetBlock, otherwise re-queries the stream.
 func (c *BlockNumberCache) GetBlockNumber(ctx context.Context, streamID sttypes.StreamID, targetBlock uint64) (uint64, error) {
 	c.mu.RLock()
 	if info, exists := c.cache[streamID]; exists && info.IsValid {
@@ -100,13 +102,8 @@ func (c *BlockNumberCache) GetBlockNumber(ctx context.Context, streamID sttypes.
 			c.updateAccessStats(streamID)
 			return info.BlockNumber, nil
 		}
-		// If cached block number is less than target, we need to query again
-		// unless it's within the MinBlockThreshold
-		if c.config.MinBlockThreshold > 0 && (targetBlock-info.BlockNumber) <= c.config.MinBlockThreshold {
-			c.mu.RUnlock()
-			c.updateAccessStats(streamID)
-			return info.BlockNumber, nil
-		}
+		// Cached block number is less than target - must re-query.
+		// The peer may have advanced since we last checked.
 	}
 	c.mu.RUnlock()
 
@@ -142,7 +139,8 @@ func (c *BlockNumberCache) GetBlockNumber(ctx context.Context, streamID sttypes.
 	return blockNumber, nil
 }
 
-// doGetCurrentNumberRequest returns estimated current block number and corresponding stream
+// doGetCurrentNumberRequest queries any available stream for its current block number
+// and caches the result. Used by estimateCurrentNumber to poll network height.
 func (c *BlockNumberCache) doGetCurrentNumberRequest(ctx context.Context) (uint64, sttypes.StreamID, error) {
 	bn, stid, err := c.protocol.GetCurrentBlockNumber(ctx, syncproto.WithHighPriority())
 	if err != nil {
@@ -224,9 +222,6 @@ func (c *BlockNumberCache) cleanupExpiredEntries() {
 	defer c.mu.Unlock()
 
 	for streamID, info := range c.cache {
-		// Use a much longer MaxAge since we're syncing long ranges
-		// For example: syncing from 0 to 1,000,000, peer has 1,200,000
-		// We don't need to query again until we catch up to 1,200,000
 		if now.Sub(info.Timestamp) > c.config.MaxAge {
 			delete(c.cache, streamID)
 			expiredCount++
@@ -299,7 +294,7 @@ func (c *BlockNumberCache) Reset() {
 		Msg("Block number cache reset")
 }
 
-// Stop stops the background cleanup goroutine
+// Stop stops the background cleanup goroutine. Safe to call multiple times.
 func (c *BlockNumberCache) Stop() {
 	c.stopOnce.Do(func() {
 		close(c.stopChan)

@@ -123,10 +123,9 @@ func BenchmarkGetBlockNumber_Mixed(b *testing.B) {
 func BenchmarkEvictOldestEntries(b *testing.B) {
 	provider := NewBenchmarkProtocolProvider()
 	config := &CacheConfig{
-		MaxSize:           100,
-		MaxAge:            1 * time.Hour,
-		MinBlockThreshold: 100,
-		CleanupInterval:   1 * time.Minute,
+		MaxSize:         100,
+		MaxAge:          1 * time.Hour,
+		CleanupInterval: 1 * time.Minute,
 	}
 	cache := NewBlockNumberCache(provider, config)
 	defer cache.Stop()
@@ -154,10 +153,9 @@ func BenchmarkEvictOldestEntries(b *testing.B) {
 func BenchmarkCleanupExpiredEntries(b *testing.B) {
 	provider := NewBenchmarkProtocolProvider()
 	config := &CacheConfig{
-		MaxSize:           1000,
-		MaxAge:            1 * time.Hour,
-		MinBlockThreshold: 100,
-		CleanupInterval:   1 * time.Minute,
+		MaxSize:         1000,
+		MaxAge:          1 * time.Hour,
+		CleanupInterval: 1 * time.Minute,
 	}
 	cache := NewBlockNumberCache(provider, config)
 	defer cache.Stop()
