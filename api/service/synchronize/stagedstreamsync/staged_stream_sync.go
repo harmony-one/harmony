@@ -380,7 +380,13 @@ func New(
 	}
 
 	status := NewStatus()
-	bnCache := NewBlockNumberCache(protocol, nil) // Use default config
+
+	// Only create block number cache for non-epoch chains.
+	// Epoch sync uses different stages (SyncEpoch) that don't query per-stream block numbers.
+	var bnCache *BlockNumberCache
+	if !isEpochChain {
+		bnCache = NewBlockNumberCache(protocol, nil)
+	}
 
 	return &StagedStreamSync{
 		bc:                bc,
