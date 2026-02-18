@@ -152,8 +152,11 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	// Fetch blocks from neighbors
 	s.state.gbm = newDownloadManager(b.configs.bc, currProgress, targetHeight, BlocksPerRequest, s.state.logger)
 
-	// Identify available valid streams
-	whitelistStreams, err := b.identifySyncedStreams(context.Background(), s, targetHeight, []sttypes.StreamID{})
+	// Identify available valid streams.
+	// Use a timeout so a dead/slow whitelisted stream cannot stall the entire sync.
+	identifyCtx, identifyCtxCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer identifyCtxCancel()
+	whitelistStreams, err := b.identifySyncedStreams(identifyCtx, s, targetHeight, []sttypes.StreamID{})
 	if err != nil {
 		b.configs.logger.Error().
 			Err(err).
@@ -215,15 +218,7 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, s *StageState, 
 			if err != nil {
 				b.configs.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
-
-				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					// Do not remove stream when failure is due to context cancelation or deadline; only mark as failed.
-					b.configs.protocol.StreamFailed(stid, "getCurrentNumber request failed")
-				} else {
-					// Clear cache entry before removing the stream from the protocol
-					s.state.bnCache.RemoveStream(stid)
-					b.configs.protocol.RemoveStream(stid, "getCurrentNumber request failed")
-				}
+				// The cache is a transparent optimization. On failure, just skip.
 				return
 			}
 
@@ -537,7 +532,9 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 			return ErrNotEnoughStreams
 		}
 
-		whitelistStreams, err := b.identifySyncedStreams(context.Background(), s, s.state.invalidBlock.Number, s.state.invalidBlock.StreamID)
+		reidentifyCtx, reidentifyCtxCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		whitelistStreams, err := b.identifySyncedStreams(reidentifyCtx, s, s.state.invalidBlock.Number, s.state.invalidBlock.StreamID)
+		reidentifyCtxCancel()
 		if len(whitelistStreams) == 0 {
 			b.configs.logger.Error().
 				Uint64("bad block number", s.state.invalidBlock.Number).
