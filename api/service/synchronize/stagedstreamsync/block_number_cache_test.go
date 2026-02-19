@@ -429,6 +429,86 @@ func TestDoGetCurrentNumberRequest_Error(t *testing.T) {
 	mockProtocol.AssertExpectations(t)
 }
 
+func TestGetBlockNumber_ProtocolError(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+	defer cache.Stop()
+
+	streamID := sttypes.StreamID("test-stream")
+	targetBlock := uint64(1000)
+
+	// Mock protocol returns error
+	mockProtocol.On("GetCurrentBlockNumber", mock.Anything, mock.Anything).Return(uint64(0), streamID, fmt.Errorf("network error"))
+
+	// Should propagate the error
+	blockNumber, err := cache.GetBlockNumber(context.Background(), streamID, targetBlock)
+	require.Error(t, err)
+	assert.Equal(t, uint64(0), blockNumber)
+	assert.Contains(t, err.Error(), "network error")
+
+	// Verify nothing was cached
+	cache.mu.RLock()
+	_, exists := cache.cache[streamID]
+	cache.mu.RUnlock()
+	assert.False(t, exists)
+
+	mockProtocol.AssertExpectations(t)
+}
+
+func TestGetBlockNumber_ContextCanceled(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+	defer cache.Stop()
+
+	streamID := sttypes.StreamID("test-stream")
+	targetBlock := uint64(1000)
+
+	// Mock protocol returns context deadline exceeded
+	mockProtocol.On("GetCurrentBlockNumber", mock.Anything, mock.Anything).Return(uint64(0), streamID, context.DeadlineExceeded)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	blockNumber, err := cache.GetBlockNumber(ctx, streamID, targetBlock)
+	require.Error(t, err)
+	assert.Equal(t, uint64(0), blockNumber)
+
+	mockProtocol.AssertExpectations(t)
+}
+
+func TestGetBlockNumber_RequeryBelowTarget_OldEntryPreserved(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+	defer cache.Stop()
+
+	streamID := sttypes.StreamID("test-stream")
+	targetBlock := uint64(2000)
+
+	// Simulate doGetCurrentNumberRequest having cached an old value
+	cache.mu.Lock()
+	cache.cache[streamID] = &BlockInfo{
+		BlockNumber: 500,
+		Timestamp:   time.Now(),
+		LastUsed:    time.Now(),
+		AccessCount: 1,
+		IsValid:     true,
+	}
+	cache.mu.Unlock()
+
+	// Re-query returns a higher value, but still below target
+	mockProtocol.On("GetCurrentBlockNumber", mock.Anything, mock.Anything).Return(uint64(800), streamID, nil)
+
+	blockNumber, err := cache.GetBlockNumber(context.Background(), streamID, targetBlock)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(800), blockNumber)
+
+	// Old cache entry should be preserved (not overwritten) since 800 < target 2000
+	cache.mu.RLock()
+	info := cache.cache[streamID]
+	cache.mu.RUnlock()
+	assert.Equal(t, uint64(500), info.BlockNumber) // old value unchanged
+}
+
 func TestGetBlockNumber_InvalidatedStreamRequery(t *testing.T) {
 	mockProtocol := &MockProtocolProvider{}
 	cache := NewBlockNumberCache(mockProtocol, nil)
@@ -476,6 +556,66 @@ func TestStopMultipleCalls(t *testing.T) {
 		cache.Stop()
 		cache.Stop()
 	})
+}
+
+func TestInvalidateStream_NonExistent(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+	defer cache.Stop()
+
+	// Should be a no-op, not panic
+	assert.NotPanics(t, func() {
+		cache.InvalidateStream("non-existent-stream")
+	})
+	assert.Equal(t, 0, len(cache.cache))
+}
+
+func TestRemoveStream_NonExistent(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+	defer cache.Stop()
+
+	// Should be a no-op, not panic
+	assert.NotPanics(t, func() {
+		cache.RemoveStream("non-existent-stream")
+	})
+	assert.Equal(t, 0, len(cache.cache))
+}
+
+func TestCacheStats_HitsAndMisses(t *testing.T) {
+	mockProtocol := &MockProtocolProvider{}
+	cache := NewBlockNumberCache(mockProtocol, nil)
+	defer cache.Stop()
+
+	streamID := sttypes.StreamID("test-stream")
+
+	// Pre-populate cache
+	cache.mu.Lock()
+	cache.cache[streamID] = &BlockInfo{
+		BlockNumber: 5000,
+		Timestamp:   time.Now(),
+		LastUsed:    time.Now(),
+		AccessCount: 1,
+		IsValid:     true,
+	}
+	cache.mu.Unlock()
+
+	// Cache hit (target 1000, cached 5000)
+	_, err := cache.GetBlockNumber(context.Background(), streamID, 1000)
+	require.NoError(t, err)
+
+	stats := cache.GetStats()
+	assert.Equal(t, uint64(1), stats.Hits)
+	assert.Equal(t, uint64(0), stats.Misses)
+
+	// Cache miss (different stream, no entry)
+	mockProtocol.On("GetCurrentBlockNumber", mock.Anything, mock.Anything).Return(uint64(3000), sttypes.StreamID("other"), nil)
+	_, err = cache.GetBlockNumber(context.Background(), "other", 2000)
+	require.NoError(t, err)
+
+	stats = cache.GetStats()
+	assert.Equal(t, uint64(1), stats.Hits)
+	assert.Equal(t, uint64(1), stats.Misses)
 }
 
 func TestReset(t *testing.T) {
