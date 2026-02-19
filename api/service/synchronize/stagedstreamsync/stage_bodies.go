@@ -154,7 +154,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 
 	// Identify available valid streams.
 	// Use a timeout so a dead/slow whitelisted stream cannot stall the entire sync.
-	identifyCtx, identifyCtxCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	identifyCtx, identifyCtxCancel := context.WithTimeout(context.Background(), IdentifyStreamsTimeout)
 	defer identifyCtxCancel()
 	whitelistStreams, err := b.identifySyncedStreams(identifyCtx, s, targetHeight, []sttypes.StreamID{})
 	if err != nil {
@@ -532,7 +532,7 @@ func (b *StageBodies) redownloadBadBlock(ctx context.Context, s *StageState) err
 			return ErrNotEnoughStreams
 		}
 
-		reidentifyCtx, reidentifyCtxCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		reidentifyCtx, reidentifyCtxCancel := context.WithTimeout(context.Background(), IdentifyStreamsTimeout)
 		whitelistStreams, err := b.identifySyncedStreams(reidentifyCtx, s, s.state.invalidBlock.Number, s.state.invalidBlock.StreamID)
 		reidentifyCtxCancel()
 		if len(whitelistStreams) == 0 {

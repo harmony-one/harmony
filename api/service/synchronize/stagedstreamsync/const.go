@@ -46,6 +46,10 @@ const (
 	// and should not interfere with the progress-based timeout system
 	EpochSyncTimeout time.Duration = 15 * time.Minute
 
+	// IdentifyStreamsTimeout is the timeout for identifySyncedStreams.
+	// Prevents a dead/slow whitelisted stream from stalling the sync cycle.
+	IdentifyStreamsTimeout time.Duration = 5 * time.Minute
+
 	// pivot block distance ranges
 	MinPivotDistanceToHead uint64 = 1024
 	MaxPivotDistanceToHead uint64 = 2048
