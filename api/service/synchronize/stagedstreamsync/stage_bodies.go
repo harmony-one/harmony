@@ -214,11 +214,23 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, s *StageState, 
 		go func(stid sttypes.StreamID, targetHeight uint64) {
 			defer wg.Done()
 
-			bn, err := s.state.bnCache.GetBlockNumber(ctx, stid, targetHeight)
+			var bn uint64
+			var err error
+			if s.state.bnCache != nil {
+				bn, err = s.state.bnCache.GetBlockNumber(ctx, stid, targetHeight)
+			} else {
+				bn, _, err = b.configs.protocol.GetCurrentBlockNumber(ctx, syncProto.WithWhitelist([]sttypes.StreamID{stid}))
+			}
 			if err != nil {
 				b.configs.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
-				// The cache is a transparent optimization. On failure, just skip.
+
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					// Do not remove stream when failure is due to context cancelation or deadline; only mark as failed.
+					b.configs.protocol.StreamFailed(stid, "getCurrentNumber request failed")
+				} else {
+					b.configs.protocol.RemoveStream(stid, "getCurrentNumber request failed")
+				}
 				return
 			}
 
