@@ -170,6 +170,10 @@ func (d *Downloader) Close() {
 
 	d.cancel()
 
+	if d.stagedSyncInstance != nil && d.stagedSyncInstance.bnCache != nil {
+		d.stagedSyncInstance.bnCache.Stop()
+	}
+
 	if d.bh != nil {
 		d.bh.close()
 	}
