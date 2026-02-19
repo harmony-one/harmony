@@ -904,16 +904,22 @@ func (s *StagedStreamSync) estimateCurrentNumber(ctx context.Context) (uint64, e
 		go func() {
 			defer wg.Done()
 
-			// bn, stid, err := s.doGetCurrentNumberRequest(ctx)
-			bn, stid, err := s.bnCache.doGetCurrentNumberRequest(ctx)
-
+			var bn uint64
+			var stid sttypes.StreamID
+			var err error
+			if s.bnCache != nil {
+				bn, stid, err = s.bnCache.doGetCurrentNumberRequest(ctx)
+			} else {
+				bn, stid, err = s.doGetCurrentNumberRequest(ctx)
+			}
 			if err != nil {
 				s.logger.Err(err).Str("streamID", string(stid)).
 					Msg(WrapStagedSyncMsg("getCurrentNumber request failed"))
 
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) && stid != "" {
-					// Invalidate cache so next query re-fetches from this stream
-					s.bnCache.InvalidateStream(stid)
+					if s.bnCache != nil {
+						s.bnCache.InvalidateStream(stid)
+					}
 					s.protocol.StreamFailed(stid, "getCurrentNumber request failed")
 				}
 				return
