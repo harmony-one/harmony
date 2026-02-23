@@ -1070,6 +1070,11 @@ func (host *HostV2) AddDNSNodestoTrustedPeers(ctx context.Context, sources []str
 		}
 		attempted++
 
+		// Skip dialing to self
+		if info.ID == host.h.ID() {
+			continue
+		}
+
 		// Skip if already marked as trusted
 		if host.trustedPeerIDs.Exists(info.ID) {
 			continue
