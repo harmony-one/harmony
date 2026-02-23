@@ -34,6 +34,9 @@ type syncStream struct {
 	closeC    chan struct{}
 	closeStat uint32
 
+	// registered tracks whether this stream was added to the stream manager.
+	registered uint32
+
 	logger zerolog.Logger
 }
 
@@ -53,6 +56,7 @@ func (p *Protocol) wrapStream(raw libp2p_network.Stream, trusted bool) *syncStre
 		respC:      make(chan *syncpb.Response, 100),
 		closeC:     make(chan struct{}),
 		closeStat:  0,
+		registered: 0,
 		logger:     logger,
 	}
 }
@@ -230,20 +234,29 @@ func (st *syncStream) handleRespLoop() {
 	}
 }
 
-// Close stops the stream handling and closes the underlying stream
+// MarkRegistered marks this stream as successfully added to the stream manager.
+func (st *syncStream) MarkRegistered() {
+	atomic.StoreUint32(&st.registered, 1)
+}
+
+// IsRegistered reports whether this stream was successfully added to the stream manager.
+func (st *syncStream) IsRegistered() bool {
+	return atomic.LoadUint32(&st.registered) == 1
+}
+
+// Close stops the stream handling and closes the underlying stream.
+// Only streams registered with the stream manager will trigger sm.RemoveStream.
 func (st *syncStream) Close(reason string, criticalErr bool) error {
 	notClosed := atomic.CompareAndSwapUint32(&st.closeStat, 0, 1)
 	if !notClosed {
-		// Already closed by another goroutine. Directly return
 		return nil
 	}
-	if err := st.protocol.sm.RemoveStream(st.ID(), "force close: "+reason, criticalErr); err != nil {
-		// ErrStreamAlreadyRemoved is benign - it means the stream was either never added
-		// to the stream manager (e.g., rejected on HandleStream) or was already cleaned up
-		// through another path. Only log unexpected errors.
-		if !stderrors.Is(err, streammanager.ErrStreamAlreadyRemoved) {
-			st.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
-				Msg("failed to remove sync stream on close")
+	if st.IsRegistered() {
+		if err := st.protocol.sm.RemoveStream(st.ID(), "force close: "+reason, criticalErr); err != nil {
+			if !stderrors.Is(err, streammanager.ErrStreamAlreadyRemoved) {
+				st.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
+					Msg("failed to remove sync stream on close")
+			}
 		}
 	}
 	close(st.closeC)

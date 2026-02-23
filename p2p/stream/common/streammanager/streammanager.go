@@ -323,30 +323,49 @@ func (sm *streamManager) loop() {
 	}
 }
 
-// NewStream handles a new stream from stream handler protocol
+// NewStream registers a stream with the stream manager.
+// On error the caller is responsible for closing the raw stream.
 func (sm *streamManager) NewStream(stream sttypes.Stream) error {
 	if err := sm.sanityCheckStream(stream); err != nil {
-		stream.Close("stream sanity check failed", true)
 		return errors.Wrap(err, "stream sanity check failed")
 	}
 	task := addStreamTask{
 		st:   stream,
-		errC: make(chan error),
+		errC: make(chan error, 1),
 	}
-	sm.addStreamCh <- task
-	return <-task.errC
+	select {
+	case sm.addStreamCh <- task:
+		select {
+		case err := <-task.errC:
+			return err
+		case <-sm.ctx.Done():
+			return sm.ctx.Err()
+		}
+	case <-sm.ctx.Done():
+		return sm.ctx.Err()
+	}
 }
 
-// RemoveStream close and remove a stream from stream manager
+// RemoveStream removes a stream from the stream manager.
+// Returns ctx.Err() if the stream manager has been shut down.
 func (sm *streamManager) RemoveStream(stID sttypes.StreamID, reason string, criticalErr bool) error {
 	task := rmStreamTask{
 		id:          stID,
 		reason:      reason,
 		criticalErr: criticalErr,
-		errC:        make(chan error),
+		errC:        make(chan error, 1),
 	}
-	sm.rmStreamCh <- task
-	return <-task.errC
+	select {
+	case sm.rmStreamCh <- task:
+		select {
+		case err := <-task.errC:
+			return err
+		case <-sm.ctx.Done():
+			return sm.ctx.Err()
+		}
+	case <-sm.ctx.Done():
+		return sm.ctx.Err()
+	}
 }
 
 // GetStreams return the streams.

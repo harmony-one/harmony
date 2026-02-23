@@ -228,19 +228,20 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream, trusted bool) {
 	p.logger.Info().Str("stream", raw.ID()).Msg("handle new sync stream")
 	st := p.wrapStream(raw, trusted)
 	if err := p.sm.NewStream(st); err != nil {
-		// Possibly we have reach the hard limit of the stream
 		if !errors.Is(err, streammanager.ErrStreamAlreadyExist) && !errors.Is(err, streammanager.ErrStreamRemovalNotExpired) {
 			p.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
 				Msg("failed to add new stream")
 		}
-		// Close the wrapped stream to avoid resource leak
-		if closeErr := st.Close("failed to add stream: "+err.Error(), false); closeErr != nil {
+		// Only close the raw stream. The stream is not registered, so calling
+		// st.Close() would route through sm.RemoveStream and could evict an
+		// existing stream for the same peer (StreamID is peer-based).
+		if closeErr := st.BaseStream.Close(); closeErr != nil {
 			p.logger.Warn().Err(closeErr).Str("stream ID", string(st.ID())).
-				Msg("failed to close rejected stream")
+				Msg("failed to close rejected raw stream")
 		}
 		return
 	}
-	//to get my ID use raw.Conn().LocalPeer().String()
+	st.MarkRegistered()
 	p.logger.Info().
 		Str("remotePeer", raw.Conn().RemotePeer().String()).
 		Str("protoID", string(st.ProtoID())).
