@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
 	syncProto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
@@ -183,20 +184,24 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 	return nil
 }
 
-// IdentifySyncedStreams roughly find the synced streams.
+// identifySyncedStreams queries all available streams for their current block number
+// and returns those at or above targetHeight.
+// Results map: streamID → error (nil = synced, non-nil = failure reason).
+// Streams below target or with context errors are not recorded.
+// Failed streams are only punished when synced streams exist; otherwise the
+// stream pool is preserved to avoid cascading removal during systemic issues.
 func (b *StageBodies) identifySyncedStreams(ctx context.Context, s *StageState, targetHeight uint64, excludeIDs []sttypes.StreamID) (streams []sttypes.StreamID, err error) {
+	results := sttypes.NewSafeMap[sttypes.StreamID, error]()
 	var (
-		synced = make(map[sttypes.StreamID]uint64)
-		lock   sync.Mutex
-		wg     sync.WaitGroup
+		wg          sync.WaitGroup
+		syncedCount int32
+		failedCount int32
 	)
 
 	numStreams := b.configs.protocol.NumStreams()
 	streamIDs := b.configs.protocol.GetStreamIDs()
 
-	// ask all streams for height
 	for i := 0; i < numStreams; i++ {
-		// skip excluded streams
 		excluded := false
 		if len(excludeIDs) > 0 {
 			for _, excludedStreamID := range excludeIDs {
@@ -222,42 +227,68 @@ func (b *StageBodies) identifySyncedStreams(ctx context.Context, s *StageState, 
 				bn, _, err = b.configs.protocol.GetCurrentBlockNumber(ctx, syncProto.WithWhitelist([]sttypes.StreamID{stid}))
 			}
 			if err != nil {
-				b.configs.logger.Err(err).Str("streamID", string(stid)).
-					Msg(WrapStagedSyncMsg("[identifySyncedStreams] getCurrentNumber request failed"))
-
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					// Do not remove stream when failure is due to context cancelation or deadline; only mark as failed.
-					b.configs.protocol.StreamFailed(stid, "getCurrentNumber request failed")
-				} else {
-					b.configs.protocol.RemoveStream(stid, "getCurrentNumber request failed")
+					return
 				}
+				results.Set(stid, err)
+				atomic.AddInt32(&failedCount, 1)
 				return
 			}
 
-			if bn < targetHeight {
-				return
+			if bn >= targetHeight {
+				results.Set(stid, nil)
+				atomic.AddInt32(&syncedCount, 1)
 			}
-
-			lock.Lock()
-			synced[stid] = bn
-			lock.Unlock()
 		}(stID, targetHeight)
 	}
 
-	// Wait for all goroutines to finish
 	wg.Wait()
 
-	// If no valid block number results were received, return an error
-	if len(synced) == 0 {
+	if syncedCount == 0 {
+		if failedCount > 0 {
+			b.configs.logger.Warn().
+				Int32("failedStreams", failedCount).
+				Msg(WrapStagedSyncMsg("[identifySyncedStreams] no synced streams found; skipping punishment to preserve stream pool"))
+		}
 		return nil, ErrZeroBlockResponse
 	}
 
-	// Compute synced streams array
-	for st := range synced {
-		streams = append(streams, st)
-	}
+	streams = make([]sttypes.StreamID, 0, syncedCount)
+	results.Iterate(func(stid sttypes.StreamID, err error) {
+		if err == nil {
+			streams = append(streams, stid)
+		} else {
+			b.handleIdentifyStreamFailure(s, stid, err)
+		}
+	})
 
 	return streams, nil
+}
+
+func (b *StageBodies) handleIdentifyStreamFailure(s *StageState, stid sttypes.StreamID, err error) {
+	severity := requestmanager.ClassifyRequestError(err)
+
+	switch severity {
+	case requestmanager.RequestErrorSkip:
+		b.configs.logger.Debug().Err(err).Str("streamID", string(stid)).
+			Msg(WrapStagedSyncMsg("[identifySyncedStreams] skipping non-stream error"))
+
+	case requestmanager.RequestErrorCritical:
+		b.configs.logger.Warn().Err(err).Str("streamID", string(stid)).
+			Msg(WrapStagedSyncMsg("[identifySyncedStreams] removing stream due to critical error"))
+		if s.state.bnCache != nil {
+			s.state.bnCache.RemoveStream(stid)
+		}
+		b.configs.protocol.RemoveStream(stid, "identifySyncedStreams: critical protocol error")
+
+	default:
+		b.configs.logger.Info().Err(err).Str("streamID", string(stid)).
+			Msg(WrapStagedSyncMsg("[identifySyncedStreams] marking stream as failed"))
+		if s.state.bnCache != nil {
+			s.state.bnCache.InvalidateStream(stid)
+		}
+		b.configs.protocol.StreamFailed(stid, "identifySyncedStreams: request failed")
+	}
 }
 
 func (b *StageBodies) runDownloadLoop(ctx context.Context, tx kv.RwTx, gbm *downloadManager, s *StageState, wl []sttypes.StreamID, startBlockNumber uint64, startTime time.Time) {

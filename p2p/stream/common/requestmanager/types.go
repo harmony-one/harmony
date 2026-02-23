@@ -2,6 +2,7 @@ package requestmanager
 
 import (
 	"container/list"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -21,6 +22,59 @@ var (
 	// because there are no active streams available.
 	ErrNoAvailableStream = errors.New("no available stream")
 )
+
+// RequestErrorSeverity represents how a request error should affect the stream.
+type RequestErrorSeverity int
+
+const (
+	// RequestErrorSkip means the error is not the stream's fault
+	// (system-level: stream busy, queue full, no available streams).
+	RequestErrorSkip RequestErrorSeverity = iota
+
+	// RequestErrorLow means the stream had a transient problem
+	// (timeout, write failure, peer error response).
+	RequestErrorLow
+
+	// RequestErrorCritical means the stream has a fundamental problem
+	// (protocol mismatch, malformed response).
+	RequestErrorCritical
+)
+
+// ClassifyRequestError classifies request-level errors by severity.
+// Unlike ClassifyStreamError (transport-level), this handles errors from
+// DoRequest and protocol response parsing.
+func ClassifyRequestError(err error) RequestErrorSeverity {
+	if err == nil {
+		return RequestErrorSkip
+	}
+
+	if errors.Is(err, ErrQueueFull) || errors.Is(err, ErrClosed) || errors.Is(err, ErrNoAvailableStream) {
+		return RequestErrorSkip
+	}
+
+	lower := strings.ToLower(err.Error())
+
+	// Dispatch-level: stream busy or unavailable
+	if strings.Contains(lower, "no more available") ||
+		strings.Contains(lower, "too many requests") {
+		return RequestErrorSkip
+	}
+
+	// Transient I/O or timeout
+	if strings.Contains(lower, "request timeout") ||
+		strings.Contains(lower, "write bytes") ||
+		strings.Contains(lower, "stream removed") {
+		return RequestErrorLow
+	}
+
+	// Protocol mismatch: stream responded with unexpected type
+	if strings.Contains(lower, "not sync response") ||
+		strings.Contains(lower, "response not get") {
+		return RequestErrorCritical
+	}
+
+	return RequestErrorLow
+}
 
 // stream is the wrapped version of sttypes.Stream.
 // TODO: enable stream handle multiple pending requests at the same time
