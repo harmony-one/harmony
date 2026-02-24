@@ -51,6 +51,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -749,6 +750,25 @@ func normalizeDNSAddress(addr string) string {
 	return "/dnsaddr/" + domain
 }
 
+// filterRemoteDialAddrs removes loopback addresses that can trigger dial-to-self
+// attempts when remote peers advertise localhost endpoints.
+func filterRemoteDialAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
+	filtered := make([]ma.Multiaddr, 0, len(addrs))
+	for _, addr := range addrs {
+		ip, err := manet.ToIP(addr)
+		if err != nil {
+			// Keep non-IP multiaddrs such as DNS addresses.
+			filtered = append(filtered, addr)
+			continue
+		}
+		if ip.IsLoopback() {
+			continue
+		}
+		filtered = append(filtered, addr)
+	}
+	return filtered
+}
+
 // hasTrustedSources checks if there are any trusted sources configured.
 // Returns true if at least one of trustedNodes or dnsStaticNodes is non-empty.
 func (host *HostV2) hasTrustedSources() bool {
@@ -892,9 +912,15 @@ func (host *HostV2) AddTrustedNodes(ctx context.Context) {
 			host.logger.Error().Err(err).Str("addr", addr).Msg("[AddTrustedNodes] failed to parse concrete trusted node")
 			continue
 		}
-		host.logger.Info().Interface("peerID", info.ID).Int("numAddrs", len(info.Addrs)).Str("src", addr).Msg("[AddTrustedNodes] adding concrete trusted peer")
-		host.Peerstore().AddAddrs(info.ID, info.Addrs, libp2p_peerstore.PermanentAddrTTL)
-		if err := host.h.Connect(ctx, *info); err != nil {
+		dialInfo := *info
+		dialInfo.Addrs = filterRemoteDialAddrs(info.Addrs)
+		if len(dialInfo.Addrs) == 0 {
+			host.logger.Warn().Interface("peerID", info.ID).Str("src", addr).Msg("[AddTrustedNodes] skipping trusted peer: only loopback addresses")
+			continue
+		}
+		host.logger.Info().Interface("peerID", info.ID).Int("numAddrs", len(dialInfo.Addrs)).Str("src", addr).Msg("[AddTrustedNodes] adding concrete trusted peer")
+		host.Peerstore().AddAddrs(dialInfo.ID, dialInfo.Addrs, libp2p_peerstore.PermanentAddrTTL)
+		if err := host.h.Connect(ctx, dialInfo); err != nil {
 			host.logger.Error().Err(err).Interface("peerID", info.ID).Msg("[AddTrustedNodes] failed to connect trusted peer")
 			trustedPeersConnectFailuresCounter.Inc()
 			continue
@@ -1089,13 +1115,19 @@ func (host *HostV2) AddDNSNodestoTrustedPeers(ctx context.Context, sources []str
 			continue
 		}
 
-		host.Peerstore().AddAddrs(info.ID, info.Addrs, libp2p_peerstore.PermanentAddrTTL)
-		addrsStr := make([]string, len(info.Addrs))
-		for i, addr := range info.Addrs {
+		dialInfo := info
+		dialInfo.Addrs = filterRemoteDialAddrs(info.Addrs)
+		if len(dialInfo.Addrs) == 0 {
+			host.logger.Warn().Interface("peerID", info.ID).Msg("[AddDNSNodestoTrustedPeers] skipping peer: only loopback addresses")
+			continue
+		}
+		host.Peerstore().AddAddrs(dialInfo.ID, dialInfo.Addrs, libp2p_peerstore.PermanentAddrTTL)
+		addrsStr := make([]string, len(dialInfo.Addrs))
+		for i, addr := range dialInfo.Addrs {
 			addrsStr[i] = addr.String()
 		}
-		host.logger.Info().Interface("peerID", info.ID).Int("numAddrs", len(info.Addrs)).Strs("addrs", addrsStr).Msg("[AddDNSNodestoTrustedPeers] attempting to connect")
-		if err := host.h.Connect(ctx, info); err != nil {
+		host.logger.Info().Interface("peerID", info.ID).Int("numAddrs", len(dialInfo.Addrs)).Strs("addrs", addrsStr).Msg("[AddDNSNodestoTrustedPeers] attempting to connect")
+		if err := host.h.Connect(ctx, dialInfo); err != nil {
 			host.logger.Error().Err(err).Interface("peerID", info.ID).Strs("addrs", addrsStr).Msg("[AddDNSNodestoTrustedPeers] connect failed")
 			trustedPeersConnectFailuresCounter.Inc()
 			continue
