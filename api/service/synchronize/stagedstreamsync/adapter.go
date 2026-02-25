@@ -32,6 +32,7 @@ type syncProtocol interface {
 	SubscribeAddStreamEvent(ch chan<- streammanager.EvtStreamAdded) event.Subscription
 	NumStreams() int
 	GetStreamIDs() []sttypes.StreamID
+	ResetStreamStateForRecovery(reason string) error
 }
 
 type blockChain interface {

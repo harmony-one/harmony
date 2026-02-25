@@ -60,6 +60,7 @@ type streamManager struct {
 	// incoming task channels
 	addStreamCh chan addStreamTask
 	rmStreamCh  chan rmStreamTask
+	resetCh     chan resetTask
 	stopCh      chan stopTask
 	discCh      chan discTask
 	curTask     interface{}
@@ -194,6 +195,7 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 		handleStream:          handleStream,
 		addStreamCh:           make(chan addStreamTask),
 		rmStreamCh:            make(chan rmStreamTask),
+		resetCh:               make(chan resetTask),
 		stopCh:                make(chan stopTask),
 		discCh:                make(chan discTask, 1), // discCh is a buffered channel to avoid overuse of goroutine
 		coolDown:              abool.New(),
@@ -278,7 +280,10 @@ func (sm *streamManager) loop() {
 			numReservedTrustedPeerStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(atomic.LoadInt64(&sm.numTrustedStreamsReserved)))
 
 			if !sm.softHaveEnoughStreams() {
-				sm.discCh <- discTask{}
+				select {
+				case sm.discCh <- discTask{}:
+				default:
+				}
 			}
 
 		case <-sm.discCh:
@@ -317,6 +322,10 @@ func (sm *streamManager) loop() {
 		case rmStream := <-sm.rmStreamCh:
 			err := sm.handleRemoveStream(rmStream.id, rmStream.reason, rmStream.criticalErr)
 			rmStream.errC <- err
+
+		case reset := <-sm.resetCh:
+			err := sm.handleResetForWatchdog()
+			reset.errC <- err
 
 		case stop := <-sm.stopCh:
 			sm.coolDown.Set() // to immediately block discoveries
@@ -411,10 +420,33 @@ type (
 
 	discTask struct{}
 
+	resetTask struct {
+		errC chan error
+	}
+
 	stopTask struct {
 		done chan struct{}
 	}
 )
+
+// Reset clears cooldown/blocking state so discovery can retry peers while
+// keeping active stream connections intact.
+func (sm *streamManager) Reset() error {
+	task := resetTask{
+		errC: make(chan error, 1),
+	}
+	select {
+	case sm.resetCh <- task:
+		select {
+		case err := <-task.errC:
+			return err
+		case <-sm.ctx.Done():
+			return sm.ctx.Err()
+		}
+	case <-sm.ctx.Done():
+		return sm.ctx.Err()
+	}
+}
 
 // sanity checks the service, network and shard ID
 func (sm *streamManager) sanityCheckStream(st sttypes.Stream) error {
@@ -720,6 +752,30 @@ func (sm *streamManager) tryToReplaceRemovedStream() error {
 	return nil
 }
 
+func (sm *streamManager) handleResetForWatchdog() error {
+	mainStreams := sm.streams.size()
+	reservedStreams := sm.reservedStreams.size()
+
+	// Keep active connections intact. Clear cooldown/blocking state so peer
+	// discovery can retry candidates again.
+	sm.removedStreams.Clear()
+	sm.coolDownCache.Reset()
+	sm.coolDown.UnSet()
+	sm.trustedPeersProcessed.UnSet()
+
+	select {
+	case sm.discCh <- discTask{}:
+	default:
+	}
+
+	sm.logger.Warn().
+		Int("mainStreams", mainStreams).
+		Int("reservedStreams", reservedStreams).
+		Msg("[StreamManager] watchdog reset completed")
+
+	return nil
+}
+
 func (sm *streamManager) removeAllStreamOnClose() {
 	var wg sync.WaitGroup
 
@@ -817,7 +873,7 @@ func (sm *streamManager) countTrustedPeerStreamsInReserved() int {
 
 // setupTrustedStreams attempts to establish exactly TrustedMinPeers trusted peer streams.
 // It starts goroutines in batches, waits for them to complete, and retries if needed.
-func (sm *streamManager) setupTrustedStreams(trustedPeers []libp2p_peer.ID, trustedMinPeers int) int {
+func (sm *streamManager) setupTrustedStreams(ctx context.Context, trustedPeers []libp2p_peer.ID, trustedMinPeers int) int {
 	if trustedMinPeers <= 0 {
 		return 0
 	}
@@ -952,7 +1008,7 @@ func (sm *streamManager) setupTrustedStreams(trustedPeers []libp2p_peer.ID, trus
 					Interface("peerID", pid).
 					Msg("[setupTrustedStreams] attempting to setup stream with trusted peer")
 
-				err := sm.setupStreamWithPeer(sm.ctx, pid, true)
+				err := sm.setupStreamWithPeer(ctx, pid, true)
 				if err != nil {
 					// Handle error directly in goroutine
 					sm.coolDownCache.Add(pid)
@@ -1027,7 +1083,7 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 				Msg("[discoverAndSetupStream] processing trusted peers for bootstrap stream setup")
 
 			// Setup trusted streams - this function handles batching and waiting
-			successCount := sm.setupTrustedStreams(trustedPeers, trustedMinPeers)
+			successCount := sm.setupTrustedStreams(discCtx, trustedPeers, trustedMinPeers)
 			connectedTrustedStreams = successCount
 
 			sm.logger.Info().
@@ -1068,7 +1124,7 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		connecting += 1
 		go func(pid libp2p_peer.ID) {
-			err := sm.setupStreamWithPeer(sm.ctx, pid, false)
+			err := sm.setupStreamWithPeer(discCtx, pid, false)
 			if err != nil {
 				sm.coolDownCache.Add(pid)
 				sm.logger.Warn().Err(err).

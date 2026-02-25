@@ -30,6 +30,7 @@ type Operator interface {
 	NewStream(stream sttypes.Stream) error
 	RemoveStream(stID sttypes.StreamID, reason string, criticalErr bool) error
 	SetEnoughStreamsCallback(callback func()) // Add callback for when enough streams are found
+	Reset() error
 }
 
 // Subscriber is the interface to support stream event subscription

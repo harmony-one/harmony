@@ -642,6 +642,15 @@ func (p *Protocol) GetStreamIDs() []sttypes.StreamID {
 	return ids
 }
 
+// ResetStreamStateForRecovery clears stream manager runtime state for stream
+// discovery recovery without touching sync stage progress.
+func (p *Protocol) ResetStreamStateForRecovery(reason string) error {
+	p.logger.Warn().
+		Str("reason", reason).
+		Msg("resetting stream state for recovery")
+	return p.sm.Reset()
+}
+
 // GetStreamManager get the underlying stream manager for upper level stream operations
 func (p *Protocol) GetStreamManager() streammanager.StreamManager {
 	return p.sm

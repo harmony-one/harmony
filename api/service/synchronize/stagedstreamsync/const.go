@@ -50,6 +50,12 @@ const (
 	// Prevents a dead/slow whitelisted stream from stalling the sync cycle.
 	IdentifyStreamsTimeout time.Duration = 5 * time.Minute
 
+	// StreamDiscoveryWatchdogTimeout is the maximum time to wait for enough stream
+	// connections before resetting stream manager runtime state and retrying.
+	// Keep it longer than stream removal cooldown windows so punished nodes are not
+	// unblocked immediately by watchdog recovery.
+	StreamDiscoveryWatchdogTimeout time.Duration = 75 * time.Minute
+
 	// pivot block distance ranges
 	MinPivotDistanceToHead uint64 = 1024
 	MaxPivotDistanceToHead uint64 = 2048

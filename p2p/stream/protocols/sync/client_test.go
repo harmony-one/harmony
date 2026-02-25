@@ -831,6 +831,11 @@ func (sm *testStreamManager) RemoveStream(stID sttypes.StreamID, reason string, 
 	return errors.New("stream not exist")
 }
 
+func (sm *testStreamManager) Reset() error {
+	sm.streamIDs = nil
+	return nil
+}
+
 func (sm *testStreamManager) isStreamExist(stid sttypes.StreamID) bool {
 	for _, id := range sm.streamIDs {
 		if id == stid {
