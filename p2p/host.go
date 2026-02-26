@@ -754,6 +754,7 @@ func normalizeDNSAddress(addr string) string {
 // attempts when remote peers advertise localhost endpoints.
 func filterRemoteDialAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
 	filtered := make([]ma.Multiaddr, 0, len(addrs))
+	loopback := make([]ma.Multiaddr, 0, len(addrs))
 	for _, addr := range addrs {
 		ip, err := manet.ToIP(addr)
 		if err != nil {
@@ -762,9 +763,15 @@ func filterRemoteDialAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
 			continue
 		}
 		if ip.IsLoopback() {
+			loopback = append(loopback, addr)
 			continue
 		}
 		filtered = append(filtered, addr)
+	}
+	// Keep loopback addresses only when they are the only available candidates.
+	// This preserves local/test connectivity while still preferring non-loopback routes.
+	if len(filtered) == 0 && len(loopback) > 0 {
+		return loopback
 	}
 	return filtered
 }
