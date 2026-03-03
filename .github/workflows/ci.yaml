@@ -40,7 +40,7 @@ jobs:
     if: needs.check.outputs.tag_annotated == 'true'
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-13, [self-hosted, linux, ARM64]]
+        os: [ubuntu-22.04, [self-hosted, linux, ARM64]]
 
     steps:
       - name: Import GPG key
@@ -99,23 +99,6 @@ jobs:
         run: |
           make linux_static
           mv ./bin/harmony ./bin/harmony-arm64
-        working-directory: harmony
-
-      - name: Build harmony binary and packages for MacOS
-        if: matrix.os == 'macos-13'
-        run: |
-          brew install bash
-          sudo rm -f /usr/local/opt/openssl
-          sudo ln -sf /usr/local/opt/openssl@1.1 /usr/local/opt/openssl
-          # hack for older chip (macos)
-          sudo mkdir -p /opt/homebrew/opt
-          sudo ln -sf /usr/local/opt/openssl@1.1 /opt/homebrew/opt/openssl@1.1
-          sudo ln -sf /usr/local/opt/gmp /opt/homebrew/opt/gmp
-          make
-          cd ./bin && mkdir ./lib && mv ./*.dylib ./lib && rm -f ./bootnode
-          gpg --detach-sign harmony
-          zip -qr ./harmony-macos.zip ./*
-          rm -rf `ls * | egrep -v harmony-macos.zip`
         working-directory: harmony
 
       - name: Upload artifact
@@ -232,10 +215,6 @@ jobs:
           gpg --detach-sign harmony-arm64
           sha256sum harmony-arm64 >> harmony-arm64.sha256
 
-      - name: Signed amd64 harmony binary
-        run: |
-          shasum -a 256 harmony-macos.zip >> harmony-macos.zip.sha256
-
       - name: Get tag message
         env:
           TAG_SHA: ${{ github.event.after }}
@@ -347,22 +326,3 @@ jobs:
           asset_name: harmony-arm64.sig
           asset_content_type: application/octet-stream
 
-      - name: Upload harmony binary for MacOS
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./harmony-macos.zip
-          asset_name: harmony-macos-${{ env.build_version }}.zip
-          asset_content_type: application/zip
-
-      - name: Upload sha256 signature of harmony for MacOS
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./harmony-macos.zip.sha256
-          asset_name: harmony-macos.zip.sha256
-          asset_content_type: text/plain
