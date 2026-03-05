@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	stderrs "errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -10,18 +11,80 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/p2p/store"
+	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
 	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	protobuf "google.golang.org/protobuf/proto"
 )
+
+const (
+	peerScoreValidResponsesCap   = 100
+	peerScoreErrorResponsesCap   = 100
+	peerScoreRejectedPayloadsCap = 100
+)
+
+func (p *Protocol) trackRequestScore(stid sttypes.StreamID, reqErr error) {
+	if p == nil || p.config.Host == nil || stid == "" {
+		return
+	}
+	p2pHost := p.config.Host.GetP2PHost()
+	if p2pHost == nil || p2pHost.Peerstore() == nil {
+		return
+	}
+	scoreStore, ok := p2pHost.Peerstore().(store.ScoreDatastore)
+	if !ok || scoreStore == nil {
+		return
+	}
+
+	var diff store.ScoreDiff
+	if reqErr == nil {
+		diff = store.IncrementValidResponses{Cap: peerScoreValidResponsesCap}
+	} else {
+		diff = classifyRequestScoreDiff(reqErr)
+	}
+	if diff == nil {
+		return
+	}
+
+	if _, err := scoreStore.SetScore(libp2p_peer.ID(stid), diff); err != nil {
+		p.logger.Debug().Err(err).Str("streamID", string(stid)).Msg("failed to update peer score")
+	}
+}
+
+func classifyRequestScoreDiff(reqErr error) store.ScoreDiff {
+	// Caller cancellation should not penalize peers.
+	if stderrs.Is(reqErr, context.Canceled) {
+		return nil
+	}
+
+	switch requestmanager.ClassifyRequestError(reqErr) {
+	case requestmanager.RequestErrorSkip:
+		return nil
+	case requestmanager.RequestErrorCritical:
+		return store.IncrementRejectedPayloads{Cap: peerScoreRejectedPayloadsCap}
+	}
+
+	// RequestErrorLow and parser-level failures: separate malformed payloads from transient errors.
+	lower := strings.ToLower(reqErr.Error())
+	if strings.Contains(lower, "not sync response") ||
+		strings.Contains(lower, "response not ") ||
+		strings.Contains(lower, "commit sigs size not expected") ||
+		strings.Contains(lower, "rlp") {
+		return store.IncrementRejectedPayloads{Cap: peerScoreRejectedPayloadsCap}
+	}
+	return store.IncrementErrorResponses{Cap: peerScoreErrorResponsesCap}
+}
 
 // GetBlocksByNumber do getBlocksByNumberRequest through sync stream protocol.
 // Return the block as result, target stream id, and error
 func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...Option) (blocks []*types.Block, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getBlocksByNumber")
 	defer p.doMetricPostClientRequest("getBlocksByNumber", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if len(bns) == 0 {
 		err = fmt.Errorf("zero block numbers requested")
@@ -48,6 +111,7 @@ func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...
 func (p *Protocol) GetRawBlocksByNumber(ctx context.Context, bns []uint64, opts ...Option) (blockBytes [][]byte, sigBytes [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getBlocksByNumber")
 	defer p.doMetricPostClientRequest("getBlocksByNumber", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if len(bns) == 0 {
 		err = fmt.Errorf("zero block numbers requested")
@@ -79,6 +143,7 @@ func (p *Protocol) GetRawBlocksByNumber(ctx context.Context, bns []uint64, opts 
 func (p *Protocol) GetCurrentBlockNumber(ctx context.Context, opts ...Option) (bn uint64, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getBlockNumber")
 	defer p.doMetricPostClientRequest("getBlockNumber", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	req := newGetBlockNumberRequest()
 
@@ -96,6 +161,7 @@ func (p *Protocol) GetCurrentBlockNumber(ctx context.Context, opts ...Option) (b
 func (p *Protocol) GetBlockHashes(ctx context.Context, bns []uint64, opts ...Option) (hashes []common.Hash, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getBlockHashes")
 	defer p.doMetricPostClientRequest("getBlockHashes", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if len(bns) == 0 {
 		err = fmt.Errorf("zero block numbers requested")
@@ -119,6 +185,7 @@ func (p *Protocol) GetBlockHashes(ctx context.Context, bns []uint64, opts ...Opt
 func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts ...Option) (blocks []*types.Block, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getBlocksByHashes")
 	defer p.doMetricPostClientRequest("getBlocksByHashes", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if len(hs) == 0 {
 		err = fmt.Errorf("zero block hashes requested")
@@ -141,6 +208,7 @@ func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts
 func (p *Protocol) GetRawBlocksByHashes(ctx context.Context, hs []common.Hash, opts ...Option) (blockBytes [][]byte, sigBytes [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getBlocksByHashes")
 	defer p.doMetricPostClientRequest("getBlocksByHashes", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if len(hs) == 0 {
 		err = fmt.Errorf("empty block hashes requested")
@@ -173,6 +241,7 @@ func (p *Protocol) GetRawBlocksByHashes(ctx context.Context, hs []common.Hash, o
 func (p *Protocol) GetReceipts(ctx context.Context, hs []common.Hash, opts ...Option) (receipts []types.Receipts, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getReceipts")
 	defer p.doMetricPostClientRequest("getReceipts", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if len(hs) == 0 {
 		err = fmt.Errorf("zero receipt hashes requested")
@@ -196,6 +265,7 @@ func (p *Protocol) GetReceipts(ctx context.Context, hs []common.Hash, opts ...Op
 func (p *Protocol) GetNodeData(ctx context.Context, hs []common.Hash, opts ...Option) (data [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getNodeData")
 	defer p.doMetricPostClientRequest("getNodeData", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if len(hs) == 0 {
 		err = fmt.Errorf("zero node data hashes requested")
@@ -219,6 +289,7 @@ func (p *Protocol) GetNodeData(ctx context.Context, hs []common.Hash, opts ...Op
 func (p *Protocol) GetAccountRange(ctx context.Context, root common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (accounts []*message.AccountData, proof [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getAccountRange")
 	defer p.doMetricPostClientRequest("getAccountRange", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if bytes == 0 {
 		err = fmt.Errorf("zero account ranges bytes requested")
@@ -242,6 +313,7 @@ func (p *Protocol) GetAccountRange(ctx context.Context, root common.Hash, origin
 func (p *Protocol) GetStorageRanges(ctx context.Context, root common.Hash, accounts []common.Hash, origin common.Hash, limit common.Hash, bytes uint64, opts ...Option) (slots [][]*message.StorageData, proof [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getStorageRanges")
 	defer p.doMetricPostClientRequest("getStorageRanges", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if bytes == 0 {
 		err = fmt.Errorf("zero storage ranges bytes requested")
@@ -277,6 +349,7 @@ func (p *Protocol) GetStorageRanges(ctx context.Context, root common.Hash, accou
 func (p *Protocol) GetByteCodes(ctx context.Context, hs []common.Hash, bytes uint64, opts ...Option) (codes [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getByteCodes")
 	defer p.doMetricPostClientRequest("getByteCodes", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if bytes == 0 {
 		err = fmt.Errorf("zero bytecode bytes requested")
@@ -304,6 +377,7 @@ func (p *Protocol) GetByteCodes(ctx context.Context, hs []common.Hash, bytes uin
 func (p *Protocol) GetTrieNodes(ctx context.Context, root common.Hash, paths []*message.TrieNodePathSet, bytes uint64, opts ...Option) (nodes [][]byte, stid sttypes.StreamID, err error) {
 	timer := p.doMetricClientRequest("getTrieNodes")
 	defer p.doMetricPostClientRequest("getTrieNodes", err, timer)
+	defer func() { p.trackRequestScore(stid, err) }()
 
 	if bytes == 0 {
 		err = fmt.Errorf("zero trie nodes bytes requested")

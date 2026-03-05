@@ -133,6 +133,8 @@ type HostConfig struct {
 	DiscConcurrency                 int
 	MaxConnPerIP                    int
 	DisablePrivateIPScan            bool
+	PeerScoreRetention              time.Duration
+	PeerMinScore                    float64
 	MaxPeers                        int64
 	ConnManagerLowWatermark         int
 	ConnManagerHighWatermark        int
@@ -233,9 +235,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open peerstore: %w", err)
 	}
-	var scoreRetention time.Duration
-	// TODO: add scoreRetention to configs (for now, it is zero and so, peer scoring is disabled)
-	scoreRetention = 0
+	scoreRetention := cfg.PeerScoreRetention
 	logger := log.New()
 	ps, err := store.NewExtendedPeerstore(context.Background(), logger, clock.SystemClock, basePs, datastore, scoreRetention)
 	if err != nil {
@@ -255,6 +255,9 @@ func NewHost(cfg HostConfig) (Host, error) {
 	if cfg.DisablePrivateIPScan {
 		// Prevent dialing of public addresses
 		connGtr = gating.AddBlocking(connGtr, cfg.DisablePrivateIPScan)
+	}
+	if scoreRetention > 0 {
+		connGtr = gating.AddScoring(connGtr, ps, cfg.PeerMinScore)
 	}
 	connGtr = gating.AddBanExpiry(connGtr, ps, clock.SystemClock)
 	connGtr = gating.AddMetering(connGtr)
