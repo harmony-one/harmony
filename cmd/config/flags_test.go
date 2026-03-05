@@ -32,7 +32,7 @@ func TestHarmonyFlags(t *testing.T) {
 				"219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX,/ip4/99.81.170.167/tcp/12019/p" +
 				"2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj --ip 8.8.8.8 --port 9000 --network_type=mainn" +
 				"et --dns_zone=t.hmny.io --min_peers=6 --max_bls_keys_per_node=" +
-				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
+				"11 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
 				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5 -" +
 				"-localnet.blocks_per_epoch=64 --localnet.blocks_per_epoch_v2=64",
 			expConfig: harmonyconfig.HarmonyConfig{
@@ -117,7 +117,7 @@ func TestHarmonyFlags(t *testing.T) {
 				BLSKeys: harmonyconfig.BlsConfig{
 					KeyDir:           "./.hmy/blskeys",
 					KeyFiles:         []string{},
-					MaxKeys:          10,
+					MaxKeys:          11,
 					PassEnabled:      true,
 					PassSrcType:      "auto",
 					PassFile:         "",

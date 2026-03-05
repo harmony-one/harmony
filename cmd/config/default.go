@@ -9,7 +9,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.6.7"
+const tomlConfigVersion = "2.6.8"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -81,7 +81,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	BLSKeys: harmonyconfig.BlsConfig{
 		KeyDir:   "./.hmy/blskeys",
 		KeyFiles: []string{},
-		MaxKeys:  10,
+		MaxKeys:  11,
 
 		PassEnabled:      true,
 		PassSrcType:      blsPassTypeAuto,
