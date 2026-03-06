@@ -146,27 +146,29 @@ func newJsTracer(code string, ctx *tracers.Context, cfg json.RawMessage) (tracer
 		}
 	}
 
-	fmt.Println("newJsTracer 2")
-
 	t.setTypeConverters()
 	t.setBuiltinFunctions()
+	fmt.Println("newJsTracer 2", code)
 	ret, err := vm.RunString("(" + code + ")")
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("newJsTracer 2.2")
 	// Check tracer's interface for required and optional methods.
 	obj := ret.ToObject(vm)
 	result, ok := goja.AssertFunction(obj.Get("result"))
 	if !ok {
 		return nil, errors.New("trace object must expose a function result()")
 	}
+	fmt.Println("newJsTracer 3")
 	fault, ok := goja.AssertFunction(obj.Get("fault"))
 	if !ok {
 		return nil, errors.New("trace object must expose a function fault()")
 	}
+	fmt.Println("newJsTracer 3.1")
 	step, ok := goja.AssertFunction(obj.Get("step"))
 	t.traceStep = ok
-	fmt.Println("newJsTracer  3")
+	fmt.Println("newJsTracer  3.3")
 	enter, hasEnter := goja.AssertFunction(obj.Get("enter"))
 	exit, hasExit := goja.AssertFunction(obj.Get("exit"))
 	if hasEnter != hasExit {
