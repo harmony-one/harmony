@@ -318,9 +318,12 @@ type Tracer struct {
 // and 'result' functions.
 func New(code string) (*Tracer, error) {
 	// Resolve any tracers by name and assemble the tracer object
+	fmt.Println("NEW: ", code)
 	if tracer, ok := tracer(code); ok {
 		code = tracer
 	}
+	fmt.Println("NEW2: ", code)
+
 	tracer := &Tracer{
 		vm:              duktape.New(),
 		ctx:             make(map[string]interface{}),
