@@ -127,6 +127,7 @@ type jsTracer struct {
 // The methods `step`, `enter`, and `exit` are optional, but note that
 // `enter` and `exit` always go together.
 func newJsTracer(code string, ctx *tracers.Context, cfg json.RawMessage) (tracers.Tracer, error) {
+	fmt.Println("newJsTracer 1")
 	vm := goja.New()
 	// By default field names are exported to JS as is, i.e. capitalized.
 	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
@@ -144,6 +145,8 @@ func newJsTracer(code string, ctx *tracers.Context, cfg json.RawMessage) (tracer
 			t.ctx["txHash"] = vm.ToValue(ctx.TxHash.Bytes())
 		}
 	}
+
+	fmt.Println("newJsTracer 2")
 
 	t.setTypeConverters()
 	t.setBuiltinFunctions()
@@ -163,6 +166,7 @@ func newJsTracer(code string, ctx *tracers.Context, cfg json.RawMessage) (tracer
 	}
 	step, ok := goja.AssertFunction(obj.Get("step"))
 	t.traceStep = ok
+	fmt.Println("newJsTracer  3")
 	enter, hasEnter := goja.AssertFunction(obj.Get("enter"))
 	exit, hasExit := goja.AssertFunction(obj.Get("exit"))
 	if hasEnter != hasExit {
@@ -186,6 +190,7 @@ func newJsTracer(code string, ctx *tracers.Context, cfg json.RawMessage) (tracer
 			return nil, err
 		}
 	}
+	fmt.Println("newJsTracer  4")
 	// Setup objects carrying data to JS. These are created once and re-used.
 	t.log = &steplog{
 		vm:       vm,
