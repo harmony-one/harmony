@@ -731,6 +731,14 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, txctx *tr
 	//	TxIndex:   i,
 	//	TxHash:    tx.Hash(),
 	//}
+
+	// catch error
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("traceTx panicked: %v", r)
+		}
+	}()
+
 	rs, err := hmy.traceTx(ctx, message, txctx, vmctx, statedb, config)
 	fmt.Printf("%T, rs: `%+v`, err: %s", rs, rs, err)
 	return rs, err
