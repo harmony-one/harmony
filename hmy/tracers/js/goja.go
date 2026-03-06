@@ -151,6 +151,7 @@ func newJsTracer(code string, ctx *tracers.Context, cfg json.RawMessage) (tracer
 	fmt.Println("newJsTracer 2", code)
 	ret, err := vm.RunString("(" + code + ")")
 	if err != nil {
+		fmt.Println("newJsTracer 2.1", err)
 		return nil, err
 	}
 	fmt.Println("newJsTracer 2.2")
