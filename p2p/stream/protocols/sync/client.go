@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/store"
 	"github.com/harmony-one/harmony/p2p/stream/common/requestmanager"
 	"github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
@@ -50,9 +51,13 @@ func (p *Protocol) trackRequestScore(stid sttypes.StreamID, reqErr error) {
 		return
 	}
 
-	if _, err := scoreStore.SetScore(libp2p_peer.ID(stid), diff); err != nil {
+	scores, err := scoreStore.SetScore(libp2p_peer.ID(stid), diff)
+	if err != nil {
 		p.logger.Debug().Err(err).Str("streamID", string(stid)).Msg("failed to update peer score")
+		return
 	}
+
+	p2p.SetPeerScoreMetric(p.config.Host.GetID().String(), string(stid), store.ComputePeerScore(scores))
 }
 
 func classifyRequestScoreDiff(reqErr error) store.ScoreDiff {

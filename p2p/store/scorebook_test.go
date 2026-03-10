@@ -274,7 +274,7 @@ func assertPeerScores(t *testing.T, store ExtendedPeerstore, id peer.ID, expecte
 
 	score, err := store.GetPeerScore(id)
 	require.NoError(t, err)
-	require.Equal(t, expected.Gossip.Total, score)
+	require.Equal(t, ComputePeerScore(expected), score)
 }
 
 func createMemoryStore(t *testing.T) ExtendedPeerstore {
