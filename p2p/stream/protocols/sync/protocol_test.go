@@ -80,9 +80,9 @@ func TestProtocol_advertiseLoop(t *testing.T) {
 func TestProtocol_StartupMode(t *testing.T) {
 	// Test that startup mode is enabled by default
 	p := &Protocol{
-		startupMode:      true,
 		startupStartTime: time.Now(),
 	}
+	p.startupMode.Store(true)
 
 	if !p.IsInStartupMode() {
 		t.Error("Expected startup mode to be enabled by default")
@@ -136,7 +136,6 @@ func TestProtocol_Advertise(t *testing.T) {
 			}
 
 			p := &Protocol{
-				startupMode:      tt.startupMode,
 				startupStartTime: time.Now(),
 				disc:             mockDisc,
 				ctx:              context.Background(),
@@ -146,6 +145,7 @@ func TestProtocol_Advertise(t *testing.T) {
 					ShardID: 0,
 				},
 			}
+			p.startupMode.Store(tt.startupMode)
 
 			// Test startup mode timing constants
 			if tt.startupMode {
@@ -159,9 +159,9 @@ func TestProtocol_Advertise(t *testing.T) {
 			}
 
 			// Test peer discovery count tracking
-			p.recentPeerDiscoveryCount = tt.peersFound
-			if p.recentPeerDiscoveryCount != tt.peersFound {
-				t.Errorf("Expected peer count %d, got %d", tt.peersFound, p.recentPeerDiscoveryCount)
+			p.recentPeerDiscoveryCount.Store(int64(tt.peersFound))
+			if got := int(p.recentPeerDiscoveryCount.Load()); got != tt.peersFound {
+				t.Errorf("Expected peer count %d, got %d", tt.peersFound, got)
 			}
 		})
 	}
@@ -174,7 +174,6 @@ func TestProtocol_AdvertiseLoop(t *testing.T) {
 	}
 
 	p := &Protocol{
-		startupMode:      true,
 		startupStartTime: time.Now(),
 		disc:             mockDisc,
 		ctx:              context.Background(),
@@ -185,6 +184,7 @@ func TestProtocol_AdvertiseLoop(t *testing.T) {
 			ShardID: 0,
 		},
 	}
+	p.startupMode.Store(true)
 
 	// Test startup mode timing constants directly
 	if !p.IsInStartupMode() {
@@ -208,11 +208,11 @@ func TestProtocol_AdvertiseLoop(t *testing.T) {
 
 func TestProtocol_ExitStartupMode(t *testing.T) {
 	p := &Protocol{
-		startupMode:      true,
 		startupStartTime: time.Now(),
 		ctx:              context.Background(),
 		logger:           zerolog.New(io.Discard),
 	}
+	p.startupMode.Store(true)
 
 	// Test manual exit
 	p.ExitStartupMode()
@@ -221,13 +221,13 @@ func TestProtocol_ExitStartupMode(t *testing.T) {
 	}
 
 	// Test automatic exit after timeout
-	p.startupMode = true
+	p.startupMode.Store(true)
 	p.startupStartTime = time.Now().Add(-StartupModeDuration - time.Second)
 
 	// Instead of calling advertise which requires complex setup,
 	// test the timeout logic directly
 	if time.Since(p.startupStartTime) > StartupModeDuration {
-		p.startupMode = false
+		p.startupMode.Store(false)
 	}
 
 	if p.IsInStartupMode() {

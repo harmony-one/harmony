@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -51,10 +52,11 @@ type (
 		rm       requestmanager.RequestManager // deliver the response from stream
 		disc     discovery.Discovery
 
-		lastAdvertiseDuration    time.Duration // last advertise duration to adjust it dynamically
-		recentPeerDiscoveryCount int           // recent peer discovery count
-		startupMode              bool          // true during first 10 minutes for faster advertisement
-		startupStartTime         time.Time     // when startup mode began
+		lastAdvertiseDuration time.Duration // last advertise duration to adjust it dynamically
+		startupStartTime      time.Time     // when startup mode began
+		// atomic fields to avoid races between advertise loop and stream callbacks
+		recentPeerDiscoveryCount atomic.Int64 // recent peer discovery count
+		startupMode              atomic.Bool  // true during first 10 minutes for faster advertisement
 
 		config Config
 		logger zerolog.Logger
@@ -99,9 +101,9 @@ func NewProtocol(config Config) *Protocol {
 		ctx:              ctx,
 		cancel:           cancel,
 		closeC:           make(chan struct{}),
-		startupMode:      true,
 		startupStartTime: time.Now(),
 	}
+	sp.startupMode.Store(true)
 	smConfig := streammanager.Config{
 		SoftLoCap: config.SmSoftLowCap,
 		HardLoCap: config.SmHardLowCap,
@@ -258,23 +260,24 @@ func (p *Protocol) HandleStream(raw libp2p_network.Stream, trusted bool) {
 }
 
 func (p *Protocol) advertiseLoop() {
-	// Use constants for sleep time boundaries
-	var minSleepTime, maxSleepTime time.Duration
-	if p.startupMode {
-		minSleepTime = MinSleepTimeStartup
-		maxSleepTime = MaxSleepTimeStartup
-	} else {
-		minSleepTime = MinSleepTimeNormal
-		maxSleepTime = MaxSleepTimeNormal
-	}
-
 	for {
+		// Recompute boundaries every cycle so exiting startup mode takes effect immediately.
+		var minSleepTime, maxSleepTime time.Duration
+		if p.IsInStartupMode() {
+			minSleepTime = MinSleepTimeStartup
+			maxSleepTime = MaxSleepTimeStartup
+		} else {
+			minSleepTime = MinSleepTimeNormal
+			maxSleepTime = MaxSleepTimeNormal
+		}
+
 		sleep := p.advertise()
+		peersFound := int(p.recentPeerDiscoveryCount.Load())
 
 		// Adaptive sleep: Increase if new peers were found, decrease otherwise
-		if p.recentPeerDiscoveryCount > 0 {
+		if peersFound > 0 {
 			// Increase sleep time based on number of peers found
-			sleep += time.Duration(p.recentPeerDiscoveryCount) * SleepIncreasePerPeer
+			sleep += time.Duration(peersFound) * SleepIncreasePerPeer
 		} else {
 			// Decrease sleep time by 30% when no peers found (better than /= 2)
 			sleep = time.Duration(float64(sleep) * SleepDecreaseRatio)
@@ -289,8 +292,8 @@ func (p *Protocol) advertiseLoop() {
 
 		p.logger.Debug().
 			Dur("sleep", sleep).
-			Int("peersFound", p.recentPeerDiscoveryCount).
-			Bool("startupMode", p.startupMode).
+			Int("peersFound", peersFound).
+			Bool("startupMode", p.IsInStartupMode()).
 			Msg("[Protocol] advertisement loop sleeping")
 
 		select {
@@ -383,18 +386,20 @@ func (p *Protocol) getPeerDiscoveryLimit() int {
 // advertise will advertise all compatible protocol versions for helping nodes running low version
 func (p *Protocol) advertise() time.Duration {
 	var nextWait time.Duration
-	newPeersDiscovered := false
 	maxRetries := 3
+	peerDiscoveryCount := 0
 
 	// Check if we should exit startup mode (after 10 minutes)
-	if p.startupMode && time.Since(p.startupStartTime) > StartupModeDuration {
-		p.startupMode = false
+	startupMode := p.IsInStartupMode()
+	if startupMode && time.Since(p.startupStartTime) > StartupModeDuration {
+		p.ExitStartupMode()
+		startupMode = false
 		p.logger.Info().Msg("Exiting startup mode, switching to normal advertisement timing")
 	}
 
 	// Use timing constants based on startup mode
 	var baseTimeout, timeoutIncrementStep, maxTimeout, backoffTimeRatio, maxBackoff time.Duration
-	if p.startupMode {
+	if startupMode {
 		baseTimeout = BaseTimeoutStartup
 		timeoutIncrementStep = TimeoutIncrementStepStartup
 		maxTimeout = MaxTimeoutStartup
@@ -426,7 +431,6 @@ func (p *Protocol) advertise() time.Duration {
 			p.lastAdvertiseDuration = elapsed
 
 			if err == nil {
-				newPeersDiscovered = true
 				p.logger.Debug().
 					Str("protocol", string(pid)).
 					Float64("elapsed(sec)", elapsed.Seconds()).
@@ -485,9 +489,9 @@ func (p *Protocol) advertise() time.Duration {
 
 		ctx, cancel := context.WithTimeout(p.ctx, timeout)
 		peers, err := p.disc.FindPeers(ctx, string(p.ProtoID()), p.getDHTRequestLimit())
-		cancel()
 
 		if err != nil {
+			cancel()
 			p.logger.Warn().Err(err).Msg("[Protocol] failed to find peers")
 			nextWait = backoffTimeRatio + time.Duration(i)*timeoutIncrementStep
 			if nextWait > maxBackoff {
@@ -522,6 +526,7 @@ func (p *Protocol) advertise() time.Duration {
 				validPeersFound++
 			}
 		}
+		cancel()
 
 		// Log discovery results
 		p.logger.Debug().
@@ -531,13 +536,12 @@ func (p *Protocol) advertise() time.Duration {
 			Msg("[Protocol] peer discovery results")
 
 		if validPeersFound >= targetValidPeers {
-			newPeersDiscovered = true
-			p.recentPeerDiscoveryCount = validPeersFound
+			peerDiscoveryCount = validPeersFound
 			p.logger.Info().Int("validPeers", validPeersFound).Msg("[Protocol] found sufficient valid peers")
 			break
 		} else if newPeersCount > 0 {
 			// Found some peers but not enough valid ones
-			p.recentPeerDiscoveryCount = validPeersFound
+			peerDiscoveryCount = validPeersFound
 			p.logger.Debug().Int("validPeers", validPeersFound).Int("target", targetValidPeers).Msg("[Protocol] found peers but not enough valid ones")
 		}
 
@@ -548,10 +552,10 @@ func (p *Protocol) advertise() time.Duration {
 		}
 	}
 
-	if !newPeersDiscovered {
-		p.recentPeerDiscoveryCount = 0
+	if peerDiscoveryCount == 0 {
 		p.logger.Debug().Msg("[Protocol] no new peers found during advertisement")
 	}
+	p.recentPeerDiscoveryCount.Store(int64(peerDiscoveryCount))
 
 	return nextWait
 }
@@ -650,13 +654,12 @@ func (p *Protocol) SubscribeAddStreamEvent(ch chan<- streammanager.EvtStreamAdde
 
 // ExitStartupMode exits startup mode early when enough peers are found
 func (p *Protocol) ExitStartupMode() {
-	if p.startupMode {
-		p.startupMode = false
+	if p.startupMode.CompareAndSwap(true, false) {
 		p.logger.Info().Msg("Exiting startup mode early - sufficient peers found")
 	}
 }
 
 // IsInStartupMode returns true if the protocol is in startup mode
 func (p *Protocol) IsInStartupMode() bool {
-	return p.startupMode
+	return p.startupMode.Load()
 }
