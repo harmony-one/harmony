@@ -711,6 +711,7 @@ func (hmy *Harmony) ComputeStateDB(block *types.Block, reexec uint64) (*state.DB
 // be tracer dependent.
 // NOTE: Only support default StructLogger tracer
 func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.Context, statedb *state.DB, config *TraceConfig) (interface{}, error) {
+	fmt.Println("TraceTx", config.Tracer)
 	// Assemble the structured logger or the JavaScript tracer
 	var (
 		tracer vm.Tracer
