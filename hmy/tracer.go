@@ -721,11 +721,14 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 	case config != nil && config.Tracer != nil:
 		if *config.Tracer == "ParityBlockTracer" {
 			tracer = &tracers.ParityBlockTracer{}
+			fmt.Println("TraceTx 1")
 			break
 		} else if *config.Tracer == "RosettaBlockTracer" {
 			tracer = &tracers.RosettaBlockTracer{ParityBlockTracer: &tracers.ParityBlockTracer{}}
+			fmt.Println("TraceTx 2")
 			break
 		}
+		fmt.Println("TraceTx 3")
 		// Define a meaningful timeout of a single transaction trace
 		timeout := defaultTraceTimeout
 		if config.Timeout != nil {
@@ -733,10 +736,12 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 				return nil, err
 			}
 		}
+		fmt.Println("TraceTx 4")
 		// Constuct the JavaScript tracer to execute with
 		if tracer, err = tracers.New(*config.Tracer); err != nil {
 			return nil, err
 		}
+		fmt.Println("TraceTx 5")
 		// Handle timeouts and RPC cancellations
 		deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
 		go func() {
@@ -751,13 +756,15 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 	default:
 		tracer = vm.NewStructLogger(config.LogConfig)
 	}
+	fmt.Println("TraceTx 6")
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer})
-
+	fmt.Println("TraceTx 7")
 	result, err := core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()))
 	if err != nil {
 		return nil, fmt.Errorf("tracing failed: %v", err)
 	}
+	fmt.Println("TraceTx 8")
 	// Depending on the tracer type, format and return the output
 	switch tracer := tracer.(type) {
 	case *vm.StructLogger:
