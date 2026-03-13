@@ -15,6 +15,10 @@ import (
 	"github.com/holiman/uint256"
 )
 
+func init() {
+	register("ParityBlockTracer", newPrestateTracer)
+}
+
 func (jst *ParityBlockTracer) CaptureTxStart(gasLimit uint64) {
 
 }
