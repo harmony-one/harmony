@@ -30,8 +30,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/harmony/common/math"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -860,7 +860,27 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	if _, err = core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas())); err != nil {
 		return nil, fmt.Errorf("tracing failed: %w", err)
 	}
-	return tracer.GetResult()
+
+	switch tracer := tracer.(type) {
+	//case *vm.StructLogger:
+	//	return &ExecutionResult{
+	//		Gas:         result.UsedGas,
+	//		Failed:      result.VMErr != nil,
+	//		ReturnValue: fmt.Sprintf("%x", result.ReturnData),
+	//		StructLogs:  FormatLogs(tracer.StructLogs(), config),
+	//	}, nil
+
+	case tracers.Tracer:
+		return tracer.GetResult()
+	case *native.ParityBlockTracer:
+		return tracer.GetResult()
+		//case *tracers.RosettaBlockTracer:
+		//	return tracer.GetResult()
+	default:
+		panic(fmt.Sprintf("bad tracer type %T", tracer))
+	}
+
+	//return tracer.GetResult()
 }
 
 // ComputeTxEnv returns the execution environment of a certain transaction.

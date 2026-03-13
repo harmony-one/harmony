@@ -670,6 +670,50 @@ func (jst *ParityBlockTracer) CaptureFault(pc uint64, op vm.OpCode, gas, cost ui
 	return
 }
 
+// GetResult calls the Javascript 'result' function and returns its value, or any accumulated error
+func (jst *ParityBlockTracer) GetParityResult() ([]json.RawMessage, error) {
+	var results []json.RawMessage
+	var err error
+	var headPiece string
+	var finalize func(ac *action, traceAddress []int)
+	finalize = func(ac *action, traceAddress []int) {
+		typStr, acStr, outStr := ac.toJsonStr()
+		if acStr == nil {
+			err = errors.New("tracer internal failure")
+			return
+		}
+		traceStr, _ := json.Marshal(traceAddress)
+		bodyPiece := fmt.Sprintf(
+			`,"subtraces":%d,"traceAddress":%s,"type":"%s","action":%s`,
+			len(ac.subCalls), string(traceStr), typStr, *acStr,
+		)
+		var resultPiece string
+		if ac.err != nil {
+			resultPiece = fmt.Sprintf(`,"error":"Reverted","revert":"0x%x"`, ac.revert)
+
+		} else if outStr != nil {
+			resultPiece = fmt.Sprintf(`,"result":%s`, *outStr)
+		} else {
+			resultPiece = `,"result":null`
+		}
+
+		jstr := "{" + headPiece + bodyPiece + resultPiece + "}"
+		results = append(results, json.RawMessage(jstr))
+		for i, subAc := range ac.subCalls {
+			finalize(subAc, append(traceAddress[:], i))
+		}
+	}
+	for _, curTx := range jst.tracers {
+		root := &curTx.action
+		headPiece = fmt.Sprintf(
+			`"blockNumber":%d,"blockHash":"%s","transactionHash":"%s","transactionPosition":%d`,
+			curTx.blockNumber, curTx.blockHash.Hex(), curTx.transactionHash.Hex(), curTx.transactionPosition,
+		)
+		finalize(root, make([]int, 0))
+	}
+	return results, err
+}
+
 func (jst *ParityBlockTracer) GetResult() (json.RawMessage, error) {
 	var builder strings.Builder
 	var err error
