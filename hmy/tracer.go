@@ -819,7 +819,39 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	if config == nil {
 		config = &tracers.TraceConfig{}
 	}
-	// Default tracer is the struct logger
+
+	//switch {
+	//case config.Tracer != nil:
+	//	if *config.Tracer == "ParityBlockTracer" {
+	//		tracer = &tracers.ParityBlockTracer{}
+	//		break
+	//	} else if *config.Tracer == "RosettaBlockTracer" {
+	//		tracer = &tracers.RosettaBlockTracer{ParityBlockTracer: &tracers.ParityBlockTracer{}}
+	//		break
+	//	}
+	//	// Define a meaningful timeout of a single transaction trace
+	//	//timeout := defaultTraceTimeout
+	//	//if config.Timeout != nil {
+	//	//	if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
+	//	//		return nil, err
+	//	//	}
+	//	//}
+	//	//// Constuct the JavaScript tracer to execute with
+	//	//if tracer, err = tracers.New(*config.Tracer); err != nil {
+	//	//	return nil, err
+	//	//}
+	//	//// Handle timeouts and RPC cancellations
+	//	//deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
+	//	//go func() {
+	//	//	<-deadlineCtx.Done()
+	//	//	tracer.(*tracers.Tracer).Stop(errors.New("execution timeout"))
+	//	//}()
+	//	//defer cancel()
+	//default:
+	//	// Default tracer is the struct logger
+	//	tracer = logger.NewStructLogger(config.Config)
+	//}
+
 	tracer = logger.NewStructLogger(config.Config)
 	if config.Tracer != nil {
 		tracer, err = tracers.New(*config.Tracer, txctx, config.TracerConfig)
