@@ -12,11 +12,16 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/holiman/uint256"
 )
 
 func init() {
-	register("ParityBlockTracer", newPrestateTracer)
+	register("ParityBlockTracer", newParityTracer)
+}
+
+func newParityTracer(ctx *tracers.Context, _ json.RawMessage) (tracers.Tracer, error) {
+	return &ParityBlockTracer{}, nil
 }
 
 func (jst *ParityBlockTracer) CaptureTxStart(gasLimit uint64) {
@@ -24,8 +29,6 @@ func (jst *ParityBlockTracer) CaptureTxStart(gasLimit uint64) {
 }
 
 func (jst *ParityBlockTracer) CaptureTxEnd(restGas uint64) {
-	//TODO implement me
-	//panic("implement me")
 }
 
 func (jst *ParityBlockTracer) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
@@ -34,8 +37,6 @@ func (jst *ParityBlockTracer) CaptureEnter(typ vm.OpCode, from common.Address, t
 }
 
 func (jst *ParityBlockTracer) CaptureExit(output []byte, gasUsed uint64, err error) {
-	//TODO implement me
-	//panic("implement me")
 }
 
 // CaptureStart implements the ParityBlockTracer interface to initialize the tracing operation.
