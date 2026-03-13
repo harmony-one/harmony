@@ -39,6 +39,7 @@ import (
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/hmy/tracers/logger"
+	"github.com/harmony-one/harmony/hmy/tracers/native"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/holiman/uint256"
 )
@@ -830,6 +831,8 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	}
 	// Default tracer is the struct logger
 	tracer = logger.NewStructLogger(config.Config)
+
+	tracer = &native.ParityBlockTracer{}
 	if config.Tracer != nil {
 		tracer, err = tracers.New(*config.Tracer, txctx, config.TracerConfig)
 		if err != nil {
