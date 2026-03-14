@@ -832,13 +832,14 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	// Default tracer is the struct logger
 	tracer = logger.NewStructLogger(config.Config)
 
-	tracer = &native.ParityBlockTracer{}
+	//tracer = &native.ParityBlockTracer{}
 	if config.Tracer != nil {
 		tracer, err = tracers.New(*config.Tracer, txctx, config.TracerConfig)
 		if err != nil {
 			return nil, err
 		}
 	}
+	fmt.Printf("tracer: %T %s\n", tracer, config.TracerConfig)
 	// Define a meaningful timeout of a single transaction trace
 	if config.Timeout != nil {
 		if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
