@@ -863,6 +863,7 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	}
 
 	switch tracer := tracer.(type) {
+	// TODO(frozen): check do we really need it
 	//case *vm.StructLogger:
 	//	return &ExecutionResult{
 	//		Gas:         result.UsedGas,
@@ -870,12 +871,13 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	//		ReturnValue: fmt.Sprintf("%x", result.ReturnData),
 	//		StructLogs:  FormatLogs(tracer.StructLogs(), config),
 	//	}, nil
+	//case *tracers.RosettaBlockTracer:
+	//	return tracer.GetResult()
 	case *native.ParityBlockTracer:
 		rs, err := tracer.GetParityResult()
 		fmt.Printf("*native.ParityBlockTracer: %T\n", rs)
 		return rs, err
-		//case *tracers.RosettaBlockTracer:
-		//	return tracer.GetResult()
+
 	case tracers.Tracer:
 		return tracer.GetResult()
 
