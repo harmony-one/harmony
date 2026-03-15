@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/eth/rpc"
@@ -44,7 +45,7 @@ func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockN
 	for _, result := range results {
 		raw, ok := result.Result.([]json.RawMessage)
 		if !ok {
-			return results, errors.New("tracer bug:expected []json.RawMessage")
+			return results, errors.New(fmt.Sprintf("tracer bug:expected []json.RawMessage, found %T", result.Result))
 		}
 		resultArray = append(resultArray, raw...)
 	}

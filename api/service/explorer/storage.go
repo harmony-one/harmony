@@ -10,16 +10,15 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
-	"github.com/harmony-one/harmony/internal/tikv"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/core"
 	core2 "github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy/tracers"
+	"github.com/harmony-one/harmony/hmy/tracers/native"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/rs/zerolog"
@@ -100,7 +99,7 @@ type (
 
 	traceResult struct {
 		btc  batch
-		data *tracers.TraceBlockStorage
+		data *native.TraceBlockStorage
 	}
 )
 
@@ -155,7 +154,7 @@ func (s *storage) Close() {
 	close(s.closeC)
 }
 
-func (s *storage) DumpTraceResult(data *tracers.TraceBlockStorage) {
+func (s *storage) DumpTraceResult(data *native.TraceBlockStorage) {
 	s.tm.AddNewTraceTask(data)
 }
 
@@ -203,7 +202,7 @@ func (s *storage) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error
 	if !s.available.IsSet() {
 		return nil, ErrExplorerNotReady
 	}
-	traceStorage := &tracers.TraceBlockStorage{
+	traceStorage := &native.TraceBlockStorage{
 		Hash: hash,
 	}
 	err := traceStorage.FromDB(func(key []byte) ([]byte, error) {
@@ -281,7 +280,7 @@ func (tm *taskManager) AddNewTask(b *types.Block) {
 	}
 }
 
-func (tm *taskManager) AddNewTraceTask(data *tracers.TraceBlockStorage) {
+func (tm *taskManager) AddNewTraceTask(data *native.TraceBlockStorage) {
 	tm.T <- &traceResult{
 		data: data,
 	}

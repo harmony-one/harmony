@@ -29,8 +29,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/harmony/common/math"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -38,6 +38,7 @@ import (
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/hmy/tracers/logger"
+	"github.com/harmony-one/harmony/hmy/tracers/native"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/holiman/uint256"
 )
@@ -54,16 +55,6 @@ const (
 
 	err
 )
-
-//// TraceConfig holds extra parameters to trace functions.
-//type TraceConfig struct {
-//	*vm.LogConfig
-//	Tracer         *string
-//	Timeout        *string
-//	Reexec         *uint64
-//	BlockOverrides *BlockOverrides
-//	Stateoverrides *StateOverrides
-//}
 
 // StdTraceConfig holds extra parameters to standard-json trace functions.
 type StdTraceConfig struct {
@@ -726,84 +717,7 @@ func (hmy *Harmony) ComputeStateDB(block *types.Block, reexec uint64) (*state.DB
 // be tracer dependent.
 // NOTE: Only support default StructLogger tracer
 func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, txctx *tracers.Context, vmctx vm.BlockContext, statedb *state.DB, config *tracers.TraceConfig) (interface{}, error) {
-	//txctx := &Context{
-	//	BlockHash: task.block.Hash(),
-	//	TxIndex:   i,
-	//	TxHash:    tx.Hash(),
-	//}
-	rs, err := hmy.traceTx(ctx, message, txctx, vmctx, statedb, config)
-	fmt.Printf("%T, rs: `%+v`, err: %s", rs, rs, err)
-	return rs, err
-	/*
-		// Assemble the structured logger or the JavaScript tracer
-		var (
-			tracer    vm.Tracer
-			err       error
-			timeout   = defaultTraceTimeout
-			txContext = core.NewEVMTxContext(message)
-		)
-		switch {
-		case config != nil && config.Tracer != nil:
-			if *config.Tracer == "ParityBlockTracer" {
-				tracer = &tracers.ParityBlockTracer{}
-				break
-			} else if *config.Tracer == "RosettaBlockTracer" {
-				tracer = &tracers.RosettaBlockTracer{ParityBlockTracer: &tracers.ParityBlockTracer{}}
-				break
-			}
-			// Define a meaningful timeout of a single transaction trace
-			timeout := defaultTraceTimeout
-			if config.Timeout != nil {
-				if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
-					return nil, err
-				}
-			}
-			// Constuct the JavaScript tracer to execute with
-			if tracer, err = tracers.New(*config.Tracer); err != nil {
-				return nil, err
-			}
-			// Handle timeouts and RPC cancellations
-			deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
-			go func() {
-				<-deadlineCtx.Done()
-				tracer.(*tracers.Tracer).Stop(errors.New("execution timeout"))
-			}()
-			defer cancel()
-
-		case config == nil:
-			tracer = vm.NewStructLogger(nil)
-
-		default:
-			tracer = vm.NewStructLogger(config.LogConfig)
-		}
-		// Run the transaction with tracing enabled.
-		vmenv := vm.NewEVM(vmctx, core.NewEVMTxContext(message), statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer})
-
-		result, err := core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()))
-		if err != nil {
-			return nil, fmt.Errorf("tracing failed: %v", err)
-		}
-		// Depending on the tracer type, format and return the output
-		switch tracer := tracer.(type) {
-		case *vm.StructLogger:
-			return &ExecutionResult{
-				Gas:         result.UsedGas,
-				Failed:      result.VMErr != nil,
-				ReturnValue: fmt.Sprintf("%x", result.ReturnData),
-				StructLogs:  FormatLogs(tracer.StructLogs(), config),
-			}, nil
-
-		case *tracers.Tracer:
-			return tracer.GetResult()
-		case *tracers.ParityBlockTracer:
-			return tracer.GetResult()
-		case *tracers.RosettaBlockTracer:
-			return tracer.GetResult()
-
-		default:
-			panic(fmt.Sprintf("bad tracer type %T", tracer))
-		}
-	*/
+	return hmy.traceTx(ctx, message, txctx, vmctx, statedb, config)
 }
 
 // traceTx configures a new tracer according to the provided configuration, and
@@ -848,7 +762,29 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	if _, err = core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas())); err != nil {
 		return nil, fmt.Errorf("tracing failed: %w", err)
 	}
-	return tracer.GetResult()
+
+	switch tracer := tracer.(type) {
+	// TODO(frozen): check do we really need it
+	//case *vm.StructLogger:
+	//	return &ExecutionResult{
+	//		Gas:         result.UsedGas,
+	//		Failed:      result.VMErr != nil,
+	//		ReturnValue: fmt.Sprintf("%x", result.ReturnData),
+	//		StructLogs:  FormatLogs(tracer.StructLogs(), config),
+	//	}, nil
+	//case *tracers.RosettaBlockTracer:
+	//	return tracer.GetResult()
+	case *native.ParityBlockTracer:
+		rs, err := tracer.GetParityResult()
+		fmt.Printf("*native.ParityBlockTracer: %T\n", rs)
+		return rs, err
+
+	case tracers.Tracer:
+		return tracer.GetResult()
+
+	default:
+		panic(fmt.Sprintf("bad tracer type %T", tracer))
+	}
 }
 
 // ComputeTxEnv returns the execution environment of a certain transaction.
@@ -1035,27 +971,3 @@ func (r *StructLogRes) GetOperatorEvent(key string) string {
 		return ""
 	}
 }
-
-// FormatLogs formats EVM returned structured logs for json output
-//func FormatLogs(logs []*vm.StructLog, conf *tracers.TraceConfig) []StructLogRes {
-//	formatted := make([]StructLogRes, len(logs))
-//	for index, trace := range logs {
-//		formatted[index] = StructLogRes{
-//			Pc:              trace.Pc,
-//			Op:              trace.Op.String(),
-//			CallerAddress:   trace.CallerAddress,
-//			ContractAddress: trace.ContractAddress,
-//			Gas:             trace.Gas,
-//			GasCost:         trace.GasCost,
-//			Depth:           trace.Depth,
-//			Error:           trace.Err,
-//
-//			rawStack:         trace.Stack,
-//			rawAfterStack:    trace.AfterStack,
-//			rawMemory:        trace.Memory,
-//			rawStorage:       trace.Storage,
-//			rawOperatorEvent: trace.OperatorEvent,
-//		}
-//	}
-//	return formatted
-//}

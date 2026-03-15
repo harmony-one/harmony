@@ -12,16 +12,15 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
-
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/hmy/tracers"
+	"github.com/harmony-one/harmony/hmy/tracers/native"
 	"github.com/harmony-one/harmony/internal/chain"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -226,7 +225,7 @@ func (s *Service) GetTraceResultByHash(hash ethCommon.Hash) (json.RawMessage, er
 }
 
 // DumpTraceResult instruct the explorer storage to trace data in explorer DB
-func (s *Service) DumpTraceResult(data *tracers.TraceBlockStorage) {
+func (s *Service) DumpTraceResult(data *native.TraceBlockStorage) {
 	s.storage.DumpTraceResult(data)
 }
 
