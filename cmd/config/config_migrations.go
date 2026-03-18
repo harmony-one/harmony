@@ -519,6 +519,14 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.6.7"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("BLSKeys.MaxKeys") == nil {
+			confTree.Set("BLSKeys.MaxKeys", defaultConfig.BLSKeys.MaxKeys)
+		}
+		confTree.Set("Version", "2.6.8")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {
