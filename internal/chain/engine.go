@@ -39,6 +39,8 @@ const (
 	epochCtxCache    = 20
 	vrfBeta          = 32 // 32 bytes randomness
 	vrfProof         = 96 // 96 bytes proof (bls sig)
+	// Maximum allowed future skew for block timestamps.
+	allowedFutureBlockTime = 15 * time.Second
 )
 
 type engineImpl struct {
@@ -63,6 +65,18 @@ func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header
 	parentHeader := chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
 	if parentHeader == nil {
 		return engine.ErrUnknownAncestor
+	}
+	// Apply timestamp rules only when the corresponding fork is active.
+	if chain.Config().IsTimestampValidation(header.Epoch()) {
+		// Keep block timestamps strictly increasing.
+		if header.Time().Cmp(parentHeader.Time()) <= 0 {
+			return errors.New("timestamp older than parent")
+		}
+		// Reject blocks that are too far in the future relative to local wall clock.
+		limit := big.NewInt(time.Now().Add(allowedFutureBlockTime).Unix())
+		if header.Time().Cmp(limit) > 0 {
+			return engine.ErrFutureBlock
+		}
 	}
 	if seal {
 		if err := e.VerifySeal(chain, header); err != nil {

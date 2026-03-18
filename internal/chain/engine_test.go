@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/trie"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -322,8 +323,14 @@ func (bc *fakeBlockChain) CurrentBlock() *types.Block {
 func (bc *fakeBlockChain) CurrentHeader() *block.Header {
 	return bc.currentBlock.Header()
 }
-func (bc *fakeBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block    { return nil }
-func (bc *fakeBlockChain) GetHeader(hash common.Hash, number uint64) *block.Header  { return nil }
+func (bc *fakeBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block { return nil }
+func (bc *fakeBlockChain) GetHeader(hash common.Hash, number uint64) *block.Header {
+	header := bc.currentBlock.Header()
+	if header != nil && header.Hash() == hash && header.Number().Uint64() == number {
+		return header
+	}
+	return nil
+}
 func (bc *fakeBlockChain) GetHeaderByHash(hash common.Hash) *block.Header           { return nil }
 func (bc *fakeBlockChain) GetReceiptsByHash(hash common.Hash) types.Receipts        { return nil }
 func (bc *fakeBlockChain) ContractCode(hash common.Hash) ([]byte, error)            { return []byte{}, nil }
@@ -351,7 +358,7 @@ func (bc *fakeBlockChain) ReadValidatorInformation(addr common.Address) (*stakin
 	return nil, nil
 }
 func (bc *fakeBlockChain) Config() *params.ChainConfig {
-	return params.LocalnetChainConfig
+	return &bc.config
 }
 func (cr *fakeBlockChain) StateAt(root common.Hash) (*state.DB, error) {
 	return nil, nil
@@ -393,5 +400,65 @@ func makeVoteData(kp blsKeyPair, block *types.Block) slash.Vote {
 		SignerPubKeys:   []bls.SerializedPublicKey{kp.Pub()},
 		BlockHeaderHash: block.Hash(),
 		Signature:       kp.Sign(block),
+	}
+}
+
+func TestVerifyHeaderTimestampValidation(t *testing.T) {
+	chain := makeFakeBlockChain()
+	eng := NewEngine()
+
+	parent := chain.CurrentHeader()
+	parent.SetTime(big.NewInt(time.Now().Unix()))
+
+	mkChild := func(ts int64) *block.Header {
+		h := blockfactory.NewTestHeader()
+		h.SetParentHash(parent.Hash())
+		h.SetNumber(new(big.Int).Add(parent.Number(), big.NewInt(1)))
+		h.SetEpoch(parent.Epoch())
+		h.SetTime(big.NewInt(ts))
+		return h
+	}
+
+	if err := eng.VerifyHeader(chain, mkChild(parent.Time().Int64()+1), false); err != nil {
+		t.Fatalf("expected valid timestamp, got %v", err)
+	}
+
+	if err := eng.VerifyHeader(chain, mkChild(parent.Time().Int64()), false); err == nil {
+		t.Fatal("expected error for non-increasing timestamp")
+	}
+
+	if err := eng.VerifyHeader(chain, mkChild(time.Now().Add(allowedFutureBlockTime+time.Second).Unix()), false); err != engine.ErrFutureBlock {
+		t.Fatalf("expected ErrFutureBlock, got %v", err)
+	}
+}
+
+func TestVerifyHeaderTimestampValidationBackwardCompatibleBeforeFork(t *testing.T) {
+	chain := makeFakeBlockChain()
+	eng := NewEngine()
+
+	// Keep activation epoch above the header epoch.
+	chain.config.TimestampValidationEpoch = big.NewInt(100)
+
+	parent := chain.CurrentHeader()
+	parent.SetEpoch(big.NewInt(5))
+	parent.SetTime(big.NewInt(time.Now().Unix()))
+
+	mkChild := func(ts int64) *block.Header {
+		h := blockfactory.NewTestHeader()
+		h.SetParentHash(parent.Hash())
+		h.SetNumber(new(big.Int).Add(parent.Number(), big.NewInt(1)))
+		h.SetEpoch(parent.Epoch())
+		h.SetTime(big.NewInt(ts))
+		return h
+	}
+
+	older := mkChild(parent.Time().Int64() - 1)
+	if err := eng.VerifyHeader(chain, older, false); err != nil {
+		t.Fatalf("expected old timestamp allowed pre-fork, got %v", err)
+	}
+
+	future := mkChild(time.Now().Add(allowedFutureBlockTime + time.Minute).Unix())
+	if err := eng.VerifyHeader(chain, future, false); err != nil {
+		t.Fatalf("expected future timestamp allowed pre-fork, got %v", err)
 	}
 }

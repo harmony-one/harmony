@@ -81,6 +81,7 @@ var (
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		TimestampValidationEpoch:              EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
@@ -133,6 +134,7 @@ var (
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  big.NewInt(3044),
+		TimestampValidationEpoch:              EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
@@ -185,6 +187,7 @@ var (
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		TimestampValidationEpoch:              EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
@@ -238,6 +241,7 @@ var (
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   big.NewInt(144),
 		TestnetExternalEpoch:                  EpochTBD,
+		TimestampValidationEpoch:              EpochTBD,
 		IsOneSecondEpoch:                      big.NewInt(17436),
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(35626),
@@ -291,6 +295,7 @@ var (
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		TimestampValidationEpoch:              EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
@@ -343,6 +348,7 @@ var (
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
+		TimestampValidationEpoch:              big.NewInt(0),
 		IsOneSecondEpoch:                      big.NewInt(4),
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
@@ -394,6 +400,7 @@ var (
 		big.NewInt(2),                      // HIP30Epoch
 		big.NewInt(0),                      // DevnetExternalEpoch
 		big.NewInt(0),                      // TestnetExternalEpoch
+		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // BlockGas30MEpoch
 		big.NewInt(2),                      // MaxRateEpoch
 		big.NewInt(0),                      // TopMaxRateEpoch
@@ -448,6 +455,7 @@ var (
 		big.NewInt(2),        // HIP30Epoch
 		big.NewInt(0),        // DevnetExternalEpoch
 		big.NewInt(0),        // TestnetExternalEpoch
+		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // BlockGas30MEpoch
 		big.NewInt(2),        // MaxRateEpoch
 		big.NewInt(0),        // TopMaxRateEpoch
@@ -629,6 +637,10 @@ type ChainConfig struct {
 
 	TestnetExternalEpoch *big.Int `json:"testnet-external-epoch,omitempty"`
 
+	// TimestampValidationEpoch is the first epoch to enforce strict monotonic
+	// and future-bounded block timestamp checks during header verification.
+	TimestampValidationEpoch *big.Int `json:"timestamp-validation-epoch,omitempty"`
+
 	BlockGas30MEpoch *big.Int `json:"block-gas-30m-epoch,omitempty"`
 
 	// MaxRateEpoch will make sure the validator max-rate is at least equal to the minRate + the validator max-rate-increase
@@ -777,6 +789,11 @@ func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
 	return isForked(c.IsOneSecondEpoch, epoch)
+}
+
+// IsTimestampValidation determines whether timestamp hardfork checks are enabled.
+func (c *ChainConfig) IsTimestampValidation(epoch *big.Int) bool {
+	return isForked(c.TimestampValidationEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%
