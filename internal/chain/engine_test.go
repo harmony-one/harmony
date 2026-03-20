@@ -407,8 +407,12 @@ func TestVerifyHeaderTimestampValidation(t *testing.T) {
 	chain := makeFakeBlockChain()
 	eng := NewEngine()
 
-	parent := chain.CurrentHeader()
+	parent := blockfactory.NewTestHeader()
+	parent.SetNumber(big.NewInt(doubleSignBlockNumber))
+	parent.SetEpoch(big.NewInt(currentEpoch))
 	parent.SetTime(big.NewInt(time.Now().Unix()))
+	chain.currentBlock = *types.NewBlockWithHeader(parent)
+	parent = chain.CurrentHeader()
 
 	mkChild := func(ts int64) *block.Header {
 		h := blockfactory.NewTestHeader()
@@ -439,9 +443,12 @@ func TestVerifyHeaderTimestampValidationBackwardCompatibleBeforeFork(t *testing.
 	// Keep activation epoch above the header epoch.
 	chain.config.TimestampValidationEpoch = big.NewInt(100)
 
-	parent := chain.CurrentHeader()
+	parent := blockfactory.NewTestHeader()
+	parent.SetNumber(big.NewInt(doubleSignBlockNumber))
 	parent.SetEpoch(big.NewInt(5))
 	parent.SetTime(big.NewInt(time.Now().Unix()))
+	chain.currentBlock = *types.NewBlockWithHeader(parent)
+	parent = chain.CurrentHeader()
 
 	mkChild := func(ts int64) *block.Header {
 		h := blockfactory.NewTestHeader()
