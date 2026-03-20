@@ -294,6 +294,15 @@ func (d *Downloader) waitForEnoughStreams(requiredStreams int) (bool, int) {
 
 		case <-watchdog.C:
 			numStreams := d.syncProtocol.NumStreams()
+			// Re-check before recovery reset: streams might have recovered while the
+			// watchdog event was pending in the select queue.
+			if numStreams >= requiredStreams {
+				d.logger.Info().
+					Int("requiredStreams", requiredStreams).
+					Int("NumStreams", numStreams).
+					Msg(WrapStagedSyncMsg("watchdog fired but stream requirement is already met; skipping recovery reset"))
+				return true, numStreams
+			}
 			d.logger.Warn().
 				Int("requiredStreams", requiredStreams).
 				Int("NumStreams", numStreams).
