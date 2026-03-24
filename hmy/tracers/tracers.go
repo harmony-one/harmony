@@ -66,7 +66,6 @@ func RegisterLookup(wildcard bool, lookup lookupFunc) {
 // New returns a new instance of a tracer, by iterating through the
 // registered lookups.
 func New(code string, ctx *Context, cfg json.RawMessage) (Tracer, error) {
-	fmt.Printf("tracers.New: code %s, block %d, tx %s\n", code, ctx.BlockNumber, ctx.TxHash)
 	for _, lookup := range lookups {
 		if tracer, err := lookup(code, ctx, cfg); err == nil {
 			return tracer, nil

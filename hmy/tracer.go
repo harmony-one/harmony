@@ -741,7 +741,6 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 			return nil, err
 		}
 	}
-	fmt.Printf("tracer: %T, %v\n", tracer, config)
 	// Define a meaningful timeout of a single transaction trace
 	if config.Timeout != nil {
 		if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
