@@ -124,14 +124,5 @@ func Asset(name string) ([]byte, error) {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	//"4byte_tracer.js":    _4byte_tracerJs,
-	//"bigram_tracer.js":   bigram_tracerJs,
-	//"block_tracer.js":    block_tracerJs,
 	"call_tracer.js": call_tracerJs,
-	//"evmdis_tracer.js":   evmdis_tracerJs,
-	//"noop_tracer.js":     noop_tracerJs,
-	//"opcount_tracer.js":  opcount_tracerJs,
-	//"prestate_tracer.js": prestate_tracerJs,
-	//"trigram_tracer.js":  trigram_tracerJs,
-	//"unigram_tracer.js":  unigram_tracerJs,
 }
