@@ -29,20 +29,20 @@ func NewThreadSafeDecider(decider Decider, mu *sync.RWMutex) Decider {
 }
 
 func (a threadSafeDeciderImpl) String() string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.String()
 }
 
 func (a threadSafeDeciderImpl) Participants() multibls.PublicKeys {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.Participants()
 }
 
 func (a threadSafeDeciderImpl) IndexOf(key bls.SerializedPublicKey) int {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.IndexOf(key)
 }
 
@@ -51,26 +51,26 @@ func (a threadSafeDeciderImpl) ParticipantsCount() int64 {
 }
 
 func (a threadSafeDeciderImpl) NthNextValidator(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.NthNextValidator(slotList, pubKey, next)
 }
 
 func (a threadSafeDeciderImpl) NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.NthNextValidatorV2(slotList, pubKey, next)
 }
 
 func (a threadSafeDeciderImpl) NthNextHmy(instance shardingconfig.Instance, pubkey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.NthNextHmy(instance, pubkey, next)
 }
 
 func (a threadSafeDeciderImpl) FirstParticipant(instance shardingconfig.Instance) *bls.PublicKeyWrapper {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.FirstParticipant(instance)
 }
 
@@ -87,8 +87,8 @@ func (a threadSafeDeciderImpl) submitVote(p Phase, pubkeys []bls.SerializedPubli
 }
 
 func (a threadSafeDeciderImpl) SignersCount(phase Phase) int64 {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.SignersCount(phase)
 }
 
@@ -99,26 +99,26 @@ func (a threadSafeDeciderImpl) reset(phases []Phase) {
 }
 
 func (a threadSafeDeciderImpl) ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.ReadBallot(p, pubkey)
 }
 
 func (a threadSafeDeciderImpl) GetBallotsCount(p Phase, pubkeys []bls.SerializedPublicKey) int64 {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.GetBallotsCount(p, pubkeys)
 }
 
 func (a threadSafeDeciderImpl) TwoThirdsSignersCount() int64 {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.TwoThirdsSignersCount()
 }
 
 func (a threadSafeDeciderImpl) AggregateVotes(p Phase) *bls_core.Sign {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.AggregateVotes(p)
 }
 
@@ -129,8 +129,8 @@ func (a threadSafeDeciderImpl) SetVoters(subCommittee *shard.Committee, epoch *b
 }
 
 func (a threadSafeDeciderImpl) Policy() Policy {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.Policy()
 }
 
@@ -141,20 +141,20 @@ func (a threadSafeDeciderImpl) AddNewVote(p Phase, pubkeys []*bls.PublicKeyWrapp
 }
 
 func (a threadSafeDeciderImpl) IsQuorumAchievedByMask(mask *bls.Mask) bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.IsQuorumAchievedByMask(mask)
 }
 
 func (a threadSafeDeciderImpl) QuorumThreshold() numeric.Dec {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.QuorumThreshold()
 }
 
 func (a threadSafeDeciderImpl) IsAllSigsCollected() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.IsAllSigsCollected()
 }
 
@@ -171,19 +171,19 @@ func (a threadSafeDeciderImpl) ResetViewChangeVotes() {
 }
 
 func (a threadSafeDeciderImpl) CurrentTotalPower(p Phase) (*numeric.Dec, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.CurrentTotalPower(p)
 }
 
 func (a threadSafeDeciderImpl) IsQuorumAchieved(p Phase) bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.IsQuorumAchieved(p)
 }
 
 func (a threadSafeDeciderImpl) ComputeTotalPowerByMask(mask *bls.Mask) numeric.Dec {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.decider.ComputeTotalPowerByMask(mask)
 }
