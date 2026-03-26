@@ -149,8 +149,8 @@ func StopServers() error {
 
 func getAuthAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
 	return []rpc.API{
-		NewPublicTraceAPI(hmy, Debug), // Debug version means geth trace rpc
-		NewPublicTraceAPI(hmy, Trace), // Trace version means parity trace rpc
+		NewPublicTraceAPI(hmy, Debug, rateLimiterEnable, ratelimit), // Debug version means geth trace rpc
+		NewPublicTraceAPI(hmy, Trace, rateLimiterEnable, ratelimit), // Trace version means parity trace rpc
 	}
 }
 

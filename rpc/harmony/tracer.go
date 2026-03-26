@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,6 +33,9 @@ import (
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/hmy/tracers"
+	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -55,11 +59,23 @@ var (
 type PublicTracerService struct {
 	hmy     *hmy.Harmony
 	version Version
+	limiter *rate.Limiter
 }
 
 // NewPublicTraceAPI creates a new API for the RPC interface
-func NewPublicTraceAPI(hmy *hmy.Harmony, version Version) rpc.API {
-	var service interface{} = &PublicTracerService{hmy, version}
+func NewPublicTraceAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
+	var limiter *rate.Limiter
+	if limiterEnable {
+		if limit > 0 {
+			limiter = rate.NewLimiter(rate.Limit(limit), limit)
+		} else {
+			utils.Logger().Warn().
+				Int("rpc_ratelimit", limit).
+				Msg("Disabling RPC rate limiter due to non-positive RequestsPerSecond")
+		}
+	}
+
+	var service interface{} = &PublicTracerService{hmy: hmy, version: version, limiter: limiter}
 	if version == Trace {
 		service = &PublicParityTracerService{service.(*PublicTracerService)}
 	}
@@ -71,11 +87,31 @@ func NewPublicTraceAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	}
 }
 
+func (s *PublicTracerService) wait(ctx context.Context) error {
+	if s.limiter == nil {
+		return nil
+	}
+	deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
+	defer cancel()
+	if !s.limiter.Allow() {
+		name := reflect.TypeOf(s.limiter).Elem().Name()
+		rpcRateLimitCounterVec.With(prometheus.Labels{
+			"limiter_name": name,
+		}).Inc()
+	}
+	return s.limiter.Wait(deadlineCtx)
+}
+
 // TraceChain returns the structured logs created during the execution of EVM
 // between two blocks (excluding start) and returns them as a JSON object.
 func (s *PublicTracerService) TraceChain(ctx context.Context, start, end rpc.BlockNumber, config *tracers.TraceConfig) (*rpc.Subscription, error) {
 	timer := DoMetricRPCRequest(TraceChain)
 	defer DoRPCRequestDuration(TraceChain, timer)
+
+	if err := s.wait(ctx); err != nil {
+		DoMetricRPCQueryInfo(TraceChain, RateLimitedNumber)
+		return nil, err
+	}
 
 	// TODO (JL): Make API available after DoS testing
 	return nil, ErrNotAvailable
@@ -109,6 +145,11 @@ func (s *PublicTracerService) TraceBlockByNumber(ctx context.Context, number rpc
 	timer := DoMetricRPCRequest(TraceBlockByNumber)
 	defer DoRPCRequestDuration(TraceBlockByNumber, timer)
 
+	if err := s.wait(ctx); err != nil {
+		DoMetricRPCQueryInfo(TraceBlockByNumber, RateLimitedNumber)
+		return nil, err
+	}
+
 	// Fetch the block that we want to trace
 	block := s.hmy.BlockChain.GetBlockByNumber(uint64(number))
 
@@ -120,6 +161,11 @@ func (s *PublicTracerService) TraceBlockByNumber(ctx context.Context, number rpc
 func (s *PublicTracerService) TraceBlockByHash(ctx context.Context, hash common.Hash, config *tracers.TraceConfig) ([]*hmy.TxTraceResult, error) {
 	timer := DoMetricRPCRequest(TraceBlockByHash)
 	defer DoRPCRequestDuration(TraceBlockByHash, timer)
+
+	if err := s.wait(ctx); err != nil {
+		DoMetricRPCQueryInfo(TraceBlockByHash, RateLimitedNumber)
+		return nil, err
+	}
 
 	block := s.hmy.BlockChain.GetBlockByHash(hash)
 	if block == nil {
@@ -135,6 +181,11 @@ func (s *PublicTracerService) TraceBlock(ctx context.Context, blob []byte, confi
 	timer := DoMetricRPCRequest(TraceBlock)
 	defer DoRPCRequestDuration(TraceBlock, timer)
 
+	if err := s.wait(ctx); err != nil {
+		DoMetricRPCQueryInfo(TraceBlock, RateLimitedNumber)
+		return nil, err
+	}
+
 	block := new(types.Block)
 	if err := rlp.Decode(bytes.NewReader(blob), block); err != nil {
 		DoMetricRPCQueryInfo(TraceBlock, FailedNumber)
@@ -148,6 +199,11 @@ func (s *PublicTracerService) TraceBlock(ctx context.Context, blob []byte, confi
 func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.Hash, config *tracers.TraceConfig) (interface{}, error) {
 	timer := DoMetricRPCRequest(TraceTransaction)
 	defer DoRPCRequestDuration(TraceTransaction, timer)
+
+	if err := s.wait(ctx); err != nil {
+		DoMetricRPCQueryInfo(TraceTransaction, RateLimitedNumber)
+		return nil, err
+	}
 
 	// Retrieve the transaction and assemble its EVM context
 	tx, blockHash, _, index := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
@@ -187,6 +243,11 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber, config *tracers.TraceCallConfig) (interface{}, error) {
 	timer := DoMetricRPCRequest(TraceCall)
 	defer DoRPCRequestDuration(TraceCall, timer)
+
+	if err := s.wait(ctx); err != nil {
+		DoMetricRPCQueryInfo(TraceCall, RateLimitedNumber)
+		return nil, err
+	}
 
 	// First try to retrieve the state
 	statedb, header, err := s.hmy.StateAndHeaderByNumber(ctx, blockNr)
