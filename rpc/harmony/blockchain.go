@@ -57,20 +57,36 @@ const (
 func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
 	var limiter *rate.Limiter
 	if limiterEnable {
-		limiter = rate.NewLimiter(rate.Limit(limit), limit)
-		name := reflect.TypeOf(limiter).Elem().Name()
-		rpcRateLimitCounterVec.With(prometheus.Labels{
-			"limiter_name": name,
-		}).Add(float64(0))
+		if limit > 0 {
+			limiter = rate.NewLimiter(rate.Limit(limit), limit)
+			name := reflect.TypeOf(limiter).Elem().Name()
+			rpcRateLimitCounterVec.With(prometheus.Labels{
+				"limiter_name": name,
+			}).Add(float64(0))
+		} else {
+			utils.Logger().Warn().
+				Int("rpc_ratelimit", limit).
+				Msg("Disabling RPC rate limiter due to non-positive RequestsPerSecond")
+		}
+	}
+
+	var limiterGetStakingNetworkInfo *rate.Limiter
+	var limiterGetSuperCommittees *rate.Limiter
+	var limiterGetCurrentUtilityMetrics *rate.Limiter
+	if limiterEnable {
+		// TEMP SOLUTION to rpc node spamming issue
+		limiterGetStakingNetworkInfo = rate.NewLimiter(5, 10)
+		limiterGetSuperCommittees = rate.NewLimiter(5, 10)
+		limiterGetCurrentUtilityMetrics = rate.NewLimiter(5, 10)
 	}
 
 	s := &PublicBlockchainService{
 		hmy:                             hmy,
 		version:                         version,
 		limiter:                         limiter,
-		limiterGetStakingNetworkInfo:    rate.NewLimiter(5, 10),
-		limiterGetSuperCommittees:       rate.NewLimiter(5, 10),
-		limiterGetCurrentUtilityMetrics: rate.NewLimiter(5, 10),
+		limiterGetStakingNetworkInfo:    limiterGetStakingNetworkInfo,
+		limiterGetSuperCommittees:       limiterGetSuperCommittees,
+		limiterGetCurrentUtilityMetrics: limiterGetCurrentUtilityMetrics,
 	}
 	s.helper = s.newHelper()
 

@@ -92,7 +92,7 @@ func NewCallAPIService(
 	return &CallAPIService{
 		hmy:                 hmy,
 		publicContractAPI:   rpc2.NewPublicContractAPI(hmy, rpc2.V2, limiterEnable, rateLimit, evmCallTimeout),
-		publicStakingAPI:    rpc2.NewPublicStakingAPI(hmy, rpc2.V2),
+		publicStakingAPI:    rpc2.NewPublicStakingAPI(hmy, rpc2.V2, limiterEnable),
 		publicBlockChainAPI: rpc2.NewPublicBlockchainAPI(hmy, rpc2.V2, limiterEnable, rateLimit),
 	}
 }

@@ -180,8 +180,8 @@ func getAPIs(hmy *hmy.Harmony, config nodeconfig.RPCServerConfig) []rpc.API {
 
 	if config.StakingRPCsEnabled {
 		publicAPIs = append(publicAPIs,
-			NewPublicStakingAPI(hmy, V1),
-			NewPublicStakingAPI(hmy, V2),
+			NewPublicStakingAPI(hmy, V1, config.RateLimiterEnabled),
+			NewPublicStakingAPI(hmy, V2, config.RateLimiterEnabled),
 		)
 	}
 

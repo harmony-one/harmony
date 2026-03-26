@@ -40,8 +40,17 @@ type PublicStakingService struct {
 }
 
 // NewPublicStakingAPI creates a new API for the RPC interface
-func NewPublicStakingAPI(hmy *hmy.Harmony, version Version) rpc.API {
+func NewPublicStakingAPI(hmy *hmy.Harmony, version Version, limiterEnable bool) rpc.API {
 	viCache, _ := lru.New(validatorInfoCacheSize)
+	var limiterGetAllValidatorInformation *rate.Limiter
+	var limiterGetAllDelegationInformation *rate.Limiter
+	var limiterGetDelegationsByValidator *rate.Limiter
+	if limiterEnable {
+		// TEMP SOLUTION to rpc node spamming issue
+		limiterGetAllValidatorInformation = rate.NewLimiter(1, 3)
+		limiterGetAllDelegationInformation = rate.NewLimiter(1, 3)
+		limiterGetDelegationsByValidator = rate.NewLimiter(5, 20)
+	}
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
@@ -49,9 +58,9 @@ func NewPublicStakingAPI(hmy *hmy.Harmony, version Version) rpc.API {
 			hmy:                                hmy,
 			version:                            version,
 			validatorInfoCache:                 viCache,
-			limiterGetAllValidatorInformation:  rate.NewLimiter(1, 3),
-			limiterGetAllDelegationInformation: rate.NewLimiter(1, 3),
-			limiterGetDelegationsByValidator:   rate.NewLimiter(5, 20),
+			limiterGetAllValidatorInformation:  limiterGetAllValidatorInformation,
+			limiterGetAllDelegationInformation: limiterGetAllDelegationInformation,
+			limiterGetDelegationsByValidator:   limiterGetDelegationsByValidator,
 		},
 		Public: true,
 	}

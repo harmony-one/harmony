@@ -40,7 +40,13 @@ type PublicPoolService struct {
 func NewPublicPoolAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
 	var limiter *rate.Limiter
 	if limiterEnable {
-		limiter = rate.NewLimiter(rate.Limit(limit), limit)
+		if limit > 0 {
+			limiter = rate.NewLimiter(rate.Limit(limit), limit)
+		} else {
+			utils.Logger().Warn().
+				Int("rpc_ratelimit", limit).
+				Msg("Disabling RPC rate limiter due to non-positive RequestsPerSecond")
+		}
 	}
 	return rpc.API{
 		Namespace: version.Namespace(),
