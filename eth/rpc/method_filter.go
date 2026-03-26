@@ -10,6 +10,12 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
+// Compiled once: Match() runs per RPC method when filters are enabled.
+var (
+	methodFilterSimpleTokenPattern = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+	methodFilterWildcardPattern    = regexp.MustCompile(`^[a-zA-Z0-9_*?]+$`)
+)
+
 type RpcMethodFilter struct {
 	Allow []string
 	Deny  []string
@@ -105,10 +111,10 @@ func Match(pattern string, value string) bool {
 			return isAllowed
 		}
 	}
-	// auto detect simple checking  or wildcard
-	if regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString(pattern) {
+	// auto detect simple checking or wildcard
+	if methodFilterSimpleTokenPattern.MatchString(pattern) {
 		return strings.EqualFold(pattern, value)
-	} else if regexp.MustCompile(`^[a-zA-Z0-9_*?]+$`).MatchString(pattern) {
+	} else if methodFilterWildcardPattern.MatchString(pattern) {
 		return MatchWildCard(pattern, value)
 	}
 	// by default we use regex matching
