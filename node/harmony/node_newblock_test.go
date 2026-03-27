@@ -3,6 +3,7 @@ package node
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/consensus"
@@ -60,7 +61,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 
 	node := New(host, consensusObj, nil, nil, reg)
 
-	node.Worker.UpdateCurrent()
+	node.Worker.UpdateCurrent(time.Now())
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -80,7 +81,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 
 	node.Blockchain().InsertChain(types.Blocks{block}, false)
 
-	node.Worker.UpdateCurrent()
+	node.Worker.UpdateCurrent(time.Now())
 
 	_, err = node.Worker.FinalizeNewBlock(
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,

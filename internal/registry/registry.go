@@ -3,9 +3,11 @@ package registry
 import (
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	ntptime "github.com/harmony-one/harmony/api/service/ntp"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -32,11 +34,14 @@ type Registry struct {
 	addressToBLSKey AddressToBLSKey
 	worker          *worker.Worker
 	quorum          quorum.Decider
+	ntpTime         ntptime.NTPTime
 }
 
 // New creates a new registry.
 func New() *Registry {
-	return &Registry{}
+	return &Registry{
+		ntpTime: ntptime.LocalTime{},
+	}
 }
 
 // SetBlockchain sets the blockchain to registry.
@@ -233,6 +238,23 @@ func (r *Registry) GetQuorum() quorum.Decider {
 	defer r.mu.Unlock()
 
 	return r.quorum
+}
+
+// SetNTPTime sets the NTP time provider in the registry.
+func (r *Registry) SetNTPTime(tp ntptime.NTPTime) *Registry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.ntpTime = tp
+	return r
+}
+
+// Now returns the current NTP-corrected time.
+func (r *Registry) Now() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.ntpTime.Now()
 }
 
 type FindCommitteeByID interface {
