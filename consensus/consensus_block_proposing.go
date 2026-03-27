@@ -34,7 +34,7 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
-	env, err := worker.UpdateCurrent()
+	env, err := worker.UpdateCurrent(consensus.registry.Now())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to update worker")
 	}
