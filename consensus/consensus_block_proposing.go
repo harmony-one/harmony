@@ -34,7 +34,13 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
-	env, err := worker.UpdateCurrent(consensus.registry.Now())
+	var blockTime time.Time
+	if consensus.Blockchain().Config().IsNTP(nowEpoch) {
+		blockTime = consensus.registry.Now()
+	} else {
+		blockTime = time.Now()
+	}
+	env, err := worker.UpdateCurrent(blockTime)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to update worker")
 	}

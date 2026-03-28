@@ -88,6 +88,7 @@ var (
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
+		NTPEpoch:                              EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -144,6 +145,7 @@ var (
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
+		NTPEpoch:                              EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -199,6 +201,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		NTPEpoch:                              EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -256,6 +259,7 @@ var (
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
+		NTPEpoch:                              EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -312,6 +316,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		NTPEpoch:                              EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -367,6 +372,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		NTPEpoch:                              EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -425,6 +431,7 @@ var (
 		big.NewInt(0),                      // EIP7939CLZEpoch
 		big.NewInt(0),                      // EIP5656McopyEpoch
 		big.NewInt(0),                      // EIP6780Epoch
+		big.NewInt(0),                      // NTPEpoch
 	}
 
 	// TestChainConfig ...
@@ -483,6 +490,7 @@ var (
 		big.NewInt(0),        // EIP7939CLZEpoch
 		big.NewInt(0),        // EIP5656McopyEpoch
 		big.NewInt(0),        // EIP6780Epoch
+		big.NewInt(0),        // NTPEpoch
 	}
 
 	// TestRules ...
@@ -685,6 +693,9 @@ type ChainConfig struct {
 	EIP5656McopyEpoch *big.Int `json:"eip5656-mcopy-epoch,omitempty"`
 	// EIP6780Epoch is the first epoch to support EIP-6780 (deactivate SELFDESTRUCT)
 	EIP6780Epoch *big.Int `json:"eip6780-epoch,omitempty"`
+
+	// NTPEpoch is the first epoch to use NTP-corrected time for block timestamps
+	NTPEpoch *big.Int `json:"ntp-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -950,6 +961,11 @@ func (c *ChainConfig) IsEIP5656Mcopy(epoch *big.Int) bool {
 // IsEIP6780 determines whether EIP-6780 (deactivate SELFDESTRUCT) is active
 func (c *ChainConfig) IsEIP6780(epoch *big.Int) bool {
 	return isForked(c.EIP6780Epoch, epoch)
+}
+
+// IsNTP determines whether NTP-corrected time should be used for block timestamps
+func (c *ChainConfig) IsNTP(epoch *big.Int) bool {
+	return isForked(c.NTPEpoch, epoch)
 }
 
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
