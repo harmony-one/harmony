@@ -1,0 +1,234 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+
+env:
+  GOPATH: ${{ github.workspace }}/go
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout harmony
+        uses: actions/checkout@v4
+        with:
+          path: go/src/github.com/harmony-one/harmony
+
+      - name: Checkout mcl
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/mcl
+          path: go/src/github.com/harmony-one/mcl
+
+      - name: Checkout bls
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/bls
+          path: go/src/github.com/harmony-one/bls
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.2'
+          cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
+
+      - name: Build mcl
+        run: make -j4
+        working-directory: go/src/github.com/harmony-one/mcl
+
+      - name: Build bls
+        run: make BLS_SWAP_G=1 -j4
+        working-directory: go/src/github.com/harmony-one/bls
+
+      - name: Build harmony
+        run: make
+        working-directory: go/src/github.com/harmony-one/harmony
+
+      - name: Notify Discord on failure
+        if: failure()
+        run: |
+          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+          chmod +x send.sh && ./send.sh failure ${{ secrets.WEBHOOK_URL }}
+
+  go-checker:
+    name: Go Checker
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout harmony
+        uses: actions/checkout@v4
+        with:
+          path: go/src/github.com/harmony-one/harmony
+
+      - name: Checkout mcl
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/mcl
+          path: go/src/github.com/harmony-one/mcl
+
+      - name: Checkout bls
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/bls
+          path: go/src/github.com/harmony-one/bls
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.2'
+          cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
+
+      - name: Build mcl
+        run: make -j4
+        working-directory: go/src/github.com/harmony-one/mcl
+
+      - name: Build bls
+        run: make BLS_SWAP_G=1 -j4
+        working-directory: go/src/github.com/harmony-one/bls
+
+      - name: Install tools
+        run: |
+          go install golang.org/x/tools/cmd/goimports@v0.30.0
+          go install github.com/fjl/gencodec@v0.1.1
+        working-directory: go/src/github.com/harmony-one/harmony
+
+      - name: Run go checker
+        run: |
+          make go-get
+          bash ./scripts/travis_go_checker.sh
+        working-directory: go/src/github.com/harmony-one/harmony
+
+      - name: Notify Discord on failure
+        if: failure()
+        run: |
+          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+          chmod +x send.sh && ./send.sh failure ${{ secrets.WEBHOOK_URL }}
+
+  rpc-checker:
+    name: RPC Checker
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout harmony
+        uses: actions/checkout@v4
+        with:
+          path: go/src/github.com/harmony-one/harmony
+
+      - name: Checkout mcl
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/mcl
+          path: go/src/github.com/harmony-one/mcl
+
+      - name: Checkout bls
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/bls
+          path: go/src/github.com/harmony-one/bls
+
+      - name: Checkout harmony-test
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/harmony-test
+          path: go/src/github.com/harmony-one/harmony-test
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.2'
+          cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
+
+      - name: Build mcl
+        run: make -j4
+        working-directory: go/src/github.com/harmony-one/mcl
+
+      - name: Build bls
+        run: make BLS_SWAP_G=1 -j4
+        working-directory: go/src/github.com/harmony-one/bls
+
+      - name: Run RPC checker
+        run: |
+          make go-get
+          bash ./scripts/travis_rpc_checker.sh
+        working-directory: go/src/github.com/harmony-one/harmony
+        env:
+          TRAVIS_PULL_REQUEST_SLUG: ${{ github.event.pull_request.head.repo.full_name }}
+          TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
+          TRAVIS_BRANCH: ${{ github.ref_name }}
+
+      - name: Notify Discord on failure
+        if: failure()
+        run: |
+          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+          chmod +x send.sh && ./send.sh failure ${{ secrets.WEBHOOK_URL }}
+
+  pyhmy-checker:
+    name: pyhmy Checker
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout harmony
+        uses: actions/checkout@v4
+        with:
+          path: go/src/github.com/harmony-one/harmony
+
+      - name: Checkout mcl
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/mcl
+          path: go/src/github.com/harmony-one/mcl
+
+      - name: Checkout bls
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/bls
+          path: go/src/github.com/harmony-one/bls
+
+      - name: Checkout harmony-test
+        uses: actions/checkout@v4
+        with:
+          repository: harmony-one/harmony-test
+          path: go/src/github.com/harmony-one/harmony-test
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.2'
+          cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
+
+      - name: Build mcl
+        run: make -j4
+        working-directory: go/src/github.com/harmony-one/mcl
+
+      - name: Build bls
+        run: make BLS_SWAP_G=1 -j4
+        working-directory: go/src/github.com/harmony-one/bls
+
+      - name: Run pyhmy checker
+        run: |
+          make go-get
+          bash ./scripts/travis_pyhmy_checker.sh
+        working-directory: go/src/github.com/harmony-one/harmony
+        env:
+          TRAVIS_PULL_REQUEST_SLUG: ${{ github.event.pull_request.head.repo.full_name }}
+          TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
+          TRAVIS_BRANCH: ${{ github.ref_name }}
+
+      - name: Notify Discord on failure
+        if: failure()
+        run: |
+          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+          chmod +x send.sh && ./send.sh failure ${{ secrets.WEBHOOK_URL }}
+
+  notify-success:
+    name: Notify Discord on success
+    runs-on: ubuntu-22.04
+    needs: [build, go-checker, rpc-checker, pyhmy-checker]
+    if: success()
+    steps:
+      - run: |
+          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+          chmod +x send.sh && ./send.sh success ${{ secrets.WEBHOOK_URL }}
