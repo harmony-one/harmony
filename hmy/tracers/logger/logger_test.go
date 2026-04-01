@@ -18,11 +18,12 @@ package logger
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
@@ -83,14 +84,26 @@ func TestStructLogMarshalingOmitEmpty(t *testing.T) {
 		log  *StructLog
 		want string
 	}{
-		{"empty err and no fields", &StructLog{},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"contractAddress":"0x0000000000000000000000000000000000000000","callerAddress":"0x0000000000000000000000000000000000000000","opName":"STOP"}`},
-		{"with err", &StructLog{Err: fmt.Errorf("this failed")},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"contractAddress":"0x0000000000000000000000000000000000000000","callerAddress":"0x0000000000000000000000000000000000000000","opName":"STOP","error":"this failed"}`},
-		{"with mem", &StructLog{Memory: make([]byte, 2), MemorySize: 2},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memory":"0x0000","memSize":2,"stack":null,"depth":0,"refund":0,"contractAddress":"0x0000000000000000000000000000000000000000","callerAddress":"0x0000000000000000000000000000000000000000","opName":"STOP"}`},
-		{"with 0-size mem", &StructLog{Memory: make([]byte, 0)},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"contractAddress":"0x0000000000000000000000000000000000000000","callerAddress":"0x0000000000000000000000000000000000000000","opName":"STOP"}`},
+		{
+			name: "empty err and no fields",
+			log:  &StructLog{},
+			want: `{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"contractAddress":"0x0000000000000000000000000000000000000000","callerAddress":"0x0000000000000000000000000000000000000000","opName":"STOP"}`,
+		},
+		{
+			name: "with err",
+			log:  &StructLog{Err: vm.ErrExecutionReverted},
+			want: `{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"contractAddress":"0x0000000000000000000000000000000000000000","callerAddress":"0x0000000000000000000000000000000000000000","opName":"STOP","error":"execution reverted"}`,
+		},
+		{
+			name: "with mem",
+			log:  &StructLog{Memory: make([]byte, 2), MemorySize: 2},
+			want: `{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memory":"0x0000","memSize":2,"stack":null,"depth":0,"refund":0,"contractAddress":"0x0000000000000000000000000000000000000000","callerAddress":"0x0000000000000000000000000000000000000000","opName":"STOP"}`,
+		},
+		{
+			name: "with 0-size mem",
+			log:  &StructLog{Memory: make([]byte, 0)},
+			want: `{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"contractAddress":"0x0000000000000000000000000000000000000000","callerAddress":"0x0000000000000000000000000000000000000000","opName":"STOP"}`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -103,5 +116,163 @@ func TestStructLogMarshalingOmitEmpty(t *testing.T) {
 				t.Fatalf("mismatched results\n\thave: %v\n\twant: %v", have, want)
 			}
 		})
+	}
+}
+
+// TestFormatLogsLegacyJSON checks that our legacy structLog JSON encoding
+// matches the expected Ethereum-style shape: omitting empty error, 0x-prefixed
+// and padded memory/storage, and hex-encoded return value.
+func TestFormatLogsLegacyJSON(t *testing.T) {
+	// Build a single StructLog with:
+	// - a small memory slice so we exercise padding
+	// - a storage entry
+	// - an error
+	addr := common.HexToAddress("0x0102030405060708090a0b0c0d0e0f1011121314")
+	key := common.HexToHash("0x01")
+	val := common.HexToHash("0x02")
+
+	log := StructLog{
+		Pc:              1,
+		Op:              vm.SSTORE,
+		Gas:             10,
+		GasCost:         5,
+		Memory:          []byte{0xaa, 0xbb},
+		MemorySize:      2,
+		Depth:           1,
+		RefundCounter:   0,
+		Err:             vm.ErrExecutionReverted,
+		Storage:         map[common.Hash]common.Hash{key: val},
+		ContractAddress: addr,
+		CallerAddress:   addr,
+	}
+
+	formatted := formatLogs([]StructLog{log})
+	if len(formatted) != 1 {
+		t.Fatalf("expected 1 formatted log, got %d", len(formatted))
+	}
+
+	fl := formatted[0]
+
+	// Error must be a non-nil pointer with the right value.
+	if fl.Error == nil || *fl.Error != "execution reverted" {
+		t.Fatalf("unexpected error field: %#v", fl.Error)
+	}
+
+	// Memory must be present, with a single, 32-byte padded word encoded as 0x + 64 hex chars.
+	if fl.Memory == nil {
+		t.Fatalf("expected memory to be set")
+	}
+	if len(*fl.Memory) != 1 {
+		t.Fatalf("expected 1 memory word, got %d", len(*fl.Memory))
+	}
+	memWord := (*fl.Memory)[0]
+	if len(memWord) != 2+64 { // 0x + 64 hex chars
+		t.Fatalf("unexpected memory word length: got %d, value %q", len(memWord), memWord)
+	}
+	if memWord[:2] != "0x" {
+		t.Fatalf("memory word missing 0x prefix: %q", memWord)
+	}
+
+	// Storage keys and values must be 0x-prefixed hex.
+	if fl.Storage == nil {
+		t.Fatalf("expected storage to be set")
+	}
+	st := *fl.Storage
+	gotVal, ok := st[key.Hex()]
+	if !ok {
+		t.Fatalf("expected storage key %s to be present", key.Hex())
+	}
+	if gotVal != val.Hex() {
+		t.Fatalf("unexpected storage value: have %s, want %s", gotVal, val.Hex())
+	}
+}
+
+// TestStructLogLegacyJSONSpecFormatting mirrors the go-ethereum test to ensure
+// our legacy-ish JSON formatting matches the spec expectations for error,
+// memory padding and storage encoding.
+func TestStructLogLegacyJSONSpecFormatting(t *testing.T) {
+	tests := []struct {
+		name string
+		log  *StructLog
+		want string
+	}{
+		{
+			name: "omits empty error and pads memory/storage",
+			log: &StructLog{
+				Pc:         7,
+				Op:         vm.SSTORE,
+				Gas:        100,
+				GasCost:    20,
+				Memory:     []byte{0xaa, 0xbb},
+				Storage:    map[common.Hash]common.Hash{common.BigToHash(big.NewInt(1)): common.BigToHash(big.NewInt(2))},
+				Depth:      1,
+				ReturnData: []byte{0x12, 0x34},
+			},
+			want: `{"pc":7,"op":"SSTORE","gas":100,"gasCost":20,"depth":1,"returnData":"0x1234","memory":["0xaabb000000000000000000000000000000000000000000000000000000000000"],"storage":{"0x0000000000000000000000000000000000000000000000000000000000000001":"0x0000000000000000000000000000000000000000000000000000000000000002"}}`,
+		},
+		{
+			name: "includes error only when present",
+			log: &StructLog{
+				Pc:      1,
+				Op:      vm.STOP,
+				Gas:     2,
+				GasCost: 3,
+				Depth:   1,
+				Err:     errors.New("boom"),
+			},
+			want: `{"pc":1,"op":"STOP","gas":2,"gasCost":3,"depth":1,"error":"boom"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			have := string(tt.log.toLegacyJSON())
+			if have != tt.want {
+				t.Fatalf("mismatched results\n\thave: %v\n\twant: %v", have, tt.want)
+			}
+		})
+	}
+}
+
+// TestExecutionResultReturnValueEncoding ensures that ExecutionResult encodes
+// returnValue as hexutil.Bytes and omits it (empty bytes) on hard failure.
+func TestExecutionResultReturnValueEncoding(t *testing.T) {
+	// Successful execution: return data should be preserved and hex-encoded.
+	{
+		logger := &StructLogger{}
+		logger.output = []byte{0x01, 0x02}
+		logger.usedGas = 21
+
+		got, err := logger.GetResult()
+		if err != nil {
+			t.Fatalf("GetResult (success) returned error: %v", err)
+		}
+		var res ExecutionResult
+		if err := json.Unmarshal(got, &res); err != nil {
+			t.Fatalf("unmarshal result (success): %v", err)
+		}
+		if string(res.ReturnValue) != string(hexutil.Bytes{0x01, 0x02}) {
+			t.Fatalf("unexpected return value (success): %v", res.ReturnValue)
+		}
+	}
+
+	// Hard failure (non-revert): return data should be empty.
+	{
+		logger := &StructLogger{}
+		logger.output = []byte{0x01, 0x02}
+		logger.usedGas = 21
+		logger.err = vm.ErrOutOfGas
+
+		got, err := logger.GetResult()
+		if err != nil {
+			t.Fatalf("GetResult (failure) returned error: %v", err)
+		}
+		var res ExecutionResult
+		if err := json.Unmarshal(got, &res); err != nil {
+			t.Fatalf("unmarshal result (failure): %v", err)
+		}
+		if len(res.ReturnValue) != 0 {
+			t.Fatalf("expected empty return value on hard failure, got %v", res.ReturnValue)
+		}
 	}
 }

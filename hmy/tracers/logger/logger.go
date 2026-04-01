@@ -81,6 +81,33 @@ type StructLog struct {
 	CallerAddress   common.Address `json:"callerAddress"`
 }
 
+// structLogLegacy stores a structured log emitted by the EVM while replaying a
+// transaction in debug mode.
+type structLogLegacy struct {
+	Pc            uint64             `json:"pc"`
+	Op            string             `json:"op"`
+	Gas           uint64             `json:"gas"`
+	GasCost       uint64             `json:"gasCost"`
+	Depth         int                `json:"depth"`
+	Error         string             `json:"error,omitempty"`
+	Stack         *[]string          `json:"stack,omitempty"`
+	ReturnData    string             `json:"returnData,omitempty"`
+	Memory        *[]string          `json:"memory,omitempty"`
+	Storage       *map[string]string `json:"storage,omitempty"`
+	RefundCounter uint64             `json:"refund,omitempty"`
+}
+
+// formatMemoryWord encodes a memory chunk as a 32-byte, 0x-prefixed hex word.
+// Short chunks are right-padded with zero bytes to 32 bytes.
+func formatMemoryWord(chunk []byte) string {
+	if len(chunk) == 32 {
+		return hexutil.Encode(chunk)
+	}
+	var word [32]byte
+	copy(word[:], chunk)
+	return hexutil.Encode(word[:])
+}
+
 // overrides for gencodec
 type structLogMarshaling struct {
 	Gas         math.HexOrDecimal64
@@ -102,6 +129,50 @@ func (s *StructLog) ErrorString() string {
 		return s.Err.Error()
 	}
 	return ""
+}
+
+// toLegacyJSON converts the StructLog into the legacy JSON-encoded form used
+// by tracing tools that rely on the historical geth structLog shape.
+func (s *StructLog) toLegacyJSON() json.RawMessage {
+	msg := structLogLegacy{
+		Pc:            s.Pc,
+		Op:            s.Op.String(),
+		Gas:           s.Gas,
+		GasCost:       s.GasCost,
+		Depth:         s.Depth,
+		Error:         s.ErrorString(),
+		RefundCounter: s.RefundCounter,
+	}
+	if s.Stack != nil {
+		stack := make([]string, len(s.Stack))
+		for i, stackValue := range s.Stack {
+			stack[i] = stackValue.Hex()
+		}
+		msg.Stack = &stack
+	}
+	if len(s.ReturnData) > 0 {
+		msg.ReturnData = hexutil.Encode(s.ReturnData)
+	}
+	if len(s.Memory) > 0 {
+		memory := make([]string, 0, (len(s.Memory)+31)/32)
+		for i := 0; i < len(s.Memory); i += 32 {
+			end := i + 32
+			if end > len(s.Memory) {
+				end = len(s.Memory)
+			}
+			memory = append(memory, formatMemoryWord(s.Memory[i:end]))
+		}
+		msg.Memory = &memory
+	}
+	if len(s.Storage) > 0 {
+		storage := make(map[string]string)
+		for i, storageValue := range s.Storage {
+			storage[i.Hex()] = storageValue.Hex()
+		}
+		msg.Storage = &storage
+	}
+	element, _ := json.Marshal(msg)
+	return element
 }
 
 // StructLogger is an EVM state logger and implements EVMLogger.
@@ -248,14 +319,13 @@ func (l *StructLogger) GetResult() (json.RawMessage, error) {
 	failed := l.err != nil
 	returnData := common.CopyBytes(l.output)
 	// Return data when successful and revert reason when reverted, otherwise empty.
-	returnVal := fmt.Sprintf("%x", returnData)
 	if failed && l.err != vm.ErrExecutionReverted {
-		returnVal = ""
+		returnData = []byte{}
 	}
 	rs := &ExecutionResult{
 		Gas:         l.usedGas,
 		Failed:      failed,
-		ReturnValue: returnVal,
+		ReturnValue: hexutil.Bytes(returnData),
 		StructLogs:  formatLogs(l.StructLogs()),
 	}
 	fmt.Printf("StructLogger*GetResult: %+v\n", rs)
@@ -411,7 +481,7 @@ func (*mdLogger) CaptureTxEnd(restGas uint64) {}
 type ExecutionResult struct {
 	Gas         uint64         `json:"gas"`
 	Failed      bool           `json:"failed"`
-	ReturnValue string         `json:"returnValue"`
+	ReturnValue hexutil.Bytes  `json:"returnValue"`
 	StructLogs  []StructLogRes `json:"structLogs"`
 }
 
@@ -423,7 +493,7 @@ type StructLogRes struct {
 	Gas           uint64             `json:"gas"`
 	GasCost       uint64             `json:"gasCost"`
 	Depth         int                `json:"depth"`
-	Error         string             `json:"error,omitempty"`
+	Error         *string            `json:"error,omitempty"`
 	Stack         *[]string          `json:"stack,omitempty"`
 	Memory        *[]string          `json:"memory,omitempty"`
 	Storage       *map[string]string `json:"storage,omitempty"`
@@ -443,11 +513,13 @@ func formatLogs(logs []StructLog) []StructLogRes {
 			Gas:           trace.Gas,
 			GasCost:       trace.GasCost,
 			Depth:         trace.Depth,
-			Error:         trace.ErrorString(),
 			RefundCounter: trace.RefundCounter,
 
 			CallerAddress:   trace.CallerAddress,
 			ContractAddress: trace.ContractAddress,
+		}
+		if errStr := trace.ErrorString(); errStr != "" {
+			formatted[index].Error = &errStr
 		}
 		if trace.Stack != nil {
 			stack := make([]string, len(trace.Stack))
@@ -458,15 +530,23 @@ func formatLogs(logs []StructLog) []StructLogRes {
 		}
 		if trace.Memory != nil {
 			memory := make([]string, 0, (len(trace.Memory)+31)/32)
-			for i := 0; i+32 <= len(trace.Memory); i += 32 {
-				memory = append(memory, fmt.Sprintf("%x", trace.Memory[i:i+32]))
+			for i := 0; i < len(trace.Memory); i += 32 {
+				end := i + 32
+				if end > len(trace.Memory) {
+					end = len(trace.Memory)
+				}
+				// Pad each memory word out to 32 bytes before hex encoding to
+				// match go-ethereum's legacy structLog JSON format.
+				word := make([]byte, 32)
+				copy(word, trace.Memory[i:end])
+				memory = append(memory, hexutil.Bytes(word).String())
 			}
 			formatted[index].Memory = &memory
 		}
 		if trace.Storage != nil {
 			storage := make(map[string]string)
 			for i, storageValue := range trace.Storage {
-				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
+				storage[i.Hex()] = storageValue.Hex()
 			}
 			formatted[index].Storage = &storage
 		}
