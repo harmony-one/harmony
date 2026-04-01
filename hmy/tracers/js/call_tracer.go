@@ -21,7 +21,6 @@ func init() {
 		panic(err)
 	}
 
-	fmt.Println("Registering callTracer")
 	tracers.RegisterLookup(false, newCallTracer)
 }
 
