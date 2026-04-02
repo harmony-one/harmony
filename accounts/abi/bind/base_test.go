@@ -109,14 +109,14 @@ const hexData = "0x000000000000000000000000376c47978271565f56deb45495afa69e59c16
 
 func TestUnpackIndexedStringTyLogIntoMap(t *testing.T) {
 	hash := crypto.Keccak256Hash([]byte("testName"))
+	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"name","type":"string"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
+	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	topics := []common.Hash{
-		common.HexToHash("0x0"),
+		parsedAbi.Events["received"].ID,
 		hash,
 	}
 	mockLog := newMockLog(topics, common.HexToHash("0x0"))
 
-	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"name","type":"string"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
-	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	bc := bind.NewBoundContract(common.HexToAddress("0x0"), parsedAbi, nil, nil, nil)
 
 	expectedReceivedMap := map[string]interface{}{
@@ -134,14 +134,14 @@ func TestUnpackIndexedSliceTyLogIntoMap(t *testing.T) {
 		t.Fatal(err)
 	}
 	hash := crypto.Keccak256Hash(sliceBytes)
+	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"names","type":"string[]"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
+	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	topics := []common.Hash{
-		common.HexToHash("0x0"),
+		parsedAbi.Events["received"].ID,
 		hash,
 	}
 	mockLog := newMockLog(topics, common.HexToHash("0x0"))
 
-	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"names","type":"string[]"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
-	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	bc := bind.NewBoundContract(common.HexToAddress("0x0"), parsedAbi, nil, nil, nil)
 
 	expectedReceivedMap := map[string]interface{}{
@@ -159,14 +159,14 @@ func TestUnpackIndexedArrayTyLogIntoMap(t *testing.T) {
 		t.Fatal(err)
 	}
 	hash := crypto.Keccak256Hash(arrBytes)
+	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"addresses","type":"address[2]"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
+	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	topics := []common.Hash{
-		common.HexToHash("0x0"),
+		parsedAbi.Events["received"].ID,
 		hash,
 	}
 	mockLog := newMockLog(topics, common.HexToHash("0x0"))
 
-	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"addresses","type":"address[2]"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
-	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	bc := bind.NewBoundContract(common.HexToAddress("0x0"), parsedAbi, nil, nil, nil)
 
 	expectedReceivedMap := map[string]interface{}{
@@ -186,13 +186,13 @@ func TestUnpackIndexedFuncTyLogIntoMap(t *testing.T) {
 	functionTyBytes := append(addrBytes, functionSelector...)
 	var functionTy [24]byte
 	copy(functionTy[:], functionTyBytes[0:24])
+	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"function","type":"function"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
+	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	topics := []common.Hash{
-		common.HexToHash("0x99b5620489b6ef926d4518936cfec15d305452712b88bd59da2d9c10fb0953e8"),
+		parsedAbi.Events["received"].ID,
 		common.BytesToHash(functionTyBytes),
 	}
 	mockLog := newMockLog(topics, common.HexToHash("0x5c698f13940a2153440c6d19660878bc90219d9298fdcf37365aa8d88d40fc42"))
-	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"function","type":"function"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
-	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	bc := bind.NewBoundContract(common.HexToAddress("0x0"), parsedAbi, nil, nil, nil)
 
 	expectedReceivedMap := map[string]interface{}{
@@ -207,14 +207,14 @@ func TestUnpackIndexedFuncTyLogIntoMap(t *testing.T) {
 func TestUnpackIndexedBytesTyLogIntoMap(t *testing.T) {
 	bytes := []byte{1, 2, 3, 4, 5}
 	hash := crypto.Keccak256Hash(bytes)
+	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"content","type":"bytes"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
+	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	topics := []common.Hash{
-		common.HexToHash("0x99b5620489b6ef926d4518936cfec15d305452712b88bd59da2d9c10fb0953e8"),
+		parsedAbi.Events["received"].ID,
 		hash,
 	}
 	mockLog := newMockLog(topics, common.HexToHash("0x5c698f13940a2153440c6d19660878bc90219d9298fdcf37365aa8d88d40fc42"))
 
-	abiString := `[{"anonymous":false,"inputs":[{"indexed":true,"name":"content","type":"bytes"},{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}],"name":"received","type":"event"}]`
-	parsedAbi, _ := abi.JSON(strings.NewReader(abiString))
 	bc := bind.NewBoundContract(common.HexToAddress("0x0"), parsedAbi, nil, nil, nil)
 
 	expectedReceivedMap := map[string]interface{}{
