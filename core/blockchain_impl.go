@@ -761,6 +761,9 @@ func (bc *BlockChainImpl) State() (*state.DB, error) {
 }
 
 func (bc *BlockChainImpl) StateAt(root common.Hash) (*state.DB, error) {
+	if bc.stateCache == nil {
+		return nil, fmt.Errorf("stateCache is nil, blockchain not properly initialized")
+	}
 	return state.New(root, bc.stateCache, bc.snaps)
 }
 

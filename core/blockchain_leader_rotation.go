@@ -54,7 +54,8 @@ func (bc *BlockChainImpl) buildLeaderRotationMeta(curHeader *block.Header) error
 		return nil
 	}
 	if curHeader.NumberU64() == 0 {
-		return errors.New("current header is genesis")
+		// Skip building leader rotation meta for genesis block
+		return nil
 	}
 	curPubKey, err := bc.getLeaderPubKeyFromCoinbase(curHeader)
 	if err != nil {

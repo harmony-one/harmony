@@ -43,7 +43,10 @@ func codeBitmap(code []byte) bitvec {
 	for pc := uint64(0); pc < uint64(len(code)); {
 		op := OpCode(code[pc])
 
-		if op >= PUSH1 && op <= PUSH32 {
+		if op == PUSH0 {
+			// PUSH0 doesn't read any bytes, just increment pc
+			pc++
+		} else if op >= PUSH1 && op <= PUSH32 {
 			numbits := op - PUSH1 + 1
 			pc++
 			for ; numbits >= 8; numbits -= 8 {

@@ -86,6 +86,8 @@ var (
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
+		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
@@ -143,6 +145,8 @@ var (
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
 		EIP7939CLZEpoch:                       EpochTBD,
+		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
@@ -201,6 +205,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 	}
@@ -258,6 +263,7 @@ var (
 		EIP1153TransientStorageEpoch:          big.NewInt(35626),
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		NTPEpoch:                              big.NewInt(47190),
@@ -318,6 +324,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 	}
@@ -375,6 +382,7 @@ var (
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
+		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		NTPEpoch:                              EpochTBD,
 	}
@@ -413,6 +421,7 @@ var (
 		big.NewInt(0),                      // HIP6And8Epoch
 		big.NewInt(0),                      // StakingPrecompileEpoch
 		big.NewInt(2),                      // EIP2537PrecompileEpoch
+		big.NewInt(0),                      // EIP3855Epoch
 		big.NewInt(0),                      // ChainIdFixEpoch
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
@@ -473,6 +482,7 @@ var (
 		big.NewInt(0),        // HIP6And8Epoch
 		big.NewInt(0),        // StakingPrecompileEpoch
 		big.NewInt(2),        // EIP2537PrecompileEpoch
+		big.NewInt(0),        // EIP3855Epoch
 		big.NewInt(0),        // ChainIdFixEpoch
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
@@ -628,6 +638,9 @@ type ChainConfig struct {
 
 	// EIP2537PrecompileEpoch is the first epoch to support the EIP-2537 precompiles
 	EIP2537PrecompileEpoch *big.Int `json:"eip2537-precompile-epoch,omitempty"`
+
+	// EIP3855Epoch is the first epoch to support EIP-3855 (PUSH0 opcode)
+	EIP3855Epoch *big.Int `json:"eip3855-epoch,omitempty"`
 
 	// ChainIdFixEpoch is the first epoch to return ethereum compatible chain id by ChainID() op code
 	ChainIdFixEpoch *big.Int `json:"chain-id-fix-epoch,omitempty"`
@@ -965,6 +978,12 @@ func (c *ChainConfig) IsEIP7939CLZ(epoch *big.Int) bool {
 // IsEIP5656Mcopy determines whether EIP-5656 MCOPY opcode is available in the EVM
 func (c *ChainConfig) IsEIP5656Mcopy(epoch *big.Int) bool {
 	return isForked(c.EIP5656McopyEpoch, epoch)
+}
+
+// IsEIP3855 determines whether EIP-3855 (PUSH0 opcode)
+// is available in the EVM
+func (c *ChainConfig) IsEIP3855(epoch *big.Int) bool {
+	return isForked(c.EIP3855Epoch, epoch)
 }
 
 // IsEIP6780 determines whether EIP-6780 (deactivate SELFDESTRUCT) is active
