@@ -71,6 +71,7 @@ func New(code string, ctx *Context, cfg json.RawMessage) (Tracer, error) {
 			return tracer, nil
 		}
 	}
+	// code = ParityBlockTracer
 	return nil, errors.Errorf("tracer not found for code `%s`, lookups %d", code, len(lookups))
 }
 
