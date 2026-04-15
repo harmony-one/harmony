@@ -252,14 +252,14 @@ var (
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   big.NewInt(144),
 		TestnetExternalEpoch:                  EpochTBD,
-		TimestampValidationEpoch:              EpochTBD,
 		IsOneSecondEpoch:                      big.NewInt(17436),
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(35626),
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
-		NTPEpoch:                              EpochTBD,
+		NTPEpoch:                              big.NewInt(47170),
+		TimestampValidationEpoch:              big.NewInt(47170),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -666,10 +666,6 @@ type ChainConfig struct {
 
 	TestnetExternalEpoch *big.Int `json:"testnet-external-epoch,omitempty"`
 
-	// TimestampValidationEpoch is the first epoch to enforce strict monotonic
-	// and future-bounded block timestamp checks during header verification.
-	TimestampValidationEpoch *big.Int `json:"timestamp-validation-epoch,omitempty"`
-
 	BlockGas30MEpoch *big.Int `json:"block-gas-30m-epoch,omitempty"`
 
 	// MaxRateEpoch will make sure the validator max-rate is at least equal to the minRate + the validator max-rate-increase
@@ -696,6 +692,10 @@ type ChainConfig struct {
 
 	// NTPEpoch is the first epoch to use NTP-corrected time for block timestamps
 	NTPEpoch *big.Int `json:"ntp-epoch,omitempty"`
+
+	// TimestampValidationEpoch is the first epoch to enforce strict monotonic
+	// and future-bounded block timestamp checks during header verification.
+	TimestampValidationEpoch *big.Int `json:"timestamp-validation-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
