@@ -421,7 +421,6 @@ var (
 		big.NewInt(2),                      // HIP30Epoch
 		big.NewInt(0),                      // DevnetExternalEpoch
 		big.NewInt(0),                      // TestnetExternalEpoch
-		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // BlockGas30MEpoch
 		big.NewInt(2),                      // MaxRateEpoch
 		big.NewInt(0),                      // TopMaxRateEpoch
@@ -432,6 +431,7 @@ var (
 		big.NewInt(0),                      // EIP5656McopyEpoch
 		big.NewInt(0),                      // EIP6780Epoch
 		big.NewInt(0),                      // NTPEpoch
+		big.NewInt(0),                      // TimestampValidationEpoch
 	}
 
 	// TestChainConfig ...
@@ -480,7 +480,6 @@ var (
 		big.NewInt(2),        // HIP30Epoch
 		big.NewInt(0),        // DevnetExternalEpoch
 		big.NewInt(0),        // TestnetExternalEpoch
-		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // BlockGas30MEpoch
 		big.NewInt(2),        // MaxRateEpoch
 		big.NewInt(0),        // TopMaxRateEpoch
@@ -491,6 +490,7 @@ var (
 		big.NewInt(0),        // EIP5656McopyEpoch
 		big.NewInt(0),        // EIP6780Epoch
 		big.NewInt(0),        // NTPEpoch
+		big.NewInt(0),        // TimestampValidationEpoch
 	}
 
 	// TestRules ...
