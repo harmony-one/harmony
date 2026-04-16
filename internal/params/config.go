@@ -258,8 +258,8 @@ var (
 		EIP7939CLZEpoch:                       EpochTBD,
 		EIP5656McopyEpoch:                     EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
-		NTPEpoch:                              big.NewInt(47170),
-		TimestampValidationEpoch:              big.NewInt(47170),
+		NTPEpoch:                              big.NewInt(47190),
+		TimestampValidationEpoch:              big.NewInt(47190),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
