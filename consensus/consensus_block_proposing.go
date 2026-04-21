@@ -15,10 +15,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Constants of proposing a new block
 const (
 	IncomingReceiptsLimit = 2000 // 2000 * (numShards - 1)
-	SleepPeriod           = 1 * time.Millisecond
 )
 
 // ProposeNewBlock proposes a new block...
