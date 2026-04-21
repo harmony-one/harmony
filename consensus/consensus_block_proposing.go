@@ -18,11 +18,11 @@ import (
 // Constants of proposing a new block
 const (
 	IncomingReceiptsLimit = 2000 // 2000 * (numShards - 1)
-	SleepPeriod           = 20 * time.Millisecond
+	SleepPeriod           = 1 * time.Millisecond
 )
 
 // ProposeNewBlock proposes a new block...
-func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) {
+func (consensus *Consensus) ProposeNewBlock(now time.Time, commitSigs chan []byte) (*types.Block, error) {
 	var (
 		currentHeader = consensus.Blockchain().CurrentHeader()
 		nowEpoch      = currentHeader.Epoch()
@@ -32,18 +32,7 @@ func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Bloc
 	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)
 	defer utils.AnalysisEnd("ProposeNewBlock", nowEpoch, blockNow)
 
-	// Update worker's current header and
-	// state data in preparation to propose/process new transactions.
-	// After NTPEpoch, use the NTP-corrected clock stored in the registry
-	// so that the block timestamp reflects true wall-clock time even when
-	// the local system clock drifts.
-	var blockTime time.Time
-	if consensus.Blockchain().Config().IsNTP(nowEpoch) {
-		blockTime = consensus.registry.Now()
-	} else {
-		blockTime = time.Now()
-	}
-	env, err := worker.UpdateCurrent(blockTime)
+	env, err := worker.UpdateCurrent(now)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to update worker")
 	}
