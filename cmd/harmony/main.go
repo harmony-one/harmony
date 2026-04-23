@@ -682,7 +682,7 @@ func setupChain(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigTyp
 		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	}
 
-	engine := chain.NewEngine()
+	engine := chain.NewEngineWithTime(registry.Now)
 	registry.SetEngine(engine)
 
 	chainConfig := nodeConfig.GetNetworkType().ChainConfig()

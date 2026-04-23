@@ -40,13 +40,17 @@ const (
 	vrfBeta          = 32 // 32 bytes randomness
 	vrfProof         = 96 // 96 bytes proof (bls sig)
 	// Maximum allowed future skew for block timestamps.
-	allowedFutureBlockTime = 15 * time.Second
+	allowedFutureBlockTime = 1 * time.Second
 )
 
 type engineImpl struct {
 	// Caching field
 	epochCtxCache    *lru.Cache // epochCtxKey -> epochCtx
 	verifiedSigCache *lru.Cache // verifiedSigKey -> struct{}{}
+
+	// now returns the current time. Defaults to time.Now; can be overridden
+	// with an NTP-corrected source via SetNow.
+	now func() time.Time
 }
 
 // NewEngine creates Engine with some cache
@@ -56,6 +60,19 @@ func NewEngine() *engineImpl {
 	return &engineImpl{
 		epochCtxCache:    epochCtxCache,
 		verifiedSigCache: sigCache,
+		now:              time.Now,
+	}
+}
+
+// NewEngineWithTime creates Engine with a custom clock.
+// Use registry.Now for NTP-corrected time.
+func NewEngineWithTime(now func() time.Time) *engineImpl {
+	sigCache, _ := lru.New(verifiedSigCache)
+	epochCtxCache, _ := lru.New(epochCtxCache)
+	return &engineImpl{
+		epochCtxCache:    epochCtxCache,
+		verifiedSigCache: sigCache,
+		now:              now,
 	}
 }
 
@@ -73,7 +90,8 @@ func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header
 			return errors.New("timestamp older than parent")
 		}
 		// Reject blocks that are too far in the future relative to local wall clock.
-		limit := big.NewInt(time.Now().Add(allowedFutureBlockTime).Unix())
+		// Use the NTP-corrected clock if one was injected via SetNow.
+		limit := big.NewInt(e.now().Add(allowedFutureBlockTime).Unix())
 		if header.Time().Cmp(limit) > 0 {
 			return engine.ErrFutureBlock
 		}
