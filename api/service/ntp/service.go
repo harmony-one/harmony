@@ -2,6 +2,9 @@ package ntptime
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,38 +42,58 @@ func (ntpInner) Query(addr string) (*ntp.Response, error) {
 type ntpTimeImpl struct {
 	mu     sync.RWMutex
 	offset time.Duration // difference between NTP time and local clock
-	addr   string
+	addr   string        // active server chosen at startup
 	inner  inner
 }
 
-// TryNew creates an ntpTimeImpl, retrying up to tries times on failure.
-func TryNew(addr string, tries uint) (*ntpTimeImpl, error) {
-	return tryNew(addr, tries, ntpInner{})
+// TryNew creates an ntpTimeImpl from a comma-separated list of NTP server
+// addresses, retrying up to tries times on failure.
+func TryNew(ntpServers string, tries uint) (*ntpTimeImpl, error) {
+	return tryNew(ntpServers, tries, ntpInner{})
 }
 
-func tryNew(addr string, tries uint, inner inner) (*ntpTimeImpl, error) {
+func tryNew(ntpServers string, tries uint, inner inner) (*ntpTimeImpl, error) {
 	if tries == 0 {
-		return newNTPTime(addr, inner)
+		return newNTPTime(ntpServers, inner)
 	}
-	rs, err := newNTPTime(addr, inner)
+	rs, err := newNTPTime(ntpServers, inner)
 	if err != nil {
-		return tryNew(addr, tries-1, inner)
+		return tryNew(ntpServers, tries-1, inner)
 	}
 	return rs, nil
 }
 
-func newNTPTime(addr string, inner inner) (*ntpTimeImpl, error) {
-	a := &ntpTimeImpl{
-		mu:    sync.RWMutex{},
-		addr:  addr,
-		inner: inner,
+func newNTPTime(ntpServers string, inner inner) (*ntpTimeImpl, error) {
+	addrs := parseServers(ntpServers)
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("no NTP servers provided")
 	}
-	tm, err := inner.Query(addr)
-	if err != nil {
-		return nil, err
+	// Shuffle so every node doesn't hammer the same server.
+	rand.Shuffle(len(addrs), func(i, j int) { addrs[i], addrs[j] = addrs[j], addrs[i] })
+	for _, addr := range addrs {
+		tm, err := inner.Query(addr)
+		if err != nil {
+			continue
+		}
+		return &ntpTimeImpl{
+			addr:   addr,
+			inner:  inner,
+			offset: tm.ClockOffset,
+		}, nil
 	}
-	a.offset = tm.ClockOffset
-	return a, nil
+	return nil, fmt.Errorf("all NTP servers unreachable")
+}
+
+// parseServers splits a comma-separated server list and trims whitespace.
+func parseServers(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // Run periodically refreshes the NTP clock offset every duration.

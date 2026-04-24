@@ -257,6 +257,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		impl, err := ntptime.TryNew(nodeConfig.NtpServer, 3)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error initializing NTP time provider: %v\n", err)
+			os.Exit(1)
 		} else {
 			go impl.Run(context.Background(), time.Minute)
 			ntpService = impl
