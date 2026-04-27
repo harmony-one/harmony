@@ -30,10 +30,6 @@ import (
 	"github.com/harmony-one/harmony/hmy/tracers"
 )
 
-func init() {
-	register("callTracer", newCallTracer)
-}
-
 type callFrame struct {
 	Type    string      `json:"type"`
 	From    string      `json:"from"`
