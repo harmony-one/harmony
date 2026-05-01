@@ -42,22 +42,10 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 				for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
 					var (
 						currentHeader = p.consensus.Blockchain().CurrentHeader()
-						nowEpoch      = currentHeader.Epoch()
 						parentTime    = currentHeader.Time().Int64()
+						now           = consensus.registry.Now()
+						timestamp     = now.Unix()
 					)
-
-					// Update worker's current header and
-					// state data in preparation to propose/process new transactions.
-					// After NTPEpoch, use the NTP-corrected clock stored in the registry
-					// so that the block timestamp reflects true wall-clock time even when
-					// the local system clock drifts.
-					var now time.Time
-					if consensus.Blockchain().Config().IsNTP(nowEpoch) {
-						now = consensus.registry.Now()
-					} else {
-						now = time.Now()
-					}
-					timestamp := now.Unix()
 					if timestamp <= parentTime {
 						// Current time is within the same second as the parent block.
 						// Sleep until the next second so the child timestamp is strictly

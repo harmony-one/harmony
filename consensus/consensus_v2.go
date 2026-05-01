@@ -437,7 +437,7 @@ func (consensus *Consensus) tick() {
 				continue
 			}
 		}
-		if !v.Expired(time.Now()) {
+		if !v.Expired(consensus.registry.Now()) {
 			continue
 		}
 		if k != timeoutViewChange {
@@ -469,7 +469,7 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 		consensus.mutex.Lock()
 		defer consensus.mutex.Unlock()
 		// Update time due for next block
-		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
+		consensus.NextBlockDue = consensus.registry.Now().Add(consensus.BlockPeriod)
 
 		startTime = time.Now()
 		consensus.msgSender.Reset(newBlock.NumberU64())

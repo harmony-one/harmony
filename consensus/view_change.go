@@ -86,13 +86,13 @@ func (pm *State) fallbackNextViewID() (uint64, time.Duration) {
 // The view change duration is a fixed duration now to avoid stuck into offline nodes during
 // the view change.
 // viewID is only used as the fallback mechansim to determine the nextViewID
-func (pm *State) getNextViewID(curHeader *block.Header) (uint64, time.Duration) {
+func (pm *State) getNextViewID(curHeader *block.Header, now time.Time) (uint64, time.Duration) {
 	if curHeader == nil {
 		return pm.fallbackNextViewID()
 	}
 	blockTimestamp := curHeader.Time().Int64()
 	stuckBlockViewID := curHeader.ViewID().Uint64() + 1
-	curTimestamp := time.Now().Unix()
+	curTimestamp := now.Unix()
 
 	// timestamp messed up in current validator node
 	if curTimestamp <= blockTimestamp {
@@ -226,7 +226,7 @@ func (consensus *Consensus) startViewChange() {
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
 	curHeader := consensus.Blockchain().CurrentHeader()
-	nextViewID, duration := consensus.current.getNextViewID(curHeader)
+	nextViewID, duration := consensus.current.getNextViewID(curHeader, consensus.registry.Now())
 	consensus.setViewChangingID(nextViewID)
 	epoch := curHeader.Epoch()
 	ss, err := consensus.Blockchain().ReadShardState(epoch)
