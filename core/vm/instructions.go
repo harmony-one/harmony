@@ -1015,32 +1015,37 @@ func makeSwap(size int64) executionFunc {
 	}
 }
 
-// decodeSingle decodes a single byte to an integer n (1-107)
-// as specified in EIP-8024
+// decodeSingle decodes the immediate operand of a backward-compatible DUPN or SWAPN instruction (EIP-8024)
+// https://eips.ethereum.org/EIPS/eip-8024
 func decodeSingle(x byte) int {
-	if x <= 90 {
-		return int(x) + 17
-	}
-	return int(x) - 20
+	// Depths 1-16 are already covered by the legacy opcodes. The forbidden byte range [91, 127] removes
+	// 37 values from the 256 possible immediates, leaving 219 usable values, so this encoding covers depths
+	// 17 through 235. The immediate is encoded as (x + 111) % 256, where 111 is chosen so that these values
+	// avoid the forbidden range. Decoding is simply the modular inverse (i.e. 111+145=256).
+	return (int(x) + 145) % 256
 }
 
-// decodePair decodes a single byte to a pair of integers (n, m) where 1 <= n, m <= 28
-// as specified in EIP-8024
+// decodePair decodes the immediate operand of a backward-compatible EXCHANGE
+// instruction (EIP-8024) into stack indices (n, m) where 1 <= n < m
+// and n + m <= 30. The forbidden byte range [82, 127] removes 46 values from
+// the 256 possible immediates, leaving exactly 210 usable bytes.
+// https://eips.ethereum.org/EIPS/eip-8024
 func decodePair(x byte) (int, int) {
-	var k int
-	if x <= 79 {
-		k = int(x)
-	} else {
-		k = int(x) - 48
-	}
+	// XOR with 143 remaps the forbidden bytes [82, 127] to an unused corner
+	// of the 16x16 grid below.
+	k := int(x ^ 143)
+	// Split into row q and column r of a 16x16 grid. The 210 valid pairs
+	// occupy two triangles within this grid.
 	q, r := k/16, k%16
+	// Upper triangle (q < r): pairs where m <= 16, encoded directly as
+	// (q+1, r+1).
 	if q < r {
 		return q + 1, r + 1
 	}
+	// Lower triangle: pairs where m > 16, recovered as (r+1, 29-q).
 	return r + 1, 29 - q
 }
 
-// max returns the maximum of two integers
 func max(a, b int) int {
 	if a > b {
 		return a
@@ -1060,7 +1065,7 @@ func opDupN(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 
 	// This range is excluded to preserve compatibility with existing opcodes.
 	if x > 90 && x < 128 {
-		return nil, &ErrInvalidOpCode{opcode: OpCode(x)}
+		return nil, &ErrInvalidOpCode{opcode: DUPN}
 	}
 	n := decodeSingle(x)
 
@@ -1087,7 +1092,7 @@ func opSwapN(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 
 	// This range is excluded to preserve compatibility with existing opcodes.
 	if x > 90 && x < 128 {
-		return nil, &ErrInvalidOpCode{opcode: OpCode(x)}
+		return nil, &ErrInvalidOpCode{opcode: SWAPN}
 	}
 	n := decodeSingle(x)
 
@@ -1115,9 +1120,9 @@ func opExchange(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 	}
 
 	// This range is excluded both to preserve compatibility with existing opcodes
-	// and to keep decode_pair's 16-aligned arithmetic mapping valid (0–79, 128–255).
-	if x > 79 && x < 128 {
-		return nil, &ErrInvalidOpCode{opcode: OpCode(x)}
+	// and to keep decode_pair’s 16-aligned arithmetic mapping valid (0–81, 128–255).
+	if x > 81 && x < 128 {
+		return nil, &ErrInvalidOpCode{opcode: EXCHANGE}
 	}
 	n, m := decodePair(x)
 	need := max(n, m) + 1
@@ -1128,7 +1133,7 @@ func opExchange(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 		return nil, &ErrStackUnderflow{stackLen: scope.Stack.len(), required: need}
 	}
 
-	// The (n+1)'th stack item is swapped with the (m+1)'th stack item.
+	// The (n+1)‘th stack item is swapped with the (m+1)‘th stack item.
 	indexN := scope.Stack.len() - 1 - n
 	indexM := scope.Stack.len() - 1 - m
 	scope.Stack.data[indexN], scope.Stack.data[indexM] = scope.Stack.data[indexM], scope.Stack.data[indexN]
