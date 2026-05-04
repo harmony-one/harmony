@@ -46,12 +46,41 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 						now           = consensus.registry.Now()
 						timestamp     = now.Unix()
 					)
+					// Block timestamps are validated at second precision and must strictly increase.
+					// We decide whether we can propose using consensus.registry.Now(), which is the
+					// NTP-adjusted consensus clock. Do not use time.Until(target) here: time.Until()
+					// is based on raw local time.Now(), and local time can be a few milliseconds
+					// ahead/behind registry.Now().
+					//
+					// Near the next-second boundary this matters:
+					//   registry.Now() may still be 24.999s while time.Now() is already 25.004s.
+					// If we sleep using local time, the sleep duration can be <= 0 even though the
+					// consensus clock still has not crossed parentTime+1. That can burn all retries,
+					// skip proposal setup, and leave finalCommit with no receiver for commitSigAndBitmap.
+					//
+					// Therefore compute the delay using the same clock used for the timestamp check,
+					// then re-read registry.Now() after sleeping before deciding whether to continue.
 					if timestamp <= parentTime {
-						// Current time is within the same second as the parent block.
-						// Sleep until the next second so the child timestamp is strictly
-						// greater, satisfying the engine.go validation check.
-						time.Sleep(time.Until(time.Unix(parentTime+1, 0)))
-						continue
+						target := time.Unix(parentTime+1, 0)
+
+						if delay := target.Sub(consensus.registry.Now()); delay > 0 {
+							time.Sleep(delay)
+						}
+
+						now = consensus.registry.Now()
+						timestamp = now.Unix()
+
+						if timestamp <= parentTime {
+							consensus.GetLogger().Warn().
+								Int64("parentTimeUnix", parentTime).
+								Time("registryNow", now).
+								Time("targetTime", target).
+								Int64("registryTimestampUnix", timestamp).
+								Int("retryCount", retryCount).
+								Msg("[timestamp-guard] registry clock still not past parent timestamp after sleep")
+
+							continue
+						}
 					}
 					consensus.GetLogger().Info().
 						Uint64("blockNum", proposal.blockNum).
