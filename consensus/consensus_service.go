@@ -691,7 +691,6 @@ func (consensus *Consensus) GetLogger() *zerolog.Logger {
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
-		Time(zerolog.TimestampFieldName, consensus.registry.Now()).
 		Uint32("shardID", consensus.ShardID).
 		Uint64("myBlock", consensus.current.getBlockNum()).
 		Uint64("myViewID", consensus.current.getCurBlockViewID()).
