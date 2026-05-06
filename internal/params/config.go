@@ -1165,6 +1165,7 @@ type Rules struct {
 	Is1153TransientStorage bool
 	Is7939CLZ              bool
 	IsEIP5656Mcopy         bool
+	IsEIP3855              bool
 	IsEIP6780              bool
 	Is3860                 bool
 	IsPrague               bool // EIP-2935: Serve historical block hashes from state
@@ -1203,6 +1204,7 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		Is1153TransientStorage:     c.IsEIP1153TransientStorage(epoch),
 		Is7939CLZ:                  c.IsEIP7939CLZ(epoch),
 		IsEIP5656Mcopy:             c.IsEIP5656Mcopy(epoch),
+		IsEIP3855:                  c.IsEIP3855(epoch),
 		IsEIP6780:                  c.IsEIP6780(epoch),
 		Is3860:                     c.IsEIP3860(epoch),
 		IsPrague:                   c.IsPrague(epoch),

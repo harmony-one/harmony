@@ -98,6 +98,14 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 				cfg.JumpTable = &copy
 			}
 		}
+		// Automatically enable EIP-3855 if the epoch is reached
+		if evm.chainRules.IsEIP3855 {
+			cfg.ExtraEips = append(cfg.ExtraEips, 3855)
+		}
+		// Automatically enable EIP-3860 if the epoch is reached
+		if evm.chainRules.Is3860 {
+			cfg.ExtraEips = append(cfg.ExtraEips, 3860)
+		}
 		// Automatically enable EIP-8024 if the epoch is reached
 		if evm.chainRules.Is8024 {
 			cfg.ExtraEips = append(cfg.ExtraEips, 8024)
