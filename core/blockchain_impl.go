@@ -403,6 +403,17 @@ func VerifyBlockCrossLinks(blockchain BlockChain, block *types.Block) error {
 	}
 
 	for _, crossLink := range crossLinks {
+		// CrossLinks on beacon headers must reference only non-beacon shards when the
+		// RejectShard0CrossLink fork is enabled for the block epoch.
+		if blockchain.Config().IsRejectShard0CrossLink(block.Epoch()) &&
+			crossLink.ShardID() == shard.BeaconChainShardID {
+			return errors.Errorf(
+				"[CrossLinkVerification] invalid crosslink shard: %d block: %d on beacon block %d",
+				crossLink.ShardID(),
+				crossLink.BlockNum(),
+				block.NumberU64(),
+			)
+		}
 		// ReadCrossLink beacon chain usage.
 		cl, err := blockchain.ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
 		if err == nil && cl != nil {
