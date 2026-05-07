@@ -42,6 +42,7 @@ var (
 		EIP155Epoch:                           big.NewInt(28),
 		S3Epoch:                               big.NewInt(28),
 		CrossTxEpoch:                          big.NewInt(28),
+		CXMerkleProofReplayFixEpoch:           EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(100),
 		ReceiptLogEpoch:                       big.NewInt(101),
 		PreStakingEpoch:                       big.NewInt(185),
@@ -103,6 +104,7 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(2),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -164,6 +166,7 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -225,6 +228,7 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -287,6 +291,7 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -347,6 +352,7 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(0),
@@ -408,6 +414,7 @@ var (
 		EthAllProtocolChangesShard0ChainID, // EthCompatibleShard0ChainID
 		big.NewInt(0),                      // EthCompatibleEpoch
 		big.NewInt(0),                      // CrossTxEpoch
+		big.NewInt(0),                      // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
 		big.NewInt(1),                      // AggregatedRewardEpoch
 		big.NewInt(1),                      // StakingEpoch
@@ -471,6 +478,7 @@ var (
 		EthTestShard0ChainID, // EthCompatibleShard0ChainID
 		big.NewInt(0),        // EthCompatibleEpoch
 		big.NewInt(0),        // CrossTxEpoch
+		big.NewInt(0),        // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),        // CrossLinkEpoch
 		big.NewInt(1),        // AggregatedRewardEpoch
 		big.NewInt(1),        // StakingEpoch
@@ -574,6 +582,10 @@ type ChainConfig struct {
 	// CrossTxEpoch is the epoch where cross-shard transaction starts being
 	// processed.
 	CrossTxEpoch *big.Int `json:"cross-tx-epoch,omitempty"`
+
+	// CXMerkleProofReplayFixEpoch is the epoch where CX receipt replay checks
+	// bind merkle proof identity to authenticated source headers.
+	CXMerkleProofReplayFixEpoch *big.Int `json:"cx-merkle-proof-replay-fix-epoch,omitempty"`
 
 	// CrossLinkEpoch is the epoch where beaconchain starts containing
 	// cross-shard links.
@@ -841,6 +853,11 @@ func (c *ChainConfig) AcceptsCrossTx(epoch *big.Int) bool {
 // cross-shard transaction fields.
 func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 	return isForked(c.CrossTxEpoch, epoch)
+}
+
+// IsCXMerkleProofReplayFixEpoch determines whether replay-fix checks are enabled.
+func (c *ChainConfig) IsCXMerkleProofReplayFixEpoch(epoch *big.Int) bool {
+	return isForked(c.CXMerkleProofReplayFixEpoch, epoch)
 }
 
 // IsEthCompatible determines whether it is ethereum compatible epoch

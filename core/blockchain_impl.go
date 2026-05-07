@@ -2693,6 +2693,14 @@ func (bc *BlockChainImpl) CXMerkleProof(toShardID uint32, block *block.Header) (
 
 func (bc *BlockChainImpl) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxps []*types.CXReceiptsProof) error {
 	for _, cxp := range cxps {
+		if cxp.Header != nil && bc.Config().IsCXMerkleProofReplayFixEpoch(cxp.Header.Epoch()) {
+			if err := rawdb.WriteCXReceiptsProofSpentWithKey(
+				db, cxp.Header.ShardID(), cxp.Header.Number().Uint64(),
+			); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := rawdb.WriteCXReceiptsProofSpent(db, cxp); err != nil {
 			return err
 		}
@@ -2703,6 +2711,10 @@ func (bc *BlockChainImpl) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxp
 func (bc *BlockChainImpl) IsSpent(cxp *types.CXReceiptsProof) bool {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	if cxp.Header != nil && bc.Config().IsCXMerkleProofReplayFixEpoch(cxp.Header.Epoch()) {
+		shardID = cxp.Header.ShardID()
+		blockNum = cxp.Header.Number().Uint64()
+	}
 	by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, blockNum)
 	return by == rawdb.SpentByte
 }
