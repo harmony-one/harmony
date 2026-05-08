@@ -776,7 +776,6 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	//	return tracer.GetResult()
 	case *native.ParityBlockTracer:
 		rs, err := tracer.GetParityResult()
-		fmt.Printf("*native.ParityBlockTracer: %T\n", rs)
 		return rs, err
 
 	case tracers.Tracer:
