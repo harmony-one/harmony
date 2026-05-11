@@ -92,6 +92,7 @@ var (
 		EIP6780Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -152,6 +153,7 @@ var (
 		EIP3855Epoch:                          big.NewInt(7170),
 		EIP3860Epoch:                          big.NewInt(7170),
 		EIP8024Epoch:                          big.NewInt(7170),
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -211,6 +213,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -272,6 +275,7 @@ var (
 		EIP8024Epoch:                          big.NewInt(49685),
 		EIP6780Epoch:                          big.NewInt(49810),
 		PragueEpoch:                           EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -332,6 +336,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -391,6 +396,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -453,6 +459,7 @@ var (
 		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // PragueEpoch
 		big.NewInt(0),                      // EIP8024Epoch
+		big.NewInt(0),                      // RejectDuplicateSlashEvidenceEpoch
 	}
 
 	// TestChainConfig ...
@@ -515,6 +522,7 @@ var (
 		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // PragueEpoch
 		big.NewInt(0),        // EIP8024Epoch
+		big.NewInt(0),        // RejectDuplicateSlashEvidenceEpoch
 	}
 
 	// TestRules ...
@@ -726,6 +734,11 @@ type ChainConfig struct {
 	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
 	// EIP8024Epoch is the first epoch to support EIP-8024 (DUPN, SWAPN, EXCHANGE opcodes)
 	EIP8024Epoch *big.Int `json:"eip8024-epoch,omitempty"`
+
+	// RejectDuplicateSlashEvidenceEpoch is the first epoch where beacon header slash
+	// payloads are validated with stricter canonical uniqueness rules. Until set to a
+	// concrete epoch on a network, EpochTBD leaves the rule inactive there.
+	RejectDuplicateSlashEvidenceEpoch *big.Int `json:"reject-duplicate-slash-evidence-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -1010,6 +1023,12 @@ func (c *ChainConfig) IsEIP3860(epoch *big.Int) bool {
 // IsEIP8024 determines whether EIP-8024 (DUPN, SWAPN, EXCHANGE) is available in the EVM
 func (c *ChainConfig) IsEIP8024(epoch *big.Int) bool {
 	return isForked(c.EIP8024Epoch, epoch)
+}
+
+// IsRejectDuplicateSlashEvidence returns whether stricter beacon header slash
+// payload checks are active for the given epoch.
+func (c *ChainConfig) IsRejectDuplicateSlashEvidence(epoch *big.Int) bool {
+	return isForked(c.RejectDuplicateSlashEvidenceEpoch, epoch)
 }
 
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
