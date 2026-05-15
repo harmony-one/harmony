@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	_ "net/http/pprof"
@@ -20,7 +19,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/crosslink_sending"
-	ntptime "github.com/harmony-one/harmony/api/service/ntp"
 	"github.com/harmony-one/harmony/api/service/pprof"
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	syncService "github.com/harmony-one/harmony/api/service/synchronize/stagedstreamsync"
@@ -247,21 +245,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 	nodeconfig.GetDefaultConfig().SyncClient = nodeConfig.SyncClient
 
-	var ntpService ntptime.NTPTime = ntptime.LocalTime{}
-	// Check NTP and time accuracy
 	// It skips the time accuracy check on the localnet since all nodes are running on the same machine
-	switch hc.Network.NetworkType {
-	case nodeconfig.Localnet:
-		ntpService = ntptime.LocalTime{}
-	default:
-		impl, err := ntptime.TryNew(nodeConfig.NtpServer, 3)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error initializing NTP time provider: %v\n", err)
-		} else {
-			go impl.Run(context.Background(), time.Minute)
-			ntpService = impl
-		}
-	}
 	if hc.Network.NetworkType != nodeconfig.Localnet {
 		clockAccuracyResp, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
 		if !clockAccuracyResp.IsAccurate() {
@@ -277,7 +261,6 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			utils.Logger().Warn().Err(err).Msg("Check Local Time Accuracy Error")
 		}
 	}
-	currentNode.Consensus.Registry().SetNTPTime(ntpService)
 
 	// Parse RPC config
 	nodeConfig.RPCServer = hc.ToRPCServerConfig()

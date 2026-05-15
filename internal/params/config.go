@@ -90,7 +90,6 @@ var (
 		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
-		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
 	}
@@ -151,7 +150,6 @@ var (
 		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
-		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
 	}
@@ -211,7 +209,6 @@ var (
 		EIP5656McopyEpoch:                     EpochTBD,
 		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
-		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
 	}
@@ -272,7 +269,6 @@ var (
 		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
-		NTPEpoch:                              big.NewInt(47190),
 		TimestampValidationEpoch:              big.NewInt(47190),
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
@@ -334,7 +330,6 @@ var (
 		EIP5656McopyEpoch:                     EpochTBD,
 		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
-		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
 	}
@@ -394,7 +389,6 @@ var (
 		EIP5656McopyEpoch:                     EpochTBD,
 		EIP3855Epoch:                          EpochTBD,
 		EIP3860Epoch:                          EpochTBD,
-		NTPEpoch:                              EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
 	}
@@ -456,7 +450,6 @@ var (
 		big.NewInt(0),                      // EIP5656McopyEpoch
 		big.NewInt(0),                      // EIP3860Epoch
 		big.NewInt(0),                      // EIP6780Epoch
-		big.NewInt(0),                      // NTPEpoch
 		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // PragueEpoch
 		big.NewInt(0),                      // EIP8024Epoch
@@ -519,7 +512,6 @@ var (
 		big.NewInt(0),        // EIP5656McopyEpoch
 		big.NewInt(0),        // EIP3860Epoch
 		big.NewInt(0),        // EIP6780Epoch
-		big.NewInt(0),        // NTPEpoch
 		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // PragueEpoch
 		big.NewInt(0),        // EIP8024Epoch
@@ -726,9 +718,6 @@ type ChainConfig struct {
 	EIP3860Epoch *big.Int `json:"eip3860-epoch,omitempty"`
 	// EIP6780Epoch is the first epoch to support EIP-6780 (deactivate SELFDESTRUCT)
 	EIP6780Epoch *big.Int `json:"eip6780-epoch,omitempty"`
-
-	// NTPEpoch is the first epoch to use NTP-corrected time for block timestamps
-	NTPEpoch *big.Int `json:"ntp-epoch,omitempty"`
 
 	// TimestampValidationEpoch is the first epoch to enforce strict monotonic
 	// and future-bounded block timestamp checks during header verification.
@@ -1021,11 +1010,6 @@ func (c *ChainConfig) IsEIP3860(epoch *big.Int) bool {
 // IsEIP8024 determines whether EIP-8024 (DUPN, SWAPN, EXCHANGE) is available in the EVM
 func (c *ChainConfig) IsEIP8024(epoch *big.Int) bool {
 	return isForked(c.EIP8024Epoch, epoch)
-}
-
-// IsNTP determines whether NTP-corrected time should be used for block timestamps
-func (c *ChainConfig) IsNTP(epoch *big.Int) bool {
-	return isForked(c.NTPEpoch, epoch)
 }
 
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
