@@ -40,7 +40,19 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 				return
 			case proposal := <-consensus.GetReadySignal():
 				for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
-					time.Sleep(SleepPeriod)
+					var (
+						currentHeader = p.consensus.Blockchain().CurrentHeader()
+						now           = time.Now()
+						timestamp     = now.Unix()
+						parentTime    = currentHeader.Time().Int64()
+					)
+					if timestamp <= parentTime {
+						// Current time is within the same second as the parent block.
+						// Sleep until the next second so the child timestamp is strictly
+						// greater, satisfying the engine.go validation check.
+						time.Sleep(time.Until(time.Unix(parentTime+1, 0)))
+						continue
+					}
 					consensus.GetLogger().Info().
 						Uint64("blockNum", proposal.blockNum).
 						Bool("asyncProposal", proposal.Type == AsyncProposal).
@@ -76,7 +88,7 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 							}
 						}
 					}()
-					newBlock, err := consensus.ProposeNewBlock(newCommitSigsChan)
+					newBlock, err := consensus.ProposeNewBlock(now, newCommitSigsChan)
 					if err == nil {
 						consensus.GetLogger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).

@@ -22,20 +22,20 @@ const (
 )
 
 // ProposeNewBlock proposes a new block...
-func (consensus *Consensus) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) {
+func (consensus *Consensus) ProposeNewBlock(now time.Time, commitSigs chan []byte) (*types.Block, error) {
 	var (
 		currentHeader = consensus.Blockchain().CurrentHeader()
 		nowEpoch      = currentHeader.Epoch()
 		blockNow      = currentHeader.Number()
 		worker        = consensus.registry.GetWorker()
 	)
+
 	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)
 	defer utils.AnalysisEnd("ProposeNewBlock", nowEpoch, blockNow)
 
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions.
-	blockTime := time.Now()
-	env, err := worker.UpdateCurrent(blockTime)
+	env, err := worker.UpdateCurrent(now)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to update worker")
 	}
