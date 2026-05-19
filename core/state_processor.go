@@ -105,25 +105,6 @@ func (p *StateProcessor) Process(
 	types.Receipts, types.CXReceipts, []staking.StakeMsg,
 	[]*types.Log, UsedGas, reward.Reader, *state.DB, error,
 ) {
-	// Decode header slashes and apply scheduled slash-payload rules before the
-	// processor result cache. When the fork flag is off, extra uniqueness checks are skipped.
-	header := block.Header()
-	var slashes slash.Records
-	if s := header.Slashes(); len(s) > 0 {
-		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, nil, 0, nil, statedb, errors.New(
-				"[Process] Cannot finalize block",
-			)
-		}
-	}
-	if p.bc.ShardID() == shard.BeaconChainShardID {
-		if err := checkBeaconSlashEvidenceUniqueness(p.bc.Config(), block.Epoch(), slashes); err != nil {
-			return nil, nil, nil, nil, 0, nil, statedb, errors.WithMessage(err,
-				"[Process] invalid beacon slash payload",
-			)
-		}
-	}
-
 	cacheKey := block.Hash()
 	if readCache {
 		if cached, ok := p.resultCache.Get(cacheKey); ok {
@@ -140,6 +121,7 @@ func (p *StateProcessor) Process(
 		outcxs         types.CXReceipts
 		incxs          = block.IncomingReceipts()
 		usedGas        = new(uint64)
+		header         = block.Header()
 		allLogs        []*types.Log
 		gp             = new(GasPool).AddGas(block.GasLimit())
 		blockStakeMsgs = make([]staking.StakeMsg, 0)
@@ -212,6 +194,25 @@ func (p *StateProcessor) Process(
 		}
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Staking Txns")
 	}
+
+	// Decode header slashes and apply scheduled slash-payload rules before the
+	// processor result cache. When the fork flag is off, extra uniqueness checks are skipped.
+	var slashes slash.Records
+	if s := header.Slashes(); len(s) > 0 {
+		if err := rlp.DecodeBytes(s, &slashes); err != nil {
+			return nil, nil, nil, nil, 0, nil, statedb, errors.New(
+				"[Process] Cannot finalize block",
+			)
+		}
+	}
+	if p.bc.ShardID() == shard.BeaconChainShardID {
+		if err := checkBeaconSlashEvidenceUniqueness(p.bc.Config(), block.Epoch(), slashes); err != nil {
+			return nil, nil, nil, nil, 0, nil, statedb, errors.WithMessage(err,
+				"[Process] invalid beacon slash payload",
+			)
+		}
+	}
+
 	// incomingReceipts should always be processed
 	// after transactions (to be consistent with the block proposal)
 	for _, cx := range block.IncomingReceipts() {
