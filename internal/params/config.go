@@ -145,13 +145,13 @@ var (
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
-		EIP7939CLZEpoch:                       EpochTBD,
-		EIP5656McopyEpoch:                     EpochTBD,
-		EIP3855Epoch:                          EpochTBD,
-		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
-		EIP8024Epoch:                          EpochTBD,
+		EIP7939CLZEpoch:                       big.NewInt(7170),
+		EIP5656McopyEpoch:                     big.NewInt(7170),
+		EIP3855Epoch:                          big.NewInt(7170),
+		EIP3860Epoch:                          big.NewInt(7170),
+		EIP8024Epoch:                          big.NewInt(7170),
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
