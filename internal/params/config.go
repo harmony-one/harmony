@@ -264,14 +264,14 @@ var (
 		IsOneSecondEpoch:                      big.NewInt(17436),
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(35626),
-		EIP7939CLZEpoch:                       EpochTBD,
-		EIP5656McopyEpoch:                     EpochTBD,
-		EIP3855Epoch:                          EpochTBD,
-		EIP3860Epoch:                          EpochTBD,
-		EIP6780Epoch:                          EpochTBD,
 		TimestampValidationEpoch:              big.NewInt(47190),
+		EIP7939CLZEpoch:                       big.NewInt(49685),
+		EIP5656McopyEpoch:                     big.NewInt(49685),
+		EIP3855Epoch:                          big.NewInt(49685),
+		EIP3860Epoch:                          big.NewInt(49685),
+		EIP8024Epoch:                          big.NewInt(49685),
+		EIP6780Epoch:                          EpochTBD, //????
 		PragueEpoch:                           EpochTBD,
-		EIP8024Epoch:                          EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
