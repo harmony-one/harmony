@@ -141,7 +141,7 @@ var (
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  big.NewInt(3044),
-		TimestampValidationEpoch:              EpochTBD,
+		TimestampValidationEpoch:              big.NewInt(7170),
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
