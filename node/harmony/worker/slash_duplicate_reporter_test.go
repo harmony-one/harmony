@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"testing"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/ethereum/go-ethereum/common"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
