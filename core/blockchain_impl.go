@@ -401,6 +401,10 @@ func VerifyBlockCrossLinks(blockchain BlockChain, block *types.Block) error {
 	if !crossLinks.IsSorted() {
 		return errors.New("[CrossLinkVerification] cross links are not sorted")
 	}
+	if blockchain.Config().IsDuplicateCrossLinkRejection(block.Epoch()) &&
+		crossLinks.HasDuplicateShardBlocks() {
+		return errors.New("[CrossLinkVerification] duplicate cross links in block header")
+	}
 
 	for _, crossLink := range crossLinks {
 		// ReadCrossLink beacon chain usage.

@@ -152,3 +152,15 @@ func (cls CrossLinks) IsSorted() bool {
 		return cls[i].ViewID().Cmp(cls[j].ViewID()) < 0
 	})
 }
+
+// HasDuplicateShardBlocks reports duplicate (shardID, blockNum) pairs.
+// The list must be sorted (see IsSorted).
+func (cls CrossLinks) HasDuplicateShardBlocks() bool {
+	for i := 1; i < len(cls); i++ {
+		if cls[i-1].ShardID() == cls[i].ShardID() &&
+			cls[i-1].BlockNum() == cls[i].BlockNum() {
+			return true
+		}
+	}
+	return false
+}

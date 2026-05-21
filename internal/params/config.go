@@ -82,6 +82,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		TimestampValidationEpoch:              EpochTBD,
+		DuplicateCrossLinkEpoch:               EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
@@ -142,6 +143,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  big.NewInt(3044),
 		TimestampValidationEpoch:              EpochTBD,
+		DuplicateCrossLinkEpoch:               EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
@@ -202,6 +204,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		TimestampValidationEpoch:              EpochTBD,
+		DuplicateCrossLinkEpoch:               EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
@@ -270,6 +273,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		EIP6780Epoch:                          EpochTBD,
 		TimestampValidationEpoch:              big.NewInt(47190),
+		DuplicateCrossLinkEpoch:               EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
 	}
@@ -323,6 +327,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		TimestampValidationEpoch:              EpochTBD,
+		DuplicateCrossLinkEpoch:               EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
@@ -382,6 +387,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		TimestampValidationEpoch:              big.NewInt(0),
+		DuplicateCrossLinkEpoch:               EpochTBD,
 		IsOneSecondEpoch:                      big.NewInt(4),
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
@@ -453,6 +459,7 @@ var (
 		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // PragueEpoch
 		big.NewInt(0),                      // EIP8024Epoch
+		EpochTBD,                           // DuplicateCrossLinkEpoch
 	}
 
 	// TestChainConfig ...
@@ -515,6 +522,7 @@ var (
 		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // PragueEpoch
 		big.NewInt(0),        // EIP8024Epoch
+		EpochTBD,             // DuplicateCrossLinkEpoch
 	}
 
 	// TestRules ...
@@ -722,6 +730,9 @@ type ChainConfig struct {
 	// TimestampValidationEpoch is the first epoch to enforce strict monotonic
 	// and future-bounded block timestamp checks during header verification.
 	TimestampValidationEpoch *big.Int `json:"timestamp-validation-epoch,omitempty"`
+	// DuplicateCrossLinkEpoch is the first epoch to reject duplicate (shardID,
+	// blockNum) pairs in a beacon block Header.CrossLinks list.
+	DuplicateCrossLinkEpoch *big.Int `json:"duplicate-cross-link-epoch,omitempty"`
 	// PragueEpoch is the first epoch to support the Prague feature
 	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
 	// EIP8024Epoch is the first epoch to support EIP-8024 (DUPN, SWAPN, EXCHANGE opcodes)
@@ -869,6 +880,12 @@ func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
 // IsTimestampValidation determines whether timestamp hardfork checks are enabled.
 func (c *ChainConfig) IsTimestampValidation(epoch *big.Int) bool {
 	return isForked(c.TimestampValidationEpoch, epoch)
+}
+
+// IsDuplicateCrossLinkRejection determines whether duplicate cross-links in a
+// beacon block header are rejected.
+func (c *ChainConfig) IsDuplicateCrossLinkRejection(epoch *big.Int) bool {
+	return isForked(c.DuplicateCrossLinkEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%

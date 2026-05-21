@@ -39,6 +39,25 @@ func TestCrosslinks_Sorting(t *testing.T) {
 	require.True(t, bb.IsSorted())
 }
 
+func TestCrossLinks_HasDuplicateShardBlocks(t *testing.T) {
+	cl := CrossLink{
+		ShardIDF:     1,
+		BlockNumberF: big.NewInt(42),
+		ViewIDF:      big.NewInt(0),
+	}
+	duplicates := CrossLinks{cl, cl}
+	duplicates.Sort()
+	require.True(t, duplicates.IsSorted())
+	require.True(t, duplicates.HasDuplicateShardBlocks())
+
+	unique := CrossLinks{
+		{ShardIDF: 1, BlockNumberF: big.NewInt(1), ViewIDF: big.NewInt(0)},
+		{ShardIDF: 1, BlockNumberF: big.NewInt(2), ViewIDF: big.NewInt(0)},
+	}
+	unique.Sort()
+	require.False(t, unique.HasDuplicateShardBlocks())
+}
+
 func TestBigNumberInequality(t *testing.T) {
 	type A struct {
 		X int
