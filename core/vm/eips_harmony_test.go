@@ -114,7 +114,6 @@ func TestAutoEIPActivationRespectsEpochBoundaries(t *testing.T) {
 		EIP5656McopyEpoch:                     big.NewInt(0),
 		EIP3860Epoch:                          big.NewInt(100),
 		EIP6780Epoch:                          big.NewInt(100),
-		NTPEpoch:                              big.NewInt(0),
 		TimestampValidationEpoch:              big.NewInt(0),
 		PragueEpoch:                           big.NewInt(0),
 		EIP8024Epoch:                          big.NewInt(100),
