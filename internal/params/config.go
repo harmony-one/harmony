@@ -145,7 +145,7 @@ var (
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
-		EIP6780Epoch:                          EpochTBD,
+		EIP6780Epoch:                          big.NewInt(7178),
 		PragueEpoch:                           EpochTBD,
 		EIP7939CLZEpoch:                       big.NewInt(7170),
 		EIP5656McopyEpoch:                     big.NewInt(7170),
@@ -270,7 +270,7 @@ var (
 		EIP3855Epoch:                          big.NewInt(49685),
 		EIP3860Epoch:                          big.NewInt(49685),
 		EIP8024Epoch:                          big.NewInt(49685),
-		EIP6780Epoch:                          EpochTBD, //????
+		EIP6780Epoch:                          big.NewInt(49810),
 		PragueEpoch:                           EpochTBD,
 	}
 
