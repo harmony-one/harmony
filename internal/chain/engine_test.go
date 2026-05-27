@@ -542,9 +542,9 @@ func TestVerifyHeaderTimestamp_WallClockFutureLimit(t *testing.T) {
 	skewSec := int64(allowedFutureBlockTime.Seconds())
 
 	tests := []struct {
-		name         string
+		name          string
 		offsetFromNow int64
-		wantErr      error
+		wantErr       error
 	}{
 		// Inside the wall-clock window AND inside the step window (parent==now):
 		{"at_skew_boundary_within_step", skewSec - int64(maxBlockTimeStep.Seconds()), nil},
@@ -675,10 +675,10 @@ func TestVerifyHeaderTimestamp_ParentAheadOfWall(t *testing.T) {
 	now := time.Now().Unix()
 
 	tests := []struct {
-		name      string
+		name        string
 		parentAhead int64 // parent.Time = now + parentAhead
-		headerTime int64 // header.Time absolute (computed lazily below)
-		wantErr   error
+		headerTime  int64 // header.Time absolute (computed lazily below)
+		wantErr     error
 	}{
 		// parent = now+5: step arm allows parent+12 = now+17; wall arm allows now+15.
 		// header at now+15 should be rejected by step arm? No — step is parent+12=now+17 ≥ now+15 ✓.
@@ -691,9 +691,9 @@ func TestVerifyHeaderTimestamp_ParentAheadOfWall(t *testing.T) {
 	}
 
 	// fill in headerTime values that depend on `now`
-	tests[0].headerTime = now + 15            // wall+15 exactly
-	tests[1].headerTime = now + 16            // one past wall+15
-	tests[2].headerTime = now + 5 + 13        // parent+13 also > wall+15 but also fails step
+	tests[0].headerTime = now + 15     // wall+15 exactly
+	tests[1].headerTime = now + 16     // one past wall+15
+	tests[2].headerTime = now + 5 + 13 // parent+13 also > wall+15 but also fails step
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

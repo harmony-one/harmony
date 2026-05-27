@@ -19,9 +19,9 @@ func fixedNow(unixSec int64) time.Time {
 
 func TestComputeProposalTiming_ReadyCases(t *testing.T) {
 	tests := []struct {
-		name        string
-		parentTime  int64
-		wallOffset  int64 // wall = parent + wallOffset
+		name          string
+		parentTime    int64
+		wallOffset    int64 // wall = parent + wallOffset
 		wantTimestamp int64 // expected proposeAt.Unix()
 	}{
 		{"one_second_after_parent", 1000, 1, 1001},
