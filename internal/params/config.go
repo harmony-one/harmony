@@ -92,6 +92,7 @@ var (
 		EIP6780Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -152,6 +153,7 @@ var (
 		EIP3855Epoch:                          big.NewInt(7170),
 		EIP3860Epoch:                          big.NewInt(7170),
 		EIP8024Epoch:                          big.NewInt(7170),
+		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -211,6 +213,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -272,6 +275,7 @@ var (
 		EIP8024Epoch:                          big.NewInt(49685),
 		EIP6780Epoch:                          big.NewInt(49810),
 		PragueEpoch:                           EpochTBD,
+		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -332,6 +336,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -391,6 +396,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -453,6 +459,7 @@ var (
 		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // PragueEpoch
 		big.NewInt(0),                      // EIP8024Epoch
+		big.NewInt(0),                      // SlashExternalStakeDenomFixEpoch
 	}
 
 	// TestChainConfig ...
@@ -515,6 +522,7 @@ var (
 		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // PragueEpoch
 		big.NewInt(0),        // EIP8024Epoch
+		big.NewInt(0),        // SlashExternalStakeDenomFixEpoch
 	}
 
 	// TestRules ...
@@ -726,6 +734,10 @@ type ChainConfig struct {
 	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
 	// EIP8024Epoch is the first epoch to support EIP-8024 (DUPN, SWAPN, EXCHANGE opcodes)
 	EIP8024Epoch *big.Int `json:"eip8024-epoch,omitempty"`
+
+	// SlashExternalStakeDenomFixEpoch is the first epoch where double-sign external delegator
+	// slash uses snapshot self-stake in the external-stake denominator (bug03 / HIP coordination).
+	SlashExternalStakeDenomFixEpoch *big.Int `json:"slash-external-stake-denom-fix-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -869,6 +881,12 @@ func (c *ChainConfig) IsOneSecond(epoch *big.Int) bool {
 // IsTimestampValidation determines whether timestamp hardfork checks are enabled.
 func (c *ChainConfig) IsTimestampValidation(epoch *big.Int) bool {
 	return isForked(c.TimestampValidationEpoch, epoch)
+}
+
+// IsSlashExternalStakeDenomFix returns whether double-sign slashing uses snapshot self-stake
+// for the external delegator slash denominator.
+func (c *ChainConfig) IsSlashExternalStakeDenomFix(epoch *big.Int) bool {
+	return isForked(c.SlashExternalStakeDenomFixEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%
