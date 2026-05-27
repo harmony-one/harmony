@@ -41,6 +41,10 @@ const (
 	vrfProof         = 96 // 96 bytes proof (bls sig)
 	// Maximum allowed future skew for block timestamps.
 	allowedFutureBlockTime = 15 * time.Second
+	// Maximum amount a block timestamp may advance past its parent (per block).
+	// Caps cascading chain-time drift when leaders skew ahead of peers.
+	// Set above 2× the largest consensus BlockPeriod used in this repo (5s).
+	maxBlockTimeStep = 12 * time.Second
 )
 
 type engineImpl struct {
@@ -75,6 +79,27 @@ func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header
 		// Reject blocks that are too far in the future relative to local wall clock.
 		limit := big.NewInt(time.Now().Add(allowedFutureBlockTime).Unix())
 		if header.Time().Cmp(limit) > 0 {
+			return engine.ErrFutureBlock
+		}
+		// Bound per-block forward progression: a single block may not jump more
+		// than maxBlockTimeStep past its parent, relative to this node's local
+		// wall clock at verification time. This limits how far chain time can
+		// ratchet per block when parents were produced with skewed clocks.
+		//
+		// If local wall time already exceeds parent+maxBlockTimeStep, use that
+		// wall time as the step ceiling instead (same clock source as the
+		// allowed-future check above). That way a long header-time gap (e.g.
+		// no blocks for a while) does not force recovery only maxBlockTimeStep
+		// seconds per block.
+		stepLimit := new(big.Int).Add(
+			parentHeader.Time(),
+			big.NewInt(int64(maxBlockTimeStep.Seconds())),
+		)
+		walltime := big.NewInt(time.Now().Unix())
+		if walltime.Cmp(stepLimit) > 0 {
+			stepLimit = walltime
+		}
+		if header.Time().Cmp(stepLimit) > 0 {
 			return engine.ErrFutureBlock
 		}
 	}
