@@ -469,3 +469,13 @@ func TestVerifyHeaderTimestampValidationBackwardCompatibleBeforeFork(t *testing.
 		t.Fatalf("expected future timestamp allowed pre-fork, got %v", err)
 	}
 }
+
+func TestVerifiedSigCacheKeyIncludesShardID(t *testing.T) {
+	hash := common.Hash{1, 2, 3}
+	var sig bls.SerializedSignature
+	bitmap := []byte{0xff}
+
+	if newVerifiedSigKey(1, hash, sig, bitmap) == newVerifiedSigKey(2, hash, sig, bitmap) {
+		t.Fatal("verified signature cache keys must include shard ID")
+	}
+}

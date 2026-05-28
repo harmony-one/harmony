@@ -618,7 +618,7 @@ func (e *engineImpl) VerifyCrossLink(chain engine.ChainReader, cl types.CrossLin
 }
 
 func (e *engineImpl) verifySignatureCached(chain engine.ChainReader, pas payloadArgs, sas sigArgs) error {
-	verifiedKey := newVerifiedSigKey(pas.blockHash, sas.sig, sas.bitmap)
+	verifiedKey := newVerifiedSigKey(pas.shardID, pas.blockHash, sas.sig, sas.bitmap)
 	if _, ok := e.verifiedSigCache.Get(verifiedKey); ok {
 		return nil
 	}
@@ -677,16 +677,18 @@ const bitmapKeyBytes = 64
 
 // verifiedSigKey is the key for caching header verification results
 type verifiedSigKey struct {
+	shardID   uint32
 	blockHash common.Hash
 	signature bls_cosi.SerializedSignature
 	bitmap    [bitmapKeyBytes]byte
 }
 
-func newVerifiedSigKey(blockHash common.Hash, sig bls_cosi.SerializedSignature, bitmap []byte) verifiedSigKey {
+func newVerifiedSigKey(shardID uint32, blockHash common.Hash, sig bls_cosi.SerializedSignature, bitmap []byte) verifiedSigKey {
 	var keyBM [bitmapKeyBytes]byte
 	copy(keyBM[:], bitmap)
 
 	return verifiedSigKey{
+		shardID:   shardID,
 		blockHash: blockHash,
 		signature: sig,
 		bitmap:    keyBM,
