@@ -391,6 +391,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		ShardStateValidationEpoch:             EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -453,6 +454,7 @@ var (
 		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // PragueEpoch
 		big.NewInt(0),                      // EIP8024Epoch
+		EpochTBD,                           // ShardStateValidationEpoch
 	}
 
 	// TestChainConfig ...
@@ -515,6 +517,7 @@ var (
 		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // PragueEpoch
 		big.NewInt(0),        // EIP8024Epoch
+		EpochTBD,             // ShardStateValidationEpoch
 	}
 
 	// TestRules ...
@@ -726,6 +729,9 @@ type ChainConfig struct {
 	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
 	// EIP8024Epoch is the first epoch to support EIP-8024 (DUPN, SWAPN, EXCHANGE opcodes)
 	EIP8024Epoch *big.Int `json:"eip8024-epoch,omitempty"`
+	// ShardStateValidationEpoch is the first epoch to enforce that only scheduled
+	// epoch-ending blocks may carry shard state bytes in their header
+	ShardStateValidationEpoch *big.Int `json:"shard-state-validation-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -1010,6 +1016,11 @@ func (c *ChainConfig) IsEIP3860(epoch *big.Int) bool {
 // IsEIP8024 determines whether EIP-8024 (DUPN, SWAPN, EXCHANGE) is available in the EVM
 func (c *ChainConfig) IsEIP8024(epoch *big.Int) bool {
 	return isForked(c.EIP8024Epoch, epoch)
+}
+
+// IsShardStateValidation returns true when non-epoch-ending blocks are rejected if they carry shard state bytes
+func (c *ChainConfig) IsShardStateValidation(epoch *big.Int) bool {
+	return isForked(c.ShardStateValidationEpoch, epoch)
 }
 
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
