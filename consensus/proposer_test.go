@@ -18,6 +18,7 @@ func fixedNow(unixSec int64) time.Time {
 }
 
 func TestComputeProposalTiming_ReadyCases(t *testing.T) {
+	skewClamp := int64(viewChangeSlot)
 	tests := []struct {
 		name          string
 		parentTime    int64
@@ -31,9 +32,9 @@ func TestComputeProposalTiming_ReadyCases(t *testing.T) {
 		// > step but <= threshold → clamp to parent+step
 		{"just_past_step_clamps", 1000, maxProposerForwardStep + 1, 1000 + maxProposerForwardStep},
 		{"plus_15s_skew_clamps", 1000, 17, 1000 + maxProposerForwardStep},
-		{"at_stall_threshold_clamps", 1000, stallRecoveryThreshold, 1000 + maxProposerForwardStep},
+		{"at_stall_threshold_clamps", 1000, skewClamp, 1000 + maxProposerForwardStep},
 		// > threshold → stall recovery, NO clamp, propose at wall
-		{"just_past_threshold_no_clamp", 1000, stallRecoveryThreshold + 1, 1000 + stallRecoveryThreshold + 1},
+		{"just_past_threshold_no_clamp", 1000, skewClamp + 1, 1000 + skewClamp + 1},
 		{"short_stall_propose_at_wall", 1000, 60, 1060},
 		{"five_minute_stall_propose_at_wall", 1000, 300, 1300},
 		{"one_hour_stall_propose_at_wall", 1000, 3600, 4600},
@@ -42,7 +43,7 @@ func TestComputeProposalTiming_ReadyCases(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			now := fixedNow(tc.parentTime + tc.wallOffset)
-			d := computeProposalTiming(now, tc.parentTime)
+			d := computeProposalTiming(now, tc.parentTime, skewClamp, true)
 			if !d.ready {
 				t.Fatalf("expected ready, got %+v", d)
 			}
@@ -60,6 +61,7 @@ func TestComputeProposalTiming_ReadyCases(t *testing.T) {
 }
 
 func TestComputeProposalTiming_SleepCases(t *testing.T) {
+	skewClamp := int64(viewChangeSlot)
 	tests := []struct {
 		name           string
 		parentTime     int64
@@ -106,7 +108,7 @@ func TestComputeProposalTiming_SleepCases(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			now := fixedNow(tc.parentTime + tc.wallOffset)
-			d := computeProposalTiming(now, tc.parentTime)
+			d := computeProposalTiming(now, tc.parentTime, skewClamp, true)
 			if d.ready {
 				t.Fatalf("expected !ready, got %+v", d)
 			}
@@ -123,6 +125,7 @@ func TestComputeProposalTiming_SleepCases(t *testing.T) {
 }
 
 func TestComputeProposalTiming_GiveUpCases(t *testing.T) {
+	skewClamp := int64(viewChangeSlot)
 	tests := []struct {
 		name       string
 		parentTime int64
@@ -152,7 +155,7 @@ func TestComputeProposalTiming_GiveUpCases(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			now := fixedNow(tc.parentTime + tc.wallOffset)
-			d := computeProposalTiming(now, tc.parentTime)
+			d := computeProposalTiming(now, tc.parentTime, skewClamp, true)
 			if !d.giveUp {
 				t.Fatalf("expected giveUp, got %+v", d)
 			}
@@ -171,17 +174,17 @@ func TestComputeProposalTiming_GiveUpCases(t *testing.T) {
 func TestComputeProposalTiming_ClampVsStallBoundary(t *testing.T) {
 	parentTime := int64(1000)
 	step := maxProposerForwardStep
-	threshold := stallRecoveryThreshold
+	threshold := int64(viewChangeSlot)
 
 	// At threshold (inclusive): clamp.
-	at := computeProposalTiming(fixedNow(parentTime+threshold), parentTime)
+	at := computeProposalTiming(fixedNow(parentTime+threshold), parentTime, threshold, true)
 	if !at.ready || at.proposeAt.Unix() != parentTime+step {
 		t.Fatalf("at threshold: expected clamp to parent+step (%d), got %+v",
 			parentTime+step, at)
 	}
 
 	// One past threshold: no clamp, propose at wall.
-	past := computeProposalTiming(fixedNow(parentTime+threshold+1), parentTime)
+	past := computeProposalTiming(fixedNow(parentTime+threshold+1), parentTime, threshold, true)
 	if !past.ready || past.proposeAt.Unix() != parentTime+threshold+1 {
 		t.Fatalf("past threshold: expected no clamp (propose at %d), got %+v",
 			parentTime+threshold+1, past)
@@ -193,10 +196,9 @@ func TestComputeProposalTiming_ClampVsStallBoundary(t *testing.T) {
 // honest validators (with synced clocks) will accept the block.
 func TestComputeProposalTiming_AdversarialSkewedLeaderClamps(t *testing.T) {
 	parentTime := int64(1000)
-	// Simulate a leader 15s ahead of real time, with parent freshly produced.
 	skewedNow := fixedNow(parentTime + 15)
 
-	d := computeProposalTiming(skewedNow, parentTime)
+	d := computeProposalTiming(skewedNow, parentTime, int64(viewChangeSlot), true)
 	if !d.ready {
 		t.Fatalf("expected ready, got %+v", d)
 	}
@@ -211,9 +213,8 @@ func TestComputeProposalTiming_AdversarialSkewedLeaderClamps(t *testing.T) {
 // block that would take many rounds to catch up.
 func TestComputeProposalTiming_FastStallRecovery(t *testing.T) {
 	parentTime := int64(1000)
-	// 5-minute stall.
 	wall := parentTime + 300
-	d := computeProposalTiming(fixedNow(wall), parentTime)
+	d := computeProposalTiming(fixedNow(wall), parentTime, int64(viewChangeSlot), true)
 	if !d.ready {
 		t.Fatalf("expected ready, got %+v", d)
 	}
@@ -223,15 +224,51 @@ func TestComputeProposalTiming_FastStallRecovery(t *testing.T) {
 	}
 }
 
+// TestComputeProposalTiming_SkewClampBand verifies +42s skew clamps with
+// viewChangeSlot threshold instead of using stall recovery.
+func TestComputeProposalTiming_SkewClampBand(t *testing.T) {
+	parentTime := int64(1000)
+	threshold := int64(viewChangeSlot)
+
+	d := computeProposalTiming(fixedNow(parentTime+42), parentTime, threshold, true)
+	if !d.ready || d.proposeAt.Unix() != parentTime+maxProposerForwardStep {
+		t.Fatalf("+42s: expected clamp to %d, got %+v",
+			parentTime+maxProposerForwardStep, d)
+	}
+
+	d = computeProposalTiming(fixedNow(parentTime+46), parentTime, threshold, true)
+	if !d.ready || d.proposeAt.Unix() != parentTime+46 {
+		t.Fatalf("+46s: expected wall, got %+v", d)
+	}
+}
+
+// TestComputeProposalTiming_LegacyBeforeFork matches pre-fork leader behavior.
+func TestComputeProposalTiming_LegacyBeforeFork(t *testing.T) {
+	parentTime := int64(1000)
+
+	// No clamp even with large positive skew.
+	d := computeProposalTiming(fixedNow(parentTime+42), parentTime, 0, false)
+	if !d.ready || d.proposeAt.Unix() != parentTime+42 {
+		t.Fatalf("legacy +42s: expected wall, got %+v", d)
+	}
+
+	// Sleep without give-up cap when far behind parent.
+	d = computeProposalTiming(fixedNow(parentTime-60), parentTime, 0, false)
+	if d.ready || d.giveUp {
+		t.Fatalf("legacy -60s: expected sleep, got %+v", d)
+	}
+	if d.sleep != 61*time.Second {
+		t.Fatalf("legacy sleep = %v, want 61s", d.sleep)
+	}
+}
+
 // TestComputeProposalTiming_CascadingAftermath verifies that when parent is
 // slightly in the future of wall (after a cascading-skew round), the proposer
 // sleeps the right amount and the wait is within the catch-up cap.
 func TestComputeProposalTiming_CascadingAftermath(t *testing.T) {
 	parentTime := int64(1000)
-	// Honest leader's wall is BlockPeriod (2s) after the prior tick, but parent
-	// was produced by a +10s-skewed leader.
-	wall := parentTime - 8 // need to wait 9s for wall to exceed parent
-	d := computeProposalTiming(fixedNow(wall), parentTime)
+	wall := parentTime - 8
+	d := computeProposalTiming(fixedNow(wall), parentTime, int64(viewChangeSlot), true)
 	if d.ready || d.giveUp {
 		t.Fatalf("expected sleep path, got %+v", d)
 	}
@@ -248,21 +285,17 @@ func TestComputeProposalTiming_CascadingAftermath(t *testing.T) {
 // honest path after a clamped leader produced parent+step: the next leader's
 // wall should already be at or past parent, so no sleep needed.
 func TestComputeProposalTiming_HonestRecoveryAfterClampedLeader(t *testing.T) {
-	// Previous (skewed) leader was clamped to parentPrev+step.
 	parentPrev := int64(1000)
-	parentTime := parentPrev + maxProposerForwardStep // = 1012
-	// Honest next leader's wall = parentPrev + 2 (BlockPeriod). That is BEHIND
-	// the clamped parent.Time. So proposer must sleep.
-	wall := parentPrev + 2 // = 1002
-	d := computeProposalTiming(fixedNow(wall), parentTime)
+	parentTime := parentPrev + maxProposerForwardStep
+	wall := parentPrev + 2
+	d := computeProposalTiming(fixedNow(wall), parentTime, int64(viewChangeSlot), true)
 	if d.ready || d.giveUp {
 		t.Fatalf("expected sleep, got %+v", d)
 	}
-	expected := time.Duration(parentTime+1-wall) * time.Second // 11s
+	expected := time.Duration(parentTime+1-wall) * time.Second
 	if d.sleep != expected {
 		t.Fatalf("expected %v sleep, got %v", expected, d.sleep)
 	}
-	// 11s must be within catch-up cap (17s).
 	if d.sleep > maxProposerCatchupWait {
 		t.Fatalf("legitimate cascading aftermath sleep %v exceeds cap %v",
 			d.sleep, maxProposerCatchupWait)
@@ -276,9 +309,9 @@ func TestComputeProposalTiming_ConstantsAlignWithEngine(t *testing.T) {
 	if maxProposerForwardStep <= 0 {
 		t.Fatalf("maxProposerForwardStep must be positive, got %d", maxProposerForwardStep)
 	}
-	if stallRecoveryThreshold <= maxProposerForwardStep {
-		t.Fatalf("stallRecoveryThreshold (%d) must exceed maxProposerForwardStep (%d)",
-			stallRecoveryThreshold, maxProposerForwardStep)
+	if int64(viewChangeSlot) <= maxProposerForwardStep {
+		t.Fatalf("viewChangeSlot (%d) must exceed maxProposerForwardStep (%d)",
+			viewChangeSlot, maxProposerForwardStep)
 	}
 	if maxProposerCatchupWait < time.Duration(maxProposerForwardStep)*time.Second {
 		t.Fatalf("maxProposerCatchupWait (%v) must be >= maxProposerForwardStep seconds (%ds) "+

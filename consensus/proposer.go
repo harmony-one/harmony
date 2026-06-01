@@ -12,16 +12,10 @@ const (
 	// When local wall is only moderately ahead of parent.Time, clamp the
 	// proposed unix time to parent+maxProposerForwardStep so the header stays
 	// inside the engine's per-block step bound relative to that parent.
-	// When wall is far ahead of parent (see stallRecoveryThreshold), do not
+	// When wall is far ahead of parent (above skew-clamp threshold), do not
 	// clamp so the proposed time can follow local wall (matches engine's
 	// max(parent+step, localWall) step ceiling).
 	maxProposerForwardStep int64 = 12
-	// stallRecoveryThreshold separates the two clamp behaviors above, in
-	// seconds of (localWall - parent.Time). Large gaps often mean no block was
-	// committed for a while (parent time is stale vs this leader's clock), not
-	// only sub-second skew. The threshold is chosen above typical skew but
-	// below multi-minute scales; it is a heuristic, not consensus state.
-	stallRecoveryThreshold int64 = 30
 	// maxProposerCatchupWait caps sleeping until parent.Time+1 when the leader
 	// wall is behind the parent header time. Without a cap, a far-future
 	// parent would block this goroutine for a long time. 17s covers waiting
@@ -48,17 +42,23 @@ type proposalTiming struct {
 // WaitForConsensusReadyV2. Extracted so the timing logic can be unit-tested
 // without spinning up the full consensus stack.
 //
-// Semantics (wall := now.Unix(), parent := parentTime):
+// When timestampValidation is false (before TimestampValidationEpoch), only the
+// legacy sleep-until-parent+1 behavior applies.
+//
+// When timestampValidation is true (wall := now.Unix(), parent := parentTime):
 //   - wall <= parent: sleep until parent+1, capped by maxProposerCatchupWait;
 //     if the sleep would exceed the cap, giveUp for this attempt.
-//   - wall > parent+maxProposerForwardStep && wall-parent <= stallRecoveryThreshold:
+//   - wall > parent+maxProposerForwardStep && wall-parent <= skewClampThreshold:
 //     clamp to parent+maxProposerForwardStep (skew clamp band).
-//   - wall > parent+stallRecoveryThreshold: no clamp; propose at wall.
+//   - wall > parent+skewClampThreshold: no clamp; propose at wall (stall recovery).
 //   - else wall > parent && wall <= parent+maxProposerForwardStep: propose at wall.
-func computeProposalTiming(now time.Time, parentTime int64) proposalTiming {
+func computeProposalTiming(now time.Time, parentTime int64, skewClampThreshold int64, timestampValidation bool) proposalTiming {
+	if !timestampValidation {
+		return computeLegacyProposalTiming(now, parentTime)
+	}
 	timestamp := now.Unix()
 	if timestamp > parentTime+maxProposerForwardStep &&
-		timestamp-parentTime <= stallRecoveryThreshold {
+		timestamp-parentTime <= skewClampThreshold {
 		timestamp = parentTime + maxProposerForwardStep
 		now = time.Unix(timestamp, 0)
 	}
@@ -68,6 +68,16 @@ func computeProposalTiming(now time.Time, parentTime int64) proposalTiming {
 			return proposalTiming{giveUp: true}
 		}
 		return proposalTiming{sleep: waitFor}
+	}
+	return proposalTiming{ready: true, proposeAt: now}
+}
+
+// computeLegacyProposalTiming is the pre-TimestampValidationEpoch leader behavior:
+// sleep until parent+1 when wall is not past parent, otherwise propose at wall.
+func computeLegacyProposalTiming(now time.Time, parentTime int64) proposalTiming {
+	timestamp := now.Unix()
+	if timestamp <= parentTime {
+		return proposalTiming{sleep: time.Unix(parentTime+1, 0).Sub(now)}
 	}
 	return proposalTiming{ready: true, proposeAt: now}
 }
@@ -107,7 +117,11 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 				for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
 					currentHeader := p.consensus.Blockchain().CurrentHeader()
 					parentTime := currentHeader.Time().Int64()
-					timing := computeProposalTiming(time.Now(), parentTime)
+					chainConfig := p.consensus.Blockchain().Config()
+					epoch := currentHeader.Epoch()
+					timestampValidation := chainConfig != nil && chainConfig.IsTimestampValidation(epoch)
+					skewClamp := int64(viewChangeSlot)
+					timing := computeProposalTiming(time.Now(), parentTime, skewClamp, timestampValidation)
 					if timing.giveUp {
 						consensus.GetLogger().Warn().
 							Int64("parentTime", parentTime).
