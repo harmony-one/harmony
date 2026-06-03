@@ -132,6 +132,10 @@ func (p *StateProcessor) Process(
 		return nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
+	statedb.SetValidatorWrapperAddressBind(
+		p.bc.Config().IsValidatorWrapperAddressBind(header.Epoch()),
+	)
+
 	if p.bc.Config().IsPrague(block.Epoch()) {
 		// This should not underflow as genesis block is not processed.
 		ProcessBlockHashHistory(statedb, block.Header(), p.bc.Config(), p.bc)

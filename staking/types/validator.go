@@ -35,6 +35,8 @@ const (
 
 var (
 	errAddressNotMatch = errors.New("validator key not match")
+	// ErrValidatorWrapperAddressMismatch
+	ErrValidatorWrapperAddressMismatch = errors.New("validator wrapper address does not match account")
 	// ErrInvalidSelfDelegation ..
 	ErrInvalidSelfDelegation = errors.New(
 		"self delegation can not be less than min_self_delegation",

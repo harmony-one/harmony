@@ -92,6 +92,7 @@ var (
 		EIP6780Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		ValidatorWrapperAddressBindEpoch:      EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -152,6 +153,7 @@ var (
 		EIP3855Epoch:                          big.NewInt(7170),
 		EIP3860Epoch:                          big.NewInt(7170),
 		EIP8024Epoch:                          big.NewInt(7170),
+		ValidatorWrapperAddressBindEpoch:      EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -211,6 +213,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		ValidatorWrapperAddressBindEpoch:      EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -272,6 +275,7 @@ var (
 		EIP8024Epoch:                          big.NewInt(49685),
 		EIP6780Epoch:                          big.NewInt(49810),
 		PragueEpoch:                           EpochTBD,
+		ValidatorWrapperAddressBindEpoch:      EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -332,6 +336,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		ValidatorWrapperAddressBindEpoch:      EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -391,6 +396,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		ValidatorWrapperAddressBindEpoch:      EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -453,6 +459,7 @@ var (
 		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // PragueEpoch
 		big.NewInt(0),                      // EIP8024Epoch
+		big.NewInt(0),                      // ValidatorWrapperAddressBindEpoch
 	}
 
 	// TestChainConfig ...
@@ -515,6 +522,7 @@ var (
 		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // PragueEpoch
 		big.NewInt(0),        // EIP8024Epoch
+		big.NewInt(0),        // ValidatorWrapperAddressBindEpoch
 	}
 
 	// TestRules ...
@@ -726,6 +734,10 @@ type ChainConfig struct {
 	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
 	// EIP8024Epoch is the first epoch to support EIP-8024 (DUPN, SWAPN, EXCHANGE opcodes)
 	EIP8024Epoch *big.Int `json:"eip8024-epoch,omitempty"`
+
+	// ValidatorWrapperAddressBindEpoch is the first epoch that requires validator wrapper
+	// RLP address fields to match the account storing the wrapper.
+	ValidatorWrapperAddressBindEpoch *big.Int `json:"validator-wrapper-address-bind-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -1045,6 +1057,11 @@ func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsValidatorCodeFix(epoch *big.Int) bool {
 	return isForked(c.ValidatorCodeFixEpoch, epoch)
+}
+
+// IsValidatorWrapperAddressBind requires wrapper.Address to match the loading account.
+func (c *ChainConfig) IsValidatorWrapperAddressBind(epoch *big.Int) bool {
+	return isForked(c.ValidatorWrapperAddressBindEpoch, epoch)
 }
 
 func (c *ChainConfig) IsHIP32(epoch *big.Int) bool {

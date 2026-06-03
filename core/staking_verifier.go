@@ -29,6 +29,20 @@ var (
 	errBlockNumMissing     = errors.New("no block number was provided")
 )
 
+func checkValidatorWrapperAddressBinding(
+	chainConfig *params.ChainConfig,
+	epoch *big.Int,
+	accountAddr common.Address,
+	wrapper *staking.ValidatorWrapper,
+) error {
+	if chainConfig != nil &&
+		chainConfig.IsValidatorWrapperAddressBind(epoch) &&
+		wrapper.Address != accountAddr {
+		return staking.ErrValidatorWrapperAddressMismatch
+	}
+	return nil
+}
+
 func checkDuplicateFields(
 	addrs []common.Address, state vm.StateDB,
 	validator common.Address, identity string, blsKeys []bls.SerializedPublicKey,
@@ -265,6 +279,11 @@ func VerifyAndDelegateFromMsg(
 			if err != nil {
 				return nil, nil, nil, err
 			}
+			if err := checkValidatorWrapperAddressBinding(
+				chainConfig, epoch, delegationIndex.ValidatorAddress, wrapper,
+			); err != nil {
+				return nil, nil, nil, err
+			}
 			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
 				utils.Logger().Warn().
 					Str("validator", delegationIndex.ValidatorAddress.String()).
@@ -315,6 +334,11 @@ func VerifyAndDelegateFromMsg(
 		// request a copy, and since delegations will be changed, copy them too
 		delegateeWrapper, err = stateDB.ValidatorWrapper(msg.ValidatorAddress, false, true)
 		if err != nil {
+			return nil, nil, nil, err
+		}
+		if err := checkValidatorWrapperAddressBinding(
+			chainConfig, epoch, msg.ValidatorAddress, delegateeWrapper,
+		); err != nil {
 			return nil, nil, nil, err
 		}
 		updatedValidatorWrappers = append(updatedValidatorWrappers, delegateeWrapper)
