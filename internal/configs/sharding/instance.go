@@ -18,7 +18,6 @@ const (
 	MainNet NetworkID = iota
 	TestNet
 	LocalNet
-	Pangaea
 	Partner
 	StressNet
 	DevNet

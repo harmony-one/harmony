@@ -64,8 +64,6 @@ func getShardSchedule(networkType nodeconfig.NetworkType) shardingconfig.Schedul
 		return shardingconfig.MainnetSchedule
 	case nodeconfig.Testnet:
 		return shardingconfig.TestnetSchedule
-	case nodeconfig.Pangaea:
-		return shardingconfig.PangaeaSchedule
 	case nodeconfig.Localnet:
 		return shardingconfig.LocalnetSchedule
 	case nodeconfig.Partner:

@@ -128,7 +128,7 @@ func main() {
 	muxer := flag.String("muxer", "yamux, mplexC6", "protocol muxer to mux per-protocol streams (yamux, mplex, mplexC6)")
 	userAgent := flag.String("user_agent", defUserAgent, "explicitly set the user-agent, so we can differentiate from other Go libp2p users")
 	noRelay := flag.Bool("no_relay", true, "no relay services, direct connections between peers only")
-	networkType := flag.String("network", "mainnet", "network type (mainnet, testnet, pangaea, partner, stressnet, devnet, localnet)")
+	networkType := flag.String("network", "mainnet", "network type (mainnet, testnet, partner, stressnet, devnet, localnet)")
 	pprof := flag.Bool("pprof", false, "enabled pprof")
 	pprofAddr := flag.String("pprof.addr", "127.0.0.1:6060", "http pprof address")
 	//keyFile := flag.String("pprof.profile.names", "", "the private key file of the bootnode")

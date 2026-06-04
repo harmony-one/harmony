@@ -11,11 +11,6 @@ var (
 		"/dnsaddr/bootstrap.b.hmny.io",
 	}
 
-	pangaeaBootNodes = []string{
-		"/ip4/52.40.84.2/tcp/9800/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29",
-		"/ip4/54.86.126.90/tcp/9800/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv",
-	}
-
 	partnerBootNodes = []string{
 		"/dnsaddr/bootstrap.ps.hmny.io",
 	}
@@ -30,7 +25,6 @@ var (
 const (
 	mainnetDNSZone   = "t.hmny.io"
 	testnetDNSZone   = "b.hmny.io"
-	pangaeaDNSZone   = "os.hmny.io"
 	partnerDNSZone   = "ps.hmny.io"
 	stressnetDNSZone = "stn.hmny.io"
 )
@@ -136,8 +130,6 @@ func GetDefaultBootNodes(networkType NetworkType) []string {
 		return mainnetBootNodes
 	case Testnet:
 		return testnetBootNodes
-	case Pangaea:
-		return pangaeaBootNodes
 	case Partner:
 		return partnerBootNodes
 	case Stressnet:
@@ -163,8 +155,6 @@ func GetDefaultDNSZone(networkType NetworkType) string {
 		return mainnetDNSZone
 	case Testnet:
 		return testnetDNSZone
-	case Pangaea:
-		return pangaeaDNSZone
 	case Partner:
 		return partnerDNSZone
 	case Devnet:

@@ -116,7 +116,6 @@ const (
 	// - Devnet: Request 12, expect ~4 valid (33% success rate)
 	DHTRequestLimitMainnet   = 20 // Request 20, expect ~8 valid
 	DHTRequestLimitTestnet   = 10 // Request 10, expect ~3 valid
-	DHTRequestLimitPangaea   = 10 // Request 10, expect ~3 valid
 	DHTRequestLimitPartner   = 10 // Request 10, expect ~3 valid
 	DHTRequestLimitStressnet = 12 // Request 12, expect ~4 valid
 	DHTRequestLimitDevnet    = 12 // Request 12, expect ~4 valid
@@ -132,7 +131,6 @@ const (
 	// - Else: InitStreams=4, DiscSoftLowCap=4, DiscHardLowCap=4
 	TargetValidPeersMainnet   = 8 // Target 8 valid peers (matches InitStreams)
 	TargetValidPeersTestnet   = 3 // Target 3 valid peers (matches InitStreams)
-	TargetValidPeersPangaea   = 3 // Target 3 valid peers (testnet-like)
 	TargetValidPeersPartner   = 3 // Target 3 valid peers (matches InitStreams)
 	TargetValidPeersStressnet = 4 // Target 4 valid peers (else config)
 	TargetValidPeersDevnet    = 4 // Target 4 valid peers (else config)

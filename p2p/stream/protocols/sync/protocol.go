@@ -340,8 +340,6 @@ func (p *Protocol) getDHTRequestLimit() int {
 		return DHTRequestLimitMainnet
 	case nodeconfig.Testnet:
 		return DHTRequestLimitTestnet
-	case nodeconfig.Pangaea:
-		return DHTRequestLimitPangaea
 	case nodeconfig.Partner:
 		return DHTRequestLimitPartner
 	case nodeconfig.Stressnet:
@@ -362,8 +360,6 @@ func (p *Protocol) getTargetValidPeers() int {
 		return TargetValidPeersMainnet
 	case nodeconfig.Testnet:
 		return TargetValidPeersTestnet
-	case nodeconfig.Pangaea:
-		return TargetValidPeersPangaea
 	case nodeconfig.Partner:
 		return TargetValidPeersPartner
 	case nodeconfig.Stressnet:

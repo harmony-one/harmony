@@ -3256,7 +3256,6 @@ func (bc *BlockChainImpl) UpdateBlockRewardAccumulator(
 ) error {
 	current, err := bc.ReadBlockRewardAccumulator(number - 1)
 	if err != nil {
-		// one-off fix for pangaea, return after pangaea enter staking.
 		current = big.NewInt(0)
 		bc.WriteBlockRewardAccumulator(batch, current, number)
 	}
