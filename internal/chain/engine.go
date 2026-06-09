@@ -569,13 +569,27 @@ func applySlashes(
 		sortedKeys = append(sortedKeys, key)
 	}
 
-	// Sort them so the slashes are always consistent
+	// Sort them so the slashes are always consistent.
+	canonicalOrder := chain.Config().IsSlashGroupOrderFix(header.Epoch())
 	sort.SliceStable(sortedKeys, func(i, j int) bool {
-		if sortedKeys[i].shardID < sortedKeys[j].shardID {
+		a, b := sortedKeys[i], sortedKeys[j]
+		if canonicalOrder {
+			if a.shardID != b.shardID {
+				return a.shardID < b.shardID
+			}
+			if a.height != b.height {
+				return a.height < b.height
+			}
+			if a.viewID != b.viewID {
+				return a.viewID < b.viewID
+			}
+			return a.epoch < b.epoch
+		}
+		if a.shardID < b.shardID {
 			return true
-		} else if sortedKeys[i].height < sortedKeys[j].height {
+		} else if a.height < b.height {
 			return true
-		} else if sortedKeys[i].viewID < sortedKeys[j].viewID {
+		} else if a.viewID < b.viewID {
 			return true
 		}
 		return false

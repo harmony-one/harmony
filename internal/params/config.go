@@ -92,6 +92,7 @@ var (
 		EIP6780Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		SlashGroupOrderFixEpoch:               EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -152,6 +153,7 @@ var (
 		EIP3855Epoch:                          big.NewInt(7170),
 		EIP3860Epoch:                          big.NewInt(7170),
 		EIP8024Epoch:                          big.NewInt(7170),
+		SlashGroupOrderFixEpoch:               EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -211,6 +213,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		SlashGroupOrderFixEpoch:               EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -272,6 +275,7 @@ var (
 		EIP8024Epoch:                          big.NewInt(49685),
 		EIP6780Epoch:                          big.NewInt(49810),
 		PragueEpoch:                           EpochTBD,
+		SlashGroupOrderFixEpoch:               EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -332,6 +336,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		SlashGroupOrderFixEpoch:               EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -391,6 +396,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		SlashGroupOrderFixEpoch:               big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
@@ -453,6 +459,7 @@ var (
 		big.NewInt(0),                      // TimestampValidationEpoch
 		big.NewInt(0),                      // PragueEpoch
 		big.NewInt(0),                      // EIP8024Epoch
+		big.NewInt(1),                      // SlashGroupOrderFixEpoch
 	}
 
 	// TestChainConfig ...
@@ -515,6 +522,7 @@ var (
 		big.NewInt(0),        // TimestampValidationEpoch
 		big.NewInt(0),        // PragueEpoch
 		big.NewInt(0),        // EIP8024Epoch
+		big.NewInt(1),        // SlashGroupOrderFixEpoch
 	}
 
 	// TestRules ...
@@ -726,6 +734,10 @@ type ChainConfig struct {
 	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
 	// EIP8024Epoch is the first epoch to support EIP-8024 (DUPN, SWAPN, EXCHANGE opcodes)
 	EIP8024Epoch *big.Int `json:"eip8024-epoch,omitempty"`
+
+	// SlashGroupOrderFixEpoch is the first epoch to apply slash groups in a
+	// canonical lexicographic order during beacon-chain finalization.
+	SlashGroupOrderFixEpoch *big.Int `json:"slash-group-order-fix-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -805,6 +817,9 @@ func (c *ChainConfig) mustValid() {
 	// eip-2537 is applied on or after hip30
 	require(c.EIP2537PrecompileEpoch.Cmp(c.HIP30Epoch) >= 0,
 		"must satisfy: EIP2537PrecompileEpoch >= HIP30Epoch")
+	// slash groups are only applied in the staking era
+	require(c.SlashGroupOrderFixEpoch == nil || c.SlashGroupOrderFixEpoch.Cmp(c.StakingEpoch) >= 0,
+		"must satisfy: SlashGroupOrderFixEpoch >= StakingEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -1045,6 +1060,10 @@ func (c *ChainConfig) IsFeeCollectEpoch(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsValidatorCodeFix(epoch *big.Int) bool {
 	return isForked(c.ValidatorCodeFixEpoch, epoch)
+}
+
+func (c *ChainConfig) IsSlashGroupOrderFix(epoch *big.Int) bool {
+	return isForked(c.SlashGroupOrderFixEpoch, epoch)
 }
 
 func (c *ChainConfig) IsHIP32(epoch *big.Int) bool {
