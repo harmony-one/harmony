@@ -13,7 +13,7 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout harmony
         uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
 
   go-checker:
     name: Go Checker
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout harmony
         uses: actions/checkout@v4
@@ -105,7 +105,7 @@ jobs:
 
   rpc-checker:
     name: RPC Checker
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout harmony
         uses: actions/checkout@v4
@@ -160,7 +160,7 @@ jobs:
 
   pyhmy-checker:
     name: pyhmy Checker
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout harmony
         uses: actions/checkout@v4
