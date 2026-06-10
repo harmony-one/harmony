@@ -19,18 +19,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: go/src/github.com/harmony-one/harmony
+          persist-credentials: false
 
       - name: Checkout mcl
         uses: actions/checkout@v4
         with:
           repository: harmony-one/mcl
           path: go/src/github.com/harmony-one/mcl
+          persist-credentials: false
 
       - name: Checkout bls
         uses: actions/checkout@v4
         with:
           repository: harmony-one/bls
           path: go/src/github.com/harmony-one/bls
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -64,18 +67,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: go/src/github.com/harmony-one/harmony
+          persist-credentials: false
 
       - name: Checkout mcl
         uses: actions/checkout@v4
         with:
           repository: harmony-one/mcl
           path: go/src/github.com/harmony-one/mcl
+          persist-credentials: false
 
       - name: Checkout bls
         uses: actions/checkout@v4
         with:
           repository: harmony-one/bls
           path: go/src/github.com/harmony-one/bls
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -117,24 +123,28 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: go/src/github.com/harmony-one/harmony
+          persist-credentials: false
 
       - name: Checkout mcl
         uses: actions/checkout@v4
         with:
           repository: harmony-one/mcl
           path: go/src/github.com/harmony-one/mcl
+          persist-credentials: false
 
       - name: Checkout bls
         uses: actions/checkout@v4
         with:
           repository: harmony-one/bls
           path: go/src/github.com/harmony-one/bls
+          persist-credentials: false
 
       - name: Checkout harmony-test
         uses: actions/checkout@v4
         with:
           repository: harmony-one/harmony-test
           path: go/src/github.com/harmony-one/harmony-test
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -174,24 +184,28 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: go/src/github.com/harmony-one/harmony
+          persist-credentials: false
 
       - name: Checkout mcl
         uses: actions/checkout@v4
         with:
           repository: harmony-one/mcl
           path: go/src/github.com/harmony-one/mcl
+          persist-credentials: false
 
       - name: Checkout bls
         uses: actions/checkout@v4
         with:
           repository: harmony-one/bls
           path: go/src/github.com/harmony-one/bls
+          persist-credentials: false
 
       - name: Checkout harmony-test
         uses: actions/checkout@v4
         with:
           repository: harmony-one/harmony-test
           path: go/src/github.com/harmony-one/harmony-test
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v5
