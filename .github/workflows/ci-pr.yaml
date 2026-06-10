@@ -53,12 +53,6 @@ jobs:
         run: make
         working-directory: go/src/github.com/harmony-one/harmony
 
-      - name: Notify Discord on failure
-        if: failure()
-        run: |
-          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
-          chmod +x send.sh && ./send.sh failure ${{ secrets.WEBHOOK_URL }}
-
   go-checker:
     name: Go Checker
     runs-on: ubuntu-22.04
@@ -108,12 +102,6 @@ jobs:
           make go-get
           bash ./scripts/travis_go_checker.sh
         working-directory: go/src/github.com/harmony-one/harmony
-
-      - name: Notify Discord on failure
-        if: failure()
-        run: |
-          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
-          chmod +x send.sh && ./send.sh failure ${{ secrets.WEBHOOK_URL }}
 
   rpc-checker:
     name: RPC Checker
@@ -170,12 +158,6 @@ jobs:
           TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
           TRAVIS_BRANCH: ${{ github.ref_name }}
 
-      - name: Notify Discord on failure
-        if: failure()
-        run: |
-          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
-          chmod +x send.sh && ./send.sh failure ${{ secrets.WEBHOOK_URL }}
-
   pyhmy-checker:
     name: pyhmy Checker
     runs-on: ubuntu-22.04
@@ -230,19 +212,3 @@ jobs:
           TRAVIS_PULL_REQUEST_SLUG: ${{ github.event.pull_request.head.repo.full_name }}
           TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
           TRAVIS_BRANCH: ${{ github.ref_name }}
-
-      - name: Notify Discord on failure
-        if: failure()
-        run: |
-          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
-          chmod +x send.sh && ./send.sh failure ${{ secrets.WEBHOOK_URL }}
-
-  notify-success:
-    name: Notify Discord on success
-    runs-on: ubuntu-22.04
-    needs: [build, go-checker, rpc-checker, pyhmy-checker]
-    if: success()
-    steps:
-      - run: |
-          wget -q https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
-          chmod +x send.sh && ./send.sh success ${{ secrets.WEBHOOK_URL }}
