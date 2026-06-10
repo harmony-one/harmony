@@ -15,37 +15,46 @@ jobs:
     name: Build
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout harmony
+      - &checkout-harmony
+        name: Checkout harmony
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
         with:
+          ref: ${{ github.sha }}
           path: go/src/github.com/harmony-one/harmony
           persist-credentials: false
 
-      - name: Checkout mcl
+      - &checkout-mcl
+        name: Checkout mcl
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
         with:
           repository: harmony-one/mcl
+          ref: master
           path: go/src/github.com/harmony-one/mcl
           persist-credentials: false
 
-      - name: Checkout bls
+      - &checkout-bls
+        name: Checkout bls
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
         with:
           repository: harmony-one/bls
+          ref: master
           path: go/src/github.com/harmony-one/bls
           persist-credentials: false
 
-      - name: Set up Go
+      - &setup-go
+        name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24.2'
           cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
 
-      - name: Build mcl
+      - &build-mcl
+        name: Build mcl
         run: make -j4
         working-directory: go/src/github.com/harmony-one/mcl
 
-      - name: Build bls
+      - &build-bls
+        name: Build bls
         run: make BLS_SWAP_G=1 -j4
         working-directory: go/src/github.com/harmony-one/bls
 
@@ -57,39 +66,12 @@ jobs:
     name: Go Checker
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout harmony
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          path: go/src/github.com/harmony-one/harmony
-          persist-credentials: false
-
-      - name: Checkout mcl
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          repository: harmony-one/mcl
-          path: go/src/github.com/harmony-one/mcl
-          persist-credentials: false
-
-      - name: Checkout bls
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          repository: harmony-one/bls
-          path: go/src/github.com/harmony-one/bls
-          persist-credentials: false
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.2'
-          cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
-
-      - name: Build mcl
-        run: make -j4
-        working-directory: go/src/github.com/harmony-one/mcl
-
-      - name: Build bls
-        run: make BLS_SWAP_G=1 -j4
-        working-directory: go/src/github.com/harmony-one/bls
+      - *checkout-harmony
+      - *checkout-mcl
+      - *checkout-bls
+      - *setup-go
+      - *build-mcl
+      - *build-bls
 
       - name: Install tools
         run: |
@@ -107,108 +89,47 @@ jobs:
     name: RPC Checker
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout harmony
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          path: go/src/github.com/harmony-one/harmony
-          persist-credentials: false
+      - *checkout-harmony
+      - *checkout-mcl
+      - *checkout-bls
 
-      - name: Checkout mcl
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          repository: harmony-one/mcl
-          path: go/src/github.com/harmony-one/mcl
-          persist-credentials: false
-
-      - name: Checkout bls
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          repository: harmony-one/bls
-          path: go/src/github.com/harmony-one/bls
-          persist-credentials: false
-
-      - name: Checkout harmony-test
+      - &checkout-harmony-test
+        name: Checkout harmony-test
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
         with:
           repository: harmony-one/harmony-test
           path: go/src/github.com/harmony-one/harmony-test
           persist-credentials: false
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.2'
-          cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
-
-      - name: Build mcl
-        run: make -j4
-        working-directory: go/src/github.com/harmony-one/mcl
-
-      - name: Build bls
-        run: make BLS_SWAP_G=1 -j4
-        working-directory: go/src/github.com/harmony-one/bls
+      - *setup-go
+      - *build-mcl
+      - *build-bls
 
       - name: Run RPC checker
         run: |
           make go-get
           bash ./scripts/travis_rpc_checker.sh
         working-directory: go/src/github.com/harmony-one/harmony
-        env:
+        env: &travis-pr-env
           TRAVIS_PULL_REQUEST_SLUG: ${{ github.event.pull_request.head.repo.full_name }}
           TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
           TRAVIS_BRANCH: ${{ github.ref_name }}
 
   pyhmy-checker:
     name: pyhmy Checker
-    runs-on: ubuntu-24.04actions/checkout@v6
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout harmony
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          path: go/src/github.com/harmony-one/harmony
-          persist-credentials: false
-
-      - name: Checkout mcl
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          repository: harmony-one/mcl
-          path: go/src/github.com/harmony-one/mcl
-          persist-credentials: false
-
-      - name: Checkout bls
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          repository: harmony-one/bls
-          path: go/src/github.com/harmony-one/bls
-          persist-credentials: false
-
-      - name: Checkout harmony-test
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
-        with:
-          repository: harmony-one/harmony-test
-          path: go/src/github.com/harmony-one/harmony-test
-          persist-credentials: false
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.2'
-          cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
-
-      - name: Build mcl
-        run: make -j4
-        working-directory: go/src/github.com/harmony-one/mcl
-
-      - name: Build bls
-        run: make BLS_SWAP_G=1 -j4
-        working-directory: go/src/github.com/harmony-one/bls
+      - *checkout-harmony
+      - *checkout-mcl
+      - *checkout-bls
+      - *checkout-harmony-test
+      - *setup-go
+      - *build-mcl
+      - *build-bls
 
       - name: Run pyhmy checker
         run: |
           make go-get
           bash ./scripts/travis_pyhmy_checker.sh
         working-directory: go/src/github.com/harmony-one/harmony
-        env:
-          TRAVIS_PULL_REQUEST_SLUG: ${{ github.event.pull_request.head.repo.full_name }}
-          TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
-          TRAVIS_BRANCH: ${{ github.ref_name }}
+        env: *travis-pr-env
