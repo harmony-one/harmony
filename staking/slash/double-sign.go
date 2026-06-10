@@ -91,6 +91,9 @@ var (
 	errSlashFromFutureEpoch     = errors.New("cannot have slash from future epoch")
 	errSlashBeforeStakingEpoch  = errors.New("cannot have slash before staking epoch")
 	errSlashBlockNoConflict     = errors.New("cannot slash for signing on non-conflicting blocks")
+	errSlashEpochHeightMismatch = errors.New("slash evidence epoch does not match block height epoch")
+	// ErrSlashEpochHeightMismatch is returned when slash evidence epoch disagrees with its block height.
+	ErrSlashEpochHeightMismatch = errSlashEpochHeightMismatch
 )
 
 // MarshalJSON ..
@@ -172,6 +175,15 @@ func Verify(
 	if candidate.Evidence.Epoch.Cmp(currentEpoch) == 1 {
 		return errors.Wrapf(
 			errSlashFromFutureEpoch, "current-epoch %v", currentEpoch,
+		)
+	}
+
+	heightEpoch := shard.Schedule.CalcEpochNumber(candidate.Evidence.Height)
+	if candidate.Evidence.Epoch.Cmp(heightEpoch) != 0 {
+		return errors.Wrapf(
+			errSlashEpochHeightMismatch,
+			"evidence-epoch %v height %v maps to epoch %v",
+			candidate.Evidence.Epoch, candidate.Evidence.Height, heightEpoch,
 		)
 	}
 
@@ -455,8 +467,9 @@ func Apply(
 ) (*Application, error) {
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 	for _, slash := range slashes {
+		slashEpoch := shard.Schedule.CalcEpochNumber(slash.Evidence.Height)
 		snapshot, err := chain.ReadValidatorSnapshotAtEpoch(
-			slash.Evidence.Epoch,
+			slashEpoch,
 			slash.Evidence.Offender,
 		)
 
