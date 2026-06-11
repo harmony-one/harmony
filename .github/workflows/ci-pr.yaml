@@ -15,7 +15,7 @@ env:
 
 jobs:
   build:
-    name: Build
+    name: Build harmony/bootnode binary
     runs-on: ubuntu-24.04
     steps:
       - &checkout-harmony
@@ -69,7 +69,7 @@ jobs:
         working-directory: go/src/github.com/harmony-one/harmony
 
   go-checker:
-    name: Go Checker
+    name: Run unit tests
     runs-on: ubuntu-24.04
     steps:
       - *checkout-harmony
@@ -93,7 +93,7 @@ jobs:
         working-directory: go/src/github.com/harmony-one/harmony
 
   rpc-checker:
-    name: RPC Checker
+    name: Run RPC integration tests
     runs-on: ubuntu-24.04
     steps:
       - *checkout-harmony
@@ -125,7 +125,7 @@ jobs:
           TRAVIS_BRANCH: ${{ github.ref_name }}
 
   pyhmy-checker:
-    name: pyhmy Checker
+    name: Run pyhmy tests
     runs-on: ubuntu-24.04
     steps:
       - *checkout-harmony
