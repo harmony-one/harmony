@@ -21,6 +21,7 @@ jobs:
   build:
     name: Build harmony/bootnode binary
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - &checkout-harmony
         name: Checkout harmony
@@ -75,6 +76,7 @@ jobs:
   go-checker:
     name: Run unit tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - *checkout-harmony
       - *checkout-mcl
@@ -99,6 +101,7 @@ jobs:
   rpc-checker:
     name: Run RPC integration tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - *checkout-harmony
       - *checkout-mcl
@@ -131,6 +134,7 @@ jobs:
   pyhmy-checker:
     name: Run pyhmy tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - *checkout-harmony
       - *checkout-mcl
