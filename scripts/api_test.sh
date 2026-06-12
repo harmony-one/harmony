@@ -69,10 +69,7 @@ while getopts "lbvp" OPTION; do
 			    --data "{\"jsonrpc\":\"2.0\",\"method\":\"hmy_sendRawTransaction\",\"params\":[\""$SIGNED_RAW_TRANSACTION"\"],\"id\":1}" | jq -r '.result')
 		echo "TRANSACTION_HASH:"
 		echo $TRANSACTION_HASH
-		sleep 20s
-		TRANSACTION=$(curl --location --request POST "http://l0.b.hmny.io:9500" \
-			  --header "Content-Type: application/json" \
-			  --data "{\"jsonrpc\":\"2.0\",\"method\":\"hmy_getTransactionByHash\",\"params\":[\"$TRANSACTION_HASH\"],\"id\":1}")
+		TRANSACTION=$(./test/wait_tx_receipt.sh "http://l0.b.hmny.io:9500" "$TRANSACTION_HASH" 60 1)
 
 		echo "TRANSACTION:"
 		echo "$TRANSACTION"
@@ -113,10 +110,7 @@ while getopts "lbvp" OPTION; do
 			    --data "{\"jsonrpc\":\"2.0\",\"method\":\"hmy_sendRawTransaction\",\"params\":[\""$SIGNED_RAW_TRANSACTION"\"],\"id\":1}" | jq -r '.result')
 		echo "TRANSACTION_HASH:"
 		echo $TRANSACTION_HASH
-		sleep 20s
-		TRANSACTION=$(curl --location --request POST "http://localhost:9500" \
-			  --header "Content-Type: application/json" \
-			  --data "{\"jsonrpc\":\"2.0\",\"method\":\"hmy_getTransactionByHash\",\"params\":[\"$TRANSACTION_HASH\"],\"id\":1}")
+		TRANSACTION=$(./test/wait_tx_receipt.sh "http://localhost:9500" "$TRANSACTION_HASH" 60 1)
 
 		echo "TRANSACTION:"
 		echo "$TRANSACTION"
