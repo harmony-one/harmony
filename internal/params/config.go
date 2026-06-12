@@ -382,7 +382,7 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		TimestampValidationEpoch:              big.NewInt(0),
-		IsOneSecondEpoch:                      big.NewInt(4),
+		IsOneSecondEpoch:                      big.NewInt(0),
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
 		EIP7939CLZEpoch:                       EpochTBD,
