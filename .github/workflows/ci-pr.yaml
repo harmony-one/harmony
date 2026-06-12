@@ -25,7 +25,7 @@ jobs:
     steps:
       - &checkout-harmony
         name: Checkout harmony
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.3
         with:
           ref: ${{ github.sha }}
           path: go/src/github.com/harmony-one/harmony
@@ -33,7 +33,7 @@ jobs:
 
       - &checkout-mcl
         name: Checkout mcl
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.3
         with:
           repository: harmony-one/mcl
           fetch-depth: 1
@@ -43,7 +43,7 @@ jobs:
 
       - &checkout-bls
         name: Checkout bls
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.3
         with:
           repository: harmony-one/bls
           fetch-depth: 1
@@ -113,7 +113,7 @@ jobs:
 
       - &checkout-harmony-test
         name: Checkout harmony-test
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.0
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.3
         with:
           repository: harmony-one/harmony-test
           ref: master
