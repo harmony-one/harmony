@@ -194,6 +194,25 @@ func (p *StateProcessor) Process(
 		}
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Staking Txns")
 	}
+
+	// Decode header slashes and apply scheduled slash-payload rules before the
+	// processor result cache. When the fork flag is off, extra uniqueness checks are skipped.
+	var slashes slash.Records
+	if s := header.Slashes(); len(s) > 0 {
+		if err := rlp.DecodeBytes(s, &slashes); err != nil {
+			return nil, nil, nil, nil, 0, nil, statedb, errors.New(
+				"[Process] Cannot finalize block",
+			)
+		}
+	}
+	if p.bc.ShardID() == shard.BeaconChainShardID {
+		if err := checkBeaconSlashEvidenceUniqueness(p.bc.Config(), block.Epoch(), slashes); err != nil {
+			return nil, nil, nil, nil, 0, nil, statedb, errors.WithMessage(err,
+				"[Process] invalid beacon slash payload",
+			)
+		}
+	}
+
 	// incomingReceipts should always be processed
 	// after transactions (to be consistent with the block proposal)
 	for _, cx := range block.IncomingReceipts() {
@@ -202,15 +221,6 @@ func (p *StateProcessor) Process(
 		); err != nil {
 			return nil, nil,
 				nil, nil, 0, nil, statedb, errors.New("[Process] Cannot apply incoming receipts")
-		}
-	}
-
-	slashes := slash.Records{}
-	if s := header.Slashes(); len(s) > 0 {
-		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, nil, 0, nil, statedb, errors.New(
-				"[Process] Cannot finalize block",
-			)
 		}
 	}
 
