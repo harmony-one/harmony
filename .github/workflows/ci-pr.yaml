@@ -58,6 +58,21 @@ jobs:
           go-version: '1.24.2'
           cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
 
+      - &cache-native-libs
+        name: Cache native mcl/bls libraries
+        uses: actions/cache@v4
+        with:
+          path: |
+            go/src/github.com/harmony-one/mcl/bin
+            go/src/github.com/harmony-one/mcl/lib
+            go/src/github.com/harmony-one/mcl/obj
+            go/src/github.com/harmony-one/bls/bin
+            go/src/github.com/harmony-one/bls/lib
+            go/src/github.com/harmony-one/bls/obj
+          key: ${{ runner.os }}-native-libs-${{ hashFiles('go/src/github.com/harmony-one/mcl/**', 'go/src/github.com/harmony-one/bls/**') }}
+          restore-keys: |
+            ${{ runner.os }}-native-libs-
+
       - &build-mcl
         name: Build mcl
         run: make -j4
@@ -82,6 +97,7 @@ jobs:
       - *checkout-mcl
       - *checkout-bls
       - *setup-go
+      - *cache-native-libs
       - *build-mcl
       - *build-bls
       - *build-harmony
@@ -107,6 +123,7 @@ jobs:
       - *checkout-mcl
       - *checkout-bls
       - *setup-go
+      - *cache-native-libs
       - *build-mcl
       - *build-bls
       - *build-harmony
@@ -120,6 +137,10 @@ jobs:
           fetch-depth: 1
           path: go/src/github.com/harmony-one/harmony-test
           persist-credentials: false
+
+      - &setup-docker-buildx
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Run RPC checker
         run: |
@@ -140,10 +161,12 @@ jobs:
       - *checkout-mcl
       - *checkout-bls
       - *setup-go
+      - *cache-native-libs
       - *build-mcl
       - *build-bls
       - *build-harmony
       - *checkout-harmony-test
+      - *setup-docker-buildx
 
       - name: Run pyhmy checker
         run: |

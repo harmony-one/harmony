@@ -99,24 +99,21 @@ debug-ext:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	./test/debug.sh ./test/configs/local-resharding-with-external.txt 64 64 &
-	echo sleep 10s before creating the external validator
-	sleep 10
+	./test/wait_rpc_ready.sh http://localhost:9500 60 1
 	bash ./test/build-localnet-validator.sh
 
 debug-multi-bls:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	./test/debug.sh ./test/configs/local-multi-bls.txt 64 64 &
-	echo sleep 10s before creating the external validator
-	sleep 10
+	./test/wait_rpc_ready.sh http://localhost:9500 60 1
 	bash ./test/build-localnet-validator.sh
 
 debug-multi-bls-with-terminal:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	screen -L -Logfile ./tmp_log/localnet_terminal.log -dmS localnet bash -c './test/debug.sh ./test/configs/local-multi-bls.txt 64 64; echo "Press any key to exit..."; read -n 1'
-	echo sleep 10s before creating the external validator
-	sleep 10
+	./test/wait_rpc_ready.sh http://localhost:9500 60 1
 	bash ./test/build-localnet-validator.sh
 	screen -r localnet
 
@@ -129,8 +126,7 @@ debug-multi-bls-multi-ext-node:
 	# add VERBOSE=true before bash or run `export VERBOSE=true` on the shell level for have max logging
 	# add LEGACY_SYNC=true before bash  or run `export LEGACY_SYNC=true` on the shell level to switch to the legacy sync
 	./test/debug.sh ./test/configs/local-multi-bls-multi-ext-node.txt &
-	echo sleep 10s before creating the external validator
-	sleep 10
+	./test/wait_rpc_ready.sh http://localhost:9500 60 1
 	bash ./test/build-localnet-validator.sh
 
 clean:

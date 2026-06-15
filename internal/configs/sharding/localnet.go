@@ -46,6 +46,9 @@ const (
 
 	localnetEpochBlock1 = 5
 
+	localnetBootstrapEpochBlocks = 4
+	localnetBootstrapEpochs      = 3
+
 	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
 )
 
@@ -80,70 +83,79 @@ func (ls localnetSchedule) BlocksPerEpoch() uint64 {
 	return localnetConfig.BlocksPerEpochV2
 }
 
+func (ls localnetSchedule) blocksInEpoch(epochNum uint64) uint64 {
+	if epochNum > 0 &&
+		localnetBootstrapEpochBlocks > 0 &&
+		localnetBootstrapEpochs > 0 &&
+		epochNum <= localnetBootstrapEpochs {
+		return localnetBootstrapEpochBlocks
+	}
+	if params.LocalnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))) {
+		return ls.BlocksPerEpoch()
+	}
+	return ls.BlocksPerEpochOld()
+}
+
 func (ls localnetSchedule) twoSecondsFirstBlock() uint64 {
 	if params.LocalnetChainConfig.TwoSecondsEpoch.Uint64() == 0 {
 		return 0
 	}
-	return (params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()-1)*ls.BlocksPerEpochOld() + localnetEpochBlock1
+	return ls.EpochLastBlock(params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()-1) + 1
 }
 
 func (ls localnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
-	firstBlock2s := ls.twoSecondsFirstBlock()
-	switch {
-	case blockNum < localnetEpochBlock1:
+	if blockNum < localnetEpochBlock1 {
 		return big.NewInt(0)
-	case blockNum < firstBlock2s:
-		return big.NewInt(int64((blockNum-localnetEpochBlock1)/ls.BlocksPerEpochOld() + 1))
-	default:
-		extra := uint64(0)
-		if firstBlock2s == 0 {
-			blockNum -= localnetEpochBlock1
-			extra = 1
-		}
-		return big.NewInt(int64(extra + (blockNum-firstBlock2s)/ls.BlocksPerEpoch() + params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()))
 	}
+	low, high := uint64(1), uint64(1)
+	for ls.EpochLastBlock(high) < blockNum {
+		low = high + 1
+		high *= 2
+	}
+	for low < high {
+		mid := low + (high-low)/2
+		if ls.EpochLastBlock(mid) < blockNum {
+			low = mid + 1
+		} else {
+			high = mid
+		}
+	}
+	return big.NewInt(int64(low))
 }
 
 func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
-	switch {
-	case blockNum < localnetEpochBlock1-1:
-		return false
-	case blockNum == localnetEpochBlock1-1:
-		return true
-	default:
-		firstBlock2s := ls.twoSecondsFirstBlock()
-		switch {
-		case blockNum >= firstBlock2s:
-			if firstBlock2s == 0 {
-				blockNum -= localnetEpochBlock1
-			}
-			return ((blockNum-firstBlock2s)%ls.BlocksPerEpoch() == ls.BlocksPerEpoch()-1)
-		default: // genesis
-			blocks := ls.BlocksPerEpochOld()
-			return ((blockNum-localnetEpochBlock1)%blocks == blocks-1)
-		}
-	}
+	epoch := ls.CalcEpochNumber(blockNum).Uint64()
+	return blockNum == ls.EpochLastBlock(epoch)
 }
 
 func (ls localnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
-	switch {
-	case epochNum == 0:
+	if epochNum == 0 {
 		return localnetEpochBlock1 - 1
-	default:
-		switch {
-		case params.LocalnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
-			blocks := ls.BlocksPerEpoch()
-			firstBlock2s := ls.twoSecondsFirstBlock()
-			block2s := (1 + epochNum - params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()) * blocks
-			if firstBlock2s == 0 {
-				return block2s - blocks + localnetEpochBlock1 - 1
-			}
-			return firstBlock2s + block2s - 1
-		default: // genesis
-			blocks := ls.BlocksPerEpochOld()
-			return localnetEpochBlock1 + blocks*epochNum - 1
+	}
+
+	bootstrapEpochs := uint64(0)
+	if localnetBootstrapEpochBlocks > 0 && localnetBootstrapEpochs > 0 {
+		bootstrapEpochs = localnetBootstrapEpochs
+		if bootstrapEpochs > epochNum {
+			bootstrapEpochs = epochNum
 		}
 	}
+
+	blocks := bootstrapEpochs * localnetBootstrapEpochBlocks
+	regularEpochs := epochNum - bootstrapEpochs
+	twoSecondsEpoch := params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()
+	oldEpochs := uint64(0)
+	if regularEpochs > 0 && twoSecondsEpoch > bootstrapEpochs+1 {
+		oldEpochs = twoSecondsEpoch - bootstrapEpochs - 1
+		if oldEpochs > regularEpochs {
+			oldEpochs = regularEpochs
+		}
+	}
+	v2Epochs := regularEpochs - oldEpochs
+
+	blocks += oldEpochs * ls.BlocksPerEpochOld()
+	blocks += v2Epochs * ls.BlocksPerEpoch()
+	return localnetEpochBlock1 + blocks - 1
 }
 
 func (ls localnetSchedule) VdfDifficulty() int {

@@ -39,13 +39,7 @@ hmy --node=http://127.0.0.1:9500 transfer     --from $FAUCET_ADDRESS --to one19z
 hmy --node=http://127.0.0.1:9500 transfer     --from $FAUCET_ADDRESS --to one1lctumupg2y009pjmnhnmn4nqjk0zf0dspjanf7     --from-shard 0 --to-shard 0 --amount 110000 
 
 
-#wait for epoch 2
-epoch=$(hmy blockchain latest-headers --node="http://localhost:9500" | jq -r '.["result"]["beacon-chain-header"]["epoch"]')
-while (( epoch < 1 )); do
-	echo "Not yet on epoch 1 .. waiting 30s"
-	epoch=$(hmy blockchain latest-headers --node="http://localhost:9500" | jq -r '.["result"]["beacon-chain-header"]["epoch"]')
-	sleep 30
-done
+./test/wait_till_n_epoch.sh 1
 
 echo "Now in epoch 1, we'll create the external validators"
 
@@ -89,4 +83,3 @@ hmy blockchain validator information one1auqndgthqu5lznsn7tuma8s5333cq0y07cwc6x 
 hmy blockchain validator information one19aw2wcr5y4lxeuwt0ajgt5aw3a3qkjdgg67ygj --node="http://localhost:9500"
 hmy blockchain validator information one1eenp9ujcrmyaq22ef6jrpry2k97tjz4xs6ppcf --node="http://localhost:9500"
 '''
-
