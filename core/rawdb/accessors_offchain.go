@@ -129,6 +129,11 @@ func ReadCXReceiptsProofSpent(db DatabaseReader, shardID uint32, number uint64) 
 func WriteCXReceiptsProofSpent(dbw DatabaseWriter, cxp *types.CXReceiptsProof) error {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	return WriteCXReceiptsProofSpentWithKey(dbw, shardID, blockNum)
+}
+
+// WriteCXReceiptsProofSpentWithKey writes CXReceiptsProof as spent into database.
+func WriteCXReceiptsProofSpentWithKey(dbw DatabaseWriter, shardID uint32, blockNum uint64) error {
 	if err := dbw.Put(cxReceiptSpentKey(shardID, blockNum), []byte{SpentByte}); err != nil {
 		utils.Logger().Error().Msg("Failed to write CX receipt proof")
 		return err
