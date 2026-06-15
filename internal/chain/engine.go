@@ -149,6 +149,13 @@ func (e *engineImpl) VerifyShardState(
 	if len(headerShardStateBytes) == 0 {
 		return nil
 	}
+	// Only scheduled epoch-ending blocks may carry shard state.
+	// A non-last block with non-empty shard-state bytes would be accepted by
+	// SuperCommitteeForNextEpoch (which returns shard.State{} for non-last blocks),
+	// causing the chain to persist an empty next-epoch committee and halt consensus.
+	if bc.Config().IsShardStateValidation(header.Epoch()) && !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+		return errors.New("[VerifyShardState] non-epoch-ending block must not carry shard state")
+	}
 	shardState, err := bc.SuperCommitteeForNextEpoch(beacon, header, true)
 	if err != nil {
 		return err
