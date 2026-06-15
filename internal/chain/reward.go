@@ -347,7 +347,18 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
 				return numeric.ZeroDec(), network.EmptyPayout, err
 			}
-			allCrossLinks = append(allCrossLinks, crossLinks...)
+			// Defensive filter follows the RejectShard0CrossLink fork activation.
+			for _, cl := range crossLinks {
+				if bc.Config().IsRejectShard0CrossLink(curHeader.Epoch()) &&
+					cl.ShardID() == shard.BeaconChainShardID {
+					utils.Logger().Warn().
+						Uint64("beacon-block-number", curHeader.Number().Uint64()).
+						Uint64("crosslink-block-number", cl.BlockNum()).
+						Msg("ignoring shard-0 crosslink in beacon header CrossLinks")
+					continue
+				}
+				allCrossLinks = append(allCrossLinks, cl)
+			}
 		}
 	}
 
@@ -439,6 +450,14 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 		startTime = time.Now()
 		for i := range crossLinks {
 			cxLink := crossLinks[i]
+			if bc.Config().IsRejectShard0CrossLink(header.Epoch()) &&
+				cxLink.ShardID() == shard.BeaconChainShardID {
+				utils.Logger().Warn().
+					Uint64("beacon-block-number", header.Number().Uint64()).
+					Uint64("crosslink-block-number", cxLink.BlockNum()).
+					Msg("ignoring shard-0 crosslink in beacon header CrossLinks")
+				continue
+			}
 			payables, _, err := processOneCrossLink(bc, state, cxLink, defaultReward, i)
 
 			if err != nil {

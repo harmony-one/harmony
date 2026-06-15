@@ -407,6 +407,17 @@ func VerifyBlockCrossLinks(blockchain BlockChain, block *types.Block) error {
 	}
 
 	for _, crossLink := range crossLinks {
+		// CrossLinks on beacon headers must reference only non-beacon shards when the
+		// RejectShard0CrossLink fork is enabled for the block epoch.
+		if blockchain.Config().IsRejectShard0CrossLink(block.Epoch()) &&
+			crossLink.ShardID() == shard.BeaconChainShardID {
+			return errors.Errorf(
+				"[CrossLinkVerification] invalid crosslink shard: %d block: %d on beacon block %d",
+				crossLink.ShardID(),
+				crossLink.BlockNum(),
+				block.NumberU64(),
+			)
+		}
 		// ReadCrossLink beacon chain usage.
 		cl, err := blockchain.ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
 		if err == nil && cl != nil {
@@ -2697,6 +2708,14 @@ func (bc *BlockChainImpl) CXMerkleProof(toShardID uint32, block *block.Header) (
 
 func (bc *BlockChainImpl) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxps []*types.CXReceiptsProof) error {
 	for _, cxp := range cxps {
+		if cxp.Header != nil && bc.Config().IsCXMerkleProofReplayFixEpoch(cxp.Header.Epoch()) {
+			if err := rawdb.WriteCXReceiptsProofSpentWithKey(
+				db, cxp.Header.ShardID(), cxp.Header.Number().Uint64(),
+			); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := rawdb.WriteCXReceiptsProofSpent(db, cxp); err != nil {
 			return err
 		}
@@ -2707,6 +2726,10 @@ func (bc *BlockChainImpl) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxp
 func (bc *BlockChainImpl) IsSpent(cxp *types.CXReceiptsProof) bool {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	if cxp.Header != nil && bc.Config().IsCXMerkleProofReplayFixEpoch(cxp.Header.Epoch()) {
+		shardID = cxp.Header.ShardID()
+		blockNum = cxp.Header.Number().Uint64()
+	}
 	by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, blockNum)
 	return by == rawdb.SpentByte
 }

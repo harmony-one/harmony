@@ -42,10 +42,12 @@ var (
 		EIP155Epoch:                           big.NewInt(28),
 		S3Epoch:                               big.NewInt(28),
 		CrossTxEpoch:                          big.NewInt(28),
+		CXMerkleProofReplayFixEpoch:           EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(100),
 		ReceiptLogEpoch:                       big.NewInt(101),
 		PreStakingEpoch:                       big.NewInt(185),
 		CrossLinkEpoch:                        big.NewInt(186),
+		RejectShard0CrossLinkEpoch:            EpochTBD, // mainnet activation TBD (consensus hardfork)
 		StakingEpoch:                          big.NewInt(186),
 		QuickUnlockEpoch:                      big.NewInt(191),
 		FiveSecondsEpoch:                      big.NewInt(230),
@@ -93,6 +95,7 @@ var (
 		EIP6780Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -103,10 +106,12 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(2),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
 		CrossLinkEpoch:                        big.NewInt(2),
+		RejectShard0CrossLinkEpoch:            big.NewInt(0),
 		StakingEpoch:                          big.NewInt(2),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
@@ -142,18 +147,19 @@ var (
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  big.NewInt(3044),
-		TimestampValidationEpoch:              EpochTBD,
+		TimestampValidationEpoch:              big.NewInt(7170),
 		DuplicateCrossLinkEpoch:               EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
-		EIP7939CLZEpoch:                       EpochTBD,
-		EIP5656McopyEpoch:                     EpochTBD,
-		EIP3855Epoch:                          EpochTBD,
-		EIP3860Epoch:                          EpochTBD,
-		EIP6780Epoch:                          EpochTBD,
+		EIP6780Epoch:                          big.NewInt(7178),
 		PragueEpoch:                           EpochTBD,
-		EIP8024Epoch:                          EpochTBD,
+		EIP7939CLZEpoch:                       big.NewInt(7170),
+		EIP5656McopyEpoch:                     big.NewInt(7170),
+		EIP3855Epoch:                          big.NewInt(7170),
+		EIP3860Epoch:                          big.NewInt(7170),
+		EIP8024Epoch:                          big.NewInt(7170),
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -164,10 +170,12 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
 		CrossLinkEpoch:                        big.NewInt(2),
+		RejectShard0CrossLinkEpoch:            big.NewInt(0),
 		StakingEpoch:                          big.NewInt(2),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
@@ -214,6 +222,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -225,10 +234,12 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
 		CrossLinkEpoch:                        big.NewInt(2),
+		RejectShard0CrossLinkEpoch:            big.NewInt(0),
 		StakingEpoch:                          big.NewInt(2),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
@@ -267,15 +278,16 @@ var (
 		IsOneSecondEpoch:                      big.NewInt(17436),
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          big.NewInt(35626),
-		EIP7939CLZEpoch:                       EpochTBD,
-		EIP5656McopyEpoch:                     EpochTBD,
-		EIP3855Epoch:                          EpochTBD,
-		EIP3860Epoch:                          EpochTBD,
-		EIP6780Epoch:                          EpochTBD,
 		TimestampValidationEpoch:              big.NewInt(47190),
 		DuplicateCrossLinkEpoch:               EpochTBD,
+		EIP7939CLZEpoch:                       big.NewInt(49685),
+		EIP5656McopyEpoch:                     big.NewInt(49685),
+		EIP3855Epoch:                          big.NewInt(49685),
+		EIP3860Epoch:                          big.NewInt(49685),
+		EIP8024Epoch:                          big.NewInt(49685),
+		EIP6780Epoch:                          big.NewInt(49810),
 		PragueEpoch:                           EpochTBD,
-		EIP8024Epoch:                          EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -287,10 +299,12 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
 		CrossLinkEpoch:                        big.NewInt(2),
+		RejectShard0CrossLinkEpoch:            big.NewInt(0),
 		StakingEpoch:                          big.NewInt(2),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
@@ -337,6 +351,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -347,10 +362,12 @@ var (
 		EIP155Epoch:                           big.NewInt(0),
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
+		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(0),
 		CrossLinkEpoch:                        big.NewInt(2),
+		RejectShard0CrossLinkEpoch:            big.NewInt(0),
 		StakingEpoch:                          big.NewInt(2),
 		QuickUnlockEpoch:                      big.NewInt(0),
 		FiveSecondsEpoch:                      big.NewInt(0),
@@ -397,6 +414,7 @@ var (
 		EIP3860Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
+		RejectDuplicateSlashEvidenceEpoch:     big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -408,7 +426,9 @@ var (
 		EthAllProtocolChangesShard0ChainID, // EthCompatibleShard0ChainID
 		big.NewInt(0),                      // EthCompatibleEpoch
 		big.NewInt(0),                      // CrossTxEpoch
+		big.NewInt(0),                      // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
+		big.NewInt(0),                      // RejectShard0CrossLinkEpoch
 		big.NewInt(1),                      // AggregatedRewardEpoch
 		big.NewInt(1),                      // StakingEpoch
 		big.NewInt(0),                      // PreStakingEpoch
@@ -457,9 +477,10 @@ var (
 		big.NewInt(0),                      // EIP3860Epoch
 		big.NewInt(0),                      // EIP6780Epoch
 		big.NewInt(0),                      // TimestampValidationEpoch
+		big.NewInt(0),                      // DuplicateCrossLinkEpoch
 		big.NewInt(0),                      // PragueEpoch
 		big.NewInt(0),                      // EIP8024Epoch
-		EpochTBD,                           // DuplicateCrossLinkEpoch
+		big.NewInt(0),                      // RejectDuplicateSlashEvidenceEpoch
 	}
 
 	// TestChainConfig ...
@@ -471,7 +492,9 @@ var (
 		EthTestShard0ChainID, // EthCompatibleShard0ChainID
 		big.NewInt(0),        // EthCompatibleEpoch
 		big.NewInt(0),        // CrossTxEpoch
+		big.NewInt(0),        // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),        // CrossLinkEpoch
+		big.NewInt(0),        // RejectShard0CrossLinkEpoch
 		big.NewInt(1),        // AggregatedRewardEpoch
 		big.NewInt(1),        // StakingEpoch
 		big.NewInt(0),        // PreStakingEpoch
@@ -520,9 +543,10 @@ var (
 		big.NewInt(0),        // EIP3860Epoch
 		big.NewInt(0),        // EIP6780Epoch
 		big.NewInt(0),        // TimestampValidationEpoch
+		big.NewInt(0),        // DuplicateCrossLinkEpoch
 		big.NewInt(0),        // PragueEpoch
 		big.NewInt(0),        // EIP8024Epoch
-		EpochTBD,             // DuplicateCrossLinkEpoch
+		big.NewInt(0),        // RejectDuplicateSlashEvidenceEpoch
 	}
 
 	// TestRules ...
@@ -575,9 +599,17 @@ type ChainConfig struct {
 	// processed.
 	CrossTxEpoch *big.Int `json:"cross-tx-epoch,omitempty"`
 
+	// CXMerkleProofReplayFixEpoch is the epoch where CX receipt replay checks
+	// bind merkle proof identity to authenticated source headers.
+	CXMerkleProofReplayFixEpoch *big.Int `json:"cx-merkle-proof-replay-fix-epoch,omitempty"`
+
 	// CrossLinkEpoch is the epoch where beaconchain starts containing
 	// cross-shard links.
 	CrossLinkEpoch *big.Int `json:"cross-link-epoch,omitempty"`
+
+	// RejectShard0CrossLinkEpoch is the epoch where beacon headers start rejecting
+	// shard-0 cross-links in Header.CrossLinks.
+	RejectShard0CrossLinkEpoch *big.Int `json:"reject-shard0-cross-link-epoch,omitempty"`
 
 	// AggregatedRewardEpoch is the epoch when block rewards are distributed every 64 blocks
 	AggregatedRewardEpoch *big.Int `json:"aggregated-reward-epoch,omitempty"`
@@ -737,6 +769,11 @@ type ChainConfig struct {
 	PragueEpoch *big.Int `json:"prague-epoch,omitempty"`
 	// EIP8024Epoch is the first epoch to support EIP-8024 (DUPN, SWAPN, EXCHANGE opcodes)
 	EIP8024Epoch *big.Int `json:"eip8024-epoch,omitempty"`
+
+	// RejectDuplicateSlashEvidenceEpoch is the first epoch where beacon header slash
+	// payloads are validated with stricter canonical uniqueness rules. Until set to a
+	// concrete epoch on a network, EpochTBD leaves the rule inactive there.
+	RejectDuplicateSlashEvidenceEpoch *big.Int `json:"reject-duplicate-slash-evidence-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -843,6 +880,11 @@ func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 	return isForked(c.CrossTxEpoch, epoch)
 }
 
+// IsCXMerkleProofReplayFixEpoch determines whether replay-fix checks are enabled.
+func (c *ChainConfig) IsCXMerkleProofReplayFixEpoch(epoch *big.Int) bool {
+	return isForked(c.CXMerkleProofReplayFixEpoch, epoch)
+}
+
 // IsEthCompatible determines whether it is ethereum compatible epoch
 func (c *ChainConfig) IsEthCompatible(epoch *big.Int) bool {
 	return isForked(c.EthCompatibleEpoch, epoch)
@@ -943,6 +985,12 @@ func (c *ChainConfig) IsCrossLink(epoch *big.Int) bool {
 	return isForked(c.CrossLinkEpoch, epoch)
 }
 
+// IsRejectShard0CrossLink determines whether shard-0 cross-links in beacon
+// header CrossLinks are rejected by consensus.
+func (c *ChainConfig) IsRejectShard0CrossLink(epoch *big.Int) bool {
+	return isForked(c.RejectShard0CrossLinkEpoch, epoch)
+}
+
 // IsS3 returns whether epoch is either equal to the S3 fork epoch or greater.
 func (c *ChainConfig) IsS3(epoch *big.Int) bool {
 	return isForked(c.S3Epoch, epoch)
@@ -1027,6 +1075,12 @@ func (c *ChainConfig) IsEIP3860(epoch *big.Int) bool {
 // IsEIP8024 determines whether EIP-8024 (DUPN, SWAPN, EXCHANGE) is available in the EVM
 func (c *ChainConfig) IsEIP8024(epoch *big.Int) bool {
 	return isForked(c.EIP8024Epoch, epoch)
+}
+
+// IsRejectDuplicateSlashEvidence returns whether stricter beacon header slash
+// payload checks are active for the given epoch.
+func (c *ChainConfig) IsRejectDuplicateSlashEvidence(epoch *big.Int) bool {
+	return isForked(c.RejectDuplicateSlashEvidenceEpoch, epoch)
 }
 
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
@@ -1166,6 +1220,7 @@ type Rules struct {
 	Is1153TransientStorage bool
 	Is7939CLZ              bool
 	IsEIP5656Mcopy         bool
+	IsEIP3855              bool
 	IsEIP6780              bool
 	Is3860                 bool
 	IsPrague               bool // EIP-2935: Serve historical block hashes from state
@@ -1204,6 +1259,7 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		Is1153TransientStorage:     c.IsEIP1153TransientStorage(epoch),
 		Is7939CLZ:                  c.IsEIP7939CLZ(epoch),
 		IsEIP5656Mcopy:             c.IsEIP5656Mcopy(epoch),
+		IsEIP3855:                  c.IsEIP3855(epoch),
 		IsEIP6780:                  c.IsEIP6780(epoch),
 		Is3860:                     c.IsEIP3860(epoch),
 		IsPrague:                   c.IsPrague(epoch),

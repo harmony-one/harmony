@@ -469,3 +469,294 @@ func TestVerifyHeaderTimestampValidationBackwardCompatibleBeforeFork(t *testing.
 		t.Fatalf("expected future timestamp allowed pre-fork, got %v", err)
 	}
 }
+
+func TestVerifiedSigCacheKeyIncludesShardID(t *testing.T) {
+	hash := common.Hash{1, 2, 3}
+	var sig bls.SerializedSignature
+	bitmap := []byte{0xff}
+
+	if newVerifiedSigKey(1, hash, sig, bitmap) == newVerifiedSigKey(2, hash, sig, bitmap) {
+		t.Fatal("verified signature cache keys must include shard ID")
+	}
+}
+
+// setupTimestampValidationChain returns a chain wired with the timestamp
+// validation fork active, the parent header committed at parentTime, and a
+// helper to build child headers parented to it.
+func setupTimestampValidationChain(t *testing.T, parentTime int64) (
+	*fakeBlockChain, *engineImpl, func(ts int64) *block.Header,
+) {
+	t.Helper()
+	chain := makeFakeBlockChain()
+	eng := NewEngine()
+
+	// Force fork active for any epoch >= 0.
+	chain.config.TimestampValidationEpoch = big.NewInt(0)
+
+	parent := blockfactory.NewTestHeader()
+	parent.SetNumber(big.NewInt(doubleSignBlockNumber))
+	parent.SetEpoch(big.NewInt(currentEpoch))
+	parent.SetTime(big.NewInt(parentTime))
+	chain.currentBlock = *types.NewBlockWithHeader(parent)
+	parent = chain.CurrentHeader()
+
+	mkChild := func(ts int64) *block.Header {
+		h := blockfactory.NewTestHeader()
+		h.SetParentHash(parent.Hash())
+		h.SetNumber(new(big.Int).Add(parent.Number(), big.NewInt(1)))
+		h.SetEpoch(parent.Epoch())
+		h.SetTime(big.NewInt(ts))
+		return h
+	}
+	return chain, eng, mkChild
+}
+
+// TestVerifyHeaderTimestamp_Monotonic covers the strict-monotonic rule
+// (header.Time MUST be > parent.Time) at the boundary.
+func TestVerifyHeaderTimestamp_Monotonic(t *testing.T) {
+	now := time.Now().Unix()
+	chain, eng, mkChild := setupTimestampValidationChain(t, now)
+
+	tests := []struct {
+		name        string
+		headerTime  int64
+		expectError bool
+	}{
+		{"equal_to_parent_rejected", now, true},
+		{"one_below_parent_rejected", now - 1, true},
+		{"far_below_parent_rejected", now - 1000, true},
+		{"one_above_parent_accepted", now + 1, false},
+		{"small_step_accepted", now + 2, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := eng.VerifyHeader(chain, mkChild(tc.headerTime), false)
+			if tc.expectError && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tc.expectError && err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+		})
+	}
+}
+
+// TestVerifyHeaderTimestamp_WallClockFutureLimit covers the
+// allowedFutureBlockTime ceiling (header.Time MUST be <= now + 15s).
+func TestVerifyHeaderTimestamp_WallClockFutureLimit(t *testing.T) {
+	// Parent right at wall clock so the wall-clock arm is the binding constraint
+	// rather than the step arm. (parent + maxStep would otherwise be tighter.)
+	now := time.Now().Unix()
+	chain, eng, mkChild := setupTimestampValidationChain(t, now)
+
+	skewSec := int64(allowedFutureBlockTime.Seconds())
+
+	tests := []struct {
+		name          string
+		offsetFromNow int64
+		wantErr       error
+	}{
+		// Inside the wall-clock window AND inside the step window (parent==now):
+		{"at_skew_boundary_within_step", skewSec - int64(maxBlockTimeStep.Seconds()), nil},
+		// Beyond wall-clock window must be ErrFutureBlock.
+		{"one_past_skew_rejected", skewSec + 1, engine.ErrFutureBlock},
+		{"far_past_skew_rejected", skewSec + 60, engine.ErrFutureBlock},
+		{"way_in_future_rejected", 3600, engine.ErrFutureBlock},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := eng.VerifyHeader(chain, mkChild(now+tc.offsetFromNow), false)
+			if tc.wantErr == nil && err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if tc.wantErr != nil && err != tc.wantErr {
+				t.Fatalf("expected %v, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestVerifyHeaderTimestamp_StepLimitNormalOp exercises the per-block
+// forward-step bound when parent is roughly aligned with wall clock.
+// In this regime, parent+maxStep is the binding constraint.
+func TestVerifyHeaderTimestamp_StepLimitNormalOp(t *testing.T) {
+	now := time.Now().Unix()
+	// Parent slightly behind wall (typical BlockPeriod gap).
+	parentTime := now - 2
+	chain, eng, mkChild := setupTimestampValidationChain(t, parentTime)
+
+	step := int64(maxBlockTimeStep.Seconds())
+
+	tests := []struct {
+		name       string
+		headerTime int64
+		wantErr    error
+	}{
+		{"one_above_parent", parentTime + 1, nil},
+		{"five_above_parent", parentTime + 5, nil},
+		{"at_step_boundary_accepted", parentTime + step, nil},
+		{"one_past_step_rejected", parentTime + step + 1, engine.ErrFutureBlock},
+		{"well_past_step_rejected", parentTime + step + 5, engine.ErrFutureBlock},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := eng.VerifyHeader(chain, mkChild(tc.headerTime), false)
+			if tc.wantErr == nil && err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if tc.wantErr != nil && err != tc.wantErr {
+				t.Fatalf("expected %v, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestVerifyHeaderTimestamp_StallRecovery exercises the wall-aware relaxation
+// of the step limit. When parent is far behind wall (a real network stall),
+// the validator should accept blocks up to current wall clock so chain time
+// catches up in a single block instead of crawling at maxStep/block.
+func TestVerifyHeaderTimestamp_StallRecovery(t *testing.T) {
+	now := time.Now().Unix()
+
+	tests := []struct {
+		name       string
+		stallSec   int64 // how far parent is behind wall
+		headerTime func(parent, wall int64) int64
+		wantErr    error
+	}{
+		{
+			name:       "short_view_change_block_at_wall",
+			stallSec:   30,
+			headerTime: func(_, wall int64) int64 { return wall },
+			wantErr:    nil,
+		},
+		{
+			name:       "five_minute_stall_block_at_wall",
+			stallSec:   300,
+			headerTime: func(_, wall int64) int64 { return wall },
+			wantErr:    nil,
+		},
+		{
+			name:       "one_hour_stall_block_at_wall",
+			stallSec:   3600,
+			headerTime: func(_, wall int64) int64 { return wall },
+			wantErr:    nil,
+		},
+		{
+			name:       "stall_block_below_wall_still_above_parent_step",
+			stallSec:   300,
+			headerTime: func(parent, _ int64) int64 { return parent + 50 },
+			wantErr:    nil,
+		},
+		{
+			name:       "stall_block_at_parent_plus_step",
+			stallSec:   300,
+			headerTime: func(parent, _ int64) int64 { return parent + int64(maxBlockTimeStep.Seconds()) },
+			wantErr:    nil,
+		},
+		{
+			name:       "stall_block_beyond_wall_rejected",
+			stallSec:   300,
+			headerTime: func(_, wall int64) int64 { return wall + int64(allowedFutureBlockTime.Seconds()) + 5 },
+			wantErr:    engine.ErrFutureBlock,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			parentTime := now - tc.stallSec
+			chain, eng, mkChild := setupTimestampValidationChain(t, parentTime)
+			err := eng.VerifyHeader(chain, mkChild(tc.headerTime(parentTime, now)), false)
+			if tc.wantErr == nil && err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if tc.wantErr != nil && err != tc.wantErr {
+				t.Fatalf("expected %v, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestVerifyHeaderTimestamp_ParentAheadOfWall covers the case where parent is
+// already slightly in the future (e.g., from a previous +skew leader). The
+// max(parent+maxStep, wall) arm yields parent+maxStep, but the wall+15s arm
+// is the actual binding constraint when parent is enough into the future.
+func TestVerifyHeaderTimestamp_ParentAheadOfWall(t *testing.T) {
+	now := time.Now().Unix()
+
+	tests := []struct {
+		name        string
+		parentAhead int64 // parent.Time = now + parentAhead
+		headerTime  int64 // header.Time absolute (computed lazily below)
+		wantErr     error
+	}{
+		// parent = now+5: step arm allows parent+12 = now+17; wall arm allows now+15.
+		// header at now+15 should be rejected by step arm? No — step is parent+12=now+17 ≥ now+15 ✓.
+		// And wall arm allows ≤ now+15 ✓. So accepted.
+		{"parent_ahead_within_both_arms", 5, 0 /* set below */, nil},
+		// parent+12 = now+17 > now+15 (wall+15). Reject under wall+15 ceiling.
+		{"parent_ahead_violates_wall_ceiling", 5, 0, engine.ErrFutureBlock},
+		// header at parent+13 violates step arm too.
+		{"parent_ahead_violates_step_arm", 5, 0, engine.ErrFutureBlock},
+	}
+
+	// fill in headerTime values that depend on `now`
+	tests[0].headerTime = now + 15     // wall+15 exactly
+	tests[1].headerTime = now + 16     // one past wall+15
+	tests[2].headerTime = now + 5 + 13 // parent+13 also > wall+15 but also fails step
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			parentTime := now + tc.parentAhead
+			chain, eng, mkChild := setupTimestampValidationChain(t, parentTime)
+			err := eng.VerifyHeader(chain, mkChild(tc.headerTime), false)
+			if tc.wantErr == nil && err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if tc.wantErr != nil && err != tc.wantErr {
+				t.Fatalf("expected %v, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestVerifyHeaderTimestamp_CascadingSkewBound is the security test: a
+// hypothetical +15s-skewed leader cannot push chain time more than
+// maxBlockTimeStep ahead of parent. The validator (with synced clock) MUST
+// reject the abusive block.
+func TestVerifyHeaderTimestamp_CascadingSkewBound(t *testing.T) {
+	now := time.Now().Unix()
+	parentTime := now - 2 // typical block period gap, parent slightly behind real time
+	chain, eng, mkChild := setupTimestampValidationChain(t, parentTime)
+
+	step := int64(maxBlockTimeStep.Seconds())
+
+	// Honest leader at parent + step is the maximum chain-time advancement.
+	if err := eng.VerifyHeader(chain, mkChild(parentTime+step), false); err != nil {
+		t.Fatalf("expected boundary accept, got %v", err)
+	}
+	// Adversarial leader trying to push chain time +15s above real wall must be
+	// rejected (parent + step is the binding constraint, not wall + 15s).
+	skewedHeader := mkChild(now + int64(allowedFutureBlockTime.Seconds()))
+	if err := eng.VerifyHeader(chain, skewedHeader, false); err != engine.ErrFutureBlock {
+		t.Fatalf("expected ErrFutureBlock for cascading-skew push, got %v", err)
+	}
+}
+
+// TestVerifyHeaderTimestamp_UnknownAncestor verifies the existing precedence
+// of the ErrUnknownAncestor check vs. the new timestamp checks.
+func TestVerifyHeaderTimestamp_UnknownAncestor(t *testing.T) {
+	chain := makeFakeBlockChain()
+	eng := NewEngine()
+	chain.config.TimestampValidationEpoch = big.NewInt(0)
+
+	orphan := blockfactory.NewTestHeader()
+	orphan.SetParentHash(common.HexToHash("0xdead"))
+	orphan.SetNumber(big.NewInt(doubleSignBlockNumber + 1))
+	orphan.SetEpoch(big.NewInt(currentEpoch))
+	orphan.SetTime(big.NewInt(time.Now().Unix()))
+
+	if err := eng.VerifyHeader(chain, orphan, false); err != engine.ErrUnknownAncestor {
+		t.Fatalf("expected ErrUnknownAncestor, got %v", err)
+	}
+}
