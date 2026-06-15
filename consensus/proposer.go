@@ -7,6 +7,81 @@ import (
 	"github.com/harmony-one/harmony/node/harmony/worker"
 )
 
+const (
+	// maxProposerForwardStep mirrors internal/chain.maxBlockTimeStep (12s).
+	// When local wall is only moderately ahead of parent.Time, clamp the
+	// proposed unix time to parent+maxProposerForwardStep so the header stays
+	// inside the engine's per-block step bound relative to that parent.
+	// When wall is far ahead of parent (above skew-clamp threshold), do not
+	// clamp so the proposed time can follow local wall (matches engine's
+	// max(parent+step, localWall) step ceiling).
+	maxProposerForwardStep int64 = 12
+	// maxProposerCatchupWait caps sleeping until parent.Time+1 when the leader
+	// wall is behind the parent header time. Without a cap, a far-future
+	// parent would block this goroutine for a long time. 17s covers waiting
+	// out a parent timestamp that is still valid under allowedFutureBlockTime
+	// (15s) plus typical inter-second boundary (+1s), on the same machine.
+	maxProposerCatchupWait = 17 * time.Second
+)
+
+// proposalTiming describes the next wait/propose action from the leader's
+// local wall time and parent header unix time only (no chain or peer state).
+// Exactly one mode applies: ready (propose), sleep then retry, or giveUp.
+type proposalTiming struct {
+	// ready: when true, the leader should propose with timestamp = proposeAt.
+	ready     bool
+	proposeAt time.Time
+	// sleep: when non-zero, the leader should sleep for this duration and retry.
+	sleep time.Duration
+	// giveUp: when true, the leader should break out of the retry loop because
+	// the parent timestamp is too far in the future to wait out.
+	giveUp bool
+}
+
+// computeProposalTiming is the pure decision function used by
+// WaitForConsensusReadyV2. Extracted so the timing logic can be unit-tested
+// without spinning up the full consensus stack.
+//
+// When timestampValidation is false (before TimestampValidationEpoch), only the
+// legacy sleep-until-parent+1 behavior applies.
+//
+// When timestampValidation is true (wall := now.Unix(), parent := parentTime):
+//   - wall <= parent: sleep until parent+1, capped by maxProposerCatchupWait;
+//     if the sleep would exceed the cap, giveUp for this attempt.
+//   - wall > parent+maxProposerForwardStep && wall-parent <= skewClampThreshold:
+//     clamp to parent+maxProposerForwardStep (skew clamp band).
+//   - wall > parent+skewClampThreshold: no clamp; propose at wall (stall recovery).
+//   - else wall > parent && wall <= parent+maxProposerForwardStep: propose at wall.
+func computeProposalTiming(now time.Time, parentTime int64, skewClampThreshold int64, timestampValidation bool) proposalTiming {
+	if !timestampValidation {
+		return computeLegacyProposalTiming(now, parentTime)
+	}
+	timestamp := now.Unix()
+	if timestamp > parentTime+maxProposerForwardStep &&
+		timestamp-parentTime <= skewClampThreshold {
+		timestamp = parentTime + maxProposerForwardStep
+		now = time.Unix(timestamp, 0)
+	}
+	if timestamp <= parentTime {
+		waitFor := time.Unix(parentTime+1, 0).Sub(now)
+		if waitFor > maxProposerCatchupWait {
+			return proposalTiming{giveUp: true}
+		}
+		return proposalTiming{sleep: waitFor}
+	}
+	return proposalTiming{ready: true, proposeAt: now}
+}
+
+// computeLegacyProposalTiming is the pre-TimestampValidationEpoch leader behavior:
+// sleep until parent+1 when wall is not past parent, otherwise propose at wall.
+func computeLegacyProposalTiming(now time.Time, parentTime int64) proposalTiming {
+	timestamp := now.Unix()
+	if timestamp <= parentTime {
+		return proposalTiming{sleep: time.Unix(parentTime+1, 0).Sub(now)}
+	}
+	return proposalTiming{ready: true, proposeAt: now}
+}
+
 type Proposer struct {
 	consensus *Consensus
 }
@@ -40,19 +115,25 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 				return
 			case proposal := <-consensus.GetReadySignal():
 				for retryCount := 0; retryCount < 3 && consensus.IsLeader(); retryCount++ {
-					var (
-						currentHeader = p.consensus.Blockchain().CurrentHeader()
-						now           = time.Now()
-						timestamp     = now.Unix()
-						parentTime    = currentHeader.Time().Int64()
-					)
-					if timestamp <= parentTime {
-						// Current time is within the same second as the parent block.
-						// Sleep until the next second so the child timestamp is strictly
-						// greater, satisfying the engine.go validation check.
-						time.Sleep(time.Until(time.Unix(parentTime+1, 0)))
+					currentHeader := p.consensus.Blockchain().CurrentHeader()
+					parentTime := currentHeader.Time().Int64()
+					chainConfig := p.consensus.Blockchain().Config()
+					epoch := currentHeader.Epoch()
+					timestampValidation := chainConfig != nil && chainConfig.IsTimestampValidation(epoch)
+					skewClamp := int64(viewChangeSlot)
+					timing := computeProposalTiming(time.Now(), parentTime, skewClamp, timestampValidation)
+					if timing.giveUp {
+						consensus.GetLogger().Warn().
+							Int64("parentTime", parentTime).
+							Int64("now", time.Now().Unix()).
+							Msg("[Proposer] parent timestamp too far ahead, giving up this round")
+						break
+					}
+					if !timing.ready {
+						time.Sleep(timing.sleep)
 						continue
 					}
+					now := timing.proposeAt
 					consensus.GetLogger().Info().
 						Uint64("blockNum", proposal.blockNum).
 						Bool("asyncProposal", proposal.Type == AsyncProposal).
