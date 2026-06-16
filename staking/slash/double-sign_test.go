@@ -50,7 +50,6 @@ const (
 var doubleSignBlockNumber = shardingconfig.MainnetSchedule.EpochLastBlock(doubleSignEpoch-1) + 1
 
 const (
-
 	creationHeight  = 33
 	lastEpochInComm = 5
 	currentEpoch    = 5
