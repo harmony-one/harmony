@@ -14,13 +14,16 @@ SHELL := bash
 EPOCH_TO_WAIT ?=5
 EXTRA_NODES_FILE ?="./test/configs/local-extra-nodes.txt"
 
-.PHONY: all help libs exe race trace-pointer debug debug-ext debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker go-vet go-test docker build_localnet_validator protofiles travis_go_checker travis_rpc_checker travis_rosetta_checker debug-start-log debug-stop-log debug-restart-log debug-delete-log
+.PHONY: all help deps deps-static libs build exe race trace-pointer debug debug-ext debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker go-vet go-test docker build_localnet_validator protofiles travis_go_checker travis_rpc_checker travis_rosetta_checker debug-start-log debug-stop-log debug-restart-log debug-delete-log
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
 
 help:
 	@echo "all - build the harmony binary & bootnode along with the MCL & BLS libs (if necessary)"
+	@echo "deps - build only the MCL & BLS libs through the shared dependency bootstrap"
+	@echo "deps-static - build only the static MCL & BLS libs through the shared dependency bootstrap"
+	@echo "build - build the harmony binary & bootnode after dependency bootstrap"
 	@echo "libs - build only the MCL & BLS libs (if necessary)"
 	@echo "exe - build the harmony binary & bootnode"
 	@echo "race - build the harmony binary & bootnode with race condition checks"
@@ -69,9 +72,15 @@ help:
 	@echo "debug-multi-bls-multi-ext-node - start a localnet with multiple external nodes and multi-BLS configuration"
 	@echo "protofiles - generate Go code from protobuf files"
 
-libs:
-	make -C $(TOP)/mcl -j8
-	make -C $(TOP)/bls BLS_SWAP_G=1 -j8
+deps:
+	bash ./scripts/build_crypto_deps.sh
+
+deps-static:
+	STATIC_BLS=true bash ./scripts/build_crypto_deps.sh
+
+libs: deps
+
+build: deps exe
 
 exe:
 	bash ./scripts/go_executable_build.sh -S
@@ -170,8 +179,7 @@ test-rosetta-attach:
 	bash ./test/rosetta.sh attach
 
 linux_static:
-	make -C $(TOP)/mcl -j8
-	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
+	STATIC_BLS=true bash ./scripts/build_crypto_deps.sh
 	bash ./scripts/go_executable_build.sh -s
 
 linux_static_quick:
