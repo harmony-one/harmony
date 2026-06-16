@@ -470,6 +470,16 @@ func TestVerifyHeaderTimestampValidationBackwardCompatibleBeforeFork(t *testing.
 	}
 }
 
+func TestVerifiedSigCacheKeyIncludesShardID(t *testing.T) {
+	hash := common.Hash{1, 2, 3}
+	var sig bls.SerializedSignature
+	bitmap := []byte{0xff}
+
+	if newVerifiedSigKey(1, hash, sig, bitmap) == newVerifiedSigKey(2, hash, sig, bitmap) {
+		t.Fatal("verified signature cache keys must include shard ID")
+	}
+}
+
 // setupTimestampValidationChain returns a chain wired with the timestamp
 // validation fork active, the parent header committed at parentTime, and a
 // helper to build child headers parented to it.

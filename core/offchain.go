@@ -154,6 +154,10 @@ func (bc *BlockChainImpl) CommitOffChainData(
 				Msg("[insertChain/crosslinks] cross links are not sorted")
 			return NonStatTy, errors.New("proposed cross links are not sorted")
 		}
+		if bc.chainConfig.IsDuplicateCrossLinkRejection(block.Epoch()) &&
+			crossLinks.HasDuplicateShardBlocks() {
+			return NonStatTy, errors.New("proposed cross links contain duplicates")
+		}
 		for _, crossLink := range *crossLinks {
 			// Process crosslink
 			if err := bc.WriteCrossLinks(

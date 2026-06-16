@@ -1,6 +1,6 @@
 # Harmony
 
-[![Build Status](https://travis-ci.com/harmony-one/harmony.svg?branch=main)](https://travis-ci.com/harmony-one/harmony)
+[![Build Status](https://github.com/harmony-one/harmony/actions/workflows/ci-pr.yaml/badge.svg?branch=dev)](https://github.com/harmony-one/harmony/actions/workflows/ci-pr.yaml?query=branch%3Adev)
 ![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-45%25-brightgreen.svg?longCache=true&style=flat)
 ![Discord](https://img.shields.io/discord/532383335348043777.svg)
 [![Github Action](https://github.com/harmony-one/harmony/actions/workflows/ci.yaml/badge.svg?event=push)](https://github.com/harmony-one/harmony/actions/workflows/ci.yaml)

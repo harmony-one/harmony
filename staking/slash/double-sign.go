@@ -362,10 +362,11 @@ func delegatorSlashApply(
 	rewardBeneficiary common.Address,
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
+	useSlashExternalStakeDenomFix bool,
 ) error {
 	// First delegation is validator's own stake
 	validatorDebt := new(big.Int).Div(snapshot.Delegations[0].Amount, common.Big2)
-	return delegatorSlashApplyDebt(snapshot, current, state, validatorDebt, rewardBeneficiary, doubleSignEpoch, slashTrack)
+	return delegatorSlashApplyDebt(snapshot, current, state, validatorDebt, rewardBeneficiary, doubleSignEpoch, slashTrack, useSlashExternalStakeDenomFix)
 }
 
 // delegatorSlashApply applies slashing to all delegators including the validator.
@@ -378,10 +379,15 @@ func delegatorSlashApplyDebt(
 	rewardBeneficiary common.Address,
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
+	useSlashExternalStakeDenomFix bool,
 ) error {
 	slashIndexPairs, totalStake := makeSlashList(snapshot, current)
 	validatorDelegation := &current.Delegations[0]
-	totalExternalStake := new(big.Int).Sub(totalStake, validatorDelegation.Amount)
+	selfStakeForExternalDenom := validatorDelegation.Amount
+	if useSlashExternalStakeDenomFix {
+		selfStakeForExternalDenom = snapshot.Delegations[0].Amount
+	}
+	totalExternalStake := new(big.Int).Sub(totalStake, selfStakeForExternalDenom)
 	validatorSlashed := applySlashingToDelegation(validatorDelegation, state, rewardBeneficiary, doubleSignEpoch, validatorDebt)
 	totalSlahsed := new(big.Int).Set(validatorSlashed)
 	// External delegators
@@ -445,6 +451,7 @@ func applySlashingToDelegation(delegation *staking.Delegation, state *state.DB, 
 func Apply(
 	chain staking.ValidatorSnapshotReader, state *state.DB,
 	slashes Records, rewardBeneficiary common.Address,
+	useSlashExternalStakeDenomFix bool,
 ) (*Application, error) {
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 	for _, slash := range slashes {
@@ -471,6 +478,7 @@ func Apply(
 		if err := delegatorSlashApply(
 			snapshot.Validator, current, state,
 			rewardBeneficiary, slash.Evidence.Epoch, slashDiff,
+			useSlashExternalStakeDenomFix,
 		); err != nil {
 			return nil, err
 		}
