@@ -492,15 +492,33 @@ func (d Description) EnsureLength() (Description, error) {
 	return d, nil
 }
 
+// BLSProofMessageHash returns the message hash used for BLS proof-of-possession.
+// When bindToAddress is true, the validator address is prepended so the PoP
+// cannot be replayed for a different validator account.
+func BLSProofMessageHash(validatorAddr common.Address, bindToAddress bool) []byte {
+	if bindToAddress {
+		messageBytes := make([]byte, common.AddressLength+len(BLSVerificationStr))
+		copy(messageBytes, validatorAddr.Bytes())
+		copy(messageBytes[common.AddressLength:], BLSVerificationStr)
+		return hash.Keccak256(messageBytes)
+	}
+	return hash.Keccak256([]byte(BLSVerificationStr))
+}
+
 // VerifyBLSKeys checks if the public BLS key at index i of pubKeys matches the
 // BLS key signature at index i of pubKeysSigs.
-func VerifyBLSKeys(pubKeys []bls.SerializedPublicKey, pubKeySigs []bls.SerializedSignature) error {
+func VerifyBLSKeys(
+	pubKeys []bls.SerializedPublicKey,
+	pubKeySigs []bls.SerializedSignature,
+	validatorAddr common.Address,
+	bindToAddress bool,
+) error {
 	if len(pubKeys) != len(pubKeySigs) {
 		return errBLSKeysNotMatchSigs
 	}
 
 	for i := 0; i < len(pubKeys); i++ {
-		if err := VerifyBLSKey(&pubKeys[i], &pubKeySigs[i]); err != nil {
+		if err := VerifyBLSKey(&pubKeys[i], &pubKeySigs[i], validatorAddr, bindToAddress); err != nil {
 			return err
 		}
 	}
@@ -509,7 +527,12 @@ func VerifyBLSKeys(pubKeys []bls.SerializedPublicKey, pubKeySigs []bls.Serialize
 }
 
 // VerifyBLSKey checks if the public BLS key matches the BLS signature
-func VerifyBLSKey(pubKey *bls.SerializedPublicKey, pubKeySig *bls.SerializedSignature) error {
+func VerifyBLSKey(
+	pubKey *bls.SerializedPublicKey,
+	pubKeySig *bls.SerializedSignature,
+	validatorAddr common.Address,
+	bindToAddress bool,
+) error {
 	if len(pubKeySig) == 0 {
 		return errBLSKeysNotMatchSigs
 	}
@@ -524,9 +547,8 @@ func VerifyBLSKey(pubKey *bls.SerializedPublicKey, pubKeySig *bls.SerializedSign
 		return err
 	}
 
-	messageBytes := []byte(BLSVerificationStr)
-	msgHash := hash.Keccak256(messageBytes)
-	if !msgSig.VerifyHash(blsPubKey, msgHash[:]) {
+	msgHash := BLSProofMessageHash(validatorAddr, bindToAddress)
+	if !msgSig.VerifyHash(blsPubKey, msgHash) {
 		return errBLSKeysNotMatchSigs
 	}
 
@@ -580,7 +602,7 @@ func matchesHarmonyBLSKey(
 
 // CreateValidatorFromNewMsg creates validator from NewValidator message
 func CreateValidatorFromNewMsg(
-	val *CreateValidator, blockNum, epoch *big.Int,
+	val *CreateValidator, blockNum, epoch *big.Int, bindBLSProof bool,
 ) (*Validator, error) {
 	desc, err := val.Description.EnsureLength()
 	if err != nil {
@@ -596,7 +618,7 @@ func CreateValidatorFromNewMsg(
 		return nil, err
 	}
 
-	if err = VerifyBLSKeys(pubKeys, val.SlotKeySigs); err != nil {
+	if err = VerifyBLSKeys(pubKeys, val.SlotKeySigs, val.ValidatorAddress, bindBLSProof); err != nil {
 		return nil, err
 	}
 
@@ -615,7 +637,9 @@ func CreateValidatorFromNewMsg(
 }
 
 // UpdateValidatorFromEditMsg updates validator from EditValidator message
-func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator, epoch *big.Int) error {
+func UpdateValidatorFromEditMsg(
+	validator *Validator, edit *EditValidator, epoch *big.Int, bindBLSProof bool,
+) error {
 	if validator.Address != edit.ValidatorAddress {
 		return errAddressNotMatch
 	}
@@ -671,7 +695,9 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator, epoch
 			); err != nil {
 				return err
 			}
-			if err := VerifyBLSKey(edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
+			if err := VerifyBLSKey(
+				edit.SlotKeyToAdd, edit.SlotKeyToAddSig, validator.Address, bindBLSProof,
+			); err != nil {
 				return err
 			}
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)

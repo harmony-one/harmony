@@ -99,6 +99,7 @@ var (
 		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
+		BLSProofBindEpoch:                     EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -166,6 +167,7 @@ var (
 		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
+		BLSProofBindEpoch:                     EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -232,6 +234,7 @@ var (
 		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
+		BLSProofBindEpoch:                     EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -300,6 +303,7 @@ var (
 		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
+		BLSProofBindEpoch:                     EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -367,6 +371,7 @@ var (
 		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
+		BLSProofBindEpoch:                     EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -433,6 +438,7 @@ var (
 		SlashExternalStakeDenomFixEpoch:       EpochTBD,
 		RejectDuplicateSlashEvidenceEpoch:     big.NewInt(0),
 		SlashGroupOrderFixEpoch:               big.NewInt(2),
+		BLSProofBindEpoch:                     EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -502,6 +508,7 @@ var (
 		big.NewInt(0),                      // SlashExternalStakeDenomFixEpoch
 		big.NewInt(0),                      // RejectDuplicateSlashEvidenceEpoch
 		big.NewInt(1),                      // SlashGroupOrderFixEpoch
+		big.NewInt(0),                      // BLSProofBindEpoch
 	}
 
 	// TestChainConfig ...
@@ -571,6 +578,7 @@ var (
 		big.NewInt(0),        // SlashExternalStakeDenomFixEpoch
 		big.NewInt(0),        // RejectDuplicateSlashEvidenceEpoch
 		big.NewInt(1),        // SlashGroupOrderFixEpoch
+		EpochTBD,             // BLSProofBindEpoch
 	}
 
 	// TestRules ...
@@ -807,6 +815,10 @@ type ChainConfig struct {
 	// SlashGroupOrderFixEpoch is the first epoch to apply slash groups in a
 	// canonical lexicographic order during beacon-chain finalization.
 	SlashGroupOrderFixEpoch *big.Int `json:"slash-group-order-fix-epoch,omitempty"`
+	// BLSProofBindEpoch is the first epoch that binds BLS proof-of-possession
+	// signatures to the validator address and rejects duplicate BLS keys among
+	// validators created earlier in the same block.
+	BLSProofBindEpoch *big.Int `json:"bls-proof-bind-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -1167,6 +1179,11 @@ func (c *ChainConfig) IsSlashGroupOrderFix(epoch *big.Int) bool {
 // IsValidatorWrapperAddressBind requires wrapper.Address to match the loading account.
 func (c *ChainConfig) IsValidatorWrapperAddressBind(epoch *big.Int) bool {
 	return isForked(c.ValidatorWrapperAddressBindEpoch, epoch)
+}
+
+// IsBLSProofBind requires BLS proof-of-possession to be bound to validator address.
+func (c *ChainConfig) IsBLSProofBind(epoch *big.Int) bool {
+	return isForked(c.BLSProofBindEpoch, epoch)
 }
 
 func (c *ChainConfig) IsHIP32(epoch *big.Int) bool {
