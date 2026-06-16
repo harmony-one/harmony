@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
@@ -52,7 +53,7 @@ func TestDoubleSignEvidenceCannotBeReboundToLaterEpoch(t *testing.T) {
 		offender,
 		offenderSigner.Pub.Bytes,
 	)
-	chain, setupState, _ := epochRebindSlashChain(t, oldShardState, forgedShardState)
+	chain, setupState, genesis := epochRebindSlashChain(t, oldShardState, forgedShardState)
 
 	currentSelfStake := epochRebindSlashOnes(100_000)
 	newDelegatorStake := epochRebindSlashOnes(500_000)
@@ -92,6 +93,12 @@ func TestDoubleSignEvidenceCannotBeReboundToLaterEpoch(t *testing.T) {
 			Epoch:     new(big.Int).Set(forgedEpoch),
 		},
 	))
+
+	setupBlockNum := epochRebindSlashNextBlock(shardingconfig.MainnetSchedule.EpochLastBlock(forgedEpoch.Uint64()-1) + 1)
+	setupHeader := epochRebindSlashHeader(forgedEpoch, setupBlockNum, offender, genesis.Hash())
+	processor := corepkg.NewStateProcessor(chain, chain)
+	_, err := epochRebindSlashProcessBlock(t, chain, processor, setupState, setupHeader)
+	require.NoError(t, err)
 
 	headState, err := chain.State()
 	require.NoError(t, err)
@@ -305,6 +312,62 @@ func epochRebindSlashValidator(
 		},
 		Delegations: delegations,
 	}
+}
+
+func epochRebindSlashHeader(
+	epoch *big.Int,
+	number uint64,
+	coinbase common.Address,
+	parentHash common.Hash,
+) *block.Header {
+	return blockfactory.ForMainnet.NewHeader(epoch).With().
+		Number(new(big.Int).SetUint64(number)).
+		Epoch(epoch).
+		ShardID(shard.BeaconChainShardID).
+		ViewID(common.Big1).
+		Coinbase(coinbase).
+		ParentHash(parentHash).
+		GasLimit(params.TestGenesisGasLimit).
+		Time(new(big.Int).SetUint64(number * 2)).
+		Header()
+}
+
+func epochRebindSlashProcessBlock(
+	t *testing.T,
+	chain *corepkg.BlockChainImpl,
+	processor *corepkg.StateProcessor,
+	statedb *state.DB,
+	header *block.Header,
+) (*coretypes.Block, error) {
+	t.Helper()
+
+	inputBlock := coretypes.NewBlockWithHeader(header)
+	receipts, outcxs, stakeMsgs, _, usedGas, payout, _, err := processor.Process(
+		inputBlock,
+		statedb,
+		vm.Config{},
+		false,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	header.SetGasUsed(usedGas)
+	header.SetRoot(statedb.IntermediateRoot(params.MainnetChainConfig.IsS3(header.Epoch())))
+	finalBlock := coretypes.NewBlock(header, nil, receipts, outcxs, nil, nil)
+
+	status, err := chain.WriteBlockWithState(
+		finalBlock,
+		receipts,
+		outcxs,
+		stakeMsgs,
+		payout,
+		statedb,
+	)
+	require.NoError(t, err)
+	require.Equal(t, corepkg.CanonStatTy, status)
+
+	return finalBlock, nil
 }
 
 func epochRebindSlashNextBlock(start uint64) uint64 {
