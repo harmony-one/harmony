@@ -51,9 +51,11 @@ func TestSlashGroupOrderCanRejectSameBeaconBlock(t *testing.T) {
 	committeeSigners := []hmybls.PrivateKeyWrapper{proposerSigner, offenderSigner}
 	coinbase := slashOrderCoinbaseAddress(proposerSigner)
 
+	earlyHeight := slashOrderEvidenceHeight(earlyEpoch)
+	lateHeight := slashOrderEvidenceHeight(lateEpoch)
 	slashRecords := slash.Records{
-		slashOrderRecord(t, earlyEpoch, 1, 37, 7, offender, reporter, offenderSigner),
-		slashOrderRecord(t, lateEpoch, shard.BeaconChainShardID, 38, 7, offender, reporter, offenderSigner),
+		slashOrderRecord(t, earlyEpoch, 1, earlyHeight, 7, offender, reporter, offenderSigner),
+		slashOrderRecord(t, lateEpoch, shard.BeaconChainShardID, lateHeight, 7, offender, reporter, offenderSigner),
 	}
 
 	chain, setupBlock := newSlashOrderChain(
@@ -154,9 +156,11 @@ func TestSlashGroupOrderIsDeterministicAfterFix(t *testing.T) {
 	committeeSigners := []hmybls.PrivateKeyWrapper{proposerSigner, offenderSigner}
 	coinbase := slashOrderCoinbaseAddress(proposerSigner)
 
+	earlyHeight := slashOrderEvidenceHeight(earlyEpoch)
+	lateHeight := slashOrderEvidenceHeight(lateEpoch)
 	slashRecords := slash.Records{
-		slashOrderRecord(t, earlyEpoch, 1, 37, 7, offender, reporter, offenderSigner),
-		slashOrderRecord(t, lateEpoch, shard.BeaconChainShardID, 38, 7, offender, reporter, offenderSigner),
+		slashOrderRecord(t, earlyEpoch, 1, earlyHeight, 7, offender, reporter, offenderSigner),
+		slashOrderRecord(t, lateEpoch, shard.BeaconChainShardID, lateHeight, 7, offender, reporter, offenderSigner),
 	}
 
 	chainConfig := *params.MainnetChainConfig
@@ -598,6 +602,14 @@ func slashOrderSetupBlockNumber(epoch *big.Int) uint64 {
 		number++
 	}
 	return number
+}
+
+func slashOrderEvidenceHeight(epoch *big.Int) uint64 {
+	height := shardingconfig.MainnetSchedule.EpochLastBlock(epoch.Uint64()-1) + 37
+	for slashOrderBadBlockNumber(height) {
+		height++
+	}
+	return height
 }
 
 func slashOrderBadBlockNumber(number uint64) bool {
