@@ -58,21 +58,14 @@ jobs:
           go-version: '1.24.2'
           cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
 
-      - &cache-crypto-deps
-        name: Cache crypto dependency build outputs
-        uses: actions/cache@v4
-        with:
-          path: |
-            go/src/github.com/harmony-one/mcl/bin
-            go/src/github.com/harmony-one/mcl/lib
-            go/src/github.com/harmony-one/bls/bin
-            go/src/github.com/harmony-one/bls/lib
-          key: ${{ runner.os }}-crypto-deps-${{ hashFiles('go/src/github.com/harmony-one/mcl/**', 'go/src/github.com/harmony-one/bls/**') }}
-
       - &build-crypto-deps
         name: Build crypto deps
-        run: JOBS=4 make deps
-        working-directory: go/src/github.com/harmony-one/harmony
+        uses: ./go/src/github.com/harmony-one/harmony/.github/actions/build-crypto-deps
+        with:
+          harmony-path: go/src/github.com/harmony-one/harmony
+          mcl-path: go/src/github.com/harmony-one/mcl
+          bls-path: go/src/github.com/harmony-one/bls
+          jobs: "4"
 
       - &build-harmony
         name: Build harmony
@@ -88,7 +81,6 @@ jobs:
       - *checkout-mcl
       - *checkout-bls
       - *setup-go
-      - *cache-crypto-deps
       - *build-crypto-deps
       - *build-harmony
 
@@ -113,7 +105,6 @@ jobs:
       - *checkout-mcl
       - *checkout-bls
       - *setup-go
-      - *cache-crypto-deps
       - *build-crypto-deps
       - *build-harmony
 
@@ -146,7 +137,6 @@ jobs:
       - *checkout-mcl
       - *checkout-bls
       - *setup-go
-      - *cache-crypto-deps
       - *build-crypto-deps
       - *build-harmony
       - *checkout-harmony-test

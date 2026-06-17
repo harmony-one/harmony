@@ -74,6 +74,15 @@ jobs:
         with:
           go-version-file: 'harmony/go.mod'
 
+      - name: Build crypto deps
+        uses: ./harmony/.github/actions/build-crypto-deps
+        with:
+          harmony-path: harmony
+          mcl-path: mcl
+          bls-path: bls
+          jobs: "4"
+          static: "true"
+
       - name: Get latest version and release
         run: |
           VERSION=$(git tag -l --sort=-v:refname | head -n 1 | tr -d v)
@@ -85,7 +94,7 @@ jobs:
       - name: Build harmony binary and packages for Linux
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          make linux_static
+          make linux_static_quick
           make deb
           echo %_signature gpg >> $HOME/.rpmmacros && echo "%_gpg_name Harmony (harmony.one)" >> $HOME/.rpmmacros
           make rpm
@@ -97,7 +106,7 @@ jobs:
       - name: Build harmony binary and packages for Linux
         if: join(matrix.os, '-') == 'self-hosted-linux-ARM64'
         run: |
-          make linux_static
+          make linux_static_quick
           mv ./bin/harmony ./bin/harmony-arm64
         working-directory: harmony
 
@@ -325,4 +334,3 @@ jobs:
           asset_path: ./harmony-arm64.sig
           asset_name: harmony-arm64.sig
           asset_content_type: application/octet-stream
-
