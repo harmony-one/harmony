@@ -72,6 +72,17 @@ jobs:
         run: make exe
         working-directory: go/src/github.com/harmony-one/harmony
 
+      - &upload-harmony-binaries
+        name: Upload harmony binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmony-binaries
+          path: |
+            go/src/github.com/harmony-one/harmony/bin/harmony
+            go/src/github.com/harmony-one/harmony/bin/bootnode
+          retention-days: 1
+          if-no-files-found: error
+
   go-checker:
     name: Run unit tests
     runs-on: ubuntu-24.04
@@ -98,6 +109,7 @@ jobs:
 
   rpc-checker:
     name: Run RPC integration tests
+    needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -106,7 +118,14 @@ jobs:
       - *checkout-bls
       - *setup-go
       - *build-crypto-deps
-      - *build-harmony
+      - name: Download harmony binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: harmony-binaries
+          path: go/src/github.com/harmony-one/harmony/bin
+      - name: Make harmony binaries executable
+        run: chmod +x bin/harmony bin/bootnode
+        working-directory: go/src/github.com/harmony-one/harmony
 
       - &checkout-harmony-test
         name: Checkout harmony-test
@@ -130,6 +149,7 @@ jobs:
 
   pyhmy-checker:
     name: Run pyhmy tests
+    needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -138,7 +158,14 @@ jobs:
       - *checkout-bls
       - *setup-go
       - *build-crypto-deps
-      - *build-harmony
+      - name: Download harmony binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: harmony-binaries
+          path: go/src/github.com/harmony-one/harmony/bin
+      - name: Make harmony binaries executable
+        run: chmod +x bin/harmony bin/bootnode
+        working-directory: go/src/github.com/harmony-one/harmony
       - *checkout-harmony-test
 
       - name: Run pyhmy checker
