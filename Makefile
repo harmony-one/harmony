@@ -157,8 +157,7 @@ distclean: clean
 	make -C $(TOP)/bls clean
 
 go-get:
-	source ./scripts/setup_bls_build_flags.sh
-	go get -v ./...
+	source ./scripts/setup_bls_build_flags.sh && go get -v ./...
 
 test:
 	bash ./test/all.sh
