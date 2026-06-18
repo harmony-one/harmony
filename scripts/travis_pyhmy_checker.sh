@@ -45,7 +45,6 @@ git fetch origin "${TEST_REPO_BRANCH}"
 git checkout "${TEST_REPO_BRANCH}"
 git pull --rebase=true
 cd localnet
-docker build --build-arg MAIN_REPO_BRANCH="${MAIN_REPO_BRANCH}" --progress plain \
-    --build-arg MAIN_REPO_ORG="${MAIN_REPO_ORG}" -t harmonyone/localnet-test .
+"${DIR}/build_harmony_test_image.sh" "${MAIN_REPO_BRANCH}" "${MAIN_REPO_ORG}"
 # WARN: this is the place where LOCAL repository is provided to the harmony-tests repo
 docker run -v "$DIR/../:/go/src/github.com/harmony-one/harmony" harmonyone/localnet-test -p

@@ -133,10 +133,14 @@ jobs:
           path: go/src/github.com/harmony-one/harmony-test
           persist-credentials: false
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Run RPC checker
         run: bash ./scripts/travis_rpc_checker.sh
         working-directory: go/src/github.com/harmony-one/harmony
         env: &travis-pr-env
+          HARMONY_TEST_DOCKER_CACHE: "true"
           TRAVIS_PULL_REQUEST_SLUG: ${{ github.event.pull_request.head.repo.full_name }}
           TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
           TRAVIS_BRANCH: ${{ github.ref_name }}
@@ -157,6 +161,9 @@ jobs:
         run: chmod +x bin/harmony bin/bootnode
         working-directory: go/src/github.com/harmony-one/harmony
       - *checkout-harmony-test
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Run pyhmy checker
         run: bash ./scripts/travis_pyhmy_checker.sh
