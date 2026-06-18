@@ -114,10 +114,6 @@ jobs:
     timeout-minutes: 25
     steps:
       - *checkout-harmony
-      - *checkout-mcl
-      - *checkout-bls
-      - *setup-go
-      - *build-crypto-deps
       - name: Download harmony binaries
         uses: actions/download-artifact@v4
         with:
@@ -138,9 +134,7 @@ jobs:
           persist-credentials: false
 
       - name: Run RPC checker
-        run: |
-          make go-get
-          bash ./scripts/travis_rpc_checker.sh
+        run: bash ./scripts/travis_rpc_checker.sh
         working-directory: go/src/github.com/harmony-one/harmony
         env: &travis-pr-env
           TRAVIS_PULL_REQUEST_SLUG: ${{ github.event.pull_request.head.repo.full_name }}
@@ -154,10 +148,6 @@ jobs:
     timeout-minutes: 25
     steps:
       - *checkout-harmony
-      - *checkout-mcl
-      - *checkout-bls
-      - *setup-go
-      - *build-crypto-deps
       - name: Download harmony binaries
         uses: actions/download-artifact@v4
         with:
@@ -169,8 +159,6 @@ jobs:
       - *checkout-harmony-test
 
       - name: Run pyhmy checker
-        run: |
-          make go-get
-          bash ./scripts/travis_pyhmy_checker.sh
+        run: bash ./scripts/travis_pyhmy_checker.sh
         working-directory: go/src/github.com/harmony-one/harmony
         env: *travis-pr-env
