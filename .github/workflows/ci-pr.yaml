@@ -123,27 +123,9 @@ jobs:
         run: chmod +x bin/harmony bin/bootnode
         working-directory: go/src/github.com/harmony-one/harmony
 
-      - &checkout-harmony-test
-        name: Checkout harmony-test
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 #v6.0.3
-        with:
-          repository: harmony-one/harmony-test
-          ref: master
-          fetch-depth: 1
-          path: go/src/github.com/harmony-one/harmony-test
-          persist-credentials: false
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Run RPC checker
-        run: bash ./scripts/travis_rpc_checker.sh
+        run: bash ./scripts/run_harmony_test_image.sh -n
         working-directory: go/src/github.com/harmony-one/harmony
-        env: &travis-pr-env
-          HARMONY_TEST_DOCKER_CACHE: "true"
-          TRAVIS_PULL_REQUEST_SLUG: ${{ github.event.pull_request.head.repo.full_name }}
-          TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
-          TRAVIS_BRANCH: ${{ github.ref_name }}
 
   pyhmy-checker:
     name: Run pyhmy tests
@@ -160,12 +142,7 @@ jobs:
       - name: Make harmony binaries executable
         run: chmod +x bin/harmony bin/bootnode
         working-directory: go/src/github.com/harmony-one/harmony
-      - *checkout-harmony-test
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Run pyhmy checker
-        run: bash ./scripts/travis_pyhmy_checker.sh
+        run: bash ./scripts/run_harmony_test_image.sh -p
         working-directory: go/src/github.com/harmony-one/harmony
-        env: *travis-pr-env
