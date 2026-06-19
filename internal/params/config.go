@@ -43,6 +43,7 @@ var (
 		S3Epoch:                               big.NewInt(28),
 		CrossTxEpoch:                          big.NewInt(28),
 		CXMerkleProofReplayFixEpoch:           EpochTBD,
+		CXReceiptStateRollbackEpoch:           EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(100),
 		ReceiptLogEpoch:                       big.NewInt(101),
 		PreStakingEpoch:                       big.NewInt(185),
@@ -111,6 +112,7 @@ var (
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
+		CXReceiptStateRollbackEpoch:           EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(2),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -179,6 +181,7 @@ var (
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
+		CXReceiptStateRollbackEpoch:           EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -247,6 +250,7 @@ var (
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
+		CXReceiptStateRollbackEpoch:           EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -316,6 +320,7 @@ var (
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
+		CXReceiptStateRollbackEpoch:           EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -383,6 +388,7 @@ var (
 		S3Epoch:                               big.NewInt(0),
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
+		CXReceiptStateRollbackEpoch:           big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(0),
@@ -451,6 +457,7 @@ var (
 		big.NewInt(0),                      // EthCompatibleEpoch
 		big.NewInt(0),                      // CrossTxEpoch
 		big.NewInt(0),                      // CXMerkleProofReplayFixEpoch
+		big.NewInt(0),                      // CXReceiptStateRollbackEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
 		big.NewInt(0),                      // RejectShard0CrossLinkEpoch
 		big.NewInt(1),                      // AggregatedRewardEpoch
@@ -521,6 +528,7 @@ var (
 		big.NewInt(0),        // EthCompatibleEpoch
 		big.NewInt(0),        // CrossTxEpoch
 		big.NewInt(0),        // CXMerkleProofReplayFixEpoch
+		big.NewInt(0),        // CXReceiptStateRollbackEpoch
 		big.NewInt(0),        // CrossLinkEpoch
 		big.NewInt(0),        // RejectShard0CrossLinkEpoch
 		big.NewInt(1),        // AggregatedRewardEpoch
@@ -634,6 +642,10 @@ type ChainConfig struct {
 	// CXMerkleProofReplayFixEpoch is the epoch where CX receipt replay checks
 	// bind merkle proof identity to authenticated source headers.
 	CXMerkleProofReplayFixEpoch *big.Int `json:"cx-merkle-proof-replay-fix-epoch,omitempty"`
+
+	// CXReceiptStateRollbackEpoch is the epoch where EVM frame reverts also
+	// roll back cross-shard receipts created by the cross-shard precompile.
+	CXReceiptStateRollbackEpoch *big.Int `json:"cx-receipt-state-rollback-epoch,omitempty"`
 
 	// CrossLinkEpoch is the epoch where beaconchain starts containing
 	// cross-shard links.
@@ -931,6 +943,12 @@ func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 // IsCXMerkleProofReplayFixEpoch determines whether replay-fix checks are enabled.
 func (c *ChainConfig) IsCXMerkleProofReplayFixEpoch(epoch *big.Int) bool {
 	return isForked(c.CXMerkleProofReplayFixEpoch, epoch)
+}
+
+// IsCXReceiptStateRollback returns whether EVM frame reverts also roll back
+// cross-shard receipts created by the cross-shard precompile.
+func (c *ChainConfig) IsCXReceiptStateRollback(epoch *big.Int) bool {
+	return isForked(c.CXReceiptStateRollbackEpoch, epoch)
 }
 
 // IsEthCompatible determines whether it is ethereum compatible epoch
@@ -1283,16 +1301,17 @@ type Rules struct {
 	IsEIP2537Precompile,
 	// eip-155 chain id fix
 	IsChainIdFix bool
-	IsValidatorCodeFix     bool
-	IsYoloV2               bool
-	Is1153TransientStorage bool
-	Is7939CLZ              bool
-	IsEIP5656Mcopy         bool
-	IsEIP3855              bool
-	IsEIP6780              bool
-	Is3860                 bool
-	IsPrague               bool // EIP-2935: Serve historical block hashes from state
-	Is8024                 bool
+	IsValidatorCodeFix       bool
+	IsYoloV2                 bool
+	Is1153TransientStorage   bool
+	Is7939CLZ                bool
+	IsEIP5656Mcopy           bool
+	IsEIP3855                bool
+	IsEIP6780                bool
+	Is3860                   bool
+	IsPrague                 bool // EIP-2935: Serve historical block hashes from state
+	Is8024                   bool
+	IsCXReceiptStateRollback bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1332,5 +1351,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		Is3860:                     c.IsEIP3860(epoch),
 		IsPrague:                   c.IsPrague(epoch),
 		Is8024:                     c.IsEIP8024(epoch),
+		IsCXReceiptStateRollback:   c.IsCXReceiptStateRollback(epoch),
 	}
 }
