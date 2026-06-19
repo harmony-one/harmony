@@ -85,9 +85,20 @@ func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerC
 		if err := rmf.LoadRpcMethodFiltersFromFile(rpcFilterFilePath); err != nil {
 			return err
 		}
+		utils.Logger().Info().Str("path", rpcFilterFilePath).Msg("Loaded RPC method filter file")
 	} else {
 		rmf.ExposeAll()
 	}
+	utils.Logger().Info().
+		Bool("http", config.HTTPEnabled).
+		Bool("ws", config.WSEnabled).
+		Bool("rateLimiter", config.RateLimiterEnabled).
+		Int("requestsPerSecond", config.RequestsPerSecond).
+		Bool("ethRPCs", config.EthRPCsEnabled).
+		Bool("stakingRPCs", config.StakingRPCsEnabled).
+		Bool("legacyRPCs", config.LegacyRPCsEnabled).
+		Bool("debugRPCs", config.DebugEnabled).
+		Msg("Starting RPC servers")
 	if config.HTTPEnabled {
 		timeouts := rpc.HTTPTimeouts{
 			ReadTimeout:  config.HTTPTimeoutRead,
@@ -154,7 +165,7 @@ func StopServers() error {
 		}
 		wsListener = nil
 		utils.Logger().Info().
-			Str("url", fmt.Sprintf("http://%s", wsEndpoint)).
+			Str("url", fmt.Sprintf("ws://%s", wsEndpoint)).
 			Msg("WS endpoint closed")
 	}
 	if wsHandler != nil {
@@ -256,6 +267,8 @@ func startHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter, httpTimeouts rpc.HTTPTi
 		Str("url", fmt.Sprintf("http://%s", httpEndpoint)).
 		Str("cors", strings.Join(httpOrigins, ",")).
 		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
+		Strs("modules", HTTPModules).
+		Bool("auth", false).
 		Msg("HTTP endpoint opened")
 	fmt.Printf("Started RPC server at: %v\n", httpEndpoint)
 	return nil
@@ -273,7 +286,9 @@ func startAuthHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter, httpTimeouts rpc.HT
 		Str("url", fmt.Sprintf("http://%s", httpAuthEndpoint)).
 		Str("cors", strings.Join(httpOrigins, ",")).
 		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
-		Msg("HTTP endpoint opened")
+		Strs("modules", HTTPModules).
+		Bool("auth", true).
+		Msg("HTTP auth endpoint opened")
 	fmt.Printf("Started Auth-RPC server at: %v\n", httpAuthEndpoint)
 	return nil
 }
@@ -286,7 +301,10 @@ func startWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
 
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
-		Msg("WebSocket WS endpoint opened")
+		Str("origins", strings.Join(wsOrigins, ",")).
+		Strs("modules", WSModules).
+		Bool("auth", false).
+		Msg("WebSocket endpoint opened")
 	fmt.Printf("Started WS server at: %v\n", wsEndpoint)
 	return nil
 }
@@ -299,7 +317,10 @@ func startAuthWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
 
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("ws://%s", wsAuthListener.Addr())).
-		Msg("WebSocket Auth-WS endpoint opened")
+		Str("origins", strings.Join(wsOrigins, ",")).
+		Strs("modules", WSModules).
+		Bool("auth", true).
+		Msg("WebSocket auth endpoint opened")
 	fmt.Printf("Started Auth-WS server at: %v\n", wsAuthEndpoint)
 	return nil
 }
