@@ -106,6 +106,27 @@ func TestApplySlashing(t *testing.T) {
 	}
 }
 
+func TestVerifyShardStateRejectsNonLastBlock(t *testing.T) {
+	chain := makeFakeBlockChain()
+	header := makeFakeHeader()
+	header.SetNumber(big.NewInt(1))
+
+	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+		t.Fatalf("test block %d must not be an epoch-ending block", header.Number().Uint64())
+	}
+
+	encodedEmptyState, err := shard.EncodeWrapper(shard.State{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	header.SetShardState(encodedEmptyState)
+
+	err = NewEngine().VerifyShardState(chain, chain, header)
+	if err == nil {
+		t.Fatal("expected shard state on non-last block to be rejected")
+	}
+}
+
 //
 // Make slash record for testing
 //
@@ -373,7 +394,7 @@ func (bc *fakeBlockChain) ReadValidatorStats(addr common.Address) (*staking.Vali
 	return nil, nil
 }
 func (bc *fakeBlockChain) SuperCommitteeForNextEpoch(beacon engine.ChainReader, header *block.Header, isVerify bool) (*shard.State, error) {
-	return nil, nil
+	return &bc.superCommittee, nil
 }
 
 //
