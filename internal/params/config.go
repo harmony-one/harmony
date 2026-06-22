@@ -101,6 +101,7 @@ var (
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
+		SlashBallotSignerFixEpoch:             EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -170,6 +171,7 @@ var (
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
+		SlashBallotSignerFixEpoch:             EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -238,6 +240,7 @@ var (
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
+		SlashBallotSignerFixEpoch:             EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -308,6 +311,7 @@ var (
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
+		SlashBallotSignerFixEpoch:             EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -377,6 +381,7 @@ var (
 		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
 		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
+		SlashBallotSignerFixEpoch:             EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -445,6 +450,7 @@ var (
 		RejectDuplicateSlashEvidenceEpoch:     big.NewInt(0),
 		SlashGroupOrderFixEpoch:               big.NewInt(2),
 		BLSProofBindEpoch:                     EpochTBD,
+		SlashBallotSignerFixEpoch:             big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
@@ -516,6 +522,7 @@ var (
 		big.NewInt(0),                      // RejectDuplicateSlashEvidenceEpoch
 		big.NewInt(1),                      // SlashGroupOrderFixEpoch
 		big.NewInt(0),                      // BLSProofBindEpoch
+		big.NewInt(1),                      // SlashBallotSignerFixEpoch
 	}
 
 	// TestChainConfig ...
@@ -587,6 +594,7 @@ var (
 		big.NewInt(0),        // RejectDuplicateSlashEvidenceEpoch
 		big.NewInt(1),        // SlashGroupOrderFixEpoch
 		EpochTBD,             // BLSProofBindEpoch
+		big.NewInt(1),        // SlashBallotSignerFixEpoch
 	}
 
 	// TestRules ...
@@ -831,6 +839,11 @@ type ChainConfig struct {
 	// signatures to the validator address and rejects duplicate BLS keys among
 	// validators created earlier in the same block.
 	BLSProofBindEpoch *big.Int `json:"bls-proof-bind-epoch,omitempty"`
+	// SlashBallotSignerFixEpoch is the first epoch where slash verification requires
+	// ballot signer keys to match the double-sign intersection and verifies
+	// signatures against that intersection only. Until set to a concrete epoch on
+	// a network, EpochTBD leaves the rule inactive there.
+	SlashBallotSignerFixEpoch *big.Int `json:"slash-ballot-signer-fix-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -913,6 +926,8 @@ func (c *ChainConfig) mustValid() {
 	// slash groups are only applied in the staking era
 	require(c.SlashGroupOrderFixEpoch == nil || c.SlashGroupOrderFixEpoch.Cmp(c.StakingEpoch) >= 0,
 		"must satisfy: SlashGroupOrderFixEpoch >= StakingEpoch")
+	require(c.SlashBallotSignerFixEpoch == nil || c.SlashBallotSignerFixEpoch.Cmp(c.StakingEpoch) >= 0,
+		"must satisfy: SlashBallotSignerFixEpoch >= StakingEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -1202,6 +1217,12 @@ func (c *ChainConfig) IsValidatorWrapperAddressBind(epoch *big.Int) bool {
 // IsBLSProofBind requires BLS proof-of-possession to be bound to validator address.
 func (c *ChainConfig) IsBLSProofBind(epoch *big.Int) bool {
 	return isForked(c.BLSProofBindEpoch, epoch)
+}
+
+// IsSlashBallotSignerFix returns whether slash verification uses stricter ballot
+// signer key rules during double-sign evidence checks.
+func (c *ChainConfig) IsSlashBallotSignerFix(epoch *big.Int) bool {
+	return isForked(c.SlashBallotSignerFixEpoch, epoch)
 }
 
 func (c *ChainConfig) IsHIP32(epoch *big.Int) bool {

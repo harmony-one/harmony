@@ -94,6 +94,7 @@ var (
 	errSlashEpochHeightMismatch = errors.New("slash evidence epoch does not match block height epoch")
 	// ErrSlashEpochHeightMismatch is returned when slash evidence epoch disagrees with its block height.
 	ErrSlashEpochHeightMismatch = errSlashEpochHeightMismatch
+	errSlashExtraBallotKeys     = errors.New("slash ballot signer keys do not match double-sign intersection")
 )
 
 // MarshalJSON ..
@@ -239,6 +240,7 @@ func Verify(
 		)
 	}
 
+	useSlashBallotSignerFix := chain.Config().IsSlashBallotSignerFix(candidate.Evidence.Epoch)
 	for _, ballot := range [...]Vote{
 		candidate.Evidence.FirstVote,
 		candidate.Evidence.SecondVote,
@@ -251,7 +253,15 @@ func Verify(
 			return err
 		}
 
-		for _, pubKey := range ballot.SignerPubKeys {
+		verifyKeys := ballot.SignerPubKeys
+		if useSlashBallotSignerFix {
+			if len(ballot.SignerPubKeys) != len(doubleSignKeys) {
+				return errSlashExtraBallotKeys
+			}
+			verifyKeys = doubleSignKeys
+		}
+
+		for _, pubKey := range verifyKeys {
 			publicKeyObj, err := bls.BytesToBLSPublicKey(pubKey[:])
 
 			if err != nil {

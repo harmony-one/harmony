@@ -80,6 +80,96 @@ var (
 	reporterAddr = makeTestAddress("reporter")
 )
 
+func TestVerifyRejectsExtraBallotSignerKeys(t *testing.T) {
+	record := extraBallotSignerSlashRecord(t)
+	sdb := defaultTestStateDB()
+	chain := defaultFakeBlockChain()
+
+	err := Verify(chain, sdb, &record)
+	if err == nil {
+		t.Fatal("expected slash with mismatched ballot signer keys to be rejected")
+	}
+	if !strings.Contains(err.Error(), errSlashExtraBallotKeys.Error()) &&
+		!strings.Contains(err.Error(), errFailVerifySlash.Error()) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVerifyExtraBallotSignerKeysBackwardCompat(t *testing.T) {
+	record := extraBallotSignerSlashRecord(t)
+	sdb := defaultTestStateDB()
+	chain := defaultFakeBlockChain()
+	chain.config.SlashBallotSignerFixEpoch = params.EpochTBD
+
+	if err := Verify(chain, sdb, &record); err != nil {
+		t.Fatalf("legacy slash verify should accept aggregated-key proof before fork: %v", err)
+	}
+}
+
+func extraBallotSignerSlashRecord(t *testing.T) Record {
+	t.Helper()
+
+	attacker1 := genKeyPair()
+	attacker2 := genKeyPair()
+	extra1 := subtractBLSPublicKeys(t, attacker1.pub, offKey.pub)
+	extra2 := subtractBLSPublicKeys(t, attacker2.pub, offKey.pub)
+
+	firstVote := makeExtraBallotVote(t, attacker1, offPub, extra1, doubleSignBlock1)
+	secondVote := makeExtraBallotVote(t, attacker2, offPub, extra2, doubleSignBlock2)
+
+	return Record{
+		Evidence: Evidence{
+			ConflictingVotes: ConflictingVotes{
+				FirstVote:  firstVote,
+				SecondVote: secondVote,
+			},
+			Moment: Moment{
+				Epoch:   big.NewInt(doubleSignEpoch),
+				ShardID: doubleSignShardID,
+				Height:  doubleSignBlockNumber,
+				ViewID:  doubleSignViewID,
+			},
+			Offender: offAddr,
+		},
+		Reporter: reporterAddr,
+	}
+}
+
+func makeExtraBallotVote(
+	t *testing.T,
+	attacker blsKeyPair,
+	victimPub bls.SerializedPublicKey,
+	extraPub bls.SerializedPublicKey,
+	block *types.Block,
+) Vote {
+	t.Helper()
+
+	msg := consensus_sig.ConstructCommitPayload(
+		params.LocalnetChainConfig,
+		block.Epoch(),
+		block.Hash(),
+		block.Number().Uint64(),
+		block.Header().ViewID().Uint64(),
+	)
+	return Vote{
+		SignerPubKeys:   []bls.SerializedPublicKey{victimPub, extraPub},
+		BlockHeaderHash: block.Hash(),
+		Signature:       attacker.pri.SignHash(msg).Serialize(),
+	}
+}
+
+func subtractBLSPublicKeys(t *testing.T, minuendPub, subtrahendPub *bls_core.PublicKey) bls.SerializedPublicKey {
+	t.Helper()
+
+	diffPub := &bls_core.PublicKey{}
+	diffPub.Add(minuendPub)
+	diffPub.Sub(subtrahendPub)
+
+	var serialized bls.SerializedPublicKey
+	copy(serialized[:], diffPub.Serialize())
+	return serialized
+}
+
 func TestVerify(t *testing.T) {
 	tests := []struct {
 		r      Record
