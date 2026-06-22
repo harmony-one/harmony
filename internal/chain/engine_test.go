@@ -106,14 +106,10 @@ func TestApplySlashing(t *testing.T) {
 	}
 }
 
-func TestVerifyShardStateRejectsNonLastBlock(t *testing.T) {
+func TestVerifyShardStateRejectsEmptyShardState(t *testing.T) {
 	chain := makeFakeBlockChain()
+	chain.superCommittee = shard.State{}
 	header := makeFakeHeader()
-	header.SetNumber(big.NewInt(1))
-
-	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
-		t.Fatalf("test block %d must not be an epoch-ending block", header.Number().Uint64())
-	}
 
 	encodedEmptyState, err := shard.EncodeWrapper(shard.State{}, false)
 	if err != nil {
@@ -123,7 +119,7 @@ func TestVerifyShardStateRejectsNonLastBlock(t *testing.T) {
 
 	err = NewEngine().VerifyShardState(chain, chain, header)
 	if err == nil {
-		t.Fatal("expected shard state on non-last block to be rejected")
+		t.Fatal("expected empty shard state to be rejected")
 	}
 }
 

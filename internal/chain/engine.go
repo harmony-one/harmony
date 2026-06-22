@@ -149,15 +149,12 @@ func (e *engineImpl) VerifyShardState(
 	if len(headerShardStateBytes) == 0 {
 		return nil
 	}
-	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
-		return errors.Errorf(
-			"[VerifyShardState] shard state present on non-last block %d",
-			header.Number().Uint64(),
-		)
-	}
 	shardState, err := bc.SuperCommitteeForNextEpoch(beacon, header, true)
 	if err != nil {
 		return err
+	}
+	if shardState == nil || len(shardState.Shards) == 0 {
+		return errors.New("[VerifyShardState] shard state must not be empty")
 	}
 
 	isStaking := false
