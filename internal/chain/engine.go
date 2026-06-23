@@ -153,7 +153,7 @@ func (e *engineImpl) VerifyShardState(
 	if err != nil {
 		return err
 	}
-	if shardState == nil || len(shardState.Shards) == 0 {
+	if bc.Config().IsShardStateValidation(header.Epoch()) && (shardState == nil || len(shardState.Shards) == 0) {
 		return errors.New("[VerifyShardState] shard state must not be empty")
 	}
 
