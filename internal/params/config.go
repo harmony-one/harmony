@@ -319,7 +319,7 @@ var (
 		CXReceiptStateRollbackEpoch:           big.NewInt(52650),
 		ShardStateValidationEpoch:             big.NewInt(52650),
 		SlashBallotSignerFixEpoch:             big.NewInt(52650),
-		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
+		VerifyBeaconHeaderSlashEpoch:          big.NewInt(53000),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
