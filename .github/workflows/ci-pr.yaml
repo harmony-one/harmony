@@ -152,6 +152,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - *checkout-harmony
+      - *checkout-bls
       - *download-harmony-binaries
       - *prepare-harmony-binaries
       - *checkout-harmony-test
