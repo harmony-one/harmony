@@ -154,7 +154,6 @@ jobs:
           TRAVIS_PULL_REQUEST_SLUG: ${{ github.event.pull_request.head.repo.full_name }}
           TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
           TRAVIS_BRANCH: ${{ github.ref_name }}
-          HARMONY_PREBUILT_STATIC: 'true'
 
   pyhmy-checker:
     name: Run pyhmy tests (${{ matrix.arch }})
