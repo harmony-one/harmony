@@ -59,7 +59,7 @@ jobs:
           cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
 
       - name: Build harmony
-        run: make
+        run: make linux_static
         working-directory: go/src/github.com/harmony-one/harmony
 
       - name: Upload harmony binaries artifact
