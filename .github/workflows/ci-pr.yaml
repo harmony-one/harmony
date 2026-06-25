@@ -68,10 +68,20 @@ jobs:
         run: make BLS_SWAP_G=1 -j4
         working-directory: go/src/github.com/harmony-one/bls
 
-      - &build-harmony
-        name: Build harmony
+      - name: Build harmony
         run: make
         working-directory: go/src/github.com/harmony-one/harmony
+
+      - name: Upload harmony binaries artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+        with:
+          name: harmony-binaries
+          path: |
+            go/src/github.com/harmony-one/harmony/bin/harmony
+            go/src/github.com/harmony-one/harmony/bin/bootnode
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 6
 
   go-checker:
     name: Run unit tests
@@ -84,7 +94,6 @@ jobs:
       - *setup-go
       - *build-mcl
       - *build-bls
-      - *build-harmony
 
       - name: Install tools
         run: |
@@ -100,6 +109,7 @@ jobs:
 
   rpc-checker:
     name: Run RPC integration tests
+    needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -109,7 +119,24 @@ jobs:
       - *setup-go
       - *build-mcl
       - *build-bls
-      - *build-harmony
+
+      - &download-harmony-binaries
+        name: Download and extract harmony binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c #v8.0.1
+        with:
+          name: harmony-binaries
+          path: go/src/github.com/harmony-one/harmony/bin
+
+      - &prepare-harmony-binaries
+        name: Prepare harmony binaries
+        run: |
+          set -euo pipefail
+
+          chmod +x go/src/github.com/harmony-one/harmony/bin/harmony
+          chmod +x go/src/github.com/harmony-one/harmony/bin/bootnode
+
+          test -x go/src/github.com/harmony-one/harmony/bin/harmony
+          test -x go/src/github.com/harmony-one/harmony/bin/bootnode
 
       - &checkout-harmony-test
         name: Checkout harmony-test
@@ -133,6 +160,7 @@ jobs:
 
   pyhmy-checker:
     name: Run pyhmy tests
+    needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -142,7 +170,8 @@ jobs:
       - *setup-go
       - *build-mcl
       - *build-bls
-      - *build-harmony
+      - *download-harmony-binaries
+      - *prepare-harmony-binaries
       - *checkout-harmony-test
 
       - name: Run pyhmy checker
