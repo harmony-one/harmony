@@ -103,6 +103,7 @@ var (
 		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
 		SlashBallotSignerFixEpoch:             EpochTBD,
+		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -174,6 +175,7 @@ var (
 		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
 		SlashBallotSignerFixEpoch:             EpochTBD,
+		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -244,6 +246,7 @@ var (
 		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
 		SlashBallotSignerFixEpoch:             EpochTBD,
+		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -316,6 +319,7 @@ var (
 		CXReceiptStateRollbackEpoch:           big.NewInt(52650),
 		ShardStateValidationEpoch:             big.NewInt(52650),
 		SlashBallotSignerFixEpoch:             big.NewInt(52650),
+		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -387,6 +391,7 @@ var (
 		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
 		SlashBallotSignerFixEpoch:             EpochTBD,
+		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -457,6 +462,7 @@ var (
 		SlashGroupOrderFixEpoch:               big.NewInt(2),
 		BLSProofBindEpoch:                     EpochTBD,
 		SlashBallotSignerFixEpoch:             big.NewInt(2),
+		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -530,6 +536,7 @@ var (
 		big.NewInt(1),                      // SlashGroupOrderFixEpoch
 		big.NewInt(0),                      // BLSProofBindEpoch
 		big.NewInt(1),                      // SlashBallotSignerFixEpoch
+		big.NewInt(1),                      // VerifyBeaconHeaderSlashEpoch
 	}
 
 	// TestChainConfig ...
@@ -603,6 +610,7 @@ var (
 		big.NewInt(1),        // SlashGroupOrderFixEpoch
 		EpochTBD,             // BLSProofBindEpoch
 		big.NewInt(1),        // SlashBallotSignerFixEpoch
+		big.NewInt(1),        // VerifyBeaconHeaderSlashEpoch
 	}
 
 	// TestRules ...
@@ -855,6 +863,10 @@ type ChainConfig struct {
 	// signatures against that intersection only. Until set to a concrete epoch on
 	// a network, EpochTBD leaves the rule inactive there.
 	SlashBallotSignerFixEpoch *big.Int `json:"slash-ballot-signer-fix-epoch,omitempty"`
+	// VerifyBeaconHeaderSlashEpoch is the first epoch where beacon header slash
+	// records are validated before block finalization. Until set to a concrete
+	// epoch on a network, EpochTBD leaves the rule inactive there.
+	VerifyBeaconHeaderSlashEpoch *big.Int `json:"verify-beacon-header-slash-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -939,6 +951,8 @@ func (c *ChainConfig) mustValid() {
 		"must satisfy: SlashGroupOrderFixEpoch >= StakingEpoch")
 	require(c.SlashBallotSignerFixEpoch == nil || c.SlashBallotSignerFixEpoch.Cmp(c.StakingEpoch) >= 0,
 		"must satisfy: SlashBallotSignerFixEpoch >= StakingEpoch")
+	require(c.VerifyBeaconHeaderSlashEpoch == nil || c.VerifyBeaconHeaderSlashEpoch.Cmp(c.StakingEpoch) >= 0,
+		"must satisfy: VerifyBeaconHeaderSlashEpoch >= StakingEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -1239,6 +1253,12 @@ func (c *ChainConfig) IsBLSProofBind(epoch *big.Int) bool {
 // signer key rules during double-sign evidence checks.
 func (c *ChainConfig) IsSlashBallotSignerFix(epoch *big.Int) bool {
 	return isForked(c.SlashBallotSignerFixEpoch, epoch)
+}
+
+// IsVerifyBeaconHeaderSlash returns whether beacon header slash records must
+// pass validation before block finalization for the given epoch.
+func (c *ChainConfig) IsVerifyBeaconHeaderSlash(epoch *big.Int) bool {
+	return isForked(c.VerifyBeaconHeaderSlashEpoch, epoch)
 }
 
 func (c *ChainConfig) IsHIP32(epoch *big.Int) bool {

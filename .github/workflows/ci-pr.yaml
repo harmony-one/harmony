@@ -19,9 +19,18 @@ concurrency:
 
 jobs:
   build:
-    name: Build harmony/bootnode binary
-    runs-on: ubuntu-24.04
+    name: Build harmony/bootnode binary (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    strategy: &arch-matrix
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+
     steps:
       - &checkout-harmony
         name: Checkout harmony
@@ -53,28 +62,32 @@ jobs:
 
       - &setup-go
         name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c #v6.4.0
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 #v6.5.0
         with:
           go-version: '1.24.2'
           cache-dependency-path: go/src/github.com/harmony-one/harmony/go.sum
 
-      - &build-mcl
-        name: Build mcl
-        run: make -j4
-        working-directory: go/src/github.com/harmony-one/mcl
-
-      - &build-bls
-        name: Build bls
-        run: make BLS_SWAP_G=1 -j4
-        working-directory: go/src/github.com/harmony-one/bls
-
-      - &build-harmony
-        name: Build harmony
-        run: make
+      - name: Build harmony
+        run: make linux_static
         working-directory: go/src/github.com/harmony-one/harmony
+
+      - name: Upload harmony binaries artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+        with:
+          name: harmony-binaries-${{ matrix.arch }}
+          path: |
+            go/src/github.com/harmony-one/harmony/bin/harmony
+            go/src/github.com/harmony-one/harmony/bin/bootnode
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 6
 
   go-checker:
     name: Run unit tests
+    needs: build
+    # TODO:@mur-me for now only amd64, in the future
+    # frozen621/harmony-proto:latest shouldn't be used and
+    # build-docker-proto-image.yaml should cover it
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -82,16 +95,17 @@ jobs:
       - *checkout-mcl
       - *checkout-bls
       - *setup-go
-      - *build-mcl
-      - *build-bls
-      - *build-harmony
-
+      - name: Build mcl
+        run: make -j4
+        working-directory: go/src/github.com/harmony-one/mcl
+      - name: Build bls
+        run: make BLS_SWAP_G=1 -j4
+        working-directory: go/src/github.com/harmony-one/bls
       - name: Install tools
         run: |
           go install golang.org/x/tools/cmd/goimports@v0.30.0
           go install github.com/fjl/gencodec@v0.1.1
         working-directory: go/src/github.com/harmony-one/harmony
-
       - name: Run go checker
         run: |
           make go-get
@@ -99,17 +113,30 @@ jobs:
         working-directory: go/src/github.com/harmony-one/harmony
 
   rpc-checker:
-    name: Run RPC integration tests
-    runs-on: ubuntu-24.04
+    name: Run RPC integration tests (${{ matrix.arch }})
+    needs: build
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    strategy: *arch-matrix
     steps:
       - *checkout-harmony
-      - *checkout-mcl
-      - *checkout-bls
-      - *setup-go
-      - *build-mcl
-      - *build-bls
-      - *build-harmony
+      - &download-harmony-binaries
+        name: Download and extract harmony binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c #v8.0.1
+        with:
+          name: harmony-binaries-${{ matrix.arch }}
+          path: go/src/github.com/harmony-one/harmony/bin
+
+      - &prepare-harmony-binaries
+        name: Prepare harmony binaries
+        run: |
+          set -euo pipefail
+
+          chmod +x go/src/github.com/harmony-one/harmony/bin/harmony
+          chmod +x go/src/github.com/harmony-one/harmony/bin/bootnode
+
+          test -x go/src/github.com/harmony-one/harmony/bin/harmony
+          test -x go/src/github.com/harmony-one/harmony/bin/bootnode
 
       - &checkout-harmony-test
         name: Checkout harmony-test
@@ -123,7 +150,6 @@ jobs:
 
       - name: Run RPC checker
         run: |
-          make go-get
           bash ./scripts/travis_rpc_checker.sh
         working-directory: go/src/github.com/harmony-one/harmony
         env: &travis-pr-env
@@ -132,22 +158,27 @@ jobs:
           TRAVIS_BRANCH: ${{ github.ref_name }}
 
   pyhmy-checker:
-    name: Run pyhmy tests
-    runs-on: ubuntu-24.04
+    name: Run pyhmy tests (${{ matrix.arch }})
+    needs: build
+    # TODO:@mur-me for now only amd64, in the future
+    # we need to rewrite https://github.com/harmony-one/go-sdk/blob/master/.github/workflows/hmybuild.yml to cover arm64
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: amd64
     steps:
       - *checkout-harmony
-      - *checkout-mcl
       - *checkout-bls
-      - *setup-go
-      - *build-mcl
-      - *build-bls
-      - *build-harmony
+      - *download-harmony-binaries
+      - *prepare-harmony-binaries
       - *checkout-harmony-test
 
       - name: Run pyhmy checker
         run: |
-          make go-get
           bash ./scripts/travis_pyhmy_checker.sh
         working-directory: go/src/github.com/harmony-one/harmony
         env: *travis-pr-env
