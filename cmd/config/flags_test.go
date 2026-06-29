@@ -383,11 +383,11 @@ func TestNetworkFlags(t *testing.T) {
 			},
 		},
 		{
-			args: []string{"--network", "stk", "--bootnodes", "1,2,3,4", "--dns.zone", "8.8.8.8",
+			args: []string{"--network", "stn", "--bootnodes", "1,2,3,4", "--dns.zone", "8.8.8.8",
 				"--dns.port", "9001", "--dns.server-port", "9002"},
 			expConfig: harmonyconfig.HarmonyConfig{
 				Network: harmonyconfig.NetworkConfig{
-					NetworkType: "pangaea",
+					NetworkType: "stressnet",
 					BootNodes:   []string{"1", "2", "3", "4"},
 				},
 				DNSSync: harmonyconfig.DnsSync{
@@ -399,18 +399,18 @@ func TestNetworkFlags(t *testing.T) {
 			},
 		},
 		{
-			args: []string{"--network_type", "stk", "--bootnodes", "1,2,3,4", "--dns_zone", "8.8.8.8",
+			args: []string{"--network_type", "stn", "--bootnodes", "1,2,3,4", "--dns_zone", "8.8.8.8",
 				"--dns_port", "9001"},
 			expConfig: harmonyconfig.HarmonyConfig{
 				Network: harmonyconfig.NetworkConfig{
-					NetworkType: "pangaea",
+					NetworkType: "stressnet",
 					BootNodes:   []string{"1", "2", "3", "4"},
 				},
 				DNSSync: harmonyconfig.DnsSync{
 					Port:       9001,
 					Zone:       "8.8.8.8",
 					Server:     true,
-					ServerPort: nodeconfig.GetDefaultDNSPort(nodeconfig.Pangaea),
+					ServerPort: nodeconfig.GetDefaultDNSPort(nodeconfig.Stressnet),
 				},
 			},
 		},
