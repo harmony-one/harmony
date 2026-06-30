@@ -447,7 +447,7 @@ func TestVerifyBLSKeys(t *testing.T) {
 		pubs := getPubsFromPairs(pairs, test.pubIndexes)
 		sigs := getSigsFromPairs(pairs, test.sigIndexes)
 
-		err := VerifyBLSKeys(pubs, sigs)
+		err := VerifyBLSKeys(pubs, sigs, validatorAddr, false)
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}
@@ -506,7 +506,7 @@ func TestCreateValidatorFromNewMsg(t *testing.T) {
 		cv := makeCreateValidator()
 		test.editCreateValidator(&cv)
 
-		v, err := CreateValidatorFromNewMsg(&cv, common.Big1, common.Big1)
+		v, err := CreateValidatorFromNewMsg(&cv, common.Big1, common.Big1, false)
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}
@@ -673,7 +673,7 @@ func TestUpdateValidatorFromEditMsg(t *testing.T) {
 	for i, test := range tests {
 		val := makeValidValidator()
 
-		err := UpdateValidatorFromEditMsg(&val, &test.editValidator, common.Big0)
+		err := UpdateValidatorFromEditMsg(&val, &test.editValidator, common.Big0, false)
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}

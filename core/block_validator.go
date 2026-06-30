@@ -227,6 +227,14 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 			"[ValidateCXReceiptsProof] BlockHash or OutgoingReceiptHash not match in block Header",
 		)
 	}
+	if v.bc.Config().IsCXMerkleProofReplayFixEpoch(cxp.Header.Epoch()) {
+		if cxp.Header.Number().Cmp(merkleProof.BlockNum) != 0 ||
+			cxp.Header.ShardID() != merkleProof.ShardID {
+			return errors.New(
+				"[ValidateCXReceiptsProof] BlockNum or ShardID not match in block Header",
+			)
+		}
+	}
 
 	// (4) verify blockHeader with seal
 	var commitSig bls.SerializedSignature

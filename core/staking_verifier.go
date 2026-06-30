@@ -29,9 +29,24 @@ var (
 	errBlockNumMissing     = errors.New("no block number was provided")
 )
 
+func checkValidatorWrapperAddressBinding(
+	chainConfig *params.ChainConfig,
+	epoch *big.Int,
+	accountAddr common.Address,
+	wrapper *staking.ValidatorWrapper,
+) error {
+	if chainConfig != nil &&
+		chainConfig.IsValidatorWrapperAddressBind(epoch) &&
+		wrapper.Address != accountAddr {
+		return staking.ErrValidatorWrapperAddressMismatch
+	}
+	return nil
+}
+
 func checkDuplicateFields(
 	addrs []common.Address, state vm.StateDB,
 	validator common.Address, identity string, blsKeys []bls.SerializedPublicKey,
+	checkSameBlock bool,
 ) error {
 	checkIdentity := identity != ""
 	checkBlsKeys := len(blsKeys) != 0
@@ -41,22 +56,47 @@ func checkDuplicateFields(
 		blsKeyMap[key] = struct{}{}
 	}
 
+	checked := map[common.Address]struct{}{}
+	checkAddr := func(addr common.Address) error {
+		if bytes.Equal(validator.Bytes(), addr.Bytes()) {
+			return nil
+		}
+		wrapper, err := state.ValidatorWrapper(addr, true, false)
+		if err != nil {
+			return err
+		}
+
+		if checkIdentity && wrapper.Identity == identity {
+			return errors.Wrapf(errDupIdentity, "duplicate identity %s", identity)
+		}
+		if checkBlsKeys {
+			for _, existingKey := range wrapper.SlotPubKeys {
+				if _, ok := blsKeyMap[existingKey]; ok {
+					return errors.Wrapf(errDupBlsKey, "duplicate bls key %x", existingKey)
+				}
+			}
+		}
+		return nil
+	}
+
 	for _, addr := range addrs {
-		if !bytes.Equal(validator.Bytes(), addr.Bytes()) {
-			wrapper, err := state.ValidatorWrapper(addr, true, false)
+		checked[addr] = struct{}{}
+		if err := checkAddr(addr); err != nil {
+			return err
+		}
+	}
 
-			if err != nil {
-				return err
-			}
-
-			if checkIdentity && wrapper.Identity == identity {
-				return errors.Wrapf(errDupIdentity, "duplicate identity %s", identity)
-			}
-			if checkBlsKeys {
-				for _, existingKey := range wrapper.SlotPubKeys {
-					if _, ok := blsKeyMap[existingKey]; ok {
-						return errors.Wrapf(errDupBlsKey, "duplicate bls key %x", existingKey)
-					}
+	if checkSameBlock {
+		if lister, ok := state.(interface {
+			CachedValidatorAddresses() []common.Address
+		}); ok {
+			for _, addr := range lister.CachedValidatorAddresses() {
+				if _, ok := checked[addr]; ok {
+					continue
+				}
+				checked[addr] = struct{}{}
+				if err := checkAddr(addr); err != nil {
+					return err
 				}
 			}
 		}
@@ -98,17 +138,20 @@ func VerifyAndCreateValidatorFromMsg(
 	if err != nil {
 		return nil, err
 	}
+	bindBLSProof := chainContext.Config().IsBLSProofBind(epoch)
 	if err := checkDuplicateFields(
 		addrs, stateDB,
 		msg.ValidatorAddress,
 		msg.Identity,
-		msg.SlotPubKeys); err != nil {
+		msg.SlotPubKeys,
+		bindBLSProof,
+	); err != nil {
 		return nil, err
 	}
 	if !CanTransfer(stateDB, msg.ValidatorAddress, msg.Amount) {
 		return nil, errInsufficientBalanceForStake
 	}
-	v, err := staking.CreateValidatorFromNewMsg(msg, blockNum, epoch)
+	v, err := staking.CreateValidatorFromNewMsg(msg, blockNum, epoch, bindBLSProof)
 	if err != nil {
 		return nil, err
 	}
@@ -154,11 +197,14 @@ func VerifyAndEditValidatorFromMsg(
 	if err != nil {
 		return nil, err
 	}
+	bindBLSProof := chainContext.Config().IsBLSProofBind(epoch)
 	if err := checkDuplicateFields(
 		addrs, stateDB,
 		msg.ValidatorAddress,
 		msg.Identity,
-		newBlsKeys); err != nil {
+		newBlsKeys,
+		bindBLSProof,
+	); err != nil {
 		return nil, err
 	}
 	// request a copy, but delegations are not being changed so do not deep copy them
@@ -166,7 +212,7 @@ func VerifyAndEditValidatorFromMsg(
 	if err != nil {
 		return nil, err
 	}
-	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, msg, epoch); err != nil {
+	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, msg, epoch, bindBLSProof); err != nil {
 		return nil, err
 	}
 	newRate := wrapper.Validator.Rate
@@ -265,6 +311,11 @@ func VerifyAndDelegateFromMsg(
 			if err != nil {
 				return nil, nil, nil, err
 			}
+			if err := checkValidatorWrapperAddressBinding(
+				chainConfig, epoch, delegationIndex.ValidatorAddress, wrapper,
+			); err != nil {
+				return nil, nil, nil, err
+			}
 			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
 				utils.Logger().Warn().
 					Str("validator", delegationIndex.ValidatorAddress.String()).
@@ -315,6 +366,11 @@ func VerifyAndDelegateFromMsg(
 		// request a copy, and since delegations will be changed, copy them too
 		delegateeWrapper, err = stateDB.ValidatorWrapper(msg.ValidatorAddress, false, true)
 		if err != nil {
+			return nil, nil, nil, err
+		}
+		if err := checkValidatorWrapperAddressBinding(
+			chainConfig, epoch, msg.ValidatorAddress, delegateeWrapper,
+		); err != nil {
 			return nil, nil, nil, err
 		}
 		updatedValidatorWrappers = append(updatedValidatorWrappers, delegateeWrapper)

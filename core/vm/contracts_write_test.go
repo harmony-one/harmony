@@ -263,6 +263,67 @@ func TestCrossShardXferPrecompile(t *testing.T) {
 	}
 }
 
+func TestCrossShardXferReceiptRevertedWithCreate(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+	stateCache := state.NewDatabase(db)
+	statedb, err := state.New(common.Hash{}, stateCache, nil)
+	require.NoError(t, err)
+
+	var env = NewEVM(BlockContext{
+		EpochNumber: big.NewInt(1),
+		NumShards:   2,
+		Transfer: func(db StateDB, sender, recipient common.Address, amount *big.Int, txType types.TransactionType) {
+		},
+		CanTransfer: func(_ StateDB, _ common.Address, _ *big.Int) bool {
+			return true
+		},
+		IsValidator: func(_ StateDB, _ common.Address) bool {
+			return false
+		},
+	}, TxContext{}, statedb, params.AllProtocolChanges, Config{})
+
+	ret, _, _, err := env.Create(
+		AccountRef(common.HexToAddress("0x1337")),
+		crossShardXferThenRevertInitCode(CrossShardXferPrecompileTests[0].input, CrossShardXferPrecompileTests[0].value),
+		10_000_000,
+		CrossShardXferPrecompileTests[0].value,
+	)
+
+	require.ErrorIs(t, err, ErrExecutionReverted)
+	require.Empty(t, ret)
+	require.Nil(t, env.CXReceipt, "reverted constructor must not leak cross-shard receipt")
+}
+
+func crossShardXferThenRevertInitCode(input []byte, value *big.Int) []byte {
+	code := make([]byte, 0, 128)
+	for offset := 0; offset < len(input); offset += 32 {
+		chunk := make([]byte, 32)
+		copy(chunk, input[offset:])
+		code = append(code, byte(PUSH32))
+		code = append(code, chunk...)
+		code = append(code, byte(PUSH1), byte(offset), byte(MSTORE))
+	}
+	valueBytes := value.Bytes()
+	code = append(code,
+		byte(PUSH1), 0x00, // out size
+		byte(PUSH1), 0x00, // out offset
+		byte(PUSH1), byte(len(input)), // input size
+		byte(PUSH1), 0x00, // input offset
+		byte(PUSH1)+byte(len(valueBytes))-1,
+	)
+	code = append(code, valueBytes...)
+	code = append(code,
+		byte(PUSH1), 0xf9, // cross-shard precompile
+		byte(PUSH2), 0x27, 0x10, // gas
+		byte(CALL),
+		byte(POP),
+		byte(PUSH1), 0x00,
+		byte(PUSH1), 0x00,
+		byte(REVERT),
+	)
+	return code
+}
+
 var CrossShardXferPrecompileTests = []writeCapablePrecompileTest{
 	{
 		input:    []byte{40, 72, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165, 36, 21, 19, 218, 159, 68, 99, 241, 212, 135, 75, 84, 141, 251, 172, 41, 217, 31, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},

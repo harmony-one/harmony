@@ -1,0 +1,8 @@
+# Ignore everything in the Docker build context.
+*
+
+# Keep only files required to run the build.
+!Dockerfile.release
+!.dockerignore
+!harmony-amd64
+!harmony-arm64

@@ -48,4 +48,4 @@ cd localnet
 docker build --build-arg MAIN_REPO_BRANCH="${MAIN_REPO_BRANCH}" --progress plain \
     --build-arg MAIN_REPO_ORG="${MAIN_REPO_ORG}" -t harmonyone/localnet-test .
 # WARN: this is the place where LOCAL repository is provided to the harmony-tests repo
-docker run -v "$DIR/../:/go/src/github.com/harmony-one/harmony" harmonyone/localnet-test -r
+docker run -v "$DIR/../:/go/src/github.com/harmony-one/harmony" harmonyone/localnet-test -B -r

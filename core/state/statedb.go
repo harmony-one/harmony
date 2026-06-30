@@ -118,6 +118,9 @@ type DB struct {
 	// Transient storage
 	transientStorage transientStorage
 
+	// validatorWrapperAddressBind requires wrapper.Address == account on load/store.
+	validatorWrapperAddressBind bool
+
 	// Journal of state modifications. This is the backbone of
 	// Snapshot and RevertToSnapshot.
 	journal        *journal
@@ -1276,6 +1279,24 @@ var (
 	ErrAddressNotPresent = errors.New("address not present in state")
 )
 
+// SetValidatorWrapperAddressBind enables binding checks for validator wrapper load/store.
+func (db *DB) SetValidatorWrapperAddressBind(enabled bool) {
+	db.validatorWrapperAddressBind = enabled
+}
+
+// CachedValidatorAddresses returns validator addresses loaded or updated in the
+// current state transition. Used to detect duplicate BLS keys among validators
+// created earlier in the same block.
+func (db *DB) CachedValidatorAddresses() []common.Address {
+	addrs := make([]common.Address, 0, len(db.stateValidators))
+	for addr := range db.stateValidators {
+		if db.IsValidator(addr) {
+			addrs = append(addrs, addr)
+		}
+	}
+	return addrs
+}
+
 // ValidatorWrapper retrieves the existing validator in the cache, if sendOriginal
 // else it will return a copy of the wrapper - which needs to be explicitly committed
 // with UpdateValidatorWrapper.
@@ -1310,6 +1331,9 @@ func (db *DB) ValidatorWrapper(
 			common2.MustAddressToBech32(addr),
 		)
 	}
+	if db.validatorWrapperAddressBind && val.Address != addr {
+		return nil, stk.ErrValidatorWrapperAddressMismatch
+	}
 	// populate cache because the validator is not in it
 	db.stateValidators[addr] = &val
 	return copyValidatorWrapperIfNeeded(&val, sendOriginal, copyDelegations), nil
@@ -1338,6 +1362,9 @@ func copyValidatorWrapperIfNeeded(
 func (db *DB) UpdateValidatorWrapper(
 	addr common.Address, val *stk.ValidatorWrapper,
 ) error {
+	if db.validatorWrapperAddressBind && val.Address != addr {
+		return stk.ErrValidatorWrapperAddressMismatch
+	}
 	if err := val.SanityCheck(); err != nil {
 		return err
 	}

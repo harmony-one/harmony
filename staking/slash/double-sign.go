@@ -91,6 +91,10 @@ var (
 	errSlashFromFutureEpoch     = errors.New("cannot have slash from future epoch")
 	errSlashBeforeStakingEpoch  = errors.New("cannot have slash before staking epoch")
 	errSlashBlockNoConflict     = errors.New("cannot slash for signing on non-conflicting blocks")
+	errSlashEpochHeightMismatch = errors.New("slash evidence epoch does not match block height epoch")
+	// ErrSlashEpochHeightMismatch is returned when slash evidence epoch disagrees with its block height.
+	ErrSlashEpochHeightMismatch = errSlashEpochHeightMismatch
+	errSlashExtraBallotKeys     = errors.New("slash ballot signer keys do not match double-sign intersection")
 )
 
 // MarshalJSON ..
@@ -175,6 +179,15 @@ func Verify(
 		)
 	}
 
+	heightEpoch := shard.Schedule.CalcEpochNumber(candidate.Evidence.Height)
+	if candidate.Evidence.Epoch.Cmp(heightEpoch) != 0 {
+		return errors.Wrapf(
+			errSlashEpochHeightMismatch,
+			"evidence-epoch %v height %v maps to epoch %v",
+			candidate.Evidence.Epoch, candidate.Evidence.Height, heightEpoch,
+		)
+	}
+
 	superCommittee, err := chain.ReadShardState(candidate.Evidence.Epoch)
 
 	if err != nil {
@@ -227,6 +240,7 @@ func Verify(
 		)
 	}
 
+	useSlashBallotSignerFix := chain.Config().IsSlashBallotSignerFix(candidate.Evidence.Epoch)
 	for _, ballot := range [...]Vote{
 		candidate.Evidence.FirstVote,
 		candidate.Evidence.SecondVote,
@@ -239,7 +253,15 @@ func Verify(
 			return err
 		}
 
-		for _, pubKey := range ballot.SignerPubKeys {
+		verifyKeys := ballot.SignerPubKeys
+		if useSlashBallotSignerFix {
+			if len(ballot.SignerPubKeys) != len(doubleSignKeys) {
+				return errSlashExtraBallotKeys
+			}
+			verifyKeys = doubleSignKeys
+		}
+
+		for _, pubKey := range verifyKeys {
 			publicKeyObj, err := bls.BytesToBLSPublicKey(pubKey[:])
 
 			if err != nil {
@@ -362,10 +384,11 @@ func delegatorSlashApply(
 	rewardBeneficiary common.Address,
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
+	useSlashExternalStakeDenomFix bool,
 ) error {
 	// First delegation is validator's own stake
 	validatorDebt := new(big.Int).Div(snapshot.Delegations[0].Amount, common.Big2)
-	return delegatorSlashApplyDebt(snapshot, current, state, validatorDebt, rewardBeneficiary, doubleSignEpoch, slashTrack)
+	return delegatorSlashApplyDebt(snapshot, current, state, validatorDebt, rewardBeneficiary, doubleSignEpoch, slashTrack, useSlashExternalStakeDenomFix)
 }
 
 // delegatorSlashApply applies slashing to all delegators including the validator.
@@ -378,10 +401,15 @@ func delegatorSlashApplyDebt(
 	rewardBeneficiary common.Address,
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
+	useSlashExternalStakeDenomFix bool,
 ) error {
 	slashIndexPairs, totalStake := makeSlashList(snapshot, current)
 	validatorDelegation := &current.Delegations[0]
-	totalExternalStake := new(big.Int).Sub(totalStake, validatorDelegation.Amount)
+	selfStakeForExternalDenom := validatorDelegation.Amount
+	if useSlashExternalStakeDenomFix {
+		selfStakeForExternalDenom = snapshot.Delegations[0].Amount
+	}
+	totalExternalStake := new(big.Int).Sub(totalStake, selfStakeForExternalDenom)
 	validatorSlashed := applySlashingToDelegation(validatorDelegation, state, rewardBeneficiary, doubleSignEpoch, validatorDebt)
 	totalSlahsed := new(big.Int).Set(validatorSlashed)
 	// External delegators
@@ -445,11 +473,13 @@ func applySlashingToDelegation(delegation *staking.Delegation, state *state.DB, 
 func Apply(
 	chain staking.ValidatorSnapshotReader, state *state.DB,
 	slashes Records, rewardBeneficiary common.Address,
+	useSlashExternalStakeDenomFix bool,
 ) (*Application, error) {
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 	for _, slash := range slashes {
+		slashEpoch := shard.Schedule.CalcEpochNumber(slash.Evidence.Height)
 		snapshot, err := chain.ReadValidatorSnapshotAtEpoch(
-			slash.Evidence.Epoch,
+			slashEpoch,
 			slash.Evidence.Offender,
 		)
 
@@ -471,6 +501,7 @@ func Apply(
 		if err := delegatorSlashApply(
 			snapshot.Validator, current, state,
 			rewardBeneficiary, slash.Evidence.Epoch, slashDiff,
+			useSlashExternalStakeDenomFix,
 		); err != nil {
 			return nil, err
 		}
