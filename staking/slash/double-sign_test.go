@@ -18,6 +18,7 @@ import (
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -41,11 +42,14 @@ var (
 
 const (
 	// validator creation parameters
-	doubleSignShardID     = 0
-	doubleSignEpoch       = 4
-	doubleSignBlockNumber = 37
-	doubleSignViewID      = 38
+	doubleSignShardID = 0
+	doubleSignEpoch   = 4
+	doubleSignViewID  = 38
+)
 
+var doubleSignBlockNumber = shardingconfig.MainnetSchedule.EpochLastBlock(doubleSignEpoch-1) + 1
+
+const (
 	creationHeight  = 33
 	lastEpochInComm = 5
 	currentEpoch    = 5
@@ -75,6 +79,96 @@ var (
 	leaderAddr   = makeTestAddress("leader")
 	reporterAddr = makeTestAddress("reporter")
 )
+
+func TestVerifyRejectsExtraBallotSignerKeys(t *testing.T) {
+	record := extraBallotSignerSlashRecord(t)
+	sdb := defaultTestStateDB()
+	chain := defaultFakeBlockChain()
+
+	err := Verify(chain, sdb, &record)
+	if err == nil {
+		t.Fatal("expected slash with mismatched ballot signer keys to be rejected")
+	}
+	if !strings.Contains(err.Error(), errSlashExtraBallotKeys.Error()) &&
+		!strings.Contains(err.Error(), errFailVerifySlash.Error()) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVerifyExtraBallotSignerKeysBackwardCompat(t *testing.T) {
+	record := extraBallotSignerSlashRecord(t)
+	sdb := defaultTestStateDB()
+	chain := defaultFakeBlockChain()
+	chain.config.SlashBallotSignerFixEpoch = params.EpochTBD
+
+	if err := Verify(chain, sdb, &record); err != nil {
+		t.Fatalf("legacy slash verify should accept aggregated-key proof before fork: %v", err)
+	}
+}
+
+func extraBallotSignerSlashRecord(t *testing.T) Record {
+	t.Helper()
+
+	attacker1 := genKeyPair()
+	attacker2 := genKeyPair()
+	extra1 := subtractBLSPublicKeys(t, attacker1.pub, offKey.pub)
+	extra2 := subtractBLSPublicKeys(t, attacker2.pub, offKey.pub)
+
+	firstVote := makeExtraBallotVote(t, attacker1, offPub, extra1, doubleSignBlock1)
+	secondVote := makeExtraBallotVote(t, attacker2, offPub, extra2, doubleSignBlock2)
+
+	return Record{
+		Evidence: Evidence{
+			ConflictingVotes: ConflictingVotes{
+				FirstVote:  firstVote,
+				SecondVote: secondVote,
+			},
+			Moment: Moment{
+				Epoch:   big.NewInt(doubleSignEpoch),
+				ShardID: doubleSignShardID,
+				Height:  doubleSignBlockNumber,
+				ViewID:  doubleSignViewID,
+			},
+			Offender: offAddr,
+		},
+		Reporter: reporterAddr,
+	}
+}
+
+func makeExtraBallotVote(
+	t *testing.T,
+	attacker blsKeyPair,
+	victimPub bls.SerializedPublicKey,
+	extraPub bls.SerializedPublicKey,
+	block *types.Block,
+) Vote {
+	t.Helper()
+
+	msg := consensus_sig.ConstructCommitPayload(
+		params.LocalnetChainConfig,
+		block.Epoch(),
+		block.Hash(),
+		block.Number().Uint64(),
+		block.Header().ViewID().Uint64(),
+	)
+	return Vote{
+		SignerPubKeys:   []bls.SerializedPublicKey{victimPub, extraPub},
+		BlockHeaderHash: block.Hash(),
+		Signature:       attacker.pri.SignHash(msg).Serialize(),
+	}
+}
+
+func subtractBLSPublicKeys(t *testing.T, minuendPub, subtrahendPub *bls_core.PublicKey) bls.SerializedPublicKey {
+	t.Helper()
+
+	diffPub := &bls_core.PublicKey{}
+	diffPub.Add(minuendPub)
+	diffPub.Sub(subtrahendPub)
+
+	var serialized bls.SerializedPublicKey
+	copy(serialized[:], diffPub.Serialize())
+	return serialized
+}
 
 func TestVerify(t *testing.T) {
 	tests := []struct {
@@ -166,7 +260,14 @@ func TestVerify(t *testing.T) {
 			// error from blockchain.ReadShardState (fakeChainErrEpoch)
 			r: func() Record {
 				r := defaultSlashRecord()
-				r.Evidence.Epoch = big.NewInt(currentEpoch)
+				epoch := int64(currentEpoch)
+				height := shardingconfig.MainnetSchedule.EpochLastBlock(uint64(epoch-1)) + 1
+				r.Evidence.Epoch = big.NewInt(epoch)
+				r.Evidence.Height = height
+				block1 := makeBlockForTestAt(epoch, height, 0)
+				block2 := makeBlockForTestAt(epoch, height, 1)
+				r.Evidence.FirstVote = makeVoteData(offKey, block1)
+				r.Evidence.SecondVote = makeVoteData(offKey, block2)
 				return r
 			}(),
 			sdb:   defaultTestStateDB(),
@@ -235,6 +336,18 @@ func TestVerify(t *testing.T) {
 			chain: defaultFakeBlockChain(),
 
 			expErr: errors.New("could not verify bls key signature on slash"),
+		},
+		{
+			// evidence epoch rebound to a later epoch with the same height
+			r: func() Record {
+				r := defaultSlashRecord()
+				r.Evidence.Epoch = big.NewInt(doubleSignEpoch + 1)
+				return r
+			}(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
+			expErr: errSlashEpochHeightMismatch,
 		},
 	}
 	for i, test := range tests {
@@ -927,10 +1040,14 @@ func makeTestAddress(item interface{}) common.Address {
 }
 
 func makeBlockForTest(epoch int64, index int) *types.Block {
+	return makeBlockForTestAt(epoch, doubleSignBlockNumber, index)
+}
+
+func makeBlockForTestAt(epoch int64, height uint64, index int) *types.Block {
 	h := blockfactory.NewTestHeader()
 
 	h.SetEpoch(big.NewInt(epoch))
-	h.SetNumber(big.NewInt(doubleSignBlockNumber))
+	h.SetNumber(new(big.Int).SetUint64(height))
 	h.SetViewID(big.NewInt(doubleSignViewID))
 	h.SetRoot(common.BigToHash(big.NewInt(int64(index))))
 

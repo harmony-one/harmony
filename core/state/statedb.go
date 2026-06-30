@@ -1284,6 +1284,19 @@ func (db *DB) SetValidatorWrapperAddressBind(enabled bool) {
 	db.validatorWrapperAddressBind = enabled
 }
 
+// CachedValidatorAddresses returns validator addresses loaded or updated in the
+// current state transition. Used to detect duplicate BLS keys among validators
+// created earlier in the same block.
+func (db *DB) CachedValidatorAddresses() []common.Address {
+	addrs := make([]common.Address, 0, len(db.stateValidators))
+	for addr := range db.stateValidators {
+		if db.IsValidator(addr) {
+			addrs = append(addrs, addr)
+		}
+	}
+	return addrs
+}
+
 // ValidatorWrapper retrieves the existing validator in the cache, if sendOriginal
 // else it will return a copy of the wrapper - which needs to be explicitly committed
 // with UpdateValidatorWrapper.

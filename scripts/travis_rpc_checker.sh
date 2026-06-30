@@ -47,4 +47,4 @@ git pull --rebase=true
 cd localnet
 "${DIR}/build_harmony_test_image.sh" "${MAIN_REPO_BRANCH}" "${MAIN_REPO_ORG}"
 # WARN: this is the place where LOCAL repository is provided to the harmony-tests repo
-docker run -v "$DIR/../:/go/src/github.com/harmony-one/harmony" harmonyone/localnet-test -n
+docker run -v "$DIR/../:/go/src/github.com/harmony-one/harmony" harmonyone/localnet-test -B -n

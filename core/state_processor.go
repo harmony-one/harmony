@@ -215,6 +215,13 @@ func (p *StateProcessor) Process(
 				"[Process] invalid beacon slash payload",
 			)
 		}
+		if err := checkBeaconHeaderSlashEvidence(
+			p.bc.Config(), p.bc, statedb, block.Epoch(), slashes,
+		); err != nil {
+			return nil, nil, nil, nil, 0, nil, statedb, errors.WithMessage(err,
+				"[Process] invalid beacon slash payload",
+			)
+		}
 	}
 
 	// incomingReceipts should always be processed

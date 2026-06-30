@@ -195,7 +195,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = checkDuplicateFields(addrs, test.sdb, test.validator, test.identity, test.pubs)
+		err = checkDuplicateFields(addrs, test.sdb, test.validator, test.identity, test.pubs, false)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)

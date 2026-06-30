@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	chain2 "github.com/harmony-one/harmony/internal/chain"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -28,10 +29,11 @@ import (
 )
 
 const (
-	slashTestEpoch       = int64(2)
-	slashTestBlockNumber = uint64(37)
-	slashTestViewID      = uint64(38)
+	slashTestEpoch  = int64(2)
+	slashTestViewID = uint64(38)
 )
+
+var slashTestBlockNumber = shardingconfig.MainnetSchedule.EpochLastBlock(uint64(slashTestEpoch-1)) + 1
 
 // TestVerifySlashes_RejectsReporterVariantDuplicateEvidence is a regression test for
 // bug07: duplicate evidence with different reporters must not reach successes.

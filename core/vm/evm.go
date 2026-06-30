@@ -283,6 +283,23 @@ func (evm *EVM) SetTxContext(txCtx TxContext) {
 	evm.TxContext = txCtx
 }
 
+func (evm *EVM) snapshotCXReceipt() *types.CXReceipt {
+	if !evm.chainRules.IsCXReceiptStateRollback {
+		return nil
+	}
+	if evm.CXReceipt == nil {
+		return nil
+	}
+	return evm.CXReceipt.Copy()
+}
+
+func (evm *EVM) restoreCXReceipt(receipt *types.CXReceipt) {
+	if !evm.chainRules.IsCXReceiptStateRollback {
+		return
+	}
+	evm.CXReceipt = receipt
+}
+
 // Call executes the contract associated with the addr with the given input as
 // parameters. It also handles any necessary value transfer required and takes
 // the necessary steps to create accounts and reverses the state in case of an
@@ -297,6 +314,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		return nil, gas, ErrInsufficientBalance
 	}
 	snapshot := evm.StateDB.Snapshot()
+	cxReceiptSnapshot := evm.snapshotCXReceipt()
 	p, isPrecompile := evm.precompile(addr)
 
 	if !evm.StateDB.Exist(addr) {
@@ -368,6 +386,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// when we're in homestead this also counts for code storage gas errors.
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
+		evm.restoreCXReceipt(cxReceiptSnapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -405,6 +424,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		return nil, gas, ErrInsufficientBalance
 	}
 	var snapshot = evm.StateDB.Snapshot()
+	cxReceiptSnapshot := evm.snapshotCXReceipt()
 
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Debug && evm.Config.Tracer != nil {
@@ -446,6 +466,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	}
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
+		evm.restoreCXReceipt(cxReceiptSnapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -464,6 +485,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 		return nil, gas, ErrDepth
 	}
 	var snapshot = evm.StateDB.Snapshot()
+	cxReceiptSnapshot := evm.snapshotCXReceipt()
 
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Debug && evm.Config.Tracer != nil {
@@ -491,6 +513,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	}
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
+		evm.restoreCXReceipt(cxReceiptSnapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -513,6 +536,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	// then certain tests start failing; stRevertTest/RevertPrecompiledTouchExactOOG.json.
 	// We could change this, but for now it's left for legacy reasons
 	var snapshot = evm.StateDB.Snapshot()
+	cxReceiptSnapshot := evm.snapshotCXReceipt()
 
 	// We do an AddBalance of zero here, just in order to trigger a touch.
 	// This doesn't matter on Mainnet, where all empties are gone at the time of Byzantium,
@@ -552,6 +576,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	}
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
+		evm.restoreCXReceipt(cxReceiptSnapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -598,6 +623,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	}
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()
+	cxReceiptSnapshot := evm.snapshotCXReceipt()
 	evm.StateDB.CreateAccount(address)
 	if evm.chainRules.IsEIP158 {
 		evm.StateDB.SetNonce(address, 1)
@@ -651,6 +677,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	// when we're in homestead this also counts for code storage gas errors.
 	if maxCodeSizeExceeded || (err != nil && (evm.chainRules.IsS3 || err != ErrCodeStoreOutOfGas)) {
 		evm.StateDB.RevertToSnapshot(snapshot)
+		evm.restoreCXReceipt(cxReceiptSnapshot)
 		if err != ErrExecutionReverted {
 			contract.UseGas(contract.Gas)
 		}

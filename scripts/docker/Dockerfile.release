@@ -1,0 +1,35 @@
+FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+
+ARG TARGETARCH
+
+ARG HARMONY_USER=harmony
+ARG HARMONY_USER_UID=1000
+ARG HARMONY_USER_GID=1000
+
+ENV HARMONY_HOME=/harmony
+ENV HOME=${HARMONY_HOME}
+
+# hadolint ignore=DL3018
+RUN apk add --no-cache bash bind-tools tini curl sed \
+    && addgroup -g "${HARMONY_USER_GID}" "${HARMONY_USER}" \
+    && adduser -u "${HARMONY_USER_UID}" -G "${HARMONY_USER}" --shell /sbin/nologin --no-create-home -D "${HARMONY_USER}" \
+    && addgroup "${HARMONY_USER}" tty \
+    && sed -i -e "s/bin\/sh/bin\/bash/" /etc/passwd \
+    && echo "[ ! -z \"\$TERM\" -a -r /etc/motd ] && cat /etc/motd" >> /etc/bash/bashrc
+
+WORKDIR ${HARMONY_HOME}
+
+COPY "harmony-${TARGETARCH}" /usr/local/bin/harmony
+
+RUN chmod +x /usr/local/bin/harmony \
+    && mkdir -p /data \
+    && chown -R "${HARMONY_USER_UID}:${HARMONY_USER_GID}" "${HARMONY_HOME}" /data
+
+VOLUME /data
+
+USER ${HARMONY_USER_UID}:${HARMONY_USER_GID}
+
+EXPOSE 9000/tcp 9500/tcp 9800/tcp 6000/tcp
+
+ENTRYPOINT ["tini", "--"]
+CMD ["harmony", "-c", "harmony.conf"]

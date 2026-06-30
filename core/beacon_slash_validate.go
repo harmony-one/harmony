@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -37,6 +38,26 @@ func checkBeaconSlashEvidenceUniqueness(cfg *params.ChainConfig, epoch *big.Int,
 		}
 		seen[h] = struct{}{}
 		seen[sh] = struct{}{}
+	}
+	return nil
+}
+
+// checkBeaconHeaderSlashEvidence validates decoded beacon header slash records
+// before finalization when the chain schedule enables the rule.
+func checkBeaconHeaderSlashEvidence(
+	cfg *params.ChainConfig,
+	chain slash.CommitteeReader,
+	statedb *state.DB,
+	epoch *big.Int,
+	records slash.Records,
+) error {
+	if cfg == nil || !cfg.IsVerifyBeaconHeaderSlash(epoch) || len(records) == 0 {
+		return nil
+	}
+	for i := range records {
+		if err := slash.Verify(chain, statedb, &records[i]); err != nil {
+			return errInvalidBeaconSlashPayload
+		}
 	}
 	return nil
 }

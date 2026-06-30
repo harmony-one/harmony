@@ -106,6 +106,23 @@ func TestApplySlashing(t *testing.T) {
 	}
 }
 
+func TestVerifyShardStateRejectsEmptyShardState(t *testing.T) {
+	chain := makeFakeBlockChain()
+	chain.superCommittee = shard.State{}
+	header := makeFakeHeader()
+
+	encodedEmptyState, err := shard.EncodeWrapper(shard.State{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	header.SetShardState(encodedEmptyState)
+
+	err = NewEngine().VerifyShardState(chain, chain, header)
+	if err == nil {
+		t.Fatal("expected empty shard state to be rejected")
+	}
+}
+
 //
 // Make slash record for testing
 //
@@ -373,7 +390,7 @@ func (bc *fakeBlockChain) ReadValidatorStats(addr common.Address) (*staking.Vali
 	return nil, nil
 }
 func (bc *fakeBlockChain) SuperCommitteeForNextEpoch(beacon engine.ChainReader, header *block.Header, isVerify bool) (*shard.State, error) {
-	return nil, nil
+	return &bc.superCommittee, nil
 }
 
 //

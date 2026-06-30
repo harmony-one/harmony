@@ -95,3 +95,18 @@ func TestCheckBeaconSlashEvidenceUniqueness_RejectsSwappedVoteEvidence(t *testin
 	require.ErrorIs(t, err, errInvalidBeaconSlashPayload)
 	require.Equal(t, evidenceHash, hash.FromRLPNew256(records[0].Evidence))
 }
+
+func TestCheckBeaconHeaderSlashEvidence_SkippedBeforeFork(t *testing.T) {
+	records, _ := reporterVariantSlashRecords(t)
+	cfg := params.MainnetChainConfig
+
+	err := checkBeaconHeaderSlashEvidence(cfg, nil, nil, big.NewInt(1_000_000), records)
+	require.NoError(t, err)
+}
+
+func TestCheckBeaconHeaderSlashEvidence_SkippedWhenEmpty(t *testing.T) {
+	cfg := params.TestChainConfig
+
+	err := checkBeaconHeaderSlashEvidence(cfg, nil, nil, big.NewInt(0), nil)
+	require.NoError(t, err)
+}

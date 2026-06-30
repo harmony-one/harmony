@@ -62,6 +62,18 @@ var (
 // JumpTable contains the EVM opcodes supported at a given fork.
 type JumpTable [256]*operation
 
+func copyJumpTable(jt *JumpTable) JumpTable {
+	var cpy JumpTable
+	for i, op := range jt {
+		if op == nil {
+			continue
+		}
+		opCopy := *op
+		cpy[i] = &opCopy
+	}
+	return cpy
+}
+
 func validate(jt JumpTable) JumpTable {
 	for i, op := range jt {
 		if op == nil {
