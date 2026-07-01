@@ -83,13 +83,11 @@ jobs:
           compression-level: 6
 
   go-checker:
-    name: Run unit tests
+    name: Run unit tests (${{ matrix.arch }})
     needs: build
-    # TODO:@mur-me for now only amd64, in the future
-    # frozen621/harmony-proto:latest shouldn't be used and
-    # build-docker-proto-image.yaml should cover it
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    strategy: *arch-matrix
     steps:
       - *checkout-harmony
       - *checkout-mcl
