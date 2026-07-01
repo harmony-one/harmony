@@ -160,16 +160,9 @@ jobs:
   pyhmy-checker:
     name: Run pyhmy tests (${{ matrix.arch }})
     needs: build
-    # TODO:@mur-me for now only amd64, in the future
-    # we need to rewrite https://github.com/harmony-one/go-sdk/blob/master/.github/workflows/hmybuild.yml to cover arm64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            arch: amd64
+    strategy: *arch-matrix
     steps:
       - *checkout-harmony
       - *checkout-bls
