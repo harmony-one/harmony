@@ -167,3 +167,145 @@ func TestAutoEIPActivationRespectsEpochBoundaries(t *testing.T) {
 		require.ErrorIs(t, err, ErrGasUintOverflow)
 	})
 }
+
+func TestJumpTableOpcodeEpochDecoupling(t *testing.T) {
+	base := &params.ChainConfig{
+		ChainID:       big.NewInt(1),
+		EIP155Epoch:   big.NewInt(0),
+		S3Epoch:       big.NewInt(0),
+		IstanbulEpoch: big.NewInt(0),
+	}
+
+	t.Run("7939-only", func(t *testing.T) {
+		cfg := *base
+		cfg.EIP7939CLZEpoch = big.NewInt(10)
+		evm := NewEVM(
+			BlockContext{EpochNumber: big.NewInt(10)},
+			TxContext{},
+			nil,
+			&cfg,
+			Config{},
+		)
+		jt := evm.interpreter.cfg.JumpTable
+		require.Equal(t, minStack(1, 1), jt[CLZ].minStack)
+		require.Equal(t, minStack(0, 0), jt[TLOAD].minStack)
+		require.Equal(t, minStack(0, 0), jt[MCOPY].minStack)
+	})
+
+	t.Run("1153-only", func(t *testing.T) {
+		cfg := *base
+		cfg.EIP1153TransientStorageEpoch = big.NewInt(10)
+		evm := NewEVM(
+			BlockContext{EpochNumber: big.NewInt(10)},
+			TxContext{},
+			nil,
+			&cfg,
+			Config{},
+		)
+		jt := evm.interpreter.cfg.JumpTable
+		require.Equal(t, minStack(1, 1), jt[TLOAD].minStack)
+		require.Equal(t, minStack(0, 0), jt[CLZ].minStack)
+		require.Equal(t, minStack(0, 0), jt[MCOPY].minStack)
+	})
+
+	t.Run("5656-only", func(t *testing.T) {
+		cfg := *base
+		cfg.EIP5656McopyEpoch = big.NewInt(10)
+		evm := NewEVM(
+			BlockContext{EpochNumber: big.NewInt(10)},
+			TxContext{},
+			nil,
+			&cfg,
+			Config{},
+		)
+		jt := evm.interpreter.cfg.JumpTable
+		require.Equal(t, minStack(3, 0), jt[MCOPY].minStack)
+		require.Equal(t, minStack(0, 0), jt[TLOAD].minStack)
+		require.Equal(t, minStack(0, 0), jt[CLZ].minStack)
+	})
+
+	t.Run("before-activation", func(t *testing.T) {
+		cfg := *base
+		cfg.EIP1153TransientStorageEpoch = big.NewInt(10)
+		cfg.EIP7939CLZEpoch = big.NewInt(10)
+		cfg.EIP5656McopyEpoch = big.NewInt(10)
+		evm := NewEVM(
+			BlockContext{EpochNumber: big.NewInt(9)},
+			TxContext{},
+			nil,
+			&cfg,
+			Config{},
+		)
+		jt := evm.interpreter.cfg.JumpTable
+		require.Equal(t, minStack(0, 0), jt[TLOAD].minStack)
+		require.Equal(t, minStack(0, 0), jt[CLZ].minStack)
+		require.Equal(t, minStack(0, 0), jt[MCOPY].minStack)
+	})
+}
+
+func assertOpcodeAvailability(
+	t *testing.T,
+	cfg *params.ChainConfig,
+	epoch int64,
+	want1153, wantCLZ, wantMCOPY bool,
+) {
+	t.Helper()
+	evm := NewEVM(
+		BlockContext{EpochNumber: big.NewInt(epoch)},
+		TxContext{},
+		nil,
+		cfg,
+		Config{},
+	)
+	jt := evm.interpreter.cfg.JumpTable
+	if want1153 {
+		require.Equal(t, minStack(1, 1), jt[TLOAD].minStack)
+	} else {
+		require.Equal(t, minStack(0, 0), jt[TLOAD].minStack)
+	}
+	if wantCLZ {
+		require.Equal(t, minStack(1, 1), jt[CLZ].minStack)
+	} else {
+		require.Equal(t, minStack(0, 0), jt[CLZ].minStack)
+	}
+	if wantMCOPY {
+		require.Equal(t, minStack(3, 0), jt[MCOPY].minStack)
+	} else {
+		require.Equal(t, minStack(0, 0), jt[MCOPY].minStack)
+	}
+}
+
+// TestTestnetEVMJumpTableMatchesDeployedBinary verifies opcode availability on
+// testnet epochs matches the prior bundled jump-table behavior that is live on
+// testnet today (CLZ bundled with EIP-1153 from epoch 6280; MCOPY from 7170).
+func TestTestnetEVMJumpTableMatchesDeployedBinary(t *testing.T) {
+	cfg := params.TestnetChainConfig
+
+	t.Run("before-1153", func(t *testing.T) {
+		assertOpcodeAvailability(t, cfg, 6279, false, false, false)
+	})
+	t.Run("1153-and-clz-era", func(t *testing.T) {
+		assertOpcodeAvailability(t, cfg, 6280, true, true, false)
+		assertOpcodeAvailability(t, cfg, 7169, true, true, false)
+	})
+	t.Run("mcopy-era", func(t *testing.T) {
+		assertOpcodeAvailability(t, cfg, 7170, true, true, true)
+	})
+}
+
+// TestDevnetEVMJumpTableMatchesDeployedBinary verifies the same deployed-binary
+// compatibility for devnet (PartnerChainConfig): CLZ from 35626, MCOPY from 49685.
+func TestDevnetEVMJumpTableMatchesDeployedBinary(t *testing.T) {
+	cfg := params.PartnerChainConfig
+
+	t.Run("before-1153", func(t *testing.T) {
+		assertOpcodeAvailability(t, cfg, 35625, false, false, false)
+	})
+	t.Run("1153-and-clz-era", func(t *testing.T) {
+		assertOpcodeAvailability(t, cfg, 35626, true, true, false)
+		assertOpcodeAvailability(t, cfg, 49684, true, true, false)
+	})
+	t.Run("mcopy-era", func(t *testing.T) {
+		assertOpcodeAvailability(t, cfg, 49685, true, true, true)
+	})
+}
