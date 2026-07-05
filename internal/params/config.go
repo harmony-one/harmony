@@ -42,13 +42,10 @@ var (
 		EIP155Epoch:                           big.NewInt(28),
 		S3Epoch:                               big.NewInt(28),
 		CrossTxEpoch:                          big.NewInt(28),
-		CXMerkleProofReplayFixEpoch:           EpochTBD,
-		CXReceiptStateRollbackEpoch:           EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(100),
 		ReceiptLogEpoch:                       big.NewInt(101),
 		PreStakingEpoch:                       big.NewInt(185),
 		CrossLinkEpoch:                        big.NewInt(186),
-		RejectShard0CrossLinkEpoch:            EpochTBD, // mainnet activation TBD (consensus hardfork)
 		StakingEpoch:                          big.NewInt(186),
 		QuickUnlockEpoch:                      big.NewInt(191),
 		FiveSecondsEpoch:                      big.NewInt(230),
@@ -80,13 +77,22 @@ var (
 		LeaderRotationInternalValidatorsEpoch: big.NewInt(2152), // 2024-10-31 13:02 UTC
 		LeaderRotationExternalValidatorsEpoch: big.NewInt(2152), // 2024-10-31 13:02 UTC
 		HIP32Epoch:                            big.NewInt(2152), // 2024-10-31 13:02 UTC
+		CXMerkleProofReplayFixEpoch:           big.NewInt(2959), // Bloom release
+		RejectShard0CrossLinkEpoch:            big.NewInt(2959), // Bloom release
+		DuplicateCrossLinkEpoch:               big.NewInt(2959), // Bloom release
+		ValidatorWrapperAddressBindEpoch:      big.NewInt(2959), // Bloom release
+		SlashExternalStakeDenomFixEpoch:       big.NewInt(2959), // Bloom release
+		RejectDuplicateSlashEvidenceEpoch:     big.NewInt(2959), // Bloom release
+		SlashGroupOrderFixEpoch:               big.NewInt(2959), // Bloom release
+		CXReceiptStateRollbackEpoch:           big.NewInt(2959), // Bloom release
+		ShardStateValidationEpoch:             big.NewInt(2959), // Bloom release
+		SlashBallotSignerFixEpoch:             big.NewInt(2959), // Bloom release
+		VerifyBeaconHeaderSlashEpoch:          big.NewInt(2959), // Bloom release
 		AllowlistEpoch:                        EpochTBD,
 		LeaderRotationV2Epoch:                 EpochTBD,
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  EpochTBD,
 		TimestampValidationEpoch:              EpochTBD,
-		DuplicateCrossLinkEpoch:               EpochTBD,
-		ShardStateValidationEpoch:             EpochTBD,
 		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                EpochTBD,
 		EIP1153TransientStorageEpoch:          EpochTBD,
@@ -97,13 +103,7 @@ var (
 		EIP6780Epoch:                          EpochTBD,
 		PragueEpoch:                           EpochTBD,
 		EIP8024Epoch:                          EpochTBD,
-		ValidatorWrapperAddressBindEpoch:      EpochTBD,
-		SlashExternalStakeDenomFixEpoch:       EpochTBD,
-		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
-		SlashGroupOrderFixEpoch:               EpochTBD,
 		BLSProofBindEpoch:                     EpochTBD,
-		SlashBallotSignerFixEpoch:             EpochTBD,
-		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
