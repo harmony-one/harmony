@@ -16,9 +16,8 @@ func TestIsOneEpochBeforeHIP30(t *testing.T) {
 	require.False(t, c.IsOneEpochBeforeHIP30(big.NewInt(3)))
 }
 
-func TestMainnetTBDFeaturesInactiveBeforeActivation(t *testing.T) {
-	// Representative mainnet epoch well below every EpochTBD placeholder (10_000_000).
-	epoch := big.NewInt(3000)
+func TestMainnetFeaturesInactiveBeforeBloomActivation(t *testing.T) {
+	epoch := big.NewInt(2958)
 	cfg := MainnetChainConfig
 
 	checks := []struct {
@@ -63,4 +62,35 @@ func TestMainnetTBDFeaturesInactiveBeforeActivation(t *testing.T) {
 	require.False(t, rules.Is7939CLZ)
 	require.False(t, rules.IsEIP5656Mcopy)
 	require.False(t, rules.IsCXReceiptStateRollback)
+}
+
+func TestMainnetBloomFeaturesActiveAtActivation(t *testing.T) {
+	epoch := big.NewInt(2959)
+	cfg := MainnetChainConfig
+
+	checks := []struct {
+		name string
+		got  bool
+	}{
+		{"CXMerkleProofReplayFix", cfg.IsCXMerkleProofReplayFixEpoch(epoch)},
+		{"CXReceiptStateRollback", cfg.IsCXReceiptStateRollback(epoch)},
+		{"RejectShard0CrossLink", cfg.IsRejectShard0CrossLink(epoch)},
+		{"DuplicateCrossLink", cfg.IsDuplicateCrossLinkRejection(epoch)},
+		{"ShardStateValidation", cfg.IsShardStateValidation(epoch)},
+		{"ValidatorWrapperAddressBind", cfg.IsValidatorWrapperAddressBind(epoch)},
+		{"SlashExternalStakeDenomFix", cfg.IsSlashExternalStakeDenomFix(epoch)},
+		{"RejectDuplicateSlashEvidence", cfg.IsRejectDuplicateSlashEvidence(epoch)},
+		{"SlashGroupOrderFix", cfg.IsSlashGroupOrderFix(epoch)},
+		{"SlashBallotSignerFix", cfg.IsSlashBallotSignerFix(epoch)},
+		{"VerifyBeaconHeaderSlash", cfg.IsVerifyBeaconHeaderSlash(epoch)},
+	}
+
+	for _, check := range checks {
+		t.Run(check.name, func(t *testing.T) {
+			require.True(t, check.got, "Bloom feature should be active at activation epoch")
+		})
+	}
+
+	rules := cfg.Rules(epoch)
+	require.True(t, rules.IsCXReceiptStateRollback)
 }
