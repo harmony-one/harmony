@@ -65,15 +65,34 @@ func TestMainnetTBDFeaturesInactiveBeforeActivation(t *testing.T) {
 	require.False(t, rules.IsCXReceiptStateRollback)
 }
 
+func requireBloomFeaturesActiveAtBloom(
+	t *testing.T,
+	name string,
+	cfg *ChainConfig,
+	featureEpochs []*big.Int,
+) {
+	t.Helper()
+
+	maxFeatureEpoch := maxEpoch(featureEpochs)
+
+	require.Truef(
+		t,
+		cfg.isBloomFeatureActive(maxFeatureEpoch, cfg.BloomEpoch),
+		"%s bloom features must be active at BloomEpoch=%s; max feature epoch=%s",
+		name,
+		cfg.BloomEpoch,
+		maxFeatureEpoch,
+	)
+}
+
 func TestBloomEpochConfigured(t *testing.T) {
 	require.Equal(t, big.NewInt(7414), TestnetChainConfig.BloomEpoch)
 	require.Equal(t, big.NewInt(53508), PartnerChainConfig.BloomEpoch)
 	require.Equal(t, big.NewInt(5), LocalnetChainConfig.BloomEpoch)
 
-	require.True(t, TestnetChainConfig.BloomEpoch.Cmp(maxEpoch(testnetBloomFeatureEpochs())) >= 0)
-	require.True(t, PartnerChainConfig.BloomEpoch.Cmp(maxEpoch(devnetBloomFeatureEpochs())) >= 0)
-	require.True(t, LocalnetChainConfig.BloomEpoch.Cmp(maxEpoch(localnetBloomFeatureEpochs())) >= 0)
-
+	requireBloomFeaturesActiveAtBloom(t, "testnet", TestnetChainConfig, testnetBloomFeatureEpochs())
+	requireBloomFeaturesActiveAtBloom(t, "partner", PartnerChainConfig, devnetBloomFeatureEpochs())
+	requireBloomFeaturesActiveAtBloom(t, "localnet", LocalnetChainConfig, localnetBloomFeatureEpochs())
 	for _, epoch := range localnetBloomFeatureEpochs() {
 		require.Equal(t, big.NewInt(5), epoch)
 	}
