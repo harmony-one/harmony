@@ -64,3 +64,110 @@ func TestMainnetTBDFeaturesInactiveBeforeActivation(t *testing.T) {
 	require.False(t, rules.IsEIP5656Mcopy)
 	require.False(t, rules.IsCXReceiptStateRollback)
 }
+
+func TestBloomEpochConfigured(t *testing.T) {
+	require.Equal(t, big.NewInt(7420), TestnetChainConfig.BloomEpoch)
+	require.Equal(t, big.NewInt(53508), PartnerChainConfig.BloomEpoch)
+	require.Equal(t, big.NewInt(5), LocalnetChainConfig.BloomEpoch)
+
+	require.True(t, TestnetChainConfig.BloomEpoch.Cmp(maxEpoch(testnetBloomFeatureEpochs())) >= 0)
+	require.True(t, PartnerChainConfig.BloomEpoch.Cmp(maxEpoch(devnetBloomFeatureEpochs())) >= 0)
+	require.True(t, LocalnetChainConfig.BloomEpoch.Cmp(maxEpoch(localnetBloomFeatureEpochs())) >= 0)
+
+	for _, epoch := range localnetBloomFeatureEpochs() {
+		require.Equal(t, big.NewInt(5), epoch)
+	}
+}
+
+func testnetBloomFeatureEpochs() []*big.Int {
+	return []*big.Int{
+		TestnetChainConfig.CXMerkleProofReplayFixEpoch,
+		TestnetChainConfig.CXReceiptStateRollbackEpoch,
+		TestnetChainConfig.TimestampValidationEpoch,
+		TestnetChainConfig.SlashExternalStakeDenomFixEpoch,
+		TestnetChainConfig.DuplicateCrossLinkEpoch,
+		TestnetChainConfig.ShardStateValidationEpoch,
+		TestnetChainConfig.RejectShard0CrossLinkEpoch,
+		TestnetChainConfig.EIP2537PrecompileEpoch,
+		TestnetChainConfig.EIP1153TransientStorageEpoch,
+		TestnetChainConfig.EIP7939CLZEpoch,
+		TestnetChainConfig.EIP5656McopyEpoch,
+		TestnetChainConfig.EIP3855Epoch,
+		TestnetChainConfig.EIP3860Epoch,
+		TestnetChainConfig.EIP6780Epoch,
+		TestnetChainConfig.EIP8024Epoch,
+		TestnetChainConfig.RejectDuplicateSlashEvidenceEpoch,
+		TestnetChainConfig.AllowlistEpoch,
+		TestnetChainConfig.LeaderRotationV2Epoch,
+		TestnetChainConfig.SlashGroupOrderFixEpoch,
+		TestnetChainConfig.ValidatorWrapperAddressBindEpoch,
+		TestnetChainConfig.BLSProofBindEpoch,
+		TestnetChainConfig.SlashBallotSignerFixEpoch,
+		TestnetChainConfig.VerifyBeaconHeaderSlashEpoch,
+	}
+}
+
+func devnetBloomFeatureEpochs() []*big.Int {
+	return []*big.Int{
+		PartnerChainConfig.CXMerkleProofReplayFixEpoch,
+		PartnerChainConfig.CXReceiptStateRollbackEpoch,
+		PartnerChainConfig.TimestampValidationEpoch,
+		PartnerChainConfig.SlashExternalStakeDenomFixEpoch,
+		PartnerChainConfig.DuplicateCrossLinkEpoch,
+		PartnerChainConfig.ShardStateValidationEpoch,
+		PartnerChainConfig.RejectShard0CrossLinkEpoch,
+		PartnerChainConfig.EIP2537PrecompileEpoch,
+		PartnerChainConfig.EIP1153TransientStorageEpoch,
+		PartnerChainConfig.EIP7939CLZEpoch,
+		PartnerChainConfig.EIP5656McopyEpoch,
+		PartnerChainConfig.EIP3855Epoch,
+		PartnerChainConfig.EIP3860Epoch,
+		PartnerChainConfig.EIP6780Epoch,
+		PartnerChainConfig.EIP8024Epoch,
+		PartnerChainConfig.RejectDuplicateSlashEvidenceEpoch,
+		PartnerChainConfig.LeaderRotationV2Epoch,
+		PartnerChainConfig.SlashGroupOrderFixEpoch,
+		PartnerChainConfig.ValidatorWrapperAddressBindEpoch,
+		PartnerChainConfig.BLSProofBindEpoch,
+		PartnerChainConfig.SlashBallotSignerFixEpoch,
+		PartnerChainConfig.VerifyBeaconHeaderSlashEpoch,
+	}
+}
+
+func localnetBloomFeatureEpochs() []*big.Int {
+	return []*big.Int{
+		LocalnetChainConfig.CXMerkleProofReplayFixEpoch,
+		LocalnetChainConfig.CXReceiptStateRollbackEpoch,
+		LocalnetChainConfig.TimestampValidationEpoch,
+		LocalnetChainConfig.SlashExternalStakeDenomFixEpoch,
+		LocalnetChainConfig.DuplicateCrossLinkEpoch,
+		LocalnetChainConfig.ShardStateValidationEpoch,
+		LocalnetChainConfig.RejectShard0CrossLinkEpoch,
+		LocalnetChainConfig.EIP2537PrecompileEpoch,
+		LocalnetChainConfig.EIP1153TransientStorageEpoch,
+		LocalnetChainConfig.EIP7939CLZEpoch,
+		LocalnetChainConfig.EIP5656McopyEpoch,
+		LocalnetChainConfig.EIP3855Epoch,
+		LocalnetChainConfig.EIP3860Epoch,
+		LocalnetChainConfig.EIP6780Epoch,
+		LocalnetChainConfig.EIP8024Epoch,
+		LocalnetChainConfig.RejectDuplicateSlashEvidenceEpoch,
+		LocalnetChainConfig.AllowlistEpoch,
+		LocalnetChainConfig.LeaderRotationV2Epoch,
+		LocalnetChainConfig.SlashGroupOrderFixEpoch,
+		LocalnetChainConfig.ValidatorWrapperAddressBindEpoch,
+		LocalnetChainConfig.BLSProofBindEpoch,
+		LocalnetChainConfig.SlashBallotSignerFixEpoch,
+		LocalnetChainConfig.VerifyBeaconHeaderSlashEpoch,
+	}
+}
+
+func maxEpoch(epochs []*big.Int) *big.Int {
+	max := epochs[0]
+	for _, epoch := range epochs[1:] {
+		if epoch.Cmp(max) > 0 {
+			max = epoch
+		}
+	}
+	return max
+}
