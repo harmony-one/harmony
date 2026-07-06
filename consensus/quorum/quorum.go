@@ -237,10 +237,6 @@ func (s *cIdentities) NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.Pu
 			Msg("[NthNextValidatorV2] pubKey not found in participants")
 	}
 
-	if pubKeyIndex == -1 && next == 0 {
-		return true, &s.publicKeys[0]
-	}
-
 	curAddr, curOK := publicToAddress[pubKey.Bytes]
 	if !curOK {
 		utils.Logger().Error().
