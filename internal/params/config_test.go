@@ -66,7 +66,7 @@ func TestMainnetTBDFeaturesInactiveBeforeActivation(t *testing.T) {
 }
 
 func TestBloomEpochConfigured(t *testing.T) {
-	require.Equal(t, big.NewInt(7420), TestnetChainConfig.BloomEpoch)
+	require.Equal(t, big.NewInt(7414), TestnetChainConfig.BloomEpoch)
 	require.Equal(t, big.NewInt(53508), PartnerChainConfig.BloomEpoch)
 	require.Equal(t, big.NewInt(5), LocalnetChainConfig.BloomEpoch)
 
