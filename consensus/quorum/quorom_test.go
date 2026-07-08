@@ -708,8 +708,23 @@ func TestCIdentities_NthNextValidatorV2EdgeCase1(t *testing.T) {
 	t.Log("Calling NthNextValidatorV2 with next=0 to test panic handling")
 	found, key := c.NthNextValidatorV2(slots, &wrapper, 0)
 
-	require.Equal(t, true, found)
-	require.Equal(t, 0, c.IndexOf(key.Bytes))
+	require.False(t, found)
+	require.Equal(t, wrapper.Bytes, key.Bytes)
+}
+
+func TestCIdentities_NthNextValidatorV2MissingSlotEntry(t *testing.T) {
+	c, slots, list := createTestCIdentities(2, 2)
+
+	// Drop the last slot so its BLS key is in participants but unmapped in slotList.
+	unmappedKey := list[len(list)-1]
+	slots = slots[:len(slots)-1]
+
+	found, key := c.NthNextValidatorV2(slots, &list[0], 1)
+
+	require.True(t, found)
+	// Skips unmapped keys at indices 1 and 3, lands on validator 1's mapped key at index 2.
+	require.Equal(t, 2, c.IndexOf(key.Bytes))
+	require.NotEqual(t, unmappedKey.Bytes, key.Bytes)
 }
 
 func TestCIdentities_NthNextValidatorV2EdgeCase2(t *testing.T) {

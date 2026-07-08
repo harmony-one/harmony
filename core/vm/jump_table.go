@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/params"
+	harmonyparams "github.com/harmony-one/harmony/internal/params"
 )
 
 type (
@@ -52,8 +53,8 @@ var (
 	byzantiumInstructionSet        = newByzantiumInstructionSet()
 	constantinopleInstructionSet   = newConstantinopleInstructionSet()
 	istanbulInstructionSet         = newIstanbulInstructionSet()
-	eip1153InstructionSet          = eip1153TransientStorage()
-	eip5656InstructionSet          = eip5656Mcopy()
+	eip1153InstructionSet          = eip1153TransientStorageOnly()
+	eip5656InstructionSet          = eip5656McopyOnly()
 	//berlinInstructionSet           = newBerlinInstructionSet()
 	//londonInstructionSet           = newLondonInstructionSet()
 	//mergeInstructionSet            = newMergeInstructionSet()
@@ -123,19 +124,43 @@ func newBerlinInstructionSet() JumpTable {
 	return validate(instructionSet)
 }*/
 
-// EIP 5656 MCOPY
-func eip5656Mcopy() JumpTable {
-	instructionSet := eip1153TransientStorage()
+// EIP 5656 MCOPY (standalone; does not imply EIP-1153 or EIP-7939).
+func eip5656McopyOnly() JumpTable {
+	instructionSet := newIstanbulInstructionSet()
 	enable5656(&instructionSet) // MCOPY - https://eips.ethereum.org/EIPS/eip-5656
 	return validate(instructionSet)
 }
 
-// EIP 1153 Transient Storage
-func eip1153TransientStorage() JumpTable {
+// EIP 1153 Transient Storage (standalone; does not imply EIP-7939).
+func eip1153TransientStorageOnly() JumpTable {
 	instructionSet := newIstanbulInstructionSet()
 	enable1153(&instructionSet) // Transient Storage - https://eips.ethereum.org/EIPS/eip-1153
-	enable7939(&instructionSet) // EIP-7939 (CLZ opcode)
 	return validate(instructionSet)
+}
+
+// jumpTableForRules builds an instruction set from the base fork and each
+// independently scheduled EIP opcode activation flag.
+func jumpTableForRules(rules harmonyparams.Rules) *JumpTable {
+	var base JumpTable
+	switch {
+	case rules.IsIstanbul:
+		base = istanbulInstructionSet
+	case rules.IsS3:
+		base = constantinopleInstructionSet
+	default:
+		base = frontierInstructionSet
+	}
+	jt := copyJumpTable(&base)
+	if rules.Is1153TransientStorage {
+		enable1153(&jt)
+	}
+	if rules.Is7939CLZ {
+		enable7939(&jt)
+	}
+	if rules.IsEIP5656Mcopy {
+		enable5656(&jt)
+	}
+	return &jt
 }
 
 // newIstanbulInstructionSet returns the frontier, homestead, byzantium,

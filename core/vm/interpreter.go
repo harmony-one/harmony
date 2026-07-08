@@ -77,18 +77,7 @@ type EVMInterpreter struct {
 func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	if cfg.JumpTable == nil {
-		switch {
-		case evm.chainRules.IsEIP5656Mcopy:
-			cfg.JumpTable = &eip5656InstructionSet
-		case evm.chainRules.Is1153TransientStorage:
-			cfg.JumpTable = &eip1153InstructionSet
-		case evm.chainRules.IsIstanbul:
-			cfg.JumpTable = &istanbulInstructionSet
-		case evm.chainRules.IsS3:
-			cfg.JumpTable = &constantinopleInstructionSet
-		default:
-			cfg.JumpTable = &frontierInstructionSet
-		}
+		cfg.JumpTable = jumpTableForRules(evm.chainRules)
 		// Automatically enable EIP-6780 if the chain rule is active
 		if evm.chainRules.IsEIP6780 {
 			copy := copyJumpTable(cfg.JumpTable)

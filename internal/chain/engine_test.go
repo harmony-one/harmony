@@ -110,6 +110,7 @@ func TestVerifyShardStateRejectsEmptyShardState(t *testing.T) {
 	chain := makeFakeBlockChain()
 	chain.superCommittee = shard.State{}
 	header := makeFakeHeader()
+	header.SetEpoch(big.NewInt(currentEpoch))
 
 	encodedEmptyState, err := shard.EncodeWrapper(shard.State{}, false)
 	if err != nil {
@@ -462,7 +463,7 @@ func TestVerifyHeaderTimestampValidationBackwardCompatibleBeforeFork(t *testing.
 
 	parent := blockfactory.NewTestHeader()
 	parent.SetNumber(big.NewInt(doubleSignBlockNumber))
-	parent.SetEpoch(big.NewInt(5))
+	parent.SetEpoch(big.NewInt(4))
 	parent.SetTime(big.NewInt(time.Now().Unix()))
 	chain.currentBlock = *types.NewBlockWithHeader(parent)
 	parent = chain.CurrentHeader()

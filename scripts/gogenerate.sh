@@ -6,4 +6,4 @@ case "${0}" in
 *) progdir=.;;
 esac
 git grep -l '^//go:generate ' -- '*.go' | \
-	PROTOC_IMAGE="frozen621/harmony-proto:latest" "${progdir}/xargs_by_dir.sh" go generate -v -x
+	PROTOC_IMAGE="harmonyone/harmony-proto:51f7fa3c1588" "${progdir}/xargs_by_dir.sh" go generate -v -x

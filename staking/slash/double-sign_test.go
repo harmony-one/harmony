@@ -84,6 +84,7 @@ func TestVerifyRejectsExtraBallotSignerKeys(t *testing.T) {
 	record := extraBallotSignerSlashRecord(t)
 	sdb := defaultTestStateDB()
 	chain := defaultFakeBlockChain()
+	chain.config.SlashBallotSignerFixEpoch = big.NewInt(0)
 
 	err := Verify(chain, sdb, &record)
 	if err == nil {

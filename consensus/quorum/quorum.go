@@ -234,11 +234,15 @@ func (s *cIdentities) NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.Pu
 	if pubKeyIndex == -1 {
 		utils.Logger().Error().
 			Str("key", pubKey.Bytes.Hex()).
-			Msg("[NthNextValidator] pubKey not found")
+			Msg("[NthNextValidatorV2] pubKey not found in participants")
 	}
 
-	if pubKeyIndex == -1 && next == 0 {
-		return true, &s.publicKeys[0]
+	curAddr, curOK := publicToAddress[pubKey.Bytes]
+	if !curOK {
+		utils.Logger().Error().
+			Str("key", pubKey.Bytes.Hex()).
+			Msg("[NthNextValidatorV2] pubKey not found in slot list")
+		return false, pubKey
 	}
 
 	numKeys := len(s.publicKeys)
@@ -249,10 +253,18 @@ func (s *cIdentities) NthNextValidatorV2(slotList shard.SlotList, pubKey *bls.Pu
 		if attempts > numKeys {
 			utils.Logger().Warn().
 				Str("key", pubKey.Bytes.Hex()).
-				Msg("[NthNextValidator] Could not find a different validator within limit")
+				Msg("[NthNextValidatorV2] Could not find a different validator within limit")
 			return false, pubKey
 		}
-		if publicToAddress[s.publicKeys[idx].Bytes] != publicToAddress[pubKey.Bytes] {
+		candAddr, candOK := publicToAddress[s.publicKeys[idx].Bytes]
+		if !candOK {
+			utils.Logger().Warn().
+				Str("key", s.publicKeys[idx].Bytes.Hex()).
+				Msg("[NthNextValidatorV2] candidate key not found in slot list, skipping")
+			attempts++
+			continue
+		}
+		if candAddr != curAddr {
 			return true, &s.publicKeys[idx]
 		}
 		attempts++

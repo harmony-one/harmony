@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker run --platform linux/amd64 -v ${PWD}:/tmp ${PROTOC_IMAGE}  /tmp/harmonymessage.proto
+docker run -v ${PWD}:/tmp ${PROTOC_IMAGE}  /tmp/harmonymessage.proto
