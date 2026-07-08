@@ -1,0 +1,44 @@
+name: Build crypto deps
+description: Cache and build Harmony mcl/bls dependencies.
+
+inputs:
+  harmony-path:
+    description: Path to the harmony checkout.
+    required: true
+  mcl-path:
+    description: Path to the mcl checkout.
+    required: true
+  bls-path:
+    description: Path to the bls checkout.
+    required: true
+  jobs:
+    description: Parallel make jobs.
+    required: false
+    default: "4"
+  static:
+    description: Build static BLS outputs.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Cache crypto dependency build outputs
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ inputs['mcl-path'] }}/bin
+          ${{ inputs['mcl-path'] }}/lib
+          ${{ inputs['bls-path'] }}/bin
+          ${{ inputs['bls-path'] }}/lib
+        key: ${{ runner.os }}-${{ runner.arch }}-crypto-deps-static-${{ inputs.static }}-${{ hashFiles(format('{0}/**', inputs['mcl-path']), format('{0}/**', inputs['bls-path'])) }}
+
+    - name: Build crypto deps
+      shell: bash
+      working-directory: ${{ inputs['harmony-path'] }}
+      run: |
+        if [[ "${{ inputs.static }}" == "true" ]]; then
+          JOBS="${{ inputs.jobs }}" make deps-static
+        else
+          JOBS="${{ inputs.jobs }}" make deps
+        fi

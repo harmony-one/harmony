@@ -116,6 +116,15 @@ jobs:
           # Release artifacts should not restore mutable CI/PR caches.
           cache: false
 
+      - name: Build crypto deps
+        uses: ./harmony/.github/actions/build-crypto-deps
+        with:
+          harmony-path: harmony
+          mcl-path: mcl
+          bls-path: bls
+          jobs: "4"
+          static: "true"
+
       - name: Build harmony binary for Linux
         id: build-binary
         run: |
@@ -134,7 +143,7 @@ jobs:
 
           BINARY_NAME="harmony-${ARCH}"
 
-          make linux_static
+          make linux_static_quick
           mv ./bin/harmony "./bin/${BINARY_NAME}"
 
           file "./bin/${BINARY_NAME}"
