@@ -54,7 +54,7 @@ func TestCheckBeaconSlashEvidenceUniqueness_SkippedBeforeFork(t *testing.T) {
 	records, _ := reporterVariantSlashRecords(t)
 	cfg := params.MainnetChainConfig
 
-	err := checkBeaconSlashEvidenceUniqueness(cfg, big.NewInt(1_000_000), records)
+	err := checkBeaconSlashEvidenceUniqueness(cfg, big.NewInt(2963), records)
 	require.NoError(t, err)
 }
 
@@ -100,7 +100,7 @@ func TestCheckBeaconHeaderSlashEvidence_SkippedBeforeFork(t *testing.T) {
 	records, _ := reporterVariantSlashRecords(t)
 	cfg := params.MainnetChainConfig
 
-	err := checkBeaconHeaderSlashEvidence(cfg, nil, nil, big.NewInt(1_000_000), records)
+	err := checkBeaconHeaderSlashEvidence(cfg, nil, nil, big.NewInt(2963), records)
 	require.NoError(t, err)
 }
 
