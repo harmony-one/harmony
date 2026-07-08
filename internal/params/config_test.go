@@ -17,8 +17,9 @@ func TestIsOneEpochBeforeHIP30(t *testing.T) {
 }
 
 func TestMainnetTBDFeaturesInactiveBeforeActivation(t *testing.T) {
-	// Representative mainnet epoch well below every EpochTBD placeholder (10_000_000).
-	epoch := big.NewInt(3000)
+	// Representative mainnet epoch just below the Bloom activation epoch (2964);
+	// EpochTBD-gated features (10_000_000 placeholder) remain inactive here too.
+	epoch := big.NewInt(2963)
 	cfg := MainnetChainConfig
 
 	checks := []struct {
