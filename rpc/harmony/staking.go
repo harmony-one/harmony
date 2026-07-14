@@ -878,11 +878,10 @@ func (s *PublicStakingService) GetAvailableRedelegationBalance(
 
 	redelegationTotal := big.NewInt(0)
 	for _, d := range delegations {
-		for _, u := range d.Undelegations {
-			if u.Epoch.Cmp(currEpoch) < 1 { // Undelegation.Epoch < currentEpoch
-				redelegationTotal.Add(redelegationTotal, u.Amount)
-			}
-		}
+		redelegationTotal.Add(
+			redelegationTotal,
+			staking.TotalRedelegatableUndelegations(d.Undelegations, currEpoch),
+		)
 	}
 	return redelegationTotal, nil
 }

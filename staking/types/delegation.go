@@ -152,6 +152,19 @@ func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 	return nil
 }
 
+// TotalRedelegatableUndelegations returns undelegated tokens eligible for redelegation
+// at currEpoch. This matches the redelegation loop in core/staking_verifier.go, which
+// only consumes entries with undelegation.Epoch strictly before the current epoch.
+func TotalRedelegatableUndelegations(undelegations Undelegations, currEpoch *big.Int) *big.Int {
+	total := big.NewInt(0)
+	for _, u := range undelegations {
+		if u.Epoch.Cmp(currEpoch) < 0 {
+			total.Add(total, u.Amount)
+		}
+	}
+	return total
+}
+
 // TotalInUndelegation - return the total amount of token in undelegation (locking period)
 func (d *Delegation) TotalInUndelegation() *big.Int {
 	total := big.NewInt(0)

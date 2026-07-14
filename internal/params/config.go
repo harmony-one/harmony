@@ -476,7 +476,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(5),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(5),
 		BloomEpoch:                            big.NewInt(5),
-		StakingV2Epoch:                        EpochTBD,
+		StakingV2Epoch:                        big.NewInt(6),
 	}
 
 	// AllProtocolChanges ...
@@ -628,7 +628,7 @@ var (
 		big.NewInt(1),        // SlashBallotSignerFixEpoch
 		big.NewInt(1),        // VerifyBeaconHeaderSlashEpoch
 		big.NewInt(1),        // BloomEpoch
-		big.NewInt(0),                      // StakingV2Epoch
+		big.NewInt(0),        // StakingV2Epoch
 	}
 
 	// TestRules ...
