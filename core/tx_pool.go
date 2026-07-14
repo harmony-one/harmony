@@ -38,6 +38,7 @@ import (
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	stakingabi "github.com/harmony-one/harmony/staking"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -754,13 +755,16 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 		return err
 	}
 	stakingTx, isStakingTx := tx.(*staking.StakingTransaction)
+	isPrecompileDelegate := pool.isStakingPrecompileDelegate(tx, from)
 	if !isStakingTx || (isStakingTx && stakingTx.StakingType() != staking.DirectiveDelegate) {
-		if pool.currentState.GetBalance(from).Cmp(cost) < 0 {
-			return errors.Wrapf(
-				ErrInsufficientFunds,
-				"current shard-id: %d",
-				pool.chain.CurrentBlock().ShardID(),
-			)
+		if !isPrecompileDelegate {
+			if pool.currentState.GetBalance(from).Cmp(cost) < 0 {
+				return errors.Wrapf(
+					ErrInsufficientFunds,
+					"current shard-id: %d",
+					pool.chain.CurrentBlock().ShardID(),
+				)
+			}
 		}
 	}
 	intrGas := uint64(0)
@@ -779,7 +783,86 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	if isStakingTx {
 		return pool.validateStakingTx(stakingTx)
 	}
-	return nil
+	return pool.validateStakingPrecompileCall(tx, from)
+}
+
+func (pool *TxPool) isStakingPrecompileDelegate(tx types.PoolTransaction, from common.Address) bool {
+	if pool.chain.CurrentBlock().ShardID() != shard.BeaconChainShardID {
+		return false
+	}
+	if !pool.chainconfig.IsStakingPrecompile(pool.pendingEpoch()) {
+		return false
+	}
+	to := tx.To()
+	if to == nil || *to != stakingabi.PrecompileAddress {
+		return false
+	}
+	stakeMsg, err := stakingabi.ParseStakeMsg(from, tx.Data())
+	if err != nil {
+		return false
+	}
+	_, ok := stakeMsg.(*staking.Delegate)
+	return ok
+}
+
+func (pool *TxPool) validateStakingPrecompileCall(tx types.PoolTransaction, from common.Address) error {
+	if pool.chain.CurrentBlock().ShardID() != shard.BeaconChainShardID {
+		return nil
+	}
+	if !pool.chainconfig.IsStakingPrecompile(pool.pendingEpoch()) {
+		return nil
+	}
+	to := tx.To()
+	if to == nil || *to != stakingabi.PrecompileAddress {
+		return nil
+	}
+	stakeMsg, err := stakingabi.ParseStakeMsg(from, tx.Data())
+	if err != nil {
+		return err
+	}
+
+	b32, _ := hmyCommon.AddressToBech32(from)
+	switch msg := stakeMsg.(type) {
+	case *staking.Delegate:
+		chain, ok := pool.chain.(ChainContext)
+		if !ok {
+			utils.Logger().Debug().Msg("Missing chain context in txPool")
+			return nil
+		}
+		delegations, err := chain.ReadDelegationsByDelegator(msg.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		pendingEpoch := pool.pendingEpoch()
+		_, delegateAmt, _, err := VerifyAndDelegateFromMsg(
+			pool.currentState, pendingEpoch, msg, delegations, pool.chainconfig)
+		if err != nil {
+			return err
+		}
+		gasAmt := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.GasLimit()))
+		totalAmt := new(big.Int).Add(delegateAmt, gasAmt)
+		if bal := pool.currentState.GetBalance(from); bal.Cmp(totalAmt) < 0 {
+			return fmt.Errorf("not enough balance for delegation: %v < %v", bal, delegateAmt)
+		}
+		return nil
+	case *staking.Undelegate:
+		_, err := VerifyAndUndelegateFromMsg(pool.currentState, pool.pendingEpoch(), msg)
+		return err
+	case *staking.CollectRewards:
+		chain, ok := pool.chain.(ChainContext)
+		if !ok {
+			utils.Logger().Debug().Msg("Missing chain context in txPool")
+			return nil
+		}
+		delegations, err := chain.ReadDelegationsByDelegator(msg.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		_, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations)
+		return err
+	default:
+		return errors.WithMessagef(ErrInvalidSender, "staking precompile sender is %s", b32)
+	}
 }
 
 // validateStakingTx checks the staking message based on the staking directive
