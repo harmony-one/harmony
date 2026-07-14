@@ -420,6 +420,45 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 			return 0, errInvalidSigner
 		}
 		err = st.evm.Context.CollectRewards(st.evm.StateDB, nil, stkMsg)
+	case types.BatchDelegate:
+		if !st.evm.ChainConfig().IsStakingV2(st.evm.Context.EpochNumber) {
+			return 0, errors.New("batch delegation is only available in StakingV2 epoch")
+		}
+		stkMsg := &stakingTypes.BatchDelegate{}
+		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
+			return 0, err
+		}
+		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
+		}
+		err = st.evm.Context.BatchDelegate(st.evm.StateDB, nil, stkMsg)
+	case types.BatchUndelegate:
+		if !st.evm.ChainConfig().IsStakingV2(st.evm.Context.EpochNumber) {
+			return 0, errors.New("batch undelegation is only available in StakingV2 epoch")
+		}
+		stkMsg := &stakingTypes.BatchUndelegate{}
+		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
+			return 0, err
+		}
+		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
+		}
+		err = st.evm.Context.BatchUndelegate(st.evm.StateDB, nil, stkMsg)
+	case types.UndelegateAll:
+		if !st.evm.ChainConfig().IsStakingV2(st.evm.Context.EpochNumber) {
+			return 0, errors.New("undelegate all is only available in StakingV2 epoch")
+		}
+		stkMsg := &stakingTypes.UndelegateAll{}
+		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
+			return 0, err
+		}
+		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
+		}
+		err = st.evm.Context.UndelegateAll(st.evm.StateDB, nil, stkMsg)
 	default:
 		return 0, stakingTypes.ErrInvalidStakingKind
 	}

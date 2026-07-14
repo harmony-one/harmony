@@ -330,24 +330,68 @@ func VerifyAndDelegateFromMsg(
 			startBalance := big.NewInt(0).Set(delegateBalance)
 			// Start from the oldest undelegated tokens
 			curIndex := 0
-			for ; curIndex < len(delegation.Undelegations); curIndex++ {
-				if delegation.Undelegations[curIndex].Epoch.Cmp(epoch) >= 0 {
-					break
+			isStakingV2 := chainConfig.IsStakingV2(epoch)
+
+			if isStakingV2 {
+				// Staking V2: Properly handle undelegation consumption with explicit entry removal
+				newUndelegations := []staking.Undelegation{}
+				for curIndex < len(delegation.Undelegations) {
+					entry := &delegation.Undelegations[curIndex]
+					if entry.Epoch.Cmp(epoch) >= 0 {
+						// Keep all remaining entries (not yet eligible for redelegation)
+						newUndelegations = append(newUndelegations, delegation.Undelegations[curIndex:]...)
+						break
+					}
+
+					if entry.Amount.Cmp(delegateBalance) <= 0 {
+						// Fully consume this entry
+						delegateBalance.Sub(delegateBalance, entry.Amount)
+						// Don't add to newUndelegations (fully consumed)
+					} else {
+						// Partially consume this entry
+						remainingAmount := big.NewInt(0).Sub(entry.Amount, delegateBalance)
+						newUndelegations = append(newUndelegations, staking.Undelegation{
+							Amount: remainingAmount,
+							Epoch:  entry.Epoch,
+						})
+						delegateBalance = big.NewInt(0)
+						curIndex++
+						// Keep all remaining entries
+						if curIndex < len(delegation.Undelegations) {
+							newUndelegations = append(newUndelegations, delegation.Undelegations[curIndex:]...)
+						}
+						break
+					}
+					curIndex++
 				}
-				if delegation.Undelegations[curIndex].Amount.Cmp(delegateBalance) <= 0 {
-					delegateBalance.Sub(delegateBalance, delegation.Undelegations[curIndex].Amount)
-				} else {
-					delegation.Undelegations[curIndex].Amount.Sub(
-						delegation.Undelegations[curIndex].Amount, delegateBalance,
-					)
-					delegateBalance = big.NewInt(0)
-					break
+				// Only update undelegations if something was consumed
+				if startBalance.Cmp(delegateBalance) > 0 {
+					delegation.Undelegations = newUndelegations
+				}
+			} else {
+				// Original logic (for backward compatibility)
+				for ; curIndex < len(delegation.Undelegations); curIndex++ {
+					if delegation.Undelegations[curIndex].Epoch.Cmp(epoch) >= 0 {
+						break
+					}
+					if delegation.Undelegations[curIndex].Amount.Cmp(delegateBalance) <= 0 {
+						delegateBalance.Sub(delegateBalance, delegation.Undelegations[curIndex].Amount)
+					} else {
+						delegation.Undelegations[curIndex].Amount.Sub(
+							delegation.Undelegations[curIndex].Amount, delegateBalance,
+						)
+						delegateBalance = big.NewInt(0)
+						break
+					}
 				}
 			}
 
 			if startBalance.Cmp(delegateBalance) > 0 {
 				// Used undelegated token for redelegation
-				delegation.Undelegations = delegation.Undelegations[curIndex:]
+				if !isStakingV2 {
+					// Original logic: slice undelegations array
+					delegation.Undelegations = delegation.Undelegations[curIndex:]
+				}
 				if err := wrapper.SanityCheck(); err != nil {
 					return nil, nil, nil, err
 				}
@@ -464,6 +508,292 @@ func VerifyAndUndelegateFromMsg(
 		}
 	}
 	return nil, errNoDelegationToUndelegate
+}
+
+// VerifyAndBatchDelegateFromMsg verifies batch delegation message using the stateDB
+// and returns all updated validator wrappers, total balance to be deducted, and locked tokens map.
+//
+// Note that this function never updates the stateDB, it only reads from stateDB.
+func VerifyAndBatchDelegateFromMsg(
+	stateDB vm.StateDB, epoch *big.Int, msg *staking.BatchDelegate, delegations []staking.DelegationIndex, chainConfig *params.ChainConfig,
+) ([]*staking.ValidatorWrapper, *big.Int, map[common.Address]*big.Int, error) {
+	if stateDB == nil {
+		return nil, nil, nil, errStateDBIsMissing
+	}
+	if epoch == nil {
+		return nil, nil, nil, errEpochMissing
+	}
+	if chainConfig == nil {
+		return nil, nil, nil, errors.New("chain config is required")
+	}
+	if !chainConfig.IsStakingV2(epoch) {
+		return nil, nil, nil, errors.New("batch delegation is only available in StakingV2 epoch")
+	}
+	if len(msg.Delegations) == 0 {
+		return nil, nil, nil, errors.New("batch delegation must contain at least one delegation")
+	}
+
+	allUpdatedWrappers := []*staking.ValidatorWrapper{}
+	totalBalanceToDeduct := big.NewInt(0)
+	allFromLockedTokens := map[common.Address]*big.Int{}
+	wrapperMap := map[common.Address]*staking.ValidatorWrapper{}
+
+	for _, delegationAction := range msg.Delegations {
+		if !stateDB.IsValidator(delegationAction.ValidatorAddress) {
+			return nil, nil, nil, errValidatorNotExist
+		}
+		if delegationAction.Amount == nil || delegationAction.Amount.Sign() == -1 {
+			return nil, nil, nil, errNegativeAmount
+		}
+		if delegationAction.Amount.Cmp(minimumDelegation) < 0 {
+			if chainConfig.IsMinDelegation100(epoch) {
+				if delegationAction.Amount.Cmp(minimumDelegationV2) < 0 {
+					return nil, nil, nil, errDelegationTooSmallV2
+				}
+			} else {
+				return nil, nil, nil, errDelegationTooSmall
+			}
+		}
+
+		delegateMsg := &staking.Delegate{
+			DelegatorAddress: msg.DelegatorAddress,
+			ValidatorAddress: delegationAction.ValidatorAddress,
+			Amount:           delegationAction.Amount,
+		}
+
+		updatedWrappers, balanceToDeduct, fromLockedTokens, err := VerifyAndDelegateFromMsg(
+			stateDB, epoch, delegateMsg, delegations, chainConfig,
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		for _, wrapper := range updatedWrappers {
+			if existingWrapper, exists := wrapperMap[wrapper.Address]; exists {
+				if existingWrapper != wrapper {
+					return nil, nil, nil, errors.New("duplicate validator wrapper in batch delegation")
+				}
+			} else {
+				wrapperMap[wrapper.Address] = wrapper
+				allUpdatedWrappers = append(allUpdatedWrappers, wrapper)
+			}
+		}
+
+		totalBalanceToDeduct.Add(totalBalanceToDeduct, balanceToDeduct)
+
+		for validatorAddr, amount := range fromLockedTokens {
+			if existingAmount, exists := allFromLockedTokens[validatorAddr]; exists {
+				allFromLockedTokens[validatorAddr] = new(big.Int).Add(existingAmount, amount)
+			} else {
+				allFromLockedTokens[validatorAddr] = new(big.Int).Set(amount)
+			}
+		}
+	}
+
+	if totalBalanceToDeduct.Cmp(big.NewInt(0)) > 0 {
+		if !CanTransfer(stateDB, msg.DelegatorAddress, totalBalanceToDeduct) {
+			return nil, nil, nil, errors.Wrapf(
+				errInsufficientBalanceForStake, "insufficient balance for batch delegation: %v",
+				totalBalanceToDeduct,
+			)
+		}
+	}
+
+	return allUpdatedWrappers, totalBalanceToDeduct, allFromLockedTokens, nil
+}
+
+// VerifyAndBatchUndelegateFromMsg verifies batch undelegation message using the stateDB
+// and returns all updated validator wrappers.
+//
+// Note that this function never updates the stateDB, it only reads from stateDB.
+func VerifyAndBatchUndelegateFromMsg(
+	stateDB vm.StateDB, epoch *big.Int, msg *staking.BatchUndelegate,
+) ([]*staking.ValidatorWrapper, error) {
+	if stateDB == nil {
+		return nil, errStateDBIsMissing
+	}
+	if epoch == nil {
+		return nil, errEpochMissing
+	}
+	if len(msg.DelegationIndexes) == 0 {
+		return nil, errors.New("batch undelegation must contain at least one delegation index")
+	}
+	if len(msg.DelegationIndexes) != len(msg.Amounts) {
+		return nil, errors.New("delegation indexes and amounts must have the same length")
+	}
+
+	allUpdatedWrappers := []*staking.ValidatorWrapper{}
+	wrapperMap := map[common.Address]*staking.ValidatorWrapper{}
+
+	for i, delegationIndex := range msg.DelegationIndexes {
+		amount := msg.Amounts[i]
+		if amount == nil || amount.Sign() == -1 {
+			return nil, errNegativeAmount
+		}
+
+		if !stateDB.IsValidator(delegationIndex.ValidatorAddress) {
+			return nil, errValidatorNotExist
+		}
+
+		var wrapper *staking.ValidatorWrapper
+		var exists bool
+		if wrapper, exists = wrapperMap[delegationIndex.ValidatorAddress]; !exists {
+			var err error
+			wrapper, err = stateDB.ValidatorWrapper(delegationIndex.ValidatorAddress, false, true)
+			if err != nil {
+				return nil, err
+			}
+			wrapperMap[delegationIndex.ValidatorAddress] = wrapper
+		}
+
+		if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
+			utils.Logger().Warn().
+				Str("validator", delegationIndex.ValidatorAddress.String()).
+				Uint64("delegation index", delegationIndex.Index).
+				Int("delegations length", len(wrapper.Delegations)).
+				Msg("Delegation index out of bound")
+			return nil, errors.New("Delegation index out of bound")
+		}
+
+		delegation := &wrapper.Delegations[delegationIndex.Index]
+		if !bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
+			return nil, errors.New("delegator address mismatch")
+		}
+
+		if err := delegation.Undelegate(epoch, amount); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, wrapper := range wrapperMap {
+		if err := wrapper.SanityCheck(); err != nil {
+			if errors.Cause(err) == staking.ErrInvalidSelfDelegation {
+				wrapper.Status = effective.Inactive
+			} else {
+				return nil, err
+			}
+		}
+		allUpdatedWrappers = append(allUpdatedWrappers, wrapper)
+	}
+
+	return allUpdatedWrappers, nil
+}
+
+// VerifyAndUndelegateAllFromMsg verifies and prepares undelegation of all delegations
+// for a delegator. It reads all delegations from the current state and creates a batch undelegation.
+// This ensures delegations created in the same block are included.
+//
+// Note that this function never updates the stateDB, it only reads from stateDB.
+func VerifyAndUndelegateAllFromMsg(
+	stateDB vm.StateDB, epoch *big.Int, msg *staking.UndelegateAll, delegations []staking.DelegationIndex, chainContext ChainContext,
+) ([]*staking.ValidatorWrapper, error) {
+	if stateDB == nil {
+		return nil, errStateDBIsMissing
+	}
+	if epoch == nil {
+		return nil, errEpochMissing
+	}
+
+	delegationIndexes := []staking.DelegationIndex{}
+	amounts := []*big.Int{}
+	processedValidators := map[common.Address]map[uint64]bool{}
+
+	// First, process delegations from the provided list (from previous block)
+	for _, delegationIndex := range delegations {
+		if !stateDB.IsValidator(delegationIndex.ValidatorAddress) {
+			continue
+		}
+
+		wrapper, err := stateDB.ValidatorWrapper(delegationIndex.ValidatorAddress, false, false)
+		if err != nil {
+			continue
+		}
+
+		if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
+			continue
+		}
+
+		delegation := &wrapper.Delegations[delegationIndex.Index]
+		if !bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
+			continue
+		}
+
+		if delegation.Amount.Cmp(common.Big0) <= 0 {
+			continue
+		}
+
+		delegationIndexes = append(delegationIndexes, delegationIndex)
+		amounts = append(amounts, new(big.Int).Set(delegation.Amount))
+
+		// Track processed delegations to avoid duplicates
+		if processedValidators[delegationIndex.ValidatorAddress] == nil {
+			processedValidators[delegationIndex.ValidatorAddress] = make(map[uint64]bool)
+		}
+		processedValidators[delegationIndex.ValidatorAddress][delegationIndex.Index] = true
+	}
+
+	// Then, scan all validators in current state to find any new delegations created in this block
+	if chainContext != nil {
+		validatorList, err := chainContext.ReadValidatorList()
+		if err == nil {
+			for _, validatorAddr := range validatorList {
+				if !stateDB.IsValidator(validatorAddr) {
+					continue
+				}
+
+				wrapper, err := stateDB.ValidatorWrapper(validatorAddr, false, false)
+				if err != nil {
+					continue
+				}
+
+				// Check all delegations for this delegator
+				for i := range wrapper.Delegations {
+					delegation := &wrapper.Delegations[i]
+					if !bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
+						continue
+					}
+
+					if delegation.Amount.Cmp(common.Big0) <= 0 {
+						continue
+					}
+
+					// Skip if already processed
+					if processedValidators[validatorAddr] != nil && processedValidators[validatorAddr][uint64(i)] {
+						continue
+					}
+
+					// Found a new delegation (created in this block)
+					delegationIndexes = append(delegationIndexes, staking.DelegationIndex{
+						ValidatorAddress: validatorAddr,
+						Index:            uint64(i),
+						BlockNum:         big.NewInt(0),
+					})
+					amounts = append(amounts, new(big.Int).Set(delegation.Amount))
+
+					if processedValidators[validatorAddr] == nil {
+						processedValidators[validatorAddr] = make(map[uint64]bool)
+					}
+					processedValidators[validatorAddr][uint64(i)] = true
+				}
+			}
+		}
+	}
+
+	// If no delegations found and no chain context to scan, return error
+	if len(delegationIndexes) == 0 {
+		if chainContext == nil && len(delegations) == 0 {
+			return nil, errors.New("no delegations to undelegate")
+		}
+		return nil, errors.New("no active delegations to undelegate")
+	}
+
+	batchUndelegateMsg := &staking.BatchUndelegate{
+		DelegatorAddress:  msg.DelegatorAddress,
+		DelegationIndexes: delegationIndexes,
+		Amounts:           amounts,
+	}
+
+	return VerifyAndBatchUndelegateFromMsg(stateDB, epoch, batchUndelegateMsg)
 }
 
 // VerifyAndMigrateFromMsg verifies and transfers all delegations of

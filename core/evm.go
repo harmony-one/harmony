@@ -93,6 +93,9 @@ func NewEVMBlockContext(msg Message, header *block.Header, chain ChainContext, a
 		Delegate:              DelegateFn(header, chain),
 		Undelegate:            UndelegateFn(header, chain),
 		CollectRewards:        CollectRewardsFn(header, chain),
+		BatchDelegate:         BatchDelegateFn(header, chain),
+		BatchUndelegate:       BatchUndelegateFn(header, chain),
+		UndelegateAll:         UndelegateAllFn(header, chain),
 		CalculateMigrationGas: CalculateMigrationGasFn(chain),
 		ShardID:               chain.ShardID(),
 		NumShards:             shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards(),
@@ -323,6 +326,193 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 				},
 				totalRewards,
 			)
+		}
+
+		return nil
+	}
+}
+
+func BatchDelegateFn(ref *block.Header, chain ChainContext) vm.BatchDelegateFunc {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, batchDelegate *stakingTypes.BatchDelegate) error {
+		delegations, err := chain.ReadDelegationsByDelegatorAt(batchDelegate.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
+		if err != nil {
+			return err
+		}
+		updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, err := VerifyAndBatchDelegateFromMsg(
+			db, ref.Epoch(), batchDelegate, delegations, chain.Config())
+		if err != nil {
+			return err
+		}
+		for _, wrapper := range updatedValidatorWrappers {
+			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
+				return err
+			}
+		}
+
+		db.SubBalance(batchDelegate.DelegatorAddress, balanceToBeDeducted)
+
+		if rosettaTracer != nil && balanceToBeDeducted.Sign() != 0 {
+			for _, delegationAction := range batchDelegate.Delegations {
+				rosettaTracer.AddRosettaLog(
+					vm.CALL,
+					&vm.RosettaLogAddressItem{
+						Account: &batchDelegate.DelegatorAddress,
+					},
+					&vm.RosettaLogAddressItem{
+						Account:    &batchDelegate.DelegatorAddress,
+						SubAccount: &delegationAction.ValidatorAddress,
+						Metadata:   map[string]interface{}{"type": "delegation"},
+					},
+					delegationAction.Amount,
+				)
+			}
+		}
+
+		if len(fromLockedTokens) > 0 {
+			sortedKeys := []common.Address{}
+			for key := range fromLockedTokens {
+				sortedKeys = append(sortedKeys, key)
+			}
+			sort.SliceStable(sortedKeys, func(i, j int) bool {
+				return bytes.Compare(sortedKeys[i][:], sortedKeys[j][:]) < 0
+			})
+			for _, key := range sortedKeys {
+				redelegatedToken, ok := fromLockedTokens[key]
+				if !ok {
+					return errors.New("Key missing for delegation receipt")
+				}
+				encodedRedelegationData := []byte{}
+				addrBytes := key.Bytes()
+				encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
+				encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
+				db.AddLog(&types.Log{
+					Address:     batchDelegate.DelegatorAddress,
+					Topics:      []common.Hash{staking.DelegateTopic},
+					Data:        encodedRedelegationData,
+					BlockNumber: ref.Number().Uint64(),
+				})
+
+				if rosettaTracer != nil {
+					fromAccount := common.BytesToAddress(key.Bytes())
+					rosettaTracer.AddRosettaLog(
+						vm.CALL,
+						&vm.RosettaLogAddressItem{
+							Account:    &batchDelegate.DelegatorAddress,
+							SubAccount: &fromAccount,
+							Metadata:   map[string]interface{}{"type": "undelegation"},
+						},
+						&vm.RosettaLogAddressItem{
+							Account:    &batchDelegate.DelegatorAddress,
+							SubAccount: &fromAccount,
+							Metadata:   map[string]interface{}{"type": "delegation"},
+						},
+						redelegatedToken,
+					)
+				}
+			}
+		}
+		return nil
+	}
+}
+
+func BatchUndelegateFn(ref *block.Header, chain ChainContext) vm.BatchUndelegateFunc {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, batchUndelegate *stakingTypes.BatchUndelegate) error {
+		updatedValidatorWrappers, err := VerifyAndBatchUndelegateFromMsg(db, ref.Epoch(), batchUndelegate)
+		if err != nil {
+			return err
+		}
+
+		for _, wrapper := range updatedValidatorWrappers {
+			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
+				return err
+			}
+		}
+
+		if rosettaTracer != nil {
+			for i, delegationIndex := range batchUndelegate.DelegationIndexes {
+				amount := batchUndelegate.Amounts[i]
+				rosettaTracer.AddRosettaLog(
+					vm.CALL,
+					&vm.RosettaLogAddressItem{
+						Account:    &batchUndelegate.DelegatorAddress,
+						SubAccount: &delegationIndex.ValidatorAddress,
+						Metadata:   map[string]interface{}{"type": "delegation"},
+					},
+					&vm.RosettaLogAddressItem{
+						Account:    &batchUndelegate.DelegatorAddress,
+						SubAccount: &delegationIndex.ValidatorAddress,
+						Metadata:   map[string]interface{}{"type": "undelegation"},
+					},
+					amount,
+				)
+			}
+		}
+
+		return nil
+	}
+}
+
+func UndelegateAllFn(ref *block.Header, chain ChainContext) vm.UndelegateAllFunc {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, undelegateAll *stakingTypes.UndelegateAll) error {
+		if chain == nil {
+			return errors.New("[UndelegateAll] No chain context provided")
+		}
+		delegations, err := chain.ReadDelegationsByDelegatorAt(undelegateAll.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
+		if err != nil {
+			return err
+		}
+
+		// Track original amounts before undelegation for rosetta logging
+		originalAmounts := map[common.Address]*big.Int{}
+		for _, delegationIndex := range delegations {
+			if !db.IsValidator(delegationIndex.ValidatorAddress) {
+				continue
+			}
+			wrapper, err := db.ValidatorWrapper(delegationIndex.ValidatorAddress, false, false)
+			if err != nil {
+				continue
+			}
+			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
+				continue
+			}
+			delegation := &wrapper.Delegations[delegationIndex.Index]
+			if !bytes.Equal(delegation.DelegatorAddress.Bytes(), undelegateAll.DelegatorAddress.Bytes()) {
+				continue
+			}
+			if delegation.Amount.Cmp(common.Big0) > 0 {
+				originalAmounts[delegationIndex.ValidatorAddress] = new(big.Int).Set(delegation.Amount)
+			}
+		}
+
+		updatedValidatorWrappers, err := VerifyAndUndelegateAllFromMsg(
+			db, ref.Epoch(), undelegateAll, delegations, chain,
+		)
+		if err != nil {
+			return err
+		}
+		for _, wrapper := range updatedValidatorWrappers {
+			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
+				return err
+			}
+		}
+
+		if rosettaTracer != nil {
+			for validatorAddr, amount := range originalAmounts {
+				rosettaTracer.AddRosettaLog(
+					vm.CALL,
+					&vm.RosettaLogAddressItem{
+						Account:    &undelegateAll.DelegatorAddress,
+						SubAccount: &validatorAddr,
+						Metadata:   map[string]interface{}{"type": "delegation"},
+					},
+					&vm.RosettaLogAddressItem{
+						Account:    &undelegateAll.DelegatorAddress,
+						SubAccount: &validatorAddr,
+						Metadata:   map[string]interface{}{"type": "undelegation"},
+					},
+					amount,
+				)
+			}
 		}
 
 		return nil
