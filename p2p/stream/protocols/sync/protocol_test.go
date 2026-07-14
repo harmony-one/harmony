@@ -242,7 +242,6 @@ func TestProtocol_GetPeerDiscoveryLimit(t *testing.T) {
 	}{
 		{nodeconfig.Mainnet, DHTRequestLimitMainnet},
 		{nodeconfig.Testnet, DHTRequestLimitTestnet},
-		{nodeconfig.Pangaea, DHTRequestLimitPangaea},
 		{nodeconfig.Partner, DHTRequestLimitPartner},
 		{nodeconfig.Stressnet, DHTRequestLimitStressnet},
 		{nodeconfig.Devnet, DHTRequestLimitDevnet},
@@ -274,7 +273,6 @@ func TestProtocol_GetDHTRequestLimit(t *testing.T) {
 	}{
 		{nodeconfig.Mainnet, DHTRequestLimitMainnet},
 		{nodeconfig.Testnet, DHTRequestLimitTestnet},
-		{nodeconfig.Pangaea, DHTRequestLimitPangaea},
 		{nodeconfig.Partner, DHTRequestLimitPartner},
 		{nodeconfig.Stressnet, DHTRequestLimitStressnet},
 		{nodeconfig.Devnet, DHTRequestLimitDevnet},
@@ -306,7 +304,6 @@ func TestProtocol_GetTargetValidPeers(t *testing.T) {
 	}{
 		{nodeconfig.Mainnet, TargetValidPeersMainnet},
 		{nodeconfig.Testnet, TargetValidPeersTestnet},
-		{nodeconfig.Pangaea, TargetValidPeersPangaea},
 		{nodeconfig.Partner, TargetValidPeersPartner},
 		{nodeconfig.Stressnet, TargetValidPeersStressnet},
 		{nodeconfig.Devnet, TargetValidPeersDevnet},
