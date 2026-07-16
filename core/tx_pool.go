@@ -1042,7 +1042,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.DelegatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
-		_, err = VerifyAndBatchUndelegateFromMsg(pool.currentState, pendingEpoch, stkMsg)
+		_, err = VerifyAndBatchUndelegateFromMsg(pool.currentState, pendingEpoch, stkMsg, pool.chainconfig)
 		return err
 	case staking.DirectiveUndelegateAll:
 		pendingEpoch := pool.pendingEpoch()
@@ -1069,7 +1069,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if err != nil {
 			return err
 		}
-		_, err = VerifyAndUndelegateAllFromMsg(pool.currentState, pendingEpoch, stkMsg, delegations, chain)
+		_, err = VerifyAndUndelegateAllFromMsg(pool.currentState, pendingEpoch, stkMsg, delegations, chain, pool.chainconfig)
 		return err
 	default:
 		return staking.ErrInvalidStakingKind

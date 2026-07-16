@@ -23,7 +23,7 @@ func TestWrapWritePrecompileErrorBeforeFork(t *testing.T) {
 	)
 
 	origErr := errors.New("insufficient balance to stake")
-	output, gas, err := wrapWritePrecompileError(evm, nil, 42_000, origErr)
+	output, gas, err := wrapWritePrecompileError(evm, &stakingPrecompile{}, nil, 42_000, origErr)
 	require.Equal(t, origErr, err)
 	require.Equal(t, uint64(42_000), gas)
 	require.Nil(t, output)
@@ -39,13 +39,29 @@ func TestWrapWritePrecompileErrorAfterFork(t *testing.T) {
 	)
 
 	origErr := errors.New("insufficient balance to stake")
-	output, gas, err := wrapWritePrecompileError(evm, nil, 42_000, origErr)
+	output, gas, err := wrapWritePrecompileError(evm, &stakingPrecompile{}, nil, 42_000, origErr)
 	require.ErrorIs(t, err, ErrExecutionReverted)
 	require.Equal(t, uint64(42_000), gas)
 
 	reason, unpackErr := abi.UnpackRevert(output)
 	require.NoError(t, unpackErr)
 	require.Equal(t, origErr.Error(), reason)
+}
+
+func TestWrapWritePrecompileErrorSkipsNonStaking(t *testing.T) {
+	evm := NewEVM(
+		BlockContext{EpochNumber: big.NewInt(6)},
+		TxContext{},
+		nil,
+		params.LocalnetChainConfig,
+		Config{},
+	)
+
+	origErr := errors.New("cross shard transfer failed")
+	output, gas, err := wrapWritePrecompileError(evm, &crossShardXferPrecompile{}, nil, 42_000, origErr)
+	require.Equal(t, origErr, err)
+	require.Equal(t, uint64(42_000), gas)
+	require.Nil(t, output)
 }
 
 func TestStakingPrecompileAddressMismatchRevertsAfterFork(t *testing.T) {
@@ -73,9 +89,13 @@ func TestStakingPrecompileAddressMismatchRevertsAfterFork(t *testing.T) {
 	p := &stakingPrecompile{}
 	gas, err := p.RequiredGas(env, contract, input)
 	require.NoError(t, err)
-	contract.Gas = gas
+	contract.Gas = gas + 1_000
 
-	_, remainingGas, err := RunPrecompiledContract(p, env, contract, input, gas, false)
+	output, remainingGas, err := RunPrecompiledContract(p, env, contract, input, gas+1_000, false)
 	require.ErrorIs(t, err, ErrExecutionReverted)
-	require.NotZero(t, remainingGas)
+	require.Equal(t, uint64(1_000), remainingGas)
+
+	reason, unpackErr := abi.UnpackRevert(output)
+	require.NoError(t, unpackErr)
+	require.NotEmpty(t, reason)
 }

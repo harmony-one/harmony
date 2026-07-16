@@ -278,6 +278,17 @@ var (
 func VerifyAndDelegateFromMsg(
 	stateDB vm.StateDB, epoch *big.Int, msg *staking.Delegate, delegations []staking.DelegationIndex, chainConfig *params.ChainConfig,
 ) ([]*staking.ValidatorWrapper, *big.Int, map[common.Address]*big.Int, error) {
+	return verifyAndDelegateFromMsg(stateDB, epoch, msg, delegations, chainConfig, nil)
+}
+
+// verifyAndDelegateFromMsg is the shared implementation for single and batch
+// delegation. When wrapperCache is non-nil, wrappers are reused across calls so
+// batch actions compose against the same in-memory state (undelegations,
+// amounts) without mutating stateDB.
+func verifyAndDelegateFromMsg(
+	stateDB vm.StateDB, epoch *big.Int, msg *staking.Delegate, delegations []staking.DelegationIndex, chainConfig *params.ChainConfig,
+	wrapperCache map[common.Address]*staking.ValidatorWrapper,
+) ([]*staking.ValidatorWrapper, *big.Int, map[common.Address]*big.Int, error) {
 	if stateDB == nil {
 		return nil, nil, nil, errStateDBIsMissing
 	}
@@ -297,6 +308,22 @@ func VerifyAndDelegateFromMsg(
 		}
 	}
 
+	getWrapper := func(addr common.Address) (*staking.ValidatorWrapper, error) {
+		if wrapperCache != nil {
+			if cached, ok := wrapperCache[addr]; ok {
+				return cached, nil
+			}
+		}
+		wrapper, err := stateDB.ValidatorWrapper(addr, false, true)
+		if err != nil {
+			return nil, err
+		}
+		if wrapperCache != nil {
+			wrapperCache[addr] = wrapper
+		}
+		return wrapper, nil
+	}
+
 	updatedValidatorWrappers := []*staking.ValidatorWrapper{}
 	delegateBalance := big.NewInt(0).Set(msg.Amount)
 	fromLockedTokens := map[common.Address]*big.Int{}
@@ -306,8 +333,7 @@ func VerifyAndDelegateFromMsg(
 		// Check if we can use tokens in undelegation to delegate (redelegate)
 		for i := range delegations {
 			delegationIndex := &delegations[i]
-			// request a copy, and since delegations will be changed, copy them too
-			wrapper, err := stateDB.ValidatorWrapper(delegationIndex.ValidatorAddress, false, true)
+			wrapper, err := getWrapper(delegationIndex.ValidatorAddress)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -407,8 +433,7 @@ func VerifyAndDelegateFromMsg(
 
 	if delegateeWrapper == nil {
 		var err error
-		// request a copy, and since delegations will be changed, copy them too
-		delegateeWrapper, err = stateDB.ValidatorWrapper(msg.ValidatorAddress, false, true)
+		delegateeWrapper, err = getWrapper(msg.ValidatorAddress)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -533,10 +558,9 @@ func VerifyAndBatchDelegateFromMsg(
 		return nil, nil, nil, errors.New("batch delegation must contain at least one delegation")
 	}
 
-	allUpdatedWrappers := []*staking.ValidatorWrapper{}
+	wrapperCache := map[common.Address]*staking.ValidatorWrapper{}
 	totalBalanceToDeduct := big.NewInt(0)
 	allFromLockedTokens := map[common.Address]*big.Int{}
-	wrapperMap := map[common.Address]*staking.ValidatorWrapper{}
 
 	for _, delegationAction := range msg.Delegations {
 		if !stateDB.IsValidator(delegationAction.ValidatorAddress) {
@@ -561,22 +585,11 @@ func VerifyAndBatchDelegateFromMsg(
 			Amount:           delegationAction.Amount,
 		}
 
-		updatedWrappers, balanceToDeduct, fromLockedTokens, err := VerifyAndDelegateFromMsg(
-			stateDB, epoch, delegateMsg, delegations, chainConfig,
+		_, balanceToDeduct, fromLockedTokens, err := verifyAndDelegateFromMsg(
+			stateDB, epoch, delegateMsg, delegations, chainConfig, wrapperCache,
 		)
 		if err != nil {
 			return nil, nil, nil, err
-		}
-
-		for _, wrapper := range updatedWrappers {
-			if existingWrapper, exists := wrapperMap[wrapper.Address]; exists {
-				if existingWrapper != wrapper {
-					return nil, nil, nil, errors.New("duplicate validator wrapper in batch delegation")
-				}
-			} else {
-				wrapperMap[wrapper.Address] = wrapper
-				allUpdatedWrappers = append(allUpdatedWrappers, wrapper)
-			}
 		}
 
 		totalBalanceToDeduct.Add(totalBalanceToDeduct, balanceToDeduct)
@@ -599,6 +612,22 @@ func VerifyAndBatchDelegateFromMsg(
 		}
 	}
 
+	// Preserve stable insertion order from first touch in the cache.
+	allUpdatedWrappers := make([]*staking.ValidatorWrapper, 0, len(wrapperCache))
+	seen := map[common.Address]bool{}
+	for _, delegationAction := range msg.Delegations {
+		if w, ok := wrapperCache[delegationAction.ValidatorAddress]; ok && !seen[w.Address] {
+			allUpdatedWrappers = append(allUpdatedWrappers, w)
+			seen[w.Address] = true
+		}
+	}
+	for addr, w := range wrapperCache {
+		if !seen[addr] {
+			allUpdatedWrappers = append(allUpdatedWrappers, w)
+			seen[addr] = true
+		}
+	}
+
 	return allUpdatedWrappers, totalBalanceToDeduct, allFromLockedTokens, nil
 }
 
@@ -607,13 +636,19 @@ func VerifyAndBatchDelegateFromMsg(
 //
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndBatchUndelegateFromMsg(
-	stateDB vm.StateDB, epoch *big.Int, msg *staking.BatchUndelegate,
+	stateDB vm.StateDB, epoch *big.Int, msg *staking.BatchUndelegate, chainConfig *params.ChainConfig,
 ) ([]*staking.ValidatorWrapper, error) {
 	if stateDB == nil {
 		return nil, errStateDBIsMissing
 	}
 	if epoch == nil {
 		return nil, errEpochMissing
+	}
+	if chainConfig == nil {
+		return nil, errors.New("chain config is required")
+	}
+	if !chainConfig.IsStakingV2(epoch) {
+		return nil, errors.New("batch undelegation is only available in StakingV2 epoch")
 	}
 	if len(msg.DelegationIndexes) == 0 {
 		return nil, errors.New("batch undelegation must contain at least one delegation index")
@@ -685,13 +720,24 @@ func VerifyAndBatchUndelegateFromMsg(
 //
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndUndelegateAllFromMsg(
-	stateDB vm.StateDB, epoch *big.Int, msg *staking.UndelegateAll, delegations []staking.DelegationIndex, chainContext ChainContext,
+	stateDB vm.StateDB, epoch *big.Int, msg *staking.UndelegateAll, delegations []staking.DelegationIndex, chainContext ChainContext, chainConfig *params.ChainConfig,
 ) ([]*staking.ValidatorWrapper, error) {
 	if stateDB == nil {
 		return nil, errStateDBIsMissing
 	}
 	if epoch == nil {
 		return nil, errEpochMissing
+	}
+	if chainConfig == nil {
+		if chainContext != nil {
+			chainConfig = chainContext.Config()
+		}
+	}
+	if chainConfig == nil {
+		return nil, errors.New("chain config is required")
+	}
+	if !chainConfig.IsStakingV2(epoch) {
+		return nil, errors.New("undelegate all is only available in StakingV2 epoch")
 	}
 
 	delegationIndexes := []staking.DelegationIndex{}
@@ -793,7 +839,7 @@ func VerifyAndUndelegateAllFromMsg(
 		Amounts:           amounts,
 	}
 
-	return VerifyAndBatchUndelegateFromMsg(stateDB, epoch, batchUndelegateMsg)
+	return VerifyAndBatchUndelegateFromMsg(stateDB, epoch, batchUndelegateMsg, chainConfig)
 }
 
 // VerifyAndMigrateFromMsg verifies and transfers all delegations of
