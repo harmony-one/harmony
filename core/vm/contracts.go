@@ -296,20 +296,25 @@ func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contrac
 	}
 	gasCost, err := p.RequiredGas(evm, contract, input)
 	if err != nil {
-		return wrapWritePrecompileError(evm, nil, 0, err)
+		return wrapWritePrecompileError(evm, p, nil, 0, err)
 	}
 	if suppliedGas < gasCost {
 		return nil, 0, ErrOutOfGas
 	}
 	suppliedGas -= gasCost
 	output, err := p.RunWriteCapable(evm, contract, input)
-	return wrapWritePrecompileError(evm, output, suppliedGas, err)
+	return wrapWritePrecompileError(evm, p, output, suppliedGas, err)
 }
 
 func wrapWritePrecompileError(
-	evm *EVM, output []byte, remainingGas uint64, err error,
+	evm *EVM, p WriteCapablePrecompiledContract, output []byte, remainingGas uint64, err error,
 ) ([]byte, uint64, error) {
 	if err == nil || err == ErrExecutionReverted {
+		return output, remainingGas, err
+	}
+	// Only the staking precompile switches to ABI Error(string) reverts after StakingV2.
+	// Other write-capable precompiles keep their prior exceptional-error behavior.
+	if _, ok := p.(*stakingPrecompile); !ok {
 		return output, remainingGas, err
 	}
 	if evm == nil || evm.ChainConfig() == nil ||
