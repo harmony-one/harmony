@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/accounts/abi"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
@@ -444,15 +445,25 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 	evm := vm.NewEVM(ctx, NewEVMTxContext(msg), db, params.TestChainConfig, vm.Config{})
 	// interpreter := vm.NewEVMInterpreter(evm, vm.Config{})
 	address := common.BytesToAddress([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 252})
-	// caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int)
-	_, _, err := evm.Call(vm.AccountRef(common.Address{}), address,
-		[]byte{109, 107, 47, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19},
-		math.MaxUint64, new(big.Int))
-	expectedError := errors.New("abi: cannot marshal in to go type: length insufficient 31 require 32")
-	if err != nil {
-		if err.Error() != expectedError.Error() {
-			t.Error(fmt.Sprintf("Got error %v in evm.Call but expected %v", err, expectedError))
+	malformedInput := []byte{109, 107, 47, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19}
+	expectedABIError := "abi: cannot marshal in to go type: length insufficient 31 require 32"
+	ret, _, err := evm.Call(vm.AccountRef(common.Address{}), address, malformedInput, math.MaxUint64, new(big.Int))
+	if err == nil {
+		t.Fatal("expected error from malformed staking precompile input")
+	}
+	if params.TestChainConfig.IsStakingV2(header.Epoch()) {
+		if !errors.Is(err, vm.ErrExecutionReverted) {
+			t.Errorf("Got error %v in evm.Call but expected %v", err, vm.ErrExecutionReverted)
 		}
+		reason, unpackErr := abi.UnpackRevert(ret)
+		if unpackErr != nil {
+			t.Fatalf("failed to unpack revert data: %v", unpackErr)
+		}
+		if reason != expectedABIError {
+			t.Errorf("Got revert reason %q but expected %q", reason, expectedABIError)
+		}
+	} else if err.Error() != expectedABIError {
+		t.Errorf("Got error %v in evm.Call but expected %v", err, expectedABIError)
 	}
 
 	// now add a validator, and send its address as caller
