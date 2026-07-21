@@ -16,6 +16,36 @@ var (
 	delegation = NewDelegation(delegatorAddr, delegationAmt)
 )
 
+func TestUndelegateSameEpoch(t *testing.T) {
+	d := NewDelegation(delegatorAddr, big.NewInt(100000))
+	epoch := big.NewInt(10)
+	amount1 := big.NewInt(1000)
+	amount2 := big.NewInt(2000)
+
+	if err := d.Undelegate(epoch, amount1); err != nil {
+		t.Fatalf("first undelegate failed: %v", err)
+	}
+	if err := d.Undelegate(epoch, amount2); err != nil {
+		t.Fatalf("second undelegate failed: %v", err)
+	}
+
+	if len(d.Undelegations) != 1 {
+		t.Fatalf("expected one undelegation entry, got %d", len(d.Undelegations))
+	}
+	expectedUndelegated := big.NewInt(3000)
+	if d.Undelegations[0].Amount.Cmp(expectedUndelegated) != 0 {
+		t.Errorf("same-epoch merge: undelegation amount = %s, want %s",
+			d.Undelegations[0].Amount, expectedUndelegated)
+	}
+	if d.Undelegations[0].Epoch.Cmp(epoch) != 0 {
+		t.Errorf("undelegation epoch = %s, want %s", d.Undelegations[0].Epoch, epoch)
+	}
+	expectedDelegated := big.NewInt(97000)
+	if d.Amount.Cmp(expectedDelegated) != 0 {
+		t.Errorf("delegated amount = %s, want %s", d.Amount, expectedDelegated)
+	}
+}
+
 func TestUndelegate(t *testing.T) {
 	epoch1 := big.NewInt(10)
 	amount1 := big.NewInt(1000)

@@ -906,15 +906,17 @@ func VerifyAndMigrateFromMsg(
 				totalAmount = delegation.Amount.Add(delegation.Amount, delegationAmountToMigrate)
 				// and the undelegations
 				for _, undelegationToMigrate := range undelegationsToMigrate {
-					exist := false
-					for _, entry := range delegation.Undelegations {
-						if entry.Epoch.Cmp(undelegationToMigrate.Epoch) == 0 {
-							exist = true
-							entry.Amount.Add(entry.Amount, undelegationToMigrate.Amount)
+					merged := false
+					for i := range delegation.Undelegations {
+						if delegation.Undelegations[i].Epoch.Cmp(undelegationToMigrate.Epoch) == 0 {
+							delegation.Undelegations[i].Amount.Add(
+								delegation.Undelegations[i].Amount, undelegationToMigrate.Amount,
+							)
+							merged = true
 							break
 						}
 					}
-					if !exist {
+					if !merged {
 						delegation.Undelegations = append(delegation.Undelegations,
 							undelegationToMigrate)
 					}
