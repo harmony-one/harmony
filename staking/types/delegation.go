@@ -129,25 +129,20 @@ func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 	}
 	d.Amount.Sub(d.Amount, amt)
 
-	exist := false
-	for _, entry := range d.Undelegations {
-		if entry.Epoch.Cmp(epoch) == 0 {
-			exist = true
-			entry.Amount.Add(entry.Amount, amt)
+	for i := range d.Undelegations {
+		if d.Undelegations[i].Epoch.Cmp(epoch) == 0 {
+			d.Undelegations[i].Amount.Add(d.Undelegations[i].Amount, amt)
 			return nil
 		}
 	}
 
-	if !exist {
-		item := Undelegation{amt, epoch}
-		d.Undelegations = append(d.Undelegations, item)
+	d.Undelegations = append(d.Undelegations, Undelegation{amt, epoch})
 
-		// Always sort the undelegate by epoch in increasing order
-		sort.SliceStable(
-			d.Undelegations,
-			func(i, j int) bool { return d.Undelegations[i].Epoch.Cmp(d.Undelegations[j].Epoch) < 0 },
-		)
-	}
+	// Always sort the undelegate by epoch in increasing order
+	sort.SliceStable(
+		d.Undelegations,
+		func(i, j int) bool { return d.Undelegations[i].Epoch.Cmp(d.Undelegations[j].Epoch) < 0 },
+	)
 
 	return nil
 }
