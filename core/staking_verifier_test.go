@@ -2408,12 +2408,13 @@ func TestVerifyAndBatchUndelegateFromMsg(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		sdb         vm.StateDB
-		epoch       *big.Int
-		msg         staking.BatchUndelegate
-		chainConfig *params.ChainConfig
-		expErr      error
+		name         string
+		sdb          vm.StateDB
+		epoch        *big.Int
+		msg          staking.BatchUndelegate
+		chainConfig  *params.ChainConfig
+		expErr       error
+		checkAmounts bool
 	}{
 		{
 			name: "successful batch undelegate from two validators",
@@ -2432,15 +2433,12 @@ func TestVerifyAndBatchUndelegateFromMsg(t *testing.T) {
 			chainConfig: stakingV2Config(),
 			msg: staking.BatchUndelegate{
 				DelegatorAddress: delegatorAddr,
-				DelegationIndexes: []staking.DelegationIndex{
-					{ValidatorAddress: validatorAddr, Index: 1, BlockNum: big.NewInt(100)},
-					{ValidatorAddress: validatorAddr2, Index: 1, BlockNum: big.NewInt(100)},
-				},
-				Amounts: []*big.Int{
-					new(big.Int).Set(fiveKOnes),
-					new(big.Int).Set(fiveKOnes),
+				Undelegations: []staking.UndelegationAction{
+					{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(fiveKOnes)},
+					{ValidatorAddress: validatorAddr2, Amount: new(big.Int).Set(fiveKOnes)},
 				},
 			},
+			checkAmounts: true,
 		},
 		{
 			name:        "nil state db",
@@ -2449,10 +2447,9 @@ func TestVerifyAndBatchUndelegateFromMsg(t *testing.T) {
 			chainConfig: stakingV2Config(),
 			msg: staking.BatchUndelegate{
 				DelegatorAddress: delegatorAddr,
-				DelegationIndexes: []staking.DelegationIndex{
-					{ValidatorAddress: validatorAddr, Index: 1, BlockNum: big.NewInt(100)},
+				Undelegations: []staking.UndelegationAction{
+					{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(fiveKOnes)},
 				},
-				Amounts: []*big.Int{new(big.Int).Set(fiveKOnes)},
 			},
 			expErr: errStateDBIsMissing,
 		},
@@ -2463,10 +2460,9 @@ func TestVerifyAndBatchUndelegateFromMsg(t *testing.T) {
 			chainConfig: stakingV2Config(),
 			msg: staking.BatchUndelegate{
 				DelegatorAddress: delegatorAddr,
-				DelegationIndexes: []staking.DelegationIndex{
-					{ValidatorAddress: validatorAddr, Index: 1, BlockNum: big.NewInt(100)},
+				Undelegations: []staking.UndelegationAction{
+					{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(fiveKOnes)},
 				},
-				Amounts: []*big.Int{new(big.Int).Set(fiveKOnes)},
 			},
 			expErr: errEpochMissing,
 		},
@@ -2481,39 +2477,22 @@ func TestVerifyAndBatchUndelegateFromMsg(t *testing.T) {
 			}(),
 			msg: staking.BatchUndelegate{
 				DelegatorAddress: delegatorAddr,
-				DelegationIndexes: []staking.DelegationIndex{
-					{ValidatorAddress: validatorAddr, Index: 1, BlockNum: big.NewInt(100)},
+				Undelegations: []staking.UndelegationAction{
+					{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(fiveKOnes)},
 				},
-				Amounts: []*big.Int{new(big.Int).Set(fiveKOnes)},
 			},
 			expErr: errors.New("batch undelegation is only available in StakingV2 epoch"),
 		},
 		{
-			name:        "empty delegation indexes",
-			sdb:         makeDefaultStateForUndelegate(t),
-			epoch:       epoch,
-			chainConfig: stakingV2Config(),
-			msg: staking.BatchUndelegate{
-				DelegatorAddress:  delegatorAddr,
-				DelegationIndexes: []staking.DelegationIndex{},
-				Amounts:           []*big.Int{},
-			},
-			expErr: errors.New("batch undelegation must contain at least one delegation index"),
-		},
-		{
-			name:        "mismatched lengths",
+			name:        "empty undelegations",
 			sdb:         makeDefaultStateForUndelegate(t),
 			epoch:       epoch,
 			chainConfig: stakingV2Config(),
 			msg: staking.BatchUndelegate{
 				DelegatorAddress: delegatorAddr,
-				DelegationIndexes: []staking.DelegationIndex{
-					{ValidatorAddress: validatorAddr, Index: 1, BlockNum: big.NewInt(100)},
-					{ValidatorAddress: validatorAddr2, Index: 1, BlockNum: big.NewInt(100)},
-				},
-				Amounts: []*big.Int{new(big.Int).Set(fiveKOnes)},
+				Undelegations:    []staking.UndelegationAction{},
 			},
-			expErr: errors.New("delegation indexes and amounts must have the same length"),
+			expErr: errors.New("batch undelegation must contain at least one undelegation"),
 		},
 		{
 			name:        "invalid validator",
@@ -2522,10 +2501,9 @@ func TestVerifyAndBatchUndelegateFromMsg(t *testing.T) {
 			chainConfig: stakingV2Config(),
 			msg: staking.BatchUndelegate{
 				DelegatorAddress: delegatorAddr,
-				DelegationIndexes: []staking.DelegationIndex{
-					{ValidatorAddress: makeTestAddr("not exist"), Index: 1, BlockNum: big.NewInt(100)},
+				Undelegations: []staking.UndelegationAction{
+					{ValidatorAddress: makeTestAddr("not exist"), Amount: new(big.Int).Set(fiveKOnes)},
 				},
-				Amounts: []*big.Int{new(big.Int).Set(fiveKOnes)},
 			},
 			expErr: errValidatorNotExist,
 		},
@@ -2536,40 +2514,37 @@ func TestVerifyAndBatchUndelegateFromMsg(t *testing.T) {
 			chainConfig: stakingV2Config(),
 			msg: staking.BatchUndelegate{
 				DelegatorAddress: delegatorAddr,
-				DelegationIndexes: []staking.DelegationIndex{
-					{ValidatorAddress: validatorAddr, Index: 1, BlockNum: big.NewInt(100)},
+				Undelegations: []staking.UndelegationAction{
+					{ValidatorAddress: validatorAddr, Amount: big.NewInt(-1)},
 				},
-				Amounts: []*big.Int{big.NewInt(-1)},
 			},
 			expErr: errNegativeAmount,
 		},
 		{
-			name:        "delegation index out of bound",
-			sdb:         makeDefaultStateForUndelegate(t),
-			epoch:       epoch,
-			chainConfig: stakingV2Config(),
-			msg: staking.BatchUndelegate{
-				DelegatorAddress: delegatorAddr,
-				DelegationIndexes: []staking.DelegationIndex{
-					{ValidatorAddress: validatorAddr, Index: 999, BlockNum: big.NewInt(100)},
-				},
-				Amounts: []*big.Int{new(big.Int).Set(fiveKOnes)},
-			},
-			expErr: errors.New("Delegation index out of bound"),
-		},
-		{
-			name:        "delegator address mismatch",
+			name:        "no delegation for delegator",
 			sdb:         makeDefaultStateForUndelegate(t),
 			epoch:       epoch,
 			chainConfig: stakingV2Config(),
 			msg: staking.BatchUndelegate{
 				DelegatorAddress: makeTestAddr("wrong delegator"),
-				DelegationIndexes: []staking.DelegationIndex{
-					{ValidatorAddress: validatorAddr, Index: 1, BlockNum: big.NewInt(100)},
+				Undelegations: []staking.UndelegationAction{
+					{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(fiveKOnes)},
 				},
-				Amounts: []*big.Int{new(big.Int).Set(fiveKOnes)},
 			},
-			expErr: errors.New("delegator address mismatch"),
+			expErr: errNoDelegationToUndelegate,
+		},
+		{
+			name:        "insufficient stake",
+			sdb:         makeDefaultStateForUndelegate(t),
+			epoch:       epoch,
+			chainConfig: stakingV2Config(),
+			msg: staking.BatchUndelegate{
+				DelegatorAddress: delegatorAddr,
+				Undelegations: []staking.UndelegationAction{
+					{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(hundredKOnes)},
+				},
+			},
+			expErr: errors.New("insufficient balance to undelegate"),
 		},
 	}
 
@@ -2586,6 +2561,33 @@ func TestVerifyAndBatchUndelegateFromMsg(t *testing.T) {
 
 			if len(ws) == 0 {
 				t.Errorf("Test %v: expected at least one wrapper", i)
+			}
+			if test.checkAmounts {
+				for _, wrapper := range ws {
+					for _, del := range wrapper.Delegations {
+						if del.DelegatorAddress != delegatorAddr {
+							continue
+						}
+						if wrapper.Address == validatorAddr {
+							// started 20k, prior 5k undelegation left 15k, then another 5k -> 10k active
+							if del.Amount.Cmp(tenKOnes) != 0 {
+								t.Errorf("validator1 amount = %s, want 10k", del.Amount)
+							}
+							// prior same-epoch entry 5k + new 5k = 10k
+							if len(del.Undelegations) != 1 || del.Undelegations[0].Amount.Cmp(tenKOnes) != 0 {
+								t.Errorf("validator1 undelegation = %+v, want 10k single entry", del.Undelegations)
+							}
+						}
+						if wrapper.Address == validatorAddr2 {
+							if del.Amount.Cmp(fifteenKOnes) != 0 {
+								t.Errorf("validator2 amount = %s, want 15k", del.Amount)
+							}
+							if len(del.Undelegations) != 1 || del.Undelegations[0].Amount.Cmp(fiveKOnes) != 0 {
+								t.Errorf("validator2 undelegation = %+v, want 5k", del.Undelegations)
+							}
+						}
+					}
+				}
 			}
 		})
 	}
@@ -2702,7 +2704,7 @@ func TestVerifyAndUndelegateAllFromMsg(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ws, err := VerifyAndUndelegateAllFromMsg(test.sdb, test.epoch, &test.msg, test.delegations, test.chain, nil)
+			ws, actions, err := VerifyAndUndelegateAllFromMsg(test.sdb, test.epoch, &test.msg, test.delegations, test.chain, nil)
 
 			if assErr := assertError(err, test.expErr); assErr != nil {
 				t.Errorf("Test %v: %v", i, assErr)
@@ -2713,6 +2715,9 @@ func TestVerifyAndUndelegateAllFromMsg(t *testing.T) {
 
 			if len(ws) == 0 {
 				t.Errorf("Test %v: expected at least one wrapper", i)
+			}
+			if len(actions) == 0 {
+				t.Errorf("Test %v: expected undelegation actions for Rosetta", i)
 			}
 		})
 	}
@@ -2744,8 +2749,6 @@ func TestBatchDelegateRedelegationComposition(t *testing.T) {
 	config.RedelegationEpoch = epoch
 	config.MinDelegation100Epoch = big.NewInt(100)
 
-	// Two destinations share the same locked-token source. Composition must
-	// consume undelegations sequentially (not double-count from fresh copies).
 	msg := staking.BatchDelegate{
 		DelegatorAddress: delegatorAddr,
 		Delegations: []staking.DelegationAction{
@@ -2865,7 +2868,7 @@ func TestUndelegateAllRequiresStakingV2(t *testing.T) {
 	config := &params.ChainConfig{}
 	config.StakingV2Epoch = big.NewInt(10000000)
 
-	_, err := VerifyAndUndelegateAllFromMsg(
+	_, _, err := VerifyAndUndelegateAllFromMsg(
 		makeDefaultStateForUndelegate(t),
 		epoch,
 		&staking.UndelegateAll{DelegatorAddress: delegatorAddr},
@@ -2875,5 +2878,173 @@ func TestUndelegateAllRequiresStakingV2(t *testing.T) {
 	)
 	if assErr := assertError(err, errors.New("undelegate all is only available in StakingV2 epoch")); assErr != nil {
 		t.Fatal(assErr)
+	}
+}
+
+func TestBatchUndelegateSameValidatorTwice(t *testing.T) {
+	epoch := big.NewInt(defaultEpoch)
+	config := &params.ChainConfig{}
+	config.StakingV2Epoch = epoch
+
+	msg := staking.BatchUndelegate{
+		DelegatorAddress: delegatorAddr,
+		Undelegations: []staking.UndelegationAction{
+			{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(fiveKOnes)},
+			{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(fiveKOnes)},
+		},
+	}
+	ws, err := VerifyAndBatchUndelegateFromMsg(makeDefaultStateForUndelegate(t), epoch, &msg, config)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ws) != 1 {
+		t.Fatalf("expected 1 wrapper, got %d", len(ws))
+	}
+	for _, del := range ws[0].Delegations {
+		if del.DelegatorAddress != delegatorAddr {
+			continue
+		}
+		// 20k - 5k prior - 5k - 5k = 5k active; undelegation 5k+5k+5k = 15k
+		if del.Amount.Cmp(fiveKOnes) != 0 {
+			t.Fatalf("active amount = %s, want 5k", del.Amount)
+		}
+		if len(del.Undelegations) != 1 || del.Undelegations[0].Amount.Cmp(fifteenKOnes) != 0 {
+			t.Fatalf("undelegation = %+v, want 15k merged", del.Undelegations)
+		}
+	}
+}
+
+func TestBatchUndelegateSelfDelegationInactive(t *testing.T) {
+	epoch := big.NewInt(defaultEpoch)
+	config := &params.ChainConfig{}
+	config.StakingV2Epoch = epoch
+
+	msg := staking.BatchUndelegate{
+		DelegatorAddress: validatorAddr,
+		Undelegations: []staking.UndelegationAction{
+			{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(fifteenKOnes)},
+		},
+	}
+	ws, err := VerifyAndBatchUndelegateFromMsg(makeDefaultStateForUndelegate(t), epoch, &msg, config)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ws) != 1 {
+		t.Fatalf("expected 1 wrapper, got %d", len(ws))
+	}
+	if ws[0].Status != effective.Inactive {
+		t.Fatalf("expected Inactive status, got %v", ws[0].Status)
+	}
+}
+
+func TestBatchDelegateTooLarge(t *testing.T) {
+	epoch := big.NewInt(defaultEpoch)
+	config := &params.ChainConfig{}
+	config.StakingV2Epoch = epoch
+	config.MinDelegation100Epoch = big.NewInt(100)
+
+	actions := make([]staking.DelegationAction, staking.MaxBatchStakingActions+1)
+	for i := range actions {
+		actions[i] = staking.DelegationAction{
+			ValidatorAddress: validatorAddr,
+			Amount:           new(big.Int).Set(fiveKOnes),
+		}
+	}
+	msg := staking.BatchDelegate{DelegatorAddress: delegatorAddr, Delegations: actions}
+	_, _, _, err := VerifyAndBatchDelegateFromMsg(makeStateDBForStake(t), epoch, &msg, nil, config)
+	if assErr := assertError(err, staking.ErrBatchTooLarge); assErr != nil {
+		t.Fatal(assErr)
+	}
+}
+
+func TestBatchUndelegateTooLarge(t *testing.T) {
+	epoch := big.NewInt(defaultEpoch)
+	config := &params.ChainConfig{}
+	config.StakingV2Epoch = epoch
+
+	actions := make([]staking.UndelegationAction, staking.MaxBatchStakingActions+1)
+	for i := range actions {
+		actions[i] = staking.UndelegationAction{
+			ValidatorAddress: validatorAddr,
+			Amount:           big.NewInt(1),
+		}
+	}
+	msg := staking.BatchUndelegate{DelegatorAddress: delegatorAddr, Undelegations: actions}
+	_, err := VerifyAndBatchUndelegateFromMsg(makeDefaultStateForUndelegate(t), epoch, &msg, config)
+	if assErr := assertError(err, staking.ErrBatchTooLarge); assErr != nil {
+		t.Fatal(assErr)
+	}
+}
+
+func TestBatchDelegateMaxTotalDelegation(t *testing.T) {
+	epoch := big.NewInt(defaultEpoch)
+	config := &params.ChainConfig{}
+	config.StakingV2Epoch = epoch
+	config.MinDelegation100Epoch = big.NewInt(100)
+
+	sdb := makeStateDBForStake(t)
+	w, err := sdb.ValidatorWrapper(validatorAddr, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current := w.TotalDelegation()
+	w.MaxTotalDelegation = new(big.Int).Add(current, fiveKOnes)
+	if err := sdb.UpdateValidatorWrapper(validatorAddr, w); err != nil {
+		t.Fatal(err)
+	}
+	sdb.IntermediateRoot(true)
+
+	msg := staking.BatchDelegate{
+		DelegatorAddress: delegatorAddr,
+		Delegations: []staking.DelegationAction{
+			{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(tenKOnes)},
+		},
+	}
+	_, _, _, err = VerifyAndBatchDelegateFromMsg(sdb, epoch, &msg, nil, config)
+	if err == nil {
+		t.Fatal("expected max total delegation error")
+	}
+}
+
+func TestBatchDelegateMixedLiquidAndLocked(t *testing.T) {
+	epoch := big.NewInt(10)
+	oldEpoch := big.NewInt(5)
+	sdb := makeStateForRedelegateCornerCases(t, validatorAddr, []struct {
+		amount *big.Int
+		epoch  *big.Int
+	}{
+		{amount: new(big.Int).Set(fiveKOnes), epoch: oldEpoch},
+	})
+	sdb.SetBalance(delegatorAddr, new(big.Int).Set(fiveKOnes))
+
+	w, err := sdb.ValidatorWrapper(validatorAddr, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegationIndex := []staking.DelegationIndex{{
+		ValidatorAddress: validatorAddr,
+		Index:            uint64(len(w.Delegations) - 1),
+		BlockNum:         big.NewInt(100),
+	}}
+	config := &params.ChainConfig{}
+	config.StakingV2Epoch = epoch
+	config.RedelegationEpoch = epoch
+	config.MinDelegation100Epoch = big.NewInt(100)
+
+	msg := staking.BatchDelegate{
+		DelegatorAddress: delegatorAddr,
+		Delegations: []staking.DelegationAction{
+			{ValidatorAddress: validatorAddr, Amount: new(big.Int).Set(tenKOnes)}, // 5k locked + 5k liquid
+		},
+	}
+	_, balance, fromLocked, err := VerifyAndBatchDelegateFromMsg(sdb, epoch, &msg, delegationIndex, config)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if balance.Cmp(fiveKOnes) != 0 {
+		t.Fatalf("liquid deduct = %s, want 5k", balance)
+	}
+	if fromLocked[validatorAddr].Cmp(fiveKOnes) != 0 {
+		t.Fatalf("locked used = %s, want 5k", fromLocked[validatorAddr])
 	}
 }

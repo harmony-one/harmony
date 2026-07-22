@@ -34,6 +34,10 @@ const (
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract. NOTE: Not payable on data of calls between transactions.
 	// TxGasValidatorCreation ...
 	TxGasValidatorCreation uint64 = 5300000 // Per transaction that creates a new validator. NOTE: Not payable on data of calls between transactions.
+	// TxGasPerBatchStakingAction is charged per BatchDelegate / BatchUndelegate action.
+	TxGasPerBatchStakingAction uint64 = 25000
+	// TxGasUndelegateAll is charged for UndelegateAll.
+	TxGasUndelegateAll uint64 = 500000
 	// TxDataZeroGas ...
 	TxDataZeroGas uint64 = 4 // Per byte of data attached to a transaction that equals zero. NOTE: Not payable on data of calls between transactions.
 	// QuadCoeffDiv ...

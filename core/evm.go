@@ -352,10 +352,6 @@ func BatchDelegateFn(ref *block.Header, chain ChainContext) vm.BatchDelegateFunc
 		db.SubBalance(batchDelegate.DelegatorAddress, balanceToBeDeducted)
 
 		if rosettaTracer != nil && balanceToBeDeducted.Sign() != 0 {
-			// Attribute liquid funds to each destination proportionally is not
-			// available without per-action liquid splits; log the aggregate
-			// liquid deduction once (matches single-Delegate amount semantics
-			// for the total liquid spent).
 			dest := batchDelegate.Delegations[0].ValidatorAddress
 			rosettaTracer.AddRosettaLog(
 				vm.CALL,
@@ -379,8 +375,6 @@ func BatchDelegateFn(ref *block.Header, chain ChainContext) vm.BatchDelegateFunc
 			sort.SliceStable(sortedKeys, func(i, j int) bool {
 				return bytes.Compare(sortedKeys[i][:], sortedKeys[j][:]) < 0
 			})
-			// When the batch has a single destination, Rosetta can mirror
-			// single-Delegate logging (source undelegation -> dest delegation).
 			var singleDest *common.Address
 			if len(batchDelegate.Delegations) == 1 {
 				singleDest = &batchDelegate.Delegations[0].ValidatorAddress
@@ -444,18 +438,19 @@ func BatchUndelegateFn(ref *block.Header, chain ChainContext) vm.BatchUndelegate
 		}
 
 		if rosettaTracer != nil {
-			for i, delegationIndex := range batchUndelegate.DelegationIndexes {
-				amount := batchUndelegate.Amounts[i]
+			for _, action := range batchUndelegate.Undelegations {
+				amount := action.Amount
+				validatorAddr := action.ValidatorAddress
 				rosettaTracer.AddRosettaLog(
 					vm.CALL,
 					&vm.RosettaLogAddressItem{
 						Account:    &batchUndelegate.DelegatorAddress,
-						SubAccount: &delegationIndex.ValidatorAddress,
+						SubAccount: &validatorAddr,
 						Metadata:   map[string]interface{}{"type": "delegation"},
 					},
 					&vm.RosettaLogAddressItem{
 						Account:    &batchUndelegate.DelegatorAddress,
-						SubAccount: &delegationIndex.ValidatorAddress,
+						SubAccount: &validatorAddr,
 						Metadata:   map[string]interface{}{"type": "undelegation"},
 					},
 					amount,
@@ -477,29 +472,7 @@ func UndelegateAllFn(ref *block.Header, chain ChainContext) vm.UndelegateAllFunc
 			return err
 		}
 
-		// Track original amounts before undelegation for rosetta logging
-		originalAmounts := map[common.Address]*big.Int{}
-		for _, delegationIndex := range delegations {
-			if !db.IsValidator(delegationIndex.ValidatorAddress) {
-				continue
-			}
-			wrapper, err := db.ValidatorWrapper(delegationIndex.ValidatorAddress, false, false)
-			if err != nil {
-				continue
-			}
-			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
-				continue
-			}
-			delegation := &wrapper.Delegations[delegationIndex.Index]
-			if !bytes.Equal(delegation.DelegatorAddress.Bytes(), undelegateAll.DelegatorAddress.Bytes()) {
-				continue
-			}
-			if delegation.Amount.Cmp(common.Big0) > 0 {
-				originalAmounts[delegationIndex.ValidatorAddress] = new(big.Int).Set(delegation.Amount)
-			}
-		}
-
-		updatedValidatorWrappers, err := VerifyAndUndelegateAllFromMsg(
+		updatedValidatorWrappers, actions, err := VerifyAndUndelegateAllFromMsg(
 			db, ref.Epoch(), undelegateAll, delegations, chain, chain.Config(),
 		)
 		if err != nil {
@@ -512,7 +485,9 @@ func UndelegateAllFn(ref *block.Header, chain ChainContext) vm.UndelegateAllFunc
 		}
 
 		if rosettaTracer != nil {
-			for validatorAddr, amount := range originalAmounts {
+			for _, action := range actions {
+				validatorAddr := action.ValidatorAddress
+				amount := action.Amount
 				rosettaTracer.AddRosettaLog(
 					vm.CALL,
 					&vm.RosettaLogAddressItem{
