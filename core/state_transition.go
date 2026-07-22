@@ -18,6 +18,7 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -351,6 +352,29 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	if err != nil {
 		return 0, err
+	}
+	var batchDirective stakingTypes.Directive
+	hasBatchExtraGas := false
+	switch msg.Type() {
+	case types.BatchDelegate:
+		batchDirective = stakingTypes.DirectiveBatchDelegate
+		hasBatchExtraGas = true
+	case types.BatchUndelegate:
+		batchDirective = stakingTypes.DirectiveBatchUndelegate
+		hasBatchExtraGas = true
+	case types.UndelegateAll:
+		batchDirective = stakingTypes.DirectiveUndelegateAll
+		hasBatchExtraGas = true
+	}
+	if hasBatchExtraGas {
+		extra, extraErr := stakingTypes.ExtraGasForStakingDirective(batchDirective, st.data)
+		if extraErr != nil {
+			return 0, extraErr
+		}
+		if gas > math.MaxUint64-extra {
+			return 0, vm.ErrGasUintOverflow
+		}
+		gas += extra
 	}
 	if err = st.useGas(gas); err != nil {
 		return 0, err

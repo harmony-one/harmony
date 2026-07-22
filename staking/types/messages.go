@@ -332,11 +332,20 @@ func (v BatchDelegate) Equals(s BatchDelegate) bool {
 	return true
 }
 
+// MaxBatchStakingActions is the maximum number of actions allowed in a single
+// BatchDelegate or BatchUndelegate transaction.
+const MaxBatchStakingActions = 50
+
+// UndelegationAction represents a single undelegation action in a batch operation
+type UndelegationAction struct {
+	ValidatorAddress common.Address `json:"validator_address"`
+	Amount           *big.Int       `json:"amount"`
+}
+
 // BatchUndelegate - type for undelegating from multiple validators in one transaction
 type BatchUndelegate struct {
-	DelegatorAddress  common.Address    `json:"delegator_address"`
-	DelegationIndexes []DelegationIndex `json:"delegation_indexes"`
-	Amounts           []*big.Int        `json:"amounts"`
+	DelegatorAddress common.Address       `json:"delegator_address"`
+	Undelegations    []UndelegationAction `json:"undelegations"`
 }
 
 // Type of BatchUndelegate
@@ -347,22 +356,15 @@ func (v BatchUndelegate) Type() Directive {
 // Copy returns a deep copy of the BatchUndelegate as a StakeMsg interface
 func (v BatchUndelegate) Copy() StakeMsg {
 	cp := BatchUndelegate{
-		DelegatorAddress:  v.DelegatorAddress,
-		DelegationIndexes: make([]DelegationIndex, len(v.DelegationIndexes)),
-		Amounts:           make([]*big.Int, len(v.Amounts)),
+		DelegatorAddress: v.DelegatorAddress,
+		Undelegations:    make([]UndelegationAction, len(v.Undelegations)),
 	}
-	for i, idx := range v.DelegationIndexes {
-		cp.DelegationIndexes[i] = DelegationIndex{
-			ValidatorAddress: idx.ValidatorAddress,
-			Index:            idx.Index,
+	for i, u := range v.Undelegations {
+		cp.Undelegations[i] = UndelegationAction{
+			ValidatorAddress: u.ValidatorAddress,
 		}
-		if idx.BlockNum != nil {
-			cp.DelegationIndexes[i].BlockNum = new(big.Int).Set(idx.BlockNum)
-		}
-	}
-	for i, amt := range v.Amounts {
-		if amt != nil {
-			cp.Amounts[i] = new(big.Int).Set(amt)
+		if u.Amount != nil {
+			cp.Undelegations[i].Amount = new(big.Int).Set(u.Amount)
 		}
 	}
 	return cp
@@ -373,28 +375,20 @@ func (v BatchUndelegate) Equals(s BatchUndelegate) bool {
 	if !bytes.Equal(v.DelegatorAddress.Bytes(), s.DelegatorAddress.Bytes()) {
 		return false
 	}
-	if len(v.DelegationIndexes) != len(s.DelegationIndexes) {
+	if len(v.Undelegations) != len(s.Undelegations) {
 		return false
 	}
-	if len(v.Amounts) != len(s.Amounts) {
-		return false
-	}
-	for i := range v.DelegationIndexes {
-		if !bytes.Equal(v.DelegationIndexes[i].ValidatorAddress.Bytes(), s.DelegationIndexes[i].ValidatorAddress.Bytes()) {
+	for i := range v.Undelegations {
+		if !bytes.Equal(v.Undelegations[i].ValidatorAddress.Bytes(), s.Undelegations[i].ValidatorAddress.Bytes()) {
 			return false
 		}
-		if v.DelegationIndexes[i].Index != s.DelegationIndexes[i].Index {
-			return false
-		}
-	}
-	for i := range v.Amounts {
-		if v.Amounts[i] == nil {
-			if s.Amounts[i] != nil {
+		if v.Undelegations[i].Amount == nil {
+			if s.Undelegations[i].Amount != nil {
 				return false
 			}
-		} else if s.Amounts[i] == nil {
+		} else if s.Undelegations[i].Amount == nil {
 			return false
-		} else if v.Amounts[i].Cmp(s.Amounts[i]) != 0 {
+		} else if v.Undelegations[i].Amount.Cmp(s.Undelegations[i].Amount) != 0 {
 			return false
 		}
 	}

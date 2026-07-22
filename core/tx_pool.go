@@ -770,6 +770,16 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	intrGas := uint64(0)
 	if isStakingTx {
 		intrGas, err = vm.IntrinsicGas(tx.Data(), false, pool.homestead, pool.istanbul, stakingTx.StakingType() == staking.DirectiveCreateValidator, pool.isEIP3860)
+		if err == nil {
+			extra, extraErr := staking.ExtraGasForStakingDirective(stakingTx.StakingType(), tx.Data())
+			if extraErr != nil {
+				return extraErr
+			}
+			if intrGas > ^uint64(0)-extra {
+				return errors.New("staking batch gas overflow")
+			}
+			intrGas += extra
+		}
 	} else {
 		intrGas, err = vm.IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, pool.istanbul, false, pool.isEIP3860)
 	}
@@ -1069,7 +1079,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if err != nil {
 			return err
 		}
-		_, err = VerifyAndUndelegateAllFromMsg(pool.currentState, pendingEpoch, stkMsg, delegations, chain, pool.chainconfig)
+		_, _, err = VerifyAndUndelegateAllFromMsg(pool.currentState, pendingEpoch, stkMsg, delegations, chain, pool.chainconfig)
 		return err
 	default:
 		return staking.ErrInvalidStakingKind
