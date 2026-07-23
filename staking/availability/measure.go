@@ -119,6 +119,7 @@ func bumpCount(
 					wrapper.Counters.NumBlocksSigned, common.Big1,
 				)
 			}
+			state.MarkValidatorWrapperDirty(addr)
 		}
 	}
 
@@ -216,6 +217,7 @@ func ComputeAndMutateEPOSStatus(
 	switch computed.IsBelowThreshold {
 	case missedTooManyBlocks:
 		wrapper.Status = effective.Inactive
+		state.MarkValidatorWrapperDirty(addr)
 		utils.Logger().Info().
 			Str("threshold", measure.String()).
 			Interface("computed", computed).
@@ -260,6 +262,7 @@ func UpdateMinimumCommissionFee(
 				Str("firstElectionEpoch", firstElectionEpoch.String()).
 				Msg("updating min commission rate")
 			wrapper.Rate.SetBytes(minRate.Bytes())
+			state.MarkValidatorWrapperDirty(addr)
 			return true, nil
 		}
 	}
@@ -268,6 +271,7 @@ func UpdateMinimumCommissionFee(
 
 type stateValidatorWrapper interface {
 	ValidatorWrapper(addr common.Address, sendOriginal bool, copyDelegations bool) (*staking.ValidatorWrapper, error)
+	MarkValidatorWrapperDirty(addr common.Address)
 }
 
 // UpdateMaxCommissionFee makes sure the max-rate is at least higher than the rate + max-rate-change.
@@ -295,6 +299,7 @@ func UpdateMaxCommissionFee(IsTopMaxRate bool, state stateValidatorWrapper, addr
 			Str("new max-rate", newRate.String()).
 			Msg("updating max commission rate")
 		wrapper.MaxRate.SetBytes(newRate.Bytes())
+		state.MarkValidatorWrapperDirty(addr)
 	}
 
 	return nil

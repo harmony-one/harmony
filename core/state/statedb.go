@@ -93,6 +93,7 @@ type DB struct {
 	stateObjectsDirty    map[common.Address]struct{} // State objects modified in the current execution
 	stateObjectsDestruct map[common.Address]struct{} // State objects destructed in the block
 	stateValidators      map[common.Address]*stk.ValidatorWrapper
+	stateValidatorsDirty map[common.Address]struct{} // Cached wrappers that need a write on Finalise
 
 	// DB error.
 	// State objects are used by the consensus core and VM which are
@@ -163,6 +164,7 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*DB, error) {
 		stateObjectsDirty:    make(map[common.Address]struct{}),
 		stateObjectsDestruct: make(map[common.Address]struct{}),
 		stateValidators:      make(map[common.Address]*stk.ValidatorWrapper),
+		stateValidatorsDirty: make(map[common.Address]struct{}),
 		logs:                 make(map[common.Hash][]*types2.Log),
 		preimages:            make(map[common.Hash][]byte),
 		journal:              newJournal(),
@@ -224,6 +226,7 @@ func (db *DB) Reset(root common.Hash) error {
 	db.stateObjectsPending = make(map[common.Address]struct{})
 	db.stateObjectsDirty = make(map[common.Address]struct{})
 	db.stateValidators = make(map[common.Address]*stk.ValidatorWrapper)
+	db.stateValidatorsDirty = make(map[common.Address]struct{})
 	db.thash = common.Hash{}
 	db.bhash = common.Hash{}
 	db.ethTxHash = common.Hash{}
@@ -781,6 +784,7 @@ func (db *DB) Copy() *DB {
 		stateObjectsDirty:    make(map[common.Address]struct{}, len(db.journal.dirties)),
 		stateObjectsDestruct: make(map[common.Address]struct{}, len(db.stateObjectsDestruct)),
 		stateValidators:      make(map[common.Address]*stk.ValidatorWrapper),
+		stateValidatorsDirty: make(map[common.Address]struct{}, len(db.stateValidatorsDirty)),
 		refund:               db.refund,
 		logs:                 make(map[common.Hash][]*types2.Log, len(db.logs)),
 		logSize:              db.logSize,
@@ -824,9 +828,16 @@ func (db *DB) Copy() *DB {
 	for addr := range db.stateObjectsDestruct {
 		state.stateObjectsDestruct[addr] = struct{}{}
 	}
+	// Deep-copy all cached validator wrappers and preserve dirty flags.
 	for addr, wrapper := range db.stateValidators {
+		if wrapper == nil {
+			continue
+		}
 		copied := staketest.CopyValidatorWrapper(*wrapper)
 		state.stateValidators[addr] = &copied
+	}
+	for addr := range db.stateValidatorsDirty {
+		state.stateValidatorsDirty[addr] = struct{}{}
 	}
 	for hash, logs := range db.logs {
 		cpy := make([]*types2.Log, len(logs))
@@ -912,16 +923,22 @@ func (db *DB) GetRefund() uint64 {
 // the journal as well as the refunds. Finalise, however, will not push any updates
 // into the tries just yet. Only IntermediateRoot or Commit will do that.
 func (db *DB) Finalise(deleteEmptyObjects bool) {
-	// Commit validator changes in cache to stateObjects
-	// TODO: remove validator cache after commit
-	for addr, wrapper := range db.stateValidators {
+	// Persist dirty validator wrappers into account code.
+	remainingDirty := make(map[common.Address]struct{})
+	for addr := range db.stateValidatorsDirty {
+		wrapper, ok := db.stateValidators[addr]
+		if !ok || wrapper == nil {
+			continue
+		}
 		if err := db.UpdateValidatorWrapper(addr, wrapper); err != nil {
 			utils.Logger().Warn().Err(err).
 				Str("name", wrapper.Name).
 				Str("addr", addr.String()).
 				Msg("Unable to update the validator wrapper on the finalize")
+			remainingDirty[addr] = struct{}{}
 		}
 	}
+	db.stateValidatorsDirty = remainingDirty
 	addressesToPrefetch := make([][]byte, 0, len(db.journal.dirties))
 	for addr := range db.journal.dirties {
 		obj, exist := db.stateObjects[addr]
@@ -1297,6 +1314,14 @@ func (db *DB) CachedValidatorAddresses() []common.Address {
 	return addrs
 }
 
+// MarkValidatorWrapperDirty marks the cached validator wrapper for write on Finalise.
+func (db *DB) MarkValidatorWrapperDirty(addr common.Address) {
+	if db.stateValidatorsDirty == nil {
+		db.stateValidatorsDirty = make(map[common.Address]struct{})
+	}
+	db.stateValidatorsDirty[addr] = struct{}{}
+}
+
 // ValidatorWrapper retrieves the existing validator in the cache, if sendOriginal
 // else it will return a copy of the wrapper - which needs to be explicitly committed
 // with UpdateValidatorWrapper.
@@ -1376,6 +1401,7 @@ func (db *DB) UpdateValidatorWrapper(
 	db.SetCode(addr, by, true)
 	// update cache
 	db.stateValidators[addr] = val
+	db.MarkValidatorWrapperDirty(addr)
 	return nil
 }
 
@@ -1468,6 +1494,7 @@ func (db *DB) AddReward(
 		return nil
 	}
 
+	db.MarkValidatorWrapperDirty(snapshot.Address)
 	rewardPool := big.NewInt(0).Set(reward)
 	curValidator.BlockReward.Add(curValidator.BlockReward, reward)
 	// Payout commission

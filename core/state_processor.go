@@ -554,6 +554,7 @@ func MayShardReduction(bc ChainContext, statedb *state.DB, header *block.Header)
 			// once epoch X begins, they can terminate servers from shards 2 and 3.
 			if curShard >= uint64(nextNumShards) || curShard != nextShard {
 				validator.Status = effective.Inactive
+				statedb.MarkValidatorWrapperDirty(address)
 				break
 			}
 		}
