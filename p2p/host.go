@@ -496,10 +496,14 @@ func NewHost(cfg HostConfig) (Host, error) {
 	trustedPeersDnsResolvedCounter.Add(0)
 	trustedPeersConnectFailuresCounter.Add(0)
 
+	consensusPubKey := ""
+	if self.ConsensusPubKey != nil {
+		consensusPubKey = self.ConsensusPubKey.SerializeToHexStr()
+	}
 	utils.Logger().Info().
 		Str("self", net.JoinHostPort(self.IP, self.Port)).
 		Interface("PeerID", self.PeerID).
-		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
+		Str("PubKey", consensusPubKey).
 		Msg("libp2p host ready")
 	return h, nil
 }

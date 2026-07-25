@@ -130,7 +130,7 @@ func (m *Mask) SetMask(mask []byte) error {
 		}
 		if ((m.Bitmap[byt] & msk) != 0) && ((mask[byt] & msk) == 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-			bls.Sub(m.AggregatePublic, m.Publics[i].Object)
+			m.AggregatePublic.Sub(m.Publics[i].Object)
 		}
 	}
 	return nil
@@ -150,7 +150,7 @@ func (m *Mask) SetBit(i int, enable bool) error {
 	}
 	if ((m.Bitmap[byt] & msk) != 0) && !enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-		bls.Sub(m.AggregatePublic, m.Publics[i].Object)
+		m.AggregatePublic.Sub(m.Publics[i].Object)
 	}
 	return nil
 }

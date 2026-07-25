@@ -42,7 +42,7 @@ func (pk *PublicKeyWrapper) GetAddress() [20]byte {
 	if pk == nil {
 		return [20]byte{}
 	}
-	return bls.GetAddress(pk.Object)
+	return pk.Object.GetAddress()
 }
 
 // WrapperFromPrivateKey makes a PrivateKeyWrapper from bls secret key

@@ -164,7 +164,7 @@ func subtractBLSPublicKeys(t *testing.T, minuendPub, subtrahendPub *bls_core.Pub
 
 	diffPub := &bls_core.PublicKey{}
 	diffPub.Add(minuendPub)
-	bls_core.Sub(diffPub, subtrahendPub)
+	diffPub.Sub(subtrahendPub)
 
 	var serialized bls.SerializedPublicKey
 	copy(serialized[:], diffPub.Serialize())

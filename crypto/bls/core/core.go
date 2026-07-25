@@ -11,10 +11,16 @@ import (
 )
 
 type (
-	ID        = herumi.ID
-	SecretKey = herumi.SecretKey
-	PublicKey = herumi.PublicKey
-	Sign      = herumi.Sign
+	ID = herumi.ID
+
+	// SecretKey wraps Herumi's key with Harmony-safe cgo boundaries.
+	SecretKey struct{ herumi.SecretKey }
+
+	// PublicKey wraps Herumi's public key with Harmony-specific operations.
+	PublicKey struct{ herumi.PublicKey }
+
+	// Sign wraps a Herumi BLS signature.
+	Sign struct{ herumi.Sign }
 )
 
 const BLS12_381 = herumi.BLS12_381
@@ -50,14 +56,14 @@ func Init(curve int) error {
 	if err := generator.Deserialize(raw); err != nil {
 		return fmt.Errorf("bls: decode Harmony generator: %w", err)
 	}
-	if err := herumi.SetGeneratorOfPublicKey(&generator); err != nil {
+	if err := herumi.SetGeneratorOfPublicKey(&generator.PublicKey); err != nil {
 		return fmt.Errorf("bls: install Harmony generator: %w", err)
 	}
 	return nil
 }
 
 // GetAddress derives the Harmony address of a BLS public key.
-func GetAddress(pub *PublicKey) [20]byte {
+func (pub *PublicKey) GetAddress() [20]byte {
 	var address [20]byte
 	if pub == nil {
 		return address
@@ -67,11 +73,118 @@ func GetAddress(pub *PublicKey) [20]byte {
 	return address
 }
 
-// Sub subtracts one BLS public key from another.
-func Sub(pub, rhs *PublicKey) {
+// GetPublicKey returns the public key corresponding to this secret key.
+func (secret *SecretKey) GetPublicKey() *PublicKey {
+	if secret == nil {
+		return nil
+	}
+	public := secret.SecretKey.GetPublicKey()
+	if public == nil {
+		return nil
+	}
+	return &PublicKey{PublicKey: *public}
+}
+
+// IsEqual reports whether two secret keys are equal.
+func (secret *SecretKey) IsEqual(rhs *SecretKey) bool {
+	return secret != nil && rhs != nil && secret.SecretKey.IsEqual(&rhs.SecretKey)
+}
+
+// Sign signs a string using Harmony's configured BLS mode.
+func (secret *SecretKey) Sign(message string) *Sign {
+	if secret == nil {
+		return nil
+	}
+	signature := secret.SecretKey.Sign(message)
+	if signature == nil {
+		return nil
+	}
+	return &Sign{Sign: *signature}
+}
+
+// SignHash copies the hash before crossing the cgo boundary.
+func (secret *SecretKey) SignHash(hash []byte) *Sign {
+	if secret == nil {
+		return nil
+	}
+	signature := secret.SecretKey.SignHash(append([]byte(nil), hash...))
+	if signature == nil {
+		return nil
+	}
+	return &Sign{Sign: *signature}
+}
+
+// SignByte copies the message before crossing the cgo boundary.
+func (secret *SecretKey) SignByte(message []byte) *Sign {
+	if secret == nil {
+		return nil
+	}
+	signature := secret.SecretKey.SignByte(append([]byte(nil), message...))
+	if signature == nil {
+		return nil
+	}
+	return &Sign{Sign: *signature}
+}
+
+// VerifyHash copies the hash before crossing the cgo boundary.
+func (signature *Sign) VerifyHash(public *PublicKey, hash []byte) bool {
+	if signature == nil || public == nil {
+		return false
+	}
+	return signature.Sign.VerifyHash(
+		&public.PublicKey,
+		append([]byte(nil), hash...),
+	)
+}
+
+// VerifyByte copies the message before crossing the cgo boundary.
+func (signature *Sign) VerifyByte(public *PublicKey, message []byte) bool {
+	if signature == nil || public == nil {
+		return false
+	}
+	return signature.Sign.VerifyByte(
+		&public.PublicKey,
+		append([]byte(nil), message...),
+	)
+}
+
+// Verify verifies a string signature.
+func (signature *Sign) Verify(public *PublicKey, message string) bool {
+	if signature == nil || public == nil {
+		return false
+	}
+	return signature.Sign.Verify(&public.PublicKey, message)
+}
+
+// Add adds another public key.
+func (pub *PublicKey) Add(rhs *PublicKey) {
+	if pub != nil && rhs != nil {
+		pub.PublicKey.Add(&rhs.PublicKey)
+	}
+}
+
+// IsEqual reports whether two public keys are equal.
+func (pub *PublicKey) IsEqual(rhs *PublicKey) bool {
+	return pub != nil && rhs != nil && pub.PublicKey.IsEqual(&rhs.PublicKey)
+}
+
+// Sub subtracts another BLS public key.
+func (pub *PublicKey) Sub(rhs *PublicKey) {
 	if pub == nil || rhs == nil {
 		return
 	}
-	out := (*herumi.G1)(unsafe.Pointer(pub))
-	herumi.G1Sub(out, out, (*herumi.G1)(unsafe.Pointer(rhs)))
+	out := (*herumi.G1)(unsafe.Pointer(&pub.PublicKey))
+	herumi.G1Sub(out, out, (*herumi.G1)(unsafe.Pointer(&rhs.PublicKey)))
+}
+
+// Add adds another signature.
+func (signature *Sign) Add(rhs *Sign) {
+	if signature != nil && rhs != nil {
+		signature.Sign.Add(&rhs.Sign)
+	}
+}
+
+// IsEqual reports whether two signatures are equal.
+func (signature *Sign) IsEqual(rhs *Sign) bool {
+	return signature != nil && rhs != nil && signature.Sign.IsEqual(&rhs.Sign)
 }
