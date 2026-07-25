@@ -1,4 +1,4 @@
-// Package core configures the Herumi BLS implementation for Harmony consensus.
+// Package bls configures the Herumi BLS implementation for Harmony consensus.
 package bls
 
 import (
