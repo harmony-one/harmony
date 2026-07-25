@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"

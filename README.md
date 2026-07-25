@@ -54,38 +54,15 @@ On macOS, make sure you have the **Xcode Command Line Tools** installed. This in
 xcode-select --install
 ```
 
-## Setting Up MCL & BLS Libraries on macOS
+## BLS dependency
 
-The Harmony project depends on the MCL (multi-curve library) and BLS (Boneh-Lynn-Shacham) cryptographic libraries. These need to be installed and configured before building the project.
+Harmony uses Herumi's official Go package with prebuilt static BLS libraries.
+No separate BLS or MCL checkout is required:
 
-### Clone and Build MCL & BLS Repositories
-First, clone the MCL and BLS repositories:
 ```bash
-git clone https://github.com/harmony-one/mcl.git
-git clone https://github.com/harmony-one/bls.git
-```
-
-### Update `.zshrc` for MCL and BLS Paths
-
-To ensure the libraries are correctly located when building the project, you need to add the MCL and BLS library paths to your `.zshrc` file.
-
-Add the following lines to your `.zshrc` (or `.bash_profile` for bash users):
-```bash
-# MCL & BLS paths for Harmony
-export MCL_PATH=$GOPATH/src/github.com/harmony-one/mcl
-export BLS_PATH=$GOPATH/src/github.com/harmony-one/bls
-
-# Add library paths for MCL and BLS
-export CGO_CFLAGS="-I$MCL_PATH/include -I$BLS_PATH/include -I/opt/homebrew/opt/openssl@1.1/include"
-export CGO_LDFLAGS="-L$MCL_PATH/lib -L$BLS_PATH/lib -L/opt/homebrew/opt/openssl@1.1/lib"
-export LD_LIBRARY_PATH=$MCL_PATH/lib:$BLS_PATH/lib:/opt/homebrew/opt/openssl@1.1/lib
-export LIBRARY_PATH=$LD_LIBRARY_PATH
-export DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
-```
-
-Then, apply the changes by running:
-```bash
-source ~/.zshrc
+git clone https://github.com/harmony-one/harmony.git
+cd harmony
+go mod download
 ```
 
 ## Dev Environment
@@ -102,10 +79,8 @@ cd $(go env GOPATH)/src/github.com/harmony-one
 ```
 > If you get 'unknown command' or something along those lines, make sure to install [golang](https://golang.org/doc/install) first.
 
-2. Clone this repo & dependent repos.
+2. Clone this repo.
 ```bash
-git clone https://github.com/harmony-one/mcl.git
-git clone https://github.com/harmony-one/bls.git
 git clone https://github.com/harmony-one/harmony.git
 cd harmony
 ```
@@ -151,17 +126,7 @@ Learn more about docker [here](https://docker-curriculum.com/).
 
 The `make` command should automatically build the Harmony binary & all dependent libs.
 
-However, if you wish to bypass the Makefile, first export the build flags:
-```bash
-export CGO_CFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include -I/opt/homebrew/opt/openssl@1.1/include"
-export CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L/opt/homebrew/opt/openssl@1.1/lib"
-export LD_LIBRARY_PATH=$GOPATH/src/github.com/harmony-one/bls/lib:$GOPATH/src/github.com/harmony-one/mcl/lib:/opt/homebrew/opt/openssl@1.1/lib
-export LIBRARY_PATH=$LD_LIBRARY_PATH
-export DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
-export GO111MODULE=on
-```
-
-Then you can build all executables with the following command:
+You can build all executables directly with:
 ```bash
 bash ./scripts/go_executable_build.sh -S
 ```
@@ -276,4 +241,3 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 - Integration with WASM
 - Fast state synchronization
 - Auditable privacy asset using ZK proof
-

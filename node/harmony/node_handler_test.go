@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/registry"
@@ -188,7 +189,7 @@ func TestVerifyVRF(t *testing.T) {
 		commitSigs <- []byte{}
 	}()
 
-	ecdsaAddr := pubKey.GetAddress()
+	ecdsaAddr := bls_core.GetAddress(pubKey)
 
 	shardState := &shard.State{}
 	com := shard.Committee{ShardID: uint32(0)}

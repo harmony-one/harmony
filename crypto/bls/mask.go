@@ -1,7 +1,7 @@
 package bls
 
 import (
-	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls/core"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )
@@ -44,7 +44,10 @@ func BytesToBLSPublicKey(bytes []byte) (*bls.PublicKey, error) {
 		return nil, errPubKeyCast
 	}
 	pubKey := &bls.PublicKey{}
-	err := pubKey.Deserialize(bytes)
+	// The upstream wrapper passes this buffer to C. Copy it so callers may
+	// safely provide a slice backed by a Go struct containing pointer fields.
+	buf := append([]byte(nil), bytes...)
+	err := pubKey.Deserialize(buf)
 
 	if err == nil {
 		BLSPubKeyCache.Add(kkey, *pubKey)
@@ -127,7 +130,7 @@ func (m *Mask) SetMask(mask []byte) error {
 		}
 		if ((m.Bitmap[byt] & msk) != 0) && ((mask[byt] & msk) == 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-			m.AggregatePublic.Sub(m.Publics[i].Object)
+			bls.Sub(m.AggregatePublic, m.Publics[i].Object)
 		}
 	}
 	return nil
@@ -147,7 +150,7 @@ func (m *Mask) SetBit(i int, enable bool) error {
 	}
 	if ((m.Bitmap[byt] & msk) != 0) && !enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-		m.AggregatePublic.Sub(m.Publics[i].Object)
+		bls.Sub(m.AggregatePublic, m.Publics[i].Object)
 	}
 	return nil
 }

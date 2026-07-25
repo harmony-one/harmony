@@ -5,8 +5,8 @@ import (
 
 	"github.com/harmony-one/harmony/internal/utils"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 )
 
 // PrivateKeys stores the bls secret keys that belongs to the node

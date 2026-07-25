@@ -24,11 +24,11 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/harmony-one/abool v1.0.1
-	github.com/harmony-one/bls v0.0.6
 	github.com/harmony-one/taggedrlp v0.1.4
 	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
+	github.com/herumi/bls-eth-go-binary v1.37.0
 	github.com/ipfs/go-ds-badger v0.3.0
 	github.com/json-iterator/go v1.1.12
 	github.com/libp2p/go-libp2p v0.36.2

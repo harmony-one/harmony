@@ -1,9 +1,3 @@
-TOP:=$(realpath ..)
-export CGO_CFLAGS:=-I$(TOP)/bls/include -I$(TOP)/mcl/include -I/opt/homebrew/opt/openssl@1.1/include
-export CGO_LDFLAGS:=-L$(TOP)/bls/lib -L/opt/homebrew/opt/openssl@1.1/lib
-export LD_LIBRARY_PATH:=$(TOP)/bls/lib:$(TOP)/mcl/lib:/opt/homebrew/opt/openssl@1.1/lib:/opt/homebrew/opt/gmp/lib/:/opt/homebrew/opt/openssl@1.1/lib
-export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
-export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
 PKGNAME=harmony
 VERSION?=$(shell git tag -l --sort=-v:refname | head -n 1 | tr -d v)
@@ -70,8 +64,7 @@ help:
 	@echo "protofiles - generate Go code from protobuf files"
 
 libs:
-	make -C $(TOP)/mcl -j8
-	make -C $(TOP)/bls BLS_SWAP_G=1 -j8
+	go mod download github.com/herumi/bls-eth-go-binary
 
 exe:
 	bash ./scripts/go_executable_build.sh -S
@@ -144,11 +137,8 @@ clean:
 	rm -f coverage.txt
 
 distclean: clean
-	make -C $(TOP)/mcl clean
-	make -C $(TOP)/bls clean
 
 go-get:
-	source ./scripts/setup_bls_build_flags.sh
 	go get -v ./...
 
 test:
@@ -170,8 +160,6 @@ test-rosetta-attach:
 	bash ./test/rosetta.sh attach
 
 linux_static:
-	make -C $(TOP)/mcl -j8
-	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
 	bash ./scripts/go_executable_build.sh -s
 
 linux_static_quick:

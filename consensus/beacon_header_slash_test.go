@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
@@ -18,6 +17,7 @@ import (
 	coretypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	hmybls "github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	chain2 "github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
@@ -442,7 +442,7 @@ func headerSlashShardState(
 
 func headerSlashCoinbaseAddress(signer hmybls.PrivateKeyWrapper) common.Address {
 	var coinbase common.Address
-	blsAddress := signer.Pub.Object.GetAddress()
+	blsAddress := signer.Pub.GetAddress()
 	coinbase.SetBytes(blsAddress[:])
 	return coinbase
 }

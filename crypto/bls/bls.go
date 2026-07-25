@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"math/big"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/pkg/errors"
 )
 
@@ -35,6 +35,14 @@ type PublicKeyWrapper struct {
 // Hex returns the hex string of the public key
 func (pk *PublicKeyWrapper) Hex() string {
 	return pk.Bytes.Hex()
+}
+
+// GetAddress derives the Harmony address of the wrapped BLS public key.
+func (pk *PublicKeyWrapper) GetAddress() [20]byte {
+	if pk == nil {
+		return [20]byte{}
+	}
+	return bls.GetAddress(pk.Object)
 }
 
 // WrapperFromPrivateKey makes a PrivateKeyWrapper from bls secret key

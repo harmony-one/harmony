@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/kms"
-	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
+	ffi_bls "github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/pkg/errors"
 )
 

@@ -3,8 +3,6 @@
 ROOT=$(dirname $0)/..
 USER=$(whoami)
 
-. "${ROOT}/scripts/setup_bls_build_flags.sh"
-
 set -x
 set -eo pipefail
 

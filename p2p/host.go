@@ -14,9 +14,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/abool"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/common/clock"
+	"github.com/harmony-one/harmony/crypto/bls/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/blockedpeers"

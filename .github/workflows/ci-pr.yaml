@@ -40,26 +40,6 @@ jobs:
           path: go/src/github.com/harmony-one/harmony
           persist-credentials: false
 
-      - &checkout-mcl
-        name: Checkout mcl
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 #v7.0.0
-        with:
-          repository: harmony-one/mcl
-          fetch-depth: 1
-          ref: master
-          path: go/src/github.com/harmony-one/mcl
-          persist-credentials: false
-
-      - &checkout-bls
-        name: Checkout bls
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 #v7.0.0
-        with:
-          repository: harmony-one/bls
-          fetch-depth: 1
-          ref: master
-          path: go/src/github.com/harmony-one/bls
-          persist-credentials: false
-
       - &setup-go
         name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 #v6.5.0
@@ -90,15 +70,7 @@ jobs:
     strategy: *arch-matrix
     steps:
       - *checkout-harmony
-      - *checkout-mcl
-      - *checkout-bls
       - *setup-go
-      - name: Build mcl
-        run: make -j4
-        working-directory: go/src/github.com/harmony-one/mcl
-      - name: Build bls
-        run: make BLS_SWAP_G=1 -j4
-        working-directory: go/src/github.com/harmony-one/bls
       - name: Install tools
         run: |
           go install golang.org/x/tools/cmd/goimports@v0.30.0
@@ -163,7 +135,6 @@ jobs:
     strategy: *arch-matrix
     steps:
       - *checkout-harmony
-      - *checkout-bls
       - *download-harmony-binaries
       - *prepare-harmony-binaries
       - *checkout-harmony-test

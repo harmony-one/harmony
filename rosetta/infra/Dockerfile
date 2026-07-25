@@ -12,9 +12,7 @@ RUN mkdir -p $HMY_PATH
 
 WORKDIR $HMY_PATH
 
-RUN git clone https://github.com/harmony-one/harmony.git && \
-    git clone https://github.com/harmony-one/bls.git && \
-    git clone https://github.com/harmony-one/mcl.git
+RUN git clone https://github.com/harmony-one/harmony.git
 
 WORKDIR $HMY_PATH/harmony
 

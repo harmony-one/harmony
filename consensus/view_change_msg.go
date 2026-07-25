@@ -7,10 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/pkg/errors"
