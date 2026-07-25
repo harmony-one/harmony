@@ -1,7 +1,7 @@
 package bls
 
 import (
-	"github.com/harmony-one/harmony/crypto/bls/core"
+	bls "github.com/harmony-one/harmony/crypto/bls/core"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )

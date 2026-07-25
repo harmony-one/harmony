@@ -27,7 +27,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/crypto/bls/core"
+	bls "github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/internal/common"
