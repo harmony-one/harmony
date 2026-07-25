@@ -43,7 +43,7 @@ func Init(curve int) error {
 	}
 	herumi.SetETHserialization(false)
 	if err := herumi.SetMapToMode(0); err != nil {
-		return fmt.Errorf("bls: failed to select Harmony map-to-curve mode")
+		return fmt.Errorf("bls: failed to select Harmony map-to-curve mode: %w", err)
 	}
 	if err := herumi.SetETHmode(herumi.EthModeOld); err != nil {
 		return err
