@@ -648,7 +648,7 @@ func crossLinkCacheProposeAndInsertBeaconBlockWithCrossLinks(
 	header := env.CurrentHeader()
 	leaderKey := consensus.GetLeaderPubKey()
 	coinbase := common.Address{}
-	blsPubKeyBytes := leaderKey.GetAddress()
+	blsPubKeyBytes := leaderKey.Object.GetAddress()
 	coinbase.SetBytes(blsPubKeyBytes[:])
 	header.SetCoinbase(coinbase)
 

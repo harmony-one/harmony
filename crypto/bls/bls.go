@@ -37,14 +37,6 @@ func (pk *PublicKeyWrapper) Hex() string {
 	return pk.Bytes.Hex()
 }
 
-// GetAddress derives the Harmony address of the wrapped BLS public key.
-func (pk *PublicKeyWrapper) GetAddress() [20]byte {
-	if pk == nil {
-		return [20]byte{}
-	}
-	return pk.Object.GetAddress()
-}
-
 // WrapperFromPrivateKey makes a PrivateKeyWrapper from bls secret key
 func WrapperFromPrivateKey(pri *bls.SecretKey) PrivateKeyWrapper {
 	pub := pri.GetPublicKey()

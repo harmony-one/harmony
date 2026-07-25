@@ -442,7 +442,7 @@ func headerSlashShardState(
 
 func headerSlashCoinbaseAddress(signer hmybls.PrivateKeyWrapper) common.Address {
 	var coinbase common.Address
-	blsAddress := signer.Pub.GetAddress()
+	blsAddress := signer.Pub.Object.GetAddress()
 	coinbase.SetBytes(blsAddress[:])
 	return coinbase
 }

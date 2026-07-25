@@ -53,7 +53,7 @@ func (consensus *Consensus) ProposeNewBlock(now time.Time, commitSigs chan []byt
 
 	// After staking, all coinbase will be the address of bls pub key
 	if consensus.Blockchain().Config().IsStaking(header.Epoch()) {
-		blsPubKeyBytes := leaderKey.GetAddress()
+		blsPubKeyBytes := leaderKey.Object.GetAddress()
 		coinbase.SetBytes(blsPubKeyBytes[:])
 	}
 

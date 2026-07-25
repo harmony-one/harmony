@@ -724,7 +724,7 @@ func fakeWrapperHeader(
 
 func fakeWrapperCoinbase(signer hmybls.PrivateKeyWrapper) common.Address {
 	coinbase := common.Address{}
-	blsPubKeyBytes := signer.Pub.GetAddress()
+	blsPubKeyBytes := signer.Pub.Object.GetAddress()
 	coinbase.SetBytes(blsPubKeyBytes[:])
 	return coinbase
 }
