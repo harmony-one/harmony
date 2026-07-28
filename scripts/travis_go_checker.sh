@@ -14,8 +14,6 @@ tmpdir=
 trap 'case "${tmpdir}" in ?*) rm -rf "${tmpdir}";; esac' EXIT
 tmpdir=$(mktemp -d)
 
-. "${progdir}/setup_bls_build_flags.sh"
-
 echo "Checking go.mod..."
 gomod_diff_output="${tmpdir}/gomod.diff"
 if git diff --exit-code -- go.mod > "${gomod_diff_output}"

@@ -8,14 +8,10 @@ RUN apt-get update && \
 
 WORKDIR /go/src/github.com/harmony-one
 
-RUN git clone https://github.com/harmony-one/mcl.git && \
-    git clone https://github.com/harmony-one/bls.git
-
 RUN echo "Cloning branch: ${ENV}" && \
     git clone -b ${ENV} https://github.com/harmony-one/harmony.git && \
     cd harmony && \
-    go mod tidy && \
-    make deps
+    go mod download
 
 WORKDIR /go/src/github.com/harmony-one/harmony
 

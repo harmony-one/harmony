@@ -11,8 +11,6 @@ ROOT="${progdir}/.."
 USER=$(whoami)
 OS=$(uname -s)
 
-. "${ROOT}/scripts/setup_bls_build_flags.sh"
-
 function cleanup() {
   if [[ "${CLEAN_START}" == "true" ]]; then
     "${progdir}/kill_node.sh"

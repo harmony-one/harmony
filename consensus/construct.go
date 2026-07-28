@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"errors"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	protobuf "google.golang.org/protobuf/proto"
 )
 

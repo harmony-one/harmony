@@ -1,7 +1,7 @@
 package bls
 
 import (
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls "github.com/harmony-one/harmony/crypto/bls/core"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )
@@ -44,7 +44,10 @@ func BytesToBLSPublicKey(bytes []byte) (*bls.PublicKey, error) {
 		return nil, errPubKeyCast
 	}
 	pubKey := &bls.PublicKey{}
-	err := pubKey.Deserialize(bytes)
+	// The upstream wrapper passes this buffer to C. Copy it so callers may
+	// safely provide a slice backed by a Go struct containing pointer fields.
+	buf := append([]byte(nil), bytes...)
+	err := pubKey.Deserialize(buf)
 
 	if err == nil {
 		BLSPubKeyCache.Add(kkey, *pubKey)

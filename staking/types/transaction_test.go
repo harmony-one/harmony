@@ -9,7 +9,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	numeric "github.com/harmony-one/harmony/numeric"
 )

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
@@ -16,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/harmony-one/harmony/crypto/hash"
 	chain2 "github.com/harmony-one/harmony/internal/chain"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"

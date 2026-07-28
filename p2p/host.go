@@ -14,9 +14,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/abool"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/common/clock"
+	bls "github.com/harmony-one/harmony/crypto/bls/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/blockedpeers"
@@ -496,10 +496,14 @@ func NewHost(cfg HostConfig) (Host, error) {
 	trustedPeersDnsResolvedCounter.Add(0)
 	trustedPeersConnectFailuresCounter.Add(0)
 
+	consensusPubKey := ""
+	if self.ConsensusPubKey != nil {
+		consensusPubKey = self.ConsensusPubKey.SerializeToHexStr()
+	}
 	utils.Logger().Info().
 		Str("self", net.JoinHostPort(self.IP, self.Port)).
 		Interface("PeerID", self.PeerID).
-		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
+		Str("PubKey", consensusPubKey).
 		Msg("libp2p host ready")
 	return h, nil
 }

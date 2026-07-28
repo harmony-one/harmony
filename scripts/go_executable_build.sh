@@ -34,22 +34,13 @@ case "${0}" in
 *) progdir=.;;
 esac
 
-. "${progdir}/setup_bls_build_flags.sh"
-
 declare -A LIB
 
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'
    GOOS=darwin
-   LIB[libbls384_256.dylib]=${BLS_DIR}/lib/libbls384_256.dylib
-   LIB[libmcl.dylib]=${MCL_DIR}/lib/libmcl.dylib
-   LIB[libgmp.10.dylib]=/opt/homebrew/opt/gmp/lib/libgmp.10.dylib
-   LIB[libgmpxx.4.dylib]=/opt/homebrew/opt/gmp/lib/libgmpxx.4.dylib
-   LIB[libcrypto.1.1.dylib]=/opt/homebrew/opt/openssl@1.1/lib/libcrypto.1.1.dylib
 else
    MD5=md5sum
-   LIB[libbls384_256.so]=${BLS_DIR}/lib/libbls384_256.so
-   LIB[libmcl.so]=${MCL_DIR}/lib/libmcl.so
 fi
 
 function usage
@@ -155,11 +146,7 @@ function build_only
          fi
       done
 
-      $MD5 "${!SRC[@]}" "${!LIB[@]}" > md5sum.txt
-      # hardcode the prebuilt libcrypto to md5sum.txt
-      if [ "$(uname -s)" == "Linux" ]; then
-         echo '771150db04267126823190c873a96e48  libcrypto.so.10' >> md5sum.txt
-      fi
+      $MD5 "${!SRC[@]}" > md5sum.txt
    fi
    popd
 }

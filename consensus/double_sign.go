@@ -5,9 +5,9 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/harmony-one/harmony/staking/slash"
 )
 

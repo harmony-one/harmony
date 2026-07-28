@@ -1,8 +1,8 @@
 package helpers
 
 import (
-	"github.com/harmony-one/bls/ffi/go/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+	bls "github.com/harmony-one/harmony/crypto/bls/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p/core/crypto"

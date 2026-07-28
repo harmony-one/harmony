@@ -13,11 +13,11 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
@@ -324,7 +324,7 @@ func TestVerify(t *testing.T) {
 			sdb:   defaultTestStateDB(),
 			chain: defaultFakeBlockChain(),
 
-			expErr: errors.New("Empty buf"),
+			expErr: errors.New("err blsSignatureDeserialize"),
 		},
 		{
 			// false signature

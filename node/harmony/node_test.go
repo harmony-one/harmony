@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
+	ffi_bls "github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/registry"

@@ -9,9 +9,9 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"

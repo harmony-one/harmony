@@ -8,7 +8,6 @@ import (
 
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core"
@@ -16,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"

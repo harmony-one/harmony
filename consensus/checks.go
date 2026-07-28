@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	libbls "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
+	libbls "github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/pkg/errors"
 	protobuf "google.golang.org/protobuf/proto"
