@@ -403,6 +403,7 @@ func delegatorSlashApplyDebt(
 	slashTrack *Application,
 	useSlashExternalStakeDenomFix bool,
 ) error {
+	state.MarkValidatorWrapperDirty(current.Address)
 	slashIndexPairs, totalStake := makeSlashList(snapshot, current)
 	validatorDelegation := &current.Delegations[0]
 	selfStakeForExternalDenom := validatorDelegation.Amount

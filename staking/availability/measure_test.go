@@ -660,6 +660,8 @@ func (state testStateDB) UpdateValidatorWrapper(addr common.Address, wrapper *st
 	return nil
 }
 
+func (state testStateDB) MarkValidatorWrapperDirty(addr common.Address) {}
+
 func (state testStateDB) GetCode(addr common.Address, isValidatorCode bool) []byte {
 	wrapper, ok := state[addr]
 	if !ok {
@@ -793,6 +795,8 @@ type stateValidatorWrapperImpl struct {
 func (a stateValidatorWrapperImpl) ValidatorWrapper(addr common.Address, sendOriginal bool, copyDelegations bool) (*staking.ValidatorWrapper, error) {
 	return a.v, a.err
 }
+
+func (a stateValidatorWrapperImpl) MarkValidatorWrapperDirty(addr common.Address) {}
 
 func TestUpdateMaxCommissionFee(t *testing.T) {
 	t.Run("0.6 + 0.6 = 1 (100%)", func(t *testing.T) {

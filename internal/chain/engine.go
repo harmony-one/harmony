@@ -428,14 +428,22 @@ func payoutUndelegations(
 				"[Finalize] failed to get validator from state to finalize",
 			)
 		}
+		wrapperDirty := false
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
+			before := len(delegation.Undelegations)
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
 				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock, isMaxRate,
 			)
+			if len(delegation.Undelegations) != before {
+				wrapperDirty = true
+			}
 			if totalWithdraw.Sign() != 0 {
 				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 			}
+		}
+		if wrapperDirty {
+			state.MarkValidatorWrapperDirty(validator)
 		}
 		countTrack[validator] = len(wrapper.Delegations)
 	}
@@ -484,6 +492,7 @@ func setElectionEpochAndMinFee(chain engine.ChainReader, header *block.Header, s
 		}
 		// Set last epoch in committee
 		wrapper.LastEpochInCommittee = newShardState.Epoch
+		state.MarkValidatorWrapperDirty(addr)
 		if minRateNotZero {
 			// Set first election epoch (applies only if previously unset)
 			state.SetValidatorFirstElectionEpoch(addr, newShardState.Epoch)

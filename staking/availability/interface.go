@@ -27,4 +27,5 @@ type RoundHeader interface {
 type ValidatorState interface {
 	ValidatorWrapper(common.Address, bool, bool) (*staking.ValidatorWrapper, error)
 	UpdateValidatorWrapper(common.Address, *staking.ValidatorWrapper) error
+	MarkValidatorWrapperDirty(common.Address)
 }
