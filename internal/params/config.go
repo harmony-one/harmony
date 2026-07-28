@@ -105,6 +105,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(2964),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(2964),
 		BloomEpoch:                            big.NewInt(2964),
+		StakingV2Epoch:                        EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -179,6 +180,7 @@ var (
 		CXMerkleProofReplayFixEpoch:           big.NewInt(7385),
 		BLSProofBindEpoch:                     big.NewInt(7420),
 		BloomEpoch:                            big.NewInt(7414),
+		StakingV2Epoch:                        EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -251,6 +253,7 @@ var (
 		SlashBallotSignerFixEpoch:             EpochTBD,
 		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 		BloomEpoch:                            EpochTBD,
+		StakingV2Epoch:                        EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -325,6 +328,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(52650),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(53000),
 		BloomEpoch:                            big.NewInt(53508),
+		StakingV2Epoch:                        EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -398,6 +402,7 @@ var (
 		SlashBallotSignerFixEpoch:             EpochTBD,
 		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 		BloomEpoch:                            EpochTBD,
+		StakingV2Epoch:                        EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -547,6 +552,7 @@ var (
 		big.NewInt(1),                      // SlashBallotSignerFixEpoch
 		big.NewInt(1),                      // VerifyBeaconHeaderSlashEpoch
 		big.NewInt(1),                      // BloomEpoch
+		big.NewInt(0),                      // StakingV2Epoch
 	}
 
 	// TestChainConfig ...
@@ -884,6 +890,8 @@ type ChainConfig struct {
 	// have individual activation epochs; each feature is active once the chain
 	// reaches the earlier of BloomEpoch and that feature's epoch.
 	BloomEpoch *big.Int `json:"bloom-epoch,omitempty"`
+	// StakingV2Epoch is the epoch when Staking V2 is activated.
+	StakingV2Epoch *big.Int `json:"staking-v2-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -1304,6 +1312,10 @@ func (c *ChainConfig) IsTopMaxRate(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsPrague(epoch *big.Int) bool {
 	return isForked(c.PragueEpoch, epoch)
+}
+
+func (c *ChainConfig) IsStakingV2(epoch *big.Int) bool {
+	return isForked(c.StakingV2Epoch, epoch)
 }
 
 // During this epoch, shards 2 and 3 will start sending
