@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GO_BUILDER_IMAGE=${GO_BUILDER_IMAGE:-golang:1.24.2@sha256:30baaea08c5d1e858329c50f29fe381e9b7d7bced11a0f5f1f69a1504cdfbf5e}
+GO_BUILDER_IMAGE=${GO_BUILDER_IMAGE:-golang:1.26.5-bookworm@sha256:53eeac89074db483fdf0ab3be1df32bf6e47562263d2d0d6baa7f26acb4957dd}
 LOCALNET_ARCH=${LOCALNET_ARCH:-$(docker info --format '{{.Architecture}}')}
 BUILD_STAMP="$ROOT/bin/.localnet-build"
 

@@ -1,4 +1,4 @@
-FROM golang:1.24.2-bullseye
+FROM golang:1.26.5-bookworm
 
 # hadolint ignore=DL3008
 RUN apt-get update > /dev/null 2>&1 && \
