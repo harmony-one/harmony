@@ -178,7 +178,7 @@ var (
 		CXMerkleProofReplayFixEpoch:           big.NewInt(7385),
 		BLSProofBindEpoch:                     big.NewInt(7420),
 		BloomEpoch:                            big.NewInt(7414),
-		IsOneSecondEpoch:                      big.NewInt(7504),
+		IsOneSecondEpoch:                      big.NewInt(7535),
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
