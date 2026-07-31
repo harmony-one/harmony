@@ -16,6 +16,21 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
+func TestProtocol_MaxAdvertiseSleep(t *testing.T) {
+	p := &Protocol{
+		config: Config{},
+	}
+	if got := p.maxAdvertiseSleep(); got != MaxSleepTimeNormal {
+		t.Fatalf("fallback sleep: got %v want %v", got, MaxSleepTimeNormal)
+	}
+
+	p.config.MaxAdvertiseWaitTime = 7
+	want := 7 * time.Minute
+	if got := p.maxAdvertiseSleep(); got != want {
+		t.Fatalf("configured sleep: got %v want %v", got, want)
+	}
+}
+
 func TestProtocol_Match(t *testing.T) {
 	tests := []struct {
 		targetID protocol.ID

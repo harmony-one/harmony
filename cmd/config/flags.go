@@ -1982,7 +1982,7 @@ var (
 	}
 	syncMaxAdvertiseWaitTimeFlag = cli.IntFlag{
 		Name:   "sync.max-advertise-wait-time",
-		Usage:  "The max time duration between two advertises for each p2p peer to tell other nodes what protocols it supports",
+		Usage:  "Max minutes between sync protocol advertisements in normal mode (caps advertise sleep)",
 		Hidden: true,
 	}
 	syncDiscSoftLowFlag = cli.IntFlag{

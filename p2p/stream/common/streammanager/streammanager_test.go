@@ -1,6 +1,7 @@
 package streammanager
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -281,6 +282,63 @@ func TestStreamSet_numStreamsWithMinProtoID(t *testing.T) {
 	num := ss.numStreamsWithMinProtoSpec(minSpec)
 	if num != numPid2 {
 		t.Errorf("unexpected result: %v/%v", num, numPid2)
+	}
+}
+
+func TestWaitForStreamRegistrations(t *testing.T) {
+	sm := newTestStreamManager()
+	sm.config.HardLoCap = 3
+
+	done := make(chan struct{})
+	go func() {
+		sm.waitForStreamRegistrations(context.Background(), 2)
+		close(done)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	select {
+	case <-done:
+		t.Fatal("wait returned before streams were registered")
+	default:
+	}
+
+	sm.streams.addStream(newTestStream(makeStreamID(1), testProtoID))
+	sm.streams.addStream(newTestStream(makeStreamID(2), testProtoID))
+
+	select {
+	case <-done:
+	case <-time.After(defTestWait):
+		t.Fatal("timed out waiting for registration wait to complete")
+	}
+}
+
+func TestDiscoverSkipsDHTOnlyAfterRegisteredHardLoCap(t *testing.T) {
+	sm := newTestStreamManager()
+	sm.config.HardLoCap = 2
+	sm.config.DiscBatch = 4
+	// Empty peer finder: if DHT runs, connecting stays 0.
+	sm.pf = newTestPeerFinder(nil, emptyDelayFunc)
+
+	discovered, err := sm.discoverAndSetupStream(context.Background())
+	if err != nil {
+		t.Fatalf("discover: %v", err)
+	}
+	if discovered != 0 {
+		t.Fatalf("expected DHT path with no peers below HardLoCap, got discovered=%d", discovered)
+	}
+	if sm.hardHaveEnoughStream() {
+		t.Fatal("expected HardLoCap unmet before registrations")
+	}
+
+	sm.streams.addStream(newTestStream(makeStreamID(101), testProtoID))
+	sm.streams.addStream(newTestStream(makeStreamID(102), testProtoID))
+
+	discovered, err = sm.discoverAndSetupStream(context.Background())
+	if err != nil {
+		t.Fatalf("discover after hard cap: %v", err)
+	}
+	if discovered != sm.streams.size() {
+		t.Fatalf("expected skip to return registered stream count %d, got %d", sm.streams.size(), discovered)
 	}
 }
 

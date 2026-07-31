@@ -96,8 +96,10 @@ const (
 	MaxBackoffStartup           = 15 * time.Second  // 15 seconds max backoff
 
 	// Advertisement loop timing constants
-	MinSleepTimeNormal  = 30 * time.Second // Minimum sleep time in normal mode
-	MaxSleepTimeNormal  = 60 * time.Minute // Maximum sleep time in normal mode
+	MinSleepTimeNormal = 30 * time.Second // Minimum sleep time in normal mode
+	// MaxSleepTimeNormal is the fallback max advertise sleep when MaxAdvertiseWaitTime
+	// is unset/zero. Prefer config Sync.MaxAdvertiseWaitTime (minutes) as the source of truth.
+	MaxSleepTimeNormal  = 15 * time.Minute
 	MinSleepTimeStartup = 10 * time.Second // Minimum sleep time in startup mode
 	MaxSleepTimeStartup = 2 * time.Minute  // Maximum sleep time in startup mode
 
@@ -111,10 +113,10 @@ const (
 	// DHT Request Limits - How many peers to request from DHT
 	// These should be higher than target limits because DHT may return invalid peers
 	// Based on stream sync configuration and realistic peer discovery ratios:
-	// - Mainnet: Request 20, expect ~8 valid (40% success rate)
+	// - Mainnet: Request 20, expect ~5 valid (matches InitStreams)
 	// - Testnet: Request 8, expect ~2 valid (25% success rate)
 	// - Devnet: Request 12, expect ~4 valid (33% success rate)
-	DHTRequestLimitMainnet   = 20 // Request 20, expect ~8 valid
+	DHTRequestLimitMainnet   = 20 // Request 20, expect ~5 valid
 	DHTRequestLimitTestnet   = 10 // Request 10, expect ~3 valid
 	DHTRequestLimitPangaea   = 10 // Request 10, expect ~3 valid
 	DHTRequestLimitPartner   = 10 // Request 10, expect ~3 valid
@@ -125,12 +127,12 @@ const (
 	// Target Valid Peer Counts - How many valid peers we want to find
 	// These are the actual peer counts we aim for after filtering
 	// Based on stream sync configuration requirements:
-	// - Mainnet: InitStreams=8, DiscSoftLowCap=8, DiscHardLowCap=6
+	// - Mainnet: InitStreams=5, DiscSoftLowCap=5, DiscHardLowCap=3
 	// - Testnet: InitStreams=3, DiscSoftLowCap=3, DiscHardLowCap=3
 	// - Localnet: InitStreams=4, DiscSoftLowCap=4, DiscHardLowCap=4
 	// - Partner: InitStreams=3, DiscSoftLowCap=3, DiscHardLowCap=3
 	// - Else: InitStreams=4, DiscSoftLowCap=4, DiscHardLowCap=4
-	TargetValidPeersMainnet   = 8 // Target 8 valid peers (matches InitStreams)
+	TargetValidPeersMainnet   = 5 // Target 5 valid peers (matches InitStreams)
 	TargetValidPeersTestnet   = 3 // Target 3 valid peers (matches InitStreams)
 	TargetValidPeersPangaea   = 3 // Target 3 valid peers (testnet-like)
 	TargetValidPeersPartner   = 3 // Target 3 valid peers (matches InitStreams)

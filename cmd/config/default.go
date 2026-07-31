@@ -209,12 +209,12 @@ var (
 		SyncMode:             0,
 		Client:               false,
 		StagedSyncCfg:        defaultStagedSyncConfig,
-		Concurrency:          6,
-		MinPeers:             6,
-		InitStreams:          8,
-		MaxAdvertiseWaitTime: 60, //minutes
-		DiscSoftLowCap:       8,
-		DiscHardLowCap:       6,
+		Concurrency:          4,
+		MinPeers:             4,
+		InitStreams:          5,
+		MaxAdvertiseWaitTime: 15, // minutes; caps advertiseLoop sleep in normal mode
+		DiscSoftLowCap:       5,
+		DiscHardLowCap:       3,
 		DiscHighCap:          128,
 		DiscBatch:            8,
 		TrustedNodes:         []string{},
