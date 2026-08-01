@@ -8,7 +8,7 @@ SHELL := bash
 EPOCH_TO_WAIT ?=5
 EXTRA_NODES_FILE ?="./test/configs/local-extra-nodes.txt"
 
-.PHONY: all help libs exe race trace-pointer debug debug-ext debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker go-vet go-test docker build_localnet_validator protofiles travis_go_checker travis_rpc_checker travis_rosetta_checker debug-start-log debug-stop-log debug-restart-log debug-delete-log
+.PHONY: all help libs exe race trace-pointer debug debug-ext debug-kill test test-all test-go test-integration test-rpc test-rpc-attach test-rosetta test-rosetta-attach test-pyhmy test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker go-vet go-test docker build_localnet_validator protofiles travis_go_checker travis_rpc_checker travis_rosetta_checker debug-start-log debug-stop-log debug-restart-log debug-delete-log
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
@@ -26,9 +26,12 @@ help:
 	@echo "debug-ext - start a localnet with 2 shards and external (s0 rpc endpoint = localhost:9598; s1 rpc endpoint = localhost:9596)"
 	@echo "clean - remove node files & logs created by localnet"
 	@echo "distclean - remove node files & logs created by localnet, and all libs"
-	@echo "test - run the entire test suite (go test & Node API test)"
+	@echo "test - run native Go checks and unit tests"
+	@echo "test-all - run native Go checks and all localnet integration suites"
 	@echo "test-go - run the go test (with go lint, fmt, imports, mod, and generate checks)"
+	@echo "test-integration - run RPC, Rosetta, and pyhmy localnet tests"
 	@echo "test-rpc - run the rpc tests"
+	@echo "test-pyhmy - run the pyhmy tests"
 	@echo "test-rpc-attach - attach onto the rpc testing docker container for inspection"
 	@echo "test-rosetta - run the rosetta tests"
 	@echo "test-rosetta-attach - attach onto the rosetta testing docker container for inspection"
@@ -141,14 +144,22 @@ distclean: clean
 go-get:
 	go get -v ./...
 
-test:
+test: test-go
+
+test-all:
 	bash ./test/all.sh
 
 test-go:
 	bash ./test/go.sh
 
+test-integration:
+	bash ./test/localnet.sh rpc rosetta pyhmy
+
 test-rpc:
 	bash ./test/rpc.sh run
+
+test-pyhmy:
+	bash ./test/localnet.sh pyhmy
 
 test-rpc-attach:
 	bash ./test/rpc.sh attach
