@@ -335,6 +335,12 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		if maxWaitTime > waitTime {
 			waitTime = maxWaitTime
 		}
+		if consensus.Blockchain().Config().IsOneSecond(consensus.Blockchain().CurrentBlock().Epoch()) {
+			waitTime = time.Until(consensus.NextBlockDue) - 200*time.Millisecond
+			if waitTime < 0 {
+				waitTime = 0
+			}
+		}
 		go consensus.finalCommit(waitTime, viewID, consensus.isLeader())
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
