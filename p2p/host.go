@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/abool"
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/common/clock"
+	ctypes "github.com/harmony-one/harmony/common/types"
 	bls "github.com/harmony-one/harmony/crypto/bls/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -465,7 +466,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		joined:                  map[string]*libp2p_pubsub.Topic{},
 		self:                    *self,
 		trustedNodes:            cfg.TrustedNodes,
-		trustedPeerIDs:          sttypes.NewSafeMap[libp2p_peer.ID, struct{}](),
+		trustedPeerIDs:          ctypes.NewSafeMap[libp2p_peer.ID, struct{}](),
 		trustedMinPeers:         cfg.TrustedMinPeers,
 		trustedBootstrapEnabled: cfg.TrustedBootstrapEnabled,
 		dnsStaticNodes:          cfg.DNSStaticNodes,
@@ -580,7 +581,7 @@ type HostV2 struct {
 	streamProtos            []sttypes.Protocol
 	self                    Peer
 	trustedNodes            []string
-	trustedPeerIDs          *sttypes.SafeMap[libp2p_peer.ID, struct{}] // Thread-safe map of trusted peer IDs
+	trustedPeerIDs          *ctypes.SafeMap[libp2p_peer.ID, struct{}] // Thread-safe map of trusted peer IDs
 	trustedMinPeers         int
 	trustedBootstrapEnabled bool
 	dnsStaticNodes          []string
