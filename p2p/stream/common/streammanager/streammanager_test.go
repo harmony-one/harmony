@@ -316,7 +316,7 @@ func TestDiscoverSkipsDHTOnlyAfterRegisteredHardLoCap(t *testing.T) {
 	sm := newTestStreamManager()
 	sm.config.HardLoCap = 2
 	sm.config.DiscBatch = 4
-	// Empty peer finder: if DHT runs, connecting stays 0.
+	// Empty peer finder: connecting stays 0 when DHT runs.
 	sm.pf = newTestPeerFinder(nil, emptyDelayFunc)
 
 	discovered, err := sm.discoverAndSetupStream(context.Background())

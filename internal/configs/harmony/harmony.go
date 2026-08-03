@@ -372,7 +372,7 @@ type SyncConfig struct {
 	Concurrency          int              // concurrency used for stream sync protocol
 	MinPeers             int              // minimum streams to start a sync task.
 	InitStreams          int              // minimum streams in bootstrap to start sync loop.
-	MaxAdvertiseWaitTime int              // max minutes between advertisements (normal mode advertiseLoop cap)
+	MaxAdvertiseWaitTime int              // max minutes between advertisements in normal mode
 	DiscSoftLowCap       int              // when number of streams is below this value, spin discover during check
 	DiscHardLowCap       int              // when removing stream, num is below this value, spin discovery immediately
 	DiscHighCap          int              // upper limit of streams in one sync protocol

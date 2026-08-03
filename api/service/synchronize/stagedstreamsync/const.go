@@ -52,8 +52,7 @@ const (
 
 	// StreamDiscoveryWatchdogTimeout is the maximum time to wait for enough stream
 	// connections before resetting stream manager runtime state and retrying.
-	// Keep it longer than streammanager.MaxRemovalCooldownDuration so punished nodes
-	// are not unblocked immediately by watchdog recovery.
+	// Intended to stay above streammanager.MaxRemovalCooldownDuration.
 	StreamDiscoveryWatchdogTimeout time.Duration = 30 * time.Minute
 
 	// pivot block distance ranges
@@ -98,7 +97,7 @@ type (
 		Concurrency          int // Number of concurrent sync requests
 		MinStreams           int // Minimum number of streams to do sync
 		InitStreams          int // Number of streams requirement for initial bootstrap
-		MaxAdvertiseWaitTime int // max minutes between advertisements (wired to advertiseLoop)
+		MaxAdvertiseWaitTime int // max minutes between advertisements in normal mode
 		// stream manager config
 		SmSoftLowCap int
 		SmHardLowCap int

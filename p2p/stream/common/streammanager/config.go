@@ -19,27 +19,21 @@ const (
 	// RemovalCooldownDuration defines the cooldown period before a removed stream can reconnect.
 	RemovalCooldownDuration = 5 * time.Minute
 	// MaxRemovalCooldownDuration is the upper bound for removal cooldowns.
-	// Keep it shorter than stagedstreamsync.StreamDiscoveryWatchdogTimeout so watchdog
-	// recovery can clear blocked peers after cooldowns would have expired anyway.
+	// Intended to stay below stagedstreamsync.StreamDiscoveryWatchdogTimeout.
 	MaxRemovalCooldownDuration = 15 * time.Minute
 
-	// Mass-disconnect / local-outage detection:
-	// Many streams dying in a short window usually means the local uplink failed, not that
-	// every remote peer is bad. Skip critical cooldowns and allow quick reconnect.
+	// Mass-disconnect / local-outage detection parameters.
 	massDisconnectWindow   = 45 * time.Second
 	massDisconnectMinCount = 3
-	// localOutageDuration is how long after a mass disconnect we keep treating
-	// connection-loss removals as local-outage (soft reconnect).
+	// localOutageDuration is how long connection-loss removals use soft reconnect.
 	localOutageDuration = 2 * time.Minute
-	// localOutageDiscHoldoff delays DHT rediscovery briefly after mass disconnect so we
-	// do not hammer discovery while the local network is still down.
+	// localOutageDiscHoldoff is the delay before rediscovery after a mass disconnect.
 	localOutageDiscHoldoff = 30 * time.Second
-	// localOutageMinInterval rate-limits how often a new local-outage window may start,
-	// so sybil flaps cannot repeatedly wipe critical cooldowns.
+	// localOutageMinInterval is the minimum time between local-outage windows.
 	localOutageMinInterval = 10 * time.Minute
 
-	// streamRegistrationWait is how long to wait for async handleStream registrations
-	// after trusted peer NewStream succeeds, before deciding whether to skip DHT.
+	// streamRegistrationWait is the max wait for async stream registration after
+	// trusted peer NewStream succeeds.
 	streamRegistrationWait = 5 * time.Second
 	// streamRegistrationPoll is the polling interval while waiting for registrations.
 	streamRegistrationPoll = 50 * time.Millisecond

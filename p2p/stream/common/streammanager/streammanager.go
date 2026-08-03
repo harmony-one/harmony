@@ -88,7 +88,7 @@ type streamManager struct {
 	numTrustedStreamsMain     int64 // Count of trusted streams in main list
 	numTrustedStreamsReserved int64 // Count of trusted streams in reserved list
 
-	// disconnectTracker detects mass removals that indicate a local network outage.
+	// disconnectTracker tracks clustered stream removals and local-outage windows.
 	disconnectTracker disconnectTracker
 
 	// callback for when enough streams are found
@@ -157,9 +157,8 @@ func (rm *RemovalInfo) ResetCount() {
 	rm.count = 0
 }
 
-// MarkRemovedForLocalOutage records a removal caused by a likely local network outage.
-// Peers may reconnect immediately; the removal count is reset so soft escalation does not
-// carry over from the outage wave.
+// MarkRemovedForLocalOutage records a connection-loss removal during a local-outage
+// window. The peer may reconnect immediately and the removal count is reset.
 func (rm *RemovalInfo) MarkRemovedForLocalOutage() {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
@@ -611,7 +610,6 @@ func (sm *streamManager) addStreamFromReserved(count int) (int, error) {
 }
 
 func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, criticalErr bool) error {
-	// Resolve which set contains the stream before counting toward mass-disconnect.
 	st, inMain := sm.streams.get(id)
 	inReserved := false
 	if !inMain {
@@ -624,8 +622,8 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 	now := time.Now()
 	connectionLoss := isConnectionLossReason(reason)
 	_, isTrusted := sm.trustedStreams.Get(id)
-	// Trusted streams stay protected on critical errors unless we are in a local
-	// outage and this removal is a connection-loss (so dead trusted links can drop).
+	// Trusted streams with critical errors stay registered unless the removal is a
+	// connection loss during an active local-outage window.
 	if isTrusted && criticalErr && !(sm.disconnectTracker.inLocalOutage(now) && connectionLoss) {
 		streamCriticalErrorCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		sm.logger.Info().
@@ -646,7 +644,6 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 	activeBefore := sm.streams.size() + sm.reservedStreams.size()
 	inLocalOutage := sm.disconnectTracker.inLocalOutage(now)
 	justEntered := false
-	// Only connection-loss removals feed mass-disconnect detection.
 	if connectionLoss {
 		inLocalOutage, justEntered = sm.disconnectTracker.observeRemoval(now, activeBefore)
 		if justEntered {
@@ -654,8 +651,7 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 		}
 	}
 
-	// Soft reconnect only for connection-loss removals inside a local-outage window.
-	// Bad-data / protocol removals keep full critical/soft cooldowns.
+	// Soft reconnect applies to connection-loss removals during a local-outage window.
 	softReconnect := inLocalOutage && connectionLoss
 	effectiveCritical := criticalErr && !softReconnect
 	if effectiveCritical {
@@ -732,13 +728,10 @@ func (sm *streamManager) onLocalOutageDetected(activeBefore int, reason string) 
 		Dur("discHoldoff", localOutageDiscHoldoff).
 		Dur("minInterval", localOutageMinInterval).
 		Str("lastReason", reason).
-		Msg("[StreamManager] mass disconnect detected; treating connection-loss removals as local network outage")
+		Msg("[StreamManager] mass disconnect detected; local-outage window started")
 
-	// Peers are not at fault for connection loss; clear connect-failure cooldown so
-	// reconnect can succeed once the local network recovers.
 	sm.coolDownCache.Reset()
 
-	// Brief holdoff so we do not immediately spam DHT while the uplink may still be down.
 	sm.coolDown.Set()
 	go func() {
 		timer := time.NewTimer(localOutageDiscHoldoff)
@@ -784,8 +777,7 @@ func (sm *streamManager) handleResetForWatchdog() error {
 	mainStreams := sm.streams.size()
 	reservedStreams := sm.reservedStreams.size()
 
-	// Keep active connections intact. Clear cooldown/blocking state so peer
-	// discovery can retry candidates again.
+	// Preserve active connections. Clear cooldown and discovery-blocking state.
 	sm.removedStreams.Clear()
 	sm.coolDownCache.Reset()
 	sm.coolDown.UnSet()
@@ -1111,8 +1103,6 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 				Msg("[discoverAndSetupStream] processing trusted peers for bootstrap stream setup")
 
 			streamsBefore := sm.streams.size()
-			// Setup trusted streams - this function handles batching and waiting for NewStream.
-			// Registration still happens asynchronously in handleStream.
 			successCount := sm.setupTrustedStreams(discCtx, trustedPeers, trustedMinPeers)
 			connectedTrustedStreams = successCount
 
@@ -1136,9 +1126,7 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 		}
 	}
 
-	// Only skip DHT after streams are actually registered. Counting initiated
-	// NewStream successes can race ahead of handleStream registration and leave
-	// the node below HardLoCap with discovery stopped.
+	// Skip DHT when enough compatible streams are already registered.
 	if sm.hardHaveEnoughStream() {
 		return sm.streams.size(), nil
 	}
@@ -1183,10 +1171,8 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 	return connectedTrustedStreams + connecting, nil
 }
 
-// waitForStreamRegistrations polls until at least target compatible streams are
-// registered, HardLoCap is met, or the wait budget/context expires. setupStreamWithPeer
-// launches handleStream asynchronously, so NewStream success alone is not enough to
-// decide whether DHT discovery can be skipped.
+// waitForStreamRegistrations waits until target compatible streams are registered,
+// HardLoCap is met, or the wait budget/context expires.
 func (sm *streamManager) waitForStreamRegistrations(ctx context.Context, target int) {
 	if target <= 0 || sm.hardHaveEnoughStream() {
 		return

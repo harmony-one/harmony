@@ -130,7 +130,7 @@ func TestDisconnectTracker_SmallSetLosingAllPeers(t *testing.T) {
 
 func TestHandleRemoveStream_MassDisconnectSkipsCriticalCooldownForConnectionLoss(t *testing.T) {
 	sm := newTestStreamManager()
-	sm.pf = newTestPeerFinder(nil, emptyDelayFunc) // prevent bootstrap discovery from inflating stream count
+	sm.pf = newTestPeerFinder(nil, emptyDelayFunc)
 	sm.config.HardLoCap = 2
 	sm.config.SoftLoCap = 2
 	sm.Start()
@@ -138,7 +138,6 @@ func TestHandleRemoveStream_MassDisconnectSkipsCriticalCooldownForConnectionLoss
 
 	const lossReason = "force close: remote closed stream"
 
-	// Seed 4 streams so threshold is 3.
 	for i := 1; i <= 4; i++ {
 		if err := sm.NewStream(newTestStream(makeStreamID(i), testProtoID)); err != nil {
 			t.Fatalf("add stream %d: %v", i, err)
@@ -203,7 +202,7 @@ func TestHandleRemoveStream_PunitiveKeepsCriticalCooldownDuringOutage(t *testing
 		}
 	}
 
-	// Trigger local outage via connection-loss removals.
+	// Trigger local outage with connection-loss removals.
 	for i := 1; i <= 3; i++ {
 		if err := sm.RemoveStream(makeStreamID(i), lossReason, true); err != nil {
 			t.Fatalf("loss remove %d: %v", i, err)
@@ -213,7 +212,6 @@ func TestHandleRemoveStream_PunitiveKeepsCriticalCooldownDuringOutage(t *testing
 		t.Fatal("expected local outage")
 	}
 
-	// Bad-data peer removed during outage must keep critical cooldown.
 	if err := sm.RemoveStream(makeStreamID(4), badReason, true); err != nil {
 		t.Fatalf("punitive remove: %v", err)
 	}

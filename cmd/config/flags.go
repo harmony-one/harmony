@@ -1982,7 +1982,7 @@ var (
 	}
 	syncMaxAdvertiseWaitTimeFlag = cli.IntFlag{
 		Name:   "sync.max-advertise-wait-time",
-		Usage:  "Max minutes between sync protocol advertisements in normal mode (caps advertise sleep)",
+		Usage:  "Max minutes between sync protocol advertisements in normal mode",
 		Hidden: true,
 	}
 	syncDiscSoftLowFlag = cli.IntFlag{

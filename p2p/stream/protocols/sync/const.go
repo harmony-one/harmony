@@ -97,8 +97,7 @@ const (
 
 	// Advertisement loop timing constants
 	MinSleepTimeNormal = 30 * time.Second // Minimum sleep time in normal mode
-	// MaxSleepTimeNormal is the fallback max advertise sleep when MaxAdvertiseWaitTime
-	// is unset/zero. Prefer config Sync.MaxAdvertiseWaitTime (minutes) as the source of truth.
+	// MaxSleepTimeNormal is used when Sync.MaxAdvertiseWaitTime is unset or non-positive.
 	MaxSleepTimeNormal  = 15 * time.Minute
 	MinSleepTimeStartup = 10 * time.Second // Minimum sleep time in startup mode
 	MaxSleepTimeStartup = 2 * time.Minute  // Maximum sleep time in startup mode

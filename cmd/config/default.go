@@ -212,7 +212,7 @@ var (
 		Concurrency:          4,
 		MinPeers:             4,
 		InitStreams:          5,
-		MaxAdvertiseWaitTime: 15, // minutes; caps advertiseLoop sleep in normal mode
+		MaxAdvertiseWaitTime: 15, // minutes
 		DiscSoftLowCap:       5,
 		DiscHardLowCap:       3,
 		DiscHighCap:          128,

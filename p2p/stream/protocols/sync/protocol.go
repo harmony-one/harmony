@@ -80,7 +80,7 @@ type (
 		Explorer   bool
 		EpochChain bool
 
-		MaxAdvertiseWaitTime int // max minutes between advertisements (wired to advertiseLoop)
+		MaxAdvertiseWaitTime int // max minutes between advertisements in normal mode
 		// stream manager config
 		SmSoftLowCap int
 		SmHardLowCap int
@@ -306,8 +306,7 @@ func (p *Protocol) advertiseLoop() {
 }
 
 // maxAdvertiseSleep returns the normal-mode max sleep between advertise cycles.
-// Sync.MaxAdvertiseWaitTime (minutes) is the configured source of truth; MaxSleepTimeNormal
-// is only the fallback when the config value is unset or non-positive.
+// Uses Sync.MaxAdvertiseWaitTime when set; otherwise MaxSleepTimeNormal.
 func (p *Protocol) maxAdvertiseSleep() time.Duration {
 	if p.config.MaxAdvertiseWaitTime > 0 {
 		return time.Duration(p.config.MaxAdvertiseWaitTime) * time.Minute
