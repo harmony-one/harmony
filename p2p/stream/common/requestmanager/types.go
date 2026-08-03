@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	types "github.com/harmony-one/harmony/common/types"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/pkg/errors"
 )
@@ -100,8 +101,8 @@ type request struct {
 	raw  *interface{}
 	// options
 	priority  reqPriority
-	whitelist *sttypes.SafeMap[sttypes.StreamID, struct{}] // allowed streams
-	blacklist *sttypes.SafeMap[sttypes.StreamID, struct{}] // banned streams}
+	whitelist *types.SafeMap[sttypes.StreamID, struct{}] // allowed streams
+	blacklist *types.SafeMap[sttypes.StreamID, struct{}] // banned streams}
 }
 
 func (req *request) ReqID() uint64 {
@@ -140,7 +141,7 @@ func (req *request) isStreamAllowed(stid sttypes.StreamID) bool {
 
 func (req *request) addBlacklistedStream(stid sttypes.StreamID) {
 	if req.blacklist == nil {
-		req.blacklist = sttypes.NewSafeMap[sttypes.StreamID, struct{}]()
+		req.blacklist = types.NewSafeMap[sttypes.StreamID, struct{}]()
 	}
 	req.blacklist.Set(stid, struct{}{})
 }
@@ -177,7 +178,7 @@ func (req *request) blacklistIDs() []sttypes.StreamID {
 
 func (req *request) addWhiteListStream(stid sttypes.StreamID) {
 	if req.whitelist == nil {
-		req.whitelist = sttypes.NewSafeMap[sttypes.StreamID, struct{}]()
+		req.whitelist = types.NewSafeMap[sttypes.StreamID, struct{}]()
 	}
 	req.whitelist.Set(stid, struct{}{})
 }

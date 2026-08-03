@@ -176,9 +176,11 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	//// Write - End
 
 	//// Read - Start
+	// Quorum may already be met before this vote when the leader's own multi-BLS
+	// keys (added in announce) alone reach threshold. Track the last handled
+	// block so we fire prepare side-effects once per round.
 	quorumIsMet := consensus.decider().IsQuorumAchieved(quorum.Prepare)
-	lastQuorumAchievedBlock := consensus.current.GetLastQuorumAchievedBlock(quorum.Prepare)
-	if quorumIsMet && recvMsg.BlockNum > lastQuorumAchievedBlock {
+	if quorumIsMet && recvMsg.BlockNum > consensus.current.GetLastQuorumAchievedBlock(quorum.Prepare) {
 		// NOTE Let it handle its own logs
 		if err := consensus.didReachPrepareQuorum(); err != nil {
 			return
@@ -281,13 +283,14 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	//// Read - Start
 	viewID := consensus.getCurBlockViewID()
 
+	// Same multi-BLS case as prepare: leader may already meet commit quorum from
+	// keys added in didReachPrepareQuorum. Fire commit side-effects once per round.
 	quorumIsMet := consensus.decider().IsQuorumAchieved(quorum.Commit)
 	//// Read - End
-	lastQuorumAchievedBlock := consensus.current.GetLastQuorumAchievedBlock(quorum.Commit)
-	if quorumIsMet && blockObj.NumberU64() > lastQuorumAchievedBlock {
+	if quorumIsMet && recvMsg.BlockNum > consensus.current.GetLastQuorumAchievedBlock(quorum.Commit) {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.fBFTLog.MarkBlockVerified(blockObj)
-		consensus.current.SetLastQuorumAchievedBlock(quorum.Commit, blockObj.NumberU64())
+		consensus.current.SetLastQuorumAchievedBlock(quorum.Commit, recvMsg.BlockNum)
 
 		if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems

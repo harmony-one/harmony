@@ -4,7 +4,6 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/harmony-one/harmony/common/types"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -41,15 +40,20 @@ type State struct {
 	// ShardID of the consensus
 	ShardID uint32
 
-	quorumAchievedBlock *types.SafeMap[quorum.Phase, uint64]
+	// lastPrepareQuorumBlock / lastCommitQuorumBlock record the block number for which
+	// prepare/commit quorum side-effects were already applied. Used to fire those
+	// side-effects once per consensus round, including the multi-BLS case where the
+	// leader's own keys may already meet quorum before the first external vote.
+	// Cleared in resetState so the same blockNum can be retried after view change.
+	lastPrepareQuorumBlock uint64
+	lastCommitQuorumBlock  uint64
 }
 
 func NewState(mode Mode, shardID uint32) State {
 	state := State{
-		mode:                uint32(mode),
-		ShardID:             shardID,
-		phase:               atomic.Value{},
-		quorumAchievedBlock: types.NewSafeMap[quorum.Phase, uint64](),
+		mode:    uint32(mode),
+		ShardID: shardID,
+		phase:   atomic.Value{},
 	}
 	state.phase.Store(FBFTAnnounce)
 	return state
@@ -59,12 +63,12 @@ func (pm *State) getBlockNum() uint64 {
 	return atomic.LoadUint64(&pm.blockNum)
 }
 
-// setBlockNum sets the FBFT blockNum in consensus object, called at node bootstrap
+// setBlockNum sets the blockNum in consensus object, called at node bootstrap
 func (pm *State) setBlockNum(blockNum uint64) {
 	atomic.StoreUint64(&pm.blockNum, blockNum)
 }
 
-// SetBlockNum sets the FBFT blockNum in consensus object, called at node bootstrap
+// SetBlockNum sets the blockNum in consensus object, called at node bootstrap
 func (pm *State) SetBlockNum(blockNum uint64) {
 	pm.setBlockNum(blockNum)
 }
@@ -74,21 +78,35 @@ func (pm *State) GetBlockNum() uint64 {
 	return pm.getBlockNum()
 }
 
-// GetLastQuorumAchievedBlock retrieves the block number of the last block
-// that achieved quorum for the specified phase.
-// If no quorum has been achieved for the given phase, it returns 0.
+// GetLastQuorumAchievedBlock returns the last block number for which quorum
+// side-effects were applied for the given phase, or 0 if none.
 func (pm *State) GetLastQuorumAchievedBlock(p quorum.Phase) uint64 {
-	lqab, exists := pm.quorumAchievedBlock.Get(p)
-	if !exists {
+	switch p {
+	case quorum.Prepare:
+		return atomic.LoadUint64(&pm.lastPrepareQuorumBlock)
+	case quorum.Commit:
+		return atomic.LoadUint64(&pm.lastCommitQuorumBlock)
+	default:
 		return 0
 	}
-	return lqab
 }
 
-// SetLastQuorumAchievedBlock updates the block number of the last block
-// that achieved quorum for the specified phase.
+// SetLastQuorumAchievedBlock records that quorum side-effects were applied for
+// the given phase at blockNum.
 func (pm *State) SetLastQuorumAchievedBlock(p quorum.Phase, blockNum uint64) {
-	pm.quorumAchievedBlock.Set(p, blockNum)
+	switch p {
+	case quorum.Prepare:
+		atomic.StoreUint64(&pm.lastPrepareQuorumBlock, blockNum)
+	case quorum.Commit:
+		atomic.StoreUint64(&pm.lastCommitQuorumBlock, blockNum)
+	}
+}
+
+// clearLastQuorumAchievedBlocks clears prepare/commit quorum markers so a new
+// consensus round (including same blockNum after view change) can fire again.
+func (pm *State) clearLastQuorumAchievedBlocks() {
+	atomic.StoreUint64(&pm.lastPrepareQuorumBlock, 0)
+	atomic.StoreUint64(&pm.lastCommitQuorumBlock, 0)
 }
 
 func (pm *State) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {
