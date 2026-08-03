@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	ctypes "github.com/harmony-one/harmony/common/types"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -191,7 +192,7 @@ func (b *StageBodies) Exec(ctx context.Context, firstCycle bool, invalidBlockRev
 // Failed streams are only punished when synced streams exist; otherwise the
 // stream pool is preserved to avoid cascading removal during systemic issues.
 func (b *StageBodies) identifySyncedStreams(ctx context.Context, s *StageState, targetHeight uint64, excludeIDs []sttypes.StreamID) (streams []sttypes.StreamID, err error) {
-	results := sttypes.NewSafeMap[sttypes.StreamID, error]()
+	results := ctypes.NewSafeMap[sttypes.StreamID, error]()
 	var (
 		wg          sync.WaitGroup
 		syncedCount int32
