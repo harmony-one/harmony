@@ -136,6 +136,10 @@ type Consensus struct {
 	lastKnownSignPower int64
 	lastKnowViewChange int64
 
+	// last COMMIT this node successfully broadcast
+	lastCommitSentBlockNum uint64
+	lastCommitSentHash     atomic.Value // common.Hash
+
 	transitions struct {
 		finalCommit bool
 	}

@@ -184,6 +184,7 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 	if err := consensus.broadcastConsensusP2pMessages(p2pMsgs); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[sendCommitMessages] Cannot send commit message!!")
 	} else {
+		consensus.recordLastCommitSent(blockObj.NumberU64(), blockObj.Hash())
 		consensus.getLogger().Info().
 			Uint64("blockNum", consensus.BlockNum()).
 			Hex("blockHash", consensus.current.blockHash[:]).
@@ -357,6 +358,8 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
 		return
 	}
+	// Compare against the COMMITTED bitmap before any later SetMask mutation.
+	consensus.checkOwnCommitInclusion(recvMsg.BlockNum, recvMsg.BlockHash, mask)
 	consensus.fBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask

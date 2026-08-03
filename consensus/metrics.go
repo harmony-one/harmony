@@ -127,6 +127,20 @@ var (
 			Buckets:   prometheus.ExponentialBuckets(800, 1.25, 10),
 		},
 	)
+	// consensusLateSignatureCounterVec counts late prepare/commit votes and
+	// local COMMIT keys missing from the COMMITTED bitmap.
+	consensusLateSignatureCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "consensus",
+			Name:      "late_signature",
+			Help:      "votes arriving after finalize, or local commits missing from the COMMITTED bitmap",
+		},
+		[]string{
+			"role",
+			"phase",
+		},
+	)
 
 	onceMetrics sync.Once
 
@@ -188,6 +202,7 @@ func initMetrics() {
 			consensusGaugeVec,
 			consensusPubkeyVec,
 			consensusFinalityHistogram,
+			consensusLateSignatureCounterVec,
 			lastPreimageImportGauge,
 			preimageEndGauge,
 			preimageStartGauge,
