@@ -38,6 +38,11 @@ type State struct {
 
 	// ShardID of the consensus
 	ShardID uint32
+
+	// lastPrepareQuorumBlock / lastCommitQuorumBlock are the block numbers for which
+	// prepare/commit quorum side-effects have been applied.
+	lastPrepareQuorumBlock uint64
+	lastCommitQuorumBlock  uint64
 }
 
 func NewState(mode Mode, shardID uint32) State {
@@ -54,7 +59,7 @@ func (pm *State) getBlockNum() uint64 {
 	return atomic.LoadUint64(&pm.blockNum)
 }
 
-// SetBlockNum sets the blockNum in consensus object, called at node bootstrap
+// setBlockNum sets the blockNum in consensus object, called at node bootstrap
 func (pm *State) setBlockNum(blockNum uint64) {
 	atomic.StoreUint64(&pm.blockNum, blockNum)
 }
@@ -67,6 +72,28 @@ func (pm *State) SetBlockNum(blockNum uint64) {
 // GetBlockNum returns the block number
 func (pm *State) GetBlockNum() uint64 {
 	return pm.getBlockNum()
+}
+
+func (pm *State) getLastPrepareQuorumBlock() uint64 {
+	return atomic.LoadUint64(&pm.lastPrepareQuorumBlock)
+}
+
+func (pm *State) setLastPrepareQuorumBlock(blockNum uint64) {
+	atomic.StoreUint64(&pm.lastPrepareQuorumBlock, blockNum)
+}
+
+func (pm *State) getLastCommitQuorumBlock() uint64 {
+	return atomic.LoadUint64(&pm.lastCommitQuorumBlock)
+}
+
+func (pm *State) setLastCommitQuorumBlock(blockNum uint64) {
+	atomic.StoreUint64(&pm.lastCommitQuorumBlock, blockNum)
+}
+
+// clearLastQuorumAchievedBlocks clears prepare/commit quorum markers.
+func (pm *State) clearLastQuorumAchievedBlocks() {
+	atomic.StoreUint64(&pm.lastPrepareQuorumBlock, 0)
+	atomic.StoreUint64(&pm.lastCommitQuorumBlock, 0)
 }
 
 func (pm *State) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {
