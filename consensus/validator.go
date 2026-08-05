@@ -358,7 +358,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
 		return
 	}
-	// Compare against the COMMITTED bitmap before any later SetMask mutation.
+	// Compare against the verified incoming COMMITTED bitmap.
 	consensus.checkOwnCommitInclusion(recvMsg.BlockNum, recvMsg.BlockHash, mask)
 	consensus.fBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.aggregatedCommitSig = aggSig
@@ -371,13 +371,11 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	// Need to check whether this block actually was committed, because it could be another block
 	// with the same number that's committed and overriding its commit sigBytes is wrong.
 	blk := consensus.Blockchain().GetBlockByHash(blockObj.Hash())
-	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) && blk != nil {
-		new := mask.CountEnabled()
-		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
-		cur := mask.CountEnabled()
-		if new > cur {
-			consensus.getLogger().Info().Hex("old", commitSigBitmap).Hex("new", recvMsg.Payload).Msg("[OnCommitted] Overriding commit signatures!!")
-			consensus.Blockchain().WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
+	participantCount := len(consensus.decider().Participants())
+	if err == nil && blk != nil && isMoreCompleteCommitPayload(commitSigBitmap, recvMsg.Payload, participantCount) {
+		consensus.getLogger().Info().Hex("old", commitSigBitmap).Hex("new", recvMsg.Payload).Msg("[OnCommitted] Overriding commit signatures!!")
+		if err := consensus.Blockchain().WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[OnCommitted] failed writing richer commit sig")
 		}
 	}
 
