@@ -151,8 +151,6 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	}
 	//// Read - End
 
-	consensus.UpdateLeaderMetrics(float64(signerCount), float64(consensus.getBlockNum()))
-
 	// Check BLS signature for the multi-sig
 	prepareSig := recvMsg.Payload
 	var sign bls_core.Sign
