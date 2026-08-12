@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
@@ -495,6 +496,42 @@ func TestVerifiedSigCacheKeyIncludesShardID(t *testing.T) {
 
 	if newVerifiedSigKey(1, hash, sig, bitmap) == newVerifiedSigKey(2, hash, sig, bitmap) {
 		t.Fatal("verified signature cache keys must include shard ID")
+	}
+}
+
+func TestVerifySignatureRejectsEmptyPreStakingQuorum(t *testing.T) {
+	chain := makeFakeBlockChain()
+	eng := NewEngine()
+	state := makeDefaultCommittee()
+	committee, err := state.FindCommitteeByID(shard.BeaconChainShardID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubKeys, err := committee.BLSPublicKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := quorum.NewVerifier(committee, big.NewInt(0), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng.epochCtxCache.Add(epochCtxKey{shardID: shard.BeaconChainShardID, epoch: 0}, epochCtx{
+		qrVerifier: verifier,
+		pubKeys:    pubKeys,
+	})
+
+	err = eng.verifySignature(chain, payloadArgs{
+		blockHash: common.Hash{1},
+		shardID:   shard.BeaconChainShardID,
+		epoch:     big.NewInt(0),
+		number:    2,
+		viewID:    1,
+	}, sigArgs{
+		sig:    bls.SerializedSignature{},
+		bitmap: make([]byte, (len(pubKeys)+7)/8),
+	})
+	if err == nil || err.Error() != "not enough signature collected" {
+		t.Fatalf("expected empty quorum rejection, got %v", err)
 	}
 }
 

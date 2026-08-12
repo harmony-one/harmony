@@ -52,6 +52,38 @@ func TestPolicyStrings(t *testing.T) {
 	}
 }
 
+func TestUniformVerifierQuorumByMask(t *testing.T) {
+	verifier := &uniformVerifier{pubKeyCnt: 4}
+	publics := make([]bls.PublicKeyWrapper, verifier.pubKeyCnt)
+	for i := range publics {
+		publics[i].Object = bls.RandPrivateKey().GetPublicKey()
+		publics[i].Bytes.FromLibBLSPublicKey(publics[i].Object)
+	}
+
+	tests := []struct {
+		name   string
+		bitmap []byte
+		quorum bool
+	}{
+		{name: "no signers", bitmap: []byte{0x00}, quorum: false},
+		{name: "below threshold", bitmap: []byte{0x03}, quorum: false},
+		{name: "at threshold", bitmap: []byte{0x07}, quorum: true},
+		{name: "padding bits", bitmap: []byte{0xf0}, quorum: false},
+		{name: "nil mask", bitmap: nil, quorum: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var mask *bls.Mask
+			if test.bitmap != nil {
+				mask = bls.NewMask(publics)
+				require.NoError(t, mask.SetMask(test.bitmap))
+			}
+			assert.Equal(t, test.quorum, verifier.IsQuorumAchievedByMask(mask))
+		})
+	}
+}
+
 func TestAddingQuoromParticipants(t *testing.T) {
 	decider := NewDecider(SuperMajorityVote, shard.BeaconChainShardID)
 
