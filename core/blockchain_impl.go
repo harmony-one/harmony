@@ -2708,7 +2708,14 @@ func (bc *BlockChainImpl) CXMerkleProof(toShardID uint32, block *block.Header) (
 
 func (bc *BlockChainImpl) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxps []*types.CXReceiptsProof) error {
 	for _, cxp := range cxps {
-		if cxp.Header != nil && bc.Config().IsCXMerkleProofReplayFixEpoch(cxp.Header.Epoch()) {
+		// Key the spent-marker off the signed Header, not the unauthenticated
+		// MerkleProof.ShardID/BlockNum: those fields are only bound to the
+		// Header by ValidateCXReceiptsProof from IsCXMerkleProofReplayFixEpoch
+		// onward, so a proof claiming an earlier epoch can carry a mutated
+		// MerkleProof while keeping a genuine Header/signature. Deriving the
+		// key from MerkleProof would let such a mutated copy of an already
+		//-applied receipt look unspent and be replayed for a fresh credit.
+		if cxp.Header != nil {
 			if err := rawdb.WriteCXReceiptsProofSpentWithKey(
 				db, cxp.Header.ShardID(), cxp.Header.Number().Uint64(),
 			); err != nil {
@@ -2726,7 +2733,10 @@ func (bc *BlockChainImpl) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxp
 func (bc *BlockChainImpl) IsSpent(cxp *types.CXReceiptsProof) bool {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()
-	if cxp.Header != nil && bc.Config().IsCXMerkleProofReplayFixEpoch(cxp.Header.Epoch()) {
+	// See WriteCXReceiptsProofSpent: always resolve the spent-marker key from
+	// the signed Header so the check can't be bypassed by mutating the
+	// unauthenticated MerkleProof fields on a genuine, previously-applied proof.
+	if cxp.Header != nil {
 		shardID = cxp.Header.ShardID()
 		blockNum = cxp.Header.Number().Uint64()
 	}

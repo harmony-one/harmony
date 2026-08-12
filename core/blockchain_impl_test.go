@@ -11,6 +11,51 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+// TestIsSpentIgnoresMutatedMerkleProofIdentity guards against replaying a
+// genuine, already-applied CXReceiptsProof by mutating the unauthenticated
+// MerkleProof.ShardID/BlockNum while keeping the same signed Header: the
+// spent-marker must be keyed off the Header, which cannot be altered without
+// invalidating the commit signature, not off MerkleProof fields that
+// ValidateCXReceiptsProof only binds to the Header from
+// IsCXMerkleProofReplayFixEpoch onward.
+func TestIsSpentIgnoresMutatedMerkleProofIdentity(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	chain, _, header, database := getTestEnvironment(*key)
+
+	header = header.With().ShardID(1).Number(big.NewInt(42)).Header()
+
+	original := &types.CXReceiptsProof{
+		Header: header,
+		MerkleProof: &types.CXMerkleProof{
+			ShardID:  1,
+			BlockNum: big.NewInt(42),
+		},
+	}
+
+	batch := database.NewBatch()
+	if err := chain.WriteCXReceiptsProofSpent(batch, []*types.CXReceiptsProof{original}); err != nil {
+		t.Fatalf("WriteCXReceiptsProofSpent failed: %v", err)
+	}
+	if err := batch.Write(); err != nil {
+		t.Fatalf("batch.Write failed: %v", err)
+	}
+
+	if !chain.IsSpent(original) {
+		t.Fatal("expected original proof to be marked spent")
+	}
+
+	replay := &types.CXReceiptsProof{
+		Header: header, // same genuine, signed header
+		MerkleProof: &types.CXMerkleProof{
+			ShardID:  99,               // mutated, unauthenticated
+			BlockNum: big.NewInt(9999), // mutated, unauthenticated
+		},
+	}
+	if !chain.IsSpent(replay) {
+		t.Fatal("expected replay with mutated MerkleProof identity to be detected as already spent")
+	}
+}
+
 func TestPrepareStakingMetadata(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 	chain, db, header, _ := getTestEnvironment(*key)
