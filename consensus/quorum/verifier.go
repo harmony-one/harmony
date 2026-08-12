@@ -70,15 +70,18 @@ func newUniformVerifier(committee *shard.Committee) (*uniformVerifier, error) {
 	}, nil
 }
 
-// IsQuorumAchievedByMask returns whether the quorum is achieved with the provided mask,
-// which is whether more than (2/3+1) nodes is included in mask.
+// IsQuorumAchievedByMask returns whether the quorum is achieved with the provided mask.
 func (uv *uniformVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
-	got := int64(len(mask.Publics))
-	exp := uv.thresholdKeyCount()
-	// Theoretically speaking, greater or equal will do the work. But current logic is more strict
-	// without equal, thus conform to current logic implemented.
-	// (engineImpl.VerifySeal, uniformVoteWeight.IsQuorumAchievedByMask)
-	return got > exp
+	if mask == nil {
+		return false
+	}
+	var signerCount int64
+	for i := range mask.Publics {
+		if enabled, err := mask.IndexEnabled(i); err == nil && enabled {
+			signerCount++
+		}
+	}
+	return signerCount >= uv.thresholdKeyCount()
 }
 
 func (uv *uniformVerifier) thresholdKeyCount() int64 {
