@@ -20,7 +20,7 @@ ENV PATH="/root/bin:${PATH}"
 RUN apt update && apt upgrade -y && \
 	apt install libgmp-dev libssl-dev curl git \
 	psmisc dnsutils jq make gcc g++ bash tig tree sudo vim \
-	silversearcher-ag unzip emacs-nox nano bash-completion -y
+	silversearcher-ag unzip emacs-nox nano bash-completion lsof -y
 
 RUN mkdir ~/bin && \
 	curl -sL -o ~/bin/gimme \
