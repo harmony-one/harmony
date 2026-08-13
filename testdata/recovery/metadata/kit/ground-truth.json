@@ -1,0 +1,23 @@
+{
+  "abandoned_child_hash": "0x797a8bb62da1e2a810994979554c1e87dac5dc37883e029a101b2844012a3a67",
+  "blocks": 48,
+  "head_hash": "0x8db488df141e6952aff2291301e0403f2104ce05a10e701e5a9c80e802d6b7a5",
+  "hmr_sha256": "78d66d4a4b4d003ffd005be682126e03cc1c7d32cfcced10ae0ce28a69e52f52",
+  "network": "localnet",
+  "reference_sha256": "e8e507c88f9a0528257bfaf431f5f8adcf94d86899457d087f8f048fb67e66a9",
+  "schema": "metadata-kit-ground-truth-v1",
+  "staking_schedule": {
+    "create_validator": 22,
+    "delegate": 26,
+    "fund_precompile": 28,
+    "post_create_validator": 40,
+    "post_delegate": 42,
+    "post_top_up": 43,
+    "precompile_direct": 45,
+    "precompile_nested": 46,
+    "precompile_reverted": 47,
+    "precompile_top_up": 48
+  },
+  "target_hash": "0x0429eb8e1d6f837e16f1c2e94e1bd13b78b1882029ec9ca1f03ed17152b2f79a",
+  "target_height": 30
+}

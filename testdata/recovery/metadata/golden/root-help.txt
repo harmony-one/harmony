@@ -1,0 +1,21 @@
+harmony-recovery hosts the emergency shard-0 in-place recovery tooling.
+The preflight subcommand samples a validator database for recovery
+eligibility without stopping the node and never writes to the database.
+The metadata command group (scan, export-reference, audit-branch) derives
+and audits the recovery target's validator metadata on a stopped node.
+
+Usage:
+  harmony-recovery [flags]
+  harmony-recovery [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  metadata    Offline validator-metadata maintenance (scan, export-reference, audit-branch; stopped node required)
+  preflight   Sample a shard-0 database for recovery target availability (never writes; node may keep running)
+
+Flags:
+  -h, --help      help for harmony-recovery
+  -v, --version   version for harmony-recovery
+
+Use "harmony-recovery [command] --help" for more information about a command.

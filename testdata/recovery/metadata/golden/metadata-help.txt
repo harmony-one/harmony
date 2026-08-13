@@ -1,0 +1,23 @@
+The metadata command family derives the recovery target's validator
+metadata from a STOPPED node's shard-0 LevelDB: scan (diagnosis/dry-run),
+export-reference (the run-once canonical .hmr + reference JSON producer)
+and audit-branch (masked re-execution of the abandoned branch).
+
+Exit codes: 0 OK; 13 unsafe open/concurrent writer; 14 I/O or corruption;
+15 invalid config/paths; 16 interrupted; 20 MISSING_REQUIRED_METADATA;
+21 INVALID_RETAINED_METADATA; 22 TARGET_STATE_UNAVAILABLE;
+23 DETERMINISM_MISMATCH; 24 AUDIT_ANOMALY; 130 SIGINT.
+
+Usage:
+  harmony-recovery metadata [flags]
+  harmony-recovery metadata [command]
+
+Available Commands:
+  audit-branch     Re-execute the abandoned branch over a masked overlay and reconcile every planned deletion
+  export-reference Produce the canonical .hmr reference package and reference manifest (run-once producer)
+  scan             Diagnose and dry-run the metadata normalization (read-only; run before export and audit)
+
+Flags:
+  -h, --help   help for metadata
+
+Use "harmony-recovery metadata [command] --help" for more information about a command.

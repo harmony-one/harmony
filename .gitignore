@@ -95,6 +95,15 @@ explorer_storage_*
 # (see testdata/recovery/preflight/README.md)
 !testdata/recovery/preflight/*/harmony_db_0/
 
+# committed metadata fixture kit is deliberately tracked
+# (see testdata/recovery/metadata/README.md). Re-include the LevelDB
+# directories first, then the file types the global rules would otherwise
+# swallow (*.log LevelDB write-ahead logs, *.hex fixture BLS secrets).
+!testdata/recovery/metadata/kit/harmony_db_0/
+!testdata/recovery/metadata/kit/clean/harmony_db_0/
+!testdata/recovery/metadata/kit/**/*.log
+!testdata/recovery/metadata/kit/**/*.hex
+
 # local blskeys for testing
 .hmy/blskeys
 
