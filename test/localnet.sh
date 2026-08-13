@@ -25,7 +25,8 @@ Usage: test/localnet.sh [--keep] MODE [MODE...]
 Modes:
   rpc      Run RPC integration tests
   pyhmy    Run pyhmy tests
-  rosetta  Run Rosetta tests
+  mesh     Run Mesh API integration tests
+  rosetta  Alias for mesh
 
 Environment:
   HARMONY_TEST_REF         harmony-test branch, tag, or commit (default: pinned commit)
@@ -54,7 +55,7 @@ trap cleanup EXIT
 while (($#)); do
   case "$1" in
     --keep) KEEP=true ;;
-    rpc|pyhmy|rosetta) MODES+=("$1") ;;
+    rpc|pyhmy|mesh|rosetta) MODES+=("$1") ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown localnet test mode: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -144,7 +145,7 @@ for mode in "${MODES[@]}"; do
   case "$mode" in
     rpc) flags=(-B -n) ;;
     pyhmy) flags=(-B -p) ;;
-    rosetta) flags=(-B -r) ;;
+    mesh|rosetta) flags=(-B -r) ;;
   esac
 
   run_args=(run)

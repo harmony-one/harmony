@@ -127,6 +127,28 @@ jobs:
           TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
           TRAVIS_BRANCH: ${{ github.ref_name }}
 
+  mesh-checker:
+    name: Run Mesh API integration tests (amd64)
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - *checkout-harmony
+      - name: Download and extract harmony binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c #v8.0.1
+        with:
+          name: harmony-binaries-amd64
+          path: go/src/github.com/harmony-one/harmony/bin
+      - *prepare-harmony-binaries
+
+      - name: Run Mesh API checker
+        run: bash ./test/localnet.sh mesh
+        working-directory: go/src/github.com/harmony-one/harmony
+        env:
+          HARMONY_BINARY_BUILDER: "true"
+          HARMONY_TEST_REF: 6afe7cdc1ecdb920d1c9a19d1b1ca912d3a590ab
+          LOCALNET_ARCH: amd64
+
   pyhmy-checker:
     name: Run pyhmy tests (${{ matrix.arch }})
     needs: build

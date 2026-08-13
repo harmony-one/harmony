@@ -29,8 +29,9 @@ assert_not_contains "docker pull" "$ROOT/test/all.sh"
 assert_not_contains "docker pull" "$ROOT/test/go.sh"
 assert_not_contains "docker pull" "$ROOT/test/rpc.sh"
 assert_not_contains "docker pull" "$ROOT/test/rosetta.sh"
+assert_not_contains "docker pull" "$ROOT/test/mesh.sh"
 assert_not_contains "docker" "$ROOT/test/go.sh"
-assert_contains 'localnet.sh" rpc rosetta pyhmy' "$ROOT/test/all.sh"
+assert_contains 'localnet.sh" rpc mesh pyhmy' "$ROOT/test/all.sh"
 assert_contains '6afe7cdc1ecdb920d1c9a19d1b1ca912d3a590ab' "$ROOT/test/localnet.sh"
 assert_contains 'test: test-go' "$ROOT/Makefile"
 assert_contains 'test-integration:' "$ROOT/Makefile"
@@ -38,6 +39,7 @@ assert_contains 'test-all:' "$ROOT/Makefile"
 
 bash "$ROOT/test/rpc.sh" >/dev/null || fail "rpc.sh without arguments must show usage"
 bash "$ROOT/test/rosetta.sh" >/dev/null || fail "rosetta.sh without arguments must show usage"
+bash "$ROOT/test/mesh.sh" >/dev/null || fail "mesh.sh without arguments must show usage"
 
 mkdir -p "$TMPDIR_TEST/source"
 git -C "$TMPDIR_TEST/source" init -q
@@ -79,7 +81,7 @@ HARMONY_RUN_ROOT="$TMPDIR_TEST/run-root" \
 LOCALNET_ARCH=arm64 \
 LOCALNET_IMAGE="harmony-localnet-test:test" \
 PATH="$TMPDIR_TEST/bin:$PATH" \
-  "$ROOT/test/localnet.sh" rpc rosetta pyhmy
+  "$ROOT/test/localnet.sh" rpc mesh pyhmy
 
 [[ $(grep -c '^built$' "$TMPDIR_TEST/builder.log") -eq 1 ]] || fail "Linux binaries must be prepared once"
 [[ $(grep -c '^build ' "$TMPDIR_TEST/docker.log") -eq 1 ]] || fail "image must be built exactly once"
@@ -95,7 +97,23 @@ assert_not_contains "pull harmonyone/localnet-test" "$TMPDIR_TEST/docker.log"
 assert_contains 'GOFLAGS=-buildvcs=false -mod=mod' "$ROOT/test/build_linux_binaries.sh"
 assert_contains 'FROM golang:1.24.2@sha256:' "$ROOT/test/localnet.Dockerfile"
 assert_contains 'PYHMY_REF=5aeb8601fa174c734f9091619520cf3160b04a16' "$ROOT/test/localnet.Dockerfile"
-assert_contains 'MESH_CLI_REF=bbbd759336a0912853d8b10e84a3731c7a0b99d3' "$ROOT/test/localnet.Dockerfile"
+assert_contains 'MESH_CLI_REF=8bdb815048e51fe0f6b821308070cc5c4b97073f' "$ROOT/test/localnet.Dockerfile"
+assert_contains 'https://github.com/coinbase/mesh-cli.git' "$ROOT/test/localnet.Dockerfile"
+assert_contains 'command -v rosetta-cli' "$ROOT/test/localnet.Dockerfile"
+assert_contains 'rosetta-cli version' "$ROOT/test/localnet.Dockerfile"
+assert_contains '= v0.10.4' "$ROOT/test/localnet.Dockerfile"
+assert_not_contains "sed -i 's/rosetta-cli/mesh-cli/g' scripts/run.sh" "$ROOT/test/localnet.Dockerfile"
+assert_contains "sed -i '2a set -o pipefail' scripts/run.sh" "$ROOT/test/localnet.Dockerfile"
+assert_contains 'tee output_mesh.log' "$ROOT/test/localnet.Dockerfile"
+assert_contains 'tee -a output_mesh.log' "$ROOT/test/localnet.Dockerfile"
+assert_contains "grep -c 'rosetta-cli check:' scripts/run.sh" "$ROOT/test/localnet.Dockerfile"
+assert_contains "grep -c 'output_mesh.log' scripts/run.sh" "$ROOT/test/localnet.Dockerfile"
+assert_contains "grep -c '^set -o pipefail$' scripts/run.sh" "$ROOT/test/localnet.Dockerfile"
+assert_contains "! grep -q 'output_rossetta.log' scripts/run.sh" "$ROOT/test/localnet.Dockerfile"
+assert_contains 'mesh-checker:' "$ROOT/.github/workflows/ci-pr.yaml"
+assert_contains 'localnet.sh mesh' "$ROOT/.github/workflows/ci-pr.yaml"
+assert_contains 'HARMONY_TEST_REF: 6afe7cdc1ecdb920d1c9a19d1b1ca912d3a590ab' "$ROOT/.github/workflows/ci-pr.yaml"
+assert_not_contains 'HARMONY_TEST_DIR:' "$ROOT/.github/workflows/ci-pr.yaml"
 assert_contains 'setuptools==80.9.0' "$ROOT/test/localnet.Dockerfile"
 assert_contains '--no-build-isolation' "$ROOT/test/localnet.Dockerfile"
 

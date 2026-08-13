@@ -163,7 +163,7 @@ Note that all test Docker containers bind several ports to the host machine for 
 * `9798` - Shard 1 Rosetta (for an explorer)
 * `9899` - Shard 0 WS for an explorer
 * `9898` - Shard 1 WS for an explorer
-> This allows you to use curl, hmy CLI, postman, rosetta-cli, etc... on your host machine to play with or probe the localnet that was used for the test.
+> This allows you to use curl, hmy CLI, Postman, the Mesh CLI, etc. on your host machine to play with or probe the localnet that was used for the test.
 
 ### Go tests
 To run this test, do:
@@ -192,18 +192,18 @@ make test-rpc-attach
 > the current block height of localnet. Reference the documentation for the CLI [here](https://docs.harmony.one/home/wallets/harmony-cli)
 > for more details & commands.
 
-### Rosetta tests
+### Mesh API tests
 To run this test, do:
 ```bash
-make test-rosetta
+make test-mesh
 ```
-This test starts a localnet (within the Docker container), **ensures it reaches a consensus**, and runs the Construction & Data API checks using the [rosetta-cli](https://github.com/coinbase/rosetta-cli).
+This test starts a localnet (within the Docker container), **ensures it reaches a consensus**, and runs the Construction & Data API checks using the [Coinbase Mesh CLI](https://github.com/coinbase/mesh-cli). The pinned v0.10.4 release still installs its official binary as `rosetta-cli`.
 This test also acts as a preliminary integration test (more thorough tests are done on the testnets).
 > The config for this test can be found [here](https://github.com/harmony-one/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s0.json) & [here](https://github.com/harmony-one/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s1.json)
 
 Similar to the RPC tests, if you wish to debug further with the localnet after the tests are done, open a new shell and run:
 ```bash
-make test-rosetta-attach
+make test-mesh-attach
 ```
 
 ## License
