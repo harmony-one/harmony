@@ -1,9 +1,11 @@
-// harmony-recovery is the emergency shard-0 recovery toolbox. Its single
-// subcommand, preflight, is a validator-friendly eligibility sampler: run it
+// harmony-recovery is the emergency shard-0 recovery toolbox. Its
+// preflight subcommand is a validator-friendly eligibility sampler: run it
 // against the node's shard-0 LevelDB - WITHOUT stopping the node - and it
 // verifies the pinned target block header/certificate/ancestry plus the
 // complete target state, prints PASS or FAIL, and writes one small JSON
-// receipt to paste into Telegram.
+// receipt to paste into Telegram. The metadata command group hosts the
+// offline validator-metadata maintenance commands (scan, export-reference,
+// audit-branch) run internally on a stopped node.
 package main
 
 import (
@@ -63,10 +65,12 @@ func orUnknown(s string) string {
 func newRootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "harmony-recovery",
-		Short: "Emergency shard-0 recovery tools (preflight eligibility sampler)",
+		Short: "Emergency shard-0 recovery tools (preflight eligibility sampler; metadata maintenance commands)",
 		Long: "harmony-recovery hosts the emergency shard-0 in-place recovery tooling.\n" +
 			"The preflight subcommand samples a validator database for recovery\n" +
-			"eligibility without stopping the node and never writes to the database.",
+			"eligibility without stopping the node and never writes to the database.\n" +
+			"The metadata command group (scan, export-reference, audit-branch) derives\n" +
+			"and audits the recovery target's validator metadata on a stopped node.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -76,6 +80,7 @@ func newRootCommand() *cobra.Command {
 	root.SetVersionTemplate("{{.Version}}\n")
 	root.Version = versionString()
 	root.AddCommand(newPreflightCommand())
+	root.AddCommand(newMetadataCommand())
 	return root
 }
 
