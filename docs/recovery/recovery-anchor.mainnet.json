@@ -1,0 +1,16 @@
+{
+  "schema": "recovery-anchor-v1",
+  "network": "mainnet",
+  "shard": 0,
+  "target_height": 92730034,
+  "target_hash": "0x30c35d2f2291e4b27debe7862956cf7a0cc7abefc044273d6823567335086d8d",
+  "abandoned_child_hash": "0x5de06979a333f20afb8b245a8cf44472dc5bfc7383a57ddee48e1809bcee7c5d",
+  "epoch": 3002,
+  "epoch_first_block": 92700672,
+  "epoch_last_block": 92733439,
+  "snapshot_base_height": 92700670,
+  "audit_end_height": 92751016,
+  "known_bad_blocks": [
+    92730036
+  ]
+}
