@@ -91,6 +91,10 @@ coverage.txt
 harmony_db_*
 explorer_storage_*
 
+# committed recovery-preflight fixtures are deliberately tracked
+# (see testdata/recovery/preflight/README.md)
+!testdata/recovery/preflight/*/harmony_db_0/
+
 # local blskeys for testing
 .hmy/blskeys
 

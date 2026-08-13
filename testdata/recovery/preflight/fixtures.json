@@ -1,0 +1,44 @@
+{
+  "bad-account-leaf": {
+    "state_root": "0x787a54bc01ed044689ced5e1de5e945572300f60ceeeeb3ee877d433887a2a09",
+    "target_hash": "0xefce7e84539bf07cc4b47e1f5a4978a93e56c47f30815823f889e30878cd346b",
+    "child_hash": "0x55daeda0db851c85153a76c15e7713427824d0f0e0fdcf0440f9aeea367d8dfa",
+    "target_height": 44,
+    "network": "localnet"
+  },
+  "bad-storage-leaf": {
+    "state_root": "0x755c11e90abd83cfd01af3a5090d4e436c31aa18652e34da2e67de0d09ba1e30",
+    "target_hash": "0xa9788a811d95b8e0b191c94961d8b42e02ca95994ffeedf7dcb334e7ba4af643",
+    "child_hash": "0xed19139f62fa1db350c21b9ef8d5275b952b4eb4dc69ce5b896e456d3cad5246",
+    "target_height": 44,
+    "network": "localnet"
+  },
+  "base": {
+    "state_root": "0xbb76bf6baabeb17cabe998226b71c2fa63493bdeb950869ccc96c5fdc05a248b",
+    "target_hash": "0x3572752c3747bf7d1879da8415a3c701940ad7216291863b5776535634fb5f3a",
+    "child_hash": "0x340d92a335f998aefb6f6e4737d3bbbee82f95f64c82267b260e943dbd031f64",
+    "target_height": 44,
+    "network": "localnet"
+  },
+  "flagged-empty-code": {
+    "state_root": "0x01ca67db75e8aad48b2e515ed615f9cd31746a951ff9d8fa21797321f5626cb7",
+    "target_hash": "0x134dffb5cc4a2536ca58d0d929aa766229e32a2efa9968cd385bd9d566c32fb3",
+    "child_hash": "0xe6d8d4f5b84fbe5349ca901bff2f3e0999336d0ad22cb32fda0142a881d5f612",
+    "target_height": 44,
+    "network": "localnet"
+  },
+  "many-anomalies": {
+    "state_root": "0x6dc03adbce3e0f851fcd266765e241c5410987905fbe4d8985ae3494dd4870af",
+    "target_hash": "0xf229d4058eacbd5d9f7a95ff73876fd210f1461e1942dfc5cf5dc06c70a2f230",
+    "child_hash": "0x57541ffcd077089de6c003f1c2e0cfc5dddfbee2b1397f76eff3d89db1cea978",
+    "target_height": 44,
+    "network": "localnet"
+  },
+  "wrapper-unbound": {
+    "state_root": "0x0af51babe6e05ea87e52c6eb58dbabc20aac37b0dc4171ab38b3467980c792e5",
+    "target_hash": "0x654ba743ab6e29d58daa7cccf7b2bcc4236f6854b4fbb72587710d6945e6c435",
+    "child_hash": "0x1dac60d8ad0240f4ab154ea8faf4f1957a5587eca6abf0a34ffbca1d3d94f931",
+    "target_height": 44,
+    "network": "localnet"
+  }
+}
