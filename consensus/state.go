@@ -26,7 +26,7 @@ type State struct {
 	viewChangingID uint64
 
 	// viewIDFloor is a process-local, monotonically increasing lower bound used
-	// by the one-off mainnet shard-0 recovery.
+	// by the one-off mainnet recovery.
 	viewIDFloor uint64
 
 	// the publickey of leader
