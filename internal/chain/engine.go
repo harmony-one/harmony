@@ -66,6 +66,9 @@ func NewEngine() *engineImpl {
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
 // Note that each block header contains the bls signature of the parent block
 func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header, seal bool) error {
+	if err := engine.ValidateBlockHash(header.Hash()); err != nil {
+		return err
+	}
 	parentHeader := chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
 	if parentHeader == nil {
 		return engine.ErrUnknownAncestor
@@ -636,6 +639,9 @@ func applySlashes(
 // i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
 // for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.
 func (e *engineImpl) VerifyHeaderSignature(chain engine.ChainReader, header *block.Header, commitSig bls_cosi.SerializedSignature, commitBitmap []byte) error {
+	if err := engine.ValidateBlockHash(header.Hash()); err != nil {
+		return err
+	}
 	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
 		return nil
 	}
@@ -647,6 +653,9 @@ func (e *engineImpl) VerifyHeaderSignature(chain engine.ChainReader, header *blo
 
 // VerifyCrossLink verifies the signature of the given CrossLink.
 func (e *engineImpl) VerifyCrossLink(chain engine.ChainReader, cl types.CrossLink) error {
+	if err := engine.ValidateBlockHash(cl.Hash()); err != nil {
+		return err
+	}
 	if cl.BlockNum() <= 1 {
 		return errors.New("crossLink BlockNumber should greater than 1")
 	}
