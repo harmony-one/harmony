@@ -783,16 +783,41 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 			Msg("InitConsensusWithMembers failed")
 	}
 
-	// Set the consensus ID to be the current block number
+	// Offline maintenance never starts consensus signing, so it must remain
+	// usable for preflight and rollback even before release constants are filled.
+	// Every networked validator installs the floor before any signing service.
+	if !hc.General.IsOffline {
+		if err := currentConsensus.ConfigureEmergencyRecoveryViewIDFloor(); err != nil {
+			utils.Logger().Panic().Err(err).
+				Msg("refusing to start without a valid emergency recovery ViewID floor")
+		}
+	}
+
+	// Set the consensus ID to the checked successor of the retained head's view.
 	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
-	currentConsensus.SetViewIDs(viewID + 1)
+	nextViewID, err := consensus.CheckedNextViewID(viewID)
+	if err != nil {
+		utils.Logger().Panic().Err(err).
+			Uint64("headViewID", viewID).
+			Msg("refusing to start because the head ViewID cannot advance")
+	}
+	currentConsensus.SetViewIDs(nextViewID)
 	utils.Logger().Info().
-		Uint64("viewID", viewID).
+		Uint64("headViewID", viewID).
+		Uint64("consensusViewID", currentConsensus.GetCurBlockViewID()).
 		Msg("Init Blockchain")
 
 	currentNode.Consensus.Registry().SetNodeConfig(currentNode.NodeConfig)
-	// update consensus information based on the blockchain
-	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation("setupConsensusAndNode"))
+	// Update the committee first, then derive the leader from the exact recovery
+	// view gap before StartChannel can trigger a proposal.
+	mode := currentConsensus.UpdateConsensusInformation("setupConsensusAndNode")
+	if !hc.General.IsOffline {
+		if err := currentConsensus.InitializeEmergencyRecoveryLeader(); err != nil {
+			utils.Logger().Panic().Err(err).
+				Msg("refusing to start without a deterministic emergency recovery leader")
+		}
+	}
+	currentConsensus.SetMode(mode)
 	currentConsensus.NextBlockDue = time.Now()
 	return currentNode
 }

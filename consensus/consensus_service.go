@@ -268,6 +268,9 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [548]byte) {
 
 // Check viewID, caller's responsibility to hold lock when change ignoreViewIDCheck
 func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
+	if err := consensus.assertEmergencyRecoveryViewID(msg.ViewID); err != nil {
+		return err
+	}
 	// just ignore consensus check for the first time when node join
 	if consensus.IgnoreViewIDCheck.IsSet() {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
@@ -494,8 +497,9 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 			}
 
 			// If the leader changed and I myself become the leader
-			if (oldLeader != nil && consensus.getLeaderPubKey() != nil &&
-				!consensus.getLeaderPubKey().Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
+			if consensus.current.GetViewIDFloor() == 0 &&
+				(oldLeader != nil && consensus.getLeaderPubKey() != nil &&
+					!consensus.getLeaderPubKey().Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
 				go func() {
 					consensus.GetLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
@@ -618,6 +622,9 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 	block := consensus.fBFTLog.GetBlockByHash(blockHash)
 	if block == nil {
 		return errGetPreparedBlock
+	}
+	if err := consensus.assertEmergencyRecoveryBlockViewID(block.Header().ViewID().Uint64()); err != nil {
+		return err
 	}
 
 	aggSig, mask, err := readSignatureBitmapPayload(payload, 32, consensus.decider().Participants())

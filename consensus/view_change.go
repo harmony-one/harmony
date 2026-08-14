@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"math"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -41,8 +42,11 @@ func (pm *State) GetCurBlockViewID() uint64 {
 
 // SetCurBlockViewID sets the current view id
 func (pm *State) SetCurBlockViewID(viewID uint64) uint64 {
-	atomic.StoreUint64(&pm.blockViewID, viewID)
-	return viewID
+	if pm.GetViewIDFloor() == 0 {
+		atomic.StoreUint64(&pm.blockViewID, viewID)
+		return viewID
+	}
+	return atomicMaxUint64(&pm.blockViewID, pm.clampViewID(viewID))
 }
 
 // GetViewChangingID return the current view changing id
@@ -54,7 +58,15 @@ func (pm *State) GetViewChangingID() uint64 {
 // SetViewChangingID set the current view changing id
 // It is meaningful during view change mode
 func (pm *State) SetViewChangingID(id uint64) {
-	atomic.StoreUint64(&pm.viewChangingID, id)
+	if pm.GetViewIDFloor() == 0 {
+		atomic.StoreUint64(&pm.viewChangingID, id)
+		return
+	}
+	id = pm.clampViewID(id)
+	if current := pm.GetCurBlockViewID(); id < current {
+		id = current
+	}
+	atomicMaxUint64(&pm.viewChangingID, id)
 }
 
 // GetViewChangeDuraion return the duration of the current view change
@@ -66,15 +78,23 @@ func (pm *State) GetViewChangeDuraion() time.Duration {
 
 // fallbackNextViewID return the next view ID and duration when there is an exception
 // to calculate the time-based viewId
-func (pm *State) fallbackNextViewID() (uint64, time.Duration) {
-	diff := int64(pm.GetViewChangingID() + 1 - pm.GetCurBlockViewID())
+func (pm *State) fallbackNextViewID() (uint64, time.Duration, error) {
+	calculated, err := checkedNextViewID(pm.GetViewChangingID())
+	if err != nil {
+		return 0, 0, err
+	}
+	nextViewID, err := pm.nextViewID(calculated)
+	if err != nil {
+		return 0, 0, err
+	}
+	diff := int64(nextViewID - pm.GetCurBlockViewID())
 	if diff <= 0 {
 		diff = int64(1)
 	}
 	pm.getLogger().Error().
 		Int64("diff", diff).
 		Msg("[fallbackNextViewID] use legacy viewID algorithm")
-	return pm.GetViewChangingID() + 1, time.Duration(diff * diff * int64(viewChangeDuration))
+	return nextViewID, time.Duration(diff * diff * int64(viewChangeDuration)), nil
 }
 
 // effectiveViewChangeTimestamp returns the wall time used to advance view ID.
@@ -108,12 +128,15 @@ func viewChangeTimestampDiff(curTimestamp, blockTimestamp int64, timestampValida
 // The view change duration is a fixed duration now to avoid stuck into offline nodes during
 // the view change.
 // viewID is only used as the fallback mechansim to determine the nextViewID
-func (pm *State) getNextViewID(curHeader *block.Header, chainConfig *params.ChainConfig) (uint64, time.Duration) {
+func (pm *State) getNextViewID(curHeader *block.Header, chainConfig *params.ChainConfig) (uint64, time.Duration, error) {
 	if curHeader == nil {
 		return pm.fallbackNextViewID()
 	}
 	blockTimestamp := curHeader.Time().Int64()
-	stuckBlockViewID := curHeader.ViewID().Uint64() + 1
+	stuckBlockViewID, err := checkedNextViewID(curHeader.ViewID().Uint64())
+	if err != nil {
+		return 0, 0, err
+	}
 	curTimestamp := time.Now().Unix()
 	timestampValidation := chainConfig != nil && chainConfig.IsTimestampValidation(curHeader.Epoch())
 
@@ -125,7 +148,14 @@ func (pm *State) getNextViewID(curHeader *block.Header, chainConfig *params.Chai
 			Msg("[getNextViewID] timestamp of block too high")
 		return pm.fallbackNextViewID()
 	}
-	nextViewID := diff + stuckBlockViewID
+	calculated, err := checkedAddViewID(diff, stuckBlockViewID)
+	if err != nil {
+		return 0, 0, err
+	}
+	nextViewID, err := pm.nextViewID(calculated)
+	if err != nil {
+		return 0, 0, err
+	}
 
 	pm.getLogger().Info().
 		Int64("curTimestamp", curTimestamp).
@@ -136,7 +166,7 @@ func (pm *State) getNextViewID(curHeader *block.Header, chainConfig *params.Chai
 		Msg("[getNextViewID]")
 
 	// duration is always the fixed view change duration for synchronous view change
-	return nextViewID, viewChangeDuration
+	return nextViewID, viewChangeDuration, nil
 }
 
 // getNextLeaderKey uniquely determine who is the leader for given viewID
@@ -144,11 +174,21 @@ func (pm *State) getNextViewID(curHeader *block.Header, chainConfig *params.Chai
 // the next leader based on the gap of the viewID of the view change and the last
 // know view id of the block.
 func (pm *State) getNextLeaderKey(blockchain engine.ChainReader, decider quorum.Decider, viewID uint64, committee *shard.Committee) *bls.PublicKeyWrapper {
+	viewID = pm.clampViewID(viewID)
+	if viewID == math.MaxUint64 {
+		pm.getLogger().Error().Msg("[getNextLeaderKey] exhausted ViewID")
+		return nil
+	}
 	gap := 1
 
 	cur := pm.GetCurBlockViewID()
 	if viewID > cur {
-		gap = int(viewID - cur)
+		delta := viewID - cur
+		if delta > uint64(^uint(0)>>1) {
+			pm.getLogger().Error().Msg("[getNextLeaderKey] ViewID gap overflows int")
+			return nil
+		}
+		gap = int(delta)
 	}
 	var lastLeaderPubKey *bls.PublicKeyWrapper
 	var err error
@@ -162,8 +202,11 @@ func (pm *State) getNextLeaderKey(blockchain engine.ChainReader, decider quorum.
 			pm.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
 			lastLeaderPubKey = pm.getLeaderPubKey()
 		} else {
-			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
-			gap = int(viewID - stuckBlockViewID)
+			gap, err = checkedLeaderViewGap(viewID, curHeader.ViewID().Uint64())
+			if err != nil {
+				pm.getLogger().Error().Err(err).Msg("[getNextLeaderKey] invalid ViewID gap")
+				return nil
+			}
 			// this is the truth of the leader based on blockchain blocks
 			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(blockchain, curHeader)
 			if err != nil || lastLeaderPubKey == nil {
@@ -247,7 +290,11 @@ func (consensus *Consensus) startViewChange() {
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
 	curHeader := consensus.Blockchain().CurrentHeader()
-	nextViewID, duration := consensus.current.getNextViewID(curHeader, consensus.Blockchain().Config())
+	nextViewID, duration, err := consensus.current.getNextViewID(curHeader, consensus.Blockchain().Config())
+	if err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[startViewChange] cannot advance ViewID")
+		return
+	}
 	consensus.setViewChangingID(nextViewID)
 	epoch := curHeader.Epoch()
 	ss, err := consensus.Blockchain().ReadShardState(epoch)
@@ -266,8 +313,12 @@ func (consensus *Consensus) startViewChange() {
 	// aganist the consensus.LeaderPubKey variable.
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
-	consensus.setLeaderPubKey(
-		consensus.current.getNextLeaderKey(consensus.Blockchain(), consensus.decider(), nextViewID, committee))
+	nextLeader := consensus.current.getNextLeaderKey(consensus.Blockchain(), consensus.decider(), nextViewID, committee)
+	if nextLeader == nil {
+		consensus.getLogger().Error().Msg("[startViewChange] cannot select leader for recovery-safe ViewID")
+		return
+	}
+	consensus.setLeaderPubKey(nextLeader)
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).
@@ -291,7 +342,7 @@ func (consensus *Consensus) startViewChange() {
 		consensus.getBlockNum(),
 		consensus.priKey,
 		members,
-		consensus.verifyBlock,
+		consensus.verifyEmergencyRecoveryBlock,
 	); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[startViewChange] Init Payload Error")
 	}
@@ -303,6 +354,10 @@ func (consensus *Consensus) startViewChange() {
 			continue
 		}
 		msgToSend := consensus.constructViewChangeMessage(&key)
+		if msgToSend == nil {
+			consensus.getLogger().Error().Msg("[startViewChange] refused to construct unsafe ViewChange message")
+			continue
+		}
 		if err := consensus.msgSender.SendWithRetry(
 			consensus.getBlockNum(),
 			msg_pb.MessageType_VIEWCHANGE,
@@ -320,6 +375,9 @@ func (consensus *Consensus) startViewChange() {
 func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper, reset bool) error {
 	if !consensus.isViewChangingMode() {
 		return errors.New("not in view changing mode anymore")
+	}
+	if err := consensus.assertEmergencyRecoveryViewID(viewID); err != nil {
+		return err
 	}
 
 	msgToSend := consensus.constructNewViewMessage(
@@ -414,13 +472,13 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 		recvMsg.BlockNum,
 		consensus.priKey,
 		members,
-		consensus.verifyBlock,
+		consensus.verifyEmergencyRecoveryBlock,
 	); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[onViewChange] Init Payload Error")
 		return
 	}
 
-	err = consensus.vc.ProcessViewChangeMsg(consensus.fBFTLog, consensus.decider(), recvMsg, consensus.verifyBlock)
+	err = consensus.vc.ProcessViewChangeMsg(consensus.fBFTLog, consensus.decider(), recvMsg, consensus.verifyEmergencyRecoveryBlock)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Uint64("viewID", recvMsg.ViewID).
@@ -484,12 +542,19 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		return
 	}
 	senderKey := recvMsg.SenderPubkeys[0]
+	if err := consensus.validateExpectedNewViewLeader(senderKey, recvMsg.ViewID); err != nil {
+		consensus.getLogger().Warn().
+			Err(err).
+			Str("sender", senderKey.Bytes.Hex()).
+			Msg("[onNewView] sender is not the selected leader")
+		return
+	}
 
 	if !consensus.onNewViewSanityCheck(recvMsg) {
 		return
 	}
 
-	preparedBlock, err := consensus.vc.VerifyNewViewMsg(recvMsg, consensus.verifyBlock)
+	preparedBlock, err := consensus.vc.VerifyNewViewMsg(recvMsg, consensus.verifyEmergencyRecoveryBlock)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[onNewView] Verify New View Msg Failed")
 		return

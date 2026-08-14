@@ -25,6 +25,10 @@ type State struct {
 	// it is the next view id
 	viewChangingID uint64
 
+	// viewIDFloor is a process-local, monotonically increasing lower bound used
+	// by the one-off mainnet shard-0 recovery.
+	viewIDFloor uint64
+
 	// the publickey of leader
 	leaderPubKey unsafe.Pointer //*bls.PublicKeyWrapper
 
