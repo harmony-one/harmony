@@ -14,12 +14,16 @@ import (
 )
 
 const (
-	// EmergencyRecoveryRetainedBlock is the last retained shard-0 block for the
-	// August 2026 mainnet recovery.
-	EmergencyRecoveryRetainedBlock uint64 = params.EmergencyRecoveryRetainedBlock
+	// EmergencyRecoveryShard0RetainedBlock is the last retained shard-0 block
+	// for the August 2026 mainnet recovery.
+	EmergencyRecoveryShard0RetainedBlock uint64 = params.EmergencyRecoveryShard0RetainedBlock
+
+	// EmergencyRecoveryShard1RetainedBlock is the last retained shard-1 block
+	// for the August 2026 mainnet recovery.
+	EmergencyRecoveryShard1RetainedBlock uint64 = params.EmergencyRecoveryShard1RetainedBlock
 
 	// EmergencyRecoveryViewIDFloor is the recovery release's signed activation
-	// floor for mainnet shard 0.
+	// floor for mainnet shards 0 and 1.
 	EmergencyRecoveryViewIDFloor uint64 = params.EmergencyRecoveryViewIDFloor
 )
 
@@ -60,18 +64,30 @@ func checkedLeaderViewGap(viewID, lastBlockViewID uint64) (int, error) {
 	return int(viewID - firstStuckView), nil
 }
 
-// emergencyRecoveryViewIDFloorFor scopes the one-off rule to mainnet shard 0
-// at and after the retained recovery block. The bool reports whether the rule
-// applies even when its required release value is still unset.
+// emergencyRecoveryViewIDFloorFor scopes the one-off rule to recovered mainnet
+// shards at and after each shard's retained block. The bool reports whether the
+// rule applies even when its required release value is still unset.
 func emergencyRecoveryViewIDFloorFor(
 	config *params.ChainConfig, shardID uint32, headHeight uint64,
 ) (floor uint64, applies bool, err error) {
 	if config == nil || config.ChainID == nil ||
-		config.ChainID.Cmp(params.MainnetChainID) != 0 ||
-		shardID != shard.BeaconChainShardID ||
-		headHeight < EmergencyRecoveryRetainedBlock {
+		config.ChainID.Cmp(params.MainnetChainID) != 0 {
 		return 0, false, nil
 	}
+
+	var retainedBlock uint64
+	switch shardID {
+	case shard.BeaconChainShardID:
+		retainedBlock = EmergencyRecoveryShard0RetainedBlock
+	case 1:
+		retainedBlock = EmergencyRecoveryShard1RetainedBlock
+	default:
+		return 0, false, nil
+	}
+	if headHeight < retainedBlock {
+		return 0, false, nil
+	}
+
 	if EmergencyRecoveryViewIDFloor == 0 {
 		return 0, true, ErrEmergencyRecoveryViewIDFloorUnset
 	}

@@ -19,6 +19,8 @@ import (
 
 func TestEmergencyRecoveryViewIDFloorScopeFailsClosed(t *testing.T) {
 	require.Equal(t, uint64(1_000_000_000), EmergencyRecoveryViewIDFloor)
+	require.Equal(t, uint64(92_730_034), EmergencyRecoveryShard0RetainedBlock)
+	require.Equal(t, uint64(94_978_278), EmergencyRecoveryShard1RetainedBlock)
 
 	mainnet := &params.ChainConfig{ChainID: new(big.Int).Set(params.MainnetChainID)}
 	testnet := &params.ChainConfig{ChainID: new(big.Int).Set(params.TestnetChainID)}
@@ -31,15 +33,38 @@ func TestEmergencyRecoveryViewIDFloorScopeFailsClosed(t *testing.T) {
 		applies    bool
 		wantErr    error
 	}{
-		{name: "nil config", shardID: shard.BeaconChainShardID, headHeight: EmergencyRecoveryRetainedBlock},
-		{name: "testnet", config: testnet, shardID: shard.BeaconChainShardID, headHeight: EmergencyRecoveryRetainedBlock},
-		{name: "shard one", config: mainnet, shardID: 1, headHeight: EmergencyRecoveryRetainedBlock},
-		{name: "before retained block", config: mainnet, shardID: shard.BeaconChainShardID, headHeight: EmergencyRecoveryRetainedBlock - 1},
+		{name: "nil config", shardID: shard.BeaconChainShardID, headHeight: EmergencyRecoveryShard0RetainedBlock},
+		{name: "testnet shard zero", config: testnet, shardID: shard.BeaconChainShardID, headHeight: EmergencyRecoveryShard0RetainedBlock},
+		{name: "testnet shard one", config: testnet, shardID: 1, headHeight: EmergencyRecoveryShard1RetainedBlock},
+		{name: "unsupported mainnet shard", config: mainnet, shardID: 2, headHeight: EmergencyRecoveryShard1RetainedBlock},
+		{name: "shard zero before retained block", config: mainnet, shardID: shard.BeaconChainShardID, headHeight: EmergencyRecoveryShard0RetainedBlock - 1},
 		{
-			name:       "applicable mainnet shard zero build requires audited floor",
+			name:       "shard zero at retained block",
 			config:     mainnet,
 			shardID:    shard.BeaconChainShardID,
-			headHeight: EmergencyRecoveryRetainedBlock,
+			headHeight: EmergencyRecoveryShard0RetainedBlock,
+			applies:    true,
+		},
+		{
+			name:       "shard zero after retained block",
+			config:     mainnet,
+			shardID:    shard.BeaconChainShardID,
+			headHeight: EmergencyRecoveryShard0RetainedBlock + 1,
+			applies:    true,
+		},
+		{name: "shard one before retained block", config: mainnet, shardID: 1, headHeight: EmergencyRecoveryShard1RetainedBlock - 1},
+		{
+			name:       "shard one at retained block",
+			config:     mainnet,
+			shardID:    1,
+			headHeight: EmergencyRecoveryShard1RetainedBlock,
+			applies:    true,
+		},
+		{
+			name:       "shard one after retained block",
+			config:     mainnet,
+			shardID:    1,
+			headHeight: EmergencyRecoveryShard1RetainedBlock + 1,
 			applies:    true,
 		},
 	}
