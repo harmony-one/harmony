@@ -142,6 +142,12 @@ func (consensus *Consensus) newBlockSanityChecks(
 
 // TODO: leo: move the sanity check to p2p message validation
 func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
+	if err := consensus.assertEmergencyRecoveryViewID(recvMsg.ViewID); err != nil {
+		consensus.getLogger().Warn().Err(err).
+			Uint64("MsgViewChangingID", recvMsg.ViewID).
+			Msg("[onViewChangeSanityCheck] rejected ViewID below recovery floor")
+		return false
+	}
 	// TODO: if difference is only one, new leader can still propose the same committed block to avoid another view change
 	// TODO: new leader catchup without ignore view change message
 
@@ -194,6 +200,12 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 
 // TODO: leo: move the sanity check to p2p message validation
 func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
+	if err := consensus.assertEmergencyRecoveryViewID(recvMsg.ViewID); err != nil {
+		consensus.getLogger().Warn().Err(err).
+			Uint64("MsgViewChangingID", recvMsg.ViewID).
+			Msg("[onNewView] rejected ViewID below recovery floor")
+		return false
+	}
 	if recvMsg.ViewID < consensus.getCurBlockViewID() {
 		consensus.getLogger().Warn().
 			Uint64("LastSuccessfulConsensusViewID", consensus.getCurBlockViewID()).
@@ -202,4 +214,22 @@ func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
 		return false
 	}
 	return true
+}
+
+func (consensus *Consensus) validateExpectedNewViewLeader(sender *bls.PublicKeyWrapper, viewID uint64) error {
+	if sender == nil {
+		return errors.New("NEWVIEW sender is missing")
+	}
+	expected := consensus.getLeaderPubKey()
+	if consensus.current.GetViewIDFloor() > 0 {
+		var err error
+		expected, err = consensus.expectedLeaderForViewID(viewID)
+		if err != nil {
+			return err
+		}
+	}
+	if expected == nil || sender.Bytes != expected.Bytes {
+		return errors.New("NEWVIEW sender is not the selected leader for ViewID")
+	}
+	return nil
 }

@@ -377,8 +377,16 @@ func (consensus *Consensus) StartChannel() {
 func (consensus *Consensus) syncReadyChan(reason string) {
 	consensus.getLogger().Info().Msgf("[ConsensusMainLoop] syncReadyChan %s", reason)
 	if consensus.getBlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
-		consensus.setBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
-		consensus.setViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
+		currentHeader := consensus.Blockchain().CurrentHeader()
+		nextViewID, err := checkedNextViewID(currentHeader.ViewID().Uint64())
+		if err != nil {
+			consensus.getLogger().Error().Err(err).
+				Uint64("headViewID", currentHeader.ViewID().Uint64()).
+				Msg("[syncReadyChan] refusing to reset to an exhausted ViewID")
+			return
+		}
+		consensus.setBlockNum(currentHeader.Number().Uint64() + 1)
+		consensus.setViewIDs(nextViewID)
 		mode := consensus.updateConsensusInformation(reason)
 		consensus.current.SetMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
@@ -560,6 +568,11 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	if blk == nil {
 		return errors.New("block to pre-commit is nil")
 	}
+	if consensus.current.GetViewIDFloor() > 0 {
+		if err := consensus.validateEmergencyRecoveryMessageBlockViewID(blk, consensus.getCurBlockViewID()); err != nil {
+			return err
+		}
+	}
 
 	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
@@ -579,13 +592,19 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		network.Bytes,
 		network.FBFTMsg
 	bareMinimumCommit := FBFTMsg.Payload
-	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
 
 	if err := consensus.verifyLastCommitSig(bareMinimumCommit, blk); err != nil {
 		return errors.Wrap(err, "[preCommitAndPropose] failed verifying last commit sig")
 	}
+	consensus.fBFTLog.AddVerifiedMessage(FBFTMsg)
 
 	go func() {
+		if consensus.current.GetViewIDFloor() > 0 {
+			if err := consensus.validateEmergencyRecoveryMessageBlockViewID(blk, FBFTMsg.ViewID); err != nil {
+				consensus.GetLogger().Error().Err(err).Msg("[preCommitAndPropose] unsafe recovery ViewID")
+				return
+			}
+		}
 		blk.SetCurrentCommitSig(bareMinimumCommit)
 
 		// Send committed message to validators since 2/3 commit is already collected
@@ -675,6 +694,13 @@ func (consensus *Consensus) tryCatchup() error {
 		if blk == nil {
 			return nil
 		}
+		if msg == nil {
+			return errors.New("[TryCatchup] committed message is missing")
+		}
+		if err := consensus.validateEmergencyRecoveryMessageBlockViewID(blk, msg.ViewID); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[TryCatchup] unsafe recovery ViewID")
+			return err
+		}
 		blk.SetCurrentCommitSig(msg.Payload)
 
 		if err := consensus.verifyBlock(blk); err != nil {
@@ -700,6 +726,12 @@ func (consensus *Consensus) tryCatchup() error {
 }
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
+	if committedMsg == nil {
+		return errors.New("committed message is missing")
+	}
+	if err := consensus.validateEmergencyRecoveryMessageBlockViewID(blk, committedMsg.ViewID); err != nil {
+		return err
+	}
 	if consensus.Blockchain().CurrentBlock().NumberU64() < blk.NumberU64() {
 		_, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.fBFTLog.IsBlockVerified(blk.Hash()))
 		if err != nil && !errors.Is(err, core.ErrKnownBlock) {
@@ -715,7 +747,9 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 
 	consensus.FinishFinalityCount()
 	consensus.postConsensusProcessing(blk)
-	consensus.setupForNewConsensus(blk, committedMsg)
+	if err := consensus.setupForNewConsensus(blk, committedMsg); err != nil {
+		return err
+	}
 	consensus.getLogger().Info().Uint64("blockNum", blk.NumberU64()).
 		Str("hash", blk.Header().Hash().Hex()).
 		Msg("Added New Block to Blockchain!!!")
@@ -840,9 +874,13 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 }
 
 // SetupForNewConsensus sets the state for new consensus
-func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
+func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) error {
+	nextViewID, err := checkedNextViewID(committedMsg.ViewID)
+	if err != nil {
+		return errors.Wrap(err, "cannot advance consensus ViewID")
+	}
 	consensus.setBlockNum(blk.NumberU64() + 1)
-	consensus.setCurBlockViewID(committedMsg.ViewID + 1)
+	consensus.setCurBlockViewID(nextViewID)
 	var epoch *big.Int
 	if blk.IsLastBlockInEpoch() {
 		epoch = new(big.Int).Add(blk.Epoch(), common.Big1)
@@ -897,6 +935,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	consensus.fBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.resetState()
 	consensus.sendLastSignPower()
+	return nil
 }
 
 func (consensus *Consensus) postCatchup(initBN uint64) {

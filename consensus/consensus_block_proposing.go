@@ -23,6 +23,9 @@ const (
 
 // ProposeNewBlock proposes a new block...
 func (consensus *Consensus) ProposeNewBlock(now time.Time, commitSigs chan []byte) (*types.Block, error) {
+	if err := consensus.assertEmergencyRecoveryViewID(consensus.getCurBlockViewID()); err != nil {
+		return nil, errors.Wrap(err, "refusing to propose with unsafe ViewID")
+	}
 	var (
 		currentHeader = consensus.Blockchain().CurrentHeader()
 		nowEpoch      = currentHeader.Epoch()

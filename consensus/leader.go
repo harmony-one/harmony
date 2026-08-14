@@ -18,6 +18,10 @@ import (
 
 // announce fires leader
 func (consensus *Consensus) announce(block *types.Block) {
+	if err := consensus.assertEmergencyRecoveryBlockViewID(block.Header().ViewID().Uint64()); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[Announce] unsafe recovery ViewID")
+		return
+	}
 	blockHash := block.Hash()
 
 	// prepare message and broadcast to validators
@@ -268,6 +272,12 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			Str("blockHash", recvMsg.BlockHash.Hex()).
 			Msg("[OnCommit] Failed finding a matching block for committed message")
 		return
+	}
+	if consensus.current.GetViewIDFloor() > 0 {
+		if err := consensus.validateEmergencyRecoveryMessageBlockViewID(blockObj, recvMsg.ViewID); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[OnCommit] unsafe recovery ViewID")
+			return
+		}
 	}
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain().Config(),
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
