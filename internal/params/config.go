@@ -156,7 +156,6 @@ var (
 		DevnetExternalEpoch:                   EpochTBD,
 		TestnetExternalEpoch:                  big.NewInt(3044),
 		TimestampValidationEpoch:              big.NewInt(7170),
-		IsOneSecondEpoch:                      EpochTBD,
 		EIP2537PrecompileEpoch:                big.NewInt(7420),
 		EIP1153TransientStorageEpoch:          big.NewInt(6280),
 		EIP6780Epoch:                          big.NewInt(7178),
@@ -179,6 +178,7 @@ var (
 		CXMerkleProofReplayFixEpoch:           big.NewInt(7385),
 		BLSProofBindEpoch:                     big.NewInt(7420),
 		BloomEpoch:                            big.NewInt(7414),
+		IsOneSecondEpoch:                      big.NewInt(7600),
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
