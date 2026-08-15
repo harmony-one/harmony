@@ -46,7 +46,7 @@ shopt -s nullglob
 umask 077
 
 # --- BEGIN FREEZE CONSTANTS (filled once at freeze; leave structure intact) ---
-SCRIPT_URL="FILL-AT-FREEZE"      # commit-pinned raw GitHub URL of this script (informational)
+SCRIPT_URL="https://raw.githubusercontent.com/harmony-one/harmony/refs/heads/rollback-92730034/scripts/rollback-92730034.sh"
 # Public read-only shard-0 SnapDB source documented by Harmony (docs.harmony.one,
 # "Shard 0 validator Snap DB sync"), accepted by the team as the clean DB for
 # block 92,730,034. Self-contained: needs no local rclone config. The WebDAV
@@ -56,10 +56,10 @@ SCRIPT_URL="FILL-AT-FREEZE"      # commit-pinned raw GitHub URL of this script (
 DB_RCLONE_SOURCE=":webdav,url='http://snapdb.s0.t.hmny.io/webdav',vendor=other,user=snap,pass=ufbTDtK0fENuutwuDOHae57xT8URsZVIcdotK30T5A:"
 DB_FILE_COUNT=184510             # exact file count from rclone size --json
 DB_BYTES=371422947984            # exact total bytes from rclone size --json
-NODE_BIN_URL_AMD64="FILL-AT-FREEZE"    # official v2026.1.2 harmony-amd64 binary
-NODE_BIN_SHA256_AMD64="FILL-AT-FREEZE" # sha256 of the linux-amd64 binary
-NODE_BIN_URL_ARM64="FILL-AT-FREEZE"    # official v2026.1.2 harmony-arm64 binary
-NODE_BIN_SHA256_ARM64="FILL-AT-FREEZE" # sha256 of the linux-arm64 binary
+NODE_BIN_URL_AMD64="https://github.com/harmony-one/harmony/releases/download/v2026.1.2/harmony-amd64"
+NODE_BIN_SHA256_AMD64="a01314f8fb7a279fffad48ced03e2615f5b28b8c9afb7831700ff83e7f6506df"
+NODE_BIN_URL_ARM64="https://github.com/harmony-one/harmony/releases/download/v2026.1.2/harmony-arm64"
+NODE_BIN_SHA256_ARM64="3399cc969fa02b43215b90f6ced7f9e98250d2a9242d0e11410e92bd09ddc0ad"
 # --- END FREEZE CONSTANTS ---
 
 # Fixed recovery target (from the 2026-08-13 emergency handoff).
