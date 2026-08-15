@@ -68,9 +68,12 @@ becomes the pinned script URL):
 
 Prerequisite line for the message: install `rclone` first
 (`sudo apt-get install rclone` or the distribution's equivalent). `curl` and
-standard tools are also required; the script checks and names anything
-missing. The node's config must keep its local RPC (`127.0.0.1:9500`)
-enabled — the script uses it to identify keys and to verify health.
+standard tools are also required. If one or more commands are missing, the
+script lists every missing command and prints a copyable install command for
+apt, dnf/yum, or pacman. Install them and run the same recovery command again;
+no database change has happened at that point. The node's config must keep
+its local RPC (`127.0.0.1:9500`) enabled — the script uses it to identify keys
+and to verify health.
 
 **systemd validators (harmony.service) — root required:**
 
@@ -100,7 +103,11 @@ Include verbatim:
   92,730,034 and **reverts nothing**; it never restarts your old chain.
 - Supported machines: Linux x86_64 and Linux arm64 (e.g. Raspberry Pi 5).
 - The database copy is large. It runs while your node is still up, and
-  reruns of `prepare` resume the copy file by file.
+  reruns of `prepare` resume the copy file by file. The script shows the
+  current step in the terminal; during the copy, rclone reports bytes,
+  transfer speed, percentage, and ETA every 10 seconds.
+- Progress is written to stderr. The final `READY`, `RUNNING`, or `STOPPED`
+  result remains the only line written to stdout.
 - Run both commands **from the same directory, as the same user**, on a
   persistent filesystem (not /tmp). Manual validators must run them from the
   directory containing the harmony binary or harmony config file.
@@ -125,7 +132,8 @@ Include verbatim:
 
 | Reason | Meaning / action |
 | --- | --- |
-| `unsupported-platform` | Not Linux x86_64/aarch64, or a required tool (for example rclone) is missing. Install the tool or handle manually. |
+| `unsupported-platform` | The machine is not Linux x86_64 or Linux aarch64. Handle it manually. |
+| `missing-dependencies` | One or more required commands are missing. The lines immediately above `STOPPED` list every missing command and print the package-manager command to install them. Install the packages, then run the same recovery command again. |
 | `needs-root` | Ran without sudo but a harmony.service is loaded, or the harmony process/files belong to a different user. Rerun with sudo (or as the owning user). |
 | `unsupported-layout` | Not packaged-systemd and not a clean manual-directory shape (extra flags, supervisor, ambiguous processes, non-mainnet/archival/multi-shard config, RPC unreachable, conflicting drop-in). Handle one-on-one. |
 | `low-disk` | Free space is below one full DB copy plus margin. Free space, or approve `prepare --discard-old-db` (only after a central old-DB archive is confirmed). |
