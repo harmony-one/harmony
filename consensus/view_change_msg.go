@@ -10,6 +10,7 @@ import (
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	coretypes "github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/harmony-one/harmony/multibls"
@@ -18,6 +19,11 @@ import (
 
 // construct the view change message
 func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWrapper) []byte {
+	if err := consensus.assertEmergencyRecoveryViewID(consensus.getViewChangingID()); err != nil {
+		consensus.getLogger().Error().Err(err).
+			Msg("[constructViewChangeMessage] unsafe recovery ViewID")
+		return nil
+	}
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_VIEWCHANGE,
@@ -45,7 +51,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 			Interface("preparedMsg", preparedMsg).
 			Msg("[constructViewChangeMessage] found prepared msg")
 		if block != nil {
-			if err := consensus.verifyBlock(block); err == nil {
+			if err := consensus.verifyEmergencyRecoveryBlock(block); err == nil {
 				tmpEncoded, err := rlp.EncodeToBytes(block)
 				if err != nil {
 					consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed encoding block")
@@ -101,6 +107,11 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 
 // new leader construct newview message
 func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.PrivateKeyWrapper) []byte {
+	if err := consensus.assertEmergencyRecoveryViewID(viewID); err != nil {
+		consensus.getLogger().Error().Err(err).
+			Msg("[constructNewViewMessage] unsafe recovery ViewID")
+		return nil
+	}
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_NEWVIEW,
@@ -116,6 +127,17 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 
 	vcMsg := message.GetViewchange()
 	vcMsg.Payload, vcMsg.PreparedBlock = consensus.vc.GetPreparedBlock(consensus.fBFTLog)
+	if consensus.current.GetViewIDFloor() > 0 && len(vcMsg.PreparedBlock) > 0 {
+		var block coretypes.Block
+		if err := rlp.DecodeBytes(vcMsg.PreparedBlock, &block); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[constructNewViewMessage] invalid prepared block")
+			return nil
+		}
+		if err := consensus.verifyEmergencyRecoveryBlock(&block); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[constructNewViewMessage] unsafe prepared block")
+			return nil
+		}
+	}
 	vcMsg.M2Aggsigs, vcMsg.M2Bitmap = consensus.vc.GetM2Bitmap(viewID)
 	vcMsg.M3Aggsigs, vcMsg.M3Bitmap = consensus.vc.GetM3Bitmap(viewID)
 	if vcMsg.M3Bitmap == nil || vcMsg.M3Aggsigs == nil {

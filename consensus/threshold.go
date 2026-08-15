@@ -45,6 +45,9 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			Msg("[didReachPrepareQuorum] Unparseable block data")
 		return err
 	}
+	if err := consensus.assertEmergencyRecoveryBlockViewID(blockObj.Header().ViewID().Uint64()); err != nil {
+		return err
+	}
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain().Config(),
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 
