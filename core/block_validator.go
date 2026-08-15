@@ -54,6 +54,9 @@ func NewBlockValidator(blockchain BlockChain) *BlockValidator {
 // ValidateBody verifies the block header's transaction root.
 // The headers are assumed to be already validated at this point.
 func (v *BlockValidator) ValidateBody(block *types.Block) error {
+	if err := validateBlockHashes(block); err != nil {
+		return err
+	}
 	// Check whether the block's known, and if not, that it's linkable
 	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
 		return errors.WithMessage(ErrKnownBlock, "validate body: has block and state")

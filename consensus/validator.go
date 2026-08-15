@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	consensusengine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -24,6 +25,16 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnAnnounce] Unparseable leader message")
+		return
+	}
+	// Reject an abandoned block before it can enter the FBFT log or cause this
+	// validator to sign PREPARE. validateNewBlock repeats this check for every
+	// other entry point.
+	if err := consensusengine.ValidateBlockHash(recvMsg.BlockHash); err != nil {
+		consensus.getLogger().Warn().Err(err).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Str("MsgBlockHash", recvMsg.BlockHash.Hex()).
+			Msg("[OnAnnounce] Rejected block")
 		return
 	}
 
@@ -86,6 +97,9 @@ func (consensus *Consensus) ValidateNewBlock(recvMsg *FBFTMessage) (*types.Block
 	return consensus.validateNewBlock(recvMsg)
 }
 func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block, error) {
+	if err := consensusengine.ValidateBlockHash(recvMsg.BlockHash); err != nil {
+		return nil, err
+	}
 	if consensus.fBFTLog.IsBlockVerified(recvMsg.BlockHash) {
 		var blockObj *types.Block
 

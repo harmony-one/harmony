@@ -31,6 +31,9 @@ func (bc *BlockChainImpl) CommitOffChainData(
 	payout reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
+	if err := validateBlockHashes(block); err != nil {
+		return NonStatTy, err
+	}
 	// Write receipts of the block
 	if err := rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts); err != nil {
 		return NonStatTy, err
