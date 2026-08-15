@@ -107,8 +107,6 @@ func NewGenesisSpec(netType nodeconfig.NetworkType, shardID uint32) *Genesis {
 		}
 	case nodeconfig.Testnet:
 		chainConfig = *params.TestnetChainConfig
-	case nodeconfig.Pangaea:
-		chainConfig = *params.PangaeaChainConfig
 	case nodeconfig.Partner:
 		chainConfig = *params.PartnerChainConfig
 	case nodeconfig.Devnet:

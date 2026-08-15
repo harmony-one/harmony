@@ -459,7 +459,7 @@ var (
 		Name:      "network",
 		Shorthand: "n",
 		DefValue:  "mainnet",
-		Usage:     "network to join (mainnet, testnet, pangaea, localnet, partner, stressnet, devnet)",
+		Usage:     "network to join (mainnet, testnet, localnet, partner, stressnet, devnet)",
 	}
 	bootNodeFlag = cli.StringSliceFlag{
 		Name:  "bootnodes",
@@ -472,7 +472,7 @@ var (
 	}
 	legacyNetworkTypeFlag = cli.StringFlag{
 		Name:       "network_type",
-		Usage:      "network to join (mainnet, testnet, pangaea, localnet, partner, stressnet, devnet)",
+		Usage:      "network to join (mainnet, testnet, localnet, partner, stressnet, devnet)",
 		Deprecated: "use --network",
 	}
 )

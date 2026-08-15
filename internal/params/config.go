@@ -12,7 +12,6 @@ import (
 var (
 	MainnetChainID            = big.NewInt(1)
 	TestnetChainID            = big.NewInt(2)
-	PangaeaChainID            = big.NewInt(3)
 	PartnerChainID            = big.NewInt(4)
 	StressnetChainID          = big.NewInt(5)
 	TestChainID               = big.NewInt(99)  // not a real network
@@ -21,7 +20,6 @@ var (
 	// EthMainnetShard0ChainID to be reserved unique chain ID for eth compatible chains.
 	EthMainnetShard0ChainID            = big.NewInt(1666600000)
 	EthTestnetShard0ChainID            = big.NewInt(1666700000)
-	EthPangaeaShard0ChainID            = big.NewInt(1666800000)
 	EthPartnerShard0ChainID            = big.NewInt(1666900000)
 	EthStressnetShard0ChainID          = big.NewInt(1667000000)
 	EthTestShard0ChainID               = big.NewInt(1667100000) // not a real network
@@ -180,79 +178,6 @@ var (
 		BLSProofBindEpoch:                     big.NewInt(7420),
 		BloomEpoch:                            big.NewInt(7414),
 	}
-	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
-	// All features except for CrossLink are enabled at launch.
-	PangaeaChainConfig = &ChainConfig{
-		ChainID:                               PangaeaChainID,
-		EthCompatibleChainID:                  EthPangaeaShard0ChainID,
-		EthCompatibleShard0ChainID:            EthPangaeaShard0ChainID,
-		EIP155Epoch:                           big.NewInt(0),
-		S3Epoch:                               big.NewInt(0),
-		CrossTxEpoch:                          big.NewInt(0),
-		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
-		CXReceiptStateRollbackEpoch:           EpochTBD,
-		MinCommissionPromoPeriod:              big.NewInt(10),
-		ReceiptLogEpoch:                       big.NewInt(0),
-		PreStakingEpoch:                       big.NewInt(1),
-		CrossLinkEpoch:                        big.NewInt(2),
-		RejectShard0CrossLinkEpoch:            big.NewInt(0),
-		StakingEpoch:                          big.NewInt(2),
-		QuickUnlockEpoch:                      big.NewInt(0),
-		FiveSecondsEpoch:                      big.NewInt(0),
-		RedelegationEpoch:                     big.NewInt(0),
-		IstanbulEpoch:                         big.NewInt(0),
-		TwoSecondsEpoch:                       big.NewInt(0),
-		EthCompatibleEpoch:                    big.NewInt(0),
-		SixtyPercentEpoch:                     big.NewInt(0),
-		NoEarlyUnlockEpoch:                    big.NewInt(0),
-		VRFEpoch:                              big.NewInt(0),
-		MinDelegation100Epoch:                 big.NewInt(0),
-		MinCommissionRateEpoch:                big.NewInt(0),
-		EPoSBound35Epoch:                      big.NewInt(0),
-		AggregatedRewardEpoch:                 big.NewInt(3),
-		PrevVRFEpoch:                          big.NewInt(0),
-		DataCopyFixEpoch:                      big.NewInt(0),
-		SHA3Epoch:                             big.NewInt(0),
-		HIP6And8Epoch:                         big.NewInt(0),
-		StakingPrecompileEpoch:                big.NewInt(2), // same as staking
-		SlotsLimitedEpoch:                     EpochTBD,      // epoch to enable HIP-16
-		ChainIdFixEpoch:                       big.NewInt(0),
-		CrossShardXferPrecompileEpoch:         big.NewInt(1),
-		FeeCollectEpoch:                       EpochTBD,
-		ValidatorCodeFixEpoch:                 EpochTBD,
-		HIP30Epoch:                            EpochTBD,
-		BlockGas30MEpoch:                      big.NewInt(0),
-		MaxRateEpoch:                          EpochTBD,
-		TopMaxRateEpoch:                       EpochTBD,
-		LeaderRotationInternalValidatorsEpoch: EpochTBD,
-		LeaderRotationExternalValidatorsEpoch: EpochTBD,
-		HIP32Epoch:                            EpochTBD,
-		AllowlistEpoch:                        EpochTBD,
-		LeaderRotationV2Epoch:                 EpochTBD,
-		DevnetExternalEpoch:                   EpochTBD,
-		TestnetExternalEpoch:                  EpochTBD,
-		TimestampValidationEpoch:              EpochTBD,
-		DuplicateCrossLinkEpoch:               EpochTBD,
-		ShardStateValidationEpoch:             EpochTBD,
-		IsOneSecondEpoch:                      EpochTBD,
-		EIP2537PrecompileEpoch:                EpochTBD,
-		EIP1153TransientStorageEpoch:          EpochTBD,
-		EIP7939CLZEpoch:                       EpochTBD,
-		EIP5656McopyEpoch:                     EpochTBD,
-		EIP3855Epoch:                          EpochTBD,
-		EIP3860Epoch:                          EpochTBD,
-		PragueEpoch:                           EpochTBD,
-		EIP8024Epoch:                          EpochTBD,
-		ValidatorWrapperAddressBindEpoch:      EpochTBD,
-		SlashExternalStakeDenomFixEpoch:       EpochTBD,
-		RejectDuplicateSlashEvidenceEpoch:     EpochTBD,
-		SlashGroupOrderFixEpoch:               EpochTBD,
-		BLSProofBindEpoch:                     EpochTBD,
-		SlashBallotSignerFixEpoch:             EpochTBD,
-		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
-		BloomEpoch:                            EpochTBD,
-	}
-
 	// PartnerChainConfig contains the chain parameters for the Partner network.
 	// This is the Devnet config
 	PartnerChainConfig = &ChainConfig{
@@ -630,7 +555,6 @@ var (
 func init() {
 	MainnetChainConfig.mustValid()
 	TestnetChainConfig.mustValid()
-	PangaeaChainConfig.mustValid()
 	PartnerChainConfig.mustValid()
 	StressnetChainConfig.mustValid()
 	LocalnetChainConfig.mustValid()
@@ -1315,7 +1239,6 @@ func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
 		MainnetChainConfig.EthCompatibleChainID = big.NewInt(0).Add(MainnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
 		TestnetChainConfig.EthCompatibleChainID = big.NewInt(0).Add(TestnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
-		PangaeaChainConfig.EthCompatibleChainID = big.NewInt(0).Add(PangaeaChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
 		PartnerChainConfig.EthCompatibleChainID = big.NewInt(0).Add(PartnerChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
 		StressnetChainConfig.EthCompatibleChainID = big.NewInt(0).Add(StressnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
 		LocalnetChainConfig.EthCompatibleChainID = big.NewInt(0).Add(LocalnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))

@@ -51,7 +51,6 @@ type NetworkType string
 const (
 	Mainnet   = "mainnet"
 	Testnet   = "testnet"
-	Pangaea   = "pangaea"
 	Partner   = "partner"
 	Stressnet = "stressnet"
 	Devnet    = "devnet"
@@ -63,8 +62,6 @@ func (t NetworkType) ChainConfig() params.ChainConfig {
 	switch t {
 	case Mainnet:
 		return *params.MainnetChainConfig
-	case Pangaea:
-		return *params.PangaeaChainConfig
 	case Partner:
 		return *params.PartnerChainConfig
 	case Devnet:
