@@ -104,7 +104,12 @@ usage_exit() {
   exit 2
 }
 
-log() { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
+log() {
+  local line
+  printf -v line '[%s] %s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
+  printf '%s\n' "$line"       # detailed run log
+  printf '%s\n' "$line" >&4   # live operator progress on stderr
+}
 
 emit() { printf '%s\n' "$*" >&3; PRINTED=1; }
 
@@ -113,6 +118,83 @@ die() { # die <reason> [detail...]
   log "FAILURE reason=$reason detail: $*"
   emit "STOPPED $reason $LOGID"
   exit 1
+}
+
+notice() {
+  # Plain operator instructions, copied to both the run log and live stderr.
+  printf '%s\n' "$*"
+  printf '%s\n' "$*" >&4
+}
+
+package_for_tool() { # <tool> <apt|dnf|pacman>
+  local tool="$1" family="$2"
+  case "$tool" in
+    curl|rclone|jq|sed|grep) printf '%s\n' "$tool" ;;
+    systemctl) printf '%s\n' systemd ;;
+    find) printf '%s\n' findutils ;;
+    sha256sum|stat|df|du|od|cat|install|readlink|sync|tee) printf '%s\n' coreutils ;;
+    flock|setsid|runuser) printf '%s\n' util-linux ;;
+    awk) printf '%s\n' gawk ;;
+    pgrep) [[ "$family" == apt ]] && printf '%s\n' procps || printf '%s\n' procps-ng ;;
+    fuser) printf '%s\n' psmisc ;;
+    getent)
+      case "$family" in
+        apt) printf '%s\n' libc-bin ;;
+        dnf) printf '%s\n' glibc-common ;;
+        pacman) printf '%s\n' glibc ;;
+      esac
+      ;;
+    *) printf '%s\n' "$tool" ;;
+  esac
+}
+
+require_tools() {
+  local tool family="" manager="" package
+  local missing=() packages=()
+  local -A seen=()
+
+  for tool in "$@"; do
+    command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+  done
+  (( ${#missing[@]} > 0 )) || return 0
+
+  notice ""
+  notice "Missing required commands: ${missing[*]}"
+  if command -v apt-get >/dev/null 2>&1; then
+    family=apt; manager="apt-get"
+  elif command -v dnf >/dev/null 2>&1; then
+    family=dnf; manager="dnf"
+  elif command -v yum >/dev/null 2>&1; then
+    family=dnf; manager="yum"
+  elif command -v pacman >/dev/null 2>&1; then
+    family=pacman; manager="pacman"
+  fi
+
+  if [[ -n "$family" ]]; then
+    for tool in "${missing[@]}"; do
+      package="$(package_for_tool "$tool" "$family")"
+      if [[ -n "$package" && -z "${seen[$package]+x}" ]]; then
+        seen["$package"]=1
+        packages+=("$package")
+      fi
+    done
+    notice "Install the missing packages, then run the same recovery command again:"
+    case "$manager" in
+      apt-get)
+        notice "  sudo apt-get update && sudo apt-get install -y ${packages[*]}"
+        ;;
+      dnf|yum)
+        notice "  sudo $manager install -y ${packages[*]}"
+        ;;
+      pacman)
+        notice "  sudo pacman -S --needed ${packages[*]}"
+        ;;
+    esac
+  else
+    notice "Install the commands listed above with this system's package manager, then run the same recovery command again."
+  fi
+  notice ""
+  die missing-dependencies "missing commands: ${missing[*]}"
 }
 
 on_exit() {
@@ -536,9 +618,17 @@ verify_db_dir() { # <dir> <label>: die unless the tree matches the pins
 }
 
 # Remote source must report exactly the pinned file count and total bytes.
+rclone_visible() {
+  # Keep stdout available to callers (for example `rclone size --json`), and
+  # copy stderr/stats to both the run log and the operator's terminal.
+  rclone "$@" --stats=10s --stats-one-line --stats-log-level NOTICE \
+    2> >(tee /dev/fd/4 >&2)
+}
+
 require_db_source_metrics() { # <phase>
   local json count bytes
-  json="$(rclone size --json --config=/dev/null "$DB_RCLONE_SOURCE")" \
+  log "checking DB source size ($1); listing $DB_FILE_COUNT files can take about a minute"
+  json="$(rclone_visible size --json --config=/dev/null "$DB_RCLONE_SOURCE")" \
     || die download-failed "cannot query DB source metrics ($1)"
   count="$(jq -r '.count // empty' <<< "$json" 2>/dev/null || true)"
   bytes="$(jq -r '.bytes // empty' <<< "$json" 2>/dev/null || true)"
@@ -577,7 +667,8 @@ ensure_db_staged() {
   fi
   log "staged DB not usable yet ($DB_TREE_ERR); starting rclone transfer"
   require_db_source_metrics pre-transfer
-  rclone sync --config=/dev/null --retries 5 "$DB_RCLONE_SOURCE" "$dst" \
+  log "downloading the clean DB; rclone will report bytes, speed, percentage, and ETA every 10 seconds"
+  rclone_visible sync --config=/dev/null --retries 5 "$DB_RCLONE_SOURCE" "$dst" \
     || die download-failed "rclone sync into staging"
   require_db_source_metrics post-transfer
   verify_db_dir "$dst" "staged clean DB"
@@ -587,15 +678,16 @@ ensure_db_staged() {
 
 discover_layout() {
   local unit="${SERVICE:-harmony.service}"
+  [[ ! -d /run/systemd/system ]] || require_tools systemctl
   if command -v systemctl >/dev/null 2>&1 \
      && [[ "$(systemctl show "$unit" -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
     (( ROOTLESS )) && die needs-root "unit $unit is loaded; systemd layouts require sudo/root"
     UNIT="$unit"
     discover_systemd
   else
-    command -v setsid >/dev/null 2>&1 || die unsupported-platform "missing tool: setsid"
+    require_tools setsid
     if (( ! ROOTLESS )); then
-      command -v runuser >/dev/null 2>&1 || die unsupported-platform "missing tool: runuser"
+      require_tools runuser
     fi
     discover_manual
   fi
@@ -935,11 +1027,11 @@ prepare_mode() {
   fi
 
   if [[ "$LAYOUT" == "systemd" ]]; then
-    command -v systemctl >/dev/null 2>&1 || die unsupported-platform "missing tool: systemctl"
+    require_tools systemctl
   else
-    command -v setsid >/dev/null 2>&1 || die unsupported-platform "missing tool: setsid"
+    require_tools setsid
     if (( ! ROOTLESS )); then
-      command -v runuser >/dev/null 2>&1 || die unsupported-platform "missing tool: runuser"
+      require_tools runuser
     fi
   fi
 
@@ -1133,11 +1225,11 @@ launch_node() {
     log "launching staged binary as $RUN_USER from $RUN_CWD (rootless=$ROOTLESS)"
     local nodecmd=(setsid "$BIN" -c "$CONFIG" --datadir "$DATADIR")
     (( ROOTLESS )) || nodecmd=(runuser -u "$RUN_USER" -- "${nodecmd[@]}")
-    # Close fd3 (caller stdout) and fd9 (the flock) so the daemon inherits
-    # neither; otherwise callers capturing our stdout would hang until the
-    # node exits, and the node would hold the lock against future runs.
+    # Close fd3 (caller stdout), fd4 (operator progress), and fd9 (the flock)
+    # so the daemon inherits none of them; otherwise callers capturing output
+    # could hang until the node exits, and the node would hold the lock.
     ( cd "$RUN_CWD" && exec "${nodecmd[@]}" ) \
-      >> "$PRIV/node.log" 2>&1 < /dev/null 3>&- 9>&- &
+      >> "$PRIV/node.log" 2>&1 < /dev/null 3>&- 4>&- 9>&- &
     local launcher=$!
     # $! may be a wrapper: rediscover the actual harmony PID via /proc.
     local deadline=$(( SECONDS + START_ACTIVE_TIMEOUT )) found=0
@@ -1331,8 +1423,9 @@ main() {
   : > "$logfile"
   chmod 600 "$logfile"
 
-  # fd3 = the single stdout line; everything else goes to the run log.
-  exec 3>&1 1>>"$logfile" 2>&1
+  # fd3 = the single final stdout line; fd4 = live progress on the original
+  # stderr; detailed output and xtrace continue to the run log.
+  exec 3>&1 4>&2 1>>"$logfile" 2>&1
   trap on_exit EXIT
   PS4='+ rollback:${LINENO}: '
   set -x
@@ -1352,9 +1445,7 @@ main() {
       die unsupported-platform "uname: $(uname -sm) (need Linux x86_64 or Linux aarch64)" ;;
   esac
   log "platform $(uname -sm) -> linux-$ARCH artifact"
-  for t in curl rclone find sha256sum flock stat df du awk sed grep jq od cat pgrep fuser install getent readlink sync; do
-    command -v "$t" >/dev/null 2>&1 || die unsupported-platform "missing tool: $t"
-  done
+  require_tools curl rclone find sha256sum flock stat df du awk sed grep jq od cat pgrep fuser install getent readlink sync tee
 
   STAMP="$(date +%Y%m%d-%H%M%S)"
   ORIG_EXE=""; ORIG_EXE_SHA256=""; CONFIG=""; DATADIR=""; BLS_IDS=""
