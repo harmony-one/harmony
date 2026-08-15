@@ -38,6 +38,7 @@ import (
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	stakingabi "github.com/harmony-one/harmony/staking"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -754,18 +755,31 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 		return err
 	}
 	stakingTx, isStakingTx := tx.(*staking.StakingTransaction)
+	isPrecompileDelegate := pool.isStakingPrecompileDelegate(tx, from)
 	if !isStakingTx || (isStakingTx && stakingTx.StakingType() != staking.DirectiveDelegate) {
-		if pool.currentState.GetBalance(from).Cmp(cost) < 0 {
-			return errors.Wrapf(
-				ErrInsufficientFunds,
-				"current shard-id: %d",
-				pool.chain.CurrentBlock().ShardID(),
-			)
+		if !isPrecompileDelegate {
+			if pool.currentState.GetBalance(from).Cmp(cost) < 0 {
+				return errors.Wrapf(
+					ErrInsufficientFunds,
+					"current shard-id: %d",
+					pool.chain.CurrentBlock().ShardID(),
+				)
+			}
 		}
 	}
 	intrGas := uint64(0)
 	if isStakingTx {
 		intrGas, err = vm.IntrinsicGas(tx.Data(), false, pool.homestead, pool.istanbul, stakingTx.StakingType() == staking.DirectiveCreateValidator, pool.isEIP3860)
+		if err == nil {
+			extra, extraErr := staking.ExtraGasForStakingDirective(stakingTx.StakingType(), tx.Data())
+			if extraErr != nil {
+				return extraErr
+			}
+			if intrGas > ^uint64(0)-extra {
+				return errors.New("staking batch gas overflow")
+			}
+			intrGas += extra
+		}
 	} else {
 		intrGas, err = vm.IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, pool.istanbul, false, pool.isEIP3860)
 	}
@@ -779,7 +793,86 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	if isStakingTx {
 		return pool.validateStakingTx(stakingTx)
 	}
-	return nil
+	return pool.validateStakingPrecompileCall(tx, from)
+}
+
+func (pool *TxPool) isStakingPrecompileDelegate(tx types.PoolTransaction, from common.Address) bool {
+	if pool.chain.CurrentBlock().ShardID() != shard.BeaconChainShardID {
+		return false
+	}
+	if !pool.chainconfig.IsStakingPrecompile(pool.pendingEpoch()) {
+		return false
+	}
+	to := tx.To()
+	if to == nil || *to != stakingabi.PrecompileAddress {
+		return false
+	}
+	stakeMsg, err := stakingabi.ParseStakeMsg(from, tx.Data())
+	if err != nil {
+		return false
+	}
+	_, ok := stakeMsg.(*staking.Delegate)
+	return ok
+}
+
+func (pool *TxPool) validateStakingPrecompileCall(tx types.PoolTransaction, from common.Address) error {
+	if pool.chain.CurrentBlock().ShardID() != shard.BeaconChainShardID {
+		return nil
+	}
+	if !pool.chainconfig.IsStakingPrecompile(pool.pendingEpoch()) {
+		return nil
+	}
+	to := tx.To()
+	if to == nil || *to != stakingabi.PrecompileAddress {
+		return nil
+	}
+	stakeMsg, err := stakingabi.ParseStakeMsg(from, tx.Data())
+	if err != nil {
+		return err
+	}
+
+	b32, _ := hmyCommon.AddressToBech32(from)
+	switch msg := stakeMsg.(type) {
+	case *staking.Delegate:
+		chain, ok := pool.chain.(ChainContext)
+		if !ok {
+			utils.Logger().Debug().Msg("Missing chain context in txPool")
+			return nil
+		}
+		delegations, err := chain.ReadDelegationsByDelegator(msg.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		pendingEpoch := pool.pendingEpoch()
+		_, delegateAmt, _, err := VerifyAndDelegateFromMsg(
+			pool.currentState, pendingEpoch, msg, delegations, pool.chainconfig)
+		if err != nil {
+			return err
+		}
+		gasAmt := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.GasLimit()))
+		totalAmt := new(big.Int).Add(delegateAmt, gasAmt)
+		if bal := pool.currentState.GetBalance(from); bal.Cmp(totalAmt) < 0 {
+			return fmt.Errorf("not enough balance for delegation: %v < %v", bal, delegateAmt)
+		}
+		return nil
+	case *staking.Undelegate:
+		_, err := VerifyAndUndelegateFromMsg(pool.currentState, pool.pendingEpoch(), msg)
+		return err
+	case *staking.CollectRewards:
+		chain, ok := pool.chain.(ChainContext)
+		if !ok {
+			utils.Logger().Debug().Msg("Missing chain context in txPool")
+			return nil
+		}
+		delegations, err := chain.ReadDelegationsByDelegator(msg.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		_, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations)
+		return err
+	default:
+		return errors.WithMessagef(ErrInvalidSender, "staking precompile sender is %s", b32)
+	}
 }
 
 // validateStakingTx checks the staking message based on the staking directive
@@ -906,6 +999,87 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		}
 
 		_, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations)
+		return err
+	case staking.DirectiveBatchDelegate:
+		pendingEpoch := pool.pendingEpoch()
+		if !pool.chainconfig.IsStakingV2(pendingEpoch) {
+			return errors.New("batch delegation is only available in StakingV2 epoch")
+		}
+		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveBatchDelegate)
+		if err != nil {
+			return err
+		}
+		stkMsg, ok := msg.(*staking.BatchDelegate)
+		if !ok {
+			return ErrInvalidMsgForStakingDirective
+		}
+		if from != stkMsg.DelegatorAddress {
+			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
+		}
+		chain, ok := pool.chain.(ChainContext)
+		if !ok {
+			utils.Logger().Debug().Msg("Missing chain context in txPool")
+			return nil
+		}
+		delegations, err := chain.ReadDelegationsByDelegator(stkMsg.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		_, delegateAmt, _, err := VerifyAndBatchDelegateFromMsg(
+			pool.currentState, pendingEpoch, stkMsg, delegations, pool.chainconfig)
+		if err != nil {
+			return err
+		}
+		gasAmt := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.GasLimit()))
+		totalAmt := new(big.Int).Add(delegateAmt, gasAmt)
+		if bal := pool.currentState.GetBalance(from); bal.Cmp(totalAmt) < 0 {
+			return fmt.Errorf("not enough balance for batch delegation: %v < %v", bal, delegateAmt)
+		}
+		return nil
+	case staking.DirectiveBatchUndelegate:
+		pendingEpoch := pool.pendingEpoch()
+		if !pool.chainconfig.IsStakingV2(pendingEpoch) {
+			return errors.New("batch undelegation is only available in StakingV2 epoch")
+		}
+		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveBatchUndelegate)
+		if err != nil {
+			return err
+		}
+		stkMsg, ok := msg.(*staking.BatchUndelegate)
+		if !ok {
+			return ErrInvalidMsgForStakingDirective
+		}
+		if from != stkMsg.DelegatorAddress {
+			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
+		}
+		_, err = VerifyAndBatchUndelegateFromMsg(pool.currentState, pendingEpoch, stkMsg, pool.chainconfig)
+		return err
+	case staking.DirectiveUndelegateAll:
+		pendingEpoch := pool.pendingEpoch()
+		if !pool.chainconfig.IsStakingV2(pendingEpoch) {
+			return errors.New("undelegate all is only available in StakingV2 epoch")
+		}
+		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegateAll)
+		if err != nil {
+			return err
+		}
+		stkMsg, ok := msg.(*staking.UndelegateAll)
+		if !ok {
+			return ErrInvalidMsgForStakingDirective
+		}
+		if from != stkMsg.DelegatorAddress {
+			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
+		}
+		chain, ok := pool.chain.(ChainContext)
+		if !ok {
+			utils.Logger().Debug().Msg("Missing chain context in txPool")
+			return nil
+		}
+		delegations, err := chain.ReadDelegationsByDelegator(stkMsg.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		_, _, err = VerifyAndUndelegateAllFromMsg(pool.currentState, pendingEpoch, stkMsg, delegations, chain, pool.chainconfig)
 		return err
 	default:
 		return staking.ErrInvalidStakingKind

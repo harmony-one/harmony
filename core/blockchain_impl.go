@@ -3259,6 +3259,24 @@ func (bc *BlockChainImpl) prepareStakingMetaData(
 
 		case staking.DirectiveUndelegate:
 		case staking.DirectiveCollectRewards:
+		case staking.DirectiveBatchDelegate:
+			batchDelegate := decodePayload.(*staking.BatchDelegate)
+			for _, delegationAction := range batchDelegate.Delegations {
+				delegate := &staking.Delegate{
+					DelegatorAddress: batchDelegate.DelegatorAddress,
+					ValidatorAddress: delegationAction.ValidatorAddress,
+					Amount:           delegationAction.Amount,
+				}
+				if err := processDelegateMetadata(delegate,
+					newDelegations,
+					state,
+					bc,
+					blockNum); err != nil {
+					return nil, nil, err
+				}
+			}
+		case staking.DirectiveBatchUndelegate:
+		case staking.DirectiveUndelegateAll:
 		default:
 		}
 	}

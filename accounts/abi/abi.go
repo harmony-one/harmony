@@ -261,6 +261,19 @@ func (abi *ABI) HasReceive() bool {
 // revertSelector is a special function selector for revert reason unpacking.
 var revertSelector = crypto.Keccak256([]byte("Error(string)"))[:4]
 
+// PackRevert ABI-encodes a revert reason using the standard Error(string) selector.
+func PackRevert(reason string) ([]byte, error) {
+	typ, err := NewType("string", "", nil)
+	if err != nil {
+		return nil, err
+	}
+	packed, err := (Arguments{{Type: typ}}).Pack(reason)
+	if err != nil {
+		return nil, err
+	}
+	return append(append([]byte(nil), revertSelector...), packed...), nil
+}
+
 // UnpackRevert resolves the abi-encoded revert reason. According to the solidity
 // spec https://solidity.readthedocs.io/en/latest/control-structures.html#revert,
 // the provided revert reason is abi-encoded as if it were a call to a function

@@ -25,6 +25,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/accounts/abi"
 	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/ethereum/go-ethereum/common/math"
@@ -295,14 +296,36 @@ func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contrac
 	}
 	gasCost, err := p.RequiredGas(evm, contract, input)
 	if err != nil {
-		return nil, 0, err
+		return wrapWritePrecompileError(evm, p, nil, 0, err)
 	}
 	if suppliedGas < gasCost {
 		return nil, 0, ErrOutOfGas
 	}
 	suppliedGas -= gasCost
 	output, err := p.RunWriteCapable(evm, contract, input)
-	return output, suppliedGas, err
+	return wrapWritePrecompileError(evm, p, output, suppliedGas, err)
+}
+
+func wrapWritePrecompileError(
+	evm *EVM, p WriteCapablePrecompiledContract, output []byte, remainingGas uint64, err error,
+) ([]byte, uint64, error) {
+	if err == nil || err == ErrExecutionReverted {
+		return output, remainingGas, err
+	}
+	// Only the staking precompile switches to ABI Error(string) reverts after StakingV2.
+	// Other write-capable precompiles keep their prior exceptional-error behavior.
+	if _, ok := p.(*stakingPrecompile); !ok {
+		return output, remainingGas, err
+	}
+	if evm == nil || evm.ChainConfig() == nil ||
+		!evm.ChainConfig().IsStakingV2(evm.Context.EpochNumber) {
+		return output, remainingGas, err
+	}
+	revertData, packErr := abi.PackRevert(err.Error())
+	if packErr != nil {
+		return output, remainingGas, err
+	}
+	return revertData, remainingGas, ErrExecutionReverted
 }
 
 // ECRECOVER implemented as a native contract.
