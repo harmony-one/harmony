@@ -181,6 +181,7 @@ EOF
   if [[ ! -d "$T/dbsrc" ]]; then
     mkdir -p "$T/dbsrc"
     printf 'MANIFEST-000001\n' > "$T/dbsrc/CURRENT"
+    cp "$T/dbsrc/CURRENT" "$T/dbsrc/CURRENT.bak"
     head -c 512 /dev/urandom > "$T/dbsrc/MANIFEST-000001"
     head -c 4096 /dev/urandom > "$T/dbsrc/000001.ldb"
     head -c 2048 /dev/urandom > "$T/dbsrc/000002.log"

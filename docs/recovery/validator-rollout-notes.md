@@ -194,8 +194,9 @@ hash-verified. The actual trust controls are:
 2. The remote file count and total bytes must equal the pinned values,
    checked before and after the transfer.
 3. The received tree must be a plain LevelDB directory: only regular files
-   with goleveldb names (`CURRENT`, `LOCK`, `LOG`, `LOG.old`, numeric
-   `.ldb`/`.sst`/`.log`), exactly one `MANIFEST-*`, and `CURRENT` naming it.
+   with goleveldb names (`CURRENT`, `CURRENT.bak`, pending numeric `CURRENT.*`,
+   `LOCK`, `LOG`, `LOG.old`, numeric `.ldb`/`.sst`/`.log`), exactly one
+   `MANIFEST-*`, and `CURRENT` naming it.
    No symlinks, no subdirectories, no device or special files.
 4. The harmony binary is pinned by SHA-256 and ELF architecture.
 5. After start, the node itself must report block 92,730,034 with hash
