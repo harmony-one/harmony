@@ -3,6 +3,8 @@
 Operator notes for the optional two-command recovery script
 (`scripts/rollback-92730034.sh`).
 Companion note on the node binary: `docs/recovery/recovery-binary-delta.md`.
+Shard-1 operations use a separate script and runbook:
+`docs/recovery/validator-rollout-notes-s1-94978278.md`.
 
 The script is **optional**. A validator can reach the same result by hand:
 stop the node, install the official v2026.1.2 binary, replace
