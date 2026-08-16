@@ -340,6 +340,8 @@ m_happy() {
 
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare
   expect "m_happy/prepare" 0 "^READY [0-9a-f]{96}(,[0-9a-f]{96})* recovery-92730034$" || return 0
+  grep -q 'rclone concurrency: transfers=' "$PRIV"/run-*.log \
+    && ok "m_happy/rclone-concurrency-selected" || bad "m_happy/rclone-concurrency-selected"
   [[ "$RB_OUT" == "READY $BLS_SORTED recovery-92730034" ]] \
     && ok "m_happy/bls-sorted" || bad "m_happy/bls-sorted" "$RB_OUT"
   grep -q 'GET node.bin' "$T/http.log" && ! grep -q 'GET node-other.bin' "$T/http.log" \
