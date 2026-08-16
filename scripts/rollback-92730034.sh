@@ -149,7 +149,7 @@ package_for_tool() { # <tool> <apt|dnf|pacman>
     curl|rclone|jq|sed|grep) printf '%s\n' "$tool" ;;
     systemctl) printf '%s\n' systemd ;;
     find) printf '%s\n' findutils ;;
-    sha256sum|stat|df|du|od|cat|install|readlink|sync|tee) printf '%s\n' coreutils ;;
+    sha256sum|stat|df|du|od|cat|install|readlink|sync|tee|nproc) printf '%s\n' coreutils ;;
     flock|setsid|runuser) printf '%s\n' util-linux ;;
     awk) printf '%s\n' gawk ;;
     pgrep) [[ "$family" == apt ]] && printf '%s\n' procps || printf '%s\n' procps-ng ;;
@@ -660,6 +660,36 @@ rclone_visible() {
     2> >(tee /dev/fd/4 >&2)
 }
 
+select_rclone_concurrency() {
+  local cores mem_kib cap selected override="${RECOVERY_RCLONE_TRANSFERS-}"
+  cores="$(nproc)"
+  mem_kib="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
+  [[ "$cores" =~ ^[1-9][0-9]*$ && "$mem_kib" =~ ^[0-9]+$ ]] \
+    || die unsupported-platform "cannot determine CPU or available memory for rclone"
+
+  if [[ -n "$override" ]]; then
+    if ! [[ "$override" =~ ^[1-9][0-9]*$ ]] || (( override > 64 )); then
+      die unsupported-platform "RECOVERY_RCLONE_TRANSFERS must be an integer from 1 to 64"
+    fi
+    selected="$override"
+  else
+    # WebDAV has high per-request latency and the snapshot has ~184k files,
+    # so capable hosts benefit more from parallel requests than from a
+    # CPU-conservative setting. Memory caps bound rclone's per-transfer
+    # buffering; a 4-core Pi 5 with >=4 GiB available selects 32.
+    if (( mem_kib < 1048576 )); then cap=4
+    elif (( mem_kib < 2097152 )); then cap=8
+    elif (( mem_kib < 4194304 )); then cap=16
+    else cap=32
+    fi
+    selected=$(( cores * 8 ))
+    (( selected < 4 )) && selected=4
+    (( selected > cap )) && selected=$cap
+  fi
+  RCLONE_TRANSFERS_SELECTED="$selected"
+  log "rclone concurrency: transfers=$selected checkers=$selected cores=$cores available-memory-kib=$mem_kib"
+}
+
 require_db_source_metrics() { # <phase>
   local json count bytes
   log "checking DB source size ($1); listing $DB_FILE_COUNT files can take about a minute"
@@ -702,8 +732,15 @@ ensure_db_staged() {
   fi
   log "staged DB not usable yet ($DB_TREE_ERR); starting rclone transfer"
   require_db_source_metrics pre-transfer
+  select_rclone_concurrency
   log "downloading the clean DB; rclone will report bytes, speed, percentage, and ETA every 10 seconds"
-  rclone_visible sync --config=/dev/null --retries 5 "$DB_RCLONE_SOURCE" "$dst" \
+  # Pin the established four-stream behavior for large files. The WebDAV
+  # backend advertises neither recursive ListR nor hashes, so --fast-list and
+  # --checksum would provide no benefit here.
+  rclone_visible sync --config=/dev/null --retries 5 \
+    --transfers="$RCLONE_TRANSFERS_SELECTED" --checkers="$RCLONE_TRANSFERS_SELECTED" \
+    --multi-thread-streams=4 \
+    "$DB_RCLONE_SOURCE" "$dst" \
     || die download-failed "rclone sync into staging"
   require_db_source_metrics post-transfer
   verify_db_dir "$dst" "staged clean DB"
@@ -1579,7 +1616,7 @@ main() {
       die unsupported-platform "uname: $(uname -sm) (need Linux x86_64 or Linux aarch64)" ;;
   esac
   log "platform $(uname -sm) -> linux-$ARCH artifact"
-  require_tools curl rclone find sha256sum flock stat df du awk sed grep jq od cat pgrep fuser install getent readlink sync tee
+  require_tools curl rclone find sha256sum flock stat df du awk sed grep jq od cat pgrep fuser install getent readlink sync tee nproc
 
   STAMP="$(date +%Y%m%d-%H%M%S)"
   ORIG_EXE=""; ORIG_EXE_SHA256=""; CONFIG=""; DATADIR=""; BLS_IDS=""

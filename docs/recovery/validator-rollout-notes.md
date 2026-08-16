@@ -132,6 +132,12 @@ Include verbatim:
   reruns of `prepare` resume the copy file by file. The script shows the
   current step in the terminal; during the copy, rclone reports bytes,
   transfer speed, percentage, and ETA every 10 seconds.
+- The script selects 4–32 parallel rclone transfers from available CPU and
+  memory; an 8 GB Raspberry Pi 5 normally selects 32. A supervised operator
+  may override it with `RECOVERY_RCLONE_TRANSFERS=1..64`.
+- Large files use four rclone streams. `--fast-list` and `--checksum` are not
+  used because this WebDAV service advertises neither recursive listing nor
+  remote hashes.
 - Progress is written to stderr. The final `READY`, `RUNNING`, or `STOPPED`
   result remains the only line written to stdout.
 - The script records and preserves the original Harmony arguments in order.
