@@ -40,7 +40,10 @@ HTTP=http://127.0.0.1:8642
 TARGET_HASH="0x30c35d2f2291e4b27debe7862956cf7a0cc7abefc044273d6823567335086d8d"
 K1="$(printf 'ab%.0s' $(seq 48))"   # 96 hex chars
 K2="$(printf 'cd%.0s' $(seq 48))"
+K3="$(printf 'ef%.0s' $(seq 48))"
 BLS_SORTED="$K1,$K2"
+UNIT_A="rbsmoke-validator-a.service"
+UNIT_B="rbsmoke-validator-b.service"
 # Force manual-layout detection even where a harmony.service unit exists.
 ABSENT_UNIT="rbsmoke-absent.service"
 
@@ -88,6 +91,7 @@ expect() { # <case> <want-rc> <line-regex>
 }
 
 state_get() { sed -n "s/^$1=//p" "$STATE" 2>/dev/null || true; }
+unit_state_get() { sed -n "s/^$2=//p" "$WORK/units/$1/private/state" 2>/dev/null || true; }
 
 pids_by_exe() { # <exe path> -> pids on stdout
   local d out=""
@@ -107,7 +111,10 @@ kill_fakes() {
   local d exe
   for d in /proc/[0-9]*; do
     exe="$(readlink "$d/exe" 2>/dev/null || true)"
-    if [[ "$exe" == "$T/cases/"* || "$exe" == "$BIN" || "$exe" == "/usr/sbin/harmony" || "$exe" == "/usr/sbin/harmony-evil" || "$exe" == "$T/imposter/"* ]]; then
+    if [[ "$exe" == "$T/cases/"* || "$exe" == "$BIN" \
+       || "$exe" == "$WORK/units/"*"/bin/harmony-recovery" \
+       || "$exe" == "/usr/sbin/harmony" || "$exe" == "/usr/sbin/harmony-evil" \
+       || "$exe" == "$T/imposter/"* ]]; then
       kill -9 "${d#/proc/}" 2>/dev/null || true
     fi
   done
@@ -118,17 +125,29 @@ rpc_set() { # healthy defaults unless overridden: rpc_set [bn] [hash] [keys-json
   printf '{"bn": %s, "blockhash": "%s", "blskey": %s}\n' "$bn" "$h" "$keys" > "$T/rpc.json"
 }
 
+rpc_set_port() { # <port> [keys-json]
+  printf '{"bn": 92730100, "blockhash": "%s", "blskey": %s}\n' \
+    "$TARGET_HASH" "${2-[\"$K3\"]}" > "$T/rpc-$1.json"
+}
+
 cleanup_case() {
   kill_fakes
   if have_systemd; then
     systemctl stop harmony.service >/dev/null 2>&1 || true
+    systemctl stop "$UNIT_A" "$UNIT_B" >/dev/null 2>&1 || true
     rm -rf /etc/systemd/system/harmony.service.d
+    rm -rf "/etc/systemd/system/$UNIT_A.d" "/etc/systemd/system/$UNIT_B.d"
+    rm -f "/etc/systemd/system/$UNIT_A" "/etc/systemd/system/$UNIT_B"
     rm -f /usr/sbin/harmony-evil
     systemctl daemon-reload || true
   fi
+  rm -rf /home/rbsmoke-a /home/rbsmoke-b
+  rm -f /etc/harmony/rbsmoke-a.conf /etc/harmony/rbsmoke-b.conf
   rm -rf "$WORK" "$SENT_DIR"
   rm -f "$DIE"
+  rm -f "$T"/rpc-*.json
   rpc_set
+  rpc_set_port 9600
 }
 
 # ---------- fixtures ----------
@@ -204,15 +223,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = '/var/tmp/rbsmoke'
 
-def cfg():
-    with open(ROOT + '/rpc.json') as f:
+def cfg(port):
+    path = ROOT + ('/rpc.json' if port == 9500 else '/rpc-%d.json' % port)
+    with open(path) as f:
         return json.load(f)
 
 class Rpc(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0)) or 0))
-        c = cfg()
+        c = cfg(self.server.server_port)
         m = body.get('method', '')
         if m == 'hmyv2_getNodeMetadata':
             result = {'blskey': c['blskey']}
@@ -255,12 +275,14 @@ class Files(BaseHTTPRequestHandler):
             f.seek(start)
             self.wfile.write(f.read())
 
-threading.Thread(target=lambda: ThreadingHTTPServer(('127.0.0.1', 9500), Rpc).serve_forever(), daemon=True).start()
+for port in (9500, 9600):
+    threading.Thread(target=lambda p=port: ThreadingHTTPServer(('127.0.0.1', p), Rpc).serve_forever(), daemon=True).start()
 ThreadingHTTPServer(('127.0.0.1', 8642), Files).serve_forever()
 EOF
   pkill -f 'rbsmoke/stub.py' 2>/dev/null || true
   sleep 0.5
   rpc_set
+  rpc_set_port 9600
   : > "$T/http.log"
   setsid python3 "$T/stub.py" >/dev/null 2>&1 < /dev/null &
   wait_for 10 curl -sf -o /dev/null "$HTTP/node.bin" || { echo "fixture HTTP server failed"; exit 1; }
@@ -849,6 +871,12 @@ m_usage() {
   expect "m_usage/start-with-flag" 2 "^usage: "
   run_rb "$T/cases/usage" prepare --discard-old-db extra
   expect "m_usage/extra-arg" 2 "^usage: "
+  run_rb "$T/cases/usage" start --systemd-unit
+  expect "m_usage/missing-unit" 2 "^usage: "
+  run_rb "$T/cases/usage" start --systemd-unit ../bad.service
+  expect "m_usage/unsafe-unit" 2 "^usage: "
+  run_rb "$T/cases/usage" start --systemd-unit 'validator@.service'
+  expect "m_usage/template-unit" 2 "^usage: "
   run_rb "$T/cases/usage" start
   expect "m_usage/start-before-prepare" 1 "^STOPPED not-ready [0-9-]+$"
 }
@@ -931,6 +959,60 @@ EOF
   SDATA=/home/harmony/data
 }
 
+s_multiple_units() {
+  new_systemd_case; mk_script
+
+  systemctl stop harmony.service
+  mv /etc/systemd/system/harmony.service "/etc/systemd/system/$UNIT_A"
+  mkdir -p /home/rbsmoke-b/data/harmony_db_0
+  printf 'x' > /home/rbsmoke-b/data/harmony_db_0/CURRENT
+  printf 'old' > /home/rbsmoke-b/data/harmony_db_0/olddata
+  cat > /etc/harmony/rbsmoke-b.conf <<'EOF'
+Version = "2.6.2"
+
+[General]
+NodeType = "validator"
+IsArchival = false
+DataDir = "/home/rbsmoke-b/data"
+
+[Network]
+NetworkType = "mainnet"
+
+[ShardData]
+EnableShardData = false
+EOF
+  cat > "/etc/systemd/system/$UNIT_B" <<EOF
+[Service]
+Type=simple
+User=harmony
+WorkingDirectory=/home/rbsmoke-b
+ExecStart=/usr/sbin/harmony -c /etc/harmony/rbsmoke-b.conf --http.port=9600
+EOF
+  chown -R harmony: /home/rbsmoke-b
+  systemctl daemon-reload
+  systemctl start "$UNIT_A" "$UNIT_B"
+  wait_for 10 bash -c "[[ \"\$(systemctl is-active '$UNIT_A')\" == active && \"\$(systemctl is-active '$UNIT_B')\" == active ]]" \
+    || { bad "s_multi/fixture" "units did not start"; return 0; }
+
+  run_rb /root prepare --systemd-unit "$UNIT_A"
+  expect "s_multi/a-prepare" 0 "^READY $BLS_SORTED recovery-92730034$" || return 0
+  [[ "$(systemctl is-active "$UNIT_B")" == active ]] \
+    && ok "s_multi/b-kept-running" || bad "s_multi/b-kept-running"
+  [[ "$(unit_state_get "$UNIT_A" UNIT)" == "$UNIT_A" ]] \
+    && ok "s_multi/a-state" || bad "s_multi/a-state"
+
+  run_rb /root start --systemd-unit "$UNIT_A"
+  expect "s_multi/a-start" 0 "^RUNNING $BLS_SORTED recovery-92730034$" || return 0
+  run_rb /root prepare --systemd-unit "$UNIT_B"
+  expect "s_multi/b-prepare" 0 "^READY $K3 recovery-92730034$" || return 0
+  [[ "$(systemctl is-active "$UNIT_A")" == active ]] \
+    && ok "s_multi/a-kept-running" || bad "s_multi/a-kept-running"
+  [[ "$(unit_state_get "$UNIT_B" RPC_URL)" == "http://127.0.0.1:9600" ]] \
+    && ok "s_multi/b-rpc-port" || bad "s_multi/b-rpc-port"
+  [[ -f "$WORK/units/$UNIT_A/private/state" && -f "$WORK/units/$UNIT_B/private/state" ]] \
+    && ok "s_multi/separate-state" || bad "s_multi/separate-state"
+}
+
 s_happy() {
   new_systemd_case; mk_script
   local orig_sha_before; orig_sha_before="$(sha256sum /usr/sbin/harmony | awk '{print $1}')"
@@ -986,7 +1068,8 @@ s_predeleted_db() {
   new_systemd_case; mk_script
   systemctl stop harmony.service
   rm -rf /home/harmony/data/harmony_db_0
-  sed -i 's|^RPC_URL=.*|RPC_URL="http://127.0.0.1:19500"|' "$RB"
+  sed -i 's/--http.port=9500/--http.port=19500/' /etc/systemd/system/harmony.service
+  systemctl daemon-reload
   run_rb /root prepare --discard-old-db
   expect "s_predeleted/ready" 0 "^READY unknown recovery-92730034$" || return 0
   [[ "$(systemctl is-active harmony.service)" != "active" ]] \
@@ -1183,15 +1266,15 @@ s_started_restart_failure() {
 }
 
 s_started_duplicate() {
-  # Duplicate (renamed recovery-binary copy) after RUNNING: the start rerun
-  # must stop AND hold the legitimate unit before reporting the duplicate.
+  # A second process using the selected config after RUNNING must stop and
+  # hold the legitimate unit before reporting the duplicate.
   new_systemd_case; mk_script
   run_rb /root prepare
   expect "s_dup/ready" 0 "^READY " || return 0
   run_rb /root start
   expect "s_dup/running" 0 "^RUNNING " || return 0
   cp "$T/fake-recovery" "$T/imposter/definitely-not-harmony"
-  setsid "$T/imposter/definitely-not-harmony" >/dev/null 2>&1 < /dev/null &
+  setsid "$T/imposter/definitely-not-harmony" -c /etc/harmony/harmony.conf >/dev/null 2>&1 < /dev/null &
   wait_for 5 bash -c "[[ -n \"\$(2>/dev/null readlink /proc/*/exe | grep -Fx '$T/imposter/definitely-not-harmony')\" ]]" || true
   run_rb /root start
   expect "s_dup/duplicate" 1 "^STOPPED duplicate-process [0-9-]+$"
@@ -1364,6 +1447,7 @@ run_systemd() {
     skip "systemd-cases" "PID 1 is not systemd here; run this group on the systemd VM/container"
     return 0
   fi
+  s_multiple_units || true
   s_happy || true
   s_predeleted_db || true
   s_conflicting_dropin || true
