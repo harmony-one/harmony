@@ -72,16 +72,30 @@ standard tools are also required. If one or more commands are missing, the
 script lists every missing command and prints a copyable install command for
 apt, dnf/yum, or pacman. Install them and run the same recovery command again;
 no database change has happened at that point. The node's config must keep
-its local RPC (`127.0.0.1:9500`) enabled — the script uses it to identify keys
-and to verify health.
+its local RPC enabled. The script reads the RPC port from the service command
+or config, then uses it to identify keys and verify health.
 
-**systemd validators (harmony.service) — root required:**
+**systemd validators — root required:**
 
 ```
-curl -fsSL <pinned-script-url> -o rollback-92730034.sh && sudo bash ./rollback-92730034.sh prepare
+curl -fsSL <pinned-script-url> -o rollback-92730034.sh
+sudo bash ./rollback-92730034.sh prepare --systemd-unit validator-a.service
 # later, only after the team sends GO:
-sudo bash ./rollback-92730034.sh start
+sudo bash ./rollback-92730034.sh start --systemd-unit validator-a.service
 ```
+
+Use the real service name in both commands. Run one command pair for each
+shard-0 service that needs recovery. Services that are not being recovered
+do not need a command. Each selected service gets separate recovery state,
+binary, and systemd GO file.
+
+Several services may use copies of the same Harmony binary. That alone is not
+treated as a duplicate. Their config files, DataDirs, RPC ports, and BLS keys
+must still be different. The READY tally must reject repeated BLS keys.
+
+For the standard `harmony.service`, the option may be omitted. The older
+`SERVICE=<name>` environment setting also remains supported, but
+`--systemd-unit` is clearer when a host runs several services.
 
 **Manual (non-systemd) validators that run harmony as a non-root user, with
 binary/config/database owned by that user — run WITHOUT sudo, as that user:**
@@ -95,13 +109,13 @@ bash ./rollback-92730034.sh start
 Rootless runs keep every file (database, replacement DB, state, staged
 binary) owned by the node user; state lives in
 `./.hmy-recovery-92730034/work/` in the invocation directory. If you see
-`STOPPED needs-root ...`, your machine has a harmony.service or files owned
-by another user: rerun with sudo.
+`STOPPED needs-root ...`, your machine has a systemd service or files owned by
+another user: rerun with sudo.
 
 Low-space recovery:
 
 ```bash
-sudo bash ./rollback-92730034.sh prepare --discard-old-db
+sudo bash ./rollback-92730034.sh prepare --systemd-unit validator-a.service --discard-old-db
 ```
 
 When the old DB still exists, the script first discovers the validator and
@@ -115,14 +129,14 @@ the clean DB while Harmony remains stopped.
 automation where the exact deletion path was already reviewed:
 
 ```bash
-sudo bash ./rollback-92730034.sh prepare --discard-old-db --quiet
+sudo bash ./rollback-92730034.sh prepare --systemd-unit validator-a.service --discard-old-db --quiet
 ```
 
-If the old DB was already deleted, use the same command with
-`harmony.service` stopped. The script discovers the paths and flags from
-systemd, reports `READY unknown recovery-92730034`, and continues without a
-BLS tally identity. This result is suitable for installation testing but must
-not count toward restart voting power.
+If the old DB was already deleted, use the same command with the selected
+service stopped. The script discovers the paths and flags from systemd,
+reports `READY unknown recovery-92730034`, and continues without a BLS tally
+identity. This result is suitable for installation testing but must not count
+toward restart voting power.
 
 Include verbatim:
 - Despite the name, the script installs a clean database ending at block
@@ -154,10 +168,9 @@ Include verbatim:
 
 ## 4. READY tally (manual spreadsheet)
 
-- One row per machine, pasting its full comma-joined READY key set.
-- Dedupe by BLS key, then select machines whose complete READY key sets are
-  pairwise disjoint (starting a machine activates *all* its keys, so "one
-  machine per key" is unsafe with overlapping multi-key configurations).
+- One row per recovered service, pasting its full comma-joined READY key set.
+- Dedupe by BLS key, then select services whose complete READY key sets are
+  pairwise disjoint (starting a service activates *all* its keys).
 - Tally the selected union against epoch-3002 shard-0 voting power:
   strictly >2/3 required, aim 75–80%.
 - Confirm duplicate signers stopped. Send GO **only to the selected
@@ -170,7 +183,7 @@ Include verbatim:
 | `unsupported-platform` | The machine is not Linux x86_64 or Linux aarch64. Handle it manually. |
 | `missing-dependencies` | One or more required commands are missing. The lines immediately above `STOPPED` list every missing command and print the package-manager command to install them. Install the packages, then run the same recovery command again. |
 | `deletion-cancelled` | The operator did not type `y` at the full-path deletion prompt. The validator remains stopped and the old DB remains intact. Review the path and rerun when ready. |
-| `needs-root` | Ran without sudo but a harmony.service is loaded, or the harmony process/files belong to a different user. Rerun with sudo (or as the owning user). |
+| `needs-root` | Ran without sudo but a systemd service is loaded, or the Harmony process/files belong to a different user. Rerun with sudo (or as the owning user). |
 | `unsupported-layout` | Not packaged-systemd and not a clean manual-directory shape (supervisor, ambiguous processes, non-mainnet/archival/multi-shard config, RPC unreachable, conflicting drop-in, or an unusual argument containing whitespace/control/systemd-special characters). Normal CLI flags and values are preserved. Handle unusual cases one-on-one. |
 | `low-disk` | Free space is below one full DB copy plus margin. Free space, or approve `prepare --discard-old-db` (only after a central old-DB archive is confirmed). |
 | `source-mismatch` | The remote DB source does not report the pinned file count and byte total (checked before and after the transfer). The SnapDB content changed after freeze or the wrong source is pinned. Node untouched; escalate — do not retry blindly. |
@@ -178,15 +191,18 @@ Include verbatim:
 | `checksum-mismatch` | The downloaded harmony binary does not match its pinned SHA-256. Node untouched; check the artifact URL. |
 | `db-verify-failed` | The staged or installed DB directory failed the structure check (wrong count/bytes, extra or missing file, symlink or special entry, bad `CURRENT`/`MANIFEST`). The node is not started. Escalate with the log. |
 | `stop-failed` | Node or unit would not stop, or could not be proven stopped. Investigate before rerunning. |
-| `duplicate-process` | Another process matches the node binary (path or SHA-256), config, DataDir, or open DB files. Find and stop it; never let two signers run. |
+| `duplicate-process` | Another process uses the selected service's config, DataDir, or open DB files. Find and stop it. A separate systemd service using the same Harmony binary is allowed. |
 | `head-mismatch` | After start, the node reported a wrong hash for block 92,730,034. The node was stopped again and the mismatch is latched in the state file: every later `start` rerun re-proves the node is stopped (stopping it again if anything restarted it), keeps refusing with `head-mismatch`, and never restarts the node. Escalate immediately; only the team, after investigating, may clear the `HEAD_MISMATCH` line from the state file. |
 | `not-ready` / `receipt-mismatch` | `start` before READY, or the systemd unit no longer runs the staged command. Re-run `prepare` / inspect drop-ins. |
 | `start-failed` / `unhealthy` | Node did not come up, or did not reach the health pins (height, target hash, BLS key set) in time. It was stopped again (systemd stays held). Collect the run log and node.log. |
-| `cannot-determine-state` | State file and filesystem disagree, or another invocation was running. The node may be **running, stopped, or in an unknown state** depending on when the failure occurred (for example, it is still running if this happened during the `prepare` transfer or a lock conflict). Check the actual node state first (`systemctl status harmony.service`, `pgrep`), do not delete, move, or modify anything under the DataDir until the situation is understood, and escalate with the run log. |
+| `cannot-determine-state` | State file and filesystem disagree, or another invocation was running. The node may be **running, stopped, or in an unknown state** depending on when the failure occurred (for example, it is still running if this happened during the `prepare` transfer or a lock conflict). Check the selected service and running processes first. Do not change anything under the DataDir until the situation is understood, and escalate with the run log. |
 
-Run logs: `/var/lib/harmony-recovery-92730034/private/run-<log-id>.log` (root
-runs) or `<invocation-dir>/.hmy-recovery-92730034/work/private/run-<log-id>.log`
-(rootless runs).
+Run logs: `/var/lib/harmony-recovery-92730034/units/<service>/private/run-<log-id>.log`
+for explicitly selected systemd services,
+`/var/lib/harmony-recovery-92730034/private/run-<log-id>.log` for the standard
+or older layout, or
+`<invocation-dir>/.hmy-recovery-92730034/work/private/run-<log-id>.log` for
+rootless runs.
 
 ## 6. What the recovery script verifies
 
@@ -245,6 +261,9 @@ Recorded accepted risks (operator decisions of 2026-08-14):
 - **Rootless duplicate scan is best-effort**: without root, the script cannot
   read other users' `/proc/<pid>/exe` or fd links, so it can match those
   processes only by command line. Acceptable for single-user manual boxes.
+- **Multiple systemd services**: the script allows separate services to use
+  the same Harmony binary. Operators must ensure they do not reuse BLS keys;
+  the READY tally must also reject repeated keys.
 - `--discard-old-db` permanently deletes the renamed old DB; gate it
   centrally (only after a central old-DB archive is confirmed) and send it
   one-on-one.

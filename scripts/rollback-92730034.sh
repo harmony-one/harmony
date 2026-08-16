@@ -8,8 +8,8 @@
 # GO. It reverts nothing and never restores the old DB automatically.
 # Requires rclone in addition to standard tools.
 #
-#   sudo bash ./rollback-92730034.sh prepare [--discard-old-db]
-#   sudo bash ./rollback-92730034.sh start
+#   sudo bash ./rollback-92730034.sh prepare [--systemd-unit NAME] [--discard-old-db]
+#   sudo bash ./rollback-92730034.sh start [--systemd-unit NAME]
 #
 # Rootless manual mode: a manual-directory validator whose harmony binary,
 # config, and database are owned by a non-root user may run both commands AS
@@ -25,7 +25,7 @@
 #   RUNNING <bls-ids> recovery-92730034    (start succeeded; node healthy)
 #   STOPPED <reason> <log-id>              (see private run log for detail)
 #
-# Supported layouts: packaged harmony.service systemd, or manual-directory
+# Supported layouts: one selected systemd service, or manual-directory
 # (exactly one directly launched Harmony process anchored by the invocation
 # directory). Manual-directory validators MUST run both commands from the
 # directory containing their harmony binary or harmony config file, as the
@@ -73,17 +73,22 @@ STOP_TIMEOUT=120                 # seconds for a clean stop
 OBSERVE_SECS=15                  # manual-layout respawn observation window
 MARGIN_MIN_BYTES=21474836480     # disk margin floor: 20 GiB
 MARGIN_MIN_DISCARD_BYTES=10737418240  # relaxed floor with --discard-old-db: 10 GiB
-RPC_URL="http://127.0.0.1:9500"
+RPC_URL=""
+DEFAULT_RPC_PORT=9500
 
-# Fixed paths (never anything under /usr/local). Rootless manual mode moves
-# WORK (and everything derived from it) under the invocation directory; see
-# main(). The sentinel is systemd-only and therefore always root-owned.
-WORK=/var/lib/harmony-recovery-92730034
+# Fixed paths (never anything under /usr/local). Explicit systemd units use
+# separate work and GO paths. Old state remains at the original paths so an
+# interrupted run made by an earlier script can resume.
+WORK_BASE=/var/lib/harmony-recovery-92730034
+LEGACY_STATE_FILE="$WORK_BASE/private/state"
+UNIT_WORK_ROOT="$WORK_BASE/units"
+WORK="$WORK_BASE"
 BIN="$WORK/bin/harmony-recovery"
 PRIV="$WORK/private"
 STATE_FILE="$PRIV/state"
 LOCK_FILE="$PRIV/lock"
-SENTINEL_DIR=/run/harmony-recovery-92730034
+SENTINEL_BASE=/run/harmony-recovery-92730034
+SENTINEL_DIR="$SENTINEL_BASE"
 SENTINEL="$SENTINEL_DIR/GO"
 STAGING_NAME=".hmy-recovery-92730034"
 HOLD_DROPIN_NAME="99-harmony-recovery-hold.conf"
@@ -97,13 +102,16 @@ LOGID=""
 PRINTED=0
 INVOCATION_DIR=""
 STAMP=""
+CLI_UNIT=""
+SELECTED_UNIT=""
+UNIT_SOURCE=""
 declare -A S=()   # state file key/value store
 declare -a ORIG_ARGS=()
 ORIG_ARGS_TEXT=""
 
 usage_exit() {
   # Usage errors touch nothing and print the one line themselves.
-  printf 'usage: [sudo] bash ./rollback-92730034.sh prepare [--discard-old-db] [--quiet] | start   (sudo required for systemd validators; rootless manual validators run as the node user)\n'
+  printf 'usage: [sudo] bash ./rollback-92730034.sh prepare [--systemd-unit NAME] [--discard-old-db] [--quiet] | start [--systemd-unit NAME]   (sudo required for systemd validators; rootless manual validators run as the node user)\n'
   exit 2
 }
 
@@ -224,6 +232,60 @@ on_exit() {
 # fsync a file or directory (GNU coreutils sync accepts path arguments).
 sync_path() { sync "$1"; }
 
+# ---------- target and path selection ----------
+
+unit_name_ok() {
+  [[ "$1" =~ ^[A-Za-z0-9_][A-Za-z0-9_.:@-]*\.service$ ]] \
+    && [[ "$1" != *@.service ]]
+}
+
+state_value() { # <file> <key>; result in STATE_VALUE
+  local file="$1" key="$2" line count=0
+  STATE_VALUE=""
+  [[ -f "$file" ]] || return 1
+  while IFS= read -r line; do
+    if [[ "$line" == "$key="* ]]; then
+      STATE_VALUE="${line#*=}"
+      count=$((count+1))
+    fi
+  done < "$file"
+  (( count == 1 ))
+}
+
+configure_paths() {
+  if (( ROOTLESS )); then
+    WORK="$INVOCATION_DIR/$STAGING_NAME/work"
+    BIN="$WORK/bin/harmony-recovery"
+    PRIV="$WORK/private"
+    STATE_FILE="$PRIV/state"
+    LOCK_FILE="$PRIV/lock"
+    return
+  fi
+
+  WORK="$WORK_BASE"
+  if [[ -n "$SELECTED_UNIT" ]]; then
+    local unit_work="$UNIT_WORK_ROOT/$SELECTED_UNIT"
+    if [[ -f "$unit_work/private/state" ]]; then
+      WORK="$unit_work"
+    elif state_value "$LEGACY_STATE_FILE" UNIT \
+      && [[ "$STATE_VALUE" == "$SELECTED_UNIT" ]]; then
+      WORK="$WORK_BASE"
+    elif [[ "$UNIT_SOURCE" == cli ]]; then
+      WORK="$unit_work"
+    fi
+  fi
+  BIN="$WORK/bin/harmony-recovery"
+  PRIV="$WORK/private"
+  STATE_FILE="$PRIV/state"
+  LOCK_FILE="$WORK_BASE/private/lock"  # serialize every recovery on this host
+  if [[ "$WORK" != "$WORK_BASE" ]]; then
+    SENTINEL_DIR="$SENTINEL_BASE/units/$SELECTED_UNIT"
+  else
+    SENTINEL_DIR="$SENTINEL_BASE"
+  fi
+  SENTINEL="$SENTINEL_DIR/GO"
+}
+
 # ---------- state file (root-owned, atomic, fsynced) ----------
 
 load_state() {
@@ -289,7 +351,7 @@ toml_get() { # <file> <section> <key> -> value (quotes stripped), empty if absen
 }
 
 rpc_call() { # <method> <params-json> -> raw response body (empty on failure)
-  curl -sS -m 10 -H 'Content-Type: application/json' \
+  curl -sS -m 10 --noproxy '*' -H 'Content-Type: application/json' \
     -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$1\",\"params\":$2}" \
     "$RPC_URL" 2>/dev/null || true
 }
@@ -301,7 +363,8 @@ rpc_blskeys() { # -> sorted comma-joined blskey list (empty on failure)
 # Parse the config and DataDir facts needed by the safety checks. Other
 # original tokens are preserved separately and passed through unchanged.
 parse_harmony_args() {
-  PARSED_CONFIG=""; PARSED_DATADIR=""; PARSED_EXTRA=""
+  PARSED_CONFIG=""; PARSED_DATADIR=""; PARSED_HTTP_PORT=""
+  PARSED_LEGACY_PORT=""; PARSED_EXTRA=""
   local args=("$@") i=0 n=$#
   while (( i < n )); do
     case "${args[$i]}" in
@@ -313,9 +376,34 @@ parse_harmony_args() {
         (( i + 1 < n )) || { PARSED_EXTRA="${args[$i]}"; return 0; }
         PARSED_DATADIR="${args[$((i+1))]}"; i=$((i+2)) ;;
       --datadir=*) PARSED_DATADIR="${args[$i]#--datadir=}"; i=$((i+1)) ;;
+      --http.port)
+        (( i + 1 < n )) || { PARSED_EXTRA="${args[$i]}"; return 0; }
+        PARSED_HTTP_PORT="${args[$((i+1))]}"; i=$((i+2)) ;;
+      --http.port=*) PARSED_HTTP_PORT="${args[$i]#--http.port=}"; i=$((i+1)) ;;
+      --port)
+        (( i + 1 < n )) || { PARSED_EXTRA="${args[$i]}"; return 0; }
+        PARSED_LEGACY_PORT="${args[$((i+1))]}"; i=$((i+2)) ;;
+      --port=*) PARSED_LEGACY_PORT="${args[$i]#--port=}"; i=$((i+1)) ;;
       *) i=$((i+1)) ;;
     esac
   done
+}
+
+derive_rpc_url() { # uses PARSED_* and CONFIG
+  local port
+  if [[ -n "$PARSED_HTTP_PORT" ]]; then
+    port="$PARSED_HTTP_PORT"
+  elif [[ -n "$PARSED_LEGACY_PORT" ]]; then
+    [[ "$PARSED_LEGACY_PORT" =~ ^[0-9]+$ ]] || return 1
+    port=$((10#$PARSED_LEGACY_PORT + 500))
+  else
+    port="$(toml_get "$CONFIG" HTTP Port)"
+    [[ -n "$port" ]] || port="$DEFAULT_RPC_PORT"
+  fi
+  [[ "$port" =~ ^[0-9]+$ && ${#port} -le 5 ]] || return 1
+  port=$((10#$port))
+  (( port >= 1 && port <= 65535 )) || return 1
+  RPC_URL="http://127.0.0.1:$port"
 }
 
 record_original_args() {
@@ -332,13 +420,10 @@ record_original_args() {
 }
 
 # ---------- duplicate-signer scan (/proc based) ----------
-# Flags any process whose exe path or exe SHA-256 matches the original or the
-# staged recovery binary (including renamed/copied/deleted variants), whose
-# cmdline references DATADIR or CONFIG, or whose open fds point under
-# <DATADIR>/harmony_db_0. $1 = legitimate PID to exclude ("" when the node is
-# supposed to be down). The legitimate PID's ancestor chain is excluded too:
-# the runuser/setsid launcher we started stays alive as the node's parent and
-# carries the node's own arguments on its command line.
+# A systemd host may run several independent validators built from the same
+# binary. For systemd, equal executable bytes alone are not a duplicate.
+# Config, DataDir, and open DB overlap are still always rejected. Manual mode
+# keeps the stricter executable path/hash checks.
 scan_duplicates() {
   local exclude="${1-}" d pid exe tgt hit cmd h f t a
   local -A hcache=() excl=()
@@ -357,33 +442,33 @@ scan_duplicates() {
     [[ -n "${excl[$pid]+x}" ]] && continue
     [[ -d "$d" ]] || continue
     hit=""
-    exe="$(readlink "$d/exe" 2>/dev/null || true)"
-    tgt="${exe% (deleted)}"
-    if [[ -n "$tgt" ]]; then
-      if [[ "$tgt" == "$ORIG_EXE" || "$tgt" == "$BIN" ]]; then
-        hit="exe-path:$tgt"
-      else
-        if [[ -z "${hcache[$tgt]+x}" ]]; then
-          h="$(sha256sum "$d/exe" 2>/dev/null | awk '{print $1}' || true)"
-          hcache[$tgt]="$h"
-        fi
-        h="${hcache[$tgt]}"
-        if [[ -n "$h" && ( "$h" == "$ORIG_EXE_SHA256" || "$h" == "$NODE_BIN_SHA256" ) ]]; then
-          hit="exe-sha256:$tgt"
-        fi
-      fi
-    fi
-    if [[ -z "$hit" ]]; then
-      cmd="$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null || true)"
-      if [[ -n "$cmd" && ( "$cmd" == *"$DATADIR"* || "$cmd" == *"$CONFIG"* ) ]]; then
-        hit="cmdline"
-      fi
+    cmd="$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null || true)"
+    if [[ -n "$cmd" && ( "$cmd" == *"$DATADIR"* || "$cmd" == *"$CONFIG"* ) ]]; then
+      hit="cmdline"
     fi
     if [[ -z "$hit" ]]; then
       for f in "$d"/fd/*; do
         t="$(readlink "$f" 2>/dev/null || true)"
         if [[ "$t" == "$DATADIR/harmony_db_0"* ]]; then hit="fd"; break; fi
       done
+    fi
+    if [[ -z "$hit" && "$LAYOUT" != "systemd" ]]; then
+      exe="$(readlink "$d/exe" 2>/dev/null || true)"
+      tgt="${exe% (deleted)}"
+      if [[ -n "$tgt" ]]; then
+        if [[ "$tgt" == "$ORIG_EXE" || "$tgt" == "$BIN" ]]; then
+          hit="exe-path:$tgt"
+        else
+          if [[ -z "${hcache[$tgt]+x}" ]]; then
+            h="$(sha256sum "$d/exe" 2>/dev/null | awk '{print $1}' || true)"
+            hcache[$tgt]="$h"
+          fi
+          h="${hcache[$tgt]}"
+          if [[ -n "$h" && ( "$h" == "$ORIG_EXE_SHA256" || "$h" == "$NODE_BIN_SHA256" ) ]]; then
+            hit="exe-sha256:$tgt"
+          fi
+        fi
+      fi
     fi
     if [[ -n "$hit" ]]; then
       DUP_HITS+="pid=$pid($hit) "
@@ -749,7 +834,7 @@ ensure_db_staged() {
 # ---------- layout discovery (prepare, fresh run only) ----------
 
 discover_layout() {
-  local unit="${SERVICE:-harmony.service}"
+  local unit="${SELECTED_UNIT:-harmony.service}"
   [[ ! -d /run/systemd/system ]] || require_tools systemctl
   if command -v systemctl >/dev/null 2>&1 \
      && [[ "$(systemctl show "$unit" -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
@@ -757,6 +842,8 @@ discover_layout() {
     UNIT="$unit"
     discover_systemd
   else
+    [[ "$UNIT_SOURCE" != cli ]] \
+      || die unsupported-layout "selected systemd unit $unit is not loaded"
     require_tools setsid
     if (( ! ROOTLESS )); then
       require_tools runuser
@@ -867,7 +954,7 @@ validate_common() {
       # and deleted the old DB. Keep an empty placeholder so the existing
       # journaled swap can rename and remove it after installing the clean DB.
       unit_is_stopped \
-        || die stop-failed "harmony.service must be fully stopped before recovering an already-deleted DB"
+        || die stop-failed "$UNIT must be fully stopped before recovering an already-deleted DB"
       mkdir -p "$DATADIR/harmony_db_0"
       S[OLD_DB_PREDELETED]=1
       log "old harmony_db_0 is already absent; created an empty discard placeholder"
@@ -896,6 +983,8 @@ validate_common() {
     done
     [[ -w "$DATADIR" ]] || die needs-root "datadir not writable by invoking user: $DATADIR"
   fi
+  parse_harmony_args "${ORIG_ARGS[@]}"
+  derive_rpc_url || die unsupported-layout "cannot determine HTTP RPC port"
   ORIG_EXE_SHA256="$(sha256sum "$ORIG_EXE" | awk '{print $1}')" \
     || die unsupported-layout "cannot hash original binary $ORIG_EXE"
   BLS_IDS="$(rpc_blskeys)"
@@ -911,6 +1000,7 @@ validate_common() {
   S[CONFIG]="$CONFIG"
   S[DATADIR]="$DATADIR"
   S[BLS_IDS]="$BLS_IDS"
+  S[RPC_URL]="$RPC_URL"
   S[ORIG_EXE]="$ORIG_EXE"
   S[ORIG_EXE_SHA256]="$ORIG_EXE_SHA256"
   S[ORIG_ARGS]="$ORIG_ARGS_TEXT"
@@ -922,6 +1012,7 @@ load_facts() { # populate globals from the state file (start / prepare rerun)
   CONFIG="${S[CONFIG]-}"
   DATADIR="${S[DATADIR]-}"
   BLS_IDS="${S[BLS_IDS]-}"
+  RPC_URL="${S[RPC_URL]-}"
   ORIG_EXE="${S[ORIG_EXE]-}"
   ORIG_EXE_SHA256="${S[ORIG_EXE_SHA256]-}"
   UNIT="${S[UNIT]-}"
@@ -945,7 +1036,48 @@ load_facts() { # populate globals from the state file (start / prepare rerun)
   if [[ "$LAYOUT" == "systemd" ]]; then
     [[ -n "$UNIT" ]] || die cannot-determine-state "systemd layout without UNIT"
   fi
+  if [[ -z "$RPC_URL" ]]; then
+    parse_harmony_args "${ORIG_ARGS[@]}"
+    derive_rpc_url || die cannot-determine-state "cannot determine RPC port from old state"
+    [[ "$RPC_URL" == "http://127.0.0.1:9500" ]] \
+      || die cannot-determine-state "old state used RPC port 9500 but this unit now resolves to $RPC_URL"
+    S[RPC_URL]="$RPC_URL"
+    save_state
+  fi
   STAGING="$DATADIR/$STAGING_NAME"
+}
+
+validate_selected_state() {
+  [[ -n "$SELECTED_UNIT" ]] || return 0
+  if [[ "${S[LAYOUT]-}" == "systemd" ]]; then
+    [[ "${S[UNIT]-}" == "$SELECTED_UNIT" ]] \
+      || die cannot-determine-state "selected unit does not match recorded unit ${S[UNIT]-unknown}"
+  elif [[ "$UNIT_SOURCE" == cli ]]; then
+    die cannot-determine-state "--systemd-unit cannot select manual recovery state"
+  fi
+}
+
+check_other_state_paths() {
+  [[ "$LAYOUT" == "systemd" ]] || return 0
+  local file other_unit other_config other_datadir
+  local files=()
+  [[ -f "$LEGACY_STATE_FILE" ]] && files+=("$LEGACY_STATE_FILE")
+  files+=("$UNIT_WORK_ROOT"/*/private/state)
+  for file in "${files[@]}"; do
+    [[ "$file" == "$STATE_FILE" ]] && continue
+    state_value "$file" LAYOUT || die cannot-determine-state "cannot read recovery state $file"
+    [[ "$STATE_VALUE" == "systemd" ]] || continue
+    state_value "$file" UNIT || die cannot-determine-state "recovery state has no unit: $file"
+    other_unit="$STATE_VALUE"
+    state_value "$file" CONFIG || die cannot-determine-state "recovery state has no config: $file"
+    other_config="$STATE_VALUE"
+    state_value "$file" DATADIR || die cannot-determine-state "recovery state has no DataDir: $file"
+    other_datadir="$STATE_VALUE"
+    [[ "$other_unit" != "$UNIT" ]] \
+      || die cannot-determine-state "more than one state file selects $UNIT"
+    [[ "$other_config" != "$CONFIG" && "$other_datadir" != "$DATADIR" ]] \
+      || die unsupported-layout "$UNIT and $other_unit share a config or DataDir"
+  done
 }
 
 # ---------- stop phase ----------
@@ -1154,6 +1286,7 @@ prepare_mode() {
   local have_state=0 rank
   if load_state; then have_state=1; fi
   if (( have_state )); then
+    validate_selected_state
     rank="$(state_rank "${S[STATE]-}")"
     (( rank >= 1 )) || die cannot-determine-state "state file present but STATE invalid: '${S[STATE]-}'"
     if (( rank >= 7 )); then
@@ -1164,10 +1297,12 @@ prepare_mode() {
       save_state
     fi
     load_facts
+    check_other_state_paths
     log "rerun with recorded state ${S[STATE]} (layout $LAYOUT)"
   else
     discover_layout
     STAGING="$DATADIR/$STAGING_NAME"
+    check_other_state_paths
     (( DISCARD_FLAG )) && S[DISCARD_REQUESTED]=1
     set_state PREPARED   # discovery facts recorded before any change
     rank=1
@@ -1447,9 +1582,11 @@ finish_running() {
 
 start_mode() {
   load_state || die not-ready "no state file; run prepare first"
+  validate_selected_state
   local rank h; rank="$(state_rank "${S[STATE]-}")"
   (( rank >= 1 )) || die cannot-determine-state "STATE invalid: '${S[STATE]-}'"
   load_facts
+  check_other_state_paths
   # A latched head mismatch blocks every ordinary start rerun: the node must
   # stay stopped until the team investigates and removes the HEAD_MISMATCH
   # line from the state file. The latch is saved before the quarantine stop,
@@ -1551,6 +1688,7 @@ start_mode() {
 main() {
   INVOCATION_DIR="$(pwd -P)"
 
+  local selector_count=0 service_unit="${SERVICE-}"
   case "${1-}" in
     prepare)
       MODE=prepare; shift
@@ -1558,6 +1696,18 @@ main() {
         case "$1" in
           --discard-old-db) DISCARD_FLAG=1 ;;
           --quiet) QUIET=1 ;;
+          --systemd-unit)
+            (( $# >= 2 )) || usage_exit
+            selector_count=$((selector_count+1))
+            (( selector_count == 1 )) || usage_exit
+            CLI_UNIT="$2"
+            shift
+            ;;
+          --systemd-unit=*)
+            selector_count=$((selector_count+1))
+            (( selector_count == 1 )) || usage_exit
+            CLI_UNIT="${1#--systemd-unit=}"
+            ;;
           *) usage_exit ;;
         esac
         shift
@@ -1565,27 +1715,52 @@ main() {
       ;;
     start)
       MODE=start; shift
-      [[ $# -eq 0 ]] || usage_exit
+      while (( $# > 0 )); do
+        case "$1" in
+          --systemd-unit)
+            (( $# >= 2 )) || usage_exit
+            selector_count=$((selector_count+1))
+            (( selector_count == 1 )) || usage_exit
+            CLI_UNIT="$2"
+            shift
+            ;;
+          --systemd-unit=*)
+            selector_count=$((selector_count+1))
+            (( selector_count == 1 )) || usage_exit
+            CLI_UNIT="${1#--systemd-unit=}"
+            ;;
+          *) usage_exit ;;
+        esac
+        shift
+      done
       ;;
     *) usage_exit ;;
   esac
 
+  if [[ -n "$CLI_UNIT" ]]; then
+    unit_name_ok "$CLI_UNIT" || usage_exit
+    [[ -z "$service_unit" || "$service_unit" == "$CLI_UNIT" ]] || usage_exit
+    SELECTED_UNIT="$CLI_UNIT"
+    UNIT_SOURCE="cli"
+  elif [[ -n "$service_unit" ]]; then
+    unit_name_ok "$service_unit" || usage_exit
+    SELECTED_UNIT="$service_unit"
+    UNIT_SOURCE="env"
+  fi
+
   ROOTLESS=0
   if [[ "$(id -u)" != "0" ]]; then
-    # Rootless manual-validator mode: all state, staging, and the staged
-    # binary live under the invocation directory, owned by the invoking user.
     ROOTLESS=1
-    WORK="$INVOCATION_DIR/$STAGING_NAME/work"
-    BIN="$WORK/bin/harmony-recovery"
-    PRIV="$WORK/private"
-    STATE_FILE="$PRIV/state"
-    LOCK_FILE="$PRIV/lock"
   fi
+  configure_paths
 
   LOGID="$(date +%Y%m%d-%H%M%S)-$$"
   if (( ROOTLESS )); then
     install -d -m 0700 "$WORK" "$WORK/bin"
   else
+    install -d -m 0711 "$WORK_BASE"
+    install -d -m 0700 "$WORK_BASE/private"
+    [[ "$WORK" == "$WORK_BASE" ]] || install -d -m 0711 "$UNIT_WORK_ROOT"
     install -d -m 0711 "$WORK"
     install -d -m 0755 "$WORK/bin"
   fi
@@ -1604,7 +1779,7 @@ main() {
   exec 9>"$LOCK_FILE"
   flock -n 9 || die cannot-determine-state "another invocation holds the lock"
 
-  log "mode=$MODE discard=$DISCARD_FLAG quiet=$QUIET invocation_dir=$INVOCATION_DIR rootless=$ROOTLESS logid=$LOGID script_url=$SCRIPT_URL"
+  log "mode=$MODE unit=${SELECTED_UNIT:-default} discard=$DISCARD_FLAG quiet=$QUIET invocation_dir=$INVOCATION_DIR rootless=$ROOTLESS logid=$LOGID script_url=$SCRIPT_URL"
   case "$(uname -sm)" in
     "Linux x86_64")
       ARCH=amd64; ELF_MACHINE=3e00
@@ -1619,7 +1794,7 @@ main() {
   require_tools curl rclone find sha256sum flock stat df du awk sed grep jq od cat pgrep fuser install getent readlink sync tee nproc
 
   STAMP="$(date +%Y%m%d-%H%M%S)"
-  ORIG_EXE=""; ORIG_EXE_SHA256=""; CONFIG=""; DATADIR=""; BLS_IDS=""
+  ORIG_EXE=""; ORIG_EXE_SHA256=""; CONFIG=""; DATADIR=""; BLS_IDS=""; RPC_URL=""
   ORIG_ARGS=(); ORIG_ARGS_TEXT=""
   UNIT=""; RUN_USER=""; RUN_CWD=""; ORIG_PID=""; STAGING=""; DID_VERIFY_DB=0
 
