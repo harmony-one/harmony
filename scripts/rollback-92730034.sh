@@ -631,7 +631,7 @@ db_tree_ok() { # <dir>
     ty="${line%% *}"; line="${line#* }"
     sz="${line%% *}"; name="${line#* }"
     [[ "$ty" == "f" ]] || { DB_TREE_ERR="non-regular entry (type $ty): $name"; set -x; return 1; }
-    [[ "$name" =~ ^(CURRENT|LOCK|LOG|LOG\.old|MANIFEST-[0-9]+|[0-9]+\.(ldb|sst|log))$ ]] \
+    [[ "$name" =~ ^(CURRENT|CURRENT\.bak|CURRENT\.[0-9]+|LOCK|LOG|LOG\.old|MANIFEST-[0-9]+|[0-9]+\.(ldb|sst|log))$ ]] \
       || { DB_TREE_ERR="unexpected filename: $name"; set -x; return 1; }
     [[ "$name" == MANIFEST-* ]] && manifests=$((manifests+1))
     n=$((n+1)); bytes=$((bytes+sz))
