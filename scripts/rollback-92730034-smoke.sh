@@ -548,6 +548,12 @@ m_low_disk() {
 m_discard() {
   cleanup_case; new_manual_case discard; mk_script; start_orig
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare --discard-old-db
+  expect "m_discard/confirmation-required" 1 "^STOPPED deletion-cancelled [0-9-]+$"
+  [[ -f "$DATA/harmony_db_0/olddata" ]] \
+    && ok "m_discard/cancel-keeps-old-db" || bad "m_discard/cancel-keeps-old-db"
+  ! orig_running \
+    && ok "m_discard/cancel-leaves-node-stopped" || bad "m_discard/cancel-leaves-node-stopped"
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare --discard-old-db --quiet
   expect "m_discard/ready" 0 "^READY $BLS_SORTED recovery-92730034$" || return 0
   local old; old="$(state_get OLD_DB_NAME)"
   [[ ! -e "$DATA/$old" ]] && ok "m_discard/old-deleted" || bad "m_discard/old-deleted" "$old still present"
@@ -899,7 +905,7 @@ RestartSec=1
 User=harmony
 Group=harmony
 WorkingDirectory=/home/harmony
-ExecStart=/usr/sbin/harmony -c /etc/harmony/harmony.conf
+ExecStart=/usr/sbin/harmony -c /etc/harmony/harmony.conf --consensus.aggregate-sig=false
 StartLimitInterval=0
 
 [Install]
@@ -925,6 +931,8 @@ s_happy() {
     && ok "s_happy/hold-present" || bad "s_happy/hold-present"
   [[ -f /etc/systemd/system/harmony.service.d/50-harmony-recovery-exec.conf ]] \
     && ok "s_happy/exec-dropin-present" || bad "s_happy/exec-dropin-present"
+  grep -q -- '--consensus.aggregate-sig=false' /etc/systemd/system/harmony.service.d/50-harmony-recovery-exec.conf \
+    && ok "s_happy/aggregate-sig-preserved" || bad "s_happy/aggregate-sig-preserved"
   systemctl start harmony.service >/dev/null 2>&1 || true
   sleep 2
   [[ "$(systemctl is-active harmony.service)" != "active" ]] \
@@ -946,12 +954,36 @@ s_happy() {
   local mp; mp="$(systemctl show harmony.service -p MainPID --value)"
   [[ "$(readlink "/proc/$mp/exe")" == "$BIN" ]] \
     && ok "s_happy/unit-runs-staged-bin" || bad "s_happy/unit-runs-staged-bin"
+  tr '\0' ' ' < "/proc/$mp/cmdline" | grep -q -- '--consensus.aggregate-sig=false' \
+    && ok "s_happy/running-aggregate-sig" || bad "s_happy/running-aggregate-sig"
   [[ ! -f /etc/systemd/system/harmony.service.d/99-harmony-recovery-hold.conf ]] \
     && ok "s_happy/hold-removed" || bad "s_happy/hold-removed"
   [[ ! -e "$SENT_DIR/GO" ]] && ok "s_happy/go-removed" || bad "s_happy/go-removed"
 
   run_rb /root start
   expect "s_happy/start-rerun" 0 "^RUNNING $BLS_SORTED recovery-92730034$"
+}
+
+s_predeleted_db() {
+  # Supervised low-space case: systemd is stopped, the old DB was already
+  # deleted, and the operator supplies the known public BLS IDs.
+  new_systemd_case; mk_script
+  systemctl stop harmony.service
+  rm -rf /home/harmony/data/harmony_db_0
+  sed -i 's|^RPC_URL=.*|RPC_URL="http://127.0.0.1:19500"|' "$RB"
+  run_rb /root prepare --discard-old-db
+  expect "s_predeleted/ready" 0 "^READY unknown recovery-92730034$" || return 0
+  [[ "$(systemctl is-active harmony.service)" != "active" ]] \
+    && ok "s_predeleted/unit-stopped" || bad "s_predeleted/unit-stopped"
+  [[ -f /home/harmony/data/harmony_db_0/MANIFEST-000001 ]] \
+    && ok "s_predeleted/clean-db-installed" || bad "s_predeleted/clean-db-installed"
+  [[ "$(state_get BLS_IDS)" == "unknown" ]] \
+    && ok "s_predeleted/bls-recorded" || bad "s_predeleted/bls-recorded"
+  [[ "$(state_get OLD_DB_DISPOSITION)" == "deleted" ]] \
+    && ok "s_predeleted/disposition" || bad "s_predeleted/disposition"
+  local old; old="$(state_get OLD_DB_NAME)"
+  [[ -n "$old" && ! -e "/home/harmony/data/$old" ]] \
+    && ok "s_predeleted/placeholder-removed" || bad "s_predeleted/placeholder-removed"
 }
 
 s_conflicting_dropin() {
@@ -1317,6 +1349,7 @@ run_systemd() {
     return 0
   fi
   s_happy || true
+  s_predeleted_db || true
   s_conflicting_dropin || true
   s_leftover_hold || true
   s_unhealthy_post || true

@@ -92,6 +92,7 @@ SUFFIX="recovery-92730034"
 
 MODE=""
 DISCARD_FLAG=0
+QUIET=0
 LOGID=""
 PRINTED=0
 INVOCATION_DIR=""
@@ -100,7 +101,7 @@ declare -A S=()   # state file key/value store
 
 usage_exit() {
   # Usage errors touch nothing and print the one line themselves.
-  printf 'usage: [sudo] bash ./rollback-92730034.sh prepare [--discard-old-db] | start   (sudo required for systemd validators; rootless manual validators run as the node user)\n'
+  printf 'usage: [sudo] bash ./rollback-92730034.sh prepare [--discard-old-db] [--quiet] | start   (sudo required for systemd validators; rootless manual validators run as the node user)\n'
   exit 2
 }
 
@@ -124,6 +125,20 @@ notice() {
   # Plain operator instructions, copied to both the run log and live stderr.
   printf '%s\n' "$*"
   printf '%s\n' "$*" >&4
+}
+
+confirm_db_deletion() { # <absolute-db-path>
+  local path="$1" answer=""
+  (( QUIET )) && return 0
+  notice ""
+  notice "The validator is stopped. The script is ready to permanently delete:"
+  notice "  $path"
+  notice "This cannot be undone. Type y and press Enter to continue; any other answer cancels."
+  printf 'Delete %s? [y/N] ' "$path" >&4
+  IFS= read -r answer || true
+  printf '\n' >&4
+  [[ "$answer" == "y" || "$answer" == "Y" ]] \
+    || die deletion-cancelled "operator did not confirm deletion of $path"
 }
 
 package_for_tool() { # <tool> <apt|dnf|pacman>
@@ -281,10 +296,11 @@ rpc_blskeys() { # -> sorted comma-joined blskey list (empty on failure)
   rpc_call hmyv2_getNodeMetadata '[]' | jq -r '.result.blskey | sort | join(",")' 2>/dev/null || true
 }
 
-# Parse harmony argv tokens (after argv[0]). Sets PARSED_CONFIG, PARSED_DATADIR,
-# PARSED_EXTRA (any token that is not -c/--config/--datadir with a value).
+# Parse harmony argv tokens (after argv[0]). Sets PARSED_CONFIG,
+# PARSED_DATADIR, PARSED_AGGREGATE_SIG, and PARSED_EXTRA. The aggregate-sig
+# flag is the one additional original flag preserved by the recovery launch.
 parse_harmony_args() {
-  PARSED_CONFIG=""; PARSED_DATADIR=""; PARSED_EXTRA=""
+  PARSED_CONFIG=""; PARSED_DATADIR=""; PARSED_AGGREGATE_SIG=""; PARSED_EXTRA=""
   local args=("$@") i=0 n=$#
   while (( i < n )); do
     case "${args[$i]}" in
@@ -296,6 +312,11 @@ parse_harmony_args() {
         (( i + 1 < n )) || { PARSED_EXTRA="${args[$i]}"; return 0; }
         PARSED_DATADIR="${args[$((i+1))]}"; i=$((i+2)) ;;
       --datadir=*) PARSED_DATADIR="${args[$i]#--datadir=}"; i=$((i+1)) ;;
+      --consensus.aggregate-sig=*)
+        PARSED_AGGREGATE_SIG="${args[$i]#--consensus.aggregate-sig=}"
+        [[ "$PARSED_AGGREGATE_SIG" == "true" || "$PARSED_AGGREGATE_SIG" == "false" ]] \
+          || PARSED_EXTRA="${args[$i]}"
+        i=$((i+1)) ;;
       *) PARSED_EXTRA="${args[$i]}"; return 0 ;;
     esac
   done
@@ -518,6 +539,9 @@ remove_hold() {
 # node's own loopback RPC, which prepare already required to be reachable.
 recovery_exec_line() {
   printf '%s -c %s --datadir %s' "$BIN" "$CONFIG" "$DATADIR"
+  if [[ -n "$CONSENSUS_AGGREGATE_SIG" ]]; then
+    printf ' --consensus.aggregate-sig=%s' "$CONSENSUS_AGGREGATE_SIG"
+  fi
 }
 
 install_exec_dropin() {
@@ -707,6 +731,7 @@ discover_systemd() {
   read -r -a tokens <<< "$argv"
   parse_harmony_args "${tokens[@]:1}"
   [[ -z "$PARSED_EXTRA" ]] || die unsupported-layout "unsupported ExecStart flag: $PARSED_EXTRA"
+  CONSENSUS_AGGREGATE_SIG="$PARSED_AGGREGATE_SIG"
   [[ -n "$PARSED_CONFIG" ]] || die unsupported-layout "no -c/--config in ExecStart"
   wd="$(systemctl show "$UNIT" -p WorkingDirectory --value)"
   [[ "$wd" == "~" || -z "$wd" ]] && wd="$(getent passwd "$(systemd_service_user)" | cut -d: -f6)"
@@ -747,6 +772,7 @@ discover_manual() {
   mapfile -d '' -t argv < "$d/cmdline" || die unsupported-layout "process $pid vanished during discovery"
   parse_harmony_args "${argv[@]:1}"
   [[ -z "$PARSED_EXTRA" ]] || die unsupported-layout "unsupported original flag: $PARSED_EXTRA"
+  CONSENSUS_AGGREGATE_SIG="$PARSED_AGGREGATE_SIG"
   [[ -n "$PARSED_CONFIG" ]] || die unsupported-layout "no -c/--config on original command line"
   exe="$(readlink "$d/exe" 2>/dev/null || true)"; tgt="${exe% (deleted)}"
   [[ -n "$tgt" && "$tgt" != *" (deleted)"* && -f "$tgt" ]] || die unsupported-layout "cannot resolve process executable"
@@ -784,7 +810,21 @@ validate_common() {
   for p in "${paths[@]}"; do
     path_sane "$p" || die unsupported-layout "path contains unsupported characters: $p"
   done
-  [[ -f "$DATADIR/harmony_db_0/CURRENT" ]] || die unsupported-layout "no harmony_db_0/CURRENT under $DATADIR"
+  if [[ ! -f "$DATADIR/harmony_db_0/CURRENT" ]]; then
+    if (( DISCARD_FLAG )) && [[ "$LAYOUT" == "systemd" \
+       && ! -e "$DATADIR/harmony_db_0" ]]; then
+      # Supervised low-space recovery: the operator already stopped Harmony
+      # and deleted the old DB. Keep an empty placeholder so the existing
+      # journaled swap can rename and remove it after installing the clean DB.
+      unit_is_stopped \
+        || die stop-failed "harmony.service must be fully stopped before recovering an already-deleted DB"
+      mkdir -p "$DATADIR/harmony_db_0"
+      S[OLD_DB_PREDELETED]=1
+      log "old harmony_db_0 is already absent; created an empty discard placeholder"
+    else
+      die unsupported-layout "no harmony_db_0/CURRENT under $DATADIR"
+    fi
+  fi
   local nt at arch shard
   nt="$(toml_get "$CONFIG" Network NetworkType)"
   [[ "$nt" == "mainnet" ]] || die unsupported-layout "NetworkType=$nt"
@@ -809,14 +849,21 @@ validate_common() {
   ORIG_EXE_SHA256="$(sha256sum "$ORIG_EXE" | awk '{print $1}')" \
     || die unsupported-layout "cannot hash original binary $ORIG_EXE"
   BLS_IDS="$(rpc_blskeys)"
-  [[ "$BLS_IDS" =~ ^[0-9a-fA-F]{96}(,[0-9a-fA-F]{96})*$ ]] \
-    || die unsupported-layout "loopback RPC unreachable or no BLS keys loaded (got: '$BLS_IDS')"
+  if ! [[ "$BLS_IDS" =~ ^[0-9a-fA-F]{96}(,[0-9a-fA-F]{96})*$ ]]; then
+    if [[ "${S[OLD_DB_PREDELETED]-}" == "1" ]]; then
+      BLS_IDS=unknown
+      log "live RPC is unavailable; READY will report unknown BLS IDs and cannot count toward the tally"
+    else
+      die unsupported-layout "loopback RPC unreachable or no BLS keys loaded (got: '$BLS_IDS')"
+    fi
+  fi
   S[LAYOUT]="$LAYOUT"
   S[CONFIG]="$CONFIG"
   S[DATADIR]="$DATADIR"
   S[BLS_IDS]="$BLS_IDS"
   S[ORIG_EXE]="$ORIG_EXE"
   S[ORIG_EXE_SHA256]="$ORIG_EXE_SHA256"
+  S[CONSENSUS_AGGREGATE_SIG]="$CONSENSUS_AGGREGATE_SIG"
   S[OLD_DB_DISPOSITION]="${S[OLD_DB_DISPOSITION]:-kept}"
 }
 
@@ -831,8 +878,12 @@ load_facts() { # populate globals from the state file (start / prepare rerun)
   RUN_USER="${S[RUN_USER]-}"
   RUN_CWD="${S[RUN_CWD]-}"
   ORIG_PID="${S[ORIG_PID]-}"
+  CONSENSUS_AGGREGATE_SIG="${S[CONSENSUS_AGGREGATE_SIG]-}"
   [[ -n "$LAYOUT" && -n "$CONFIG" && -n "$DATADIR" && -n "$BLS_IDS" ]] \
     || die cannot-determine-state "state file missing core facts"
+  [[ -z "$CONSENSUS_AGGREGATE_SIG" || "$CONSENSUS_AGGREGATE_SIG" == "true" \
+     || "$CONSENSUS_AGGREGATE_SIG" == "false" ]] \
+    || die cannot-determine-state "invalid CONSENSUS_AGGREGATE_SIG in state"
   if [[ "$LAYOUT" == "systemd" ]]; then
     [[ -n "$UNIT" ]] || die cannot-determine-state "systemd layout without UNIT"
   fi
@@ -907,6 +958,44 @@ quarantine() {
   done
   (( moved )) && log "quarantined txpool journal / sync caches into $q"
   return 0
+}
+
+discard_old_before_download() {
+  local cur="$DATADIR/harmony_db_0" free staged old_bytes margin pct need projected
+
+  if [[ "${S[OLD_DB_PREDELETED]-}" != "1" ]]; then
+    free="$(df -B1 --output=avail "$DATADIR" | tail -1 | tr -d ' ')"
+    staged=0
+    [[ -d "$STAGING" ]] && staged="$(du -sb "$STAGING" | awk '{print $1}')"
+    (( staged > DB_BYTES )) && staged=$DB_BYTES
+    old_bytes="$(du -s -B1 "$cur" | awk '{print $1}')"
+    pct=$(( DB_BYTES / 20 )); margin=$MARGIN_MIN_DISCARD_BYTES
+    (( pct > margin )) && margin=$pct
+    need=$(( DB_BYTES - staged + margin ))
+    projected=$(( free + old_bytes ))
+    log "discard projection: free=$free old-db=$old_bytes projected=$projected need=$need"
+    (( projected >= need )) \
+      || die low-disk "even deleting the old DB would leave projected=$projected need=$need"
+  fi
+
+  # Prove the remote and replacement binary are available before destroying
+  # the only local DB. The explicit discard flag is the destructive consent.
+  require_db_source_metrics pre-discard
+  ensure_binary download
+  ensure_stopped prove
+  [[ "$LAYOUT" != "systemd" ]] || rm -f "$SENTINEL"
+  require_no_duplicates ""
+  quarantine
+
+  if [[ "${S[OLD_DB_PREDELETED]-}" != "1" ]]; then
+    confirm_db_deletion "$cur"
+    S[OLD_DB_PREDELETED]=1
+    save_state
+  fi
+  rm -rf "$cur"
+  mkdir -p "$cur"
+  sync_path "$DATADIR"
+  log "old harmony_db_0 deleted; empty swap placeholder created; Harmony remains stopped"
 }
 
 # ---------- write-ahead swap machine ----------
@@ -1035,9 +1124,15 @@ prepare_mode() {
     fi
   fi
 
-  # Downloads happen while the node still runs; nothing below touches the node
-  # until the stop phase. Skip the disk gate and DB staging once the swap has
-  # begun (the staged DB is consumed by it), but always ensure the binary.
+  # Normal downloads happen while the node runs. Explicit discard mode first
+  # proves the source/binary, stops the validator, and deletes the old DB so
+  # low-space machines can stage the clean DB. Reruns resume from PREPARED.
+  if (( rank <= 1 )) && [[ "${S[DISCARD_REQUESTED]-}" == "1" ]]; then
+    discard_old_before_download
+  fi
+
+  # Skip the disk gate and DB staging once the swap has begun (the staged DB
+  # is consumed by it), but always ensure the binary.
   if (( rank <= 1 )); then
     disk_gate
     ensure_db_staged
@@ -1069,8 +1164,10 @@ rpc_healthy() {
   (( bn >= TARGET_HEIGHT )) || return 1
   h="$(rpc_call hmyv2_getBlockByNumber "[$TARGET_HEIGHT,{}]" | jq -r '.result.hash // empty' 2>/dev/null || true)"
   [[ "$h" == "$TARGET_HASH" ]] || return 1
-  keys="$(rpc_blskeys)"
-  [[ "$keys" == "$BLS_IDS" ]] || return 1
+  if [[ "$BLS_IDS" != "unknown" ]]; then
+    keys="$(rpc_blskeys)"
+    [[ "$keys" == "$BLS_IDS" ]] || return 1
+  fi
   return 0
 }
 
@@ -1224,6 +1321,9 @@ launch_node() {
     [[ -d "$RUN_CWD" ]] || die start-failed "recorded cwd $RUN_CWD missing"
     log "launching staged binary as $RUN_USER from $RUN_CWD (rootless=$ROOTLESS)"
     local nodecmd=(setsid "$BIN" -c "$CONFIG" --datadir "$DATADIR")
+    if [[ -n "$CONSENSUS_AGGREGATE_SIG" ]]; then
+      nodecmd+=("--consensus.aggregate-sig=$CONSENSUS_AGGREGATE_SIG")
+    fi
     (( ROOTLESS )) || nodecmd=(runuser -u "$RUN_USER" -- "${nodecmd[@]}")
     # Close fd3 (caller stdout), fd4 (operator progress), and fd9 (the flock)
     # so the daemon inherits none of them; otherwise callers capturing output
@@ -1272,6 +1372,16 @@ wait_healthy() {
 }
 
 finish_running() {
+  if [[ "$BLS_IDS" == "unknown" ]]; then
+    local keys
+    keys="$(rpc_blskeys)"
+    if [[ "$keys" =~ ^[0-9a-fA-F]{96}(,[0-9a-fA-F]{96})*$ ]]; then
+      BLS_IDS="$keys"
+      S[BLS_IDS]="$keys"
+      save_state
+      log "captured public BLS IDs from the recovered node"
+    fi
+  fi
   set_state STARTED
   if [[ "$LAYOUT" == "systemd" ]]; then
     remove_hold
@@ -1389,8 +1499,14 @@ main() {
   case "${1-}" in
     prepare)
       MODE=prepare; shift
-      if [[ "${1-}" == "--discard-old-db" ]]; then DISCARD_FLAG=1; shift; fi
-      [[ $# -eq 0 ]] || usage_exit
+      while (( $# > 0 )); do
+        case "$1" in
+          --discard-old-db) DISCARD_FLAG=1 ;;
+          --quiet) QUIET=1 ;;
+          *) usage_exit ;;
+        esac
+        shift
+      done
       ;;
     start)
       MODE=start; shift
@@ -1433,7 +1549,7 @@ main() {
   exec 9>"$LOCK_FILE"
   flock -n 9 || die cannot-determine-state "another invocation holds the lock"
 
-  log "mode=$MODE discard=$DISCARD_FLAG invocation_dir=$INVOCATION_DIR rootless=$ROOTLESS logid=$LOGID script_url=$SCRIPT_URL"
+  log "mode=$MODE discard=$DISCARD_FLAG quiet=$QUIET invocation_dir=$INVOCATION_DIR rootless=$ROOTLESS logid=$LOGID script_url=$SCRIPT_URL"
   case "$(uname -sm)" in
     "Linux x86_64")
       ARCH=amd64; ELF_MACHINE=3e00
@@ -1449,6 +1565,7 @@ main() {
 
   STAMP="$(date +%Y%m%d-%H%M%S)"
   ORIG_EXE=""; ORIG_EXE_SHA256=""; CONFIG=""; DATADIR=""; BLS_IDS=""
+  CONSENSUS_AGGREGATE_SIG=""
   UNIT=""; RUN_USER=""; RUN_CWD=""; ORIG_PID=""; STAGING=""; DID_VERIFY_DB=0
 
   if [[ "$MODE" == "prepare" ]]; then
