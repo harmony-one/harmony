@@ -673,12 +673,16 @@ select_rclone_concurrency() {
     fi
     selected="$override"
   else
-    if (( mem_kib < 2097152 )); then cap=4
-    elif (( mem_kib < 4194304 )); then cap=8
-    elif (( mem_kib < 8388608 )); then cap=16
+    # WebDAV has high per-request latency and the snapshot has ~184k files,
+    # so capable hosts benefit more from parallel requests than from a
+    # CPU-conservative setting. Memory caps bound rclone's per-transfer
+    # buffering; a 4-core Pi 5 with >=4 GiB available selects 32.
+    if (( mem_kib < 1048576 )); then cap=4
+    elif (( mem_kib < 2097152 )); then cap=8
+    elif (( mem_kib < 4194304 )); then cap=16
     else cap=32
     fi
-    selected=$(( cores * 4 ))
+    selected=$(( cores * 8 ))
     (( selected < 4 )) && selected=4
     (( selected > cap )) && selected=$cap
   fi
@@ -730,8 +734,12 @@ ensure_db_staged() {
   require_db_source_metrics pre-transfer
   select_rclone_concurrency
   log "downloading the clean DB; rclone will report bytes, speed, percentage, and ETA every 10 seconds"
+  # Pin the established four-stream behavior for large files. The WebDAV
+  # backend advertises neither recursive ListR nor hashes, so --fast-list and
+  # --checksum would provide no benefit here.
   rclone_visible sync --config=/dev/null --retries 5 \
     --transfers="$RCLONE_TRANSFERS_SELECTED" --checkers="$RCLONE_TRANSFERS_SELECTED" \
+    --multi-thread-streams=4 \
     "$DB_RCLONE_SOURCE" "$dst" \
     || die download-failed "rclone sync into staging"
   require_db_source_metrics post-transfer
