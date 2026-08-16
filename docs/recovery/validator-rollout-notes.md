@@ -98,6 +98,32 @@ binary) owned by the node user; state lives in
 `STOPPED needs-root ...`, your machine has a harmony.service or files owned
 by another user: rerun with sudo.
 
+Low-space recovery:
+
+```bash
+sudo bash ./rollback-92730034.sh prepare --discard-old-db
+```
+
+When the old DB still exists, the script first discovers the validator and
+public BLS IDs, confirms the source and replacement binary are available,
+and stops Harmony. It then prints the full DB path and requires the operator
+to type `y` before deletion. Any other answer cancels and leaves the old DB
+intact. After confirmation, it deletes the old DB and downloads and installs
+the clean DB while Harmony remains stopped.
+
+`--quiet` skips this confirmation and is only for centrally supervised
+automation where the exact deletion path was already reviewed:
+
+```bash
+sudo bash ./rollback-92730034.sh prepare --discard-old-db --quiet
+```
+
+If the old DB was already deleted, use the same command with
+`harmony.service` stopped. The script discovers the paths and flags from
+systemd, reports `READY unknown recovery-92730034`, and continues without a
+BLS tally identity. This result is suitable for installation testing but must
+not count toward restart voting power.
+
 Include verbatim:
 - Despite the name, the script installs a clean database ending at block
   92,730,034 and **reverts nothing**; it never restarts your old chain.
@@ -108,6 +134,9 @@ Include verbatim:
   transfer speed, percentage, and ETA every 10 seconds.
 - Progress is written to stderr. The final `READY`, `RUNNING`, or `STOPPED`
   result remains the only line written to stdout.
+- The script records and preserves the original Harmony arguments in order.
+  This covers common consensus, BLS, P2P, RPC, sync, logging, and Prometheus
+  flags. Only the executable path changes to the staged v2026.1.2 binary.
 - Run both commands **from the same directory, as the same user**, on a
   persistent filesystem (not /tmp). Manual validators must run them from the
   directory containing the harmony binary or harmony config file.
@@ -134,8 +163,9 @@ Include verbatim:
 | --- | --- |
 | `unsupported-platform` | The machine is not Linux x86_64 or Linux aarch64. Handle it manually. |
 | `missing-dependencies` | One or more required commands are missing. The lines immediately above `STOPPED` list every missing command and print the package-manager command to install them. Install the packages, then run the same recovery command again. |
+| `deletion-cancelled` | The operator did not type `y` at the full-path deletion prompt. The validator remains stopped and the old DB remains intact. Review the path and rerun when ready. |
 | `needs-root` | Ran without sudo but a harmony.service is loaded, or the harmony process/files belong to a different user. Rerun with sudo (or as the owning user). |
-| `unsupported-layout` | Not packaged-systemd and not a clean manual-directory shape (extra flags, supervisor, ambiguous processes, non-mainnet/archival/multi-shard config, RPC unreachable, conflicting drop-in). Handle one-on-one. |
+| `unsupported-layout` | Not packaged-systemd and not a clean manual-directory shape (supervisor, ambiguous processes, non-mainnet/archival/multi-shard config, RPC unreachable, conflicting drop-in, or an unusual argument containing whitespace/control/systemd-special characters). Normal CLI flags and values are preserved. Handle unusual cases one-on-one. |
 | `low-disk` | Free space is below one full DB copy plus margin. Free space, or approve `prepare --discard-old-db` (only after a central old-DB archive is confirmed). |
 | `source-mismatch` | The remote DB source does not report the pinned file count and byte total (checked before and after the transfer). The SnapDB content changed after freeze or the wrong source is pinned. Node untouched; escalate — do not retry blindly. |
 | `download-failed` | rclone could not reach or read the DB source, or a binary download failed, or the downloaded binary is not the right-architecture ELF. Node untouched; rerun after checking connectivity. |
