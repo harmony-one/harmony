@@ -134,8 +134,9 @@ Include verbatim:
   transfer speed, percentage, and ETA every 10 seconds.
 - Progress is written to stderr. The final `READY`, `RUNNING`, or `STOPPED`
   result remains the only line written to stdout.
-- If the original Harmony command uses `--consensus.aggregate-sig=true` or
-  `--consensus.aggregate-sig=false`, the script records and preserves it.
+- The script records and preserves the original Harmony arguments in order.
+  This covers common consensus, BLS, P2P, RPC, sync, logging, and Prometheus
+  flags. Only the executable path changes to the staged v2026.1.2 binary.
 - Run both commands **from the same directory, as the same user**, on a
   persistent filesystem (not /tmp). Manual validators must run them from the
   directory containing the harmony binary or harmony config file.
@@ -164,7 +165,7 @@ Include verbatim:
 | `missing-dependencies` | One or more required commands are missing. The lines immediately above `STOPPED` list every missing command and print the package-manager command to install them. Install the packages, then run the same recovery command again. |
 | `deletion-cancelled` | The operator did not type `y` at the full-path deletion prompt. The validator remains stopped and the old DB remains intact. Review the path and rerun when ready. |
 | `needs-root` | Ran without sudo but a harmony.service is loaded, or the harmony process/files belong to a different user. Rerun with sudo (or as the owning user). |
-| `unsupported-layout` | Not packaged-systemd and not a clean manual-directory shape (unsupported extra flags, supervisor, ambiguous processes, non-mainnet/archival/multi-shard config, RPC unreachable, conflicting drop-in). The supported `--consensus.aggregate-sig=true/false` flag is preserved. Handle other cases one-on-one. |
+| `unsupported-layout` | Not packaged-systemd and not a clean manual-directory shape (supervisor, ambiguous processes, non-mainnet/archival/multi-shard config, RPC unreachable, conflicting drop-in, or an unusual argument containing whitespace/control/systemd-special characters). Normal CLI flags and values are preserved. Handle unusual cases one-on-one. |
 | `low-disk` | Free space is below one full DB copy plus margin. Free space, or approve `prepare --discard-old-db` (only after a central old-DB archive is confirmed). |
 | `source-mismatch` | The remote DB source does not report the pinned file count and byte total (checked before and after the transfer). The SnapDB content changed after freeze or the wrong source is pinned. Node untouched; escalate — do not retry blindly. |
 | `download-failed` | rclone could not reach or read the DB source, or a binary download failed, or the downloaded binary is not the right-architecture ELF. Node untouched; rerun after checking connectivity. |

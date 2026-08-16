@@ -671,10 +671,17 @@ m_rootless() {
 m_extra_flags() {
   cleanup_case; new_manual_case extraflags; mk_script
   mkdir -p "$INV/k"; chown hmytest: "$INV/k"
-  start_orig --bls.dir ./k
+  start_orig --bls.dir ./k --consensus.min-peers=6 --p2p.port=9001 \
+    --http.port=9500 --sync.client=true --log.verb=3
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare
-  expect "m_extraflags/refused" 1 "^STOPPED unsupported-layout [0-9-]+$"
-  orig_running && ok "m_extraflags/node-untouched" || bad "m_extraflags/node-untouched"
+  expect "m_extraflags/ready" 0 "^READY $BLS_SORTED recovery-92730034$" || return 0
+  [[ "$(state_get ORIG_ARGS)" == "-c ./harmony.conf --bls.dir ./k --consensus.min-peers=6 --p2p.port=9001 --http.port=9500 --sync.client=true --log.verb=3" ]] \
+    && ok "m_extraflags/state-preserved" || bad "m_extraflags/state-preserved"
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
+  expect "m_extraflags/running" 0 "^RUNNING $BLS_SORTED recovery-92730034$" || return 0
+  local np; np="$(state_get NODE_PID)"
+  tr '\0' ' ' < "/proc/$np/cmdline" | grep -q -- '--bls.dir ./k.*--p2p.port=9001.*--sync.client=true' \
+    && ok "m_extraflags/running-preserved" || bad "m_extraflags/running-preserved"
 }
 
 m_ambiguous() {
@@ -874,8 +881,9 @@ run_manual() {
 new_systemd_case() {
   cleanup_case
   systemctl stop harmony.service >/dev/null 2>&1 || true
-  rm -rf /home/harmony/data
-  mkdir -p /home/harmony/data/harmony_db_0 /etc/harmony
+  rm -rf /home/harmony/data /home/harmony/blskeys /home/harmony/logs
+  mkdir -p /home/harmony/data/harmony_db_0 /home/harmony/blskeys /home/harmony/logs /etc/harmony
+  : > /home/harmony/p2p.key
   printf 'x' > /home/harmony/data/harmony_db_0/CURRENT
   printf 'old' > /home/harmony/data/harmony_db_0/olddata
   cp -f "$T/fake-orig" /usr/sbin/harmony
@@ -905,13 +913,13 @@ RestartSec=1
 User=harmony
 Group=harmony
 WorkingDirectory=/home/harmony
-ExecStart=/usr/sbin/harmony -c /etc/harmony/harmony.conf --consensus.aggregate-sig=false
+ExecStart=/usr/sbin/harmony -c /etc/harmony/harmony.conf --consensus.aggregate-sig=false --consensus.min-peers=6 --bls.dir=/home/harmony/blskeys --p2p.keyfile=/home/harmony/p2p.key --p2p.port=9000 --http=true --http.port=9500 --sync=true --sync.client=true --log.dir=/home/harmony/logs --prometheus=true --prometheus.port=9900
 StartLimitInterval=0
 
 [Install]
 WantedBy=multi-user.target
 EOF
-  chown -R harmony: /home/harmony/data
+  chown -R harmony: /home/harmony/data /home/harmony/blskeys /home/harmony/logs /home/harmony/p2p.key
   systemctl daemon-reload
   systemctl enable harmony.service >/dev/null 2>&1
   systemctl start harmony.service
@@ -933,6 +941,9 @@ s_happy() {
     && ok "s_happy/exec-dropin-present" || bad "s_happy/exec-dropin-present"
   grep -q -- '--consensus.aggregate-sig=false' /etc/systemd/system/harmony.service.d/50-harmony-recovery-exec.conf \
     && ok "s_happy/aggregate-sig-preserved" || bad "s_happy/aggregate-sig-preserved"
+  grep -q -- '--bls.dir=/home/harmony/blskeys.*--p2p.port=9000.*--http.port=9500.*--prometheus.port=9900' \
+    /etc/systemd/system/harmony.service.d/50-harmony-recovery-exec.conf \
+    && ok "s_happy/common-flags-preserved" || bad "s_happy/common-flags-preserved"
   systemctl start harmony.service >/dev/null 2>&1 || true
   sleep 2
   [[ "$(systemctl is-active harmony.service)" != "active" ]] \
@@ -956,6 +967,8 @@ s_happy() {
     && ok "s_happy/unit-runs-staged-bin" || bad "s_happy/unit-runs-staged-bin"
   tr '\0' ' ' < "/proc/$mp/cmdline" | grep -q -- '--consensus.aggregate-sig=false' \
     && ok "s_happy/running-aggregate-sig" || bad "s_happy/running-aggregate-sig"
+  tr '\0' ' ' < "/proc/$mp/cmdline" | grep -q -- '--bls.dir=/home/harmony/blskeys.*--sync.client=true.*--log.dir=/home/harmony/logs' \
+    && ok "s_happy/running-common-flags" || bad "s_happy/running-common-flags"
   [[ ! -f /etc/systemd/system/harmony.service.d/99-harmony-recovery-hold.conf ]] \
     && ok "s_happy/hold-removed" || bad "s_happy/hold-removed"
   [[ ! -e "$SENT_DIR/GO" ]] && ok "s_happy/go-removed" || bad "s_happy/go-removed"

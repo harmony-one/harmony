@@ -98,6 +98,8 @@ PRINTED=0
 INVOCATION_DIR=""
 STAMP=""
 declare -A S=()   # state file key/value store
+declare -a ORIG_ARGS=()
+ORIG_ARGS_TEXT=""
 
 usage_exit() {
   # Usage errors touch nothing and print the one line themselves.
@@ -296,11 +298,10 @@ rpc_blskeys() { # -> sorted comma-joined blskey list (empty on failure)
   rpc_call hmyv2_getNodeMetadata '[]' | jq -r '.result.blskey | sort | join(",")' 2>/dev/null || true
 }
 
-# Parse harmony argv tokens (after argv[0]). Sets PARSED_CONFIG,
-# PARSED_DATADIR, PARSED_AGGREGATE_SIG, and PARSED_EXTRA. The aggregate-sig
-# flag is the one additional original flag preserved by the recovery launch.
+# Parse the config and DataDir facts needed by the safety checks. Other
+# original tokens are preserved separately and passed through unchanged.
 parse_harmony_args() {
-  PARSED_CONFIG=""; PARSED_DATADIR=""; PARSED_AGGREGATE_SIG=""; PARSED_EXTRA=""
+  PARSED_CONFIG=""; PARSED_DATADIR=""; PARSED_EXTRA=""
   local args=("$@") i=0 n=$#
   while (( i < n )); do
     case "${args[$i]}" in
@@ -312,13 +313,21 @@ parse_harmony_args() {
         (( i + 1 < n )) || { PARSED_EXTRA="${args[$i]}"; return 0; }
         PARSED_DATADIR="${args[$((i+1))]}"; i=$((i+2)) ;;
       --datadir=*) PARSED_DATADIR="${args[$i]#--datadir=}"; i=$((i+1)) ;;
-      --consensus.aggregate-sig=*)
-        PARSED_AGGREGATE_SIG="${args[$i]#--consensus.aggregate-sig=}"
-        [[ "$PARSED_AGGREGATE_SIG" == "true" || "$PARSED_AGGREGATE_SIG" == "false" ]] \
-          || PARSED_EXTRA="${args[$i]}"
-        i=$((i+1)) ;;
-      *) PARSED_EXTRA="${args[$i]}"; return 0 ;;
+      *) i=$((i+1)) ;;
     esac
+  done
+}
+
+record_original_args() {
+  local token
+  ORIG_ARGS_TEXT=""
+  (( ${#ORIG_ARGS[@]} > 0 )) || die unsupported-layout "original Harmony argv is empty"
+  for token in "${ORIG_ARGS[@]}"; do
+    # This compact representation deliberately supports normal CLI tokens
+    # only. Whitespace/control/percent values need one-on-one handling.
+    [[ "$token" =~ ^[-A-Za-z0-9_./:@,+=]+$ ]] \
+      || die unsupported-layout "original argument is not safely representable: $token"
+    ORIG_ARGS_TEXT+="${ORIG_ARGS_TEXT:+ }$token"
   done
 }
 
@@ -431,14 +440,20 @@ pid_matches_orig() { # is <pid> plausibly the recorded original harmony process
 
 find_recovery_pids() { # processes running the staged binary with our CONFIG
   RECOVERY_PIDS=()
-  local d pid exe tgt cmd
+  local d pid exe tgt cwd cfg
   set +x
   for d in /proc/[0-9]*; do
     pid="${d#/proc/}"
     exe="$(readlink "$d/exe" 2>/dev/null || true)"; tgt="${exe% (deleted)}"
     [[ "$tgt" == "$BIN" ]] || continue
-    cmd="$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null || true)"
-    [[ "$cmd" == *"$CONFIG"* ]] && RECOVERY_PIDS+=("$pid")
+    local argv=()
+    mapfile -d '' -t argv < "$d/cmdline" 2>/dev/null || true
+    (( ${#argv[@]} )) || continue
+    parse_harmony_args "${argv[@]:1}"
+    [[ -n "$PARSED_CONFIG" ]] || continue
+    cwd="$(readlink "$d/cwd" 2>/dev/null || true)"
+    cfg="$(resolve_against "$cwd" "$PARSED_CONFIG" 2>/dev/null || true)"
+    [[ "$cfg" == "$CONFIG" ]] && RECOVERY_PIDS+=("$pid")
   done
   set -x
 }
@@ -533,15 +548,11 @@ remove_hold() {
   fi
 }
 
-# The staged binary is the ordinary official v2026.1.2 build, launched with
-# the supported original config/datadir shape (no forced sync/DNS/RPC flags),
-# so normal config validation applies. Health is judged afterwards over the
-# node's own loopback RPC, which prepare already required to be reachable.
+# The staged binary is the ordinary official v2026.1.2 build. Only the
+# executable path changes; the validated original argument tokens remain in
+# the same order. Health is judged afterwards over loopback RPC.
 recovery_exec_line() {
-  printf '%s -c %s --datadir %s' "$BIN" "$CONFIG" "$DATADIR"
-  if [[ -n "$CONSENSUS_AGGREGATE_SIG" ]]; then
-    printf ' --consensus.aggregate-sig=%s' "$CONSENSUS_AGGREGATE_SIG"
-  fi
+  printf '%s %s' "$BIN" "$ORIG_ARGS_TEXT"
 }
 
 install_exec_dropin() {
@@ -729,9 +740,10 @@ discover_systemd() {
   [[ -n "$path" && -n "$argv" ]] || die unsupported-layout "cannot parse ExecStart: $raw"
   local tokens=()
   read -r -a tokens <<< "$argv"
-  parse_harmony_args "${tokens[@]:1}"
+  ORIG_ARGS=("${tokens[@]:1}")
+  record_original_args
+  parse_harmony_args "${ORIG_ARGS[@]}"
   [[ -z "$PARSED_EXTRA" ]] || die unsupported-layout "unsupported ExecStart flag: $PARSED_EXTRA"
-  CONSENSUS_AGGREGATE_SIG="$PARSED_AGGREGATE_SIG"
   [[ -n "$PARSED_CONFIG" ]] || die unsupported-layout "no -c/--config in ExecStart"
   wd="$(systemctl show "$UNIT" -p WorkingDirectory --value)"
   [[ "$wd" == "~" || -z "$wd" ]] && wd="$(getent passwd "$(systemd_service_user)" | cut -d: -f6)"
@@ -770,9 +782,10 @@ discover_manual() {
   done < "$d/cgroup"
   local argv=()
   mapfile -d '' -t argv < "$d/cmdline" || die unsupported-layout "process $pid vanished during discovery"
-  parse_harmony_args "${argv[@]:1}"
+  ORIG_ARGS=("${argv[@]:1}")
+  record_original_args
+  parse_harmony_args "${ORIG_ARGS[@]}"
   [[ -z "$PARSED_EXTRA" ]] || die unsupported-layout "unsupported original flag: $PARSED_EXTRA"
-  CONSENSUS_AGGREGATE_SIG="$PARSED_AGGREGATE_SIG"
   [[ -n "$PARSED_CONFIG" ]] || die unsupported-layout "no -c/--config on original command line"
   exe="$(readlink "$d/exe" 2>/dev/null || true)"; tgt="${exe% (deleted)}"
   [[ -n "$tgt" && "$tgt" != *" (deleted)"* && -f "$tgt" ]] || die unsupported-layout "cannot resolve process executable"
@@ -863,7 +876,7 @@ validate_common() {
   S[BLS_IDS]="$BLS_IDS"
   S[ORIG_EXE]="$ORIG_EXE"
   S[ORIG_EXE_SHA256]="$ORIG_EXE_SHA256"
-  S[CONSENSUS_AGGREGATE_SIG]="$CONSENSUS_AGGREGATE_SIG"
+  S[ORIG_ARGS]="$ORIG_ARGS_TEXT"
   S[OLD_DB_DISPOSITION]="${S[OLD_DB_DISPOSITION]:-kept}"
 }
 
@@ -878,12 +891,20 @@ load_facts() { # populate globals from the state file (start / prepare rerun)
   RUN_USER="${S[RUN_USER]-}"
   RUN_CWD="${S[RUN_CWD]-}"
   ORIG_PID="${S[ORIG_PID]-}"
-  CONSENSUS_AGGREGATE_SIG="${S[CONSENSUS_AGGREGATE_SIG]-}"
   [[ -n "$LAYOUT" && -n "$CONFIG" && -n "$DATADIR" && -n "$BLS_IDS" ]] \
     || die cannot-determine-state "state file missing core facts"
-  [[ -z "$CONSENSUS_AGGREGATE_SIG" || "$CONSENSUS_AGGREGATE_SIG" == "true" \
-     || "$CONSENSUS_AGGREGATE_SIG" == "false" ]] \
-    || die cannot-determine-state "invalid CONSENSUS_AGGREGATE_SIG in state"
+  if [[ -n "${S[ORIG_ARGS]-}" ]]; then
+    read -r -a ORIG_ARGS <<< "${S[ORIG_ARGS]}"
+    record_original_args
+  else
+    # Compatibility with state written by the immediately previous version.
+    ORIG_ARGS=(-c "$CONFIG" --datadir "$DATADIR")
+    if [[ -n "${S[CONSENSUS_AGGREGATE_SIG]-}" ]]; then
+      ORIG_ARGS+=("--consensus.aggregate-sig=${S[CONSENSUS_AGGREGATE_SIG]}")
+    fi
+    record_original_args
+    log "state has no complete argv; using prior-version config/datadir fallback"
+  fi
   if [[ "$LAYOUT" == "systemd" ]]; then
     [[ -n "$UNIT" ]] || die cannot-determine-state "systemd layout without UNIT"
   fi
@@ -1320,10 +1341,7 @@ launch_node() {
   else
     [[ -d "$RUN_CWD" ]] || die start-failed "recorded cwd $RUN_CWD missing"
     log "launching staged binary as $RUN_USER from $RUN_CWD (rootless=$ROOTLESS)"
-    local nodecmd=(setsid "$BIN" -c "$CONFIG" --datadir "$DATADIR")
-    if [[ -n "$CONSENSUS_AGGREGATE_SIG" ]]; then
-      nodecmd+=("--consensus.aggregate-sig=$CONSENSUS_AGGREGATE_SIG")
-    fi
+    local nodecmd=(setsid "$BIN" "${ORIG_ARGS[@]}")
     (( ROOTLESS )) || nodecmd=(runuser -u "$RUN_USER" -- "${nodecmd[@]}")
     # Close fd3 (caller stdout), fd4 (operator progress), and fd9 (the flock)
     # so the daemon inherits none of them; otherwise callers capturing output
@@ -1565,7 +1583,7 @@ main() {
 
   STAMP="$(date +%Y%m%d-%H%M%S)"
   ORIG_EXE=""; ORIG_EXE_SHA256=""; CONFIG=""; DATADIR=""; BLS_IDS=""
-  CONSENSUS_AGGREGATE_SIG=""
+  ORIG_ARGS=(); ORIG_ARGS_TEXT=""
   UNIT=""; RUN_USER=""; RUN_CWD=""; ORIG_PID=""; STAGING=""; DID_VERIFY_DB=0
 
   if [[ "$MODE" == "prepare" ]]; then
