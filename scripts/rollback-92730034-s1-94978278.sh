@@ -23,6 +23,7 @@
 # Exactly one line is printed to stdout:
 #   READY <bls-ids> recovery-92730034-s1-94978278      (prepare succeeded; node stopped)
 #   RUNNING <bls-ids> recovery-92730034-s1-94978278    (start succeeded; node healthy)
+#   INDETERMINATE <bls-ids> recovery-... <log-id>       (start interrupted; signer may be active)
 #   STOPPED <reason> <log-id>              (see private run log for detail)
 #
 # Supported layouts: one selected systemd service, or manual-directory
@@ -264,8 +265,19 @@ require_tools() {
 on_exit() {
   local rc=$?
   if [[ $rc -ne 0 && $PRINTED -eq 0 ]]; then
-    printf 'STOPPED cannot-determine-state %s\n' "$LOGID" >&3
+    if [[ "$MODE" == "start" && "${S[STATE]-}" =~ ^START(ING|ED)$ ]]; then
+      printf 'INDETERMINATE %s %s %s\n' \
+        "${S[BLS_IDS]:-${BLS_IDS:-unknown}}" "$SUFFIX" "$LOGID" >&3
+    else
+      printf 'STOPPED cannot-determine-state %s\n' "$LOGID" >&3
+    fi
   fi
+}
+
+on_signal() { # <exit-code>; keep a post-GO signer alive and report uncertainty
+  local rc="$1"
+  trap - INT TERM HUP
+  exit "$rc"
 }
 
 # fsync a file or directory (GNU coreutils sync accepts path arguments).
@@ -1717,6 +1729,21 @@ finish_running() {
   emit "RUNNING $BLS_IDS $SUFFIX"
 }
 
+verify_cold_launch() {
+  ensure_binary verify
+  require_no_duplicates ""
+  if [[ "$LAYOUT" == "systemd" ]]; then
+    unit_is_stopped || die not-ready "unit is not inactive"
+    [[ -f "$(hold_dropin_path)" ]] || die not-ready "hold drop-in missing"
+    [[ -f "$(exec_dropin_path)" ]] || die not-ready "exec drop-in missing"
+    verify_effective_exec || die receipt-mismatch "effective ExecStart is not the staged recovery command"
+  fi
+  db_marker_safe "$DATADIR/$COMPANION_DB_NAME" \
+    || die not-ready "companion $COMPANION_DB_NAME changed or disappeared"
+  verify_db_dir "$DATADIR/$DB_NAME" "installed clean DB (pre-launch)"
+  chown_new_db     # re-assert run-user ownership before launch
+}
+
 start_mode() {
   load_state || die not-ready "no state file; run prepare first"
   validate_selected_state
@@ -1751,18 +1778,7 @@ start_mode() {
   fi
   case "${S[STATE]}" in
     READY)
-      ensure_binary verify
-      require_no_duplicates ""
-      if [[ "$LAYOUT" == "systemd" ]]; then
-        unit_is_stopped || die not-ready "unit is not inactive"
-        [[ -f "$(hold_dropin_path)" ]] || die not-ready "hold drop-in missing"
-        [[ -f "$(exec_dropin_path)" ]] || die not-ready "exec drop-in missing"
-        verify_effective_exec || die receipt-mismatch "effective ExecStart is not the staged recovery command"
-      fi
-      db_marker_safe "$DATADIR/$COMPANION_DB_NAME" \
-        || die not-ready "companion $COMPANION_DB_NAME changed or disappeared"
-      verify_db_dir "$DATADIR/$DB_NAME" "installed clean DB (pre-launch)"
-      chown_new_db     # re-assert run-user ownership before launch
+      verify_cold_launch
       set_state STARTING
       launch_node
       wait_healthy
@@ -1775,8 +1791,7 @@ start_mode() {
         binary_ok || { quarantine_unhealthy_node; die not-ready "staged recovery binary missing, hash mismatch, or wrong ELF"; }
         scan_duplicates "$LEGIT_PID" || { quarantine_unhealthy_node; die duplicate-process "hits: $DUP_HITS"; }
       else
-        ensure_binary verify
-        require_no_duplicates ""
+        verify_cold_launch
         launch_node
       fi
       wait_healthy
@@ -1918,6 +1933,9 @@ main() {
   # stderr; detailed output and xtrace continue to the run log.
   exec 3>&1 4>&2 1>>"$logfile" 2>&1
   trap on_exit EXIT
+  trap 'on_signal 130' INT
+  trap 'on_signal 143' TERM
+  trap 'on_signal 129' HUP
   PS4='+ rollback:${LINENO}: '
   set -x
 

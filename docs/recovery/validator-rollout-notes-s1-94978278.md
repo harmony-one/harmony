@@ -231,6 +231,18 @@ If it fails, send the complete `STOPPED` line:
 STOPPED <reason> <log-id>
 ```
 
+If `start` is interrupted after the post-GO launch begins, the script
+intentionally does not kill the validator. It prints:
+
+```text
+INDETERMINATE <bls-ids> recovery-92730034-s1-94978278 <log-id>
+```
+
+Treat that signer as potentially active. Do not start a backup using any of
+the same BLS keys. Rerun the exact same `start` command: it adopts and checks
+the already-running validator, or repeats the cold database checks before a
+relaunch when no matching process exists.
+
 Do not run these until the Harmony team explicitly sends GO.
 
 Manual validator:
@@ -345,6 +357,10 @@ confirms that its transaction journal and sync cache are no longer needed.
 - `cannot-determine-state`: persistent state, filesystem, frozen profile, or
   lock ownership is inconsistent. Check whether the selected service is
   running before changing anything.
+- `INDETERMINATE`: `start` was interrupted after the durable `STARTING`
+  transition. The validator may be active; do not start duplicate BLS keys.
+  Rerun the exact same `start` command to reconcile and obtain `RUNNING` or a
+  proven `STOPPED` result.
 
 Run logs:
 

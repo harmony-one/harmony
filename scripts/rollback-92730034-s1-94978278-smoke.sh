@@ -883,13 +883,18 @@ m_bad_oldname() {
 }
 
 m_start_reconcile() {
-  # STARTING with nothing running: relaunch without the cold pre-launch DB
-  # verification (which would fail after this deliberate tamper).
+  # STARTING with nothing running: repeat the cold pre-launch DB verification
+  # before relaunch. A crash boundary must not turn STARTING into a bypass.
   cleanup_case; new_manual_case reconcile; mk_script; start_orig
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare
   expect "m_reconcile/ready" 0 "^READY " || return 0
   sed -i 's/^STATE=.*/STATE=STARTING/' "$STATE"
-  printf 'x' > "$DATA/harmony_db_1/extra-file"   # cold verify would fail if re-run
+  printf 'x' > "$DATA/harmony_db_1/extra-file"
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
+  expect "m_reconcile/starting-tamper-refused" 1 "^STOPPED db-verify-failed [0-9-]+$"
+  [[ -z "$(pids_by_exe "$BIN")" ]] \
+    && ok "m_reconcile/tamper-not-launched" || bad "m_reconcile/tamper-not-launched"
+  rm -f "$DATA/harmony_db_1/extra-file"
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
   expect "m_reconcile/starting-relaunch" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
 
@@ -915,6 +920,61 @@ m_start_reconcile() {
   rpc_set
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
   expect "m_reconcile/recovered" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
+}
+
+m_interrupted_start_signal() { # <signal> <expected-exit>
+  # GO is authoritative: interrupting the installer after launch must not
+  # kill the signer. It must emit an indeterminate receipt so the coordinator
+  # treats the signer as potentially active and reruns start to reconcile it.
+  local sig="$1" want_rc="$2" label="${1,,}"
+  cleanup_case; new_manual_case "interrupted-$label"; mk_script; start_orig
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare
+  expect "m_interrupt_$label/ready" 0 "^READY " || return 0
+
+  rpc_set 94978277
+  local installer out="$INV/interrupted.out" err="$INV/interrupted.err" np rc
+  (
+    # An asynchronous Bash may inherit SIGINT ignored from its parent. Reset
+    # signal dispositions before exec so this models a foreground operator
+    # shell while retaining deterministic background orchestration.
+    trap - INT TERM HUP
+    cd "$INV"
+    exec env SERVICE="$ABSENT_UNIT" bash "$RB" start
+  ) >"$out" 2>"$err" &
+  installer=$!
+
+  wait_for 10 bash -c "[[ \"\$(sed -n 's/^STATE=//p' '$STATE')\" == STARTING ]]" \
+    || { bad "m_interrupt_$label/reached-starting" "state=$(state_get STATE)"; kill -TERM "$installer" 2>/dev/null || true; return 0; }
+  wait_for 10 bash -c "[[ -n \"\$(sed -n 's/^NODE_PID=//p' '$STATE')\" ]]" \
+    || { bad "m_interrupt_$label/node-launched" "pid=$(state_get NODE_PID)"; kill -TERM "$installer" 2>/dev/null || true; return 0; }
+  np="$(state_get NODE_PID)"
+  [[ -d "/proc/$np" ]] \
+    || { bad "m_interrupt_$label/node-launched" "pid=$np"; kill -TERM "$installer" 2>/dev/null || true; return 0; }
+  ok "m_interrupt_$label/node-launched"
+
+  kill -s "$sig" "$installer"
+  set +e
+  wait "$installer"
+  rc=$?
+  set -e
+  RB_OUT="$(cat "$out")"; RB_RC=$rc
+  expect "m_interrupt_$label/indeterminate" "$want_rc" "^INDETERMINATE $BLS_SORTED recovery-92730034-s1-94978278 [0-9-]+$"
+  [[ "$(state_get STATE)" == STARTING ]] \
+    && ok "m_interrupt_$label/state-starting" || bad "m_interrupt_$label/state-starting" "$(state_get STATE)"
+  [[ -d "/proc/$np" ]] \
+    && ok "m_interrupt_$label/signer-kept-running" || bad "m_interrupt_$label/signer-kept-running" "pid=$np"
+
+  rpc_set
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
+  expect "m_interrupt_$label/reconciled" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
+  [[ "$(state_get NODE_PID)" == "$np" && -d "/proc/$np" ]] \
+    && ok "m_interrupt_$label/adopted-same-pid" || bad "m_interrupt_$label/adopted-same-pid"
+}
+
+m_interrupted_start() {
+  m_interrupted_start_signal TERM 143
+  m_interrupted_start_signal INT 130
+  m_interrupted_start_signal HUP 129
 }
 
 m_failed_start() {
@@ -951,6 +1011,12 @@ m_usage() {
   expect "m_usage/start-before-prepare" 1 "^STOPPED not-ready [0-9-]+$"
 }
 
+run_manual_lifecycle() {
+  m_start_reconcile || true
+  m_interrupted_start || true
+  cleanup_case
+}
+
 run_manual() {
   # `|| true` so one failing case cannot abort the suite before the summary.
   m_happy || true
@@ -974,6 +1040,7 @@ run_manual() {
   m_state_matrix || true
   m_bad_oldname || true
   m_start_reconcile || true
+  m_interrupted_start || true
   m_failed_start || true
   m_usage || true
   cleanup_case
@@ -1596,12 +1663,13 @@ done
 GROUP="${1-all}"
 build_fixtures
 case "$GROUP" in
-  manual)      run_manual ;;
-  systemd)     run_systemd ;;
-  all)         run_manual; run_systemd ;;
-  pre-reboot)  pre_reboot ;;
-  post-reboot) post_reboot ;;
-  *) echo "usage: $0 [manual|systemd|pre-reboot|post-reboot|all]"; exit 2 ;;
+  manual)           run_manual ;;
+  manual-lifecycle) run_manual_lifecycle ;;
+  systemd)          run_systemd ;;
+  all)              run_manual; run_systemd ;;
+  pre-reboot)       pre_reboot ;;
+  post-reboot)      post_reboot ;;
+  *) echo "usage: $0 [manual|manual-lifecycle|systemd|pre-reboot|post-reboot|all]"; exit 2 ;;
 esac
 
 echo "----------------------------------------"
