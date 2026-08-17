@@ -416,18 +416,24 @@ func delegatorSlashApplyDebt(
 
 	aggregateDebt := applySlashRate(validatorSlashed, numeric.MustNewDecFromStr("0.8"))
 
-	for _, indexPair := range slashIndexPairs[1:] {
-		snapshotIndex := indexPair[0]
-		currentIndex := indexPair[1]
-		delegationSnapshot := snapshot.Delegations[snapshotIndex]
-		delegationCurrent := &current.Delegations[currentIndex]
-		// A*(B/C) => (A*B)/C
-		// slashDebt = aggregateDebt*(Amount/totalExternalStake)
-		slashDebt := new(big.Int).Mul(delegationSnapshot.Amount, aggregateDebt)
-		slashDebt.Div(slashDebt, totalExternalStake)
+	// External debt is apportioned by each delegator's share of the external
+	// stake, so there has to be some for a share to be meaningful. Delegation
+	// entries stay behind once fully undelegated, so a validator can still carry
+	// external delegators whose stake all adds up to nothing.
+	if totalExternalStake.Sign() > 0 {
+		for _, indexPair := range slashIndexPairs[1:] {
+			snapshotIndex := indexPair[0]
+			currentIndex := indexPair[1]
+			delegationSnapshot := snapshot.Delegations[snapshotIndex]
+			delegationCurrent := &current.Delegations[currentIndex]
+			// A*(B/C) => (A*B)/C
+			// slashDebt = aggregateDebt*(Amount/totalExternalStake)
+			slashDebt := new(big.Int).Mul(delegationSnapshot.Amount, aggregateDebt)
+			slashDebt.Div(slashDebt, totalExternalStake)
 
-		slahsed := applySlashingToDelegation(delegationCurrent, state, rewardBeneficiary, doubleSignEpoch, slashDebt)
-		totalSlahsed.Add(totalSlahsed, slahsed)
+			slahsed := applySlashingToDelegation(delegationCurrent, state, rewardBeneficiary, doubleSignEpoch, slashDebt)
+			totalSlahsed.Add(totalSlahsed, slahsed)
+		}
 	}
 
 	// finally, kick them off forever
