@@ -327,6 +327,20 @@ func VerifyAndDelegateFromMsg(
 
 			delegation := &wrapper.Delegations[delegationIndex.Index]
 
+			// The index is resolved from a node local lookup table rather than
+			// from state, so confirm the entry it points at really is a delegation
+			// made by this delegator before its undelegated tokens are consumed.
+			if chainConfig.IsStrictStateValidation(epoch) &&
+				!bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
+				return nil, nil, nil, errors.Errorf(
+					"delegation index %d of validator %s belongs to %s, not %s",
+					delegationIndex.Index,
+					delegationIndex.ValidatorAddress.Hex(),
+					delegation.DelegatorAddress.Hex(),
+					msg.DelegatorAddress.Hex(),
+				)
+			}
+
 			startBalance := big.NewInt(0).Set(delegateBalance)
 			// Start from the oldest undelegated tokens
 			curIndex := 0
@@ -588,10 +602,12 @@ func VerifyAndMigrateFromMsg(
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndCollectRewardsFromDelegation(
 	stateDB vm.StateDB, delegations []staking.DelegationIndex,
+	delegator common.Address, epoch *big.Int, chainConfig *params.ChainConfig,
 ) ([]*staking.ValidatorWrapper, *big.Int, error) {
 	if stateDB == nil {
 		return nil, nil, errStateDBIsMissing
 	}
+	strict := chainConfig != nil && chainConfig.IsStrictStateValidation(epoch)
 	updatedValidatorWrappers := []*staking.ValidatorWrapper{}
 	totalRewards := big.NewInt(0)
 	for i := range delegations {
@@ -602,7 +618,20 @@ func VerifyAndCollectRewardsFromDelegation(
 			return nil, nil, err
 		}
 		if uint64(len(wrapper.Delegations)) > delegation.Index {
-			delegation := &wrapper.Delegations[delegation.Index]
+			validatorAddress := delegation.ValidatorAddress
+			index := delegation.Index
+			delegation := &wrapper.Delegations[index]
+			// The index is resolved from a node local lookup table rather than
+			// from state, so confirm the entry it points at really is a delegation
+			// made by this delegator before its reward is paid out.
+			if strict &&
+				!bytes.Equal(delegation.DelegatorAddress.Bytes(), delegator.Bytes()) {
+				return nil, nil, errors.Errorf(
+					"delegation index %d of validator %s belongs to %s, not %s",
+					index, validatorAddress.Hex(),
+					delegation.DelegatorAddress.Hex(), delegator.Hex(),
+				)
+			}
 			if delegation.Reward.Cmp(common.Big0) > 0 {
 				totalRewards.Add(totalRewards, delegation.Reward)
 				delegation.Reward.SetUint64(0)
