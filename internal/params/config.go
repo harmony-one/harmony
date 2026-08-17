@@ -44,6 +44,7 @@ var (
 		CrossTxEpoch:                          big.NewInt(28),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(2964),
 		CXReceiptStateRollbackEpoch:           big.NewInt(2964),
+		StrictStateValidationEpoch:            EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(100),
 		ReceiptLogEpoch:                       big.NewInt(101),
 		PreStakingEpoch:                       big.NewInt(185),
@@ -172,6 +173,7 @@ var (
 		RejectDuplicateSlashEvidenceEpoch:     big.NewInt(7385),
 		SlashGroupOrderFixEpoch:               big.NewInt(7385),
 		CXReceiptStateRollbackEpoch:           big.NewInt(7385),
+		StrictStateValidationEpoch:            EpochTBD,
 		ShardStateValidationEpoch:             big.NewInt(7385),
 		SlashBallotSignerFixEpoch:             big.NewInt(7385),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(7385),
@@ -191,6 +193,7 @@ var (
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		CXReceiptStateRollbackEpoch:           EpochTBD,
+		StrictStateValidationEpoch:            EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -321,6 +324,7 @@ var (
 		SlashGroupOrderFixEpoch:               big.NewInt(52050),
 		BLSProofBindEpoch:                     big.NewInt(53508),
 		CXReceiptStateRollbackEpoch:           big.NewInt(52650),
+		StrictStateValidationEpoch:            EpochTBD,
 		ShardStateValidationEpoch:             big.NewInt(52650),
 		SlashBallotSignerFixEpoch:             big.NewInt(52650),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(53000),
@@ -338,6 +342,7 @@ var (
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		CXReceiptStateRollbackEpoch:           EpochTBD,
+		StrictStateValidationEpoch:            EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -410,6 +415,7 @@ var (
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(5),
 		CXReceiptStateRollbackEpoch:           big.NewInt(5),
+		StrictStateValidationEpoch:            big.NewInt(0),
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(0),
@@ -484,6 +490,7 @@ var (
 		big.NewInt(0),                      // CrossTxEpoch
 		big.NewInt(0),                      // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),                      // CXReceiptStateRollbackEpoch
+		big.NewInt(0),                      // StrictStateValidationEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
 		big.NewInt(0),                      // RejectShard0CrossLinkEpoch
 		big.NewInt(1),                      // AggregatedRewardEpoch
@@ -559,6 +566,7 @@ var (
 		big.NewInt(0),        // CrossTxEpoch
 		big.NewInt(0),        // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),        // CXReceiptStateRollbackEpoch
+		big.NewInt(0),        // StrictStateValidationEpoch
 		big.NewInt(0),        // CrossLinkEpoch
 		big.NewInt(0),        // RejectShard0CrossLinkEpoch
 		big.NewInt(1),        // AggregatedRewardEpoch
@@ -680,6 +688,16 @@ type ChainConfig struct {
 	// CXReceiptStateRollbackEpoch is the epoch where EVM frame reverts also
 	// roll back cross-shard receipts created by the cross-shard precompile.
 	CXReceiptStateRollbackEpoch *big.Int `json:"cx-receipt-state-rollback-epoch,omitempty"`
+
+	// StrictStateValidationEpoch is the epoch where the additional state
+	// transition and block acceptance checks are enabled. It covers checks whose
+	// outcome can differ from the pre-existing behaviour, so they are activated
+	// together at a single epoch rather than immediately on upgrade:
+	//   - incoming cross-shard receipts are verified on the block insert path,
+	//     not only when a block arrives through consensus
+	//   - a delegation resolved through the delegation index must belong to the
+	//     delegator named in the staking message
+	StrictStateValidationEpoch *big.Int `json:"strict-state-validation-epoch,omitempty"`
 
 	// CrossLinkEpoch is the epoch where beaconchain starts containing
 	// cross-shard links.
@@ -993,6 +1011,13 @@ func (c *ChainConfig) AcceptsCrossTx(epoch *big.Int) bool {
 // cross-shard transaction fields.
 func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 	return isForked(c.CrossTxEpoch, epoch)
+}
+
+// IsStrictStateValidation determines whether the additional state transition and
+// block acceptance checks are enabled. This activates strictly at its own epoch,
+// independently of any other hardfork.
+func (c *ChainConfig) IsStrictStateValidation(epoch *big.Int) bool {
+	return isForked(c.StrictStateValidationEpoch, epoch)
 }
 
 // IsCXMerkleProofReplayFixEpoch determines whether replay-fix checks are enabled.

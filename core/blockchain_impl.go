@@ -1883,6 +1883,24 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			return i, events, coalescedLogs, err
 		}
 
+		// Incoming cross-shard receipts credit balances during Process, and what
+		// makes them legitimate lives outside this block: the source shard's
+		// signed header, the merkle proof binding the receipts to it, and the
+		// spent markers recording which proofs this shard has already applied.
+		// None of that is covered by the header or state root checks, so the
+		// proofs are verified here before the block is processed. The markers for
+		// this block are only written later, in WriteBlockWithState.
+		//
+		// Blocks arriving through consensus are already checked in
+		// ValidateNewBlock; this covers the remaining paths into the chain, and is
+		// epoch gated because it decides block acceptance.
+		if bc.chainConfig.IsStrictStateValidation(block.Epoch()) {
+			if err := VerifyIncomingReceipts(bc, block); err != nil {
+				bc.reportBlock(block, nil, err)
+				return i, events, coalescedLogs, err
+			}
+		}
+
 		// Create a new statedb using the parent block and report an
 		// error if it fails.
 		var parent *types.Block
