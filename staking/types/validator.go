@@ -609,7 +609,9 @@ func CreateValidatorFromNewMsg(
 		return nil, err
 	}
 	commission := Commission{val.CommissionRates, blockNum}
-	pubKeys := append(val.SlotPubKeys[0:0], val.SlotPubKeys...)
+	// Full slice expression: the zero cap forces a fresh array, so the keys the
+	// validator is built from are independent of the caller's message.
+	pubKeys := append(val.SlotPubKeys[0:0:0], val.SlotPubKeys...)
 
 	// SanityCheck enforces this same limit once the wrapper is assembled. Applying
 	// it up front keeps the signature verification below proportional to the
