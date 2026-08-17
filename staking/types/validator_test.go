@@ -908,3 +908,27 @@ func assertError(gotErr, expErr error) error {
 	}
 	return nil
 }
+
+// TestCreateValidatorFromNewMsgRejectsExcessiveBLSKeysEarly checks that a create
+// validator message carrying more slot keys than a validator may hold is refused
+// before any proof of possession is verified.
+func TestCreateValidatorFromNewMsgRejectsExcessiveBLSKeysEarly(t *testing.T) {
+	cv := makeCreateValidator()
+
+	// One key more than allowed. The signatures are left unusable on purpose:
+	// reaching the verification step would report a signature error instead.
+	n := MaxBLSPerValidator + 1
+	cv.SlotPubKeys = make([]bls.SerializedPublicKey, n)
+	cv.SlotKeySigs = make([]bls.SerializedSignature, n)
+	for i := 0; i < n; i++ {
+		cv.SlotPubKeys[i] = bls.SerializedPublicKey{byte(i), byte(i >> 8), 0x01}
+	}
+
+	_, err := CreateValidatorFromNewMsg(&cv, common.Big1, common.Big1, false)
+	if err == nil {
+		t.Fatal("expected an error for more slot keys than allowed")
+	}
+	if errors.Cause(err) != ErrExcessiveBLSKeys {
+		t.Fatalf("expected ErrExcessiveBLSKeys, got: %v", err)
+	}
+}
