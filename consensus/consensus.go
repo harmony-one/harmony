@@ -78,6 +78,10 @@ type Consensus struct {
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
 
 	pendingCXReceipts map[utils.CXKey]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
+	// Number of proposal rounds each pending receipt has been retried while its
+	// source shard state was still unavailable, so the pending set keeps turning
+	// over rather than accumulating receipts that never become verifiable.
+	pendingCXReceiptsDeferrals map[utils.CXKey]int
 	// Registry for services.
 	registry *registry.Registry
 	// Minimal number of peers in the shard
@@ -301,7 +305,8 @@ func New(
 		// FBFT timeout
 		consensusTimeout:  createTimeout(),
 		dHelper:           downloadAsync{},
-		pendingCXReceipts: make(map[utils.CXKey]*types.CXReceiptsProof), // All the receipts received but not yet processed for Consensus
+		pendingCXReceipts:          make(map[utils.CXKey]*types.CXReceiptsProof), // All the receipts received but not yet processed for Consensus
+		pendingCXReceiptsDeferrals: make(map[utils.CXKey]int),
 	}
 	registry.SetQuorum(Decider)
 

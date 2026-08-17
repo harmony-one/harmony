@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"math/big"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,9 @@ import (
 const (
 	IncomingReceiptsLimit = 2000 // 2000 * (numShards - 1)
 	SleepPeriod           = 20 * time.Millisecond
+	// maxPendingCXReceiptDeferrals is how many proposal rounds a pending
+	// CXReceiptsProof may stay unverifiable before it is dropped.
+	maxPendingCXReceiptDeferrals = 10
 )
 
 // ProposeNewBlock proposes a new block...
@@ -283,6 +287,7 @@ func (consensus *Consensus) proposeReceiptsProof() []*types.CXReceiptsProof {
 	})
 
 	m := map[common.Hash]struct{}{}
+	deferrals := map[utils.CXKey]int{}
 
 Loop:
 	for _, cxp := range consensus.pendingCXReceipts {
@@ -310,7 +315,14 @@ Loop:
 		}
 
 		if err := core.NewBlockValidator(consensus.Blockchain()).ValidateCXReceiptsProof(cxp); err != nil {
-			if strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
+			// A missing source shard state means the commit signature has not been
+			// checked yet rather than found wrong, so the proof is worth retrying on
+			// a later round. Retries are capped so the pending set keeps turning over
+			// when a shard state never arrives.
+			key := utils.GetPendingCXKey(cxp.Header.ShardID(), cxp.Header.Number().Uint64())
+			if strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) &&
+				consensus.pendingCXReceiptsDeferrals[key] < maxPendingCXReceiptDeferrals {
+				deferrals[key] = consensus.pendingCXReceiptsDeferrals[key] + 1
 				pendingReceiptsList = append(pendingReceiptsList, cxp)
 			} else {
 				consensus.getLogger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
@@ -330,6 +342,9 @@ Loop:
 		key := utils.GetPendingCXKey(shardID, blockNum)
 		consensus.pendingCXReceipts[key] = v
 	}
+	// Deferral counts only survive for receipts still pending; entries dropped
+	// above lose their count along with their slot.
+	consensus.pendingCXReceiptsDeferrals = deferrals
 
 	consensus.getLogger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d", len(validReceiptsList))
 	return validReceiptsList
@@ -349,6 +364,21 @@ func (consensus *Consensus) AddPendingReceipts(receipts *types.CXReceiptsProof) 
 	shardID := receipts.Header.ShardID()
 
 	// Sanity checks
+
+	// Validation below verifies the header commit signature against the source
+	// shard state of the header's epoch, and tolerates that shard state being
+	// absent so receipts arriving just before an epoch transition are still kept.
+	// That tolerance is meant for the epoch we are about to enter, so the epoch a
+	// receipt claims is only meaningful up to one past the current one.
+	curEpoch := consensus.Blockchain().CurrentHeader().Epoch()
+	maxEpoch := new(big.Int).Add(curEpoch, common.Big1)
+	if e := receipts.Header.Epoch(); e == nil || e.Cmp(maxEpoch) > 0 {
+		consensus.getLogger().Info().
+			Interface("incoming-epoch", e).
+			Str("max-accepted-epoch", maxEpoch.String()).
+			Msg("[AddPendingReceipts] Incoming receipt epoch too far ahead")
+		return
+	}
 
 	if err := core.NewBlockValidator(consensus.Blockchain()).ValidateCXReceiptsProof(receipts); err != nil {
 		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
