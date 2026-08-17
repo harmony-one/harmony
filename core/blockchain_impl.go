@@ -459,6 +459,13 @@ func VerifyIncomingReceipts(blockchain BlockChain, block *types.Block) error {
 	m := make(map[common.Hash]struct{})
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
+		// The spent lookup and the duplicate key below are both derived from the
+		// merkle proof and the header, so a proof is only usable here once those
+		// fields are present.
+		if cxp == nil || cxp.MerkleProof == nil || cxp.MerkleProof.BlockNum == nil ||
+			cxp.Header == nil {
+			return errors.New("[verifyIncomingReceipts] incomplete CXReceiptsProof")
+		}
 		// double spent
 		if blockchain.IsSpent(cxp) {
 			return errDoubleSpent
