@@ -1461,8 +1461,9 @@ var (
 
 func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 	tests := []struct {
-		sdb vm.StateDB
-		ds  []staking.DelegationIndex
+		sdb       vm.StateDB
+		ds        []staking.DelegationIndex
+		delegator common.Address
 
 		expVWrappers    []*staking.ValidatorWrapper
 		expTotalRewards *big.Int
@@ -1470,29 +1471,34 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 	}{
 		{
 			// 0: Positive test case
-			sdb: makeStateForReward(t),
-			ds:  makeMsgCollectRewards(),
+			sdb:       makeStateForReward(t),
+			ds:        makeMsgCollectRewards(),
+			delegator: delegatorAddr,
 
 			expVWrappers:    expVWrappersForReward(),
 			expTotalRewards: new(big.Int).Add(reward01, reward11),
 		},
 		{
-			// 1: No rewards to collect
-			sdb: makeStateDBForStake(t),
-			ds:  []staking.DelegationIndex{{ValidatorAddress: validatorAddr2, Index: 0}},
+			// 1: No rewards to collect. Index 0 is the validator's own
+			// self delegation, so the collector here is the validator.
+			sdb:       makeStateDBForStake(t),
+			ds:        []staking.DelegationIndex{{ValidatorAddress: validatorAddr2, Index: 0}},
+			delegator: validatorAddr2,
 
 			expErr: errNoRewardsToCollect,
 		},
 		{
 			// 2: nil state db
-			sdb: nil,
-			ds:  makeMsgCollectRewards(),
+			sdb:       nil,
+			ds:        makeMsgCollectRewards(),
+			delegator: delegatorAddr,
 
 			expErr: errStateDBIsMissing,
 		},
 		{
 			// 3: ValidatorWrapper not in state
-			sdb: makeStateForReward(t),
+			sdb:       makeStateForReward(t),
+			delegator: delegatorAddr,
 			ds: func() []staking.DelegationIndex {
 				msg := makeMsgCollectRewards()
 				msg[1].ValidatorAddress = makeTestAddr("addr not exist")
@@ -1503,7 +1509,8 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 		},
 		{
 			// 4: Wrong input message - index out of range
-			sdb: makeStateForReward(t),
+			sdb:       makeStateForReward(t),
+			delegator: delegatorAddr,
 			ds: func() []staking.DelegationIndex {
 				dis := makeMsgCollectRewards()
 				dis[1].Index = 2
@@ -1514,7 +1521,10 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		ws, tReward, err := VerifyAndCollectRewardsFromDelegation(test.sdb, test.ds)
+		ws, tReward, err := VerifyAndCollectRewardsFromDelegation(
+			test.sdb, test.ds, test.delegator,
+			big.NewInt(defaultEpoch), params.LocalnetChainConfig,
+		)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Fatalf("Test %v: %v", i, err)
@@ -1837,4 +1847,32 @@ func assertError(got, expect error) error {
 		return fmt.Errorf("unexpected error [%v] / [%v]", got, expect)
 	}
 	return nil
+}
+
+// TestCollectRewardsRejectsForeignDelegationIndex checks that a delegation index
+// pointing at another account's delegation is refused once strict validation is
+// active, and that the pre-fork behaviour is left unchanged.
+func TestCollectRewardsRejectsForeignDelegationIndex(t *testing.T) {
+	// Index 1 of each wrapper belongs to delegatorAddr, so collecting it as
+	// validatorAddr means the index does not match the named delegator.
+	strictCfg := *params.LocalnetChainConfig
+	strictCfg.StrictStateValidationEpoch = big.NewInt(0)
+
+	legacyCfg := *params.LocalnetChainConfig
+	legacyCfg.StrictStateValidationEpoch = params.EpochTBD
+
+	_, _, err := VerifyAndCollectRewardsFromDelegation(
+		makeStateForReward(t), makeMsgCollectRewards(), validatorAddr,
+		big.NewInt(defaultEpoch), &strictCfg,
+	)
+	if err == nil {
+		t.Fatal("expected an error when the delegation index belongs to another delegator")
+	}
+
+	if _, _, err := VerifyAndCollectRewardsFromDelegation(
+		makeStateForReward(t), makeMsgCollectRewards(), validatorAddr,
+		big.NewInt(defaultEpoch), &legacyCfg,
+	); err != nil {
+		t.Fatalf("pre-fork behaviour changed: %v", err)
+	}
 }
