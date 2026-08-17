@@ -20,7 +20,7 @@ func TestEpochPrecompile(t *testing.T) {
 		CodeAddr: &precompileAddr,
 		Gas:      GasQuickStep,
 	}
-	result, _, err := RunPrecompiledContract(&epoch{}, evm, &contract, input, GasQuickStep, true)
+	result, _, err := RunPrecompiledContract(&epoch{}, evm, &contract, input, GasQuickStep, true, true)
 	if err != nil {
 		t.Fatalf("Got error%v\n", err)
 	}
