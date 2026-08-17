@@ -56,3 +56,17 @@ func TestCXReceiptsProofCopyPreservesCommitFields(t *testing.T) {
 		t.Error("Copy shares backing arrays with the original")
 	}
 }
+
+// TestContainsEmptyFieldNilReceiver checks that a nil receipts proof reports
+// itself as empty instead of reading through the nil receiver.
+func TestContainsEmptyFieldNilReceiver(t *testing.T) {
+	var cxp *CXReceiptsProof
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ContainsEmptyField did not handle a nil receiver: %v", r)
+		}
+	}()
+	if !cxp.ContainsEmptyField() {
+		t.Fatal("expected a nil proof to be reported as empty")
+	}
+}
