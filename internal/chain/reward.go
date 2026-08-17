@@ -325,11 +325,9 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	startTime := time.Now()
 	// loop through [0...63] position in the modulus index of the 64 blocks
 	// Note the current block is at position 63 of the modulus.
+	// This runs only at the last block of a reward window, so curBlockNum is at
+	// least RewardFrequency-1 and the start of the range stays within the chain.
 	for i := curBlockNum - shard.Schedule.RewardFrequency() + 1; i <= curBlockNum; i++ {
-		if i < 0 {
-			continue
-		}
-
 		var curHeader *block.Header
 		if i == curBlockNum {
 			// When it's the current block (63th), we should use the provided header since it's not written in db yet.
