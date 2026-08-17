@@ -655,7 +655,13 @@ func VerifyAndCollectRewardsFromDelegation(
 		}
 		updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)
 	}
-	if totalRewards.Int64() == 0 {
+	// Sign reports emptiness for the whole value, whereas Int64 only describes the
+	// low 64 bits of it.
+	noRewards := totalRewards.Int64() == 0
+	if strict {
+		noRewards = totalRewards.Sign() == 0
+	}
+	if noRewards {
 		return nil, nil, errNoRewardsToCollect
 	}
 	return updatedValidatorWrappers, totalRewards, nil
