@@ -155,7 +155,7 @@ func (cxp *CXReceiptsProof) Copy() *CXReceiptsProof {
 		MerkleProof:  cxp.MerkleProof.Copy(),
 		Header:       CopyHeader(cxp.Header),
 		CommitSig:    append(cxp.CommitSig[:0:0], cxp.CommitSig...),
-		CommitBitmap: append(cxp.CommitBitmap[:0:0], cxp.CommitSig...),
+		CommitBitmap: append(cxp.CommitBitmap[:0:0], cxp.CommitBitmap...),
 	}
 }
 
