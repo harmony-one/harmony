@@ -5,7 +5,9 @@
 # database ending at block 94,978,278 (a raw LevelDB directory transferred
 # with rclone from a pinned read-only source) plus the pinned official
 # v2026.1.2 harmony binary, and keeps the node stopped until the coordinated
-# GO. It reverts nothing and never restores the old DB automatically.
+# GO. At first recovered start it quarantines the old harmony_db_0 epoch
+# companion so Harmony rebuilds it. It reverts nothing and never restores an
+# old DB automatically.
 # Requires rclone in addition to standard tools.
 #
 #   sudo bash ./rollback-92730034-s1-94978278.sh prepare [--systemd-unit NAME] [--discard-old-db]
@@ -178,7 +180,7 @@ confirm_predeleted_shard1() {
   notice ""
   notice "Requested action:"
   notice "  install the shard-1 recovery DB at $DATADIR/$DB_NAME"
-  notice "  preserve the companion beacon DB at $DATADIR/$COMPANION_DB_NAME"
+  notice "  quarantine and rebuild the companion epoch DB at $DATADIR/$COMPANION_DB_NAME on start"
   notice "  leave $UNIT stopped until coordinated GO"
   notice ""
   notice "Confirm independently that this service is intended to run SHARD 1."
@@ -1008,6 +1010,75 @@ db_marker_safe() { # <database-directory>
   [[ -d "$1" && ! -L "$1" && -f "$1/CURRENT" && ! -L "$1/CURRENT" ]]
 }
 
+companion_old_name_ok() {
+  local re="^${COMPANION_DB_NAME}\\.pre-s1-recovery-[A-Za-z0-9._-]+$"
+  [[ "${S[COMPANION_OLD_NAME]-}" =~ $re ]]
+}
+
+# Before the first recovered launch, quarantine the old shard-0 epoch-chain
+# companion. Harmony creates a new epoch-chain DB from genesis when the path is
+# absent. The write-ahead fields make this safe across a crash before/after the
+# rename or before the node creates the replacement directory.
+prepare_companion_rebuild() {
+  local cur="$DATADIR/$COMPANION_DB_NAME" old
+
+  if [[ "${S[COMPANION_REBUILD_STARTED]-}" == "1" ]]; then
+    companion_old_name_ok \
+      || die cannot-determine-state "COMPANION_OLD_NAME missing or malformed: '${S[COMPANION_OLD_NAME]-}'"
+    [[ ! -L "$cur" ]] \
+      || die cannot-determine-state "rebuilt companion path is a symlink: $cur"
+    [[ ! -e "$cur" ]] || db_marker_safe "$cur" \
+      || die cannot-determine-state "rebuilt companion DB is malformed: $cur"
+    return 0
+  fi
+
+  if [[ -z "${S[COMPANION_OLD_NAME]-}" ]]; then
+    S[COMPANION_OLD_NAME]="$COMPANION_DB_NAME.pre-s1-recovery-$STAMP"
+    save_state
+  fi
+  companion_old_name_ok \
+    || die cannot-determine-state "COMPANION_OLD_NAME missing or malformed: '${S[COMPANION_OLD_NAME]-}'"
+  old="$DATADIR/${S[COMPANION_OLD_NAME]}"
+
+  if [[ -e "$cur" || -L "$cur" ]]; then
+    db_marker_safe "$cur" \
+      || die cannot-determine-state "active companion DB is malformed: $cur"
+    [[ ! -e "$old" && ! -L "$old" ]] \
+      || die cannot-determine-state "both active and quarantined companion DBs exist: $cur / $old"
+    mv "$cur" "$old"
+    sync_path "$DATADIR"
+    S[COMPANION_DB_DISPOSITION]="quarantined"
+    log "quarantined old companion epoch DB at $old"
+  elif [[ -e "$old" || -L "$old" ]]; then
+    db_marker_safe "$old" \
+      || die cannot-determine-state "quarantined companion DB is malformed: $old"
+    S[COMPANION_DB_DISPOSITION]="quarantined"
+    log "adopting already-quarantined companion epoch DB at $old"
+  else
+    # An operator may already have removed harmony_db_0 after reaching READY.
+    # That is sufficient for Harmony to rebuild it; record the fact rather
+    # than manufacturing or trusting an unverified placeholder.
+    S[COMPANION_DB_DISPOSITION]="missing-before-rebuild"
+    log "companion epoch DB is already absent; Harmony will recreate $cur"
+  fi
+
+  S[COMPANION_REBUILD_STARTED]="1"
+  save_state
+}
+
+companion_rebuild_prepared() {
+  local cur="$DATADIR/$COMPANION_DB_NAME"
+  COMPANION_REBUILD_ERR=""
+  [[ "${S[COMPANION_REBUILD_STARTED]-}" == "1" ]] \
+    || { COMPANION_REBUILD_ERR="rebuild-started receipt missing"; return 1; }
+  companion_old_name_ok \
+    || { COMPANION_REBUILD_ERR="quarantine name missing or malformed"; return 1; }
+  [[ ! -L "$cur" ]] \
+    || { COMPANION_REBUILD_ERR="active companion path is a symlink"; return 1; }
+  [[ ! -e "$cur" ]] || db_marker_safe "$cur" \
+    || { COMPANION_REBUILD_ERR="recreated companion CURRENT is missing or unsafe"; return 1; }
+}
+
 validate_common() {
   local predeleted_candidate=0
   local paths=("$CONFIG" "$DATADIR" "$ORIG_EXE")
@@ -1042,7 +1113,8 @@ validate_common() {
   shard_data="$(toml_get "$CONFIG" ShardData EnableShardData)"
   [[ "$shard_data" != "true" ]] || die unsupported-layout "EnableShardData=true"
   # A shard-1 validator legitimately carries harmony_db_0 as its beacon epoch
-  # chain. Preserve it and reject active databases for any other shard.
+  # chain. It is quarantined immediately before recovered start; reject active
+  # databases for any other shard.
   local dbdir dbbase
   for dbdir in "$DATADIR"/harmony_db_[0-9]*; do
     dbbase="${dbdir##*/}"
@@ -1458,8 +1530,12 @@ prepare_mode() {
     [[ -f "$(hold_dropin_path)" ]] || die cannot-determine-state "hold drop-in missing at READY"
     verify_effective_exec || die unsupported-layout "a later drop-in still overrides ExecStart"
   fi
-  db_marker_safe "$DATADIR/$COMPANION_DB_NAME" \
-    || die cannot-determine-state "companion $COMPANION_DB_NAME changed or disappeared"
+  if [[ -e "$DATADIR/$COMPANION_DB_NAME" || -L "$DATADIR/$COMPANION_DB_NAME" ]]; then
+    db_marker_safe "$DATADIR/$COMPANION_DB_NAME" \
+      || die cannot-determine-state "companion $COMPANION_DB_NAME is malformed at READY"
+  else
+    log "companion $COMPANION_DB_NAME is already absent; updated start will rebuild it"
+  fi
   (( DID_VERIFY_DB )) || verify_db_dir "$DATADIR/$DB_NAME" "installed clean DB (rerun)"
   emit "READY $BLS_IDS $SUFFIX"
 }
@@ -1468,6 +1544,7 @@ prepare_mode() {
 
 rpc_healthy() {
   local bn h child metadata keys
+  db_marker_safe "$DATADIR/$COMPANION_DB_NAME" || return 1
   bn="$(rpc_call hmyv2_blockNumber '[]' | jq -r '.result // empty' 2>/dev/null || true)"
   [[ "$bn" =~ ^[0-9]+$ ]] || return 1
   (( bn >= TARGET_HEIGHT )) || return 1
@@ -1625,6 +1702,8 @@ latched_manual_requarantine() {
 }
 
 launch_node() {
+  companion_rebuild_prepared \
+    || die not-ready "companion epoch DB rebuild was not prepared: $COMPANION_REBUILD_ERR"
   if [[ "$LAYOUT" == "systemd" ]]; then
     verify_effective_exec || die receipt-mismatch "effective ExecStart is not the staged recovery command"
     mkdir -p "$SENTINEL_DIR"
@@ -1695,7 +1774,7 @@ wait_healthy() {
     sleep 5
   done
   stop_started_node
-  die unhealthy "RPC health not reached in ${START_RPC_TIMEOUT}s (shard identity/blockNumber/target/rejected-child/blskey pins)"
+  die unhealthy "RPC health not reached in ${START_RPC_TIMEOUT}s (rebuilt companion/shard identity/blockNumber/target/rejected-child/blskey pins)"
 }
 
 finish_running() {
@@ -1709,12 +1788,35 @@ finish_running() {
       log "captured public BLS IDs from the recovered node"
     fi
   fi
+  S[COMPANION_DB_DISPOSITION]="rebuilt"
+  save_state
   set_state STARTED
   if [[ "$LAYOUT" == "systemd" ]]; then
     remove_hold
     rm -f "$SENTINEL"
   fi
   emit "RUNNING $BLS_IDS $SUFFIX"
+}
+
+ensure_companion_rebuild_before_start() {
+  companion_rebuild_prepared && return 0
+
+  # Compatibility with validators that reached READY/STARTING/STARTED using
+  # an earlier shard-1 script. Stop an already-started staged node before
+  # moving its open epoch DB; an unrelated/manual process remains a
+  # duplicate-process failure and is never killed by pathname guesswork.
+  if node_is_up; then
+    log "stopping previously started recovery node before companion DB rebuild"
+    quarantine_unhealthy_node
+  fi
+  if [[ "$LAYOUT" == "systemd" ]]; then
+    unit_is_stopped \
+      || die stop-failed "unit must be fully stopped before companion DB rebuild"
+  fi
+  require_no_duplicates ""
+  prepare_companion_rebuild
+  companion_rebuild_prepared \
+    || die cannot-determine-state "companion epoch DB rebuild preparation did not persist: $COMPANION_REBUILD_ERR"
 }
 
 start_mode() {
@@ -1749,6 +1851,9 @@ start_mode() {
     fi
     die head-mismatch "latched: ${S[HEAD_MISMATCH]}; node stays stopped"
   fi
+  if (( rank >= 6 )); then
+    ensure_companion_rebuild_before_start
+  fi
   case "${S[STATE]}" in
     READY)
       ensure_binary verify
@@ -1759,8 +1864,8 @@ start_mode() {
         [[ -f "$(exec_dropin_path)" ]] || die not-ready "exec drop-in missing"
         verify_effective_exec || die receipt-mismatch "effective ExecStart is not the staged recovery command"
       fi
-      db_marker_safe "$DATADIR/$COMPANION_DB_NAME" \
-        || die not-ready "companion $COMPANION_DB_NAME changed or disappeared"
+      companion_rebuild_prepared \
+        || die not-ready "companion epoch DB rebuild is not prepared: $COMPANION_REBUILD_ERR"
       verify_db_dir "$DATADIR/$DB_NAME" "installed clean DB (pre-launch)"
       chown_new_db     # re-assert run-user ownership before launch
       set_state STARTING

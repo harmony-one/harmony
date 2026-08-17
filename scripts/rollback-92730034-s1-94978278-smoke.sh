@@ -59,12 +59,54 @@ have_systemd() { [[ -d /run/systemd/system ]] && [[ "$(ps -p 1 -o comm= 2>/dev/n
 # ---------- generic helpers ----------
 
 RB_OUT=""; RB_RC=0
+
+start_companion_rebuild_simulator() { # <mode>
+  COMPANION_HELPER_PID=""
+  [[ "${1-}" == "start" ]] || return 0
+  (
+    local state datadir owner
+    local files=()
+    local _
+    for _ in $(seq 1 300); do
+      files=()
+      [[ -f "$WORK/private/state" ]] && files+=("$WORK/private/state")
+      for state in "$WORK"/units/*/private/state \
+        "$T"/cases/*/.hmy-recovery-92730034-s1-94978278/work/private/state; do
+        [[ -f "$state" ]] && files+=("$state")
+      done
+      for state in "${files[@]}"; do
+        grep -qx 'COMPANION_REBUILD_STARTED=1' "$state" || continue
+        datadir="$(sed -n 's/^DATADIR=//p' "$state")"
+        [[ -d "$datadir" ]] || continue
+        if [[ ! -e "$datadir/harmony_db_0" ]]; then
+          make_companion_db "$datadir" rebuilt
+          owner="$(stat -c %u:%g "$datadir")"
+          chown -R "$owner" "$datadir/harmony_db_0"
+          exit 0
+        fi
+      done
+      sleep 0.05
+    done
+  ) &
+  COMPANION_HELPER_PID=$!
+}
+
+stop_companion_rebuild_simulator() {
+  if [[ -n "${COMPANION_HELPER_PID-}" ]]; then
+    kill "$COMPANION_HELPER_PID" 2>/dev/null || true
+    wait "$COMPANION_HELPER_PID" 2>/dev/null || true
+    COMPANION_HELPER_PID=""
+  fi
+}
+
 run_rb() { # <cwd> <args...>; captures single stdout line + rc
   local dir="$1"; shift
+  start_companion_rebuild_simulator "${1-}"
   set +e
   RB_OUT="$(cd "$dir" && SERVICE="${RB_SERVICE-}" bash "$RB" "$@")"
   RB_RC=$?
   set -e
+  stop_companion_rebuild_simulator
 }
 
 run_rb_input() { # <input> <cwd> <args...>
@@ -77,10 +119,12 @@ run_rb_input() { # <input> <cwd> <args...>
 
 run_rb_user() { # <user> <cwd> <args...>; rootless invocation as <user>
   local u="$1" dir="$2"; shift 2
+  start_companion_rebuild_simulator "${1-}"
   set +e
   RB_OUT="$(cd "$dir" && runuser -u "$u" -- env SERVICE="${RB_SERVICE-}" bash "$RB" "$@")"
   RB_RC=$?
   set -e
+  stop_companion_rebuild_simulator
 }
 
 host_arch_token() { # AMD64 or ARM64 constant-name suffix for this host
@@ -309,10 +353,11 @@ EOF
 db_src_count() { find "$1" -mindepth 1 -type f | wc -l | tr -d ' '; }
 db_src_bytes() { find "$1" -mindepth 1 -type f -printf '%s\n' | awk '{s+=$1} END{print s+0}'; }
 
-make_companion_db() { # <DataDir>: shard-1 validators retain this beacon epoch DB
+make_companion_db() { # <DataDir> [marker]
+  local marker="${2-must-survive}"
   mkdir -p "$1/harmony_db_0"
   printf 'companion\n' > "$1/harmony_db_0/CURRENT"
-  printf 'must-survive\n' > "$1/harmony_db_0/companion-marker"
+  printf '%s\n' "$marker" > "$1/harmony_db_0/companion-marker"
 }
 
 mk_script() { # [db-source-dir] [margin-min-bytes]; builds $RB with test constants
@@ -423,6 +468,14 @@ m_happy() {
 
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
   expect "m_happy/start" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  local companion_old; companion_old="$(state_get COMPANION_OLD_NAME)"
+  [[ -f "$DATA/$companion_old/companion-marker" \
+     && "$(cat "$DATA/$companion_old/companion-marker")" == "must-survive" ]] \
+    && ok "m_happy/old-companion-quarantined" || bad "m_happy/old-companion-quarantined" "$companion_old"
+  [[ "$(cat "$DATA/harmony_db_0/companion-marker")" == "rebuilt" ]] \
+    && ok "m_happy/companion-rebuilt" || bad "m_happy/companion-rebuilt"
+  [[ "$(state_get COMPANION_DB_DISPOSITION)" == "rebuilt" ]] \
+    && ok "m_happy/companion-state-rebuilt" || bad "m_happy/companion-state-rebuilt"
   local np; np="$(state_get NODE_PID)"
   [[ -n "$np" && -d "/proc/$np" ]] || { bad "m_happy/node-pid" "np=$np"; return 0; }
   [[ "$(readlink "/proc/$np/exe")" == "$BIN" ]] && ok "m_happy/pid-exe-staged" || bad "m_happy/pid-exe-staged"
@@ -432,6 +485,22 @@ m_happy() {
 
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
   expect "m_happy/start-rerun" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
+}
+
+m_companion_already_deleted() {
+  # Compatibility with a validator that followed the old operational advice
+  # and removed harmony_db_0 after reaching READY but before GO.
+  cleanup_case; new_manual_case companionmissing; mk_script; start_orig
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare
+  expect "m_companionmissing/ready" 0 "^READY $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  rm -rf "$DATA/harmony_db_0"
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
+  expect "m_companionmissing/start" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  [[ "$(cat "$DATA/harmony_db_0/companion-marker")" == "rebuilt" ]] \
+    && ok "m_companionmissing/rebuilt" || bad "m_companionmissing/rebuilt"
+  local companion_old; companion_old="$(state_get COMPANION_OLD_NAME)"
+  [[ -n "$companion_old" && ! -e "$DATA/$companion_old" ]] \
+    && ok "m_companionmissing/no-fake-backup" || bad "m_companionmissing/no-fake-backup" "$companion_old"
 }
 
 m_source_mismatch() {
@@ -954,6 +1023,7 @@ m_usage() {
 run_manual() {
   # `|| true` so one failing case cannot abort the suite before the summary.
   m_happy || true
+  m_companion_already_deleted || true
   m_source_mismatch || true
   m_resume_partial || true
   m_bad_source || true
@@ -1121,6 +1191,12 @@ s_happy() {
 
   run_rb /root start
   expect "s_happy/start" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  local companion_old; companion_old="$(state_get COMPANION_OLD_NAME)"
+  [[ -f "$SDATA/$companion_old/companion-marker" \
+     && "$(cat "$SDATA/$companion_old/companion-marker")" == "must-survive" ]] \
+    && ok "s_happy/old-companion-quarantined" || bad "s_happy/old-companion-quarantined" "$companion_old"
+  [[ "$(cat "$SDATA/harmony_db_0/companion-marker")" == "rebuilt" ]] \
+    && ok "s_happy/companion-rebuilt" || bad "s_happy/companion-rebuilt"
   [[ "$(systemctl is-active harmony.service)" == "active" ]] \
     && ok "s_happy/unit-active" || bad "s_happy/unit-active"
   local mp; mp="$(systemctl show harmony.service -p MainPID --value)"
