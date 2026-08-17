@@ -932,3 +932,21 @@ func TestCreateValidatorFromNewMsgRejectsExcessiveBLSKeysEarly(t *testing.T) {
 		t.Fatalf("expected ErrExcessiveBLSKeys, got: %v", err)
 	}
 }
+
+// TestCreateValidatorFromNewMsgCopiesSlotKeys checks that the validator holds its
+// own slot key array rather than sharing the message's backing array.
+func TestCreateValidatorFromNewMsgCopiesSlotKeys(t *testing.T) {
+	cv := makeCreateValidator()
+	v, err := CreateValidatorFromNewMsg(&cv, common.Big1, common.Big1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v.SlotPubKeys) == 0 {
+		t.Fatal("expected at least one slot key")
+	}
+	original := cv.SlotPubKeys[0]
+	v.SlotPubKeys[0] = bls.SerializedPublicKey{0xFF}
+	if cv.SlotPubKeys[0] != original {
+		t.Error("validator slot keys share a backing array with the message")
+	}
+}
