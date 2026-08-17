@@ -195,7 +195,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = checkDuplicateFields(addrs, test.sdb, test.validator, test.identity, test.pubs, false)
+		err = checkDuplicateFields(addrs, test.sdb, test.validator, test.identity, test.pubs, false, true)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
@@ -1874,5 +1874,27 @@ func TestCollectRewardsRejectsForeignDelegationIndex(t *testing.T) {
 		big.NewInt(defaultEpoch), &legacyCfg,
 	); err != nil {
 		t.Fatalf("pre-fork behaviour changed: %v", err)
+	}
+}
+
+// TestCheckDuplicateFieldsSkipsScanWithNothingToCompare checks that the scan over
+// the validator list is skipped when the message supplies neither an identity nor
+// slot keys, and that it still runs when the skip is not enabled.
+func TestCheckDuplicateFieldsSkipsScanWithNothingToCompare(t *testing.T) {
+	sdb := makeStateDBForStake(t)
+	// An address that is not a validator in state: loading its wrapper fails, so
+	// reaching it proves the scan ran.
+	addrs := []common.Address{makeTestAddr("not a validator")}
+
+	if err := checkDuplicateFields(
+		addrs, sdb, createValidatorAddr, "", nil, false, true,
+	); err != nil {
+		t.Fatalf("expected the scan to be skipped, got: %v", err)
+	}
+
+	if err := checkDuplicateFields(
+		addrs, sdb, createValidatorAddr, "", nil, false, false,
+	); err == nil {
+		t.Fatal("expected the scan to run when the skip is not enabled")
 	}
 }

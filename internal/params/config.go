@@ -697,6 +697,8 @@ type ChainConfig struct {
 	//     not only when a block arrives through consensus
 	//   - a delegation resolved through the delegation index must belong to the
 	//     delegator named in the staking message
+	//   - the duplicate identity and slot key scan over the validator list is
+	//     skipped when the staking message supplies neither of them
 	StrictStateValidationEpoch *big.Int `json:"strict-state-validation-epoch,omitempty"`
 
 	// CrossLinkEpoch is the epoch where beaconchain starts containing
