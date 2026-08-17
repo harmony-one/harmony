@@ -287,6 +287,13 @@ func getTransactionType(
 	if tx.ShardID() != tx.ToShardID() &&
 		header.ShardID() == tx.ShardID() &&
 		tx.ToShardID() < numShards {
+		// A cross-shard transfer is completed by crediting the recipient on the
+		// destination shard, so it needs a recipient to name. Contract creation
+		// has none, and the receipt it would produce carries an address the
+		// destination cannot read back.
+		if config.IsStrictStateValidation(header.Epoch()) && tx.To() == nil {
+			return types.InvalidTx
+		}
 		return types.SubtractionOnly
 	}
 	return types.InvalidTx
