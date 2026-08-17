@@ -224,7 +224,7 @@ func init() {
 // - the returned bytes,
 // - the _remaining_ gas,
 // - any error that occurred
-func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contract *Contract, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contract *Contract, input []byte, suppliedGas uint64, readOnly bool, directCall bool) (ret []byte, remainingGas uint64, err error) {
 	////if contract.CodeAddr != nil {
 	//precompiles := PrecompiledContractsHomestead
 	//// assign empty write capable precompiles till they are available in the fork
@@ -292,6 +292,15 @@ func RunPrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contrac
 	// immediately error out if readOnly
 	if readOnly && p.IsWrite() {
 		return nil, 0, ErrWriteProtection
+	}
+	// Some precompiles spend the balance at their own address and therefore rely
+	// on the calling frame having transferred it to them, which only a plain CALL
+	// does.
+	if !directCall {
+		if d, ok := p.(DirectCallOnly); ok && d.RequiresDirectCall() &&
+			evm.ChainConfig().IsStrictStateValidation(evm.Context.EpochNumber) {
+			return nil, 0, ErrPrecompileRequiresDirectCall
+		}
 	}
 	gasCost, err := p.RequiredGas(evm, contract, input)
 	if err != nil {

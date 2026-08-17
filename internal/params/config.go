@@ -701,6 +701,9 @@ type ChainConfig struct {
 	//     skipped when the staking message supplies neither of them
 	//   - a reward total is tested for emptiness over its whole value rather
 	//     than over its low 64 bits
+	//   - a cross-shard transaction must name a recipient
+	//   - a precompile that spends the balance at its own address may only be
+	//     reached by a plain CALL
 	StrictStateValidationEpoch *big.Int `json:"strict-state-validation-epoch,omitempty"`
 
 	// CrossLinkEpoch is the epoch where beaconchain starts containing

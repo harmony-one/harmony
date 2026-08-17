@@ -76,7 +76,7 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T, e
 			t.Error(err)
 		}
 		contract.Gas = gas
-		if res, _, err := RunPrecompiledContract(p, env, contract, test.input, gas, false); err != nil {
+		if res, _, err := RunPrecompiledContract(p, env, contract, test.input, gas, false, true); err != nil {
 			if test.expectedError != nil {
 				if test.expectedError.Error() != err.Error() {
 					t.Errorf("Expected error %v, got %v", test.expectedError, err)
@@ -214,7 +214,7 @@ func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
 		p             = &stakingPrecompile{}
 		expectedError = ErrWriteProtection
 		env           = NewEVM(BlockContext{ShardID: 1}, TxContext{}, nil, params.TestChainConfig, Config{})
-		res, _, err   = RunPrecompiledContract(p, env, nil, []byte{}, 0, true)
+		res, _, err   = RunPrecompiledContract(p, env, nil, []byte{}, 0, true, true)
 	)
 	if err != nil {
 		if err.Error() != expectedError.Error() {

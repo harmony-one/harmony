@@ -371,7 +371,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 		contract.SetCallCode(&addrCopy, codeHash, code)
 
-		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false, true)
 	} else {
 		addrCopy := addr
 		// If the account has no code, we can abort here
@@ -454,7 +454,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		// The depth-check is already done, and precompiles handled above
 		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
-		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false, false)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -502,7 +502,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 		// The depth-check is already done, and precompiles handled above
 		contract := NewContract(caller, AccountRef(addrCopy), nil, gas).AsDelegate()
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addr))
-		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false, false)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and make initialise the delegate values
@@ -558,7 +558,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		// The contract is a scoped environment for this execution context only.
 		contract := NewContract(caller, AccountRef(addrCopy), new(big.Int), gas)
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
-		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, true)
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, true, false)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'

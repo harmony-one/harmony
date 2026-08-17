@@ -32,12 +32,15 @@ var (
 	ErrMaxCodeSizeExceeded      = errors.New("max code size exceeded")
 	ErrInvalidJump              = errors.New("invalid jump destination")
 	ErrWriteProtection          = errors.New("write protection")
-	ErrReturnDataOutOfBounds    = errors.New("return data out of bounds")
-	ErrGasUintOverflow          = errors.New("gas uint64 overflow")
-	ErrInvalidCode              = errors.New("invalid code: must not begin with 0xef")
-	ErrNonceUintOverflow        = errors.New("nonce uint64 overflow")
-	ErrTraceLimitReached        = errors.New("the number of logs reached the specified limit") // harmony error
-	ErrMaxInitCodeSizeExceeded  = errors.New("max initcode size exceeded")
+	// ErrPrecompileRequiresDirectCall is returned when a precompile that spends
+	// the balance at its own address is reached other than by a plain CALL.
+	ErrPrecompileRequiresDirectCall = errors.New("precompile requires a direct call")
+	ErrReturnDataOutOfBounds        = errors.New("return data out of bounds")
+	ErrGasUintOverflow              = errors.New("gas uint64 overflow")
+	ErrInvalidCode                  = errors.New("invalid code: must not begin with 0xef")
+	ErrNonceUintOverflow            = errors.New("nonce uint64 overflow")
+	ErrTraceLimitReached            = errors.New("the number of logs reached the specified limit") // harmony error
+	ErrMaxInitCodeSizeExceeded      = errors.New("max initcode size exceeded")
 
 	// errStopToken is an internal token indicating interpreter loop termination,
 	// never returned to outside callers.

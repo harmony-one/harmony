@@ -58,6 +58,15 @@ type WriteCapablePrecompiledContract interface {
 	IsWrite() bool
 }
 
+// DirectCallOnly is implemented by precompiles that spend the balance held at
+// their own address, and so depend on the calling frame having moved that
+// balance to them. Only a plain CALL does that: CALLCODE and DELEGATECALL run
+// the precompile with a value taken from the calling frame without performing
+// the matching transfer.
+type DirectCallOnly interface {
+	RequiresDirectCall() bool
+}
+
 type stakingPrecompile struct{}
 
 var _ WriteCapablePrecompiledContract = (*stakingPrecompile)(nil)
@@ -215,6 +224,13 @@ var _ WriteCapablePrecompiledContract = (*crossShardXferPrecompile)(nil)
 
 // IsWrite returns true if the pre-compiled contract is a write capable contract.
 func (c *crossShardXferPrecompile) IsWrite() bool {
+	return true
+}
+
+// RequiresDirectCall reports that this precompile may only be reached by a plain
+// CALL. It transfers out of its own address the value the calling frame reports,
+// which is only funded when that frame is a CALL.
+func (c *crossShardXferPrecompile) RequiresDirectCall() bool {
 	return true
 }
 
