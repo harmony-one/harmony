@@ -1468,6 +1468,24 @@ func (db *DB) AddReward(
 		return nil
 	}
 
+	// Rewards are distributed by position: the snapshot is taken at the start of
+	// the epoch and delegations are only ever appended, so index i refers to the
+	// same delegator in both lists. Distribution is driven by the snapshot, so the
+	// current list is the one that can run short, and index 0 is relied on below
+	// as the validator's own self delegation.
+	if len(curValidator.Delegations) == 0 {
+		return errors.Errorf(
+			"validator %s has no delegations to reward", snapshot.Address.Hex(),
+		)
+	}
+	if len(curValidator.Delegations) < len(snapshot.Delegations) {
+		return errors.Errorf(
+			"validator %s has %d delegations, fewer than the %d in its snapshot",
+			snapshot.Address.Hex(),
+			len(curValidator.Delegations), len(snapshot.Delegations),
+		)
+	}
+
 	rewardPool := big.NewInt(0).Set(reward)
 	curValidator.BlockReward.Add(curValidator.BlockReward, reward)
 	// Payout commission
