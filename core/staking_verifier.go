@@ -46,10 +46,17 @@ func checkValidatorWrapperAddressBinding(
 func checkDuplicateFields(
 	addrs []common.Address, state vm.StateDB,
 	validator common.Address, identity string, blsKeys []bls.SerializedPublicKey,
-	checkSameBlock bool,
+	checkSameBlock bool, skipWhenNothingToCompare bool,
 ) error {
 	checkIdentity := identity != ""
 	checkBlsKeys := len(blsKeys) != 0
+
+	// Every address below costs a wrapper load out of state. With no identity and
+	// no slot keys to compare against there is nothing those loads can report, so
+	// the scan has no work to do.
+	if skipWhenNothingToCompare && !checkIdentity && !checkBlsKeys {
+		return nil
+	}
 
 	blsKeyMap := map[bls.SerializedPublicKey]struct{}{}
 	for _, key := range blsKeys {
@@ -145,6 +152,7 @@ func VerifyAndCreateValidatorFromMsg(
 		msg.Identity,
 		msg.SlotPubKeys,
 		bindBLSProof,
+		chainContext.Config().IsStrictStateValidation(epoch),
 	); err != nil {
 		return nil, err
 	}
@@ -204,6 +212,7 @@ func VerifyAndEditValidatorFromMsg(
 		msg.Identity,
 		newBlsKeys,
 		bindBLSProof,
+		chainContext.Config().IsStrictStateValidation(epoch),
 	); err != nil {
 		return nil, err
 	}
