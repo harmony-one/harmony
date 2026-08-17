@@ -184,6 +184,18 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	}
 
 	merkleProof := cxp.MerkleProof
+	if merkleProof == nil {
+		return errors.New("[ValidateCXReceiptsProof] missing merkle proof")
+	}
+	// ShardIDs and CXShardHashes are separate RLP lists that together describe one
+	// destination shard per position, and the loop below walks them in lockstep.
+	// They are only a well formed pairing when their lengths agree.
+	if len(merkleProof.ShardIDs) != len(merkleProof.CXShardHashes) {
+		return errors.Errorf(
+			"[ValidateCXReceiptsProof] merkle proof shardIDs/CXShardHashes length mismatch: %d vs %d",
+			len(merkleProof.ShardIDs), len(merkleProof.CXShardHashes),
+		)
+	}
 	shardRoot := common.Hash{}
 	foundMatchingShardID := false
 	byteBuffer := bytes.Buffer{}
