@@ -8,17 +8,19 @@ Shard-0 operations remain documented separately in
 state directories from the two procedures.
 
 The script is optional. The equivalent manual operation is to stop the
-selected shard-1 validator, preserve its companion `harmony_db_0`, replace
-only `harmony_db_1` with the frozen clean database, run the official
-v2026.1.2 binary, and start only after coordinated GO. The script automates
-those steps with checks and a stopped-until-GO hold.
+selected shard-1 validator, replace only `harmony_db_1` with the frozen clean
+database, quarantine the old `harmony_db_0` epoch-chain companion so Harmony
+rebuilds it, run the official v2026.1.2 binary, and start only after
+coordinated GO. The script automates those steps with checks and a
+stopped-until-GO hold.
 
 ## 1. Frozen recovery profile
 
 - Network: Harmony mainnet.
 - Shard: `1`.
 - Database replaced: `harmony_db_1`.
-- Companion database preserved: `harmony_db_0`.
+- Companion epoch database: old `harmony_db_0` is quarantined immediately
+  before start and Harmony recreates it from genesis.
 - Retained block: `94,978,278`.
 - Retained hash:
   `0xa25d77e72c7f71f2b18847c7f6a9bbed8af42244915bd9175cc247d157b11b9f`.
@@ -100,12 +102,15 @@ What it does:
    use the same Harmony binary.
 8. Renames the existing `harmony_db_1` to
    `harmony_db_1.pre-recovery-<timestamp>`. It is not deleted by default.
-9. Preserves the companion beacon epoch database, `harmony_db_0`.
+9. Keeps `harmony_db_0` in place while preparing, then quarantines it at the
+   first recovered `start` so Harmony rebuilds a fresh beacon epoch chain.
 10. Moves the clean `harmony_db_1` into place and prepares v2026.1.2.
-11. Leaves the selected validator stopped and prints a `READY` line.
+11. Leaves the selected validator stopped after `prepare` and prints a
+    `READY` line.
 
 The script does not modify validator keys, the Harmony config, the original
-Harmony binary, or `harmony_db_0`. It does not run a chain revert.
+Harmony binary, or either database's contents in place. It uses directory
+renames and does not run a chain revert.
 
 Requirements:
 
@@ -182,8 +187,9 @@ Low-space recovery:
 
 Do not use `--discard-old-db` unless the Harmony team instructs you to. It
 permanently deletes only the old `harmony_db_1` and stops Harmony before
-downloading the replacement. It does not delete `harmony_db_0`. The script
-shows the resolved path and requires `y` before deletion.
+downloading the replacement. It does not delete `harmony_db_0`; that
+companion is separately quarantined at `start`. The script shows the
+resolved shard-1 path and requires `y` before deletion.
 
 Manual low-space command, run as the normal validator user from its Harmony
 directory:
@@ -215,7 +221,8 @@ What to expect:
 - The selected validator remains online until the clean database has
   downloaded, except in approved low-space mode.
 - The selected validator is stopped before `harmony_db_1` is replaced.
-- `harmony_db_0` remains in place.
+- `harmony_db_0` remains in place through `prepare`; the updated `start`
+  command quarantines it and requires Harmony to recreate it.
 - The selected validator remains stopped after `prepare`.
 - Each successful service prints its own `READY` line.
 
@@ -232,6 +239,11 @@ STOPPED <reason> <log-id>
 ```
 
 Do not run these until the Harmony team explicitly sends GO.
+
+If this validator reached READY with an earlier shard-1 script, download the
+current branch version before running `start`. It reuses the completed
+database and existing recovery state, then safely quarantines and rebuilds
+`harmony_db_0`.
 
 Manual validator:
 
@@ -274,7 +286,8 @@ After normal `prepare`, the paths are:
 ```text
 <DataDir>/harmony_db_1                         current clean shard-1 DB
 <DataDir>/harmony_db_1.pre-recovery-<timestamp> old shard-1 DB
-<DataDir>/harmony_db_0                         preserved beacon epoch DB
+<DataDir>/harmony_db_0                         old epoch DB before start; rebuilt DB after start
+<DataDir>/harmony_db_0.pre-s1-recovery-<timestamp> quarantined old epoch DB
 <DataDir>/pre-recovery-<timestamp>/            tx journal/sync-cache quarantine
 ```
 
@@ -303,9 +316,12 @@ discovered service/config/database facts and requires the operator to type
 `SHARD1` exactly. Without live RPC identity, the eventual result is
 `READY unknown recovery-92730034-s1-94978278` and must not count toward GO.
 
-Never delete the active `harmony_db_1` or the companion `harmony_db_0`.
-Delete the `pre-recovery-<timestamp>/` quarantine only after the team
-confirms that its transaction journal and sync cache are no longer needed.
+Never delete the active `harmony_db_1`. Do not manually delete
+`harmony_db_0`; use the updated `start` command so the old epoch DB is
+journaled and quarantined safely. If it was already deleted after READY, the
+updated script records that condition and still allows Harmony to rebuild
+it. Delete either quarantine only after the team confirms it is no longer
+needed.
 
 ## 6. STOPPED-reason triage
 
@@ -366,13 +382,20 @@ copy as checksum-verified. The script instead requires:
 4. A SHA-256- and architecture-pinned Harmony binary.
 5. Pre-change RPC proof that the selected service is a mainnet shard-1
    validator, plus its public BLS key set.
-6. Post-start RPC proof of the target hash, absence of the rejected original
-   child, the same shard identity, and BLS-key continuity.
+6. A journaled rename of the old `harmony_db_0` before recovered launch.
+7. Post-start proof that Harmony recreated `harmony_db_0`, plus RPC proof of
+   the target hash, absence of the rejected original child, the same shard
+   identity, and BLS-key continuity.
 
 A same-size content substitution can pass the physical count/size checks.
 The node failing to open the database or failing the post-start semantic
 checks is the remaining detection path. This is the same accepted
 raw-directory limitation as the shard-0 emergency procedure.
+
+The recreated epoch DB must learn only from recovered/trusted shard-0 peers.
+The installer proves recreation, not complete canonical epoch catch-up, so
+do not send GO while unrecovered shard-0 peers can repopulate abandoned epoch
+metadata.
 
 Manual-directory autostart prevention remains an operator responsibility.
 Rootless `/proc` inspection is best effort across other users. Multiple
@@ -385,10 +408,10 @@ Before rollout:
 
 1. Run the smoke suite's manual and systemd groups.
 2. Run `prepare` to READY on a real disposable shard-1 validator copy.
-3. Confirm `harmony_db_0`, keys, config, and the original binary are
-   unchanged.
+3. Confirm keys, config, and the original binary are unchanged.
 4. Reboot and confirm the selected validator remains stopped.
-5. Rehearse `start` only on a disposable copy before production GO.
+5. Rehearse `start` only on a disposable copy before production GO; confirm
+   the old `harmony_db_0` was quarantined and a new one was created.
 
 After GO:
 
@@ -398,5 +421,5 @@ After GO:
   `0xc936581d391b74a620bf6636519834b14a9a2d4e9a5154867c8407f219d8a878`.
 - Several following shard-1 blocks must finalize on the replacement chain.
 - Spot-check RUNNING services against the READY BLS tally.
-- Confirm co-resident shard-0 services and each preserved `harmony_db_0`
-  remain healthy.
+- Confirm co-resident shard-0 services remain healthy and each shard-1
+  validator has a newly rebuilt `harmony_db_0`.
