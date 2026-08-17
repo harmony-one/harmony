@@ -3269,7 +3269,21 @@ func (bc *BlockChainImpl) prepareStakingMetaData(
 					return nil, nil, err
 				}
 			}
-			delegations = append(delegations, selfIndex)
+			// One entry per validator: the index is looked up by validator
+			// address, so a second entry for the same one is not addressable
+			// and only duplicates work already covered by the first.
+			indexed := false
+			if bc.chainConfig.IsStrictStateValidation(block.Epoch()) {
+				for _, d := range delegations {
+					if d.ValidatorAddress == createValidator.ValidatorAddress {
+						indexed = true
+						break
+					}
+				}
+			}
+			if !indexed {
+				delegations = append(delegations, selfIndex)
+			}
 			newDelegations[createValidator.ValidatorAddress] = delegations
 		case staking.DirectiveEditValidator:
 		case staking.DirectiveDelegate:

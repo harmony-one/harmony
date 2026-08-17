@@ -312,6 +312,12 @@ func VerifyAndDelegateFromMsg(
 
 	var delegateeWrapper *staking.ValidatorWrapper
 	if chainConfig.IsRedelegation(epoch) {
+		// Each validator is worked on through a single wrapper. Two index entries
+		// naming the same validator would otherwise each get their own copy of it,
+		// both drawing on the same undelegated tokens, and only the copy written
+		// last would survive - crediting the delegator for tokens that are still
+		// there.
+		seenValidators := map[common.Address]*staking.ValidatorWrapper{}
 		// Check if we can use tokens in undelegation to delegate (redelegate)
 		for i := range delegations {
 			delegationIndex := &delegations[i]
@@ -319,6 +325,13 @@ func VerifyAndDelegateFromMsg(
 			wrapper, err := stateDB.ValidatorWrapper(delegationIndex.ValidatorAddress, false, true)
 			if err != nil {
 				return nil, nil, nil, err
+			}
+			if chainConfig.IsStrictStateValidation(epoch) {
+				if seen, ok := seenValidators[delegationIndex.ValidatorAddress]; ok {
+					wrapper = seen
+				} else {
+					seenValidators[delegationIndex.ValidatorAddress] = wrapper
+				}
 			}
 			if err := checkValidatorWrapperAddressBinding(
 				chainConfig, epoch, delegationIndex.ValidatorAddress, wrapper,
