@@ -1898,3 +1898,56 @@ func TestCheckDuplicateFieldsSkipsScanWithNothingToCompare(t *testing.T) {
 		t.Fatal("expected the scan to run when the skip is not enabled")
 	}
 }
+
+// TestRedelegateWithRepeatedValidatorIndex checks that undelegated tokens are
+// counted once even when the delegation index names the same validator more than
+// once. Each entry would otherwise be resolved against its own copy of the
+// validator, so the same undelegated tokens could fund the delegation twice
+// while only the copy written last survived.
+func TestRedelegateWithRepeatedValidatorIndex(t *testing.T) {
+	newConfig := func(strict bool) *params.ChainConfig {
+		c := &params.ChainConfig{}
+		c.MinDelegation100Epoch = big.NewInt(100)
+		c.RedelegationEpoch = big.NewInt(7)
+		if strict {
+			c.StrictStateValidationEpoch = big.NewInt(0)
+		} else {
+			c.StrictStateValidationEpoch = params.EpochTBD
+		}
+		return c
+	}
+	epoch := big.NewInt(7)
+	index := func(n int) []staking.DelegationIndex {
+		out := []staking.DelegationIndex{}
+		for i := 0; i < n; i++ {
+			out = append(out, staking.DelegationIndex{
+				ValidatorAddress: validatorAddr,
+				Index:            1,
+				BlockNum:         big.NewInt(defaultBlockNumber),
+			})
+		}
+		return out
+	}
+
+	msg := defaultMsgDelegate()
+	_, wantFromBalance, _, err := VerifyAndDelegateFromMsg(
+		makeStateForRedelegate(t), epoch, &msg, index(1), newConfig(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msgDup := defaultMsgDelegate()
+	_, gotFromBalance, _, err := VerifyAndDelegateFromMsg(
+		makeStateForRedelegate(t), epoch, &msgDup, index(2), newConfig(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotFromBalance.Cmp(wantFromBalance) != 0 {
+		t.Errorf(
+			"repeating the index changed the amount taken from balance: got %v want %v",
+			gotFromBalance, wantFromBalance,
+		)
+	}
+}
