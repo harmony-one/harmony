@@ -699,6 +699,8 @@ type ChainConfig struct {
 	//     delegator named in the staking message
 	//   - the duplicate identity and slot key scan over the validator list is
 	//     skipped when the staking message supplies neither of them
+	//   - a reward total is tested for emptiness over its whole value rather
+	//     than over its low 64 bits
 	StrictStateValidationEpoch *big.Int `json:"strict-state-validation-epoch,omitempty"`
 
 	// CrossLinkEpoch is the epoch where beaconchain starts containing
