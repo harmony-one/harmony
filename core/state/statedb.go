@@ -120,6 +120,7 @@ type DB struct {
 
 	// validatorWrapperAddressBind requires wrapper.Address == account on load/store.
 	validatorWrapperAddressBind bool
+	strictStateValidation       bool
 
 	// Journal of state modifications. This is the backbone of
 	// Snapshot and RevertToSnapshot.
@@ -912,15 +913,33 @@ func (db *DB) GetRefund() uint64 {
 // the journal as well as the refunds. Finalise, however, will not push any updates
 // into the tries just yet. Only IntermediateRoot or Commit will do that.
 func (db *DB) Finalise(deleteEmptyObjects bool) {
-	// Commit validator changes in cache to stateObjects
+	// Commit validator changes in cache to stateObjects.
 	// TODO: remove validator cache after commit
+	//
+	// This is a flush of wrappers that were already accepted into the cache, not
+	// a place where new values are proposed, so it encodes them as they stand.
+	// Skipping one here would leave the cache holding a value that reads back as
+	// current while the account it belongs to still holds the previous one.
 	for addr, wrapper := range db.stateValidators {
-		if err := db.UpdateValidatorWrapper(addr, wrapper); err != nil {
-			utils.Logger().Warn().Err(err).
+		if !db.strictStateValidation {
+			if err := db.UpdateValidatorWrapper(addr, wrapper); err != nil {
+				utils.Logger().Warn().Err(err).
+					Str("name", wrapper.Name).
+					Str("addr", addr.String()).
+					Msg("Unable to update the validator wrapper on the finalize")
+			}
+			continue
+		}
+		by, err := rlp.EncodeToBytes(wrapper)
+		if err != nil {
+			utils.Logger().Error().Err(err).
 				Str("name", wrapper.Name).
 				Str("addr", addr.String()).
-				Msg("Unable to update the validator wrapper on the finalize")
+				Msg("Unable to encode the validator wrapper on the finalize")
+			continue
 		}
+		// has revert in-built for the code field
+		db.SetCode(addr, by, true)
 	}
 	addressesToPrefetch := make([][]byte, 0, len(db.journal.dirties))
 	for addr := range db.journal.dirties {
@@ -1282,6 +1301,12 @@ var (
 // SetValidatorWrapperAddressBind enables binding checks for validator wrapper load/store.
 func (db *DB) SetValidatorWrapperAddressBind(enabled bool) {
 	db.validatorWrapperAddressBind = enabled
+}
+
+// SetStrictStateValidation selects how cached validator wrappers are flushed in
+// Finalise. See the flush loop there for what the two modes do.
+func (db *DB) SetStrictStateValidation(enabled bool) {
+	db.strictStateValidation = enabled
 }
 
 // CachedValidatorAddresses returns validator addresses loaded or updated in the
