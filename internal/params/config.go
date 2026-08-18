@@ -44,7 +44,6 @@ var (
 		CrossTxEpoch:                          big.NewInt(28),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(2964),
 		CXReceiptStateRollbackEpoch:           big.NewInt(2964),
-		StrictStateValidationEpoch:            EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(100),
 		ReceiptLogEpoch:                       big.NewInt(101),
 		PreStakingEpoch:                       big.NewInt(185),
@@ -106,6 +105,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(2964),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(2964),
 		BloomEpoch:                            big.NewInt(2964),
+		StrictStateValidationEpoch:            big.NewInt(3003),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -173,7 +173,6 @@ var (
 		RejectDuplicateSlashEvidenceEpoch:     big.NewInt(7385),
 		SlashGroupOrderFixEpoch:               big.NewInt(7385),
 		CXReceiptStateRollbackEpoch:           big.NewInt(7385),
-		StrictStateValidationEpoch:            EpochTBD,
 		ShardStateValidationEpoch:             big.NewInt(7385),
 		SlashBallotSignerFixEpoch:             big.NewInt(7385),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(7385),
@@ -181,6 +180,7 @@ var (
 		CXMerkleProofReplayFixEpoch:           big.NewInt(7385),
 		BLSProofBindEpoch:                     big.NewInt(7420),
 		BloomEpoch:                            big.NewInt(7414),
+		StrictStateValidationEpoch:            big.NewInt(7645),
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -193,7 +193,6 @@ var (
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		CXReceiptStateRollbackEpoch:           EpochTBD,
-		StrictStateValidationEpoch:            EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -254,6 +253,7 @@ var (
 		SlashBallotSignerFixEpoch:             EpochTBD,
 		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 		BloomEpoch:                            EpochTBD,
+		StrictStateValidationEpoch:            EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -324,11 +324,11 @@ var (
 		SlashGroupOrderFixEpoch:               big.NewInt(52050),
 		BLSProofBindEpoch:                     big.NewInt(53508),
 		CXReceiptStateRollbackEpoch:           big.NewInt(52650),
-		StrictStateValidationEpoch:            EpochTBD,
 		ShardStateValidationEpoch:             big.NewInt(52650),
 		SlashBallotSignerFixEpoch:             big.NewInt(52650),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(53000),
 		BloomEpoch:                            big.NewInt(53508),
+		StrictStateValidationEpoch:            big.NewInt(56874),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -342,7 +342,6 @@ var (
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(0),
 		CXReceiptStateRollbackEpoch:           EpochTBD,
-		StrictStateValidationEpoch:            EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(1),
@@ -403,6 +402,7 @@ var (
 		SlashBallotSignerFixEpoch:             EpochTBD,
 		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 		BloomEpoch:                            EpochTBD,
+		StrictStateValidationEpoch:            EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -415,7 +415,6 @@ var (
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(5),
 		CXReceiptStateRollbackEpoch:           big.NewInt(5),
-		StrictStateValidationEpoch:            EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(0),
@@ -477,6 +476,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(5),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(5),
 		BloomEpoch:                            big.NewInt(5),
+		StrictStateValidationEpoch:            big.NewInt(1),
 	}
 
 	// AllProtocolChanges ...
@@ -490,7 +490,6 @@ var (
 		big.NewInt(0),                      // CrossTxEpoch
 		big.NewInt(0),                      // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),                      // CXReceiptStateRollbackEpoch
-		EpochTBD,                           // StrictStateValidationEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
 		big.NewInt(0),                      // RejectShard0CrossLinkEpoch
 		big.NewInt(1),                      // AggregatedRewardEpoch
@@ -553,6 +552,7 @@ var (
 		big.NewInt(1),                      // SlashBallotSignerFixEpoch
 		big.NewInt(1),                      // VerifyBeaconHeaderSlashEpoch
 		big.NewInt(1),                      // BloomEpoch
+		big.NewInt(1),                      // StrictStateValidationEpoch
 	}
 
 	// TestChainConfig ...
@@ -566,7 +566,6 @@ var (
 		big.NewInt(0),        // CrossTxEpoch
 		big.NewInt(0),        // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),        // CXReceiptStateRollbackEpoch
-		EpochTBD,             // StrictStateValidationEpoch
 		big.NewInt(0),        // CrossLinkEpoch
 		big.NewInt(0),        // RejectShard0CrossLinkEpoch
 		big.NewInt(1),        // AggregatedRewardEpoch
@@ -629,6 +628,7 @@ var (
 		big.NewInt(1),        // SlashBallotSignerFixEpoch
 		big.NewInt(1),        // VerifyBeaconHeaderSlashEpoch
 		big.NewInt(1),        // BloomEpoch
+		big.NewInt(1),        // StrictStateValidationEpoch
 	}
 
 	// TestRules ...
@@ -688,23 +688,6 @@ type ChainConfig struct {
 	// CXReceiptStateRollbackEpoch is the epoch where EVM frame reverts also
 	// roll back cross-shard receipts created by the cross-shard precompile.
 	CXReceiptStateRollbackEpoch *big.Int `json:"cx-receipt-state-rollback-epoch,omitempty"`
-
-	// StrictStateValidationEpoch is the epoch where the additional state
-	// transition and block acceptance checks are enabled. It covers checks whose
-	// outcome can differ from the pre-existing behaviour, so they are activated
-	// together at a single epoch rather than immediately on upgrade:
-	//   - incoming cross-shard receipts are verified on the block insert path,
-	//     not only when a block arrives through consensus
-	//   - a delegation resolved through the delegation index must belong to the
-	//     delegator named in the staking message
-	//   - the duplicate identity and slot key scan over the validator list is
-	//     skipped when the staking message supplies neither of them
-	//   - a reward total is tested for emptiness over its whole value rather
-	//     than over its low 64 bits
-	//   - a cross-shard transaction must name a recipient
-	//   - a precompile that spends the balance at its own address may only be
-	//     reached by a plain CALL
-	StrictStateValidationEpoch *big.Int `json:"strict-state-validation-epoch,omitempty"`
 
 	// CrossLinkEpoch is the epoch where beaconchain starts containing
 	// cross-shard links.
@@ -907,6 +890,23 @@ type ChainConfig struct {
 	// have individual activation epochs; each feature is active once the chain
 	// reaches the earlier of BloomEpoch and that feature's epoch.
 	BloomEpoch *big.Int `json:"bloom-epoch,omitempty"`
+
+	// StrictStateValidationEpoch is the epoch where the additional state
+	// transition and block acceptance checks are enabled. It covers checks whose
+	// outcome can differ from the pre-existing behaviour, so they are activated
+	// together at a single epoch rather than immediately on upgrade:
+	//   - incoming cross-shard receipts are verified on the block insert path,
+	//     not only when a block arrives through consensus
+	//   - a delegation resolved through the delegation index must belong to the
+	//     delegator named in the staking message
+	//   - the duplicate identity and slot key scan over the validator list is
+	//     skipped when the staking message supplies neither of them
+	//   - a reward total is tested for emptiness over its whole value rather
+	//     than over its low 64 bits
+	//   - a cross-shard transaction must name a recipient
+	//   - a precompile that spends the balance at its own address may only be
+	//     reached by a plain CALL
+	StrictStateValidationEpoch *big.Int `json:"strict-state-validation-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
