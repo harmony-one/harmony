@@ -304,6 +304,23 @@ func (evm *EVM) restoreCXReceipt(receipt *types.CXReceipt) {
 // They are gathered as a side effect of running the staking precompile and are
 // read after the transaction to index delegations, so a frame that is undone has
 // to take its messages back with it.
+// codeOf returns the code to execute for an address. A validator account keeps
+// its wrapper in the code field, which is not executable code, so it is treated
+// the same way Call and CallCode already treat it: as an account with none.
+func (evm *EVM) codeOf(addr common.Address) []byte {
+	if evm.chainRules.IsStrictStateValidation && evm.Context.IsValidator(evm.StateDB, addr) {
+		return nil
+	}
+	return evm.StateDB.GetCode(addr)
+}
+
+func (evm *EVM) codeHashOf(addr common.Address) common.Hash {
+	if evm.chainRules.IsStrictStateValidation && evm.Context.IsValidator(evm.StateDB, addr) {
+		return emptyCodeHash
+	}
+	return evm.StateDB.GetCodeHash(addr)
+}
+
 func (evm *EVM) snapshotStakeMsgs() int {
 	if !evm.chainRules.IsStrictStateValidation {
 		return -1
@@ -530,7 +547,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 		addrCopy := addr
 		// Initialise a new contract and make initialise the delegate values
 		contract := NewContract(caller, AccountRef(caller.Address()), nil, gas).AsDelegate()
-		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
+		contract.SetCallCode(&addrCopy, evm.codeHashOf(addrCopy), evm.codeOf(addrCopy))
 		ret, err = evmInterpreterRun(evm, contract, input, false)
 		gas = contract.Gas
 	}
@@ -592,7 +609,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
 		contract := NewContract(caller, AccountRef(addrCopy), new(big.Int), gas)
-		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
+		contract.SetCallCode(&addrCopy, evm.codeHashOf(addrCopy), evm.codeOf(addrCopy))
 		// When an error was returned by the EVM or when setting the creation code
 		// above we revert to the snapshot and consume any gas remaining. Additionally
 		// when we're in Homestead this also counts for code storage gas errors.
