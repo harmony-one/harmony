@@ -300,6 +300,24 @@ func (evm *EVM) restoreCXReceipt(receipt *types.CXReceipt) {
 	evm.CXReceipt = receipt
 }
 
+// snapshotStakeMsgs records how many stake messages have been collected so far.
+// They are gathered as a side effect of running the staking precompile and are
+// read after the transaction to index delegations, so a frame that is undone has
+// to take its messages back with it.
+func (evm *EVM) snapshotStakeMsgs() int {
+	if !evm.chainRules.IsStrictStateValidation {
+		return -1
+	}
+	return len(evm.StakeMsgs)
+}
+
+func (evm *EVM) restoreStakeMsgs(mark int) {
+	if mark < 0 || mark > len(evm.StakeMsgs) {
+		return
+	}
+	evm.StakeMsgs = evm.StakeMsgs[:mark]
+}
+
 // Call executes the contract associated with the addr with the given input as
 // parameters. It also handles any necessary value transfer required and takes
 // the necessary steps to create accounts and reverses the state in case of an
@@ -315,6 +333,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 	snapshot := evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 	p, isPrecompile := evm.precompile(addr)
 
 	if !evm.StateDB.Exist(addr) {
@@ -387,6 +406,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -425,6 +445,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	}
 	var snapshot = evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Debug && evm.Config.Tracer != nil {
@@ -467,6 +488,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -486,6 +508,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	}
 	var snapshot = evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Debug && evm.Config.Tracer != nil {
@@ -514,6 +537,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -537,6 +561,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	// We could change this, but for now it's left for legacy reasons
 	var snapshot = evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 
 	// We do an AddBalance of zero here, just in order to trigger a touch.
 	// This doesn't matter on Mainnet, where all empties are gone at the time of Byzantium,
@@ -577,6 +602,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -624,6 +650,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 	evm.StateDB.CreateAccount(address)
 	if evm.chainRules.IsEIP158 {
 		evm.StateDB.SetNonce(address, 1)
@@ -678,6 +705,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if maxCodeSizeExceeded || (err != nil && (evm.chainRules.IsS3 || err != ErrCodeStoreOutOfGas)) {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			contract.UseGas(contract.Gas)
 		}

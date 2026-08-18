@@ -1440,6 +1440,7 @@ type Rules struct {
 	IsPrague                 bool // EIP-2935: Serve historical block hashes from state
 	Is8024                   bool
 	IsCXReceiptStateRollback bool
+	IsStrictStateValidation  bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1480,5 +1481,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsPrague:                   c.IsPrague(epoch),
 		Is8024:                     c.IsEIP8024(epoch),
 		IsCXReceiptStateRollback:   c.IsCXReceiptStateRollback(epoch),
+		IsStrictStateValidation:    c.IsStrictStateValidation(epoch),
 	}
 }
