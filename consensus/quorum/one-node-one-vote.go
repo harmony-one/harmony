@@ -90,7 +90,7 @@ func (v *uniformVoteWeight) IsAllSigsCollected() bool {
 }
 
 func (v *uniformVoteWeight) SetVoters(
-	subCommittee *shard.Committee, epoch *big.Int,
+	subCommittee *shard.Committee, epoch *big.Int, _ bool,
 ) (*TallyResult, error) {
 	// NO-OP do not add anything here
 	return nil, nil

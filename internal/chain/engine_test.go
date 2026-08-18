@@ -511,7 +511,7 @@ func TestVerifySignatureRejectsEmptyPreStakingQuorum(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifier, err := quorum.NewVerifier(committee, big.NewInt(0), false)
+	verifier, err := quorum.NewVerifier(committee, big.NewInt(0), false, false)
 	if err != nil {
 		t.Fatal(err)
 	}

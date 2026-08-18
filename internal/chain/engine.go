@@ -820,7 +820,10 @@ func readEpochCtxFromChain(chain engine.ChainReader, key epochCtxKey) (epochCtx,
 		return epochCtx{}, err
 	}
 	isStaking := chain.Config().IsStaking(epoch)
-	qrVerifier, err := quorum.NewVerifier(shardComm, epoch, isStaking)
+	qrVerifier, err := quorum.NewVerifier(
+		shardComm, epoch, isStaking,
+		chain.Config().IsStrictStateValidation(epoch),
+	)
 	if err != nil {
 		return epochCtx{}, err
 	}

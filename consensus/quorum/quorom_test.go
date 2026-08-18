@@ -259,7 +259,7 @@ func TestAddNewVote(test *testing.T) {
 	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
-	}, big.NewInt(3))
+	}, big.NewInt(3), false)
 
 	aggSig := &bls_core.Sign{}
 	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1], &sKeys[2]} {
@@ -364,7 +364,7 @@ func TestAddNewVoteAggregateSig(test *testing.T) {
 	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
-	}, big.NewInt(3))
+	}, big.NewInt(3), false)
 
 	aggSig := &bls_core.Sign{}
 	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1]} {
@@ -448,7 +448,7 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
-	}, big.NewInt(3))
+	}, big.NewInt(3), false)
 
 	aggSig := &bls_core.Sign{}
 	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1]} {
