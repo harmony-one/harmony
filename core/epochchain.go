@@ -327,8 +327,15 @@ func (bc *EpochChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	return block.Coinbase() == previousHeader.Coinbase()
 }
 
+// GetVMConfig returns the chain VM config. See BlockChainImpl.GetVMConfig for
+// why this is a copy.
 func (bc *EpochChain) GetVMConfig() *vm.Config {
-	return bc.vmConfig
+	if bc.vmConfig == nil {
+		return nil
+	}
+	cfg := *bc.vmConfig
+	cfg.ExtraEips = append([]int(nil), bc.vmConfig.ExtraEips...)
+	return &cfg
 }
 
 func (bc *EpochChain) CommitPreimages() error {
