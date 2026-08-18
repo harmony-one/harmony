@@ -18,9 +18,9 @@ type Verifier interface {
 
 // NewVerifier creates the quorum verifier for the given committee, epoch and whether the scenario
 // is staking.
-func NewVerifier(committee *shard.Committee, epoch *big.Int, isStaking bool) (Verifier, error) {
+func NewVerifier(committee *shard.Committee, epoch *big.Int, isStaking bool, strictVotePower bool) (Verifier, error) {
 	if isStaking {
-		return newStakeVerifier(committee, epoch)
+		return newStakeVerifier(committee, epoch, strictVotePower)
 	}
 	return newUniformVerifier(committee)
 }
@@ -32,8 +32,8 @@ type stakeVerifier struct {
 }
 
 // newStakeVerifier creates a stake verifier from the given committee
-func newStakeVerifier(committee *shard.Committee, epoch *big.Int) (*stakeVerifier, error) {
-	r, err := votepower.Compute(committee, epoch)
+func newStakeVerifier(committee *shard.Committee, epoch *big.Int, strictVotePower bool) (*stakeVerifier, error) {
+	r, err := votepower.Compute(committee, epoch, strictVotePower)
 	if err != nil {
 		return nil, errors.Wrap(err, "compute staking vote-power")
 	}

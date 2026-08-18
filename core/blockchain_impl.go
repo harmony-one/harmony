@@ -2934,7 +2934,10 @@ func UpdateValidatorVotingPower(
 				currentEpochSuperCommittee.Epoch,
 			)
 		}
-		roster, err := votepower.Compute(subCommittee, newEpochSuperCommittee.Epoch)
+		roster, err := votepower.Compute(
+			subCommittee, newEpochSuperCommittee.Epoch,
+			bc.Config().IsStrictStateValidation(newEpochSuperCommittee.Epoch),
+		)
 		if err != nil {
 			return nil, err
 		}
