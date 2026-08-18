@@ -23,6 +23,8 @@ GO. The script automates those steps with checks and a stopped-until-GO hold.
 - Rejected original child: block `92,730,035`,
   `0x5de06979a333f20afb8b245a8cf44472dc5bfc7383a57ddee48e1809bcee7c5d`.
 - Recovery ViewID floor: `1,000,000,000`.
+- Recovery sync policy: stream service/downloader disabled; legacy DNS client
+  forced on against team-controlled recovered peers.
 - Clean database source: `http://snapdb.s0.t.hmny.io/webdav`.
 - Frozen source inventory: `184,510` files and `371,422,947,984` logical
   bytes (about 345.9 GiB).
@@ -95,7 +97,10 @@ What it does:
 7. Renames the existing `harmony_db_0` to
    `harmony_db_0.pre-recovery-<timestamp>`. It is not deleted by default.
 8. Moves the clean database into place and prepares v2026.1.2.
-9. Leaves the selected validator stopped and prints a `READY` line.
+9. At recovered start, disables stream sync and forces the legacy DNS sync
+   client without modifying the validator's config file.
+10. Leaves the selected validator stopped after `prepare` and prints a
+    `READY` line.
 
 The script does not modify validator keys, the Harmony config, or the
 original Harmony binary. It does not run a chain revert.
@@ -210,6 +215,8 @@ What to expect:
   downloaded, except in approved low-space mode.
 - The selected validator is stopped before `harmony_db_0` is replaced.
 - The selected validator remains stopped after `prepare`.
+- The updated `start` command ignores conflicting stream-sync launch flags,
+  disables stream downloaders, and enables the controlled DNS client.
 - Each successful service prints its own `READY` line.
 
 Send the complete final line to the Harmony team:
@@ -225,6 +232,10 @@ STOPPED <reason> <log-id>
 ```
 
 Do not run these until the Harmony team explicitly sends GO.
+
+If this validator reached READY with an earlier script, download the current
+branch version before running `start`. It reuses the completed database and
+recovery state while applying the DNS-only sync policy.
 
 Manual validator:
 
@@ -355,7 +366,10 @@ copy as checksum-verified. The script instead requires:
    valid `CURRENT`.
 4. A SHA-256- and architecture-pinned Harmony binary.
 5. Pre-change local RPC access and a valid public BLS key set.
-6. Post-start RPC proof of the retained height and hash and the same BLS key
+6. An effective launch command containing `--sync=false`,
+   `--sync.client=false`, and `--dns.client=true`, with conflicting current
+   and deprecated sync-client arguments removed.
+7. Post-start RPC proof of the retained height and hash and the same BLS key
    set.
 
 A same-size content substitution can pass the physical count and size checks.
@@ -367,6 +381,11 @@ Rootless `/proc` inspection is best effort across other users. Multiple
 systemd services may use identical Harmony binaries, but they must not share
 config, DataDir, RPC port, or BLS keys.
 
+Controlled DNS limits legacy sync sources; it is not a consensus quorum or a
+complete P2P access-control boundary. Keep DNS pointed only at recovered
+nodes, restrict abandoned peers where practical, and retain the target
+committee voting-power gate for GO.
+
 ## 8. Canary and post-GO checks
 
 Before rollout:
@@ -375,7 +394,8 @@ Before rollout:
 2. Run `prepare` to READY on a real disposable shard-0 validator copy.
 3. Confirm keys, config, and the original binary are unchanged.
 4. Reboot and confirm the selected validator remains stopped.
-5. Rehearse `start` only on a disposable copy before production GO.
+5. Rehearse `start` only on a disposable copy before production GO and
+   confirm its effective command uses DNS-only sync.
 
 After GO:
 

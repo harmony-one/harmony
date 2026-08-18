@@ -27,6 +27,8 @@ stopped-until-GO hold.
 - Rejected original child: block `94,978,279`,
   `0xc936581d391b74a620bf6636519834b14a9a2d4e9a5154867c8407f219d8a878`.
 - Recovery ViewID floor: `1,000,000,000`.
+- Recovery sync policy: stream service/downloader disabled; legacy DNS client
+  forced on against team-controlled recovered peers.
 - Clean database source: `http://fulldb.s1.t.hmny.io/webdav`.
 - Frozen source inventory: `32,482` files and `70,073,877,580` logical
   bytes (about 65.3 GiB).
@@ -105,7 +107,9 @@ What it does:
 9. Keeps `harmony_db_0` in place while preparing, then quarantines it at the
    first recovered `start` so Harmony rebuilds a fresh beacon epoch chain.
 10. Moves the clean `harmony_db_1` into place and prepares v2026.1.2.
-11. Leaves the selected validator stopped after `prepare` and prints a
+11. At recovered start, disables stream sync and forces the legacy DNS sync
+    client without modifying the validator's config file.
+12. Leaves the selected validator stopped after `prepare` and prints a
     `READY` line.
 
 The script does not modify validator keys, the Harmony config, the original
@@ -224,6 +228,8 @@ What to expect:
 - `harmony_db_0` remains in place through `prepare`; the updated `start`
   command quarantines it and requires Harmony to recreate it.
 - The selected validator remains stopped after `prepare`.
+- The updated `start` command ignores conflicting stream-sync launch flags,
+  disables stream downloaders, and enables the controlled DNS client.
 - Each successful service prints its own `READY` line.
 
 Send the complete final line to the Harmony team:
@@ -243,7 +249,7 @@ Do not run these until the Harmony team explicitly sends GO.
 If this validator reached READY with an earlier shard-1 script, download the
 current branch version before running `start`. It reuses the completed
 database and existing recovery state, then safely quarantines and rebuilds
-`harmony_db_0`.
+`harmony_db_0` while applying the DNS-only sync policy.
 
 Manual validator:
 
@@ -383,7 +389,10 @@ copy as checksum-verified. The script instead requires:
 5. Pre-change RPC proof that the selected service is a mainnet shard-1
    validator, plus its public BLS key set.
 6. A journaled rename of the old `harmony_db_0` before recovered launch.
-7. Post-start proof that Harmony recreated `harmony_db_0`, plus RPC proof of
+7. An effective launch command containing `--sync=false`,
+   `--sync.client=false`, and `--dns.client=true`, with conflicting current
+   and deprecated sync-client arguments removed.
+8. Post-start proof that Harmony recreated `harmony_db_0`, plus RPC proof of
    the target hash, absence of the rejected original child, the same shard
    identity, and BLS-key continuity.
 
@@ -393,9 +402,10 @@ checks is the remaining detection path. This is the same accepted
 raw-directory limitation as the shard-0 emergency procedure.
 
 The recreated epoch DB must learn only from recovered/trusted shard-0 peers.
-The installer proves recreation, not complete canonical epoch catch-up, so
-do not send GO while unrecovered shard-0 peers can repopulate abandoned epoch
-metadata.
+The installer forces its downloader onto legacy DNS sync, but DNS is not a
+consensus quorum or a complete P2P access-control boundary. Keep DNS pointed
+only at recovered nodes, restrict abandoned peers where practical, and do
+not send GO while unrecovered peers can repopulate abandoned epoch metadata.
 
 Manual-directory autostart prevention remains an operator responsibility.
 Rootless `/proc` inspection is best effort across other users. Multiple
@@ -411,7 +421,8 @@ Before rollout:
 3. Confirm keys, config, and the original binary are unchanged.
 4. Reboot and confirm the selected validator remains stopped.
 5. Rehearse `start` only on a disposable copy before production GO; confirm
-   the old `harmony_db_0` was quarantined and a new one was created.
+   the old `harmony_db_0` was quarantined, a new one was created, and the
+   effective command uses DNS-only sync.
 
 After GO:
 

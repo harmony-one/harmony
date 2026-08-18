@@ -108,6 +108,8 @@ UNIT_SOURCE=""
 declare -A S=()   # state file key/value store
 declare -a ORIG_ARGS=()
 ORIG_ARGS_TEXT=""
+declare -a RECOVERY_ARGS=()
+RECOVERY_ARGS_TEXT=""
 
 usage_exit() {
   # Usage errors touch nothing and print the one line themselves.
@@ -417,6 +419,42 @@ record_original_args() {
       || die unsupported-layout "original argument is not safely representable: $token"
     ORIG_ARGS_TEXT+="${ORIG_ARGS_TEXT:+ }$token"
   done
+  build_recovery_args
+}
+
+# Recovery nodes may sync only through the team-controlled legacy DNS client.
+# Strip both current and deprecated client selectors from the recorded command
+# before appending one unambiguous fail-closed policy. The validator's config
+# and stored original argv remain untouched for audit/rollback purposes.
+build_recovery_args() {
+  RECOVERY_ARGS=()
+  RECOVERY_ARGS_TEXT=""
+  local i=0 n="${#ORIG_ARGS[@]}" token next
+  while (( i < n )); do
+    token="${ORIG_ARGS[$i]}"
+    case "$token" in
+      --sync|--sync.client|--sync.legacy.client|--dns.client|--dns)
+        next=""
+        (( i + 1 < n )) && next="${ORIG_ARGS[$((i+1))]}"
+        if [[ "$next" == "true" || "$next" == "false" ]]; then
+          i=$((i+2))
+        else
+          i=$((i+1))
+        fi
+        ;;
+      --sync=*|--sync.client=*|--sync.legacy.client=*|--dns.client=*|--dns=*)
+        i=$((i+1))
+        ;;
+      *)
+        RECOVERY_ARGS+=("$token")
+        i=$((i+1))
+        ;;
+    esac
+  done
+  RECOVERY_ARGS+=("--sync=false" "--sync.client=false" "--dns.client=true")
+  for token in "${RECOVERY_ARGS[@]}"; do
+    RECOVERY_ARGS_TEXT+="${RECOVERY_ARGS_TEXT:+ }$token"
+  done
 }
 
 # ---------- duplicate-signer scan (/proc based) ----------
@@ -633,11 +671,12 @@ remove_hold() {
   fi
 }
 
-# The staged binary is the ordinary official v2026.1.2 build. Only the
-# executable path changes; the validated original argument tokens remain in
-# the same order. Health is judged afterwards over loopback RPC.
+# The staged binary is the ordinary official v2026.1.2 build. Original
+# argument order is preserved except for sync selectors: stream sync is
+# removed and disabled, while the controlled legacy DNS client is forced on.
+# Health is judged afterwards over loopback RPC.
 recovery_exec_line() {
-  printf '%s %s' "$BIN" "$ORIG_ARGS_TEXT"
+  printf '%s %s' "$BIN" "$RECOVERY_ARGS_TEXT"
 }
 
 install_exec_dropin() {
@@ -1492,6 +1531,7 @@ latched_manual_requarantine() {
 }
 
 launch_node() {
+  log "recovery sync policy: stream service/client disabled; legacy DNS client enabled"
   if [[ "$LAYOUT" == "systemd" ]]; then
     verify_effective_exec || die receipt-mismatch "effective ExecStart is not the staged recovery command"
     mkdir -p "$SENTINEL_DIR"
@@ -1513,7 +1553,7 @@ launch_node() {
   else
     [[ -d "$RUN_CWD" ]] || die start-failed "recorded cwd $RUN_CWD missing"
     log "launching staged binary as $RUN_USER from $RUN_CWD (rootless=$ROOTLESS)"
-    local nodecmd=(setsid "$BIN" "${ORIG_ARGS[@]}")
+    local nodecmd=(setsid "$BIN" "${RECOVERY_ARGS[@]}")
     (( ROOTLESS )) || nodecmd=(runuser -u "$RUN_USER" -- "${nodecmd[@]}")
     # Close fd3 (caller stdout), fd4 (operator progress), and fd9 (the flock)
     # so the daemon inherits none of them; otherwise callers capturing output
@@ -1580,6 +1620,39 @@ finish_running() {
   emit "RUNNING $BLS_IDS $SUFFIX"
 }
 
+recovery_process_args_ok() { # <pid>: exact staged executable + forced argv
+  local pid="$1" i
+  local argv=()
+  mapfile -d '' -t argv < "/proc/$pid/cmdline" 2>/dev/null || return 1
+  (( ${#argv[@]} == ${#RECOVERY_ARGS[@]} + 1 )) || return 1
+  [[ "${argv[0]}" == "$BIN" ]] || return 1
+  for (( i=0; i<${#RECOVERY_ARGS[@]}; i++ )); do
+    [[ "${argv[$((i+1))]}" == "${RECOVERY_ARGS[$i]}" ]] || return 1
+  done
+}
+
+# Migrate READY/STARTING/STARTED receipts produced by an older script. A
+# systemd drop-in is rewritten only while the unit is proven stopped. A
+# manually launched staged process using the old sync policy is stopped and
+# relaunched by the existing STARTING/STARTED reconciliation path.
+ensure_recovery_launch_policy() {
+  if [[ "$LAYOUT" == "systemd" ]]; then
+    if verify_effective_exec; then return 0; fi
+    if node_is_up; then
+      log "stopping recovery node to install DNS-only sync policy"
+      quarantine_unhealthy_node
+    fi
+    unit_is_stopped \
+      || die stop-failed "unit must be fully stopped before updating recovery sync policy"
+    install_exec_dropin
+    verify_effective_exec \
+      || die receipt-mismatch "cannot install DNS-only recovery command"
+  elif node_is_up && ! recovery_process_args_ok "$LEGIT_PID"; then
+    log "stopping manual recovery node to apply DNS-only sync policy"
+    quarantine_unhealthy_node
+  fi
+}
+
 start_mode() {
   load_state || die not-ready "no state file; run prepare first"
   validate_selected_state
@@ -1611,6 +1684,9 @@ start_mode() {
       latched_manual_requarantine
     fi
     die head-mismatch "latched: block $TARGET_HEIGHT previously reported ${S[HEAD_MISMATCH]}; node stays stopped"
+  fi
+  if (( rank >= 6 )); then
+    ensure_recovery_launch_policy
   fi
   case "${S[STATE]}" in
     READY)
@@ -1795,7 +1871,7 @@ main() {
 
   STAMP="$(date +%Y%m%d-%H%M%S)"
   ORIG_EXE=""; ORIG_EXE_SHA256=""; CONFIG=""; DATADIR=""; BLS_IDS=""; RPC_URL=""
-  ORIG_ARGS=(); ORIG_ARGS_TEXT=""
+  ORIG_ARGS=(); ORIG_ARGS_TEXT=""; RECOVERY_ARGS=(); RECOVERY_ARGS_TEXT=""
   UNIT=""; RUN_USER=""; RUN_CWD=""; ORIG_PID=""; STAGING=""; DID_VERIFY_DB=0
 
   if [[ "$MODE" == "prepare" ]]; then
