@@ -307,8 +307,8 @@ func New(
 		host:         host,
 		msgSender:    NewMessageSender(host),
 		// FBFT timeout
-		consensusTimeout:  createTimeout(),
-		dHelper:           downloadAsync{},
+		consensusTimeout:           createTimeout(),
+		dHelper:                    downloadAsync{},
 		pendingCXReceipts:          make(map[utils.CXKey]*types.CXReceiptsProof), // All the receipts received but not yet processed for Consensus
 		pendingCXReceiptsDeferrals: make(map[utils.CXKey]int),
 	}

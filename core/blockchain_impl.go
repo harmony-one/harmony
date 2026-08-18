@@ -2717,8 +2717,13 @@ func (bc *BlockChainImpl) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	return block.Coinbase() == previousHeader.Coinbase()
 }
 
+// GetVMConfig returns the blockchain VM config. The returned config is a copy:
+// callers that adjust it for their own execution, a tracer for instance, would
+// otherwise be changing the configuration blocks are processed with.
 func (bc *BlockChainImpl) GetVMConfig() *vm.Config {
-	return &bc.vmConfig
+	cfg := bc.vmConfig
+	cfg.ExtraEips = append([]int(nil), bc.vmConfig.ExtraEips...)
+	return &cfg
 }
 
 func (bc *BlockChainImpl) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error) {
