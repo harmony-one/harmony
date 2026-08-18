@@ -415,7 +415,7 @@ var (
 		CrossTxEpoch:                          big.NewInt(0),
 		CXMerkleProofReplayFixEpoch:           big.NewInt(5),
 		CXReceiptStateRollbackEpoch:           big.NewInt(5),
-		StrictStateValidationEpoch:            big.NewInt(0),
+		StrictStateValidationEpoch:            EpochTBD,
 		MinCommissionPromoPeriod:              big.NewInt(10),
 		ReceiptLogEpoch:                       big.NewInt(0),
 		PreStakingEpoch:                       big.NewInt(0),
@@ -490,7 +490,7 @@ var (
 		big.NewInt(0),                      // CrossTxEpoch
 		big.NewInt(0),                      // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),                      // CXReceiptStateRollbackEpoch
-		big.NewInt(0),                      // StrictStateValidationEpoch
+		EpochTBD,                           // StrictStateValidationEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
 		big.NewInt(0),                      // RejectShard0CrossLinkEpoch
 		big.NewInt(1),                      // AggregatedRewardEpoch
@@ -566,7 +566,7 @@ var (
 		big.NewInt(0),        // CrossTxEpoch
 		big.NewInt(0),        // CXMerkleProofReplayFixEpoch
 		big.NewInt(0),        // CXReceiptStateRollbackEpoch
-		big.NewInt(0),        // StrictStateValidationEpoch
+		EpochTBD,             // StrictStateValidationEpoch
 		big.NewInt(0),        // CrossLinkEpoch
 		big.NewInt(0),        // RejectShard0CrossLinkEpoch
 		big.NewInt(1),        // AggregatedRewardEpoch
