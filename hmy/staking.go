@@ -606,7 +606,10 @@ func (hmy *Harmony) GetUndelegationPayouts(
 		}
 		noEarlyUnlock := hmy.IsNoEarlyUnlockEpoch(epoch)
 		for _, delegation := range wrapper.Delegations {
-			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod, noEarlyUnlock, isMaxRate)
+			withdraw := delegation.RemoveUnlockedUndelegations(
+				epoch, wrapper.LastEpochInCommittee, lockingPeriod, noEarlyUnlock,
+				isMaxRate, hmy.BlockChain.Config().IsStrictStateValidation(epoch),
+			)
 			if withdraw.Cmp(bigZero) == 1 {
 				undelegationPayouts.SetPayoutByDelegatorAddrAndValidatorAddr(validator, delegation.DelegatorAddress, withdraw)
 			}

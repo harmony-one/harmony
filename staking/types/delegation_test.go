@@ -75,7 +75,7 @@ func TestUnlockedLastEpochInCommittee(t *testing.T) {
 	amount4 := big.NewInt(4000)
 	delegation.Undelegate(epoch4, amount4)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false, false)
 	if result.Cmp(big.NewInt(8000)) != 0 {
 		t.Errorf("removing an unlocked undelegation fails")
 	}
@@ -90,7 +90,7 @@ func TestUnlockedLastEpochInCommitteeFail(t *testing.T) {
 	amount4 := big.NewInt(4000)
 	delegation.Undelegate(epoch4, amount4)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("premature delegation shouldn't be unlocked")
 	}
@@ -104,7 +104,7 @@ func TestUnlockedFullPeriod(t *testing.T) {
 	amount5 := big.NewInt(4000)
 	delegation.Undelegate(epoch5, amount5)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false, false)
 	if result.Cmp(big.NewInt(4000)) != 0 {
 		t.Errorf("removing an unlocked undelegation fails")
 	}
@@ -118,7 +118,7 @@ func TestQuickUnlock(t *testing.T) {
 	amount7 := big.NewInt(4000)
 	delegation.Undelegate(epoch7, amount7)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 0, false, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 0, false, false, false)
 	if result.Cmp(big.NewInt(4000)) != 0 {
 		t.Errorf("removing an unlocked undelegation fails")
 	}
@@ -133,7 +133,7 @@ func TestUnlockedFullPeriodFail(t *testing.T) {
 	amount5 := big.NewInt(4000)
 	delegation.Undelegate(epoch5, amount5)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("premature delegation shouldn't be unlocked")
 	}
@@ -147,7 +147,7 @@ func TestUnlockedPremature(t *testing.T) {
 	amount6 := big.NewInt(4000)
 	delegation.Undelegate(epoch6, amount6)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false, false, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("premature delegation shouldn't be unlocked")
 	}
@@ -161,7 +161,7 @@ func TestNoEarlyUnlock(t *testing.T) {
 	amount4 := big.NewInt(4000)
 	delegation.Undelegate(epoch4, amount4)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("should not allow early unlock")
 	}
@@ -177,7 +177,7 @@ func TestMaxRateAtLess(t *testing.T) {
 	delegation.Undelegate(epoch, amount)
 	initialLength := len(delegation.Undelegations)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, true)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, true, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("should not allow unlock before 7")
 	}
@@ -197,7 +197,7 @@ func TestMaxRateAtEqual(t *testing.T) {
 	delegation.Undelegate(epoch, amount)
 	initialLength := len(delegation.Undelegations)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, true)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, true, false)
 	if result.Cmp(big.NewInt(4000)) != 0 {
 		t.Errorf("should withdraw at 7")
 	}
@@ -217,7 +217,7 @@ func TestMaxRateAtExcess(t *testing.T) {
 	delegation.Undelegate(epoch, amount)
 	initialLength := len(delegation.Undelegations)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, true)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, true, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("should not withdraw at 8")
 	}
@@ -237,7 +237,7 @@ func TestNoMaxRateAtLess(t *testing.T) {
 	delegation.Undelegate(epoch, amount)
 	initialLength := len(delegation.Undelegations)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false, false)
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("should not allow unlock before 7")
 	}
@@ -257,7 +257,7 @@ func TestNoMaxRateAtEqual(t *testing.T) {
 	delegation.Undelegate(epoch, amount)
 	initialLength := len(delegation.Undelegations)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false, false)
 	if result.Cmp(big.NewInt(4000)) != 0 {
 		t.Errorf("should withdraw at 7")
 	}
@@ -277,12 +277,48 @@ func TestNoMaxRateAtExcess(t *testing.T) {
 	delegation.Undelegate(epoch, amount)
 	initialLength := len(delegation.Undelegations)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true, false, false)
 	if result.Cmp(big.NewInt(4000)) != 0 {
 		t.Errorf("should withdraw at 8")
 	}
 	finalLength := len(delegation.Undelegations)
 	if initialLength == finalLength {
 		t.Errorf("should remove undelegations at 8")
+	}
+}
+
+// TestRemoveUnlockedUndelegationsPaysOutEverythingRemoved checks that any entry
+// dropped from the undelegation list is included in the amount withdrawn, so no
+// tokens are removed from the list without being handed back.
+func TestRemoveUnlockedUndelegationsPaysOutEverythingRemoved(t *testing.T) {
+	// lockPeriod 0 with isMaxRate makes every past entry qualify as "unlocked for
+	// longer than the lock period", which is the case that used to drop silently.
+	mk := func() *Delegation {
+		d := NewDelegation(common.Address{0x01}, big.NewInt(0))
+		d.Undelegations = Undelegations{
+			{Amount: big.NewInt(100), Epoch: big.NewInt(1)},
+			{Amount: big.NewInt(250), Epoch: big.NewInt(2)},
+		}
+		return &d
+	}
+
+	withRelease := mk()
+	got := withRelease.RemoveUnlockedUndelegations(
+		big.NewInt(10), big.NewInt(0), 0, true, true, true,
+	)
+	if len(withRelease.Undelegations) != 0 {
+		t.Fatalf("expected all entries to be removed, %d left", len(withRelease.Undelegations))
+	}
+	if got.Cmp(big.NewInt(350)) != 0 {
+		t.Errorf("removed entries were not fully paid out: got %v want 350", got)
+	}
+
+	// Pre-fork behaviour is left as it was.
+	legacy := mk()
+	old := legacy.RemoveUnlockedUndelegations(
+		big.NewInt(10), big.NewInt(0), 0, true, true, false,
+	)
+	if old.Sign() != 0 {
+		t.Errorf("pre-fork behaviour changed: got %v", old)
 	}
 }

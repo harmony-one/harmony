@@ -424,6 +424,7 @@ func payoutUndelegations(
 		return errors.New(msg)
 	}
 	isMaxRate := chain.Config().IsMaxRate(newShardState.Epoch)
+	releaseAllUnlocked := chain.Config().IsStrictStateValidation(header.Epoch())
 	for _, validator := range validators {
 		wrapper, err := state.ValidatorWrapper(validator, true, false)
 		if err != nil {
@@ -434,7 +435,8 @@ func payoutUndelegations(
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
-				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock, isMaxRate,
+				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock,
+				isMaxRate, releaseAllUnlocked,
 			)
 			if totalWithdraw.Sign() != 0 {
 				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)

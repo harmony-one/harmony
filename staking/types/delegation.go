@@ -174,8 +174,13 @@ func (d *Delegation) DeleteEntry(epoch *big.Int) {
 
 // RemoveUnlockedUndelegations removes all fully unlocked
 // undelegations and returns the total sum
+// releaseAllUnlocked pays out every entry that is removed. Without it an entry
+// that has been unlocked for longer than the lock period under isMaxRate is
+// dropped from the list without being added to the withdrawal, which takes the
+// tokens out of circulation without crediting anyone.
 func (d *Delegation) RemoveUnlockedUndelegations(
-	curEpoch, lastEpochInCommittee *big.Int, lockPeriod int, noEarlyUnlock bool, isMaxRate bool,
+	curEpoch, lastEpochInCommittee *big.Int, lockPeriod int, noEarlyUnlock bool,
+	isMaxRate bool, releaseAllUnlocked bool,
 ) *big.Int {
 	totalWithdraw := big.NewInt(0)
 	count := 0
@@ -187,7 +192,7 @@ func (d *Delegation) RemoveUnlockedUndelegations(
 		earlyUnlockPeriodApplies := big.NewInt(0).Sub(curEpoch, lastEpochInCommittee).Int64() >= int64(lockPeriod) && !noEarlyUnlock
 		maxRateApplies := isMaxRate && epochsSinceUndelegation > int64(lockPeriod)
 		if lockPeriodApplies || earlyUnlockPeriodApplies {
-			if !maxRateApplies {
+			if releaseAllUnlocked || !maxRateApplies {
 				totalWithdraw.Add(totalWithdraw, d.Undelegations[j].Amount)
 			}
 			count++
