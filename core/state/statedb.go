@@ -1534,6 +1534,13 @@ func (db *DB) AddReward(
 		}
 
 		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
+		// Shares are rounded individually and can add up to slightly more than
+		// the pool they are shares of, so each payout is limited to what is
+		// actually left. Anything still unclaimed afterwards goes to the
+		// validator below.
+		if db.strictStateValidation && rewardInt.Cmp(rewardPool) > 0 {
+			rewardInt = new(big.Int).Set(rewardPool)
+		}
 		curDelegation := curValidator.Delegations[i]
 		curDelegation.Reward.Add(curDelegation.Reward, rewardInt)
 		rewardPool.Sub(rewardPool, rewardInt)
