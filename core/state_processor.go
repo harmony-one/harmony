@@ -135,6 +135,9 @@ func (p *StateProcessor) Process(
 	statedb.SetValidatorWrapperAddressBind(
 		p.bc.Config().IsValidatorWrapperAddressBind(header.Epoch()),
 	)
+	statedb.SetStrictStateValidation(
+		p.bc.Config().IsStrictStateValidation(header.Epoch()),
+	)
 
 	if p.bc.Config().IsPrague(block.Epoch()) {
 		// This should not underflow as genesis block is not processed.

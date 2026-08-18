@@ -121,6 +121,7 @@ type DB struct {
 
 	// validatorWrapperAddressBind requires wrapper.Address == account on load/store.
 	validatorWrapperAddressBind bool
+	strictStateValidation       bool
 
 	// Journal of state modifications. This is the backbone of
 	// Snapshot and RevertToSnapshot.
@@ -930,6 +931,25 @@ func (db *DB) Finalise(deleteEmptyObjects bool) {
 		if !ok || wrapper == nil {
 			continue
 		}
+		if db.strictStateValidation {
+			// This is a flush of wrappers that were already accepted into the
+			// cache, not a place where new values are proposed, so it encodes
+			// them as they stand. Skipping one here would leave the cache
+			// holding a value that reads back as current while the account it
+			// belongs to still holds the previous one.
+			by, err := rlp.EncodeToBytes(wrapper)
+			if err != nil {
+				utils.Logger().Error().Err(err).
+					Str("name", wrapper.Name).
+					Str("addr", addr.String()).
+					Msg("Unable to encode the validator wrapper on the finalize")
+				remainingDirty[addr] = struct{}{}
+				continue
+			}
+			// has revert in-built for the code field
+			db.SetCode(addr, by, true)
+			continue
+		}
 		if err := db.UpdateValidatorWrapper(addr, wrapper); err != nil {
 			utils.Logger().Warn().Err(err).
 				Str("name", wrapper.Name).
@@ -1299,6 +1319,12 @@ var (
 // SetValidatorWrapperAddressBind enables binding checks for validator wrapper load/store.
 func (db *DB) SetValidatorWrapperAddressBind(enabled bool) {
 	db.validatorWrapperAddressBind = enabled
+}
+
+// SetStrictStateValidation selects how cached validator wrappers are flushed in
+// Finalise. See the flush loop there for what the two modes do.
+func (db *DB) SetStrictStateValidation(enabled bool) {
+	db.strictStateValidation = enabled
 }
 
 // CachedValidatorAddresses returns validator addresses loaded or updated in the
