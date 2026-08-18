@@ -194,8 +194,14 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 		// Real Staker
 		if e := staked[i].EffectiveStake; e != nil {
 			member.EffectiveStake = member.EffectiveStake.Add(*e)
-			member.GroupPercent = e.Quo(roster.TotalEffectiveStake)
-			member.OverallPercent = member.GroupPercent.Mul(externalPercent)
+			// A share of the staked total is only defined when there is a total to
+			// take a share of. Without one every staked member is left at zero and
+			// the sum check below reports that the voting power does not add up,
+			// rather than this being resolved here.
+			if !roster.TotalEffectiveStake.IsZero() {
+				member.GroupPercent = e.Quo(roster.TotalEffectiveStake)
+				member.OverallPercent = member.GroupPercent.Mul(externalPercent)
+			}
 			theirPercentage = theirPercentage.Add(member.OverallPercent)
 			lastStakedVoter = &member
 		} else { // Our node
