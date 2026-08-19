@@ -50,7 +50,7 @@ func TestSlashWithNoExternalStake(t *testing.T) {
 	require.NotPanics(t, func() {
 		err = delegatorSlashApply(
 			snapshot, current, statedb, common.BytesToAddress([]byte{0x09}),
-			big.NewInt(1), track, true,
+			big.NewInt(1), track, true, true,
 		)
 	})
 	require.NoError(t, err)
