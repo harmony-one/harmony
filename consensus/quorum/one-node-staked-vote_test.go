@@ -75,7 +75,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	tally, err := decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
-	}, big.NewInt(3))
+	}, big.NewInt(3), false)
 	if err != nil {
 		panic("Unable to SetVoters for Base Case")
 	}
@@ -104,7 +104,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	tally, err := decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
-	}, big.NewInt(3))
+	}, big.NewInt(3), false)
 	if err != nil {
 		panic("Unable to SetVoters for Edge Case")
 	}

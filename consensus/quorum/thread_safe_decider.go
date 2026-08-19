@@ -122,10 +122,10 @@ func (a threadSafeDeciderImpl) AggregateVotes(p Phase) *bls_core.Sign {
 	return a.decider.AggregateVotes(p)
 }
 
-func (a threadSafeDeciderImpl) SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error) {
+func (a threadSafeDeciderImpl) SetVoters(subCommittee *shard.Committee, epoch *big.Int, strictVotePower bool) (*TallyResult, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.decider.SetVoters(subCommittee, epoch)
+	return a.decider.SetVoters(subCommittee, epoch, strictVotePower)
 }
 
 func (a threadSafeDeciderImpl) Policy() Policy {

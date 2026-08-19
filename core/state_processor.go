@@ -135,6 +135,9 @@ func (p *StateProcessor) Process(
 	statedb.SetValidatorWrapperAddressBind(
 		p.bc.Config().IsValidatorWrapperAddressBind(header.Epoch()),
 	)
+	statedb.SetStrictStateValidation(
+		p.bc.Config().IsStrictStateValidation(header.Epoch()),
+	)
 
 	if p.bc.Config().IsPrague(block.Epoch()) {
 		// This should not underflow as genesis block is not processed.
@@ -287,6 +290,13 @@ func getTransactionType(
 	if tx.ShardID() != tx.ToShardID() &&
 		header.ShardID() == tx.ShardID() &&
 		tx.ToShardID() < numShards {
+		// A cross-shard transfer is completed by crediting the recipient on the
+		// destination shard, so it needs a recipient to name. Contract creation
+		// has none, and the receipt it would produce carries an address the
+		// destination cannot read back.
+		if config.IsStrictStateValidation(header.Epoch()) && tx.To() == nil {
+			return types.InvalidTx
+		}
 		return types.SubtractionOnly
 	}
 	return types.InvalidTx
@@ -582,9 +592,16 @@ func MayBalanceMigration(
 				// so i will just generate one cross shard transaction
 				// in each block of the epoch. this epoch is defined by
 				// nxtShards = 2 and curShards = 4
-				parentRoot := chain.GetBlockByHash(
-					header.ParentHash(),
-				).Root() // for examining MPT at this root, should exist
+				// The MPT is examined at the parent's root, so the parent block
+				// has to be resolvable before that root can be read.
+				parent := chain.GetBlockByHash(header.ParentHash())
+				if parent == nil {
+					return nil, errors.Errorf(
+						"migration parent block %s not found",
+						header.ParentHash().Hex(),
+					)
+				}
+				parentRoot := parent.Root()
 				cx, err := generateOneMigrationMessage(
 					db, parentRoot,
 					header.NumberU64(),
@@ -611,10 +628,16 @@ func MayBalanceMigration(
 	if isDevnet || isLocalnet || isTestnet {
 		if config.IsOneEpochBeforeHIP30(header.Epoch()) {
 			if myShard := chain.ShardID(); myShard != shard.BeaconChainShardID {
-				parentRoot := chain.GetBlockByHash(
-					header.ParentHash(),
-				).Root() // for examining MPT at this root, should exist
-				// for examining MPT at this root, should exist
+				// The MPT is examined at the parent's root, so the parent block
+				// has to be resolvable before that root can be read.
+				parent := chain.GetBlockByHash(header.ParentHash())
+				if parent == nil {
+					return nil, errors.Errorf(
+						"migration parent block %s not found",
+						header.ParentHash().Hex(),
+					)
+				}
+				parentRoot := parent.Root()
 				cx, err := generateOneMigrationMessage(
 					db, parentRoot,
 					header.NumberU64(),

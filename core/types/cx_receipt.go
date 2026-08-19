@@ -155,7 +155,7 @@ func (cxp *CXReceiptsProof) Copy() *CXReceiptsProof {
 		MerkleProof:  cxp.MerkleProof.Copy(),
 		Header:       CopyHeader(cxp.Header),
 		CommitSig:    append(cxp.CommitSig[:0:0], cxp.CommitSig...),
-		CommitBitmap: append(cxp.CommitBitmap[:0:0], cxp.CommitSig...),
+		CommitBitmap: append(cxp.CommitBitmap[:0:0], cxp.CommitBitmap...),
 	}
 }
 
@@ -217,8 +217,10 @@ func (cxp *CXReceiptsProof) GetToShardID() (uint32, error) {
 
 // ContainsEmptyField checks whether the given CXReceiptsProof contains empty field
 func (cxp *CXReceiptsProof) ContainsEmptyField() bool {
-	anyNil := cxp == nil ||
-		cxp.Receipts == nil ||
+	if cxp == nil {
+		return true
+	}
+	anyNil := cxp.Receipts == nil ||
 		cxp.MerkleProof == nil ||
 		cxp.Header == nil
 	anyZero := len(cxp.CommitSig)+len(cxp.CommitBitmap) == 0

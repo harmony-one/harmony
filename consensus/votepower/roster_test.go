@@ -104,7 +104,7 @@ func TestCompute(t *testing.T) {
 
 	computedRoster, err := Compute(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
-	}, big.NewInt(3))
+	}, big.NewInt(3), false)
 	if err != nil {
 		t.Error("Computed Roster failed on vote summation to one")
 	}

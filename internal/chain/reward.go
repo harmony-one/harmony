@@ -77,16 +77,16 @@ var (
 )
 
 func lookupVotingPower(
-	epoch *big.Int, subComm *shard.Committee,
+	epoch *big.Int, subComm *shard.Committee, strictVotePower bool,
 ) (*votepower.Roster, error) {
 	// Look up
-	key := fmt.Sprintf("%s-%d", epoch.String(), subComm.ShardID)
+	key := fmt.Sprintf("%s-%d-%t", epoch.String(), subComm.ShardID, strictVotePower)
 	if b, ok := votingPowerCache.Get(key); ok {
 		return b.(*votepower.Roster), nil
 	}
 
 	// If not found, construct
-	votingPower, err := votepower.Compute(subComm, epoch)
+	votingPower, err := votepower.Compute(subComm, epoch, strictVotePower)
 	if err != nil {
 		return nil, err
 	}
@@ -325,11 +325,9 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	startTime := time.Now()
 	// loop through [0...63] position in the modulus index of the 64 blocks
 	// Note the current block is at position 63 of the modulus.
+	// This runs only at the last block of a reward window, so curBlockNum is at
+	// least RewardFrequency-1 and the start of the range stays within the chain.
 	for i := curBlockNum - shard.Schedule.RewardFrequency() + 1; i <= curBlockNum; i++ {
-		if i < 0 {
-			continue
-		}
-
 		var curHeader *block.Header
 		if i == curBlockNum {
 			// When it's the current block (63th), we should use the provided header since it's not written in db yet.
@@ -541,7 +539,7 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 		return numeric.ZeroDec(), network.EmptyPayout, err
 	}
 	votingPower, err := lookupVotingPower(
-		parentE, &subComm,
+		parentE, &subComm, bc.Config().IsStrictStateValidation(parentE),
 	)
 	if err != nil {
 		return numeric.ZeroDec(), network.EmptyPayout, err
@@ -628,7 +626,7 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 
 	startTimeLocal = time.Now()
 	votingPower, err := lookupVotingPower(
-		epoch, subComm,
+		epoch, subComm, bc.Config().IsStrictStateValidation(epoch),
 	)
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (lookupVotingPower)")
 

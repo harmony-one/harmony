@@ -459,6 +459,13 @@ func VerifyIncomingReceipts(blockchain BlockChain, block *types.Block) error {
 	m := make(map[common.Hash]struct{})
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
+		// The spent lookup and the duplicate key below are both derived from the
+		// merkle proof and the header, so a proof is only usable here once those
+		// fields are present.
+		if cxp == nil || cxp.MerkleProof == nil || cxp.MerkleProof.BlockNum == nil ||
+			cxp.Header == nil {
+			return errors.New("[verifyIncomingReceipts] incomplete CXReceiptsProof")
+		}
 		// double spent
 		if blockchain.IsSpent(cxp) {
 			return errDoubleSpent
@@ -1876,6 +1883,24 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			return i, events, coalescedLogs, err
 		}
 
+		// Incoming cross-shard receipts credit balances during Process, and what
+		// makes them legitimate lives outside this block: the source shard's
+		// signed header, the merkle proof binding the receipts to it, and the
+		// spent markers recording which proofs this shard has already applied.
+		// None of that is covered by the header or state root checks, so the
+		// proofs are verified here before the block is processed. The markers for
+		// this block are only written later, in WriteBlockWithState.
+		//
+		// Blocks arriving through consensus are already checked in
+		// ValidateNewBlock; this covers the remaining paths into the chain, and is
+		// epoch gated because it decides block acceptance.
+		if bc.chainConfig.IsStrictStateValidation(block.Epoch()) {
+			if err := VerifyIncomingReceipts(bc, block); err != nil {
+				bc.reportBlock(block, nil, err)
+				return i, events, coalescedLogs, err
+			}
+		}
+
 		// Create a new statedb using the parent block and report an
 		// error if it fails.
 		var parent *types.Block
@@ -2692,8 +2717,13 @@ func (bc *BlockChainImpl) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	return block.Coinbase() == previousHeader.Coinbase()
 }
 
+// GetVMConfig returns the blockchain VM config. The returned config is a copy:
+// callers that adjust it for their own execution, a tracer for instance, would
+// otherwise be changing the configuration blocks are processed with.
 func (bc *BlockChainImpl) GetVMConfig() *vm.Config {
-	return &bc.vmConfig
+	cfg := bc.vmConfig
+	cfg.ExtraEips = append([]int(nil), bc.vmConfig.ExtraEips...)
+	return &cfg
 }
 
 func (bc *BlockChainImpl) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error) {
@@ -2909,7 +2939,10 @@ func UpdateValidatorVotingPower(
 				currentEpochSuperCommittee.Epoch,
 			)
 		}
-		roster, err := votepower.Compute(subCommittee, newEpochSuperCommittee.Epoch)
+		roster, err := votepower.Compute(
+			subCommittee, newEpochSuperCommittee.Epoch,
+			bc.Config().IsStrictStateValidation(newEpochSuperCommittee.Epoch),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -3244,7 +3277,21 @@ func (bc *BlockChainImpl) prepareStakingMetaData(
 					return nil, nil, err
 				}
 			}
-			delegations = append(delegations, selfIndex)
+			// One entry per validator: the index is looked up by validator
+			// address, so a second entry for the same one is not addressable
+			// and only duplicates work already covered by the first.
+			indexed := false
+			if bc.chainConfig.IsStrictStateValidation(block.Epoch()) {
+				for _, d := range delegations {
+					if d.ValidatorAddress == createValidator.ValidatorAddress {
+						indexed = true
+						break
+					}
+				}
+			}
+			if !indexed {
+				delegations = append(delegations, selfIndex)
+			}
 			newDelegations[createValidator.ValidatorAddress] = delegations
 		case staking.DirectiveEditValidator:
 		case staking.DirectiveDelegate:

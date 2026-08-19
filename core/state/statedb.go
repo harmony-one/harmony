@@ -120,6 +120,7 @@ type DB struct {
 
 	// validatorWrapperAddressBind requires wrapper.Address == account on load/store.
 	validatorWrapperAddressBind bool
+	strictStateValidation       bool
 
 	// Journal of state modifications. This is the backbone of
 	// Snapshot and RevertToSnapshot.
@@ -912,15 +913,33 @@ func (db *DB) GetRefund() uint64 {
 // the journal as well as the refunds. Finalise, however, will not push any updates
 // into the tries just yet. Only IntermediateRoot or Commit will do that.
 func (db *DB) Finalise(deleteEmptyObjects bool) {
-	// Commit validator changes in cache to stateObjects
+	// Commit validator changes in cache to stateObjects.
 	// TODO: remove validator cache after commit
+	//
+	// This is a flush of wrappers that were already accepted into the cache, not
+	// a place where new values are proposed, so it encodes them as they stand.
+	// Skipping one here would leave the cache holding a value that reads back as
+	// current while the account it belongs to still holds the previous one.
 	for addr, wrapper := range db.stateValidators {
-		if err := db.UpdateValidatorWrapper(addr, wrapper); err != nil {
-			utils.Logger().Warn().Err(err).
+		if !db.strictStateValidation {
+			if err := db.UpdateValidatorWrapper(addr, wrapper); err != nil {
+				utils.Logger().Warn().Err(err).
+					Str("name", wrapper.Name).
+					Str("addr", addr.String()).
+					Msg("Unable to update the validator wrapper on the finalize")
+			}
+			continue
+		}
+		by, err := rlp.EncodeToBytes(wrapper)
+		if err != nil {
+			utils.Logger().Error().Err(err).
 				Str("name", wrapper.Name).
 				Str("addr", addr.String()).
-				Msg("Unable to update the validator wrapper on the finalize")
+				Msg("Unable to encode the validator wrapper on the finalize")
+			continue
 		}
+		// has revert in-built for the code field
+		db.SetCode(addr, by, true)
 	}
 	addressesToPrefetch := make([][]byte, 0, len(db.journal.dirties))
 	for addr := range db.journal.dirties {
@@ -1284,6 +1303,12 @@ func (db *DB) SetValidatorWrapperAddressBind(enabled bool) {
 	db.validatorWrapperAddressBind = enabled
 }
 
+// SetStrictStateValidation selects how cached validator wrappers are flushed in
+// Finalise. See the flush loop there for what the two modes do.
+func (db *DB) SetStrictStateValidation(enabled bool) {
+	db.strictStateValidation = enabled
+}
+
 // CachedValidatorAddresses returns validator addresses loaded or updated in the
 // current state transition. Used to detect duplicate BLS keys among validators
 // created earlier in the same block.
@@ -1468,6 +1493,24 @@ func (db *DB) AddReward(
 		return nil
 	}
 
+	// Rewards are distributed by position: the snapshot is taken at the start of
+	// the epoch and delegations are only ever appended, so index i refers to the
+	// same delegator in both lists. Distribution is driven by the snapshot, so the
+	// current list is the one that can run short, and index 0 is relied on below
+	// as the validator's own self delegation.
+	if len(curValidator.Delegations) == 0 {
+		return errors.Errorf(
+			"validator %s has no delegations to reward", snapshot.Address.Hex(),
+		)
+	}
+	if len(curValidator.Delegations) < len(snapshot.Delegations) {
+		return errors.Errorf(
+			"validator %s has %d delegations, fewer than the %d in its snapshot",
+			snapshot.Address.Hex(),
+			len(curValidator.Delegations), len(snapshot.Delegations),
+		)
+	}
+
 	rewardPool := big.NewInt(0).Set(reward)
 	curValidator.BlockReward.Add(curValidator.BlockReward, reward)
 	// Payout commission
@@ -1491,6 +1534,13 @@ func (db *DB) AddReward(
 		}
 
 		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
+		// Shares are rounded individually and can add up to slightly more than
+		// the pool they are shares of, so each payout is limited to what is
+		// actually left. Anything still unclaimed afterwards goes to the
+		// validator below.
+		if db.strictStateValidation && rewardInt.Cmp(rewardPool) > 0 {
+			rewardInt = new(big.Int).Set(rewardPool)
+		}
 		curDelegation := curValidator.Delegations[i]
 		curDelegation.Reward.Add(curDelegation.Reward, rewardInt)
 		rewardPool.Sub(rewardPool, rewardInt)

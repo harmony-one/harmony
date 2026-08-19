@@ -283,6 +283,17 @@ func (evm *EVM) SetTxContext(txCtx TxContext) {
 	evm.TxContext = txCtx
 }
 
+// transferType returns the kind of transfer to perform for the frame being
+// entered. Only the transaction's own transfer can move value to another shard;
+// calls made while it executes are ordinary transfers on this shard, so they
+// credit their recipient as usual.
+func (evm *EVM) transferType() types.TransactionType {
+	if evm.chainRules.IsStrictStateValidation && evm.depth > 0 {
+		return types.SameShardTx
+	}
+	return evm.Context.TxType
+}
+
 func (evm *EVM) snapshotCXReceipt() *types.CXReceipt {
 	if !evm.chainRules.IsCXReceiptStateRollback {
 		return nil
@@ -300,6 +311,41 @@ func (evm *EVM) restoreCXReceipt(receipt *types.CXReceipt) {
 	evm.CXReceipt = receipt
 }
 
+// snapshotStakeMsgs records how many stake messages have been collected so far.
+// They are gathered as a side effect of running the staking precompile and are
+// read after the transaction to index delegations, so a frame that is undone has
+// to take its messages back with it.
+// codeOf returns the code to execute for an address. A validator account keeps
+// its wrapper in the code field, which is not executable code, so it is treated
+// the same way Call and CallCode already treat it: as an account with none.
+func (evm *EVM) codeOf(addr common.Address) []byte {
+	if evm.chainRules.IsStrictStateValidation && evm.Context.IsValidator(evm.StateDB, addr) {
+		return nil
+	}
+	return evm.StateDB.GetCode(addr)
+}
+
+func (evm *EVM) codeHashOf(addr common.Address) common.Hash {
+	if evm.chainRules.IsStrictStateValidation && evm.Context.IsValidator(evm.StateDB, addr) {
+		return emptyCodeHash
+	}
+	return evm.StateDB.GetCodeHash(addr)
+}
+
+func (evm *EVM) snapshotStakeMsgs() int {
+	if !evm.chainRules.IsStrictStateValidation {
+		return -1
+	}
+	return len(evm.StakeMsgs)
+}
+
+func (evm *EVM) restoreStakeMsgs(mark int) {
+	if mark < 0 || mark > len(evm.StakeMsgs) {
+		return
+	}
+	evm.StakeMsgs = evm.StakeMsgs[:mark]
+}
+
 // Call executes the contract associated with the addr with the given input as
 // parameters. It also handles any necessary value transfer required and takes
 // the necessary steps to create accounts and reverses the state in case of an
@@ -315,6 +361,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 	snapshot := evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 	p, isPrecompile := evm.precompile(addr)
 
 	if !evm.StateDB.Exist(addr) {
@@ -333,7 +380,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		}
 		evm.StateDB.CreateAccount(addr)
 	}
-	evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value, evm.Context.TxType)
+	evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value, evm.transferType())
 
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Debug && evm.Config.Tracer != nil {
@@ -371,7 +418,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 		contract.SetCallCode(&addrCopy, codeHash, code)
 
-		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false, true)
 	} else {
 		addrCopy := addr
 		// If the account has no code, we can abort here
@@ -387,6 +434,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -425,6 +473,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	}
 	var snapshot = evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Debug && evm.Config.Tracer != nil {
@@ -454,7 +503,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		// The depth-check is already done, and precompiles handled above
 		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
-		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false, false)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -467,6 +516,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -486,6 +536,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	}
 	var snapshot = evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Debug && evm.Config.Tracer != nil {
@@ -502,18 +553,19 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 		// The depth-check is already done, and precompiles handled above
 		contract := NewContract(caller, AccountRef(addrCopy), nil, gas).AsDelegate()
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addr))
-		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false)
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, false, false)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and make initialise the delegate values
 		contract := NewContract(caller, AccountRef(caller.Address()), nil, gas).AsDelegate()
-		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
+		contract.SetCallCode(&addrCopy, evm.codeHashOf(addrCopy), evm.codeOf(addrCopy))
 		ret, err = evmInterpreterRun(evm, contract, input, false)
 		gas = contract.Gas
 	}
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -537,6 +589,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	// We could change this, but for now it's left for legacy reasons
 	var snapshot = evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 
 	// We do an AddBalance of zero here, just in order to trigger a touch.
 	// This doesn't matter on Mainnet, where all empties are gone at the time of Byzantium,
@@ -558,7 +611,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		// The contract is a scoped environment for this execution context only.
 		contract := NewContract(caller, AccountRef(addrCopy), new(big.Int), gas)
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
-		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, true)
+		ret, gas, err = RunPrecompiledContract(p, evm, contract, input, gas, true, false)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'
@@ -567,7 +620,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
 		contract := NewContract(caller, AccountRef(addrCopy), new(big.Int), gas)
-		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
+		contract.SetCallCode(&addrCopy, evm.codeHashOf(addrCopy), evm.codeOf(addrCopy))
 		// When an error was returned by the EVM or when setting the creation code
 		// above we revert to the snapshot and consume any gas remaining. Additionally
 		// when we're in Homestead this also counts for code storage gas errors.
@@ -577,6 +630,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			gas = 0
 		}
@@ -624,11 +678,12 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()
 	cxReceiptSnapshot := evm.snapshotCXReceipt()
+	stakeMsgsMark := evm.snapshotStakeMsgs()
 	evm.StateDB.CreateAccount(address)
 	if evm.chainRules.IsEIP158 {
 		evm.StateDB.SetNonce(address, 1)
 	}
-	evm.Context.Transfer(evm.StateDB, caller.Address(), address, value, evm.Context.TxType)
+	evm.Context.Transfer(evm.StateDB, caller.Address(), address, value, evm.transferType())
 
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
@@ -678,6 +733,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if maxCodeSizeExceeded || (err != nil && (evm.chainRules.IsS3 || err != ErrCodeStoreOutOfGas)) {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		evm.restoreCXReceipt(cxReceiptSnapshot)
+		evm.restoreStakeMsgs(stakeMsgsMark)
 		if err != ErrExecutionReverted {
 			contract.UseGas(contract.Gas)
 		}

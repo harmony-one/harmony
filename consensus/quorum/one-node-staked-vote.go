@@ -198,12 +198,12 @@ func (v *stakedVoteWeight) IsAllSigsCollected() bool {
 }
 
 func (v *stakedVoteWeight) SetVoters(
-	subCommittee *shard.Committee, epoch *big.Int,
+	subCommittee *shard.Committee, epoch *big.Int, strictVotePower bool,
 ) (*TallyResult, error) {
 	v.ResetPrepareAndCommitVotes()
 	v.ResetViewChangeVotes()
 
-	roster, err := votepower.Compute(subCommittee, epoch)
+	roster, err := votepower.Compute(subCommittee, epoch, strictVotePower)
 	if err != nil {
 		return nil, err
 	}

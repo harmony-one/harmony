@@ -99,7 +99,8 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		// before staking skip computing
 		if hmy.BlockChain.Config().IsStaking(prevCommittee.Epoch) {
-			if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
+			if _, err := decider.SetVoters(&comm, prevCommittee.Epoch,
+				hmy.BlockChain.Config().IsStrictStateValidation(prevCommittee.Epoch)); err != nil {
 				return nil, err
 			}
 		}
@@ -112,7 +113,8 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 	validatorSpreads = map[common.Address]numeric.Dec{}
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
-		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch); err != nil {
+		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch,
+			hmy.BlockChain.Config().IsStrictStateValidation(nowCommittee.Epoch)); err != nil {
 			return nil, errors.Wrapf(
 				err,
 				"committee is only available from staking epoch: %v, current epoch: %v",
@@ -606,7 +608,10 @@ func (hmy *Harmony) GetUndelegationPayouts(
 		}
 		noEarlyUnlock := hmy.IsNoEarlyUnlockEpoch(epoch)
 		for _, delegation := range wrapper.Delegations {
-			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod, noEarlyUnlock, isMaxRate)
+			withdraw := delegation.RemoveUnlockedUndelegations(
+				epoch, wrapper.LastEpochInCommittee, lockingPeriod, noEarlyUnlock,
+				isMaxRate, hmy.BlockChain.Config().IsStrictStateValidation(epoch),
+			)
 			if withdraw.Cmp(bigZero) == 1 {
 				undelegationPayouts.SetPayoutByDelegatorAddrAndValidatorAddr(validator, delegation.DelegatorAddress, withdraw)
 			}
