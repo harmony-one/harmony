@@ -307,6 +307,12 @@ func (sc *SyncConfig) CloseConnections() {
 
 // FindPeerByHash returns the peer with the given hash, or nil if not found.
 func (sc *SyncConfig) FindPeerByHash(peerHash []byte) *SyncPeerConfig {
+	// An empty hash names no peer. bytes.Equal reports nil and empty as equal,
+	// so without this a request that leaves the hash out would match any peer
+	// whose own hash has not been set yet.
+	if len(peerHash) == 0 {
+		return nil
+	}
 	sc.mtx.RLock()
 	defer sc.mtx.RUnlock()
 	for _, pc := range sc.peers {
