@@ -1,0 +1,64 @@
+{
+  "tool": "harmony-recovery preflight",
+  "schema": "preflight-result-v2",
+  "build": {},
+  "name": "golden-validator",
+  "hostname": "\u003chost\u003e",
+  "network": "localnet",
+  "shard": 0,
+  "db_path": "\u003cdb\u003e",
+  "node_probably_running": false,
+  "sample_note": "result reflects the database at scan time; if the node was running, this is a point-in-time sample - authoritative verification happens at apply time on a stopped node",
+  "started_at": "\u003ctime\u003e",
+  "duration_s": 0,
+  "retries": {
+    "reopen_count": 0
+  },
+  "target": {
+    "height": 44,
+    "hash": "0x3572752c3747bf7d1879da8415a3c701940ad7216291863b5776535634fb5f3a",
+    "state_root": "0xbb76bf6baabeb17cabe998226b71c2fa63493bdeb950869ccc96c5fdc05a248b",
+    "epoch": 3,
+    "view_id": 44
+  },
+  "checks": {
+    "ancestry_to_boundary": "ok",
+    "body": "ok",
+    "certificate": "ok",
+    "shard_state": "ok",
+    "state_walk": "fail: account trie root (root 0xbb76bf6baabeb17cabe998226b71c2fa63493bdeb950869ccc96c5fdc05a248b): missing trie node 0xbb76bf6baabeb17cabe998226b71c2fa63493bdeb950869ccc96c5fdc05a248b at path ",
+    "target_header": "ok"
+  },
+  "head_sample": {
+    "last_header": "0x340d92a335f998aefb6f6e4737d3bbbee82f95f64c82267b260e943dbd031f64",
+    "last_block": "0x340d92a335f998aefb6f6e4737d3bbbee82f95f64c82267b260e943dbd031f64",
+    "walk_to_target": "reached-target",
+    "child_at_target_plus_1": "0x340d92a335f998aefb6f6e4737d3bbbee82f95f64c82267b260e943dbd031f64"
+  },
+  "certificate_sources": {
+    "exact_key_present": true,
+    "child_header_present": true,
+    "satisfied_by": "exact-key+child-header"
+  },
+  "state": {
+    "counts": {
+      "accounts": 0,
+      "account_trie_nodes": 0,
+      "storage_tries": 0,
+      "storage_trie_nodes": 0,
+      "storage_leaves": 0,
+      "code_refs_contract": 0,
+      "code_refs_validator": 0,
+      "unique_code_contract": 0,
+      "unique_code_validator": 0,
+      "unique_code_bytes": 0
+    },
+    "anomalies": {
+      "total": 0,
+      "omitted": 0
+    }
+  },
+  "result": "FAIL",
+  "fail_reason": "state_walk: account trie root (root 0xbb76bf6baabeb17cabe998226b71c2fa63493bdeb950869ccc96c5fdc05a248b): missing trie node 0xbb76bf6baabeb17cabe998226b71c2fa63493bdeb950869ccc96c5fdc05a248b at path ",
+  "exit_code": 1
+}

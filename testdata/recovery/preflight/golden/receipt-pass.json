@@ -1,0 +1,89 @@
+{
+  "tool": "harmony-recovery preflight",
+  "schema": "preflight-result-v2",
+  "build": {},
+  "name": "golden-validator",
+  "hostname": "\u003chost\u003e",
+  "network": "localnet",
+  "shard": 0,
+  "db_path": "\u003cdb\u003e",
+  "node_probably_running": false,
+  "sample_note": "result reflects the database at scan time; if the node was running, this is a point-in-time sample - authoritative verification happens at apply time on a stopped node",
+  "started_at": "\u003ctime\u003e",
+  "duration_s": 0,
+  "retries": {
+    "reopen_count": 0
+  },
+  "target": {
+    "height": 44,
+    "hash": "0x3572752c3747bf7d1879da8415a3c701940ad7216291863b5776535634fb5f3a",
+    "state_root": "0xbb76bf6baabeb17cabe998226b71c2fa63493bdeb950869ccc96c5fdc05a248b",
+    "epoch": 3,
+    "view_id": 44
+  },
+  "checks": {
+    "ancestry_to_boundary": "ok",
+    "body": "ok",
+    "certificate": "ok",
+    "shard_state": "ok",
+    "state_walk": "ok",
+    "target_header": "ok"
+  },
+  "head_sample": {
+    "last_header": "0x340d92a335f998aefb6f6e4737d3bbbee82f95f64c82267b260e943dbd031f64",
+    "last_block": "0x340d92a335f998aefb6f6e4737d3bbbee82f95f64c82267b260e943dbd031f64",
+    "walk_to_target": "reached-target",
+    "child_at_target_plus_1": "0x340d92a335f998aefb6f6e4737d3bbbee82f95f64c82267b260e943dbd031f64"
+  },
+  "certificate_sources": {
+    "exact_key_present": true,
+    "child_header_present": true,
+    "satisfied_by": "exact-key+child-header"
+  },
+  "state": {
+    "digest": "34fe1ee840cc02ebe4899a7a4d68f166e243d3079c5efad64dcc6761b96fecea",
+    "digest_algorithm": "preflight_state_digest_v1",
+    "counts": {
+      "accounts": 1008,
+      "account_trie_nodes": 1359,
+      "storage_tries": 7,
+      "storage_trie_nodes": 138,
+      "storage_leaves": 103,
+      "code_refs_contract": 4,
+      "code_refs_validator": 3,
+      "unique_code_contract": 4,
+      "unique_code_validator": 3,
+      "unique_code_bytes": 3742
+    },
+    "anomalies": {
+      "total": 4,
+      "by_kind": {
+        "code-dual-class": 1,
+        "flag-decoded-zero": 1,
+        "flag-noncanonical-value": 1,
+        "wrapper-shaped-contract-code": 1
+      },
+      "examples": [
+        {
+          "kind": "flag-noncanonical-value",
+          "detail": "account 0x07d2236a00cf6561c5a98863aef977e5292e4fbabe01c1851cb04f67afe23262 IsValidator flag value 0x0000000000000000000000000000000000000000000000000000000000000002 differs from canonical"
+        },
+        {
+          "kind": "flag-decoded-zero",
+          "detail": "account 0x295d5d5c2b48a6a8e54752c31abe0bca000407a0926bb649b8253fe7e2f484be has an IsValidator flag leaf decoding to zero"
+        },
+        {
+          "kind": "wrapper-shaped-contract-code",
+          "detail": "unflagged account 0x5b1b69802f05faa3d0edfe2552ed49074d05a8c234209f41ce4f138cf5136aa6 carries wrapper-shaped code 0xbc21520a961771b96eefe386e5e8b4988abf75b17f6e90fe4c7325319b854694 (stays contract)"
+        },
+        {
+          "kind": "code-dual-class",
+          "detail": "code hash 0xbc21520a961771b96eefe386e5e8b4988abf75b17f6e90fe4c7325319b854694 referenced as both contract and validator code"
+        }
+      ],
+      "omitted": 0
+    }
+  },
+  "result": "PASS",
+  "exit_code": 0
+}

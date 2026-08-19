@@ -1,0 +1,55 @@
+{
+  "tool": "harmony-recovery preflight",
+  "schema": "preflight-result-v2",
+  "build": {},
+  "name": "golden-validator",
+  "hostname": "\u003chost\u003e",
+  "network": "localnet",
+  "shard": 0,
+  "db_path": "\u003cdb\u003e",
+  "node_probably_running": false,
+  "sample_note": "result reflects the database at scan time; if the node was running, this is a point-in-time sample - authoritative verification happens at apply time on a stopped node",
+  "started_at": "\u003ctime\u003e",
+  "duration_s": 0,
+  "retries": {
+    "reopen_count": 0
+  },
+  "target": {
+    "height": 44,
+    "hash": "0x3572752c3747bf7d1879da8415a3c701940ad7216291863b5776535634fb5f3a"
+  },
+  "checks": {
+    "ancestry_to_boundary": "skipped",
+    "body": "skipped",
+    "certificate": "skipped",
+    "shard_state": "skipped",
+    "state_walk": "skipped",
+    "target_header": "skipped"
+  },
+  "head_sample": {},
+  "certificate_sources": {
+    "exact_key_present": false,
+    "child_header_present": false
+  },
+  "state": {
+    "counts": {
+      "accounts": 0,
+      "account_trie_nodes": 0,
+      "storage_tries": 0,
+      "storage_trie_nodes": 0,
+      "storage_leaves": 0,
+      "code_refs_contract": 0,
+      "code_refs_validator": 0,
+      "unique_code_contract": 0,
+      "unique_code_validator": 0,
+      "unique_code_bytes": 0
+    },
+    "anomalies": {
+      "total": 0,
+      "omitted": 0
+    }
+  },
+  "result": "FAIL",
+  "fail_reason": "\u003cread-error\u003e",
+  "exit_code": 3
+}
