@@ -14,7 +14,7 @@ SHELL := bash
 EPOCH_TO_WAIT ?=5
 EXTRA_NODES_FILE ?="./test/configs/local-extra-nodes.txt"
 
-.PHONY: all help libs exe race trace-pointer debug debug-ext debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker go-vet go-test docker build_localnet_validator protofiles travis_go_checker travis_rpc_checker travis_rosetta_checker debug-start-log debug-stop-log debug-restart-log debug-delete-log
+.PHONY: all help libs exe race trace-pointer debug debug-ext debug-kill test test-go test-recovery test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean docker go-vet go-test docker build_localnet_validator protofiles travis_go_checker travis_rpc_checker travis_rosetta_checker debug-start-log debug-stop-log debug-restart-log debug-delete-log
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
@@ -156,6 +156,17 @@ test:
 
 test-go:
 	bash ./test/go.sh
+
+test-recovery:
+	source ./scripts/setup_bls_build_flags.sh; \
+	for gmp in /opt/homebrew/opt/gmp/lib /usr/local/opt/gmp/lib; do \
+	  [ -d "$$gmp" ] && CGO_LDFLAGS="$$CGO_LDFLAGS -L$$gmp" && \
+	  LIBRARY_PATH="$$LIBRARY_PATH:$$gmp" && LD_LIBRARY_PATH="$$LD_LIBRARY_PATH:$$gmp" && break; \
+	done; \
+	export CGO_LDFLAGS LIBRARY_PATH LD_LIBRARY_PATH GOTOOLCHAIN=$${GOTOOLCHAIN:-auto}; \
+	DYLD_FALLBACK_LIBRARY_PATH="$$LD_LIBRARY_PATH" \
+	go test -exec "/usr/bin/env DYLD_FALLBACK_LIBRARY_PATH=$$LD_LIBRARY_PATH" \
+	  ./internal/recoverydb/... ./cmd/harmony-recovery-db/
 
 test-rpc:
 	bash ./test/rpc.sh run

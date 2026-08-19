@@ -5,6 +5,7 @@ export GO111MODULE=on
 declare -A SRC
 SRC[harmony]=./cmd/harmony
 SRC[bootnode]=./cmd/bootnode
+SRC[harmony-recovery-db]=./cmd/harmony-recovery-db
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
@@ -78,8 +79,8 @@ ACTION:
    upload      upload binaries to s3
    release     upload binaries to release bucket
 
-   harmony|bootnode|
-               only build the specified binary
+   harmony|bootnode|harmony-recovery-db|
+                only build the specified binary
 
 EXAMPLES:
 
@@ -289,6 +290,6 @@ case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
    "release") release ;;
-   "harmony"|"bootnode") build_only $ACTION ;;
+   "harmony"|"bootnode"|"harmony-recovery-db") build_only $ACTION ;;
    *) usage ;;
 esac
