@@ -187,6 +187,18 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 	}
 	senderKey := recvMsg.SenderPubkeys[0]
 
+	// The sender's signature is only meaningful as a vote if the sender is in the
+	// committee voting. Signatures collected here are aggregated into the new view
+	// message while the accompanying bitmap can only describe committee members,
+	// so a signature from outside the committee is one the bitmap cannot account
+	// for and the aggregate would no longer match it.
+	if consensus.decider().IndexOf(senderKey.Bytes) == -1 {
+		consensus.getLogger().Warn().
+			Str("sender", senderKey.Bytes.Hex()).
+			Msg("[onViewChangeSanityCheck] sender is not in the committee")
+		return false
+	}
+
 	viewIDHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDHash, recvMsg.ViewID)
 	if !recvMsg.ViewidSig.VerifyHash(senderKey.Object, viewIDHash) {

@@ -63,6 +63,12 @@ func (node *Node) HandleNodeMessage(
 	case proto_node.Staking:
 		node.stakingMessageHandler(msgPayload)
 	case proto_node.Block:
+		// The leading byte selects the block message type and the remainder is its
+		// payload, so there is nothing to dispatch on when the payload is empty.
+		if len(msgPayload) == 0 {
+			utils.Logger().Error().Msg("empty block message payload")
+			return nil
+		}
 		switch blockMsgType := proto_node.BlockMessageType(msgPayload[0]); blockMsgType {
 		case proto_node.Sync:
 			blocks := []*types.Block{}
