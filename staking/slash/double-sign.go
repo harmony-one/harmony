@@ -385,10 +385,11 @@ func delegatorSlashApply(
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 	useSlashExternalStakeDenomFix bool,
+	strictStateValidation bool,
 ) error {
 	// First delegation is validator's own stake
 	validatorDebt := new(big.Int).Div(snapshot.Delegations[0].Amount, common.Big2)
-	return delegatorSlashApplyDebt(snapshot, current, state, validatorDebt, rewardBeneficiary, doubleSignEpoch, slashTrack, useSlashExternalStakeDenomFix)
+	return delegatorSlashApplyDebt(snapshot, current, state, validatorDebt, rewardBeneficiary, doubleSignEpoch, slashTrack, useSlashExternalStakeDenomFix, strictStateValidation)
 }
 
 // delegatorSlashApply applies slashing to all delegators including the validator.
@@ -402,6 +403,7 @@ func delegatorSlashApplyDebt(
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 	useSlashExternalStakeDenomFix bool,
+	strictStateValidation bool,
 ) error {
 	slashIndexPairs, totalStake := makeSlashList(snapshot, current)
 	validatorDelegation := &current.Delegations[0]
@@ -420,7 +422,7 @@ func delegatorSlashApplyDebt(
 	// stake, so there has to be some for a share to be meaningful. Delegation
 	// entries stay behind once fully undelegated, so a validator can still carry
 	// external delegators whose stake all adds up to nothing.
-	if totalExternalStake.Sign() > 0 {
+	if !strictStateValidation || totalExternalStake.Sign() > 0 {
 		for _, indexPair := range slashIndexPairs[1:] {
 			snapshotIndex := indexPair[0]
 			currentIndex := indexPair[1]
@@ -479,7 +481,7 @@ func applySlashingToDelegation(delegation *staking.Delegation, state *state.DB, 
 func Apply(
 	chain staking.ValidatorSnapshotReader, state *state.DB,
 	slashes Records, rewardBeneficiary common.Address,
-	useSlashExternalStakeDenomFix bool,
+	useSlashExternalStakeDenomFix bool, strictStateValidation bool,
 ) (*Application, error) {
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 	for _, slash := range slashes {
@@ -507,7 +509,7 @@ func Apply(
 		if err := delegatorSlashApply(
 			snapshot.Validator, current, state,
 			rewardBeneficiary, slash.Evidence.Epoch, slashDiff,
-			useSlashExternalStakeDenomFix,
+			useSlashExternalStakeDenomFix, strictStateValidation,
 		); err != nil {
 			return nil, err
 		}
