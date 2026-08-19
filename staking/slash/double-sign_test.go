@@ -797,7 +797,7 @@ func (tc *applySlashingToDelegatorTestCase) makeData() {
 
 func (tc *applySlashingToDelegatorTestCase) apply() {
 	tc.gotErr = delegatorSlashApplyDebt(tc.snapshot, tc.current, tc.state, tc.debt, tc.beneficiary,
-		big.NewInt(doubleSignEpoch), tc.slashTrack, true)
+		big.NewInt(doubleSignEpoch), tc.slashTrack, true, false)
 }
 
 func (tc *applySlashingToDelegatorTestCase) checkResult() error {
@@ -831,7 +831,7 @@ func (tc *slashApplyTestCase) makeData() {
 }
 
 func (tc *slashApplyTestCase) apply() {
-	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.state, tc.beneficiary, big.NewInt(doubleSignEpoch), tc.slashTrack, true)
+	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.state, tc.beneficiary, big.NewInt(doubleSignEpoch), tc.slashTrack, true, false)
 }
 
 func (tc *slashApplyTestCase) checkResult() error {
@@ -963,7 +963,7 @@ func (tc *applyTestCase) makeData(t *testing.T) {
 }
 
 func (tc *applyTestCase) apply() {
-	tc.gotDiff, tc.gotErr = Apply(tc.chain, tc.state, tc.slashes, leaderAddr, true)
+	tc.gotDiff, tc.gotErr = Apply(tc.chain, tc.state, tc.slashes, leaderAddr, true, false)
 }
 
 func (tc *applyTestCase) checkResult() error {
