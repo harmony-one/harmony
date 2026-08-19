@@ -5,9 +5,12 @@ import (
 	"testing"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/multibls"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/require"
 )
 
@@ -58,4 +61,39 @@ func TestOutsiderSignatureBreaksM3Aggregate(t *testing.T) {
 		bls_cosi.AggregateSig(withOutsider).VerifyHash(mask.AggregatePublic, viewIDBytes),
 		"an outsider signature in the aggregate should stop it verifying",
 	)
+}
+
+// TestViewChangeSanityCheckRejectsNonCommitteeSender exercises the actual
+// admission check rather than only the aggregate-signature failure it prevents.
+func TestViewChangeSanityCheckRejectsNonCommitteeSender(t *testing.T) {
+	memberKey := bls.RandPrivateKey()
+	member := bls.PublicKeyWrapper{Object: memberKey.GetPublicKey()}
+	require.NoError(t, member.Bytes.FromLibBLSPublicKey(member.Object))
+	outsiderKey := bls.RandPrivateKey()
+	outsider := bls.PublicKeyWrapper{Object: outsiderKey.GetPublicKey()}
+	require.NoError(t, outsider.Bytes.FromLibBLSPublicKey(outsider.Object))
+
+	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
+	decider.UpdateParticipants([]bls.PublicKeyWrapper{member}, nil)
+	reg := registry.New()
+	reg.SetQuorum(decider)
+	consensus := &Consensus{
+		ShardID:  shard.BeaconChainShardID,
+		current:  NewState(Normal, shard.BeaconChainShardID),
+		registry: reg,
+	}
+
+	viewID := uint64(1)
+	viewIDBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(viewIDBytes, viewID)
+	message := func(key bls.PublicKeyWrapper, signature *bls_core.Sign) *FBFTMessage {
+		return &FBFTMessage{
+			ViewID:        viewID,
+			SenderPubkeys: []*bls.PublicKeyWrapper{&key},
+			ViewidSig:     signature,
+		}
+	}
+
+	require.True(t, consensus.onViewChangeSanityCheck(message(member, memberKey.SignHash(viewIDBytes))))
+	require.False(t, consensus.onViewChangeSanityCheck(message(outsider, outsiderKey.SignHash(viewIDBytes))))
 }
