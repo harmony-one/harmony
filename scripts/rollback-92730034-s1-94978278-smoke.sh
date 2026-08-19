@@ -218,7 +218,7 @@ build_fixtures() {
   id hmytest >/dev/null 2>&1 || useradd -m hmytest
   id harmony >/dev/null 2>&1 || useradd -m harmony
 
-  if [[ ! -x "$T/fake-orig" ]]; then
+  if [[ ! -x "$T/fake-orig" || ! -x "$T/fake-recovery" || ! -x "$T/fake-latest" ]]; then
     cat > "$T/fake.c" <<'EOF'
 #include <stdio.h>
 #include <string.h>
@@ -234,12 +234,21 @@ int main(int argc, char **argv) {
 EOF
     cc -O2 -DVARIANT='"orig"'  -o "$T/fake-orig"     "$T/fake.c"
     cc -O2 -DVARIANT='"recov"' -o "$T/fake-recovery" "$T/fake.c"
+    cc -O2 -DVARIANT='"latest"' -o "$T/fake-latest" "$T/fake.c"
   fi
   NODE_SHA="$(sha256sum "$T/fake-recovery" | awk '{print $1}')"
   ORIG_SHA="$(sha256sum "$T/fake-orig" | awk '{print $1}')"
-  [[ "$NODE_SHA" != "$ORIG_SHA" ]] \
-    || { echo "fixture binaries are byte-identical; duplicate-scan coverage would be meaningless"; exit 1; }
+  LATEST_SHA="$(sha256sum "$T/fake-latest" | awk '{print $1}')"
+  [[ "$NODE_SHA" != "$ORIG_SHA" && "$LATEST_SHA" != "$NODE_SHA" && "$LATEST_SHA" != "$ORIG_SHA" ]] \
+    || { echo "fixture binaries are byte-identical; binary transition coverage would be meaningless"; exit 1; }
   cp -f "$T/fake-recovery" "$WWW/node.bin"
+  SCRIPT_VERSION_VALUE="$(sed -n 's/^SCRIPT_VERSION=\([1-9][0-9]*\)$/\1/p' "$SRC")"
+  SCRIPT_VERSION_DATE_VALUE="$(sed -n 's/^SCRIPT_VERSION_DATE="\([^"]*\)"$/\1/p' "$SRC")"
+  printf 'SCRIPT_VERSION=%s\nSCRIPT_VERSION_DATE="%s"\n' \
+    "$SCRIPT_VERSION_VALUE" "$SCRIPT_VERSION_DATE_VALUE" > "$WWW/current-script.sh"
+  cat > "$WWW/latest-release.json" <<'EOF'
+{"tag_name":"v2026.1.3","draft":false,"prerelease":false,"assets":[]}
+EOF
 
   # A valid-looking 64-bit LE ELF header with the WRONG e_machine for this
   # host: pins the other-arch URL, and drives the wrong-arch rejection case.
@@ -376,6 +385,9 @@ mk_script() { # [db-source-dir] [margin-min-bytes]; builds $RB with test constan
   # Host arch gets the real fixture binary; the other arch gets a distinct
   # URL/sha so a wrong arch selection fails loudly (mismatched sha).
   sed -i \
+    -e "s|^SCRIPT_URL=.*|SCRIPT_URL=\"$HTTP/current-script.sh\"|" \
+    -e "s|^NODE_RELEASE_API_URL=.*|NODE_RELEASE_API_URL=\"$HTTP/latest-release.json\"|" \
+    -e "s|^NODE_RELEASE_DOWNLOAD_ROOT=.*|NODE_RELEASE_DOWNLOAD_ROOT=\"$HTTP/releases/download\"|" \
     -e "s|^DB_RCLONE_SOURCE=.*|DB_RCLONE_SOURCE=\"$src\"|" \
     -e "s|^DB_FILE_COUNT=.*|DB_FILE_COUNT=$cnt|" \
     -e "s|^DB_BYTES=.*|DB_BYTES=$bytes|" \
@@ -430,6 +442,74 @@ orig_running() { [[ -n "$(pids_by_exe "$INV/harmony")" ]]; }
 
 # ---------- manual cases ----------
 
+m_version_preflight() {
+  cleanup_case; mk_script
+  set +e
+  RB_OUT="$(bash "$RB" --version 2>"$T/version-only.err")"
+  RB_RC=$?
+  set -e
+  [[ "$RB_RC" == "0" && -z "$RB_OUT" ]] \
+    && grep -qx "Rollback script version $SCRIPT_VERSION_VALUE ($SCRIPT_VERSION_DATE_VALUE)" "$T/version-only.err" \
+    && ok "m_version/version-only" || bad "m_version/version-only" "rc=$RB_RC out=$RB_OUT"
+
+  printf 'SCRIPT_VERSION=%s\nSCRIPT_VERSION_DATE="2026-08-19T19:00:00Z"\n' \
+    "$((SCRIPT_VERSION_VALUE + 1))" > "$WWW/current-script.sh"
+  set +e
+  RB_OUT="$(cd "$T" && SERVICE="$ABSENT_UNIT" bash "$RB" prepare \
+    --skip-binary-version-check 2>"$T/version-preflight.err")"
+  RB_RC=$?
+  set -e
+  expect "m_version/stale-script-refused" 1 "^STOPPED script-update-required [0-9-]+$"
+  grep -q "^Rollback script version $SCRIPT_VERSION_VALUE ($SCRIPT_VERSION_DATE_VALUE)$" "$T/version-preflight.err" \
+    && ok "m_version/version-printed" || bad "m_version/version-printed"
+  grep -Fq "curl -fsSL '$HTTP/current-script.sh' -o 'current-script.sh'" "$T/version-preflight.err" \
+    && ok "m_version/update-command-printed" || bad "m_version/update-command-printed"
+
+  set +e
+  RB_OUT="$(cd "$T" && SERVICE="$ABSENT_UNIT" bash "$RB" prepare \
+    --skip-script-version-check --skip-binary-version-check 2>/dev/null)"
+  RB_RC=$?
+  set -e
+  expect "m_version/skip-script-check" 1 "^STOPPED unsupported-layout [0-9-]+$"
+  printf 'SCRIPT_VERSION=%s\nSCRIPT_VERSION_DATE="%s"\n' \
+    "$SCRIPT_VERSION_VALUE" "$SCRIPT_VERSION_DATE_VALUE" > "$WWW/current-script.sh"
+}
+
+m_binary_version_prompt() {
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64) arch=arm64 ;;
+  esac
+  cp -f "$T/fake-latest" "$WWW/harmony-$arch"
+  cat > "$WWW/latest-release.json" <<EOF
+{"tag_name":"v2026.1.4","draft":false,"prerelease":false,"assets":[{"name":"harmony-$arch","browser_download_url":"$HTTP/releases/download/v2026.1.4/harmony-$arch","digest":"sha256:$LATEST_SHA"}]}
+EOF
+
+  cleanup_case; new_manual_case binaryyes; mk_script; start_orig
+  RB_SERVICE="$ABSENT_UNIT" run_rb_input y "$INV" prepare
+  expect "m_binversion/accept-latest" 0 "^READY $BLS_SORTED recovery-92730034-s1-94978278$"
+  [[ "$(state_get NODE_BIN_VERSION)" == "2026.1.4" \
+     && "$(state_get NODE_BIN_SHA256)" == "$LATEST_SHA" \
+     && "$(sha256sum "$BIN" | awk '{print $1}')" == "$LATEST_SHA" ]] \
+    && ok "m_binversion/latest-receipt" || bad "m_binversion/latest-receipt"
+  grep -q "GET harmony-$arch" "$T/http.log" \
+    && ok "m_binversion/latest-downloaded" || bad "m_binversion/latest-downloaded"
+
+  cleanup_case; new_manual_case binaryno; mk_script; start_orig
+  : > "$T/http.log"
+  RB_SERVICE="$ABSENT_UNIT" run_rb_input n "$INV" prepare
+  expect "m_binversion/decline-latest" 0 "^READY $BLS_SORTED recovery-92730034-s1-94978278$"
+  [[ "$(state_get NODE_BIN_VERSION)" == "2026.1.3" ]] \
+    && ok "m_binversion/baseline-receipt" || bad "m_binversion/baseline-receipt"
+  grep -q 'GET node.bin' "$T/http.log" && ! grep -q "GET harmony-$arch" "$T/http.log" \
+    && ok "m_binversion/baseline-downloaded" || bad "m_binversion/baseline-downloaded"
+
+  cat > "$WWW/latest-release.json" <<'EOF'
+{"tag_name":"v2026.1.3","draft":false,"prerelease":false,"assets":[]}
+EOF
+}
+
 m_happy() {
   cleanup_case; new_manual_case happy; mk_script; start_orig
   local usrsbin_before; usrsbin_before="$(ls /usr/local/sbin 2>/dev/null | sha256sum)"
@@ -471,8 +551,22 @@ m_happy() {
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare
   expect "m_happy/prepare-rerun-idempotent" 0 "^READY $BLS_SORTED recovery-92730034-s1-94978278$"
 
+  # Simulate the v2026.1.2-era READY receipt: it pinned only the binary hash.
+  # Updated start must replace only the staged binary and preserve both DBs.
+  cp -f "$T/fake-orig" "$BIN"
+  sed -i \
+    -e '/^NODE_BIN_VERSION=/d' \
+    -e '/^NODE_BIN_URL=/d' \
+    -e "s/^NODE_BIN_SHA256=.*/NODE_BIN_SHA256=$ORIG_SHA/" \
+    "$STATE"
+  : > "$T/http.log"
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
   expect "m_happy/start" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  grep -q 'GET node.bin' "$T/http.log" \
+    && ok "m_happy/ready-binary-migrated" || bad "m_happy/ready-binary-migrated"
+  [[ "$(state_get NODE_BIN_VERSION)" == "2026.1.3" \
+     && "$(state_get NODE_BIN_SHA256)" == "$NODE_SHA" ]] \
+    && ok "m_happy/binary-receipt-updated" || bad "m_happy/binary-receipt-updated"
   local companion_old; companion_old="$(state_get COMPANION_OLD_NAME)"
   [[ -f "$DATA/$companion_old/companion-marker" \
      && "$(cat "$DATA/$companion_old/companion-marker")" == "must-survive" ]] \
@@ -490,6 +584,44 @@ m_happy() {
 
   RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
   expect "m_happy/start-rerun" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
+
+  printf 'SCRIPT_VERSION=%s\nSCRIPT_VERSION_DATE="2026-08-19T21:10:00Z"\n' \
+    "$((SCRIPT_VERSION_VALUE + 1))" > "$WWW/current-script.sh"
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
+  expect "m_happy/stale-preflight-keeps-running" 1 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
+  [[ "$(state_get NODE_PID)" == "$np" && -d "/proc/$np" ]] \
+    && ok "m_happy/stale-preflight-same-pid" || bad "m_happy/stale-preflight-same-pid"
+  printf 'SCRIPT_VERSION=%s\nSCRIPT_VERSION_DATE="%s"\n' \
+    "$SCRIPT_VERSION_VALUE" "$SCRIPT_VERSION_DATE_VALUE" > "$WWW/current-script.sh"
+
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64) arch=arm64 ;;
+  esac
+  cp -f "$T/fake-latest" "$WWW/harmony-$arch"
+  cat > "$WWW/latest-release.json" <<EOF
+{"tag_name":"v2026.1.4","draft":false,"prerelease":false,"assets":[{"name":"harmony-$arch","browser_download_url":"$HTTP/releases/download/v2026.1.4/harmony-$arch","digest":"sha256:$LATEST_SHA"}]}
+EOF
+  cp -f "$T/fake-recovery" "$T/imposter/prior-recovery-release"
+  setsid "$T/imposter/prior-recovery-release" >/dev/null 2>&1 < /dev/null &
+  local old_release_pid=$!
+  RB_SERVICE="$ABSENT_UNIT" run_rb_input y "$INV" start
+  expect "m_happy/active-upgrade-old-duplicate" 1 "^STOPPED duplicate-process [0-9-]+$"
+  [[ -z "$(pids_by_exe "$BIN")" ]] \
+    && ok "m_happy/active-upgrade-quarantined" || bad "m_happy/active-upgrade-quarantined"
+  kill -9 "$old_release_pid" 2>/dev/null || true
+  wait "$old_release_pid" 2>/dev/null || true
+  RB_SERVICE="$ABSENT_UNIT" run_rb_input y "$INV" start
+  expect "m_happy/active-binary-upgrade" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
+  np="$(state_get NODE_PID)"
+  [[ "$(state_get NODE_BIN_VERSION)" == "2026.1.4" \
+     && "$(state_get NODE_BIN_SHA256)" == "$LATEST_SHA" \
+     && "$(sha256sum "/proc/$np/exe" | awk '{print $1}')" == "$LATEST_SHA" ]] \
+    && ok "m_happy/active-binary-restarted" || bad "m_happy/active-binary-restarted"
+  cat > "$WWW/latest-release.json" <<'EOF'
+{"tag_name":"v2026.1.3","draft":false,"prerelease":false,"assets":[]}
+EOF
 }
 
 m_companion_already_deleted() {
@@ -1034,6 +1166,8 @@ m_usage() {
 
 run_manual() {
   # `|| true` so one failing case cannot abort the suite before the summary.
+  m_version_preflight || true
+  m_binary_version_prompt || true
   m_happy || true
   m_companion_already_deleted || true
   m_source_mismatch || true
@@ -1229,6 +1363,29 @@ s_happy() {
 
   run_rb /root start
   expect "s_happy/start-rerun" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
+
+  # Exercise an accepted newer release while a systemd receipt is STARTING.
+  sed -i 's/^STATE=STARTED$/STATE=STARTING/' "$STATE"
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64) arch=arm64 ;;
+  esac
+  cp -f "$T/fake-latest" "$WWW/harmony-$arch"
+  cat > "$WWW/latest-release.json" <<EOF
+{"tag_name":"v2026.1.4","draft":false,"prerelease":false,"assets":[{"name":"harmony-$arch","browser_download_url":"$HTTP/releases/download/v2026.1.4/harmony-$arch","digest":"sha256:$LATEST_SHA"}]}
+EOF
+  run_rb_input y /root start
+  expect "s_happy/starting-binary-upgrade" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
+  mp="$(systemctl show harmony.service -p MainPID --value)"
+  [[ "$(state_get STATE)" == "STARTED" \
+     && "$(state_get NODE_BIN_VERSION)" == "2026.1.4" \
+     && "$(state_get NODE_BIN_SHA256)" == "$LATEST_SHA" \
+     && "$(sha256sum "/proc/$mp/exe" | awk '{print $1}')" == "$LATEST_SHA" ]] \
+    && ok "s_happy/starting-binary-restarted" || bad "s_happy/starting-binary-restarted"
+  cat > "$WWW/latest-release.json" <<'EOF'
+{"tag_name":"v2026.1.3","draft":false,"prerelease":false,"assets":[]}
+EOF
 }
 
 s_predeleted_db() {

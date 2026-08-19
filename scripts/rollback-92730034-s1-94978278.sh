@@ -4,7 +4,7 @@
 # "rollback" is a label only: this script copies the frozen clean shard-1
 # database ending at block 94,978,278 (a raw LevelDB directory transferred
 # with rclone from a pinned read-only source) plus the pinned official
-# v2026.1.2 harmony binary, and keeps the node stopped until the coordinated
+# v2026.1.3 harmony binary, and keeps the node stopped until the coordinated
 # GO. At first recovered start it quarantines the old harmony_db_0 epoch
 # companion so Harmony rebuilds it. It reverts nothing and never restores an
 # old DB automatically.
@@ -47,8 +47,13 @@ set -euo pipefail
 shopt -s nullglob
 umask 077
 
+SCRIPT_VERSION=2
+SCRIPT_VERSION_DATE="2026-08-19T20:36:43Z"
+
 # --- BEGIN FREEZE CONSTANTS (filled once at freeze; leave structure intact) ---
 SCRIPT_URL="https://raw.githubusercontent.com/harmony-one/harmony/refs/heads/rollback-92730034/scripts/rollback-92730034-s1-94978278.sh"
+NODE_RELEASE_API_URL="https://api.github.com/repos/harmony-one/harmony/releases/latest"
+NODE_RELEASE_DOWNLOAD_ROOT="https://github.com/harmony-one/harmony/releases/download"
 # Team-provided public read-only shard-1 FullDB source, accepted as the clean
 # DB for block 94,978,278. Self-contained: needs no local rclone config. The
 # WebDAV service exposes no file hashes, so integrity relies on the pinned
@@ -57,11 +62,21 @@ SCRIPT_URL="https://raw.githubusercontent.com/harmony-one/harmony/refs/heads/rol
 DB_RCLONE_SOURCE=":webdav,url='http://fulldb.s1.t.hmny.io/webdav',vendor=other,user=snap,pass=ufbTDtK0fENuutwuDOHae57xT8URsZVIcdotK30T5A:"
 DB_FILE_COUNT=32482              # exact file count from rclone size --json
 DB_BYTES=70073877580             # exact total bytes from rclone size --json
-NODE_BIN_URL_AMD64="https://github.com/harmony-one/harmony/releases/download/v2026.1.2/harmony-amd64"
-NODE_BIN_SHA256_AMD64="a01314f8fb7a279fffad48ced03e2615f5b28b8c9afb7831700ff83e7f6506df"
-NODE_BIN_URL_ARM64="https://github.com/harmony-one/harmony/releases/download/v2026.1.2/harmony-arm64"
-NODE_BIN_SHA256_ARM64="3399cc969fa02b43215b90f6ced7f9e98250d2a9242d0e11410e92bd09ddc0ad"
+NODE_BIN_BASE_VERSION="2026.1.3"
+NODE_BIN_URL_AMD64="https://github.com/harmony-one/harmony/releases/download/v2026.1.3/harmony-amd64"
+NODE_BIN_SHA256_AMD64="8a937d29bb678effa7c7a15aa6f6bd75522e452cb0ee037c3a0feb08461ab52b"
+NODE_BIN_URL_ARM64="https://github.com/harmony-one/harmony/releases/download/v2026.1.3/harmony-arm64"
+NODE_BIN_SHA256_ARM64="c624d556773347d4ae2b92140714a06a5323e847c468794da1e4b99ed9facf1e"
 # --- END FREEZE CONSTANTS ---
+
+# Compatibility only for a node already running in STARTING/STARTED with
+# v2026.1.2. READY is deliberately excluded: GO replaces its staged binary
+# with v2026.1.3 (or an operator-accepted newer release) before launch.
+LEGACY_NODE_BIN_VERSION="2026.1.2"
+LEGACY_NODE_BIN_URL_AMD64="https://github.com/harmony-one/harmony/releases/download/v2026.1.2/harmony-amd64"
+LEGACY_NODE_BIN_SHA256_AMD64="a01314f8fb7a279fffad48ced03e2615f5b28b8c9afb7831700ff83e7f6506df"
+LEGACY_NODE_BIN_URL_ARM64="https://github.com/harmony-one/harmony/releases/download/v2026.1.2/harmony-arm64"
+LEGACY_NODE_BIN_SHA256_ARM64="3399cc969fa02b43215b90f6ced7f9e98250d2a9242d0e11410e92bd09ddc0ad"
 
 # Fixed shard-1 recovery profile.
 TARGET_SHARD_ID=1
@@ -105,6 +120,12 @@ SUFFIX="recovery-92730034-s1-94978278"
 MODE=""
 DISCARD_FLAG=0
 QUIET=0
+SKIP_BINARY_VERSION_CHECK=0
+SKIP_SCRIPT_VERSION_CHECK=0
+BINARY_UPDATE_SELECTED=0
+PREVIOUS_NODE_BIN_VERSION=""
+PREVIOUS_NODE_BIN_SHA256=""
+PREFLIGHT_CONFIRMED_RUNNING=0
 LOGID=""
 PRINTED=0
 INVOCATION_DIR=""
@@ -120,7 +141,7 @@ RECOVERY_ARGS_TEXT=""
 
 usage_exit() {
   # Usage errors touch nothing and print the one line themselves.
-  printf 'usage: [sudo] bash ./rollback-92730034-s1-94978278.sh prepare [--systemd-unit NAME] [--discard-old-db] [--quiet] | start [--systemd-unit NAME]   (sudo required for systemd validators; rootless manual validators run as the node user)\n'
+  printf 'usage: [sudo] bash ./rollback-92730034-s1-94978278.sh prepare [--systemd-unit NAME] [--discard-old-db] [--quiet] [--skip-script-version-check] [--skip-binary-version-check] | start [--systemd-unit NAME] [--skip-script-version-check] [--skip-binary-version-check] | --version   (sudo required for systemd validators; rootless manual validators run as the node user)\n'
   exit 2
 }
 
@@ -136,6 +157,18 @@ emit() { printf '%s\n' "$*" >&3; PRINTED=1; }
 die() { # die <reason> [detail...]
   local reason="$1"; shift || true
   log "FAILURE reason=$reason detail: $*"
+  if (( PREFLIGHT_CONFIRMED_RUNNING )); then
+    case "$reason" in
+      script-version-check-failed|script-update-required|binary-version-check-failed|cannot-determine-state)
+        if preflight_node_still_running; then
+          log "preflight failed, but the reverified recovery node remains active"
+          emit "RUNNING ${BLS_IDS:-unknown} $SUFFIX"
+          exit 1
+        fi
+        log "preflight running-state revalidation failed; not reporting RUNNING"
+        ;;
+    esac
+  fi
   emit "STOPPED $reason $LOGID"
   exit 1
 }
@@ -144,6 +177,157 @@ notice() {
   # Plain operator instructions, copied to both the run log and live stderr.
   printf '%s\n' "$*"
   printf '%s\n' "$*" >&4
+}
+
+release_version_ok() {
+  [[ "$1" =~ ^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$ ]]
+}
+
+release_version_newer() { # <candidate> <reference>
+  release_version_ok "$1" && release_version_ok "$2" || return 2
+  local ca cb cc ra rb rc
+  IFS=. read -r ca cb cc <<< "$1"
+  IFS=. read -r ra rb rc <<< "$2"
+  (( ca > ra || (ca == ra && cb > rb) || (ca == ra && cb == rb && cc > rc) ))
+}
+
+check_script_version() {
+  if (( SKIP_SCRIPT_VERSION_CHECK )); then
+    log "script version check skipped by operator"
+    return
+  fi
+
+  local body remote_version remote_date download_name
+  body="$(curl -fsSL --retry 5 --connect-timeout 10 --max-time 30 "$SCRIPT_URL")" \
+    || die script-version-check-failed "cannot fetch canonical script $SCRIPT_URL (rerun with --skip-script-version-check only if the Harmony team instructs you to)"
+  remote_version="$(sed -n 's/^SCRIPT_VERSION=\([1-9][0-9]*\)$/\1/p' <<< "$body")"
+  remote_date="$(sed -n 's/^SCRIPT_VERSION_DATE="\([^"]*\)"$/\1/p' <<< "$body")"
+  [[ "$remote_version" =~ ^[1-9][0-9]*$ \
+     && "$remote_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] \
+    || die script-version-check-failed "canonical script has missing or malformed version metadata"
+
+  if (( remote_version > SCRIPT_VERSION )); then
+    download_name="${SCRIPT_URL##*/}"
+    [[ "$download_name" =~ ^[A-Za-z0-9._-]+$ ]] \
+      || die script-version-check-failed "cannot derive a safe download name from $SCRIPT_URL"
+    notice ""
+    notice "A newer rollback script is required."
+    notice "  running:   version $SCRIPT_VERSION ($SCRIPT_VERSION_DATE)"
+    notice "  canonical: version $remote_version ($remote_date)"
+    notice "Download the latest script, inspect its printed version, and rerun your recovery command:"
+    notice "  curl -fsSL '$SCRIPT_URL' -o '$download_name'"
+    notice ""
+    die script-update-required "canonical script version $remote_version is newer than $SCRIPT_VERSION"
+  fi
+  log "script version check passed: local=$SCRIPT_VERSION ($SCRIPT_VERSION_DATE) canonical=$remote_version ($remote_date)"
+}
+
+adopt_recorded_binary_selection() {
+  local version="${S[NODE_BIN_VERSION]-}" url="${S[NODE_BIN_URL]-}" sha="${S[NODE_BIN_SHA256]-}" expected_url actual_sha=""
+  if [[ -z "$version" && -z "$url" ]]; then
+    # STARTING/STARTED only. READY has rank 6 and falls through to v2026.1.3.
+    if (( $(state_rank "${S[STATE]-}") >= 7 )); then
+      if [[ -f "$BIN" ]]; then
+        actual_sha="$(sha256sum "$BIN" | awk '{print $1}')"
+      fi
+      if [[ "$sha" == "$LEGACY_NODE_BIN_SHA256" \
+         || ( -z "$sha" && "$actual_sha" == "$LEGACY_NODE_BIN_SHA256" ) ]]; then
+        NODE_BIN_VERSION="$LEGACY_NODE_BIN_VERSION"
+        NODE_BIN_URL="$LEGACY_NODE_BIN_URL"
+        NODE_BIN_SHA256="$LEGACY_NODE_BIN_SHA256"
+        log "retaining v$NODE_BIN_VERSION for already-${S[STATE]} recovery state"
+        return 0
+      fi
+    fi
+    return 1
+  fi
+  [[ -n "$version" && -n "$url" && "$sha" =~ ^[0-9a-f]{64}$ ]] \
+    || die cannot-determine-state "recorded binary release receipt is incomplete or malformed"
+  release_version_ok "$version" \
+    || die cannot-determine-state "recorded binary version is malformed: $version"
+  if [[ "$version" == "$NODE_BIN_BASE_VERSION" ]]; then
+    expected_url="$NODE_BIN_URL"
+  else
+    expected_url="$NODE_RELEASE_DOWNLOAD_ROOT/v$version/harmony-$ARCH"
+  fi
+  [[ "$url" == "$expected_url" ]] \
+    || die cannot-determine-state "recorded binary URL does not match version $version and architecture $ARCH"
+  if release_version_newer "$NODE_BIN_BASE_VERSION" "$version"; then
+    return 1
+  fi
+  NODE_BIN_VERSION="$version"
+  NODE_BIN_URL="$url"
+  NODE_BIN_SHA256="$sha"
+  log "using recorded Harmony binary release v$NODE_BIN_VERSION"
+  return 0
+}
+
+select_binary_release() { # <state-loaded: 0|1>
+  local have_state="$1" release_json latest_tag latest_version answer
+  local asset_name asset_record latest_url latest_digest expected_url
+
+  BINARY_UPDATE_SELECTED=0
+  PREVIOUS_NODE_BIN_VERSION=""
+  PREVIOUS_NODE_BIN_SHA256=""
+  NODE_BIN_VERSION="$NODE_BIN_BASE_VERSION"
+  if (( have_state )); then
+    adopt_recorded_binary_selection || true
+  fi
+  if (( SKIP_BINARY_VERSION_CHECK )); then
+    log "binary version check skipped by operator; selected v$NODE_BIN_VERSION"
+    return
+  fi
+
+  release_json="$(curl -fsSL --retry 5 --connect-timeout 10 --max-time 30 \
+    -H 'Accept: application/vnd.github+json' "$NODE_RELEASE_API_URL")" \
+    || die binary-version-check-failed "cannot fetch $NODE_RELEASE_API_URL (rerun with --skip-binary-version-check only if the Harmony team instructs you to)"
+  latest_tag="$(jq -r 'if (.draft == false and .prerelease == false) then (.tag_name // empty) else empty end' <<< "$release_json" 2>/dev/null || true)"
+  [[ "$latest_tag" =~ ^v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$ ]] \
+    || die binary-version-check-failed "latest stable release has an unsupported tag: '$latest_tag'"
+  latest_version="${latest_tag#v}"
+
+  if ! release_version_newer "$latest_version" "$NODE_BIN_BASE_VERSION"; then
+    log "binary version check passed: latest stable v$latest_version, baseline v$NODE_BIN_BASE_VERSION"
+    return
+  fi
+  if ! release_version_newer "$latest_version" "$NODE_BIN_VERSION"; then
+    log "latest stable v$latest_version is already the recorded binary selection"
+    return
+  fi
+
+  notice ""
+  notice "A newer Harmony binary release is available: v$latest_version (script baseline: v$NODE_BIN_BASE_VERSION)."
+  while :; do
+    printf 'Pull and use Harmony v%s instead? [y/n] ' "$latest_version" >&4
+    if ! IFS= read -r answer; then answer="n"; fi
+    printf '\n' >&4
+    case "$answer" in
+      y|Y) break ;;
+      n|N|"")
+        log "operator declined Harmony v$latest_version; selected v$NODE_BIN_VERSION"
+        return
+        ;;
+      *) notice "Please answer y or n." ;;
+    esac
+  done
+
+  asset_name="harmony-$ARCH"
+  asset_record="$(jq -r --arg name "$asset_name" \
+    '[.assets[]? | select(.name == $name) | [(.browser_download_url // ""), (.digest // "")] | @tsv] | if length == 1 then .[0] else empty end' \
+    <<< "$release_json" 2>/dev/null || true)"
+  IFS=$'\t' read -r latest_url latest_digest <<< "$asset_record"
+  expected_url="$NODE_RELEASE_DOWNLOAD_ROOT/$latest_tag/$asset_name"
+  [[ "$latest_url" == "$expected_url" && "$latest_digest" =~ ^sha256:[0-9a-f]{64}$ ]] \
+    || die binary-version-check-failed "v$latest_version has no unique $asset_name asset with a SHA-256 digest"
+  if (( have_state )); then
+    BINARY_UPDATE_SELECTED=1
+    PREVIOUS_NODE_BIN_VERSION="$NODE_BIN_VERSION"
+    PREVIOUS_NODE_BIN_SHA256="$NODE_BIN_SHA256"
+  fi
+  NODE_BIN_VERSION="$latest_version"
+  NODE_BIN_URL="$latest_url"
+  NODE_BIN_SHA256="${latest_digest#sha256:}"
+  log "operator selected latest Harmony binary release v$NODE_BIN_VERSION"
 }
 
 confirm_db_deletion() { # <absolute-db-path>
@@ -268,8 +452,32 @@ require_tools() {
 on_exit() {
   local rc=$?
   if [[ $rc -ne 0 && $PRINTED -eq 0 ]]; then
-    printf 'STOPPED cannot-determine-state %s\n' "$LOGID" >&3
+    if (( PREFLIGHT_CONFIRMED_RUNNING )) && preflight_node_still_running; then
+      printf 'RUNNING %s %s\n' "${BLS_IDS:-unknown}" "$SUFFIX" >&3
+    else
+      printf 'STOPPED cannot-determine-state %s\n' "$LOGID" >&3
+    fi
   fi
+}
+
+preflight_node_still_running() {
+  local exe safe=1
+  (( PREFLIGHT_CONFIRMED_RUNNING )) || return 1
+  node_is_up || return 1
+  if [[ "$LAYOUT" == "systemd" ]]; then
+    verify_effective_exec || safe=0
+    exe="$(readlink "/proc/$LEGIT_PID/exe" 2>/dev/null || true)"
+    [[ "${exe% (deleted)}" == "$BIN" ]] || safe=0
+  fi
+  if (( safe )) && ! binary_ok; then safe=0; fi
+  if (( safe )) && ! scan_duplicates "$LEGIT_PID"; then safe=0; fi
+  if (( safe )) && ! rpc_healthy; then safe=0; fi
+  if (( safe )); then return 0; fi
+
+  log "running-state revalidation failed; quarantining the selected recovery node"
+  PREFLIGHT_CONFIRMED_RUNNING=0
+  quarantine_unhealthy_node
+  return 1
 }
 
 # fsync a file or directory (GNU coreutils sync accepts path arguments).
@@ -567,7 +775,10 @@ scan_duplicates() {
             hcache[$tgt]="$h"
           fi
           h="${hcache[$tgt]}"
-          if [[ -n "$h" && ( "$h" == "$ORIG_EXE_SHA256" || "$h" == "$NODE_BIN_SHA256" ) ]]; then
+          if [[ -n "$h" \
+             && ( "$h" == "$ORIG_EXE_SHA256" \
+               || "$h" == "$NODE_BIN_SHA256" \
+               || ( "$BINARY_UPDATE_SELECTED" == "1" && "$h" == "$PREVIOUS_NODE_BIN_SHA256" ) ) ]]; then
             hit="exe-sha256:$tgt"
           fi
         fi
@@ -736,7 +947,7 @@ remove_hold() {
   fi
 }
 
-# The staged binary is the ordinary official v2026.1.2 build. Original
+# The staged binary is the selected, SHA-256-verified official release. Original
 # argument order is preserved except for sync selectors: stream sync is
 # removed and disabled, while the controlled legacy DNS client is forced on.
 # Health is judged afterwards over loopback RPC.
@@ -782,15 +993,31 @@ elf_arch_ok() { # <file>: little-endian 64-bit ELF whose e_machine matches the h
   [[ "${hdr:36:4}" == "$ELF_MACHINE" ]]               # full 16-bit e_machine, LE (offset 18-19)
 }
 
-# Staged binary present with the pinned hash and the right ELF architecture.
+# Staged binary present with the selected release hash and the right ELF architecture.
 binary_ok() { [[ -f "$BIN" ]] && sha_ok "$BIN" "$NODE_BIN_SHA256" && elf_arch_ok "$BIN"; }
 
+record_binary_receipt() {
+  [[ -n "${S[STATE]-}" ]] || return
+  if [[ "${S[NODE_BIN_VERSION]-}" != "$NODE_BIN_VERSION" \
+     || "${S[NODE_BIN_URL]-}" != "$NODE_BIN_URL" \
+     || "${S[NODE_BIN_SHA256]-}" != "$NODE_BIN_SHA256" ]]; then
+    S[NODE_BIN_VERSION]="$NODE_BIN_VERSION"
+    S[NODE_BIN_URL]="$NODE_BIN_URL"
+    S[NODE_BIN_SHA256]="$NODE_BIN_SHA256"
+    save_state
+    log "recorded Harmony binary release v$NODE_BIN_VERSION"
+  fi
+}
+
 ensure_binary() { # $1 = "download" to allow fetching, anything else verify-only
-  if binary_ok; then return 0; fi
+  if binary_ok; then
+    record_binary_receipt
+    return 0
+  fi
   if [[ "${1-}" != "download" ]]; then
     die not-ready "staged recovery binary missing, hash mismatch, or wrong ELF"
   fi
-  log "fetching recovery binary from $NODE_BIN_URL"
+  log "fetching Harmony v$NODE_BIN_VERSION recovery binary from $NODE_BIN_URL"
   local tmp="$WORK/bin/.harmony-recovery.tmp.$$"
   rm -f "$tmp"
   curl -fSL --retry 5 -o "$tmp" "$NODE_BIN_URL" || die download-failed "binary fetch"
@@ -800,6 +1027,7 @@ ensure_binary() { # $1 = "download" to allow fetching, anything else verify-only
   sync_path "$tmp"
   mv -f "$tmp" "$BIN"
   sync_path "$WORK/bin"
+  record_binary_receipt
 }
 
 # Verify <dir> is exactly the pinned raw LevelDB directory: only regular files
@@ -974,7 +1202,11 @@ discover_systemd() {
   [[ -z "$PARSED_EXTRA" ]] || die unsupported-layout "unsupported ExecStart flag: $PARSED_EXTRA"
   [[ -n "$PARSED_CONFIG" ]] || die unsupported-layout "no -c/--config in ExecStart"
   wd="$(systemctl show "$UNIT" -p WorkingDirectory --value)"
-  [[ "$wd" == "~" || -z "$wd" ]] && wd="$(getent passwd "$(systemd_service_user)" | cut -d: -f6)"
+  if [[ "$wd" == "~" ]]; then
+    wd="$(getent passwd "$(systemd_service_user)" | cut -d: -f6)"
+  elif [[ -z "$wd" ]]; then
+    wd="/"
+  fi
   [[ -n "$wd" ]] || die unsupported-layout "cannot resolve WorkingDirectory"
   ORIG_EXE="$path"
   CONFIG="$(resolve_against "$wd" "$PARSED_CONFIG" || true)"
@@ -1216,6 +1448,8 @@ validate_common() {
   S[DB_SOURCE]="$DB_RCLONE_SOURCE"
   S[DB_FILE_COUNT]="$DB_FILE_COUNT"
   S[DB_BYTES]="$DB_BYTES"
+  S[NODE_BIN_VERSION]="$NODE_BIN_VERSION"
+  S[NODE_BIN_URL]="$NODE_BIN_URL"
   S[NODE_BIN_SHA256]="$NODE_BIN_SHA256"
 }
 
@@ -1242,8 +1476,7 @@ load_facts() { # populate globals from the state file (start / prepare rerun)
      && "${S[REJECTED_CHILD_HASH]-}" == "$REJECTED_CHILD_HASH" \
      && "${S[DB_SOURCE]-}" == "$DB_RCLONE_SOURCE" \
      && "${S[DB_FILE_COUNT]-}" == "$DB_FILE_COUNT" \
-     && "${S[DB_BYTES]-}" == "$DB_BYTES" \
-     && "${S[NODE_BIN_SHA256]-}" == "$NODE_BIN_SHA256" ]] \
+     && "${S[DB_BYTES]-}" == "$DB_BYTES" ]] \
     || die cannot-determine-state "state file does not match this frozen shard-1 recovery profile"
   if [[ -n "${S[ORIG_ARGS]-}" ]]; then
     read -r -a ORIG_ARGS <<< "${S[ORIG_ARGS]}"
@@ -1517,6 +1750,10 @@ prepare_mode() {
     if (( rank >= 7 )); then
       die cannot-determine-state "node already past READY (state ${S[STATE]}); use start"
     fi
+  fi
+  check_script_version
+  select_binary_release "$have_state"
+  if (( have_state )); then
     if (( DISCARD_FLAG )) && [[ "${S[DISCARD_REQUESTED]-}" != "1" ]]; then
       S[DISCARD_REQUESTED]=1
       save_state
@@ -1892,13 +2129,28 @@ ensure_companion_rebuild_before_start() {
     || die cannot-determine-state "companion epoch DB rebuild preparation did not persist: $COMPANION_REBUILD_ERR"
 }
 
+upgrade_running_binary() {
+  verify_running_identity
+  if [[ -z "$PREVIOUS_NODE_BIN_SHA256" ]] \
+     || ! sha_ok "/proc/$LEGIT_PID/exe" "$PREVIOUS_NODE_BIN_SHA256"; then
+    quarantine_unhealthy_node
+    die receipt-mismatch "running recovery binary does not match the recorded pre-upgrade release"
+  fi
+  scan_duplicates "$LEGIT_PID" \
+    || { quarantine_unhealthy_node; die duplicate-process "hits: $DUP_HITS"; }
+  log "stopping v$PREVIOUS_NODE_BIN_VERSION recovery node to install operator-selected v$NODE_BIN_VERSION"
+  quarantine_unhealthy_node
+  ensure_binary download
+  require_no_duplicates ""
+  launch_node
+}
+
 start_mode() {
   load_state || die not-ready "no state file; run prepare first"
   validate_selected_state
   local rank h child; rank="$(state_rank "${S[STATE]-}")"
   (( rank >= 1 )) || die cannot-determine-state "STATE invalid: '${S[STATE]-}'"
   load_facts
-  check_other_state_paths
   # A latched head mismatch blocks every ordinary start rerun: the node must
   # stay stopped until the team investigates and removes the HEAD_MISMATCH
   # line from the state file. The latch is saved before the quarantine stop,
@@ -1924,16 +2176,47 @@ start_mode() {
     fi
     die head-mismatch "latched: ${S[HEAD_MISMATCH]}; node stays stopped"
   fi
+  if [[ "${S[STATE]}" =~ ^(STARTING|STARTED)$ ]] && node_is_up; then
+    NODE_BIN_VERSION="$NODE_BIN_BASE_VERSION"
+    adopt_recorded_binary_selection || true
+    verify_running_identity
+    binary_ok || { quarantine_unhealthy_node; die not-ready "staged recovery binary missing, hash mismatch, or wrong ELF"; }
+    scan_duplicates "$LEGIT_PID" || { quarantine_unhealthy_node; die duplicate-process "hits: $DUP_HITS"; }
+    if ! rpc_healthy; then
+      h="$(target_hash_answer)"
+      if [[ -n "$h" && "$h" != "$TARGET_HASH" ]]; then
+        latch_head_mismatch "$h"
+      fi
+      child="$(rejected_child_hash_answer)"
+      if [[ "$child" == "$REJECTED_CHILD_HASH" ]]; then
+        latch_rejected_child
+      fi
+      quarantine_unhealthy_node
+      die unhealthy "post-success node failed the RPC pin; stopped again"
+    fi
+    PREFLIGHT_CONFIRMED_RUNNING=1
+    log "confirmed healthy ${S[STATE]} node before remote version preflights"
+  fi
+  check_other_state_paths
+  check_script_version
+  select_binary_release 1
+  PREFLIGHT_CONFIRMED_RUNNING=0
+  if [[ "${S[STATE]}" == "READY" ]]; then
+    if [[ "$LAYOUT" == "systemd" ]]; then
+      unit_is_stopped || die not-ready "unit is not inactive"
+    fi
+    require_no_duplicates ""
+    # Existing READY receipts may still contain v2026.1.2. Replace only the
+    # staged binary; the recovered shard-1 and companion DB receipts stay intact.
+    ensure_binary download
+  fi
   if (( rank >= 6 )); then
     ensure_companion_rebuild_before_start
     ensure_recovery_launch_policy
   fi
   case "${S[STATE]}" in
     READY)
-      ensure_binary verify
-      require_no_duplicates ""
       if [[ "$LAYOUT" == "systemd" ]]; then
-        unit_is_stopped || die not-ready "unit is not inactive"
         [[ -f "$(hold_dropin_path)" ]] || die not-ready "hold drop-in missing"
         [[ -f "$(exec_dropin_path)" ]] || die not-ready "exec drop-in missing"
         verify_effective_exec || die receipt-mismatch "effective ExecStart is not the staged recovery command"
@@ -1949,12 +2232,19 @@ start_mode() {
       ;;
     STARTING)
       if node_is_up; then
-        log "adopting already-running node pid=$LEGIT_PID"
-        verify_running_identity
-        binary_ok || { quarantine_unhealthy_node; die not-ready "staged recovery binary missing, hash mismatch, or wrong ELF"; }
-        scan_duplicates "$LEGIT_PID" || { quarantine_unhealthy_node; die duplicate-process "hits: $DUP_HITS"; }
+        if (( BINARY_UPDATE_SELECTED )); then
+          upgrade_running_binary
+          wait_healthy
+          finish_running
+          return
+        else
+          log "adopting already-running node pid=$LEGIT_PID"
+          verify_running_identity
+          binary_ok || { quarantine_unhealthy_node; die not-ready "staged recovery binary missing, hash mismatch, or wrong ELF"; }
+          scan_duplicates "$LEGIT_PID" || { quarantine_unhealthy_node; die duplicate-process "hits: $DUP_HITS"; }
+        fi
       else
-        ensure_binary verify
+        ensure_binary download
         require_no_duplicates ""
         launch_node
       fi
@@ -1963,9 +2253,16 @@ start_mode() {
       ;;
     STARTED)
       if node_is_up; then
-        verify_running_identity
-        binary_ok || { quarantine_unhealthy_node; die not-ready "staged recovery binary missing, hash mismatch, or wrong ELF"; }
-        scan_duplicates "$LEGIT_PID" || { quarantine_unhealthy_node; die duplicate-process "hits: $DUP_HITS"; }
+        if (( BINARY_UPDATE_SELECTED )); then
+          upgrade_running_binary
+          wait_healthy
+          finish_running
+          return
+        else
+          verify_running_identity
+          binary_ok || { quarantine_unhealthy_node; die not-ready "staged recovery binary missing, hash mismatch, or wrong ELF"; }
+          scan_duplicates "$LEGIT_PID" || { quarantine_unhealthy_node; die duplicate-process "hits: $DUP_HITS"; }
+        fi
         if rpc_healthy; then
           # Heal a crash that landed between STARTED and hold removal.
           if [[ "$LAYOUT" == "systemd" ]]; then remove_hold; rm -f "$SENTINEL"; fi
@@ -1989,7 +2286,7 @@ start_mode() {
         # before anything can fail or relaunch, so an enabled unit can never
         # start without GO again. Removed only after health succeeds.
         if [[ "$LAYOUT" == "systemd" ]]; then install_hold; rm -f "$SENTINEL"; fi
-        ensure_binary verify
+        ensure_binary download
         require_no_duplicates ""
         launch_node
         wait_healthy
@@ -2009,6 +2306,11 @@ start_mode() {
 
 main() {
   INVOCATION_DIR="$(pwd -P)"
+  printf 'Rollback script version %s (%s)\n' "$SCRIPT_VERSION" "$SCRIPT_VERSION_DATE" >&2
+  if [[ "${1-}" == "--version" ]]; then
+    (( $# == 1 )) || usage_exit
+    exit 0
+  fi
 
   local selector_count=0 service_unit="${SERVICE-}"
   case "${1-}" in
@@ -2018,6 +2320,8 @@ main() {
         case "$1" in
           --discard-old-db) DISCARD_FLAG=1 ;;
           --quiet) QUIET=1 ;;
+          --skip-binary-version-check) SKIP_BINARY_VERSION_CHECK=1 ;;
+          --skip-script-version-check) SKIP_SCRIPT_VERSION_CHECK=1 ;;
           --systemd-unit)
             (( $# >= 2 )) || usage_exit
             selector_count=$((selector_count+1))
@@ -2039,6 +2343,8 @@ main() {
       MODE=start; shift
       while (( $# > 0 )); do
         case "$1" in
+          --skip-binary-version-check) SKIP_BINARY_VERSION_CHECK=1 ;;
+          --skip-script-version-check) SKIP_SCRIPT_VERSION_CHECK=1 ;;
           --systemd-unit)
             (( $# >= 2 )) || usage_exit
             selector_count=$((selector_count+1))
@@ -2103,14 +2409,18 @@ main() {
   exec 9>"$LOCK_FILE"
   flock -n 9 || die cannot-determine-state "another invocation holds the lock"
 
-  log "mode=$MODE unit=${SELECTED_UNIT:-default} discard=$DISCARD_FLAG quiet=$QUIET invocation_dir=$INVOCATION_DIR rootless=$ROOTLESS logid=$LOGID script_url=$SCRIPT_URL"
+  log "mode=$MODE unit=${SELECTED_UNIT:-default} discard=$DISCARD_FLAG quiet=$QUIET skip_script_version_check=$SKIP_SCRIPT_VERSION_CHECK skip_binary_version_check=$SKIP_BINARY_VERSION_CHECK invocation_dir=$INVOCATION_DIR rootless=$ROOTLESS logid=$LOGID script_version=$SCRIPT_VERSION script_version_date=$SCRIPT_VERSION_DATE script_url=$SCRIPT_URL"
+  require_tools curl sed
+  NODE_BIN_VERSION="$NODE_BIN_BASE_VERSION"
   case "$(uname -sm)" in
     "Linux x86_64")
       ARCH=amd64; ELF_MACHINE=3e00
-      NODE_BIN_URL="$NODE_BIN_URL_AMD64"; NODE_BIN_SHA256="$NODE_BIN_SHA256_AMD64" ;;
+      NODE_BIN_URL="$NODE_BIN_URL_AMD64"; NODE_BIN_SHA256="$NODE_BIN_SHA256_AMD64"
+      LEGACY_NODE_BIN_URL="$LEGACY_NODE_BIN_URL_AMD64"; LEGACY_NODE_BIN_SHA256="$LEGACY_NODE_BIN_SHA256_AMD64" ;;
     "Linux aarch64")
       ARCH=arm64; ELF_MACHINE=b700
-      NODE_BIN_URL="$NODE_BIN_URL_ARM64"; NODE_BIN_SHA256="$NODE_BIN_SHA256_ARM64" ;;
+      NODE_BIN_URL="$NODE_BIN_URL_ARM64"; NODE_BIN_SHA256="$NODE_BIN_SHA256_ARM64"
+      LEGACY_NODE_BIN_URL="$LEGACY_NODE_BIN_URL_ARM64"; LEGACY_NODE_BIN_SHA256="$LEGACY_NODE_BIN_SHA256_ARM64" ;;
     *)
       die unsupported-platform "uname: $(uname -sm) (need Linux x86_64 or Linux aarch64)" ;;
   esac
