@@ -188,11 +188,14 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 		return errors.New("[ValidateCXReceiptsProof] missing merkle proof")
 	}
 	// ShardIDs and CXShardHashes are separate RLP lists that together describe one
-	// destination shard per position, and the loop below walks them in lockstep.
-	// They are only a well formed pairing when their lengths agree.
-	if len(merkleProof.ShardIDs) != len(merkleProof.CXShardHashes) {
+	// destination shard per position, and the loop below reads a hash for every
+	// shard id. A list with fewer hashes than shard ids has no hash to read for
+	// the positions past its end. Hashes beyond the last shard id are never read,
+	// and are left accepted here so that this agrees with the previous release on
+	// which proofs are valid.
+	if len(merkleProof.CXShardHashes) < len(merkleProof.ShardIDs) {
 		return errors.Errorf(
-			"[ValidateCXReceiptsProof] merkle proof shardIDs/CXShardHashes length mismatch: %d vs %d",
+			"[ValidateCXReceiptsProof] merkle proof has %d shardIDs but only %d CXShardHashes",
 			len(merkleProof.ShardIDs), len(merkleProof.CXShardHashes),
 		)
 	}

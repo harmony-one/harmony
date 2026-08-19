@@ -2,6 +2,7 @@ package core
 
 import (
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -9,11 +10,10 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
-// TestValidateCXReceiptsProofRejectsMerkleProofLengthMismatch checks that a
-// merkle proof whose ShardIDs and CXShardHashes lists differ in length is
-// reported as invalid. The two lists pair up positionally, so an unequal pairing
-// is not a proof this function can evaluate.
-func TestValidateCXReceiptsProofRejectsMerkleProofLengthMismatch(t *testing.T) {
+// TestValidateCXReceiptsProofRejectsShortCXShardHashes checks that a merkle
+// proof carrying fewer hashes than shard ids is reported as invalid, since there
+// is no hash to read for the shard ids past the end of that list.
+func TestValidateCXReceiptsProofRejectsShortCXShardHashes(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 	chain, _, header, _ := getTestEnvironment(*key)
 	// AcceptsCrossTx requires an epoch past CrossTxEpoch, otherwise validation
@@ -44,12 +44,12 @@ func TestValidateCXReceiptsProofRejectsMerkleProofLengthMismatch(t *testing.T) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			t.Fatalf("ValidateCXReceiptsProof did not handle the length mismatch: %v", r)
+			t.Fatalf("ValidateCXReceiptsProof did not handle the short hash list: %v", r)
 		}
 	}()
 
 	if err := validator.ValidateCXReceiptsProof(cxp); err == nil {
-		t.Fatal("expected error for merkle proof with mismatched ShardIDs/CXShardHashes lengths")
+		t.Fatal("expected error for a merkle proof with fewer hashes than shard ids")
 	}
 }
 
@@ -86,5 +86,46 @@ func TestValidateCXReceiptsProofRejectsNilMerkleProof(t *testing.T) {
 
 	if err := validator.ValidateCXReceiptsProof(cxp); err == nil {
 		t.Fatal("expected error for nil merkle proof")
+	}
+}
+
+// TestValidateCXReceiptsProofAcceptsTrailingCXShardHashes checks that hashes
+// beyond the last shard id are still tolerated. The loop never reads them, and
+// the previous release accepted such a proof, so rejecting one here would mean
+// disagreeing with nodes that have not upgraded about which proofs are valid.
+func TestValidateCXReceiptsProofAcceptsTrailingCXShardHashes(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	chain, _, header, _ := getTestEnvironment(*key)
+	header = header.With().Epoch(big.NewInt(1)).Header()
+	validator := NewBlockValidator(chain)
+
+	to := common.BytesToAddress([]byte{0x42})
+	receipts := types.CXReceipts{{
+		TxHash:    common.Hash{0x01},
+		From:      common.BytesToAddress([]byte{0x11}),
+		To:        &to,
+		ShardID:   0,
+		ToShardID: 1,
+		Amount:    big.NewInt(1),
+	}}
+	cxp := &types.CXReceiptsProof{
+		Header:   header,
+		Receipts: receipts,
+		MerkleProof: &types.CXMerkleProof{
+			BlockNum: big.NewInt(1),
+			ShardID:  0,
+			ShardIDs: []uint32{1},
+			// One hash for the single shard id, plus a trailing one.
+			CXShardHashes: []common.Hash{types.DeriveSha(receipts), {0x99}},
+		},
+		CommitSig:    []byte{0x01},
+		CommitBitmap: []byte{0x01},
+	}
+
+	// The proof fails later on for other reasons; what matters is that it is not
+	// turned away for the length of its hash list.
+	err := validator.ValidateCXReceiptsProof(cxp)
+	if err != nil && strings.Contains(err.Error(), "CXShardHashes") {
+		t.Fatalf("trailing hashes should not be rejected: %v", err)
 	}
 }
