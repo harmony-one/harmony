@@ -1,23 +1,24 @@
-# Harmony v2026.1.2 binary checklist for recovery
+# Harmony v2026.1.3 binary checklist for recovery
 
 This is a release checklist for the Harmony team. It is not a work log and it
 is not the validator runbook.
 
 The optional recovery script, `scripts/rollback-92730034.sh`, downloads and
-runs the normal Harmony v2026.1.2 binary. Validator instructions are in
+runs the normal Harmony v2026.1.3 binary. Validator instructions are in
 `docs/recovery/validator-rollout-notes.md`.
 
-## Code included in v2026.1.2
+## Recovery code included in v2026.1.3
 
-Build v2026.1.2 only after these two PRs merge:
+v2026.1.3 contains the two recovery patches first released in v2026.1.2:
 
 - [PR #5106](https://github.com/harmony-one/harmony/pull/5106) rejects the
   abandoned shard-0 child and the known malicious block hashes.
 - [PR #5107](https://github.com/harmony-one/harmony/pull/5107) sets the
   recovery ViewID floor to `1,000,000,000`.
 
-These are the only two patch PRs in v2026.1.2. There is no separate recovery
-binary.
+It also contains [PR #5122](https://github.com/harmony-one/harmony/pull/5122),
+the v2026.1.3 mainnet correctness and hardening patch. There is no separate
+recovery binary.
 
 ## What the Harmony team publishes
 

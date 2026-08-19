@@ -9,7 +9,7 @@ commands or state directories from the two procedures.
 
 The script is optional. The equivalent manual operation is to stop the
 selected shard-0 validator, replace `harmony_db_0` with the frozen clean
-database, run the official v2026.1.2 binary, and start only after coordinated
+database, run the official v2026.1.3 binary, and start only after coordinated
 GO. The script automates those steps with checks and a stopped-until-GO hold.
 
 ## 1. Frozen recovery profile
@@ -41,9 +41,10 @@ that space for each service that has not already staged its copy.
 
 ## 2. Release and publication checklist
 
-The script stages the ordinary official v2026.1.2 `harmony-amd64` or
-`harmony-arm64` binary. There is no separate recovery binary. v2026.1.2
-contains the rejected-child rule and the recovery ViewID floor for shard 0.
+The script stages the ordinary official v2026.1.3 `harmony-amd64` or
+`harmony-arm64` binary. There is no separate recovery binary. v2026.1.3
+includes the rejected-child rule and recovery ViewID floor introduced in
+v2026.1.2, plus the v2026.1.3 mainnet hardening patch.
 
 Before sending validator instructions:
 
@@ -88,7 +89,7 @@ What it does:
 2. Checks available disk space.
 3. Downloads the 371 GB clean shard-0 database while the selected validator
    remains online. Interrupted downloads resume file by file.
-4. Downloads the official Harmony v2026.1.2 binary and verifies its
+4. Downloads the official Harmony v2026.1.3 binary and verifies its
    SHA-256 and CPU architecture.
 5. Stops the selected validator after the download finishes.
 6. Checks that no other process uses the selected validator's config,
@@ -96,7 +97,7 @@ What it does:
    same Harmony binary.
 7. Renames the existing `harmony_db_0` to
    `harmony_db_0.pre-recovery-<timestamp>`. It is not deleted by default.
-8. Moves the clean database into place and prepares v2026.1.2.
+8. Moves the clean database into place and prepares v2026.1.3.
 9. At recovered start, disables stream sync and forces the legacy DNS sync
    client without modifying the validator's config file.
 10. Leaves the selected validator stopped after `prepare` and prints a
@@ -127,6 +128,16 @@ curl -fsSL 'https://raw.githubusercontent.com/harmony-one/harmony/refs/heads/rol
 
 Keep this downloaded file for both `prepare` and `start`. Re-download it only
 when the Harmony team explicitly asks you to pick up a testing fix.
+
+Confirm that it prints:
+
+```text
+Rollback script version 2 (2026-08-19T20:36:43Z)
+```
+
+By default, the script also refuses to continue when its canonical URL has a
+newer script version. It checks for a stable Harmony release newer than
+v2026.1.3 and asks before selecting that newer binary.
 
 Choose the command matching the validator layout.
 
@@ -315,6 +326,13 @@ only for a selected, fully stopped systemd service using
 
 ## 6. STOPPED-reason triage
 
+- `script-update-required`: download the canonical script with the command
+  printed immediately above the final line, confirm its version banner, and
+  rerun the recovery command.
+- `script-version-check-failed` or `binary-version-check-failed`: the script
+  could not prove the canonical script or latest stable release metadata.
+  Check network access and contact the Harmony team; do not use a skip flag
+  unless the team explicitly instructs you to.
 - `unsupported-platform`: not Linux x86_64 or Linux arm64.
 - `missing-dependencies`: install the packages printed immediately above the
   final line and rerun the same command.
