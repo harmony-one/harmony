@@ -22,6 +22,7 @@ import (
 	"math"
 	"math/big"
 	mrand "math/rand"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -61,6 +62,7 @@ type HeaderChain struct {
 	tdCache        *lru.Cache // Cache for the most recent block total difficulties
 	numberCache    *lru.Cache // Cache for the most recent block numbers
 	canonicalCache *lru.Cache // number -> Hash
+	canonicalMu    sync.RWMutex
 
 	procInterrupt func() bool
 
@@ -402,8 +404,9 @@ func (hc *HeaderChain) getHashByNumber(number uint64) common.Hash {
 }
 
 func (hc *HeaderChain) GetCanonicalHash(number uint64) common.Hash {
-	// Since canonical chain is immutable, it's safe to read header
-	// hash by number from cache.
+	hc.canonicalMu.RLock()
+	defer hc.canonicalMu.RUnlock()
+
 	if hash, ok := hc.canonicalCache.Get(number); ok {
 		return hash.(common.Hash)
 	}

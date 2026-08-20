@@ -1319,37 +1319,38 @@ func (bc *BlockChainImpl) Rollback(chain []common.Hash) error {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 
+	oldHeader, newHeader := bc.hc.CurrentHeader(), bc.hc.CurrentHeader()
+	oldFastBlock, newFastBlock := bc.CurrentFastBlock(), bc.CurrentFastBlock()
+	oldBlock, newBlock := bc.CurrentBlock(), bc.CurrentBlock()
 	valsToRemove := map[common.Address]struct{}{}
+	var canonicalStart *uint64
+
 	for i := len(chain) - 1; i >= 0; i-- {
 		hash := chain[i]
 
-		currentHeader := bc.hc.CurrentHeader()
-		if currentHeader != nil && currentHeader.Hash() == hash {
-			parentHeader := bc.GetHeader(currentHeader.ParentHash(), currentHeader.Number().Uint64()-1)
-			if parentHeader != nil {
-				if err := bc.hc.SetCurrentHeader(parentHeader); err != nil {
-					return errors.Wrap(err, "HeaderChain SetCurrentHeader")
-				}
+		if newHeader != nil && newHeader.Hash() == hash {
+			parent := bc.GetHeader(newHeader.ParentHash(), newHeader.Number().Uint64()-1)
+			if parent != nil {
+				newHeader = parent
 			}
 		}
-		if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentFastBlock.Hash() == hash {
-			newFastBlock := bc.GetBlock(currentFastBlock.ParentHash(), currentFastBlock.NumberU64()-1)
-			if newFastBlock != nil {
-				bc.currentFastBlock.Store(newFastBlock)
-				headFastBlockGauge.Update(int64(newFastBlock.NumberU64()))
-				rawdb.WriteHeadFastBlockHash(bc.db, newFastBlock.Hash())
+		if newFastBlock != nil && newFastBlock.Hash() == hash {
+			parent := bc.GetBlock(newFastBlock.ParentHash(), newFastBlock.NumberU64()-1)
+			if parent != nil {
+				newFastBlock = parent
 			}
 		}
-		if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentBlock.Hash() == hash {
-			newBlock := bc.GetBlock(currentBlock.ParentHash(), currentBlock.NumberU64()-1)
-			if newBlock != nil {
-				bc.currentBlock.Store(newBlock)
-				headBlockGauge.Update(int64(newBlock.NumberU64()))
-				if err := rawdb.WriteHeadBlockHash(bc.db, newBlock.Hash()); err != nil {
-					return err
+		if newBlock != nil && newBlock.Hash() == hash {
+			rolledBlock := newBlock
+			parent := bc.GetBlock(rolledBlock.ParentHash(), rolledBlock.NumberU64()-1)
+			if parent != nil {
+				number := rolledBlock.NumberU64()
+				if canonicalStart == nil || number < *canonicalStart {
+					canonicalStart = &number
 				}
+				newBlock = parent
 
-				for _, stkTxn := range currentBlock.StakingTransactions() {
+				for _, stkTxn := range rolledBlock.StakingTransactions() {
 					if stkTxn.StakingType() == staking.DirectiveCreateValidator {
 						if addr, err := stkTxn.SenderAddress(); err == nil {
 							valsToRemove[addr] = struct{}{}
@@ -1359,7 +1360,96 @@ func (bc *BlockChainImpl) Rollback(chain []common.Hash) error {
 			}
 		}
 	}
-	return bc.removeInValidatorList(valsToRemove)
+
+	headerChanged := oldHeader != newHeader
+	fastBlockChanged := oldFastBlock != newFastBlock
+	blockChanged := oldBlock != newBlock
+	if !headerChanged && !fastBlockChanged && !blockChanged {
+		return nil
+	}
+
+	var validatorList []common.Address
+	if len(valsToRemove) > 0 {
+		existing, err := bc.ReadValidatorList()
+		if err != nil {
+			return err
+		}
+		validatorList = make([]common.Address, 0, len(existing))
+		for _, addr := range existing {
+			if _, remove := valsToRemove[addr]; !remove {
+				validatorList = append(validatorList, addr)
+			}
+		}
+	}
+
+	batch := bc.db.NewBatch()
+	if headerChanged {
+		if err := rawdb.WriteHeadHeaderHash(batch, newHeader.Hash()); err != nil {
+			return errors.Wrap(err, "write head header hash")
+		}
+	}
+	if fastBlockChanged {
+		if err := rawdb.WriteHeadFastBlockHash(batch, newFastBlock.Hash()); err != nil {
+			return errors.Wrap(err, "write fast head block hash")
+		}
+	}
+	if blockChanged {
+		if err := rawdb.WriteHeadBlockHash(batch, newBlock.Hash()); err != nil {
+			return errors.Wrap(err, "write head block hash")
+		}
+	}
+	if validatorList != nil {
+		if err := rawdb.WriteValidatorList(batch, validatorList); err != nil {
+			return errors.Wrap(err, "write validator list")
+		}
+	}
+
+	canonicalLocked := false
+	if canonicalStart != nil {
+		bc.hc.canonicalMu.Lock()
+		canonicalLocked = true
+		if err := rawdb.DeleteCanonicalHash(batch, *canonicalStart); err != nil {
+			bc.hc.canonicalMu.Unlock()
+			return err
+		}
+		for number := *canonicalStart + 1; number > *canonicalStart; number++ {
+			if rawdb.ReadCanonicalHash(bc.db, number) == (common.Hash{}) {
+				break
+			}
+			if err := rawdb.DeleteCanonicalHash(batch, number); err != nil {
+				bc.hc.canonicalMu.Unlock()
+				return err
+			}
+		}
+	}
+	if err := batch.Write(); err != nil {
+		if canonicalLocked {
+			bc.hc.canonicalMu.Unlock()
+		}
+		return err
+	}
+	if canonicalLocked {
+		bc.hc.canonicalCache.Purge()
+		bc.hc.canonicalMu.Unlock()
+	}
+
+	if headerChanged {
+		bc.hc.currentHeader.Store(newHeader)
+		bc.hc.currentHeaderHash = newHeader.Hash()
+		headHeaderGauge.Update(newHeader.Number().Int64())
+	}
+	if fastBlockChanged {
+		bc.currentFastBlock.Store(newFastBlock)
+		headFastBlockGauge.Update(int64(newFastBlock.NumberU64()))
+	}
+	if blockChanged {
+		bc.currentBlock.Store(newBlock)
+		headBlockGauge.Update(int64(newBlock.NumberU64()))
+	}
+	if validatorList != nil {
+		bc.validatorListCache.Add("validatorList", validatorList)
+	}
+	return nil
 }
 
 // SetReceiptsData computes all the non-consensus fields of the receipts

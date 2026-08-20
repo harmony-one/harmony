@@ -2,14 +2,181 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
+
+var errInjectedBatchWrite = errors.New("injected batch write failure")
+
+type failingBatchDatabase struct {
+	ethdb.Database
+}
+
+func (db failingBatchDatabase) NewBatch() ethdb.Batch {
+	return failingBatch{Batch: db.Database.NewBatch()}
+}
+
+type failingBatch struct {
+	ethdb.Batch
+}
+
+func (failingBatch) Write() error {
+	return errInjectedBatchWrite
+}
+
+func TestRollbackClearsCanonicalMappingAndCache(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	chain, _, header, database := getTestEnvironment(*key)
+	defer chain.Stop()
+
+	genesis := chain.Genesis()
+	makeBlock := func(parent common.Hash, number int64, extra string) *types.Block {
+		h := header.With().
+			ParentHash(parent).
+			Number(big.NewInt(number)).
+			Root(genesis.Root()).
+			Extra([]byte(extra)).
+			Header()
+		return types.NewBlockWithHeader(h)
+	}
+
+	oldBlock := makeBlock(genesis.Hash(), 1, "old canonical block")
+	if err := rawdb.WriteBlock(database, oldBlock); err != nil {
+		t.Fatalf("write old block: %v", err)
+	}
+	if err := chain.WriteHeadBlock(oldBlock); err != nil {
+		t.Fatalf("set old canonical head: %v", err)
+	}
+	if got := chain.GetBlockByNumber(1); got == nil || got.Hash() != oldBlock.Hash() {
+		t.Fatalf("failed to warm canonical cache with old block: got %v", got)
+	}
+
+	staleBlock2 := makeBlock(oldBlock.Hash(), 2, "stale block above current head")
+	if err := rawdb.WriteCanonicalHash(database, staleBlock2.Hash(), 2); err != nil {
+		t.Fatalf("write stale canonical mapping: %v", err)
+	}
+	if got := chain.GetCanonicalHash(2); got != staleBlock2.Hash() {
+		t.Fatalf("failed to warm stale canonical cache: got %s want %s", got, staleBlock2.Hash())
+	}
+
+	if err := chain.Rollback([]common.Hash{oldBlock.Hash()}); err != nil {
+		t.Fatalf("rollback old block: %v", err)
+	}
+	if got := chain.CurrentBlock().Hash(); got != genesis.Hash() {
+		t.Fatalf("current block after rollback: got %s want genesis %s", got, genesis.Hash())
+	}
+	if got := rawdb.ReadCanonicalHash(database, 1); got != (common.Hash{}) {
+		t.Fatalf("persistent canonical mapping survived rollback: got %s", got)
+	}
+	if got := chain.GetCanonicalHash(1); got != (common.Hash{}) {
+		t.Fatalf("cached canonical mapping survived rollback: got %s", got)
+	}
+	if got := rawdb.ReadCanonicalHash(database, 2); got != (common.Hash{}) {
+		t.Fatalf("persistent canonical mapping above rolled-back head survived: got %s", got)
+	}
+	if got := chain.GetCanonicalHash(2); got != (common.Hash{}) {
+		t.Fatalf("cached canonical mapping above rolled-back head survived: got %s", got)
+	}
+
+	replacement := makeBlock(genesis.Hash(), 1, "replacement canonical block")
+	if err := rawdb.WriteBlock(database, replacement); err != nil {
+		t.Fatalf("write replacement block: %v", err)
+	}
+	if err := chain.WriteHeadBlock(replacement); err != nil {
+		t.Fatalf("set replacement canonical head: %v", err)
+	}
+	if got := chain.GetBlockByNumber(1); got == nil || got.Hash() != replacement.Hash() {
+		t.Fatalf("canonical lookup after replacement: got %v want %s", got, replacement.Hash())
+	}
+}
+
+func TestRollbackBatchFailureLeavesHeadsAndCanonicalMappingUnchanged(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	chain, _, header, database := getTestEnvironment(*key)
+	defer chain.Stop()
+
+	genesis := chain.Genesis()
+	oldBlock := types.NewBlockWithHeader(header.With().
+		ParentHash(genesis.Hash()).
+		Number(big.NewInt(1)).
+		Root(genesis.Root()).
+		Extra([]byte("old canonical block")).
+		Header())
+	if err := rawdb.WriteBlock(database, oldBlock); err != nil {
+		t.Fatalf("write old block: %v", err)
+	}
+	if err := chain.WriteHeadBlock(oldBlock); err != nil {
+		t.Fatalf("write old head: %v", err)
+	}
+
+	failingDB := failingBatchDatabase{Database: database}
+	chain.db = failingDB
+	chain.hc.chainDb = failingDB
+
+	err := chain.Rollback([]common.Hash{oldBlock.Hash()})
+	if !errors.Is(err, errInjectedBatchWrite) {
+		t.Fatalf("rollback error = %v, want %v", err, errInjectedBatchWrite)
+	}
+	if got := chain.CurrentBlock().Hash(); got != oldBlock.Hash() {
+		t.Fatalf("in-memory block head changed after failed rollback: got %s want %s", got, oldBlock.Hash())
+	}
+	if got := chain.CurrentFastBlock().Hash(); got != oldBlock.Hash() {
+		t.Fatalf("in-memory fast head changed after failed rollback: got %s want %s", got, oldBlock.Hash())
+	}
+	if got := chain.CurrentHeader().Hash(); got != oldBlock.Hash() {
+		t.Fatalf("in-memory header head changed after failed rollback: got %s want %s", got, oldBlock.Hash())
+	}
+	if got := rawdb.ReadHeadBlockHash(database); got != oldBlock.Hash() {
+		t.Fatalf("persistent block head changed after failed rollback: got %s want %s", got, oldBlock.Hash())
+	}
+	if got := rawdb.ReadHeadFastBlockHash(database); got != oldBlock.Hash() {
+		t.Fatalf("persistent fast head changed after failed rollback: got %s want %s", got, oldBlock.Hash())
+	}
+	if got := rawdb.ReadHeadHeaderHash(database); got != oldBlock.Hash() {
+		t.Fatalf("persistent header head changed after failed rollback: got %s want %s", got, oldBlock.Hash())
+	}
+	if got := rawdb.ReadCanonicalHash(database, 1); got != oldBlock.Hash() {
+		t.Fatalf("canonical mapping changed after failed rollback: got %s want %s", got, oldBlock.Hash())
+	}
+}
+
+func TestGetCanonicalHashWaitsForCanonicalMutation(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	chain, _, _, _ := getTestEnvironment(*key)
+	defer chain.Stop()
+
+	chain.hc.canonicalMu.Lock()
+	done := make(chan common.Hash, 1)
+	go func() {
+		done <- chain.GetCanonicalHash(0)
+	}()
+
+	select {
+	case <-done:
+		chain.hc.canonicalMu.Unlock()
+		t.Fatal("canonical read bypassed mutation lock")
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	chain.hc.canonicalMu.Unlock()
+	select {
+	case got := <-done:
+		if got != chain.Genesis().Hash() {
+			t.Fatalf("canonical read after mutation lock: got %s want %s", got, chain.Genesis().Hash())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("canonical read did not resume after mutation lock")
+	}
+}
 
 // TestIsSpentIgnoresMutatedMerkleProofIdentity guards against replaying a
 // genuine, already-applied CXReceiptsProof by mutating the unauthenticated
