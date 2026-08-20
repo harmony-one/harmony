@@ -45,8 +45,8 @@ set -euo pipefail
 shopt -s nullglob
 umask 077
 
-SCRIPT_VERSION=2
-SCRIPT_VERSION_DATE="2026-08-19T20:36:43Z"
+SCRIPT_VERSION=3
+SCRIPT_VERSION_DATE="2026-08-20T04:02:21Z"
 
 # --- BEGIN FREEZE CONSTANTS (filled once at freeze; leave structure intact) ---
 SCRIPT_URL="https://raw.githubusercontent.com/harmony-one/harmony/refs/heads/rollback-92730034/scripts/rollback-92730034.sh"
@@ -131,6 +131,7 @@ declare -a ORIG_ARGS=()
 ORIG_ARGS_TEXT=""
 declare -a RECOVERY_ARGS=()
 RECOVERY_ARGS_TEXT=""
+declare -a CREATED_BLS_PASS_FILES=()
 
 usage_exit() {
   # Usage errors touch nothing and print the one line themselves.
@@ -343,7 +344,7 @@ package_for_tool() { # <tool> <apt|dnf|pacman>
     curl|rclone|jq|sed|grep) printf '%s\n' "$tool" ;;
     systemctl) printf '%s\n' systemd ;;
     find) printf '%s\n' findutils ;;
-    sha256sum|stat|df|du|od|cat|install|readlink|sync|tee|nproc) printf '%s\n' coreutils ;;
+    sha256sum|stat|df|du|od|cat|install|readlink|sync|tee|nproc|mktemp|ln) printf '%s\n' coreutils ;;
     flock|setsid|runuser) printf '%s\n' util-linux ;;
     awk) printf '%s\n' gawk ;;
     pgrep) [[ "$family" == apt ]] && printf '%s\n' procps || printf '%s\n' procps-ng ;;
@@ -410,6 +411,9 @@ require_tools() {
 
 on_exit() {
   local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    cleanup_created_bls_pass_files || true
+  fi
   if [[ $rc -ne 0 && $PRINTED -eq 0 ]]; then
     if (( PREFLIGHT_CONFIRMED_RUNNING )) && preflight_node_still_running; then
       printf 'RUNNING %s %s\n' "${BLS_IDS:-unknown}" "$SUFFIX" >&3
@@ -662,6 +666,283 @@ build_recovery_args() {
   RECOVERY_ARGS+=("--sync=false" "--sync.client=false" "--dns.client=true")
   for token in "${RECOVERY_ARGS[@]}"; do
     RECOVERY_ARGS_TEXT+="${RECOVERY_ARGS_TEXT:+ }$token"
+  done
+}
+
+cleanup_created_bls_pass_files() {
+  local file removed=0 failed=0
+  (( ${#CREATED_BLS_PASS_FILES[@]} > 0 )) || return 0
+  set +x
+  for file in "${CREATED_BLS_PASS_FILES[@]}"; do
+    if [[ -e "$file" || -L "$file" ]]; then
+      if rm -f -- "$file" && [[ ! -e "$file" && ! -L "$file" ]]; then
+        removed=1
+      else
+        failed=1
+      fi
+    fi
+  done
+  (( failed )) || CREATED_BLS_PASS_FILES=()
+  set -x
+  if (( removed )); then log "removed BLS passphrase file(s) created by the failed launch"; fi
+  if (( failed )); then
+    log "WARNING: could not remove every BLS passphrase file created by this launch"
+    return 1
+  fi
+}
+
+create_bls_pass_file() { # <pass-file> <key-file>
+  local pass_file="$1" key_file="$2" passphrase="" temp_file="" rc=0
+  local key_name="${key_file##*/}"
+
+  [[ ! -e "$pass_file" && ! -L "$pass_file" ]] \
+    || die cannot-determine-state "refusing to replace existing BLS passphrase path: $pass_file"
+
+  notice ""
+  notice "Harmony needs the passphrase for encrypted BLS key $key_name."
+  notice "It will be saved in the standard mode-600 .pass file so detached starts and restarts can unlock the key."
+
+  set +x
+  if (( ROOTLESS )); then
+    temp_file="$(umask 077; mktemp "${pass_file}.recovery.XXXXXX")" || rc=$?
+  else
+    temp_file="$(runuser -u "$RUN_USER" -- mktemp "${pass_file}.recovery.XXXXXX")" || rc=$?
+  fi
+  [[ -n "$temp_file" ]] && CREATED_BLS_PASS_FILES+=("$temp_file")
+
+  printf 'BLS passphrase for %s: ' "$key_name" >&4
+  if (( rc == 0 )); then
+    IFS= read -r -s passphrase || rc=$?
+  fi
+  printf '\n' >&4
+  if (( rc == 0 )); then
+    if (( ROOTLESS )); then
+      if ! printf '%s\n' "$passphrase" > "$temp_file"; then
+        rc=1
+      fi
+    else
+      # shellcheck disable=SC2016 # $secret/$1 expand in the runuser child.
+      if ! printf '%s\n' "$passphrase" \
+        | runuser -u "$RUN_USER" -- bash -c \
+          'set +x; IFS= read -r secret; printf "%s\n" "$secret" > "$1"' \
+          _ "$temp_file" 2>/dev/null; then
+        rc=1
+      fi
+    fi
+  fi
+  if (( rc == 0 )); then
+    if (( ROOTLESS )); then
+      ln -- "$temp_file" "$pass_file" 2>/dev/null || rc=$?
+    else
+      runuser -u "$RUN_USER" -- ln -- "$temp_file" "$pass_file" 2>/dev/null || rc=$?
+    fi
+  fi
+  if (( rc == 0 )); then
+    CREATED_BLS_PASS_FILES+=("$pass_file")
+    rm -f -- "$temp_file" || rc=$?
+  fi
+  passphrase=""
+  set -x
+
+  (( rc == 0 )) \
+    || die bls-passphrase-required "could not read the BLS passphrase or create $pass_file"
+  [[ -f "$pass_file" && ! -L "$pass_file" \
+     && "$(stat -c %a "$pass_file")" == "600" \
+     && "$(stat -c %U "$pass_file")" == "$RUN_USER" ]] \
+    || die bls-passphrase-required "new BLS passphrase file has unsafe ownership, mode, or type: $pass_file"
+  log "created mode-600 BLS passphrase file for $key_name"
+}
+
+prepare_manual_bls_passphrases() {
+  [[ "$LAYOUT" == "manual-directory" ]] || return 0
+
+  local enabled src pass_file key_dir key_files_raw key_csv=""
+  local token next value raw key pass_path
+  local i=0 n="${#ORIG_ARGS[@]}" key_cli_seen=0
+  local modern_bls_seen=0 modern_dir_seen=0 modern_keys_seen=0
+  local src_cli_seen=0 pass_file_cli_seen=0
+  local -a configured_keys=() key_files=()
+
+  enabled="$(toml_get "$CONFIG" BLSKeys PassEnabled)"
+  src="$(toml_get "$CONFIG" BLSKeys PassSrcType)"
+  pass_file="$(toml_get "$CONFIG" BLSKeys PassFile)"
+  key_dir="$(toml_get "$CONFIG" BLSKeys KeyDir)"
+  key_files_raw="$(toml_get "$CONFIG" BLSKeys KeyFiles)"
+  [[ -n "$enabled" ]] || enabled=true
+  [[ -n "$src" ]] || src=auto
+  [[ -n "$key_dir" ]] || key_dir="./.hmy/blskeys"
+
+  raw="${key_files_raw#[}"
+  raw="${raw%]}"
+  raw="${raw//\"/}"
+  raw="${raw//\'/}"
+  raw="$(tr -d '[:space:]' <<< "$raw")"
+  [[ -n "$raw" ]] && key_csv="$raw"
+
+  for token in "${ORIG_ARGS[@]}"; do
+    case "$token" in
+      --bls.dir|--bls.dir=*) modern_bls_seen=1; modern_dir_seen=1 ;;
+      --bls.keys|--bls.keys=*) modern_bls_seen=1; modern_keys_seen=1 ;;
+      --bls.*) modern_bls_seen=1 ;;
+    esac
+  done
+
+  while (( i < n )); do
+    token="${ORIG_ARGS[$i]}"
+    next=""
+    (( i + 1 < n )) && next="${ORIG_ARGS[$((i+1))]}"
+    case "$token" in
+      --bls.dir)
+        [[ -n "$next" ]] && key_dir="$next"
+        i=$((i+2))
+        ;;
+      --bls.dir=*)
+        key_dir="${token#*=}"
+        i=$((i+1))
+        ;;
+      --blsfolder)
+        if (( ! modern_dir_seen )) && [[ -n "$next" ]]; then key_dir="$next"; fi
+        i=$((i+2))
+        ;;
+      --blsfolder=*)
+        (( modern_dir_seen )) || key_dir="${token#*=}"
+        i=$((i+1))
+        ;;
+      --bls.keys)
+        if (( ! key_cli_seen )); then key_csv=""; key_cli_seen=1; fi
+        key_csv+="${key_csv:+,}$next"
+        i=$((i+2))
+        ;;
+      --bls.keys=*)
+        if (( ! key_cli_seen )); then key_csv=""; key_cli_seen=1; fi
+        key_csv+="${key_csv:+,}${token#*=}"
+        i=$((i+1))
+        ;;
+      --blskey_file)
+        if (( ! modern_keys_seen )); then
+          if (( ! key_cli_seen )); then key_csv=""; key_cli_seen=1; fi
+          key_csv+="${key_csv:+,}$next"
+        fi
+        i=$((i+2))
+        ;;
+      --blskey_file=*)
+        if (( ! modern_keys_seen )); then
+          if (( ! key_cli_seen )); then key_csv=""; key_cli_seen=1; fi
+          key_csv+="${key_csv:+,}${token#*=}"
+        fi
+        i=$((i+1))
+        ;;
+      --bls.pass)
+        if [[ "$next" == "true" || "$next" == "false" ]]; then
+          enabled="$next"; i=$((i+2))
+        else
+          enabled=true; i=$((i+1))
+        fi
+        ;;
+      --bls.pass=*)
+        enabled="${token#*=}"
+        i=$((i+1))
+        ;;
+      --bls.pass.src)
+        src="$next"
+        src_cli_seen=1
+        i=$((i+2))
+        ;;
+      --bls.pass.src=*)
+        src="${token#*=}"
+        src_cli_seen=1
+        i=$((i+1))
+        ;;
+      --bls.pass.file)
+        pass_file="$next"
+        pass_file_cli_seen=1
+        i=$((i+2))
+        ;;
+      --bls.pass.file=*)
+        pass_file="${token#*=}"
+        pass_file_cli_seen=1
+        i=$((i+1))
+        ;;
+      --blspass)
+        value="$next"
+        i=$((i+2))
+        if (( ! modern_bls_seen )); then
+          case "$value" in
+            none) enabled=false ;;
+            file:*) enabled=true; src="file"; pass_file="${value#file:}" ;;
+            prompt|no-prompt) enabled=true; src=prompt ;;
+            *) enabled=true; src=auto ;;
+          esac
+        fi
+        ;;
+      --blspass=*)
+        value="${token#*=}"
+        i=$((i+1))
+        if (( ! modern_bls_seen )); then
+          case "$value" in
+            none) enabled=false ;;
+            file:*) enabled=true; src="file"; pass_file="${value#file:}" ;;
+            prompt|no-prompt) enabled=true; src=prompt ;;
+            *) enabled=true; src=auto ;;
+          esac
+        fi
+        ;;
+      *) i=$((i+1)) ;;
+    esac
+  done
+
+  if (( pass_file_cli_seen && ! src_cli_seen )); then src="file"; fi
+  [[ "${enabled,,}" != "false" ]] || return 0
+
+  if [[ -n "$key_csv" ]]; then
+    IFS=',' read -r -a configured_keys <<< "$key_csv"
+    for key in "${configured_keys[@]}"; do
+      [[ -n "$key" ]] || continue
+      [[ "$key" == *.key ]] || continue
+      [[ "$key" == /* ]] || key="$RUN_CWD/$key"
+      [[ -n "$key" && -f "$key" ]] \
+        || die unsupported-layout "configured BLS key file not found: $key"
+      key_files+=("$key")
+    done
+  else
+    [[ "$key_dir" == /* ]] || key_dir="$RUN_CWD/$key_dir"
+    key_dir="$(readlink -f -- "$key_dir" 2>/dev/null || true)"
+    [[ -n "$key_dir" && -d "$key_dir" ]] || return 0
+    while IFS= read -r -d '' key; do
+      key_files+=("$key")
+    done < <(find "$key_dir" \( -type f -o -type l \) -name '*.key' -print0)
+  fi
+  (( ${#key_files[@]} > 0 )) || return 0
+
+  src="${src,,}"
+  case "$src" in
+    auto|file) ;;
+    prompt)
+      die bls-passphrase-required "manual detached launch requires BLSKeys.PassSrcType=auto or file, not prompt"
+      ;;
+    *) return 0 ;;
+  esac
+
+  if [[ -n "$pass_file" ]]; then
+    [[ "$pass_file" == /* ]] || pass_file="$RUN_CWD/$pass_file"
+    pass_file="$(readlink -m -- "$pass_file")"
+    if [[ -e "$pass_file" || -L "$pass_file" ]]; then
+      [[ -f "$pass_file" && ! -L "$pass_file" ]] \
+        || die cannot-determine-state "BLS passphrase path is not a regular file: $pass_file"
+      return 0
+    fi
+    create_bls_pass_file "$pass_file" "${key_files[0]}"
+    return 0
+  fi
+
+  for key in "${key_files[@]}"; do
+    pass_path="${key%.key}.pass"
+    if [[ -e "$pass_path" || -L "$pass_path" ]]; then
+      [[ -f "$pass_path" && ! -L "$pass_path" ]] \
+        || die cannot-determine-state "BLS passphrase path is not a regular file: $pass_path"
+      continue
+    fi
+    create_bls_pass_file "$pass_path" "$key"
   done
 }
 
@@ -1791,6 +2072,7 @@ launch_node() {
     save_state
   else
     [[ -d "$RUN_CWD" ]] || die start-failed "recorded cwd $RUN_CWD missing"
+    prepare_manual_bls_passphrases
     log "launching staged binary as $RUN_USER from $RUN_CWD (rootless=$ROOTLESS)"
     local nodecmd=(setsid "$BIN" "${RECOVERY_ARGS[@]}")
     (( ROOTLESS )) || nodecmd=(runuser -u "$RUN_USER" -- "${nodecmd[@]}")
@@ -1833,7 +2115,9 @@ wait_healthy() {
     if [[ -n "$h" && "$h" != "$TARGET_HASH" ]]; then
       latch_head_mismatch "$h"
     fi
-    if rpc_healthy; then return 0; fi
+    if rpc_healthy; then
+      return 0
+    fi
     sleep 5
   done
   stop_started_node
@@ -2175,7 +2459,7 @@ main() {
       die unsupported-platform "uname: $(uname -sm) (need Linux x86_64 or Linux aarch64)" ;;
   esac
   log "platform $(uname -sm) -> linux-$ARCH artifact"
-  require_tools curl rclone find sha256sum flock stat df du awk sed grep jq od cat pgrep fuser install getent readlink sync tee nproc
+  require_tools curl rclone find sha256sum flock stat df du awk sed grep jq od cat pgrep fuser install getent readlink sync tee nproc mktemp ln
 
   STAMP="$(date +%Y%m%d-%H%M%S)"
   ORIG_EXE=""; ORIG_EXE_SHA256=""; CONFIG=""; DATADIR=""; BLS_IDS=""; RPC_URL=""

@@ -19,14 +19,16 @@ manual procedure.
   the validator group chat if anything is unclear.
 
 Download the current script again before `start`, even if PREPARE used an
-older copy. Version 2 of the script reuses the completed database and recovery
-state from version 1, and:
+older copy. Version 3 of the script reuses the completed database and recovery
+state from earlier versions, and:
 
 - Upgrades the staged v2026.1.2 binary to v2026.1.3, or to a newer release if
   you accept it.
 - Disables stream sync and enables DNS sync for the recovered launch.
 - For shard 1, quarantines the old `harmony_db_0` companion so Harmony
   rebuilds it.
+- Lets manual validators enter encrypted BLS key passphrases securely during
+  startup and saves standard mode-600 passphrase files for detached restarts.
 - Adds script/release version checks and safer start/systemd handling.
 
 Keep the same invocation directory and user used for PREPARE, or the same
@@ -35,7 +37,7 @@ exact systemd unit.
 The script should print this exact banner:
 
 ```text
-Rollback script version 2 (2026-08-19T20:36:43Z)
+Rollback script version 3 (2026-08-20T04:02:21Z)
 ```
 
 If the version differs or no version is printed, double-check that the
@@ -160,8 +162,57 @@ hash:
 If the service exits, RPC does not become healthy, or the hash differs, stop
 the service and ask in the validator group.
 
-For a manually prepared shard-1 validator, follow the separate instructions
-provided in the validator group.
+## Shard-1 systemd validator prepared manually without the script
+
+This section applies if a privileged user completed the manual shard-1
+procedure in the PREPARE document.
+
+Before starting, quickly confirm that:
+
+- The service is still stopped.
+- `harmony_db_1` still has `32482` files and `70073877580` bytes.
+- The service uses the verified v2026.1.3 binary.
+- The final config or command uses:
+
+  ```text
+  --sync=false --sync.client=false --dns.client=true
+  ```
+
+Before starting Harmony, move the old shard-0 companion database aside so
+Harmony rebuilds it:
+
+```bash
+cd '<DataDir>'
+sudo mv harmony_db_0 "harmony_db_0.pre-s1-recovery-$(date -u +%Y%m%d-%H%M%S)"
+```
+
+If `harmony_db_0` is already missing, do not recreate or restore it. Start the
+service normally:
+
+```bash
+sudo systemctl start YOUR_SHARD1_SERVICE.service
+sudo systemctl is-active YOUR_SHARD1_SERVICE.service
+```
+
+Give Harmony up to three minutes to start. Confirm that:
+
+- A new `<DataDir>/harmony_db_0/CURRENT` exists.
+- RPC becomes healthy and the block number reaches at least `94978278`.
+- Block `94978278` has this hash:
+
+  ```text
+  0xa25d77e72c7f71f2b18847c7f6a9bbed8af42244915bd9175cc247d157b11b9f
+  ```
+
+- Block `94978279` is absent or does not have the rejected old-chain hash:
+
+  ```text
+  0xc936581d391b74a620bf6636519834b14a9a2d4e9a5154867c8407f219d8a878
+  ```
+
+If the service exits, `harmony_db_0` is not recreated, RPC does not become
+healthy, or either hash check fails, stop the service and ask in the validator
+group.
 
 ## After RUNNING
 

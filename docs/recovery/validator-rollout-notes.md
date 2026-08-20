@@ -132,7 +132,7 @@ when the Harmony team explicitly asks you to pick up a testing fix.
 Confirm that it prints:
 
 ```text
-Rollback script version 2 (2026-08-19T20:36:43Z)
+Rollback script version 3 (2026-08-20T04:02:21Z)
 ```
 
 By default, the script also refuses to continue when its canonical URL has a
