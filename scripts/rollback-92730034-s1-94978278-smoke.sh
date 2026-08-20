@@ -116,10 +116,12 @@ run_rb() { # <cwd> <args...>; captures single stdout line + rc
 
 run_rb_input() { # <input> <cwd> <args...>
   local input="$1" dir="$2"; shift 2
+  start_companion_rebuild_simulator "${1-}"
   set +e
   RB_OUT="$(cd "$dir" && printf '%s\n' "$input" | env SERVICE="${RB_SERVICE-}" bash "$RB" "$@")"
   RB_RC=$?
   set -e
+  stop_companion_rebuild_simulator
 }
 
 run_rb_user() { # <user> <cwd> <args...>; rootless invocation as <user>
@@ -127,6 +129,16 @@ run_rb_user() { # <user> <cwd> <args...>; rootless invocation as <user>
   start_companion_rebuild_simulator "${1-}"
   set +e
   RB_OUT="$(cd "$dir" && runuser -u "$u" -- env SERVICE="${RB_SERVICE-}" bash "$RB" "$@")"
+  RB_RC=$?
+  set -e
+  stop_companion_rebuild_simulator
+}
+
+run_rb_user_input() { # <input> <user> <cwd> <args...>
+  local input="$1" u="$2" dir="$3"; shift 3
+  start_companion_rebuild_simulator "${1-}"
+  set +e
+  RB_OUT="$(cd "$dir" && printf '%s\n' "$input" | runuser -u "$u" -- env SERVICE="${RB_SERVICE-}" bash "$RB" "$@")"
   RB_RC=$?
   set -e
   stop_companion_rebuild_simulator
@@ -206,6 +218,7 @@ cleanup_case() {
   rm -f /etc/harmony/rbsmoke-a.conf /etc/harmony/rbsmoke-b.conf
   rm -rf "$WORK" "$SENT_DIR"
   rm -f "$DIE"
+  rm -f "$T/require-bls-pass"
   rm -f "$T"/rpc-*.json
   rpc_set
   rpc_set_port 9600
@@ -229,6 +242,16 @@ int main(int argc, char **argv) {
      duplicate-scan tests rely on the two binaries having different SHA-256. */
   if (argc > 1 && strcmp(argv[1], "variant") == 0) { printf("%s\n", variant); return 0; }
   if (access("/var/tmp/rbsmoke/fake-harmony-die", F_OK) == 0) { fprintf(stderr, "dying by request\n"); return 1; }
+  if (access("/var/tmp/rbsmoke/require-bls-pass", F_OK) == 0) {
+    char pass[64] = {0};
+    FILE *f = fopen(".hmy/blskeys/test.pass", "r");
+    if (!f || !fgets(pass, sizeof(pass), f) || strncmp(pass, "test-pass", 9) != 0) {
+      if (f) fclose(f);
+      fprintf(stderr, "temporary BLS passphrase file missing or invalid\n");
+      return 1;
+    }
+    fclose(f);
+  }
   for (;;) pause();
 }
 EOF
@@ -958,6 +981,113 @@ m_rootless() {
   kill_fakes
 }
 
+m_bls_passphrase() {
+  # Manual validators commonly enter encrypted-key passphrases interactively.
+  # The recovery launch must create a mode-600 pass file without logging the
+  # secret, remove it after failed startup, and retain it after success.
+  cleanup_case; new_manual_case blspass; mk_script
+  mkdir -p "$INV/.hmy/blskeys"
+  printf 'encrypted-key-fixture\n' > "$INV/.hmy/blskeys/test.key"
+  printf 'encrypted-key-fixture-2\n' > "$INV/.hmy/blskeys/test2.key"
+  cat >> "$INV/harmony.conf" <<'EOF'
+
+[BLSKeys]
+KeyDir = "./.hmy/blskeys"
+KeyFiles = []
+PassEnabled = true
+PassSrcType = "auto"
+PassFile = ""
+SavePassphrase = false
+EOF
+  chown -R hmytest: "$INV"
+  start_orig --bls.keys ./.hmy/blskeys/test.key --bls.keys ./.hmy/blskeys/test2.key
+
+  local rwork="$INV/.hmy-recovery-92730034-s1-94978278/work"
+  local pass_file="$INV/.hmy/blskeys/test.pass"
+  local pass_file2="$INV/.hmy/blskeys/test2.pass"
+  RB_SERVICE="$ABSENT_UNIT" run_rb_user hmytest "$INV" prepare
+  expect "m_blspass/prepare" 0 "^READY $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  : > "$T/require-bls-pass"
+
+  RB_SERVICE="$ABSENT_UNIT" run_rb_user_input $'wrong-pass\nwrong-pass' hmytest "$INV" start
+  expect "m_blspass/wrong-pass-refused" 1 "^STOPPED start-failed [0-9-]+$"
+  [[ ! -e "$pass_file" && ! -e "$pass_file2" ]] \
+    && ok "m_blspass/wrong-pass-removed" || bad "m_blspass/wrong-pass-removed"
+
+  RB_SERVICE="$ABSENT_UNIT" run_rb_user_input $'test-pass\ntest-pass' hmytest "$INV" start
+  expect "m_blspass/start" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  [[ -f "$pass_file" && -f "$pass_file2" \
+     && "$(stat -c %U:%a "$pass_file")" == "hmytest:600" \
+     && "$(stat -c %U:%a "$pass_file2")" == "hmytest:600" ]] \
+    && ok "m_blspass/pass-file-secure" || bad "m_blspass/pass-file-secure"
+  if grep -E -R -q 'test-pass|wrong-pass' "$rwork/private" 2>/dev/null; then
+    bad "m_blspass/pass-not-logged"
+  else
+    ok "m_blspass/pass-not-logged"
+  fi
+  rm -f "$T/require-bls-pass"
+  kill_fakes
+}
+
+m_bls_passphrase_root() {
+  # A root-run manual recovery must create the pass file directly as the
+  # validator user, never root-owned and then pathname-chowned.
+  cleanup_case; new_manual_case blspassroot; mk_script
+  mkdir -p "$INV/.hmy/blskeys"
+  printf 'encrypted-key-fixture\n' > "$INV/.hmy/blskeys/test.key"
+  cat >> "$INV/harmony.conf" <<'EOF'
+
+[BLSKeys]
+KeyDir = "./.hmy/blskeys"
+KeyFiles = []
+PassEnabled = true
+PassSrcType = "auto"
+PassFile = ""
+SavePassphrase = false
+EOF
+  chown -R hmytest: "$INV"
+  start_orig
+
+  local pass_file="$INV/.hmy/blskeys/test.pass"
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare
+  expect "m_blspassroot/prepare" 0 "^READY $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  : > "$T/require-bls-pass"
+  RB_SERVICE="$ABSENT_UNIT" run_rb_input test-pass "$INV" start
+  expect "m_blspassroot/start" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  [[ -f "$pass_file" && "$(stat -c %U:%a "$pass_file")" == "hmytest:600" ]] \
+    && ok "m_blspassroot/pass-file-user-owned" || bad "m_blspassroot/pass-file-user-owned"
+  rm -f "$T/require-bls-pass"
+  kill_fakes
+}
+
+m_bls_kms_only() {
+  # Prompt-only passphrase settings are irrelevant when the validator loads
+  # only KMS .bls keys; no passphrase prompt or .pass file should be created.
+  cleanup_case; new_manual_case blskms; mk_script
+  mkdir -p "$INV/.hmy/blskeys"
+  printf 'kms-key-fixture\n' > "$INV/.hmy/blskeys/test.bls"
+  cat >> "$INV/harmony.conf" <<'EOF'
+
+[BLSKeys]
+KeyDir = "./.hmy/blskeys"
+KeyFiles = ["./.hmy/blskeys/test.bls"]
+PassEnabled = true
+PassSrcType = "prompt"
+PassFile = ""
+SavePassphrase = false
+KMSEnabled = true
+EOF
+  chown -R hmytest: "$INV"
+  start_orig
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" prepare
+  expect "m_blskms/prepare" 0 "^READY $BLS_SORTED recovery-92730034-s1-94978278$" || return 0
+  RB_SERVICE="$ABSENT_UNIT" run_rb "$INV" start
+  expect "m_blskms/start" 0 "^RUNNING $BLS_SORTED recovery-92730034-s1-94978278$"
+  [[ ! -e "$INV/.hmy/blskeys/test.pass" ]] \
+    && ok "m_blskms/no-pass-file" || bad "m_blskms/no-pass-file"
+  kill_fakes
+}
+
 m_extra_flags() {
   cleanup_case; new_manual_case extraflags; mk_script
   mkdir -p "$INV/k"; chown hmytest: "$INV/k"
@@ -1184,6 +1314,9 @@ run_manual() {
   m_duplicate || true
   m_wrong_arch || true
   m_rootless || true
+  m_bls_passphrase || true
+  m_bls_passphrase_root || true
+  m_bls_kms_only || true
   m_extra_flags || true
   m_ambiguous || true
   m_respawner || true

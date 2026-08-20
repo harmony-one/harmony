@@ -32,7 +32,7 @@ Before invoking `prepare`, use the non-mutating `--version` command shown for
 the selected shard and confirm this exact banner:
 
 ```text
-Rollback script version 2 (2026-08-19T20:36:43Z)
+Rollback script version 3 (2026-08-20T04:02:21Z)
 ```
 
 If the version differs or no version is printed, double-check that the
@@ -225,5 +225,31 @@ For a shard-0 validator, a privileged user can prepare it manually:
 6. Do not restart Harmony. Tell the validator group that manual preparation
    is complete and wait for the public Stage 2 GO announcement.
 
-If a shard-1 operator will not run the script with sudo, ask in the validator
-group for separate manual instructions.
+For a shard-1 validator, a privileged user can prepare it manually:
+
+1. Stop Harmony and prevent any related service or supervisor from restarting
+   it. Keep it stopped, including after a reboot.
+2. Confirm the exact DataDir, then remove only:
+
+   ```text
+   <DataDir>/harmony_db_1
+   ```
+
+   Keep `harmony_db_0` in place for now. Do not touch the config, `.hmy`, BLS
+   keys, P2P key, or logs.
+3. Follow Harmony's
+   [shard-1 FullDB guide](https://docs.harmony.one/home/network/validators/node-setup/syncing-db#id-4.2-shard-1-validator)
+   and download the clean database into that exact path. When complete, it
+   must contain:
+
+   ```text
+   32482 files
+   70073877580 bytes
+   ```
+4. Disable stream sync and enable DNS sync using the same config and command
+   settings shown in the shard-0 manual steps above.
+5. Install the same verified official v2026.1.3 binary shown above. Make sure
+   the new database and binary have the ownership and permissions needed by
+   the systemd service user.
+6. Do not restart Harmony. Tell the validator group that manual preparation
+   is complete and wait for the public Stage 2 GO announcement.
