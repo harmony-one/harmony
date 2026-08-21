@@ -4,10 +4,10 @@ import (
 	"encoding/binary"
 	"testing"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/harmony/crypto/bls/core"
 	"github.com/harmony-one/harmony/internal/registry"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
