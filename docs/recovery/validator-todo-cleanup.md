@@ -1,11 +1,11 @@
 # Validator cleanup: return to normal operation
 
-The rollback is complete. You can stop using the recovery script and return
+The rollback is complete. You can stop using the rollback script and return
 to your normal way of starting Harmony.
 
-The recovery script did not change the Harmony binary at your normal path.
-It ran a verified Harmony binary from its recovery folder instead. The script
-did download and install the clean recovery database. Depending on the option
+The rollback script did not change the Harmony binary at your normal path.
+It ran a verified Harmony binary from a temporary folder instead. The script
+did download and install the clean rollback database. Depending on the option
 you used, it either moved the previous database to a timestamped
 `*.pre-recovery-*` folder or deleted it. For shard 1, it also moved the
 previous `harmony_db_0` companion aside and Harmony rebuilt it.
@@ -33,7 +33,7 @@ BLS keys, P2P key, and any BLS `.pass` files.
    sudo systemctl stop "$SERVICE"
    ```
 
-3. Remove only the recovery drop-ins:
+3. Remove only the rollback drop-ins:
 
    ```bash
    sudo rm -f "/etc/systemd/system/$SERVICE.d/50-harmony-recovery-exec.conf"
@@ -61,7 +61,7 @@ BLS keys, P2P key, and any BLS `.pass` files.
 
 ## Manual validator
 
-1. Stop the exact Harmony process started by the recovery script.
+1. Stop the exact Harmony process started by the rollback script.
 2. Install Harmony v2026.1.3 or newer at your normal binary path.
 3. Start Harmony with your normal command, service manager, or supervisor.
 
@@ -78,7 +78,7 @@ Confirm that:
 
 If a check fails, stop that validator and ask in the validator group.
 
-## Remove recovery files
+## Remove rollback files
 
 After the validator starts normally and passes the checks, you may delete:
 
@@ -92,5 +92,5 @@ After the validator starts normally and passes the checks, you may delete:
   `harmony_db_0.pre-s1-recovery-*`.
 - `pre-recovery-*` transaction and sync-cache folders.
 
-On a host with several validator services, keep shared recovery files until
+On a host with several validator services, keep shared rollback files until
 every service has returned to normal operation.
