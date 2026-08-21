@@ -327,7 +327,9 @@ func New(
 	// the blockchain during initialization as it was
 	// displayed on explorer as Height right now
 	consensus.setCurBlockViewID(0)
-	consensus.SlashChan = make(chan slash.Record)
+	// Buffered so that reporting a double sign hands off without waiting on the node
+	// goroutine that drains it into the pending slash set.
+	consensus.SlashChan = make(chan slash.Record, 64)
 	consensus.readySignal = make(chan Proposal)
 	consensus.commitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF

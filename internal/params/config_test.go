@@ -191,3 +191,68 @@ func maxEpoch(epochs []*big.Int) *big.Int {
 	}
 	return max
 }
+
+// The leader liveness rule and both slashing rules take effect on every node at once, so
+// each network holds them at EpochTBD until its own activation is scheduled, and the
+// local and test networks carry them from the start.
+func TestSlashingAndLivenessActivation(t *testing.T) {
+	scheduled := []struct {
+		name   string
+		config *ChainConfig
+	}{
+		{"mainnet", MainnetChainConfig},
+		{"testnet", TestnetChainConfig},
+		{"pangaea", PangaeaChainConfig},
+		{"partner", PartnerChainConfig},
+		{"stressnet", StressnetChainConfig},
+	}
+	// An epoch far beyond anything the live networks have reached.
+	far := big.NewInt(1000000)
+	for _, tc := range scheduled {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.config.IsLeaderLivenessRotation(far) {
+				t.Error("leader liveness rotation is active without a scheduled epoch")
+			}
+			if tc.config.IsDoubleSignSlash(far) {
+				t.Error("double sign slashing is active without a scheduled epoch")
+			}
+			if tc.config.IsDowntimeSlash(far) {
+				t.Error("downtime slashing is active without a scheduled epoch")
+			}
+		})
+	}
+
+	for _, tc := range []struct {
+		name   string
+		config *ChainConfig
+		epoch  *big.Int
+	}{
+		{"localnet", LocalnetChainConfig, big.NewInt(5)},
+		{"all-protocol-changes", AllProtocolChanges, big.NewInt(1)},
+		{"test", TestChainConfig, big.NewInt(1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.config.IsLeaderLivenessRotation(tc.epoch) {
+				t.Error("leader liveness rotation is not active")
+			}
+			if !tc.config.IsDoubleSignSlash(tc.epoch) {
+				t.Error("double sign slashing is not active")
+			}
+			if !tc.config.IsDowntimeSlash(tc.epoch) {
+				t.Error("downtime slashing is not active")
+			}
+		})
+	}
+}
+
+// An unset activation epoch reads as inactive, so a config built without these fields
+// behaves as it did before they existed.
+func TestSlashingActivationDefaultsToInactive(t *testing.T) {
+	empty := &ChainConfig{}
+	epoch := big.NewInt(1000000)
+	if empty.IsLeaderLivenessRotation(epoch) ||
+		empty.IsDoubleSignSlash(epoch) ||
+		empty.IsDowntimeSlash(epoch) {
+		t.Error("an unset activation epoch must read as inactive")
+	}
+}

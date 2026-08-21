@@ -106,6 +106,9 @@ var (
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(2964),
 		BloomEpoch:                            big.NewInt(2964),
 		StrictStateValidationEpoch:            EpochTBD,
+		LeaderLivenessRotationEpoch:           EpochTBD,
+		DoubleSignSlashEpoch:                  EpochTBD,
+		DowntimeSlashEpoch:                    EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -181,6 +184,9 @@ var (
 		BLSProofBindEpoch:                     big.NewInt(7420),
 		BloomEpoch:                            big.NewInt(7414),
 		StrictStateValidationEpoch:            big.NewInt(7645),
+		LeaderLivenessRotationEpoch:           EpochTBD,
+		DoubleSignSlashEpoch:                  EpochTBD,
+		DowntimeSlashEpoch:                    EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -254,6 +260,9 @@ var (
 		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 		BloomEpoch:                            EpochTBD,
 		StrictStateValidationEpoch:            EpochTBD,
+		LeaderLivenessRotationEpoch:           EpochTBD,
+		DoubleSignSlashEpoch:                  EpochTBD,
+		DowntimeSlashEpoch:                    EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -329,6 +338,9 @@ var (
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(53000),
 		BloomEpoch:                            big.NewInt(53508),
 		StrictStateValidationEpoch:            big.NewInt(56874),
+		LeaderLivenessRotationEpoch:           EpochTBD,
+		DoubleSignSlashEpoch:                  EpochTBD,
+		DowntimeSlashEpoch:                    EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -403,6 +415,9 @@ var (
 		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 		BloomEpoch:                            EpochTBD,
 		StrictStateValidationEpoch:            EpochTBD,
+		LeaderLivenessRotationEpoch:           EpochTBD,
+		DoubleSignSlashEpoch:                  EpochTBD,
+		DowntimeSlashEpoch:                    EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -477,6 +492,9 @@ var (
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(5),
 		BloomEpoch:                            big.NewInt(5),
 		StrictStateValidationEpoch:            big.NewInt(1),
+		LeaderLivenessRotationEpoch:           big.NewInt(5),
+		DoubleSignSlashEpoch:                  big.NewInt(5),
+		DowntimeSlashEpoch:                    big.NewInt(5),
 	}
 
 	// AllProtocolChanges ...
@@ -553,6 +571,9 @@ var (
 		big.NewInt(1),                      // VerifyBeaconHeaderSlashEpoch
 		big.NewInt(1),                      // BloomEpoch
 		big.NewInt(1),                      // StrictStateValidationEpoch
+		big.NewInt(1),                      // LeaderLivenessRotationEpoch
+		big.NewInt(1),                      // DoubleSignSlashEpoch
+		big.NewInt(1),                      // DowntimeSlashEpoch
 	}
 
 	// TestChainConfig ...
@@ -629,6 +650,9 @@ var (
 		big.NewInt(1),        // VerifyBeaconHeaderSlashEpoch
 		big.NewInt(1),        // BloomEpoch
 		big.NewInt(1),        // StrictStateValidationEpoch
+		big.NewInt(1),        // LeaderLivenessRotationEpoch
+		big.NewInt(1),        // DoubleSignSlashEpoch
+		big.NewInt(1),        // DowntimeSlashEpoch
 	}
 
 	// TestRules ...
@@ -907,6 +931,18 @@ type ChainConfig struct {
 	//   - a precompile that spends the balance at its own address may only be
 	//     reached by a plain CALL
 	StrictStateValidationEpoch *big.Int `json:"strict-state-validation-epoch,omitempty"`
+	// LeaderLivenessRotationEpoch is the first epoch where view-change leader
+	// selection skips committee members that have signed none of the last few
+	// committed blocks, the same aliveness rule steady-state rotation applies.
+	// Only the leader-rotation-v2 selection path honours it.
+	LeaderLivenessRotationEpoch *big.Int `json:"leader-liveness-rotation-epoch,omitempty"`
+	// DoubleSignSlashEpoch is the first epoch where a leader reports two commit
+	// ballots cast by one signer at a single height as double-sign evidence.
+	DoubleSignSlashEpoch *big.Int `json:"double-sign-slash-epoch,omitempty"`
+	// DowntimeSlashEpoch is the first epoch where a validator that was elected but
+	// signed at or below the downtime threshold over the epoch loses a small share
+	// of its own stake, on top of losing its seat.
+	DowntimeSlashEpoch *big.Int `json:"downtime-slash-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -993,6 +1029,10 @@ func (c *ChainConfig) mustValid() {
 		"must satisfy: SlashBallotSignerFixEpoch >= StakingEpoch")
 	require(c.VerifyBeaconHeaderSlashEpoch == nil || c.VerifyBeaconHeaderSlashEpoch.Cmp(c.StakingEpoch) >= 0,
 		"must satisfy: VerifyBeaconHeaderSlashEpoch >= StakingEpoch")
+	require(c.DoubleSignSlashEpoch == nil || c.DoubleSignSlashEpoch.Cmp(c.StakingEpoch) >= 0,
+		"must satisfy: DoubleSignSlashEpoch >= StakingEpoch")
+	require(c.DowntimeSlashEpoch == nil || c.DowntimeSlashEpoch.Cmp(c.StakingEpoch) >= 0,
+		"must satisfy: DowntimeSlashEpoch >= StakingEpoch")
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
@@ -1406,6 +1446,26 @@ func (c *ChainConfig) isBloomFeatureActive(featureEpoch, epoch *big.Int) bool {
 // IsBloom returns whether the Bloom hardfork is active at the given epoch.
 func (c *ChainConfig) IsBloom(epoch *big.Int) bool {
 	return isForked(c.BloomEpoch, epoch)
+}
+
+// IsLeaderLivenessRotation returns whether view-change leader selection skips
+// committee members with no recent signatures. It carries its own activation epoch
+// rather than joining a bundle, since it settles which node the committee expects to
+// propose and so has to take effect on every node at once.
+func (c *ChainConfig) IsLeaderLivenessRotation(epoch *big.Int) bool {
+	return isForked(c.LeaderLivenessRotationEpoch, epoch)
+}
+
+// IsDoubleSignSlash returns whether conflicting commit ballots are reported as
+// double-sign evidence at the given epoch.
+func (c *ChainConfig) IsDoubleSignSlash(epoch *big.Int) bool {
+	return isForked(c.DoubleSignSlashEpoch, epoch)
+}
+
+// IsDowntimeSlash returns whether an elected validator that was absent for an epoch
+// forfeits a share of its own stake at the given epoch.
+func (c *ChainConfig) IsDowntimeSlash(epoch *big.Int) bool {
+	return isForked(c.DowntimeSlashEpoch, epoch)
 }
 
 // Rules wraps ChainConfig and is merely syntactic sugar or can be used for functions
