@@ -454,6 +454,7 @@ func (consensus *Consensus) updateConsensusInformation(reason string) Mode {
 	// Update voters in the committee
 	if _, err := consensus.decider().SetVoters(
 		committeeToSet, epochToSet,
+		consensus.Blockchain().Config().IsStrictStateValidation(epochToSet),
 	); err != nil {
 		consensus.getLogger().Error().
 			Err(err).

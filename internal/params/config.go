@@ -105,6 +105,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(2964),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(2964),
 		BloomEpoch:                            big.NewInt(2964),
+		StrictStateValidationEpoch:            EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -179,6 +180,7 @@ var (
 		CXMerkleProofReplayFixEpoch:           big.NewInt(7385),
 		BLSProofBindEpoch:                     big.NewInt(7420),
 		BloomEpoch:                            big.NewInt(7414),
+		StrictStateValidationEpoch:            big.NewInt(7645),
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -251,6 +253,7 @@ var (
 		SlashBallotSignerFixEpoch:             EpochTBD,
 		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 		BloomEpoch:                            EpochTBD,
+		StrictStateValidationEpoch:            EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -325,6 +328,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(52650),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(53000),
 		BloomEpoch:                            big.NewInt(53508),
+		StrictStateValidationEpoch:            big.NewInt(56874),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -398,6 +402,7 @@ var (
 		SlashBallotSignerFixEpoch:             EpochTBD,
 		VerifyBeaconHeaderSlashEpoch:          EpochTBD,
 		BloomEpoch:                            EpochTBD,
+		StrictStateValidationEpoch:            EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -471,6 +476,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(5),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(5),
 		BloomEpoch:                            big.NewInt(5),
+		StrictStateValidationEpoch:            big.NewInt(1),
 	}
 
 	// AllProtocolChanges ...
@@ -546,6 +552,7 @@ var (
 		big.NewInt(1),                      // SlashBallotSignerFixEpoch
 		big.NewInt(1),                      // VerifyBeaconHeaderSlashEpoch
 		big.NewInt(1),                      // BloomEpoch
+		big.NewInt(1),                      // StrictStateValidationEpoch
 	}
 
 	// TestChainConfig ...
@@ -621,6 +628,7 @@ var (
 		big.NewInt(1),        // SlashBallotSignerFixEpoch
 		big.NewInt(1),        // VerifyBeaconHeaderSlashEpoch
 		big.NewInt(1),        // BloomEpoch
+		big.NewInt(1),        // StrictStateValidationEpoch
 	}
 
 	// TestRules ...
@@ -882,6 +890,23 @@ type ChainConfig struct {
 	// have individual activation epochs; each feature is active once the chain
 	// reaches the earlier of BloomEpoch and that feature's epoch.
 	BloomEpoch *big.Int `json:"bloom-epoch,omitempty"`
+
+	// StrictStateValidationEpoch is the epoch where the additional state
+	// transition and block acceptance checks are enabled. It covers checks whose
+	// outcome can differ from the pre-existing behaviour, so they are activated
+	// together at a single epoch rather than immediately on upgrade:
+	//   - incoming cross-shard receipts are verified on the block insert path,
+	//     not only when a block arrives through consensus
+	//   - a delegation resolved through the delegation index must belong to the
+	//     delegator named in the staking message
+	//   - the duplicate identity and slot key scan over the validator list is
+	//     skipped when the staking message supplies neither of them
+	//   - a reward total is tested for emptiness over its whole value rather
+	//     than over its low 64 bits
+	//   - a cross-shard transaction must name a recipient
+	//   - a precompile that spends the balance at its own address may only be
+	//     reached by a plain CALL
+	StrictStateValidationEpoch *big.Int `json:"strict-state-validation-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -993,6 +1018,13 @@ func (c *ChainConfig) AcceptsCrossTx(epoch *big.Int) bool {
 // cross-shard transaction fields.
 func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 	return isForked(c.CrossTxEpoch, epoch)
+}
+
+// IsStrictStateValidation determines whether the additional state transition and
+// block acceptance checks are enabled. This activates strictly at its own epoch,
+// independently of any other hardfork.
+func (c *ChainConfig) IsStrictStateValidation(epoch *big.Int) bool {
+	return isForked(c.StrictStateValidationEpoch, epoch)
 }
 
 // IsCXMerkleProofReplayFixEpoch determines whether replay-fix checks are enabled.
@@ -1408,6 +1440,7 @@ type Rules struct {
 	IsPrague                 bool // EIP-2935: Serve historical block hashes from state
 	Is8024                   bool
 	IsCXReceiptStateRollback bool
+	IsStrictStateValidation  bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1448,5 +1481,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsPrague:                   c.IsPrague(epoch),
 		Is8024:                     c.IsEIP8024(epoch),
 		IsCXReceiptStateRollback:   c.IsCXReceiptStateRollback(epoch),
+		IsStrictStateValidation:    c.IsStrictStateValidation(epoch),
 	}
 }

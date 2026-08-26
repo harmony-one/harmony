@@ -155,7 +155,7 @@ func AggregateRosters(
 }
 
 // Compute creates a new roster based off the shard.SlotList
-func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
+func Compute(subComm *shard.Committee, epoch *big.Int, strictVotePower bool) (*Roster, error) {
 	if epoch == nil {
 		return nil, errors.New("nil epoch for roster compute")
 	}
@@ -177,6 +177,13 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 
 	harmonyPercent := shard.Schedule.InstanceForEpoch(epoch).HarmonyVotePercent()
 	externalPercent := shard.Schedule.InstanceForEpoch(epoch).ExternalVotePercent()
+	// The harmony share of the vote is only meaningful when there are harmony
+	// slots holding it. With none, that share belongs to the staked members as a
+	// group; otherwise it ends up as an unallocated remainder that the balancing
+	// step below hands in full to whichever staked member happens to be last.
+	if strictVotePower && roster.HMYSlotCount == 0 {
+		externalPercent = numeric.OneDec()
+	}
 
 	for i := range staked {
 		member := AccommodateHarmonyVote{

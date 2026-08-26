@@ -58,3 +58,12 @@ func (s *PrivateDebugService) GetConfig(
 ) (StructuredResponse, error) {
 	return NewStructuredResponse(s.hmy.NodeAPI.GetConfig())
 }
+
+// SetNodeToBackupMode sets the node to backup mode. This changes how the node
+// takes part in consensus, so it is kept off the public surface and is only
+// reachable when the operator has enabled the debug APIs.
+func (s *PrivateDebugService) SetNodeToBackupMode(ctx context.Context, isBackup bool) (bool, error) {
+	timer := DoMetricRPCRequest(SetNodeToBackupMode)
+	defer DoRPCRequestDuration(SetNodeToBackupMode, timer)
+	return s.hmy.NodeAPI.SetNodeBackupMode(isBackup), nil
+}

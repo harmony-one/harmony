@@ -46,10 +46,17 @@ func checkValidatorWrapperAddressBinding(
 func checkDuplicateFields(
 	addrs []common.Address, state vm.StateDB,
 	validator common.Address, identity string, blsKeys []bls.SerializedPublicKey,
-	checkSameBlock bool,
+	checkSameBlock bool, skipWhenNothingToCompare bool,
 ) error {
 	checkIdentity := identity != ""
 	checkBlsKeys := len(blsKeys) != 0
+
+	// Every address below costs a wrapper load out of state. With no identity and
+	// no slot keys to compare against there is nothing those loads can report, so
+	// the scan has no work to do.
+	if skipWhenNothingToCompare && !checkIdentity && !checkBlsKeys {
+		return nil
+	}
 
 	blsKeyMap := map[bls.SerializedPublicKey]struct{}{}
 	for _, key := range blsKeys {
@@ -145,6 +152,7 @@ func VerifyAndCreateValidatorFromMsg(
 		msg.Identity,
 		msg.SlotPubKeys,
 		bindBLSProof,
+		chainContext.Config().IsStrictStateValidation(epoch),
 	); err != nil {
 		return nil, err
 	}
@@ -204,6 +212,7 @@ func VerifyAndEditValidatorFromMsg(
 		msg.Identity,
 		newBlsKeys,
 		bindBLSProof,
+		chainContext.Config().IsStrictStateValidation(epoch),
 	); err != nil {
 		return nil, err
 	}
@@ -303,6 +312,12 @@ func VerifyAndDelegateFromMsg(
 
 	var delegateeWrapper *staking.ValidatorWrapper
 	if chainConfig.IsRedelegation(epoch) {
+		// Each validator is worked on through a single wrapper. Two index entries
+		// naming the same validator would otherwise each get their own copy of it,
+		// both drawing on the same undelegated tokens, and only the copy written
+		// last would survive - crediting the delegator for tokens that are still
+		// there.
+		seenValidators := map[common.Address]*staking.ValidatorWrapper{}
 		// Check if we can use tokens in undelegation to delegate (redelegate)
 		for i := range delegations {
 			delegationIndex := &delegations[i]
@@ -310,6 +325,13 @@ func VerifyAndDelegateFromMsg(
 			wrapper, err := stateDB.ValidatorWrapper(delegationIndex.ValidatorAddress, false, true)
 			if err != nil {
 				return nil, nil, nil, err
+			}
+			if chainConfig.IsStrictStateValidation(epoch) {
+				if seen, ok := seenValidators[delegationIndex.ValidatorAddress]; ok {
+					wrapper = seen
+				} else {
+					seenValidators[delegationIndex.ValidatorAddress] = wrapper
+				}
 			}
 			if err := checkValidatorWrapperAddressBinding(
 				chainConfig, epoch, delegationIndex.ValidatorAddress, wrapper,
@@ -326,6 +348,20 @@ func VerifyAndDelegateFromMsg(
 			}
 
 			delegation := &wrapper.Delegations[delegationIndex.Index]
+
+			// The index is resolved from a node local lookup table rather than
+			// from state, so confirm the entry it points at really is a delegation
+			// made by this delegator before its undelegated tokens are consumed.
+			if chainConfig.IsStrictStateValidation(epoch) &&
+				!bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
+				return nil, nil, nil, errors.Errorf(
+					"delegation index %d of validator %s belongs to %s, not %s",
+					delegationIndex.Index,
+					delegationIndex.ValidatorAddress.Hex(),
+					delegation.DelegatorAddress.Hex(),
+					msg.DelegatorAddress.Hex(),
+				)
+			}
 
 			startBalance := big.NewInt(0).Set(delegateBalance)
 			// Start from the oldest undelegated tokens
@@ -588,10 +624,12 @@ func VerifyAndMigrateFromMsg(
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndCollectRewardsFromDelegation(
 	stateDB vm.StateDB, delegations []staking.DelegationIndex,
+	delegator common.Address, epoch *big.Int, chainConfig *params.ChainConfig,
 ) ([]*staking.ValidatorWrapper, *big.Int, error) {
 	if stateDB == nil {
 		return nil, nil, errStateDBIsMissing
 	}
+	strict := chainConfig != nil && chainConfig.IsStrictStateValidation(epoch)
 	updatedValidatorWrappers := []*staking.ValidatorWrapper{}
 	totalRewards := big.NewInt(0)
 	for i := range delegations {
@@ -602,7 +640,20 @@ func VerifyAndCollectRewardsFromDelegation(
 			return nil, nil, err
 		}
 		if uint64(len(wrapper.Delegations)) > delegation.Index {
-			delegation := &wrapper.Delegations[delegation.Index]
+			validatorAddress := delegation.ValidatorAddress
+			index := delegation.Index
+			delegation := &wrapper.Delegations[index]
+			// The index is resolved from a node local lookup table rather than
+			// from state, so confirm the entry it points at really is a delegation
+			// made by this delegator before its reward is paid out.
+			if strict &&
+				!bytes.Equal(delegation.DelegatorAddress.Bytes(), delegator.Bytes()) {
+				return nil, nil, errors.Errorf(
+					"delegation index %d of validator %s belongs to %s, not %s",
+					index, validatorAddress.Hex(),
+					delegation.DelegatorAddress.Hex(), delegator.Hex(),
+				)
+			}
 			if delegation.Reward.Cmp(common.Big0) > 0 {
 				totalRewards.Add(totalRewards, delegation.Reward)
 				delegation.Reward.SetUint64(0)
@@ -617,7 +668,13 @@ func VerifyAndCollectRewardsFromDelegation(
 		}
 		updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)
 	}
-	if totalRewards.Int64() == 0 {
+	// Sign reports emptiness for the whole value, whereas Int64 only describes the
+	// low 64 bits of it.
+	noRewards := totalRewards.Int64() == 0
+	if strict {
+		noRewards = totalRewards.Sign() == 0
+	}
+	if noRewards {
 		return nil, nil, errNoRewardsToCollect
 	}
 	return updatedValidatorWrappers, totalRewards, nil

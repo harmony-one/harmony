@@ -609,7 +609,19 @@ func CreateValidatorFromNewMsg(
 		return nil, err
 	}
 	commission := Commission{val.CommissionRates, blockNum}
-	pubKeys := append(val.SlotPubKeys[0:0], val.SlotPubKeys...)
+	// Full slice expression: the zero cap forces a fresh array, so the keys the
+	// validator is built from are independent of the caller's message.
+	pubKeys := append(val.SlotPubKeys[0:0:0], val.SlotPubKeys...)
+
+	// SanityCheck enforces this same limit once the wrapper is assembled. Applying
+	// it up front keeps the signature verification below proportional to the
+	// number of keys a validator is actually allowed to hold, since verifying a
+	// proof of possession is far more expensive than the checks around it.
+	if c := len(pubKeys); c > MaxBLSPerValidator {
+		return nil, errors.Wrapf(
+			ErrExcessiveBLSKeys, "have: %d allowed: %d", c, MaxBLSPerValidator,
+		)
+	}
 
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	if err := containsHarmonyBLSKeys(

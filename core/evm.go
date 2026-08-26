@@ -293,7 +293,7 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 			return err
 		}
 		updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
-			db, delegations,
+			db, delegations, collectRewards.DelegatorAddress, ref.Epoch(), chain.Config(),
 		)
 		if err != nil {
 			return err

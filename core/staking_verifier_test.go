@@ -195,7 +195,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = checkDuplicateFields(addrs, test.sdb, test.validator, test.identity, test.pubs, false)
+		err = checkDuplicateFields(addrs, test.sdb, test.validator, test.identity, test.pubs, false, true)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
@@ -1461,8 +1461,9 @@ var (
 
 func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 	tests := []struct {
-		sdb vm.StateDB
-		ds  []staking.DelegationIndex
+		sdb       vm.StateDB
+		ds        []staking.DelegationIndex
+		delegator common.Address
 
 		expVWrappers    []*staking.ValidatorWrapper
 		expTotalRewards *big.Int
@@ -1470,29 +1471,34 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 	}{
 		{
 			// 0: Positive test case
-			sdb: makeStateForReward(t),
-			ds:  makeMsgCollectRewards(),
+			sdb:       makeStateForReward(t),
+			ds:        makeMsgCollectRewards(),
+			delegator: delegatorAddr,
 
 			expVWrappers:    expVWrappersForReward(),
 			expTotalRewards: new(big.Int).Add(reward01, reward11),
 		},
 		{
-			// 1: No rewards to collect
-			sdb: makeStateDBForStake(t),
-			ds:  []staking.DelegationIndex{{ValidatorAddress: validatorAddr2, Index: 0}},
+			// 1: No rewards to collect. Index 0 is the validator's own
+			// self delegation, so the collector here is the validator.
+			sdb:       makeStateDBForStake(t),
+			ds:        []staking.DelegationIndex{{ValidatorAddress: validatorAddr2, Index: 0}},
+			delegator: validatorAddr2,
 
 			expErr: errNoRewardsToCollect,
 		},
 		{
 			// 2: nil state db
-			sdb: nil,
-			ds:  makeMsgCollectRewards(),
+			sdb:       nil,
+			ds:        makeMsgCollectRewards(),
+			delegator: delegatorAddr,
 
 			expErr: errStateDBIsMissing,
 		},
 		{
 			// 3: ValidatorWrapper not in state
-			sdb: makeStateForReward(t),
+			sdb:       makeStateForReward(t),
+			delegator: delegatorAddr,
 			ds: func() []staking.DelegationIndex {
 				msg := makeMsgCollectRewards()
 				msg[1].ValidatorAddress = makeTestAddr("addr not exist")
@@ -1503,7 +1509,8 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 		},
 		{
 			// 4: Wrong input message - index out of range
-			sdb: makeStateForReward(t),
+			sdb:       makeStateForReward(t),
+			delegator: delegatorAddr,
 			ds: func() []staking.DelegationIndex {
 				dis := makeMsgCollectRewards()
 				dis[1].Index = 2
@@ -1514,7 +1521,10 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		ws, tReward, err := VerifyAndCollectRewardsFromDelegation(test.sdb, test.ds)
+		ws, tReward, err := VerifyAndCollectRewardsFromDelegation(
+			test.sdb, test.ds, test.delegator,
+			big.NewInt(defaultEpoch), params.LocalnetChainConfig,
+		)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Fatalf("Test %v: %v", i, err)
@@ -1837,4 +1847,107 @@ func assertError(got, expect error) error {
 		return fmt.Errorf("unexpected error [%v] / [%v]", got, expect)
 	}
 	return nil
+}
+
+// TestCollectRewardsRejectsForeignDelegationIndex checks that a delegation index
+// pointing at another account's delegation is refused once strict validation is
+// active, and that the pre-fork behaviour is left unchanged.
+func TestCollectRewardsRejectsForeignDelegationIndex(t *testing.T) {
+	// Index 1 of each wrapper belongs to delegatorAddr, so collecting it as
+	// validatorAddr means the index does not match the named delegator.
+	strictCfg := *params.LocalnetChainConfig
+	strictCfg.StrictStateValidationEpoch = big.NewInt(0)
+
+	legacyCfg := *params.LocalnetChainConfig
+	legacyCfg.StrictStateValidationEpoch = params.EpochTBD
+
+	_, _, err := VerifyAndCollectRewardsFromDelegation(
+		makeStateForReward(t), makeMsgCollectRewards(), validatorAddr,
+		big.NewInt(defaultEpoch), &strictCfg,
+	)
+	if err == nil {
+		t.Fatal("expected an error when the delegation index belongs to another delegator")
+	}
+
+	if _, _, err := VerifyAndCollectRewardsFromDelegation(
+		makeStateForReward(t), makeMsgCollectRewards(), validatorAddr,
+		big.NewInt(defaultEpoch), &legacyCfg,
+	); err != nil {
+		t.Fatalf("pre-fork behaviour changed: %v", err)
+	}
+}
+
+// TestCheckDuplicateFieldsSkipsScanWithNothingToCompare checks that the scan over
+// the validator list is skipped when the message supplies neither an identity nor
+// slot keys, and that it still runs when the skip is not enabled.
+func TestCheckDuplicateFieldsSkipsScanWithNothingToCompare(t *testing.T) {
+	sdb := makeStateDBForStake(t)
+	// An address that is not a validator in state: loading its wrapper fails, so
+	// reaching it proves the scan ran.
+	addrs := []common.Address{makeTestAddr("not a validator")}
+
+	if err := checkDuplicateFields(
+		addrs, sdb, createValidatorAddr, "", nil, false, true,
+	); err != nil {
+		t.Fatalf("expected the scan to be skipped, got: %v", err)
+	}
+
+	if err := checkDuplicateFields(
+		addrs, sdb, createValidatorAddr, "", nil, false, false,
+	); err == nil {
+		t.Fatal("expected the scan to run when the skip is not enabled")
+	}
+}
+
+// TestRedelegateWithRepeatedValidatorIndex checks that undelegated tokens are
+// counted once even when the delegation index names the same validator more than
+// once. Each entry would otherwise be resolved against its own copy of the
+// validator, so the same undelegated tokens could fund the delegation twice
+// while only the copy written last survived.
+func TestRedelegateWithRepeatedValidatorIndex(t *testing.T) {
+	newConfig := func(strict bool) *params.ChainConfig {
+		c := &params.ChainConfig{}
+		c.MinDelegation100Epoch = big.NewInt(100)
+		c.RedelegationEpoch = big.NewInt(7)
+		if strict {
+			c.StrictStateValidationEpoch = big.NewInt(0)
+		} else {
+			c.StrictStateValidationEpoch = params.EpochTBD
+		}
+		return c
+	}
+	epoch := big.NewInt(7)
+	index := func(n int) []staking.DelegationIndex {
+		out := []staking.DelegationIndex{}
+		for i := 0; i < n; i++ {
+			out = append(out, staking.DelegationIndex{
+				ValidatorAddress: validatorAddr,
+				Index:            1,
+				BlockNum:         big.NewInt(defaultBlockNumber),
+			})
+		}
+		return out
+	}
+
+	msg := defaultMsgDelegate()
+	_, wantFromBalance, _, err := VerifyAndDelegateFromMsg(
+		makeStateForRedelegate(t), epoch, &msg, index(1), newConfig(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msgDup := defaultMsgDelegate()
+	_, gotFromBalance, _, err := VerifyAndDelegateFromMsg(
+		makeStateForRedelegate(t), epoch, &msgDup, index(2), newConfig(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotFromBalance.Cmp(wantFromBalance) != 0 {
+		t.Errorf(
+			"repeating the index changed the amount taken from balance: got %v want %v",
+			gotFromBalance, wantFromBalance,
+		)
+	}
 }

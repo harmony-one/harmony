@@ -424,6 +424,7 @@ func payoutUndelegations(
 		return errors.New(msg)
 	}
 	isMaxRate := chain.Config().IsMaxRate(newShardState.Epoch)
+	releaseAllUnlocked := chain.Config().IsStrictStateValidation(header.Epoch())
 	for _, validator := range validators {
 		wrapper, err := state.ValidatorWrapper(validator, true, false)
 		if err != nil {
@@ -436,7 +437,8 @@ func payoutUndelegations(
 			delegation := &wrapper.Delegations[i]
 			before := len(delegation.Undelegations)
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
-				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock, isMaxRate,
+				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock,
+				isMaxRate, releaseAllUnlocked,
 			)
 			if len(delegation.Undelegations) != before {
 				wrapperDirty = true
@@ -628,6 +630,7 @@ func applySlashes(
 			records,
 			slashRewardBeneficiary,
 			chain.Config().IsSlashExternalStakeDenomFix(header.Epoch()),
+			chain.Config().IsStrictStateValidation(header.Epoch()),
 		)
 
 		if err != nil {
@@ -827,7 +830,10 @@ func readEpochCtxFromChain(chain engine.ChainReader, key epochCtxKey) (epochCtx,
 		return epochCtx{}, err
 	}
 	isStaking := chain.Config().IsStaking(epoch)
-	qrVerifier, err := quorum.NewVerifier(shardComm, epoch, isStaking)
+	qrVerifier, err := quorum.NewVerifier(
+		shardComm, epoch, isStaking,
+		chain.Config().IsStrictStateValidation(epoch),
+	)
 	if err != nil {
 		return epochCtx{}, err
 	}

@@ -393,6 +393,11 @@ func makeEnvironment(chain core.BlockChain, parent *block.Header, header *block.
 	if err != nil {
 		return nil, err
 	}
+	// Match how blocks are processed, so a proposed block flushes validator
+	// wrappers the same way the validators of that block will.
+	state.SetStrictStateValidation(
+		chain.Config().IsStrictStateValidation(header.Epoch()),
+	)
 	env := &environment{
 		signer:    types.NewEIP155Signer(chain.Config().ChainID),
 		ethSigner: types.NewEIP155Signer(chain.Config().EthCompatibleChainID),
