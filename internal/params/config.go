@@ -180,7 +180,7 @@ var (
 		CXMerkleProofReplayFixEpoch:           big.NewInt(7385),
 		BLSProofBindEpoch:                     big.NewInt(7420),
 		BloomEpoch:                            big.NewInt(7414),
-		StrictStateValidationEpoch:            big.NewInt(7645),
+		StrictStateValidationEpoch:            big.NewInt(7692),
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
@@ -328,7 +328,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(52650),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(53000),
 		BloomEpoch:                            big.NewInt(53508),
-		StrictStateValidationEpoch:            big.NewInt(56874),
+		StrictStateValidationEpoch:            big.NewInt(57757),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
