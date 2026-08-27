@@ -119,7 +119,7 @@ func TestRequestManager_NoStream_CancelRequests(t *testing.T) {
 	}
 }
 
-// For request assigned to the stream being removed, the request will be rescheduled.
+// A request assigned to a removed stream is failed after the stream state is cleaned up.
 func TestRequestManager_RemoveStream(t *testing.T) {
 	delayF := makeOnceBlockDelayFunc(150 * time.Millisecond)
 	respF := makeDefaultResponseFunc()
@@ -131,27 +131,18 @@ func TestRequestManager_RemoveStream(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	resC := ts.rm.doRequestAsync(ctx, req)
-	time.Sleep(defTestSleep)
 
 	// remove the stream which is responsible for the request
-	idToRemove := ts.pickOneOccupiedStream()
+	idToRemove, err := ts.waitForRequestStream(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ts.sm.rmStream(idToRemove)
 
-	// the request is rescheduled thus there is supposed to be no errors
+	// The request must fail only after the removed stream is no longer visible.
 	res := <-resC
 	if res.err == nil {
 		t.Errorf("unexpected error: %v", errors.New("stream removed when doing request"))
-	}
-
-	// Wait for stream removal to be processed asynchronously in the event loop
-	// The removal happens in a separate goroutine, so we need to wait for it
-	maxWait := 10 * time.Second
-	deadline := time.Now().Add(maxWait)
-	for time.Now().Before(deadline) {
-		if ts.rm.streams.Length() == 2 && ts.rm.available.Length() == 2 {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	if l := ts.rm.streams.Length(); l != 2 {
@@ -159,6 +150,9 @@ func TestRequestManager_RemoveStream(t *testing.T) {
 	}
 	if l := ts.rm.available.Length(); l != 2 {
 		t.Errorf("unexpected stream size, expected 2, got %d", l)
+	}
+	if l := ts.rm.pendings.Length(); l != 0 {
+		t.Errorf("unexpected pending request size, expected 0, got %d", l)
 	}
 }
 
@@ -524,6 +518,7 @@ type testSuite struct {
 	rm          *requestManager
 	sm          *testStreamManager
 	bootStreams []*testStream
+	requestSent chan sttypes.StreamID
 
 	delayFunc delayFunc
 	respFunc  responseFunc
@@ -541,6 +536,7 @@ func newTestSuite(delayF delayFunc, respF responseFunc, numStreams int) *testSui
 		rm:          rm,
 		sm:          sm,
 		bootStreams: make([]*testStream, 0, numStreams),
+		requestSent: make(chan sttypes.StreamID, 1),
 		delayFunc:   delayF,
 		respFunc:    respF,
 		ctx:         ctx,
@@ -572,15 +568,13 @@ func (ts *testSuite) RemoveAllStreams() {
 	}
 }
 
-func (ts *testSuite) pickOneOccupiedStream() sttypes.StreamID {
-	IDs := ts.rm.pendings.Keys()
-	for _, id := range IDs {
-		req, _ := ts.rm.pendings.Get(id)
-		if req.owner != nil {
-			return req.owner.ID()
-		}
+func (ts *testSuite) waitForRequestStream(ctx context.Context) (sttypes.StreamID, error) {
+	select {
+	case stID := <-ts.requestSent:
+		return stID, nil
+	case <-ctx.Done():
+		return "", fmt.Errorf("waiting for request stream: %w", ctx.Err())
 	}
-	return ""
 }
 
 type (
@@ -641,6 +635,10 @@ func (ts *testSuite) makeTestStream(index int) *testStream {
 		rm:      ts.rm,
 		trusted: false,
 		deliver: func(req *testRequest) {
+			select {
+			case ts.requestSent <- stid:
+			default:
+			}
 			delay := ts.delayFunc()
 			resp := ts.respFunc(req)
 			go func() {

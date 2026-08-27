@@ -90,9 +90,11 @@ type Host interface {
 	TrustedPeers() []libp2p_peer.ID
 	// IsTrustedPeer checks whether a peer is trusted
 	IsTrustedPeer(id libp2p_peer.ID) bool
-	// TrustedPeersInitiated returns true if trusted peers initialization is complete
-	// (either disabled, no sources, or AddTrustedNodes has completed)
+	// TrustedPeersInitiated returns true once trusted peer initialization no longer
+	// blocks startup (disabled, no sources, completed, canceled, or timed out).
 	TrustedPeersInitiated() bool
+	// WaitForTrustedPeers blocks until initialization is marked complete or ctx is done.
+	WaitForTrustedPeers(ctx context.Context) error
 	// TrustedMinPeers returns the minimum number of trusted peers to connect to
 	TrustedMinPeers() int
 }
@@ -480,6 +482,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		cancel:                  cancel,
 		banned:                  banned,
 		trustedPeersInitiated:   abool.New(),
+		trustedPeersReady:       make(chan struct{}),
 	}
 
 	// Set trusted peers as initiated immediately if:
@@ -487,7 +490,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	// 2. No trusted sources configured (no trusted nodes and no DNS static nodes)
 	// This allows stream manager to proceed immediately without waiting.
 	if !cfg.TrustedBootstrapEnabled || !h.hasTrustedSources() {
-		h.trustedPeersInitiated.Set()
+		h.markTrustedPeersInitiated()
 		subLogger.Info().Msg("[Host] trusted peers initialization marked as complete (disabled or no sources)")
 	}
 
@@ -597,6 +600,8 @@ type HostV2 struct {
 	cancel                  func()
 	banned                  *blockedpeers.Manager
 	trustedPeersInitiated   *abool.AtomicBool
+	trustedPeersReady       chan struct{}
+	trustedPeersReadyOnce   sync.Once
 }
 
 // PubSub ..
@@ -805,7 +810,7 @@ func (host *HostV2) addTrustedNodesWithTimeout() {
 	// Note: AddTrustedNodes may continue running in the background after timeout, but the stream manager
 	// will not wait for it. This allows the stream manager to start discovery promptly while connections
 	// continue to be established in the background.
-	host.trustedPeersInitiated.Set()
+	host.markTrustedPeersInitiated()
 	host.logger.Info().Msg("[AddTrustedNodes] trusted peers initialization marked as complete")
 }
 
@@ -1212,6 +1217,23 @@ func (host *HostV2) IsTrustedPeer(id libp2p_peer.ID) bool {
 // TrustedPeersInitiated returns true if trusted peers initialization is complete
 func (host *HostV2) TrustedPeersInitiated() bool {
 	return host.trustedPeersInitiated.IsSet()
+}
+
+func (host *HostV2) markTrustedPeersInitiated() {
+	host.trustedPeersReadyOnce.Do(func() {
+		host.trustedPeersInitiated.Set()
+		close(host.trustedPeersReady)
+	})
+}
+
+// WaitForTrustedPeers blocks until initialization is marked complete or ctx is done.
+func (host *HostV2) WaitForTrustedPeers(ctx context.Context) error {
+	select {
+	case <-host.trustedPeersReady:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // TrustedMinPeers returns the minimum number of trusted peers to connect to
