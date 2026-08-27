@@ -2,9 +2,11 @@ package p2ptests
 
 import (
 	"testing"
+	"time"
 
 	"github.com/harmony-one/harmony/test/helpers"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHostSetup(t *testing.T) {
@@ -68,17 +70,22 @@ func TestConnectionToInvalidPeer(t *testing.T) {
 
 	hostData := helpers.Hosts[0]
 	host, _, err := helpers.GenerateHost(hostData.IP, hostData.Port)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, host.Close()) })
 	assert.NotEmpty(t, host.GetID())
 
 	discoveredHostData := helpers.Hosts[1]
 	discoveredHost, _, err := helpers.GenerateHost(discoveredHostData.IP, discoveredHostData.Port)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, discoveredHost.GetID())
 
 	discoveredPeer := discoveredHost.GetSelfPeer()
-	discoveredPeer.IP = "8.8.8.8" // force invalid peer
+	require.NoError(t, discoveredHost.Close())
 
+	started := time.Now()
 	err = host.ConnectHostPeer(discoveredPeer)
 	assert.Error(t, err)
+	if elapsed := time.Since(started); elapsed >= 5*time.Second {
+		t.Fatalf("connection attempt took %s; expected failure within 5s", elapsed)
+	}
 }
