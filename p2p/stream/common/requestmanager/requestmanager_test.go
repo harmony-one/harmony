@@ -83,31 +83,41 @@ func TestRequestManager_NewStream(t *testing.T) {
 	}
 }
 
-// TestRequestManager_NoStream_CancelRequests verifies that when all streams are removed,
+// TestRequestManager_NoStream_CancelRequests verifies that when no streams are available,
 // the request is canceled after exceeding the NoStreamTimeout.
 func TestRequestManager_NoStream_CancelRequests(t *testing.T) {
 	delayF := makeDefaultDelayFunc(500 * time.Millisecond)
 	respF := makeDefaultResponseFunc()
-	ts := newTestSuite(delayF, respF, 3)
-	ts.Start()
-	defer ts.Close()
+	ts := newTestSuite(delayF, respF, 0)
+	defer ts.rm.close()
 
 	req := makeTestRequest(100)
-	ctx := context.Background()
-
-	// Simulate all streams being removed
-	ts.RemoveAllStreams()
-
-	// Perform async request
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	resC := ts.rm.doRequestAsync(ctx, req)
 
-	// Wait for the timeout threshold
-	time.Sleep(NoStreamTimeout + time.Second)
+	queuedReq := <-ts.rm.newRequestC
+	if !ts.rm.handleNewRequest(queuedReq) {
+		t.Fatal("expected request to be added to the waiting queue")
+	}
 
-	// Retrieve response
-	res := <-resC
+	// Verify the timeout boundary without waiting for the production duration.
+	ts.rm.lastActiveStreamTime = time.Now().Add(-NoStreamTimeout + time.Second)
+	ts.rm.monitorStreamHealth()
+	if queuedReq.isDone() {
+		t.Fatal("request canceled before the no-stream timeout")
+	}
 
-	// Validate results
+	ts.rm.lastActiveStreamTime = time.Now().Add(-NoStreamTimeout - time.Second)
+	ts.rm.monitorStreamHealth()
+
+	var res responseData
+	select {
+	case res = <-resC:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for no-stream cancellation")
+	}
+
 	if res.err == nil {
 		t.Fatalf("expected request to be canceled but got no error")
 	}
