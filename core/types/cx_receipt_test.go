@@ -70,3 +70,52 @@ func TestContainsEmptyFieldNilReceiver(t *testing.T) {
 		t.Fatal("expected a nil proof to be reported as empty")
 	}
 }
+
+// TestGetToShardIDRejectsNilReceipt checks that a nil element in Receipts
+// is an error. ToShardID is read from each pointer, so a nil element is
+// distinct from a nil or empty slice.
+func TestGetToShardIDRejectsNilReceipt(t *testing.T) {
+	cxp := &CXReceiptsProof{
+		Receipts: CXReceipts{nil},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("GetToShardID did not handle a nil receipt: %v", r)
+		}
+	}()
+	if _, err := cxp.GetToShardID(); err == nil {
+		t.Fatal("expected an error for a proof whose only receipt is nil")
+	}
+}
+
+// TestContainsEmptyFieldNilBlockNum checks that a merkle proof with no
+// block number is incomplete. Later reads use BlockNum as a *big.Int.
+func TestContainsEmptyFieldNilBlockNum(t *testing.T) {
+	to := common.BytesToAddress([]byte{0x42})
+	cxp := &CXReceiptsProof{
+		Receipts: CXReceipts{{
+			To: &to, Amount: big.NewInt(1),
+		}},
+		MerkleProof:  &CXMerkleProof{},
+		Header:       blockfactory.ForTest.NewHeader(big.NewInt(1)),
+		CommitSig:    []byte{0x01},
+		CommitBitmap: []byte{0x01},
+	}
+	if !cxp.ContainsEmptyField() {
+		t.Fatal("expected a proof with no merkle block number to be empty")
+	}
+}
+
+// TestCXReceiptCopyNilAmount checks that Copy preserves a nil Amount.
+// big.Int.Set requires a non-nil source.
+func TestCXReceiptCopyNilAmount(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Copy did not handle a nil amount: %v", r)
+		}
+	}()
+	got := (&CXReceipt{Amount: nil}).Copy()
+	if got == nil || got.Amount != nil {
+		t.Fatalf("expected a copy with a nil amount, got %+v", got)
+	}
+}

@@ -32,7 +32,9 @@ func (r *CXReceipt) Copy() *CXReceipt {
 		to := *cpy.To
 		cpy.To = &to
 	}
-	cpy.Amount = new(big.Int).Set(cpy.Amount)
+	if cpy.Amount != nil {
+		cpy.Amount = new(big.Int).Set(cpy.Amount)
+	}
 	return &cpy
 }
 
@@ -204,6 +206,9 @@ func (cxp *CXReceiptsProof) GetToShardID() (uint32, error) {
 		return uint32(0), errors.New("[GetShardID] CXReceiptsProof or its receipts is NIL")
 	}
 	for i, cx := range cxp.Receipts {
+		if cx == nil {
+			return uint32(0), errors.New("[GetShardID] CXReceiptsProof contains a nil receipt")
+		}
 		if i == 0 {
 			shardID = cx.ToShardID
 		} else if shardID == cx.ToShardID {
@@ -222,7 +227,9 @@ func (cxp *CXReceiptsProof) ContainsEmptyField() bool {
 	}
 	anyNil := cxp.Receipts == nil ||
 		cxp.MerkleProof == nil ||
-		cxp.Header == nil
+		cxp.MerkleProof.BlockNum == nil ||
+		cxp.Header == nil ||
+		cxp.Header.Number() == nil
 	anyZero := len(cxp.CommitSig)+len(cxp.CommitBitmap) == 0
 	return anyNil || anyZero
 }
