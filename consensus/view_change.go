@@ -571,12 +571,25 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	if m2Mask == nil || m2Mask.Bitmap == nil ||
 		(m2Mask != nil && m2Mask.Bitmap != nil &&
 			utils.CountOneBits(m3Mask.Bitmap) > utils.CountOneBits(m2Mask.Bitmap)) {
-		// m1 is not empty, check it's valid
+		// M1 payload is blockHash || prepareSig || prepareBitmap.
+		// The hash prefix must be present before slicing, and the prepare
+		// mask must meet quorum, as in ProcessViewChangeMsg.
+		if len(recvMsg.Payload) < ValidPayloadLength {
+			consensus.getLogger().Warn().
+				Int("payloadLen", len(recvMsg.Payload)).
+				Msg("[onNewView] M1 indicated but payload too short")
+			return
+		}
 		blockHash := recvMsg.Payload[:32]
 		aggSig, mask, err := readSignatureBitmapPayload(recvMsg.Payload, 32, consensus.decider().Participants())
 		if err != nil {
 			consensus.getLogger().Error().Err(err).
 				Msg("[onNewView] ReadSignatureBitmapPayload Failed")
+			return
+		}
+		if !consensus.decider().IsQuorumAchievedByMask(mask) {
+			consensus.getLogger().Warn().
+				Msg("[onNewView] M1 prepare quorum not achieved")
 			return
 		}
 		if !aggSig.VerifyHash(mask.AggregatePublic, blockHash) {
