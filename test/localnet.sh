@@ -40,15 +40,29 @@ EOF
 }
 
 cleanup() {
-  if [[ "$REMOVE_IMAGE" == true && "$IMAGE_BUILT" == true && "$KEEP" != true ]]; then
-    docker image rm -f "$LOCALNET_IMAGE" >/dev/null 2>&1 || true
+  local run_status=$?
+
+  if [[ -n "$TEMP_RUN_DIR" ]]; then
+    if [[ "$IMAGE_BUILT" == true ]]; then
+      docker run --rm \
+        --platform "linux/$LOCALNET_ARCH" \
+        --entrypoint /bin/sh \
+        -v "$RUN_ROOT:/cleanup" \
+        "$LOCALNET_IMAGE" \
+        -c 'find /cleanup -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +' \
+        >/dev/null 2>&1 || true
+    fi
+    rm -rf "$TEMP_RUN_DIR" 2>/dev/null || \
+      echo "[WARN] unable to remove temporary run directory: $TEMP_RUN_DIR" >&2
   fi
   if [[ -n "$TEMP_TEST_DIR" ]]; then
     rm -rf "$TEMP_TEST_DIR"
   fi
-  if [[ -n "$TEMP_RUN_DIR" ]]; then
-    rm -rf "$TEMP_RUN_DIR"
+  if [[ "$REMOVE_IMAGE" == true && "$IMAGE_BUILT" == true && "$KEEP" != true ]]; then
+    docker image rm -f "$LOCALNET_IMAGE" >/dev/null 2>&1 || true
   fi
+
+  return "$run_status"
 }
 trap cleanup EXIT
 

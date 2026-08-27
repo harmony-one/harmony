@@ -61,6 +61,31 @@ mkdir -p "$TMPDIR_TEST/bin" "$TMPDIR_TEST/harmony-test/localnet" "$TMPDIR_TEST/r
 cat > "$TMPDIR_TEST/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$DOCKER_LOG"
+if [[ ${DOCKER_CREATE_LOCKED_OUTPUT:-} == 1 && ${1:-} == run ]]; then
+  mount_source=
+  cleanup_run=false
+  for ((i = 1; i <= $#; i++)); do
+    arg=${!i}
+    if [[ "$arg" == --entrypoint ]]; then
+      cleanup_run=true
+    elif [[ "$arg" == *:/go/src/github.com/harmony-one/harmony ]]; then
+      mount_source=${arg%:/go/src/github.com/harmony-one/harmony}
+    elif [[ "$arg" == *:/cleanup ]]; then
+      mount_source=${arg%:/cleanup}
+    fi
+  done
+  if [[ -n "$mount_source" ]]; then
+    printf '%s\n' "$mount_source" > "$RUN_ROOT_LOG"
+    if [[ "$cleanup_run" == true ]]; then
+      chmod -R u+rwx "$mount_source"
+      rm -rf "$mount_source"/* "$mount_source"/.[!.]* "$mount_source"/..?* 2>/dev/null || true
+    else
+      mkdir -p "$mount_source/root-owned-like/nested"
+      printf 'locked\n' > "$mount_source/root-owned-like/nested/output.log"
+      chmod 000 "$mount_source/root-owned-like"
+    fi
+  fi
+fi
 if [[ ${DOCKER_FAIL_RUN:-} == 1 && ${1:-} == run ]]; then
   exit 42
 fi
@@ -127,6 +152,31 @@ LOCALNET_ARCH=arm64 \
 PATH="$TMPDIR_TEST/bin:$PATH" \
   "$ROOT/test/localnet.sh" rpc
 assert_contains "image rm -f harmony-localnet-test:" "$TMPDIR_TEST/docker.log"
+
+: > "$TMPDIR_TEST/docker.log"
+: > "$TMPDIR_TEST/run-root.log"
+set +e
+DOCKER_CREATE_LOCKED_OUTPUT=1 \
+DOCKER_LOG="$TMPDIR_TEST/docker.log" \
+RUN_ROOT_LOG="$TMPDIR_TEST/run-root.log" \
+BUILDER_LOG="$TMPDIR_TEST/builder.log" \
+HARMONY_TEST_DIR="$TMPDIR_TEST/harmony-test" \
+HARMONY_BINARY_BUILDER="$TMPDIR_TEST/bin/build-linux-binaries" \
+LOCALNET_ARCH=arm64 \
+LOCALNET_IMAGE="harmony-localnet-test:test" \
+PATH="$TMPDIR_TEST/bin:$PATH" \
+  "$ROOT/test/localnet.sh" rpc >/dev/null 2>&1
+cleanup_status=$?
+set -e
+temporary_run_root=$(<"$TMPDIR_TEST/run-root.log")
+if ((cleanup_status != 0)); then
+  chmod -R u+rwx "$(dirname "$temporary_run_root")" 2>/dev/null || true
+  rm -rf "$(dirname "$temporary_run_root")"
+  fail "temporary run cleanup must handle root-owned container output"
+fi
+[[ ! -e "$(dirname "$temporary_run_root")" ]] || fail "temporary run directory must be removed"
+assert_contains "--entrypoint /bin/sh" "$TMPDIR_TEST/docker.log"
+assert_contains "$temporary_run_root:/cleanup" "$TMPDIR_TEST/docker.log"
 
 : > "$TMPDIR_TEST/docker.log"
 DOCKER_LOG="$TMPDIR_TEST/docker.log" \
