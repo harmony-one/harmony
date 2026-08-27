@@ -332,39 +332,57 @@ func getCrosslinkHeadersForShards(shardChain core.BlockChain, curBlock *types.Bl
 	return headers, nil
 }
 
-// BootstrapConsensus is a goroutine to check number of peers and start the consensus
+const consensusPeerCheckInterval = 100 * time.Millisecond
+
+func waitForEnoughConsensusPeers(
+	ctx context.Context,
+	minPeers int,
+	checkEvery time.Duration,
+	peerCounts func() (connected, known int),
+) (connected, known int, err error) {
+	connected, known = peerCounts()
+	if connected >= minPeers {
+		return connected, known, nil
+	}
+
+	ticker := time.NewTicker(checkEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return connected, known, ctx.Err()
+		case <-ticker.C:
+			connected, known = peerCounts()
+			if connected >= minPeers {
+				return connected, known, nil
+			}
+		}
+	}
+}
+
+// BootstrapConsensus waits for enough connected peers and starts consensus.
 func (node *Node) BootstrapConsensus() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	min := node.Consensus.MinPeers
-	enoughMinPeers := make(chan struct{}, 1)
-	const checkEvery = 3 * time.Second
-	go func() {
-		for {
-			<-time.After(checkEvery)
-			numPeersNow := node.host.GetPeerCount()
-			connectedPeers := len(node.host.Network().Peers())
-			if connectedPeers >= min {
-				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
-				enoughMinPeers <- struct{}{}
-				fmt.Printf("Bootstrap consensus done. Connected %d, known %d, shard: %d\n", connectedPeers, numPeersNow, node.Consensus.ShardID)
-				return
-			}
-			utils.Logger().Info().
-				Int("numPeersNow", numPeersNow).
-				Int("targetNumPeers", min).
-				Dur("next-peer-count-check-in-seconds", checkEvery).
-				Msg("do not have enough min peers yet in bootstrap of consensus")
-		}
-	}()
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-enoughMinPeers:
-		go func() {
-			node.Consensus.StartChannel()
-		}()
-		return nil
+	minPeers := node.Consensus.MinPeers
+	connectedPeers, knownPeers, err := waitForEnoughConsensusPeers(
+		ctx,
+		minPeers,
+		consensusPeerCheckInterval,
+		func() (int, int) {
+			return len(node.host.Network().Peers()), node.host.GetPeerCount()
+		},
+	)
+	if err != nil {
+		return err
 	}
+
+	utils.Logger().Info().Msg("[bootstrap] StartConsensus")
+	fmt.Printf(
+		"Bootstrap consensus done. Connected %d, known %d, shard: %d\n",
+		connectedPeers, knownPeers, node.Consensus.ShardID,
+	)
+	go node.Consensus.StartChannel()
+	return nil
 }

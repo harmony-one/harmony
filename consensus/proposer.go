@@ -100,11 +100,6 @@ func (p *Proposer) WaitForConsensusReadyV2(stopChan chan struct{}, stoppedChan c
 
 		consensus.GetLogger().Debug().
 			Msg("Waiting for Consensus ready")
-		select {
-		case <-time.After(30 * time.Second):
-		case <-stopChan:
-			return
-		}
 
 		for {
 			// keep waiting for Consensus ready
