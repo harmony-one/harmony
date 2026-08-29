@@ -17,6 +17,38 @@ func fixedNow(unixSec int64) time.Time {
 	return time.Unix(unixSec, 0)
 }
 
+func TestWaitForConsensusReadyV2ConsumesSignalWithoutWarmupDelay(t *testing.T) {
+	consensus := &Consensus{
+		current:     NewState(Normal, 0),
+		readySignal: make(chan Proposal),
+	}
+	proposer := NewProposer(consensus)
+	stopChan := make(chan struct{})
+	stoppedChan := make(chan struct{})
+	proposer.WaitForConsensusReadyV2(stopChan, stoppedChan)
+
+	sent := make(chan struct{})
+	go func() {
+		consensus.ReadySignal(NewProposal(SyncProposal, 1), "test", "startup ready")
+		close(sent)
+	}()
+
+	select {
+	case <-sent:
+	case <-time.After(time.Second):
+		close(stopChan)
+		<-stoppedChan
+		t.Fatal("startup proposal signal was not consumed promptly")
+	}
+
+	close(stopChan)
+	select {
+	case <-stoppedChan:
+	case <-time.After(time.Second):
+		t.Fatal("proposer did not stop")
+	}
+}
+
 func TestComputeProposalTiming_ReadyCases(t *testing.T) {
 	skewClamp := int64(viewChangeSlot)
 	tests := []struct {

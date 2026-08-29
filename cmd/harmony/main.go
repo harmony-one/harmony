@@ -418,20 +418,27 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				Msg("Start p2p host failed")
 		}
 
-		if err := currentNode.BootstrapConsensus(); err != nil {
-			fmt.Fprint(os.Stderr, "could not bootstrap consensus", err.Error())
-			if !currentNode.NodeConfig.IsOffline {
-				os.Exit(-1)
-			}
-		}
-
-		if err := currentNode.StartPubSub(); err != nil {
-			fmt.Fprint(os.Stderr, "could not begin network message handling for node", err.Error())
+		if err := startNodeNetworking(
+			currentNode.StartPubSub,
+			currentNode.BootstrapConsensus,
+		); err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
 			os.Exit(-1)
 		}
 	}
 
 	select {}
+}
+
+func startNodeNetworking(startPubSub, bootstrapConsensus func() error) error {
+	// Subscribe to the shard topics before consensus can emit its first proposal.
+	if err := startPubSub(); err != nil {
+		return fmt.Errorf("could not begin network message handling for node: %w", err)
+	}
+	if err := bootstrapConsensus(); err != nil {
+		return fmt.Errorf("could not bootstrap consensus: %w", err)
+	}
+	return nil
 }
 
 func nodeconfigSetShardSchedule(config harmonyconfig.HarmonyConfig) {
