@@ -4,10 +4,11 @@ ARG MAIN_REPO_BRANCH=dev
 ARG MAIN_REPO_ORG=harmony-one
 ARG APT_SNAPSHOT=20260729T000000Z
 ARG PYHMY_REF=5aeb8601fa174c734f9091619520cf3160b04a16
+ARG MESH_CLI_VERSION=v0.10.4
 ARG MESH_CLI_REF=8bdb815048e51fe0f6b821308070cc5c4b97073f
-ARG HMY_VERSION=v2026.0.0
-ARG HMY_AMD64_SHA256=489682b069817dce437ac1cbff6b9b564f167019e026c71dfe413405034f9ccd
-ARG HMY_ARM64_SHA256=dd3aff0fd8971adc0e4ed11fc41791e86767b2a71d13f4a0b12c68f6a904b662
+ARG HMY_VERSION=v2026.1.0
+ARG HMY_AMD64_SHA256=3959f8474438c5139eef081e7185d09d69064bbb1be5b3835316dd727edda49f
+ARG HMY_ARM64_SHA256=d2b4fd4f629fed65f1f4df485846b4f9ab9591cfcd4c20166e71cfb23a146c59
 
 ENV BRANCH=${MAIN_REPO_BRANCH}
 ENV MAIN_REPO=${MAIN_REPO_ORG}
@@ -57,7 +58,7 @@ RUN set -euo pipefail && \
     git checkout -q --detach FETCH_HEAD && \
     make install > /dev/null && \
     command -v rosetta-cli && \
-    test "$(rosetta-cli version)" = v0.10.4
+    test "$(rosetta-cli version)" = "$MESH_CLI_VERSION"
 
 WORKDIR "$GOPATH/src/github.com/harmony-one/harmony-test/localnet"
 COPY scripts/ scripts/
@@ -65,14 +66,7 @@ COPY rpc_tests/ rpc_tests/
 COPY configs/ configs/
 COPY requirements.txt requirements.txt
 
-RUN sed -i '2a set -o pipefail' scripts/run.sh && \
-    sed -i 's/>> output_rossetta.log 2>&1/2>\&1 | tee -a output_mesh.log/' scripts/run.sh && \
-    sed -i 's/> output_rossetta.log 2>&1/2>\&1 | tee output_mesh.log/' scripts/run.sh && \
-    test "$(grep -c 'rosetta-cli check:' scripts/run.sh)" -eq 4 && \
-    test "$(grep -c 'output_mesh.log' scripts/run.sh)" -eq 4 && \
-    test "$(grep -c '^set -o pipefail$' scripts/run.sh)" -eq 1 && \
-    ! grep -q 'output_rossetta.log' scripts/run.sh && \
-    printf '%s\n' \
+RUN printf '%s\n' \
       'annotated-types==0.8.0' \
       'attrs==26.1.0' \
       'bitarray==3.9.2' \
