@@ -4,6 +4,8 @@
 package cli
 
 import (
+	"time"
+
 	"github.com/spf13/pflag"
 )
 
@@ -130,6 +132,23 @@ func (f IntSliceFlag) RegisterTo(fs *pflag.FlagSet) error {
 	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
 }
 
+// DurationFlag is the flag with duration value
+type DurationFlag struct {
+	Name       string
+	Shorthand  string
+	Usage      string
+	Deprecated string
+	Hidden     bool
+
+	DefValue time.Duration
+}
+
+// RegisterTo register the duration flag to FlagSet
+func (f DurationFlag) RegisterTo(fs *pflag.FlagSet) error {
+	fs.DurationP(f.Name, f.Shorthand, f.DefValue, f.Usage)
+	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
+}
+
 func markHiddenOrDeprecated(fs *pflag.FlagSet, name string, deprecated string, hidden bool) error {
 	if len(deprecated) != 0 {
 		// TODO: after totally removed node.sh, change MarkHidden to MarkDeprecated
@@ -159,6 +178,8 @@ func getFlagName(flag Flag) string {
 	case Int64Flag:
 		return f.Name
 	case Uint64Flag:
+		return f.Name
+	case DurationFlag:
 		return f.Name
 	}
 	return ""
