@@ -76,6 +76,8 @@ type P2pConfig struct {
 	DiscConcurrency      int     // Discovery Concurrency value
 	MaxConnsPerIP        int
 	DisablePrivateIPScan bool
+	PeerScoreRetention   time.Duration
+	PeerMinScore         float64
 	MaxPeers             int64
 	// In order to disable Connection Manager, it only needs to
 	// set both the high and low watermarks to zero. In this way,

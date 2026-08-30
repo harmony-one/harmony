@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"container/list"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -136,6 +137,8 @@ type HostConfig struct {
 	DiscConcurrency                 int
 	MaxConnPerIP                    int
 	DisablePrivateIPScan            bool
+	PeerScoreRetention              time.Duration
+	PeerMinScore                    float64
 	MaxPeers                        int64
 	ConnManagerLowWatermark         int
 	ConnManagerHighWatermark        int
@@ -171,6 +174,7 @@ func init() {
 		trustedPeersAddedCounter,
 		trustedPeersDnsResolvedCounter,
 		trustedPeersConnectFailuresCounter,
+		peerScoreGaugeVec,
 	)
 }
 
@@ -199,7 +203,87 @@ var (
 		Name:      "trusted_peer_connect_failures_total",
 		Help:      "Total number of failed attempts to establish P2P host-level connections with trusted peers",
 	})
+	peerScoreGaugeVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "p2p",
+			Name:      "peer_score",
+			Help:      "current peer score by local instance and remote peer",
+		},
+		[]string{"local_p2p_id", "remote_p2p_id"},
+	)
+	peerScoreMetricMu   sync.Mutex
+	peerScoreMetricList = list.New()
+	peerScoreMetricIdx  = make(map[peerScoreMetricKey]*list.Element)
 )
+
+const maxPeerScoreMetricSeries = 2048
+
+type peerScoreMetricKey struct {
+	localPeerID  string
+	remotePeerID string
+}
+
+// SetPeerScoreMetric sets the canonical P2P peer score metric.
+func SetPeerScoreMetric(localPeerID, remotePeerID string, score float64) {
+	if localPeerID == "" || remotePeerID == "" {
+		return
+	}
+	key := peerScoreMetricKey{
+		localPeerID:  localPeerID,
+		remotePeerID: remotePeerID,
+	}
+
+	peerScoreMetricMu.Lock()
+	var evicted *peerScoreMetricKey
+	if elem, exists := peerScoreMetricIdx[key]; exists {
+		peerScoreMetricList.MoveToBack(elem)
+	} else {
+		if len(peerScoreMetricIdx) >= maxPeerScoreMetricSeries {
+			if oldest := peerScoreMetricList.Front(); oldest != nil {
+				oldestKey := oldest.Value.(peerScoreMetricKey)
+				evicted = &oldestKey
+				delete(peerScoreMetricIdx, oldestKey)
+				peerScoreMetricList.Remove(oldest)
+			}
+		}
+		elem := peerScoreMetricList.PushBack(key)
+		peerScoreMetricIdx[key] = elem
+	}
+	peerScoreMetricMu.Unlock()
+
+	if evicted != nil {
+		peerScoreGaugeVec.Delete(prometheus.Labels{
+			"local_p2p_id":  evicted.localPeerID,
+			"remote_p2p_id": evicted.remotePeerID,
+		})
+	}
+
+	peerScoreGaugeVec.With(prometheus.Labels{
+		"local_p2p_id":  localPeerID,
+		"remote_p2p_id": remotePeerID,
+	}).Set(score)
+}
+
+func DeletePeerScoreMetric(localPeerID, remotePeerID string) {
+	if localPeerID == "" || remotePeerID == "" {
+		return
+	}
+	key := peerScoreMetricKey{
+		localPeerID:  localPeerID,
+		remotePeerID: remotePeerID,
+	}
+	peerScoreMetricMu.Lock()
+	if elem, exists := peerScoreMetricIdx[key]; exists {
+		delete(peerScoreMetricIdx, key)
+		peerScoreMetricList.Remove(elem)
+	}
+	peerScoreMetricMu.Unlock()
+	peerScoreGaugeVec.Delete(prometheus.Labels{
+		"local_p2p_id":  localPeerID,
+		"remote_p2p_id": remotePeerID,
+	})
+}
 
 // NewHost ..
 func NewHost(cfg HostConfig) (Host, error) {
@@ -236,9 +320,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open peerstore: %w", err)
 	}
-	var scoreRetention time.Duration
-	// TODO: add scoreRetention to configs (for now, it is zero and so, peer scoring is disabled)
-	scoreRetention = 0
+	scoreRetention := cfg.PeerScoreRetention
 	logger := log.New()
 	ps, err := store.NewExtendedPeerstore(context.Background(), logger, clock.SystemClock, basePs, datastore, scoreRetention)
 	if err != nil {
@@ -258,6 +340,9 @@ func NewHost(cfg HostConfig) (Host, error) {
 	if cfg.DisablePrivateIPScan {
 		// Prevent dialing of public addresses
 		connGtr = gating.AddBlocking(connGtr, cfg.DisablePrivateIPScan)
+	}
+	if scoreRetention > 0 {
+		connGtr = gating.AddScoring(connGtr, ps, cfg.PeerMinScore)
 	}
 	connGtr = gating.AddBanExpiry(connGtr, ps, clock.SystemClock)
 	connGtr = gating.AddMetering(connGtr)
@@ -1322,6 +1407,7 @@ func (host *HostV2) Connected(net libp2p_network.Network, conn libp2p_network.Co
 // called when a connection closed
 func (host *HostV2) Disconnected(net libp2p_network.Network, conn libp2p_network.Conn) {
 	host.logger.Debug().Interface("node", conn.RemotePeer()).Msg("peer disconnected")
+	DeletePeerScoreMetric(host.GetID().String(), conn.RemotePeer().String())
 
 	for _, function := range host.onDisconnects.GetAll() {
 		if err := function(conn); err != nil {
