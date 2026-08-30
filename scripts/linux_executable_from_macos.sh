@@ -6,7 +6,7 @@ SCRIPT_DIR=$(dirname "$0")
 PROJECT_ROOT=$(realpath "$SCRIPT_DIR/..")
 HARMONY_DIR="$PROJECT_ROOT"
 DOCKER_IMAGE="harmony-one"  # Name of the Docker image
-OUTPUT_DIR="$HARMONY_DIR/bin/linux_static_bin"  # Folder for generated binaries
+OUTPUT_DIR="$HARMONY_DIR/bin/linux_amd64_static"  # Folder for generated binaries
 
 echo "=== Paths ==="
 echo "SCRIPT_DIR: $SCRIPT_DIR"
@@ -54,7 +54,9 @@ docker exec "$CONTAINER_ID" bash -c "
     cd harmony/bin && rm -rf *  # Clear previous binaries
     cd ..
     git config --global --add safe.directory /root/go/src/github.com/harmony-one/harmony
-    make linux_static
+    # Ignore a host-copied vendor/ tree (often stale or root-owned) and resolve modules instead.
+    rm -rf vendor
+    GOFLAGS='-mod=mod' make linux_static
 "
 
 # Copy built binaries back to host machine
