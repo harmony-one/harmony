@@ -67,13 +67,14 @@ func newCallTracer(ctx *tracers.Context, cfg json.RawMessage) (tracers.Tracer, e
 	}
 	// First callframe contains tx context info
 	// and is populated on start and end.
-	return &callTracer{callstack: make([]callFrame, 1), config: config}, nil
+	return &callTracer{callstack: make([]callFrame, 0, 1), config: config}, nil
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
 func (t *callTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	t.env = env
-	t.callstack[0] = callFrame{
+	// Append the first frame to the callstack (which starts empty)
+	call := callFrame{
 		Type:  "CALL",
 		From:  addrToHex(from),
 		To:    addrToHex(to),
@@ -82,12 +83,16 @@ func (t *callTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Ad
 		Value: bigToHex(value),
 	}
 	if create {
-		t.callstack[0].Type = "CREATE"
+		call.Type = "CREATE"
 	}
+	t.callstack = append(t.callstack, call)
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
 func (t *callTracer) CaptureEnd(output []byte, gasUsed uint64, _ time.Duration, err error) {
+	if len(t.callstack) != 1 {
+		return
+	}
 	t.callstack[0].GasUsed = uintToHex(gasUsed)
 	if err != nil {
 		t.callstack[0].Error = err.Error()
