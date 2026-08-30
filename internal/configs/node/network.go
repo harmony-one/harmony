@@ -69,6 +69,11 @@ const (
 	DefaultP2PConcurrency = 0
 	// DefaultMaxConnPerIP is the maximum number of connections to/from a remote IP
 	DefaultMaxConnPerIP = 10
+	// DefaultPeerScoreRetention controls how long peer score records are kept.
+	// Zero disables peer score persistence and score-based connection gating.
+	DefaultPeerScoreRetention = time.Duration(0)
+	// DefaultPeerMinScore is the minimum score accepted by peer score gating.
+	DefaultPeerMinScore = 0.0
 	// DefaultMaxPeers is the maximum number of remote peers, with 0 representing no limit
 	DefaultMaxPeers = 0
 	// DefaultConnManagerLowWatermark is the lowest number of connections that'll be maintained in connection manager
