@@ -11,6 +11,7 @@ import (
 	libp2p_host "github.com/libp2p/go-libp2p/core/host"
 	libp2p_peer "github.com/libp2p/go-libp2p/core/peer"
 	libp2p_dis "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
 )
 
@@ -72,7 +73,59 @@ func (d *dhtDiscovery) Advertise(ctx context.Context, ns string) (time.Duration,
 // FindPeers discovers peers providing a service
 func (d *dhtDiscovery) FindPeers(ctx context.Context, ns string, peerLimit int) (<-chan libp2p_peer.AddrInfo, error) {
 	opt := discovery.Limit(peerLimit)
-	return d.disc.FindPeers(ctx, ns, opt)
+	in, err := d.disc.FindPeers(ctx, ns, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan libp2p_peer.AddrInfo)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case info, ok := <-in:
+				if !ok {
+					return
+				}
+				if d.host != nil && info.ID == d.host.ID() {
+					continue
+				}
+				if hasOnlyLoopbackAddrs(info) {
+					d.logger.Debug().
+						Interface("peerID", info.ID).
+						Int("numAddrs", len(info.Addrs)).
+						Msg("skip discovered peer with loopback-only addresses")
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case out <- info:
+				}
+			}
+		}
+	}()
+
+	return out, nil
+}
+
+func hasOnlyLoopbackAddrs(info libp2p_peer.AddrInfo) bool {
+	if len(info.Addrs) == 0 {
+		return false
+	}
+	for _, addr := range info.Addrs {
+		ip, err := manet.ToIP(addr)
+		if err != nil {
+			// Treat non-IP addresses (e.g. DNS) as potentially routable.
+			return false
+		}
+		if !ip.IsLoopback() {
+			return false
+		}
+	}
+	return true
 }
 
 // GetRawDiscovery get the raw discovery to be used for libp2p pubsub options
