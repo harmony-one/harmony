@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
@@ -103,21 +104,19 @@ func TestTrustedNodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	host.Start()
-
-	// Wait for trusted peers initialization to complete
-	// This ensures AddTrustedNodes has finished before checking peer count
-	timeout := 10 * time.Second
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if host.TrustedPeersInitiated() {
-			break
+	t.Cleanup(func() {
+		if err := host.Close(); err != nil {
+			t.Errorf("failed to close host: %v", err)
 		}
-		time.Sleep(100 * time.Millisecond)
+	})
+	if err := host.Start(); err != nil {
+		t.Fatalf("failed to start host: %v", err)
 	}
 
-	if !host.TrustedPeersInitiated() {
-		t.Fatalf("trusted peers initialization did not complete within %v", timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := host.WaitForTrustedPeers(ctx); err != nil {
+		t.Fatalf("trusted peers initialization did not complete: %v", err)
 	}
 
 	connectedPeers := host.GetPeerCount()

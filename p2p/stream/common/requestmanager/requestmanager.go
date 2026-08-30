@@ -634,14 +634,18 @@ func (rm *requestManager) removeStream(st *stream) {
 	}
 
 	cleared := st.clearPendingRequest()
+	// Make the removal visible before notifying the request. The response channel
+	// then acts as a completion signal for callers observing stream state.
+	rm.streams.Delete(id)
+	numConnectedStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
+
 	if cleared != nil {
+		rm.removePendingRequest(cleared)
 		cleared.doneWithResponse(responseData{
 			stID: id,
 			err:  errors.New("stream removed when doing request"),
 		})
 	}
-	rm.streams.Delete(id)
-	numConnectedStreamsVec.With(prometheus.Labels{"topic": string(rm.myProtoID)}).Dec()
 }
 
 func (rm *requestManager) close() {
