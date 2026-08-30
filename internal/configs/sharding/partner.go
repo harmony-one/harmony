@@ -40,6 +40,8 @@ const (
 
 func (ps partnerSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case epoch.Cmp(big.NewInt(44930)) >= 0: // one time fix for devnet shard 1 down, estimated 24 April 4:30AM UTC
+		return partnerV4
 	case epoch.Cmp(big.NewInt(2207)) >= 0: // one time fix for devnet shard 1 down, estimated 24 April 4:30AM UTC
 		return partnerV3_1
 	case params.PartnerChainConfig.IsDevnetExternalEpoch(epoch):
@@ -132,6 +134,15 @@ var partnerV3 = MustNewInstance(
 var partnerV3_1 = MustNewInstance(
 	2, 20, 4, 0,
 	numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts,
+	genesis.TNFoundationalAccounts, emptyAllowlist,
+	feeCollectorsDevnet[1], numeric.MustNewDecFromStr("0.25"),
+	hip30CollectionAddressTestnet, partnerReshardingEpoch,
+	PartnerSchedule.BlocksPerEpoch(),
+)
+
+var partnerV4 = MustNewInstance(
+	2, 20, 4, 0,
+	numeric.MustNewDecFromStr("0.01"), genesis.TNHarmonyAccounts,
 	genesis.TNFoundationalAccounts, emptyAllowlist,
 	feeCollectorsDevnet[1], numeric.MustNewDecFromStr("0.25"),
 	hip30CollectionAddressTestnet, partnerReshardingEpoch,
