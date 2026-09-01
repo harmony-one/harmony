@@ -105,7 +105,9 @@ func (consensus *Consensus) AddConsensusLastMile() error {
 }
 
 func (consensus *Consensus) spinUpStateSync() {
-	consensus.dHelper.DownloadAsync()
+	if consensus.dHelper != nil {
+		consensus.dHelper.DownloadAsync()
+	}
 	for _, v := range consensus.consensusTimeout {
 		v.Stop()
 	}

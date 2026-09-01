@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -814,12 +813,13 @@ func (sss *StagedStreamSync) EnableStages(ids ...SyncStageID) {
 
 // UpdateBlockAndStatus updates block and its status in db
 func (sss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
-	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
+	if err := errIfNotNextBlock(bc.CurrentBlock().NumberU64(), block.NumberU64()); err != nil {
 		sss.logger.Debug().
+			Err(err).
 			Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).
 			Uint64("receivedBlockNum", block.NumberU64()).
-			Msg("[STAGED_STREAM_SYNC] Inappropriate block number, ignore!")
-		return nil
+			Msg("[STAGED_STREAM_SYNC] Inappropriate block number")
+		return err
 	}
 
 	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
@@ -843,23 +843,11 @@ func (sss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Bl
 				Msg("[STAGED_STREAM_SYNC] VerifyHeaderSignature")
 		}
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
-		if err == engine.ErrUnknownAncestor {
-			return nil
-		} else if err != nil {
+		if err != nil {
 			sss.logger.Error().
 				Err(err).
 				Uint64("block number", block.NumberU64()).
 				Msgf("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block")
-
-			// if !verifyAllSig {
-			// 	utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
-			// 	for i := uint64(0); i < VerifyHeaderBatchSize-1; i++ {
-			// 		if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
-			// 			utils.Logger().Err(rbErr).Msg("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: failed to rollback")
-			// 			return err
-			// 		}
-			// 	}
-			// }
 			return err
 		}
 	}
@@ -867,6 +855,13 @@ func (sss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Bl
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
 	switch {
 	case errors.Is(err, core.ErrKnownBlock):
+		if bc.CurrentBlock().NumberU64() < block.NumberU64() {
+			sss.logger.Warn().
+				Uint64("blockHeight", block.NumberU64()).
+				Str("blockHex", block.Hash().Hex()).
+				Msg("[STAGED_STREAM_SYNC] UpdateBlockAndStatus: known block is not the canonical head")
+			return err
+		}
 		utils.Logger().Info().
 			Uint64("blockHeight", block.NumberU64()).
 			Uint64("blockEpoch", block.Epoch().Uint64()).
@@ -891,6 +886,13 @@ func (sss *StagedStreamSync) UpdateBlockAndStatus(block *types.Block, bc core.Bl
 
 	for i, tx := range block.StakingTransactions() {
 		sss.logger.Info().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
+	}
+	return nil
+}
+
+func errIfNotNextBlock(current, received uint64) error {
+	if received != current+1 {
+		return fmt.Errorf("%w: current %d received %d", ErrUnexpectedBlockNumber, current, received)
 	}
 	return nil
 }

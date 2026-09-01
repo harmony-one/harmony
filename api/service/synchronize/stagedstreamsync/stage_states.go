@@ -173,20 +173,14 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			return ErrInvalidBlockNumber
 		}
 
-		if stg.configs.bc.HasBlock(block.Hash(), block.NumberU64()) {
-			// At this point, there should be some db discrepancies
-			if blk := stg.configs.bc.GetBlock(block.Hash(), block.NumberU64()); blk != nil {
-				if blk.NumberU64() == block.NumberU64() && blk.Hash() == block.Hash() {
-					stg.configs.bc.CurrentHeader().SetNumber(block.Number())
-					gbm.MarkBlockCompleted(i)
-					if invalidBlockRevert {
-						if s.state.invalidBlock.Number == i {
-							s.state.invalidBlock.resolve()
-						}
-					}
-					continue
+		if cur := stg.configs.bc.CurrentBlock(); cur != nil && cur.NumberU64() == i && cur.Hash() == block.Hash() {
+			gbm.MarkBlockCompleted(i)
+			if invalidBlockRevert {
+				if s.state.invalidBlock.Number == i {
+					s.state.invalidBlock.resolve()
 				}
 			}
+			continue
 		}
 
 		if err := s.state.UpdateBlockAndStatus(block, stg.configs.bc, false); err != nil {
@@ -205,6 +199,13 @@ func (stg *StageStates) Exec(ctx context.Context, firstCycle bool, invalidBlockR
 			}
 
 			return err
+		}
+		if stg.configs.bc.CurrentBlock().NumberU64() != i {
+			stg.configs.logger.Warn().
+				Uint64("want", i).
+				Uint64("have", stg.configs.bc.CurrentBlock().NumberU64()).
+				Msg(WrapStagedSyncMsg("insert did not advance chain head"))
+			return ErrInsertDidNotAdvance
 		}
 
 		// Mark block as completed after successful insertion

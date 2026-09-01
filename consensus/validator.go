@@ -237,6 +237,9 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
 			Msgf("[OnPrepared] low consensus block number. Spin sync")
 		consensus.spinUpStateSync()
+		if isTooFarAhead(consensus.BlockNum(), recvMsg.BlockNum) {
+			return
+		}
 	}
 
 	// check validity of prepared signature
@@ -351,6 +354,9 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
 			Msg("[OnCommitted] low consensus block number. Spin up state sync")
 		consensus.spinUpStateSync()
+		if isTooFarAhead(consensus.BlockNum(), recvMsg.BlockNum) {
+			return
+		}
 	}
 
 	// Optimistically add committedMessage in case of receiving committed before prepared

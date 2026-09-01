@@ -13,8 +13,13 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 )
 
-// MaxBlockNumDiff limits the received block number to only 100 further from the current block number
+// MaxBlockNumDiff is the maximum allowed gap from the local block number for
+// ANNOUNCE, PREPARED, and COMMITTED messages.
 const MaxBlockNumDiff = 100
+
+func isTooFarAhead(myBlock, msgBlock uint64) bool {
+	return msgBlock > myBlock && msgBlock-myBlock > MaxBlockNumDiff
+}
 
 // verifyMessageSig verify the signature of the message are valid from the signer's public key.
 func verifyMessageSig(signerPubKey *libbls.PublicKey, message *msg_pb.Message) error {
@@ -109,7 +114,7 @@ func (consensus *Consensus) isRightBlockNumCheck(recvMsg *FBFTMessage) bool {
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("Wrong BlockNum Received, ignoring!")
 		return false
-	} else if recvMsg.BlockNum-consensus.BlockNum() > MaxBlockNumDiff {
+	} else if isTooFarAhead(consensus.BlockNum(), recvMsg.BlockNum) {
 		consensus.getLogger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("MaxBlockNumDiff", MaxBlockNumDiff).
