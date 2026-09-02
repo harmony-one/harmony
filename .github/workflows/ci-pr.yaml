@@ -135,6 +135,23 @@ jobs:
           TRAVIS_PULL_REQUEST_BRANCH: ${{ github.head_ref }}
           TRAVIS_BRANCH: ${{ github.ref_name }}
 
+  mesh-checker:
+    name: Run Mesh API integration tests (${{ matrix.arch }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy: *arch-matrix
+    steps:
+      - *checkout-harmony
+      - *download-harmony-binaries
+      - *prepare-harmony-binaries
+
+      - name: Run Mesh tests
+        run: bash ./test/localnet.sh mesh
+        working-directory: go/src/github.com/harmony-one/harmony
+        env:
+          HARMONY_BINARY_BUILDER: "true"
+
   pyhmy-checker:
     name: Run pyhmy tests (${{ matrix.arch }})
     needs: build

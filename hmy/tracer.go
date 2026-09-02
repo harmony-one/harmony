@@ -777,6 +777,8 @@ func (hmy *Harmony) traceTx(ctx context.Context, message core.Message, txctx *tr
 	case *native.ParityBlockTracer:
 		rs, err := tracer.GetParityResult()
 		return rs, err
+	case *native.RosettaBlockTracer:
+		return tracer.GetRosettaResult()
 
 	case tracers.Tracer:
 		return tracer.GetResult()
