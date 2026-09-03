@@ -1,4 +1,4 @@
-name: GitHub Actions Security Analysis with zizmor 🌈
+name: GitHub Actions Security Analysis with zizmor 🌈 and actionlint 
 
 on:
   push:
@@ -22,7 +22,8 @@ jobs:
     name: Run zizmor 🌈
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - &checkout-repository
+        name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           persist-credentials: false
@@ -33,3 +34,11 @@ jobs:
         with:
           inputs: ./.github/
           advanced-security: false
+
+  actionlint:
+    name: Run actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - *checkout-repository
+      - name: Run actionlint # Docu: https://github.com/rhysd/actionlint/blob/main/docs/usage.md#docker
+        uses: docker://rhysd/actionlint@sha256:9d36088643581e728c969f35141f88139fec77280b2be23c1f66f8e40e1025e7 #v1.7.12
