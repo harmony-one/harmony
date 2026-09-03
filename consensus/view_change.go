@@ -266,10 +266,72 @@ func (pm *State) getNextLeaderKey(blockchain engine.ChainReader, decider quorum.
 			Str("key", pm.getLeaderPubKey().Bytes.Hex()).
 			Msg("[getNextLeaderKey] currentLeaderKey not found")
 	}
+	// A view change hands the role on because the committee is waiting on a leader, so
+	// the successor is chosen from the members that are demonstrably still taking part,
+	// by the same aliveness rule rotateLeader applies during steady-state rotation.
+	if wasFound && blockchain != nil && committee != nil &&
+		blockchain.Config().IsLeaderRotationV2Epoch(epoch) &&
+		blockchain.Config().IsLeaderLivenessRotation(epoch) {
+		next = pm.skipAbsentLeaderCandidates(
+			blockchain, decider, committee, lastLeaderPubKey, gap, next,
+		)
+	}
 	pm.getLogger().Info().
 		Str("nextLeader", next.Bytes.Hex()).
 		Msg("[getNextLeaderKey] next Leader")
 	return next
+}
+
+// skipAbsentLeaderCandidates walks forward from the candidate sitting at gap until it
+// reaches a committee member with a recent signature, and returns fallback when every
+// member looks absent or the chain cannot be read.
+//
+// Walking the offset rather than the viewID keeps the result a function of the last
+// leader, the gap and the chain tip alone, so nodes that agree on those agree on the
+// leader. Returning fallback on every unreadable case holds a node that cannot run the
+// check to the plain index order the rest of the committee starts from.
+func (pm *State) skipAbsentLeaderCandidates(
+	blockchain engine.ChainReader, decider quorum.Decider, committee *shard.Committee,
+	lastLeaderPubKey *bls.PublicKeyWrapper, gap int, fallback *bls.PublicKeyWrapper,
+) *bls.PublicKeyWrapper {
+	curHeader := blockchain.CurrentHeader()
+	if curHeader == nil || gap < 0 {
+		return fallback
+	}
+	var (
+		curNumber = curHeader.Number().Uint64()
+		curEpoch  = curHeader.Epoch().Uint64()
+		members   = decider.Participants()
+		candidate = fallback
+	)
+	for i := 0; i < len(committee.Slots); i++ {
+		if i > 0 {
+			if gap > math.MaxInt-i {
+				return fallback
+			}
+			wasFound, next := decider.NthNextValidatorV2(
+				committee.Slots, lastLeaderPubKey, gap+i,
+			)
+			if !wasFound || next == nil {
+				return fallback
+			}
+			candidate = next
+		}
+		alive, err := signedRecently(blockchain, members, candidate, curNumber, curEpoch)
+		if err != nil {
+			pm.getLogger().Err(err).
+				Msg("[getNextLeaderKey] aliveness check failed, keeping indexed leader")
+			return fallback
+		}
+		if alive {
+			return candidate
+		}
+		pm.getLogger().Info().
+			Str("skipped", candidate.Bytes.Hex()).
+			Int("offset", gap+i).
+			Msg("[getNextLeaderKey] candidate has no recent signature, trying next")
+	}
+	return fallback
 }
 
 func createTimeout() map[TimeoutType]*utils.Timeout {

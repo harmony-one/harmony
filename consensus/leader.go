@@ -226,14 +226,13 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		return
 	}
 	// proceed only when the message is not received before
-	for _, signer := range recvMsg.SenderPubkeys {
-		signed := consensus.decider().ReadBallot(quorum.Commit, signer.Bytes)
-		if signed != nil {
-			consensus.getLogger().Debug().
-				Str("validatorPubKey", signer.Bytes.Hex()).
-				Msg("[OnCommit] Already Received commit message from the validator")
-			return
-		}
+	//
+	// A sender that already holds a ballot at this height and view is either re-sending
+	// that vote or voting for a second block. The vote is not counted either way, and
+	// the second case carries the evidence a double sign is reported from.
+	if seen, conflicting := consensus.priorCommitBallots(recvMsg); seen {
+		consensus.reportDoubleSign(recvMsg, conflicting)
+		return
 	}
 
 	commitBitmap := consensus.commitBitmap
@@ -298,14 +297,6 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	}
 
 	//// Write - Start
-	// Check for potential double signing
-
-	// FIXME (leo): failed view change, will comeback later
-	/*
-		if consensus.checkDoubleSign(recvMsg) {
-			return
-		}
-	*/
 	if _, err := consensus.decider().AddNewVote(
 		quorum.Commit, recvMsg.SenderPubkeys,
 		&sign, recvMsg.BlockHash,

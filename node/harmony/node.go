@@ -1081,11 +1081,12 @@ func New(
 				utils.Logger().Info().
 					RawJSON("double-sign-candidate", []byte(doubleSign.String())).
 					Msg("double sign notified by consensus leader")
-				// no point to broadcast the slash if we aren't even in the right epoch yet
+				// a slash has no meaning before the staking era, so the record is
+				// dropped while the loop stays open for the epochs that follow
 				if !node.Blockchain().Config().IsStaking(
 					node.Blockchain().CurrentHeader().Epoch(),
 				) {
-					return
+					continue
 				}
 				if hooks := node.NodeConfig.WebHooks.Hooks; hooks != nil {
 					if s := hooks.Slashing; s != nil {

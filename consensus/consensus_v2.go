@@ -770,7 +770,6 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 	if epoch.Uint64() != curEpoch {
 		return defaultKey
 	}
-	const blocksCountAliveness = 4
 	consensus.getLogger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v external rotation %v rotation v2: %v",
 		epoch.Uint64(),
 		bc.Config().IsLeaderRotationInternalValidators(epoch),
@@ -833,37 +832,15 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int, defaultKey *bls.PublicK
 			// Seems like nothing we can do here.
 			return defaultKey
 		}
-		members := consensus.decider().Participants()
-		mask := bls.NewMask(members)
-		skipped := 0
-		for j := 0; j < blocksCountAliveness; j++ {
-			header := bc.GetHeaderByNumber(curNumber - uint64(j))
-			if header == nil {
-				consensus.getLogger().Error().Msgf("Failed to get header by number %d", curNumber-uint64(j))
-				return defaultKey
-			}
-			// if epoch is different, we should not check this block.
-			if header.Epoch().Uint64() != curEpoch {
-				break
-			}
-			// Populate the mask with the bitmap.
-			err = mask.SetMask(header.LastCommitBitmap())
-			if err != nil {
-				consensus.getLogger().Err(err).Msg("Failed to set mask")
-				return defaultKey
-			}
-			ok, err := mask.KeyEnabled(next.Bytes)
-			if err != nil {
-				consensus.getLogger().Err(err).Msg("Failed to get key enabled")
-				return defaultKey
-			}
-			if !ok {
-				skipped++
-			}
+		alive, err := signedRecently(
+			bc, consensus.decider().Participants(), next, curNumber, curEpoch,
+		)
+		if err != nil {
+			consensus.getLogger().Err(err).Msg("Failed to check next leader aliveness")
+			return defaultKey
 		}
-
 		// no signature from the next leader at all, we should skip it.
-		if skipped >= blocksCountAliveness {
+		if !alive {
 			// Next leader is not signing blocks, we should skip it.
 			offset++
 			continue

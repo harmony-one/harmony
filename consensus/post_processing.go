@@ -91,7 +91,7 @@ func (consensus *Consensus) postConsensusProcessing(newBlock *types.Block) error
 
 				computed.BlocksLeftInEpoch = lastBlockOfEpoch - consensus.Beaconchain().CurrentBlock().Header().Number().Uint64()
 
-				if err != nil && computed.IsBelowThreshold {
+				if computed.IsBelowThreshold {
 					url := h.Availability.OnDroppedBelowThreshold
 					go func() {
 						webhooks.DoPost(url, computed)

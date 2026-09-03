@@ -346,12 +346,30 @@ func (e *engineImpl) Finalize(
 		// ComputeAndMutateEPOSStatus depends on the signing counts that's
 		// consistent with the counts when the new shardState was proposed.
 		// Refer to committee.IsEligibleForEPoSAuction()
+		totalDowntimeSlashed := big.NewInt(0)
 		for _, addr := range curShardState.StakedValidators().Addrs {
 			if err := availability.ComputeAndMutateEPOSStatus(
 				chain, state, addr,
 			); err != nil {
 				return nil, nil, err
 			}
+			// Runs after the EPoS status above has been settled for the epoch, which
+			// the self-delegation rule applied inside depends on.
+			slashed, err := availability.ComputeAndMutateDowntimeSlash(
+				chain, state, addr, header.Epoch(),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			if slashed != nil {
+				totalDowntimeSlashed.Add(totalDowntimeSlashed, slashed)
+			}
+		}
+		if totalDowntimeSlashed.Sign() > 0 {
+			utils.Logger().Info().
+				Str("total-slashed", totalDowntimeSlashed.String()).
+				Uint64("epoch", header.Epoch().Uint64()).
+				Msg("downtime slashing applied for the epoch")
 		}
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("ComputeAndMutateEPOSStatus")
 	}
@@ -615,9 +633,22 @@ func applySlashes(
 	// The Leader of the block gets all slashing rewards.
 	slashRewardBeneficiary := header.Coinbase()
 
+	// A validator answers for one double sign per block. It can leave conflicting
+	// ballots at more than one view of the same height, and each of those is its own
+	// record, but the penalty is set against the validator's stake at the start of the
+	// epoch and applying it twice over would charge that stake twice.
+	oncePerOffender := chain.Config().IsDoubleSignSlash(header.Epoch())
+	slashedThisBlock := map[common.Address]struct{}{}
+
 	// Do the slashing by groups in the sorted order
 	for _, key := range sortedKeys {
 		records := groupedRecords[key]
+		if oncePerOffender {
+			records = firstRecordPerOffender(records, slashedThisBlock)
+			if len(records) == 0 {
+				continue
+			}
+		}
 
 		utils.Logger().Info().
 			RawJSON("records", []byte(records.String())).
@@ -643,6 +674,27 @@ func applySlashes(
 			Msg("slash applied successfully")
 	}
 	return nil
+}
+
+// firstRecordPerOffender returns the records naming an offender not yet present in
+// slashed, and records those offenders as slashed. Callers walk the groups in canonical
+// order, so which record survives for an offender is the same on every node.
+func firstRecordPerOffender(
+	records slash.Records, slashed map[common.Address]struct{},
+) slash.Records {
+	kept := make(slash.Records, 0, len(records))
+	for i := range records {
+		offender := records[i].Evidence.Offender
+		if _, done := slashed[offender]; done {
+			utils.Logger().Info().
+				Str("offender", offender.Hex()).
+				Msg("offender already slashed in this block, skipping further records")
+			continue
+		}
+		slashed[offender] = struct{}{}
+		kept = append(kept, records[i])
+	}
+	return kept
 }
 
 // VerifyHeaderSignature verifies the signature of the given header.
