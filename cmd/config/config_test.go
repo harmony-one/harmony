@@ -140,6 +140,13 @@ Version = "1.0.4"
 		t.Errorf("Expected config version: 1.0.4, not %v", config.Version)
 	}
 	config.Version = defConf.Version // Shortcut for testing, value checked above
+	// Fixture Sync peer settings are preserved by migration; MaxAdvertiseWaitTime
+	// uses the current default when absent from the fixture.
+	defConf.Sync.Concurrency = 6
+	defConf.Sync.MinPeers = 6
+	defConf.Sync.InitStreams = 8
+	defConf.Sync.DiscSoftLowCap = 8
+	defConf.Sync.DiscHardLowCap = 6
 	require.Equal(t, config, defConf)
 }
 

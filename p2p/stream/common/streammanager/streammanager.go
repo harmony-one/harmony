@@ -89,6 +89,9 @@ type streamManager struct {
 	numTrustedStreamsMain     int64 // Count of trusted streams in main list
 	numTrustedStreamsReserved int64 // Count of trusted streams in reserved list
 
+	// disconnectTracker tracks clustered stream removals and local-outage windows.
+	disconnectTracker disconnectTracker
+
 	// callback for when enough streams are found
 	enoughStreamsCallback func()
 }
@@ -136,7 +139,7 @@ func (rm *RemovalInfo) HasExpired() bool {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	return time.Now().After(rm.expireAt)
+	return !time.Now().Before(rm.expireAt)
 }
 
 // BumpCount increases the removal count.
@@ -152,6 +155,18 @@ func (rm *RemovalInfo) ResetCount() {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
+	rm.count = 0
+}
+
+// MarkRemovedForLocalOutage records a connection-loss removal during a local-outage
+// window. The peer may reconnect immediately and the removal count is reset.
+func (rm *RemovalInfo) MarkRemovedForLocalOutage() {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	now := time.Now()
+	rm.removedAt = now
+	rm.expireAt = now
 	rm.count = 0
 }
 
@@ -596,104 +611,68 @@ func (sm *streamManager) addStreamFromReserved(count int) (int, error) {
 }
 
 func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, criticalErr bool) error {
-	// Check which set contains the stream - only delete from the one that has it
 	st, inMain := sm.streams.get(id)
+	inReserved := false
 	if !inMain {
-		// Try reserved streams
-		st, inReserved := sm.reservedStreams.get(id)
+		st, inReserved = sm.reservedStreams.get(id)
 		if !inReserved {
 			return ErrStreamAlreadyRemoved
 		}
-		// Stream is in reserved list
-		if criticalErr {
-			streamCriticalErrorCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
-		}
+	}
 
-		// Check if this is a trusted stream and handle accordingly
-		_, isTrusted := sm.trustedStreams.Get(id)
-		if isTrusted {
-			if criticalErr {
-				// Trusted streams with critical errors are not removed (protected)
-				sm.logger.Info().
-					Str("protocolID", string(sm.myProtoID)).
-					Uint32("shardID", uint32(sm.myProtoSpec.ShardID)).
-					Int("NumStreams", sm.streams.size()).
-					Int("NumTrustedStreamsMain", int(atomic.LoadInt64(&sm.numTrustedStreamsMain))).
-					Int("NumTrustedStreamsReserved", int(atomic.LoadInt64(&sm.numTrustedStreamsReserved))).
-					Interface("StreamID", id).
-					Bool("trusted", true).
-					Str("reason", reason).
-					Bool("criticalErr", criticalErr).
-					Msg("[StreamManager] trusted peer got critical error but not removed")
-				return nil
-			}
-			// Trusted stream with non-critical error: remove from trustedStreams map and update counters
-			sm.trustedStreams.Delete(id)
-			atomic.AddInt64(&sm.numTrustedStreamsReserved, -1)
-		}
-
-		sm.reservedStreams.deleteStream(st)
+	now := time.Now()
+	connectionLoss := isConnectionLossReason(reason)
+	_, isTrusted := sm.trustedStreams.Get(id)
+	// Trusted streams with critical errors stay registered unless the removal is a
+	// connection loss during an active local-outage window.
+	if isTrusted && criticalErr && !(sm.disconnectTracker.inLocalOutage(now) && connectionLoss) {
+		streamCriticalErrorCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		sm.logger.Info().
 			Str("protocolID", string(sm.myProtoID)).
 			Uint32("shardID", uint32(sm.myProtoSpec.ShardID)).
 			Int("NumStreams", sm.streams.size()).
-			Int("NumReservedStreams", sm.reservedStreams.size()).
 			Int("NumTrustedStreamsMain", int(atomic.LoadInt64(&sm.numTrustedStreamsMain))).
 			Int("NumTrustedStreamsReserved", int(atomic.LoadInt64(&sm.numTrustedStreamsReserved))).
 			Interface("StreamID", id).
+			Bool("trusted", true).
+			Bool("reserved", !inMain).
 			Str("reason", reason).
 			Bool("criticalErr", criticalErr).
-			Bool("trusted", isTrusted).
-			Msg("[StreamManager] removed stream from reserved streams list")
-
-		info, exist := sm.removedStreams.Get(id)
-		if !exist {
-			info = &RemovalInfo{count: 0}
-			sm.removedStreams.Set(id, info)
-		}
-		info.MarkAsRemoved(criticalErr)
-
-		sm.removeStreamFeed.Send(EvtStreamRemoved{id})
-		removedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
-		streamRemovalReasonCounterVec.With(prometheus.Labels{"reason": reason, "critical": strconv.FormatBool(criticalErr)}).Inc()
-		numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
-		numReservedStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.reservedStreams.size()))
-		numTrustedPeerStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(atomic.LoadInt64(&sm.numTrustedStreamsMain)))
-		numReservedTrustedPeerStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(atomic.LoadInt64(&sm.numTrustedStreamsReserved)))
-
-		sm.tryToReplaceRemovedStream()
+			Msg("[StreamManager] trusted peer got critical error but not removed")
 		return nil
 	}
 
-	// Stream is in main list
-	if criticalErr {
+	activeBefore := sm.streams.size() + sm.reservedStreams.size()
+	inLocalOutage := sm.disconnectTracker.inLocalOutage(now)
+	justEntered := false
+	if connectionLoss {
+		inLocalOutage, justEntered = sm.disconnectTracker.observeRemoval(now, activeBefore)
+		if justEntered {
+			sm.onLocalOutageDetected(activeBefore, reason)
+		}
+	}
+
+	// Soft reconnect applies to connection-loss removals during a local-outage window.
+	softReconnect := inLocalOutage && connectionLoss
+	effectiveCritical := criticalErr && !softReconnect
+	if effectiveCritical {
 		streamCriticalErrorCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 	}
 
-	// Check if this is a trusted stream and handle accordingly
-	_, isTrusted := sm.trustedStreams.Get(id)
 	if isTrusted {
-		if criticalErr {
-			// Trusted streams with critical errors are not removed (protected)
-			sm.logger.Info().
-				Str("protocolID", string(sm.myProtoID)).
-				Uint32("shardID", uint32(sm.myProtoSpec.ShardID)).
-				Int("NumStreams", sm.streams.size()).
-				Int("NumTrustedStreamsMain", int(atomic.LoadInt64(&sm.numTrustedStreamsMain))).
-				Int("NumTrustedStreamsReserved", int(atomic.LoadInt64(&sm.numTrustedStreamsReserved))).
-				Interface("StreamID", id).
-				Bool("trusted", true).
-				Str("reason", reason).
-				Bool("criticalErr", criticalErr).
-				Msg("[StreamManager] trusted peer got critical error but not removed")
-			return nil
-		}
-		// Trusted stream with non-critical error: remove from trustedStreams map and update counters
 		sm.trustedStreams.Delete(id)
-		atomic.AddInt64(&sm.numTrustedStreamsMain, -1)
+		if inMain {
+			atomic.AddInt64(&sm.numTrustedStreamsMain, -1)
+		} else {
+			atomic.AddInt64(&sm.numTrustedStreamsReserved, -1)
+		}
 	}
 
-	sm.streams.deleteStream(st)
+	if inMain {
+		sm.streams.deleteStream(st)
+	} else {
+		sm.reservedStreams.deleteStream(st)
+	}
 
 	sm.logger.Info().
 		Str("protocolID", string(sm.myProtoID)).
@@ -705,29 +684,71 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID, reason string, 
 		Interface("StreamID", id).
 		Str("reason", reason).
 		Bool("criticalErr", criticalErr).
+		Bool("effectiveCritical", effectiveCritical).
+		Bool("connectionLoss", connectionLoss).
+		Bool("softReconnect", softReconnect).
+		Bool("localOutage", inLocalOutage).
 		Bool("trusted", isTrusted).
-		Msg("[StreamManager] removed stream from main streams list")
+		Bool("reserved", !inMain).
+		Msg("[StreamManager] removed stream")
 
+	sm.recordStreamRemoval(id, effectiveCritical, softReconnect, reason)
+	sm.tryToReplaceRemovedStream()
+	return nil
+}
+
+func (sm *streamManager) recordStreamRemoval(id sttypes.StreamID, effectiveCritical, softReconnect bool, reason string) {
 	info, exist := sm.removedStreams.Get(id)
 	if !exist {
 		info = &RemovalInfo{count: 0}
 		sm.removedStreams.Set(id, info)
 	}
-	info.MarkAsRemoved(criticalErr)
+	if softReconnect {
+		info.MarkRemovedForLocalOutage()
+	} else {
+		info.MarkAsRemoved(effectiveCritical)
+	}
 
-	// try to replace removed streams from reserved list
 	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
-
 	removedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
-	streamRemovalReasonCounterVec.With(prometheus.Labels{"reason": reason, "critical": strconv.FormatBool(criticalErr)}).Inc()
+	streamRemovalReasonCounterVec.With(prometheus.Labels{
+		"reason":   reason,
+		"critical": strconv.FormatBool(effectiveCritical),
+	}).Inc()
 	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
 	numReservedStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.reservedStreams.size()))
 	numTrustedPeerStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(atomic.LoadInt64(&sm.numTrustedStreamsMain)))
 	numReservedTrustedPeerStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(atomic.LoadInt64(&sm.numTrustedStreamsReserved)))
+}
 
-	sm.tryToReplaceRemovedStream()
+func (sm *streamManager) onLocalOutageDetected(activeBefore int, reason string) {
+	sm.logger.Warn().
+		Int("activeBefore", activeBefore).
+		Int("removalsInWindow", len(sm.disconnectTracker.removalTimes)).
+		Dur("outageDuration", localOutageDuration).
+		Dur("discHoldoff", localOutageDiscHoldoff).
+		Dur("minInterval", localOutageMinInterval).
+		Str("lastReason", reason).
+		Msg("[StreamManager] mass disconnect detected; local-outage window started")
 
-	return nil
+	sm.coolDownCache.Reset()
+
+	sm.coolDown.Set()
+	go func() {
+		timer := time.NewTimer(localOutageDiscHoldoff)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+			sm.coolDown.UnSet()
+			select {
+			case sm.discCh <- discTask{}:
+			default:
+			}
+			sm.logger.Info().Msg("[StreamManager] local outage discovery holdoff ended; rediscovery triggered")
+		case <-sm.ctx.Done():
+			sm.coolDown.UnSet()
+		}
+	}()
 }
 
 func (sm *streamManager) tryToReplaceRemovedStream() error {
@@ -757,8 +778,7 @@ func (sm *streamManager) handleResetForWatchdog() error {
 	mainStreams := sm.streams.size()
 	reservedStreams := sm.reservedStreams.size()
 
-	// Keep active connections intact. Clear cooldown/blocking state so peer
-	// discovery can retry candidates again.
+	// Preserve active connections. Clear cooldown and discovery-blocking state.
 	sm.removedStreams.Clear()
 	sm.coolDownCache.Reset()
 	sm.coolDown.UnSet()
@@ -1083,23 +1103,33 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 				Int("NumTrustedStreamsReserved", int(atomic.LoadInt64(&sm.numTrustedStreamsReserved))).
 				Msg("[discoverAndSetupStream] processing trusted peers for bootstrap stream setup")
 
-			// Setup trusted streams - this function handles batching and waiting
+			streamsBefore := sm.streams.size()
 			successCount := sm.setupTrustedStreams(discCtx, trustedPeers, trustedMinPeers)
 			connectedTrustedStreams = successCount
+
+			if successCount > 0 {
+				expected := streamsBefore + successCount
+				if expected > sm.config.HardLoCap {
+					expected = sm.config.HardLoCap
+				}
+				sm.waitForStreamRegistrations(discCtx, expected)
+			}
 
 			sm.logger.Info().
 				Str("protocolID", string(sm.myProtoID)).
 				Uint32("shardID", uint32(sm.myProtoSpec.ShardID)).
 				Int("successCount", successCount).
 				Int("trustedMinPeers", trustedMinPeers).
+				Int("registeredStreams", sm.streams.size()).
 				Int("NumTrustedStreamsMain", int(atomic.LoadInt64(&sm.numTrustedStreamsMain))).
 				Int("NumTrustedStreamsReserved", int(atomic.LoadInt64(&sm.numTrustedStreamsReserved))).
-				Msg("[discoverAndSetupStream] completed trusted peer stream setup, proceeding to discover other peers")
+				Msg("[discoverAndSetupStream] completed trusted peer stream setup")
 		}
 	}
 
-	if sm.streams.size()+connectedTrustedStreams >= sm.config.HardLoCap {
-		return connectedTrustedStreams, nil
+	// Skip DHT when enough compatible streams are already registered.
+	if sm.hardHaveEnoughStream() {
+		return sm.streams.size(), nil
 	}
 
 	peers, err := sm.discover(discCtx)
@@ -1140,6 +1170,40 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, e
 	}
 
 	return connectedTrustedStreams + connecting, nil
+}
+
+// waitForStreamRegistrations waits until target compatible streams are registered,
+// HardLoCap is met, or the wait budget/context expires.
+func (sm *streamManager) waitForStreamRegistrations(ctx context.Context, target int) {
+	if target <= 0 || sm.hardHaveEnoughStream() {
+		return
+	}
+	if sm.streams.numStreamsWithMinProtoSpec(sm.myProtoSpec) >= target {
+		return
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, streamRegistrationWait)
+	defer cancel()
+	ticker := time.NewTicker(streamRegistrationPoll)
+	defer ticker.Stop()
+
+	for {
+		if sm.hardHaveEnoughStream() {
+			return
+		}
+		if sm.streams.numStreamsWithMinProtoSpec(sm.myProtoSpec) >= target {
+			return
+		}
+		select {
+		case <-waitCtx.Done():
+			sm.logger.Debug().
+				Int("target", target).
+				Int("registered", sm.streams.numStreamsWithMinProtoSpec(sm.myProtoSpec)).
+				Msg("[StreamManager] timed out waiting for stream registrations; continuing with DHT if needed")
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrInfo, error) {

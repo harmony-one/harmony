@@ -16,9 +16,27 @@ const (
 	connectTimeout = 60 * time.Second
 	// MaxReservedStreams is the maximum number of reserved streams
 	MaxReservedStreams = 100
-	// RemovalCooldownDuration defines the cooldown period (in minutes) before a removed stream can reconnect.
-	RemovalCooldownDuration    = 5 * time.Minute
-	MaxRemovalCooldownDuration = 60 * time.Minute
+	// RemovalCooldownDuration defines the cooldown period before a removed stream can reconnect.
+	RemovalCooldownDuration = 5 * time.Minute
+	// MaxRemovalCooldownDuration is the upper bound for removal cooldowns.
+	// Intended to stay below stagedstreamsync.StreamDiscoveryWatchdogTimeout.
+	MaxRemovalCooldownDuration = 15 * time.Minute
+
+	// Mass-disconnect / local-outage detection parameters.
+	massDisconnectWindow   = 45 * time.Second
+	massDisconnectMinCount = 3
+	// localOutageDuration is how long connection-loss removals use soft reconnect.
+	localOutageDuration = 2 * time.Minute
+	// localOutageDiscHoldoff is the delay before rediscovery after a mass disconnect.
+	localOutageDiscHoldoff = 30 * time.Second
+	// localOutageMinInterval is the minimum time between local-outage windows.
+	localOutageMinInterval = 10 * time.Minute
+
+	// streamRegistrationWait is the max wait for async stream registration after
+	// trusted peer NewStream succeeds.
+	streamRegistrationWait = 5 * time.Second
+	// streamRegistrationPoll is the polling interval while waiting for registrations.
+	streamRegistrationPoll = 50 * time.Millisecond
 
 	// setupConcurrency limits concurrent stream setup goroutines
 	setupConcurrency = 16

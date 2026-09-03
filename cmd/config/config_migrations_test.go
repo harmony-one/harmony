@@ -389,6 +389,12 @@ func Test_migrateConf(t *testing.T) {
 				hc := defConf
 				hc.Sync.Client = true
 				hc.Sync.Enabled = true
+				// Fixture Sync peer settings are preserved by migration.
+				hc.Sync.Concurrency = 6
+				hc.Sync.MinPeers = 6
+				hc.Sync.InitStreams = 8
+				hc.Sync.DiscSoftLowCap = 8
+				hc.Sync.DiscHardLowCap = 6
 				return hc
 			}(),
 			wantErr: false,
