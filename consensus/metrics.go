@@ -141,6 +141,21 @@ var (
 			"phase",
 		},
 	)
+	// consensusSignatureTotalCounterVec counts all prepare/commit votes that are
+	// either accepted on time or classified as late, and all local commit
+	// inclusion checks. Pair with late_signature to derive on-time vs late rates.
+	consensusSignatureTotalCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "consensus",
+			Name:      "signature_total",
+			Help:      "total prepare/commit votes (accepted or late) and local commit inclusion checks",
+		},
+		[]string{
+			"role",
+			"phase",
+		},
+	)
 
 	onceMetrics sync.Once
 
@@ -203,6 +218,7 @@ func initMetrics() {
 			consensusPubkeyVec,
 			consensusFinalityHistogram,
 			consensusLateSignatureCounterVec,
+			consensusSignatureTotalCounterVec,
 			lastPreimageImportGauge,
 			preimageEndGauge,
 			preimageStartGauge,

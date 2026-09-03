@@ -42,12 +42,34 @@ func (consensus *Consensus) checkOwnCommitInclusion(blockNum uint64, blockHash c
 		localPubs = append(localPubs, key.Pub.Bytes)
 	}
 
-	for _, pub := range excludedLocalCommitKeys(mask, localPubs) {
+	reportLocalCommitInclusions(mask, localPubs, func(pub bls.SerializedPublicKey) {
 		consensus.getLogger().Warn().
 			Uint64("blockNum", blockNum).
 			Str("blockHash", blockHash.Hex()).
 			Str("blsPubKey", pub.Hex()).
 			Msg("[OnCommitted] local commit signature not included in final commit bitmap")
+	})
+}
+
+// reportLocalCommitInclusions counts each local committee key present in the
+// COMMITTED participant set toward signature_total, and late_signature when
+// the key is disabled in the bitmap.
+func reportLocalCommitInclusions(mask *bls.Mask, localPubs []bls.SerializedPublicKey, onMissing func(bls.SerializedPublicKey)) {
+	for _, pub := range localPubs {
+		ok, err := mask.KeyEnabled(pub)
+		if err != nil {
+			continue
+		}
+		consensusSignatureTotalCounterVec.With(prometheus.Labels{
+			"role":  "validator",
+			"phase": "committed",
+		}).Inc()
+		if ok {
+			continue
+		}
+		if onMissing != nil {
+			onMissing(pub)
+		}
 		consensusLateSignatureCounterVec.With(prometheus.Labels{
 			"role":  "validator",
 			"phase": "committed",
@@ -71,6 +93,14 @@ func excludedLocalCommitKeys(mask *bls.Mask, localPubs []bls.SerializedPublicKey
 	return excluded
 }
 
+// reportAcceptedVote counts a prepare/commit vote accepted on time by the leader.
+func (consensus *Consensus) reportAcceptedVote(phase string) {
+	consensusSignatureTotalCounterVec.With(prometheus.Labels{
+		"role":  "leader",
+		"phase": phase,
+	}).Inc()
+}
+
 // reportLateVoteIfPastFinalized logs and counts a prepare/commit vote whose
 // block number is exactly one behind the leader's current block number.
 func (consensus *Consensus) reportLateVoteIfPastFinalized(recvMsg *FBFTMessage, myBlockNum uint64) {
@@ -79,6 +109,10 @@ func (consensus *Consensus) reportLateVoteIfPastFinalized(recvMsg *FBFTMessage, 
 	}
 	phase := recvMsg.MessageType.String()
 	consensusLateSignatureCounterVec.With(prometheus.Labels{
+		"role":  "leader",
+		"phase": phase,
+	}).Inc()
+	consensusSignatureTotalCounterVec.With(prometheus.Labels{
 		"role":  "leader",
 		"phase": phase,
 	}).Inc()

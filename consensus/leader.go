@@ -202,6 +202,7 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
 		return
 	}
+	consensus.reportAcceptedVote(recvMsg.MessageType.String())
 	//// Write - End
 
 	//// Read - Start
@@ -319,6 +320,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			Msg("[OnCommit] commitBitmap.SetKey failed")
 		return
 	}
+	consensus.reportAcceptedVote(recvMsg.MessageType.String())
 	//// Write - End
 
 	//// Read - Start
