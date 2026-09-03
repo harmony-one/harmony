@@ -19,6 +19,8 @@ var (
 	ErrParseCommitSigAndBitmapFail       = WrapStagedSyncError("parse commitSigAndBitmap failed")
 	ErrVerifyHeaderFail                  = WrapStagedSyncError("verify header failed")
 	ErrInsertChainFail                   = WrapStagedSyncError("insert to chain failed")
+	ErrUnexpectedBlockNumber             = WrapStagedSyncError("unexpected block number")
+	ErrInsertDidNotAdvance               = WrapStagedSyncError("block insert did not advance chain head")
 	ErrZeroBlockResponse                 = WrapStagedSyncError("zero block number response from remote nodes")
 	ErrInvalidEarlySync                  = WrapStagedSyncError("invalid early sync")
 	ErrEmptyWhitelist                    = WrapStagedSyncError("empty white list")
