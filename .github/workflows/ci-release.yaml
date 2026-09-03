@@ -48,7 +48,7 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout harmony core code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 #v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           path: harmony
           ref: refs/tags/${{ steps.resolve-tag.outputs.tag }}
@@ -84,7 +84,7 @@ jobs:
 
     steps:
       - name: Checkout harmony core code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 #v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           path: harmony
           ref: refs/tags/${{ needs.check.outputs.tag }}
@@ -92,7 +92,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Go with go.mod
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 #v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e #v7.0.0
         with:
           go-version-file: harmony/go.mod
           # Release artifacts should not restore mutable CI/PR caches.
@@ -144,7 +144,7 @@ jobs:
 
     steps:
       - name: Checkout Dockerfile and .dockerignore
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 #v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           path: harmony
           ref: refs/tags/${{ needs.check.outputs.tag }}
@@ -184,10 +184,10 @@ jobs:
           cache-image: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c #v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e #v4.3.0
 
       - name: Login to DockerHub
-        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 #v4.3.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f #v4.6.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -215,7 +215,7 @@ jobs:
 
     steps:
       - name: Checkout harmony core code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 #v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           path: harmony
           ref: refs/tags/${{ needs.check.outputs.tag }}

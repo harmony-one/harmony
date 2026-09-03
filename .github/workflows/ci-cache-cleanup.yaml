@@ -1,0 +1,35 @@
+# Inspired by https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manage-caches#deleting-cache-entries
+# But I've used 2 flags instead of for cycle and ignoring errors:
+#  `--all` deletes every cache matching the PR ref
+#  `--succeed-on-no-caches` - green when there is simply nothing to delete, but still allowing real errors 
+#    like auth or API failures to fail the workflow
+name: Cleanup GitHub runner caches on closed pull requests
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+
+    steps:
+      - name: Cleanup PR caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          set -euo pipefail
+          echo "Deleting caches for ${PR_REF}"
+          gh cache delete \
+            --all \
+            --ref "${PR_REF}" \
+            --succeed-on-no-caches
+          echo "Done"
