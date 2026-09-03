@@ -11,7 +11,7 @@ Harmony is a Go blockchain node implementation. The main executables are the
 Harmony node and bootnode. The repository also contains consensus, networking,
 staking, RPC, Rosetta, and local-network test code.
 
-The project uses Go 1.24.2. BLS support comes from the official
+The project uses Go 1.26.5. BLS support comes from the official
 `github.com/herumi/bls-eth-go-binary` Go module with prebuilt static libraries;
 separate MCL/BLS checkouts and custom native-library build flags are not needed.
 

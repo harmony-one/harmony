@@ -1,4 +1,4 @@
-FROM golang:1.24
+FROM golang:1.26.5
 
 ARG ENV=dev
 

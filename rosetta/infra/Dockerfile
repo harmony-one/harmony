@@ -1,5 +1,5 @@
 # Build
-FROM golang:1.24.2 AS build
+FROM golang:1.26.5 AS build
 
 RUN apt update -y && \
     apt install libgmp-dev libssl-dev git -y && \
