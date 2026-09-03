@@ -72,6 +72,14 @@ func (s *PublicPoolService) wait(limiter *rate.Limiter, ctx context.Context) err
 	return nil
 }
 
+func (s *PublicPoolService) txSender(tx *types.Transaction) (common.Address, error) {
+	signer := types.MakeSigner(s.hmy.ChainConfig(), s.hmy.CurrentBlock().Epoch())
+	if tx.IsEthCompatible() {
+		signer = types.NewEIP155Signer(s.hmy.ChainConfig().EthCompatibleChainID)
+	}
+	return types.Sender(signer, tx)
+}
+
 // SendRawTransaction will add the signed transaction to the transaction pool.
 // The sender is responsible for signing the transaction and using the correct nonce.
 func (s *PublicPoolService) SendRawTransaction(
@@ -109,36 +117,47 @@ func (s *PublicPoolService) SendRawTransaction(
 		return common.Hash{}, err
 	}
 
+	from, fromErr := s.txSender(tx)
+
 	// Submit transaction
 	if err := s.hmy.SendTx(ctx, tx); err != nil {
-		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
+		logger := utils.Logger().Warn().Err(err)
+		if fromErr == nil {
+			logger = logger.Str("from", from.Hex())
+		}
+		if tx.To() != nil {
+			logger = logger.Str("to", tx.To().Hex())
+		}
+		if tx.Value() != nil {
+			logger = logger.Str("value", tx.Value().String())
+		}
+		logger.Msg("Could not submit transaction")
 		return common.Hash{}, err
+	}
+
+	if fromErr != nil {
+		return common.Hash{}, fromErr
 	}
 
 	// Log submission
 	if tx.To() == nil {
-		signer := types.MakeSigner(s.hmy.ChainConfig(), s.hmy.CurrentBlock().Epoch())
-		ethSigner := types.NewEIP155Signer(s.hmy.ChainConfig().EthCompatibleChainID)
-
-		if tx.IsEthCompatible() {
-			signer = ethSigner
-		}
-		from, err := types.Sender(signer, tx)
-		if err != nil {
-			return common.Hash{}, err
-		}
 		addr := crypto.CreateAddress(from, tx.Nonce())
 		utils.Logger().Info().
-			Str("fullhash", tx.Hash().Hex()).
+			Str("hash", tx.Hash().Hex()).
 			Str("hashByType", tx.HashByType().Hex()).
+			Str("from", from.Hex()).
+			Uint64("nonce", tx.Nonce()).
 			Str("contract", common2.MustAddressToBech32(addr)).
+			Str("value", tx.Value().String()).
 			Msg("Submitted contract creation")
 	} else {
 		utils.Logger().Info().
-			Str("fullhash", tx.Hash().Hex()).
+			Str("hash", tx.Hash().Hex()).
 			Str("hashByType", tx.HashByType().Hex()).
+			Str("from", from.Hex()).
+			Uint64("nonce", tx.Nonce()).
 			Str("recipient", tx.To().Hex()).
-			Interface("tx", tx).
+			Str("value", tx.Value().String()).
 			Msg("Submitted transaction")
 	}
 
@@ -187,14 +206,19 @@ func (s *PublicPoolService) SendRawStakingTransaction(
 
 	// Submit transaction
 	if err := s.hmy.SendStakingTx(ctx, tx); err != nil {
-		utils.Logger().Warn().Err(err).Msg("Could not submit staking transaction")
+		utils.Logger().Warn().
+			Err(err).
+			Str("hash", tx.Hash().Hex()).
+			Uint64("nonce", tx.Nonce()).
+			Msg("Could not submit staking transaction")
 		return tx.Hash(), err
 	}
 
 	// Log submission
 	utils.Logger().Info().
-		Str("fullhash", tx.Hash().Hex()).
-		Msg("Submitted Staking transaction")
+		Str("hash", tx.Hash().Hex()).
+		Uint64("nonce", tx.Nonce()).
+		Msg("Submitted staking transaction")
 
 	// Response output is the same for all versions
 	return tx.Hash(), nil

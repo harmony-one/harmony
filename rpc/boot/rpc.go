@@ -67,6 +67,7 @@ func StartServers(hmyboot *hmyboot.BootService, apis []rpc.API, config bootnodeC
 		if err := rmf.LoadRpcMethodFiltersFromFile(rpcFilterFilePath); err != nil {
 			return err
 		}
+		utils.Logger().Info().Str("path", rpcFilterFilePath).Msg("Loaded RPC method filter file")
 	} else {
 		rmf.ExposeAll()
 	}
@@ -147,6 +148,7 @@ func startBootServiceHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter, httpTimeouts
 		Str("url", fmt.Sprintf("http://%s", httpEndpoint)).
 		Str("cors", strings.Join(httpOrigins, ",")).
 		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
+		Strs("modules", HTTPModules).
 		Msg("HTTP endpoint opened")
 
 	fmt.Printf("Started Boot Node RPC server at: %v\n", httpEndpoint)
@@ -160,7 +162,9 @@ func startBootServiceWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
 	}
 
 	utils.Logger().Info().
-		Str("url", fmt.Sprintf("ws://%s", wsEndpoint)).
+		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
+		Str("origins", strings.Join(wsOrigins, ",")).
+		Strs("modules", WSModules).
 		Msg("WebSocket endpoint opened")
 	fmt.Printf("Started Boot Node WS server at: %v\n", wsEndpoint)
 	return nil
