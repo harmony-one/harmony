@@ -200,6 +200,7 @@ func (consensus *Consensus) resetState() {
 
 	consensus.current.blockHash = [32]byte{}
 	consensus.current.block = []byte{}
+	consensus.current.clearLastQuorumAchievedBlocks()
 	consensus.decider().ResetPrepareAndCommitVotes()
 	if consensus.prepareBitmap != nil {
 		consensus.prepareBitmap.Clear()
