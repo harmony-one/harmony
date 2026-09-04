@@ -16,6 +16,28 @@ func TestIsOneEpochBeforeHIP30(t *testing.T) {
 	require.False(t, c.IsOneEpochBeforeHIP30(big.NewInt(3)))
 }
 
+func TestStrictStateValidationActivationEpochs(t *testing.T) {
+	tests := []struct {
+		name  string
+		cfg   *ChainConfig
+		epoch int64
+	}{
+		{"mainnet", MainnetChainConfig, 3036},
+		{"testnet", TestnetChainConfig, 7645},
+		{"devnet", PartnerChainConfig, 56874},
+		{"localnet", LocalnetChainConfig, 1},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			activationEpoch := big.NewInt(test.epoch)
+			require.Equal(t, activationEpoch, test.cfg.StrictStateValidationEpoch)
+			require.False(t, test.cfg.IsStrictStateValidation(new(big.Int).Sub(activationEpoch, big.NewInt(1))))
+			require.True(t, test.cfg.IsStrictStateValidation(activationEpoch))
+		})
+	}
+}
+
 func TestMainnetTBDFeaturesInactiveBeforeActivation(t *testing.T) {
 	// Representative mainnet epoch just below the Bloom activation epoch (2964);
 	// EpochTBD-gated features (10_000_000 placeholder) remain inactive here too.
