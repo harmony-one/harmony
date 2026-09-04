@@ -105,7 +105,7 @@ var (
 		SlashBallotSignerFixEpoch:             big.NewInt(2964),
 		VerifyBeaconHeaderSlashEpoch:          big.NewInt(2964),
 		BloomEpoch:                            big.NewInt(2964),
-		StrictStateValidationEpoch:            big.NewInt(3040),
+		StrictStateValidationEpoch:            big.NewInt(3036),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.

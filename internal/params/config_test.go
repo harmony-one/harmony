@@ -22,7 +22,7 @@ func TestStrictStateValidationActivationEpochs(t *testing.T) {
 		cfg   *ChainConfig
 		epoch int64
 	}{
-		{"mainnet", MainnetChainConfig, 3040},
+		{"mainnet", MainnetChainConfig, 3036},
 		{"testnet", TestnetChainConfig, 7645},
 		{"devnet", PartnerChainConfig, 56874},
 		{"localnet", LocalnetChainConfig, 1},
