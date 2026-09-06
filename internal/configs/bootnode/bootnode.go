@@ -95,6 +95,8 @@ type P2pConfig struct {
 	Muxer string
 	// No relay services, direct connections between peers only
 	NoRelay bool
+	// Timeout for the initial DHT bootstrap process
+	DiscBootstrapTimeout time.Duration
 }
 
 type GeneralConfig struct {

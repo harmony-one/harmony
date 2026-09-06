@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -82,6 +84,11 @@ func GetUint64FlagValue(cmd *cobra.Command, flag Uint64Flag) uint64 {
 	return getUint64FlagValue(cmd.Flags(), flag)
 }
 
+// GetDurationFlagValue get the duration value for the given DurationFlag from the local flags of the cobra command.
+func GetDurationFlagValue(cmd *cobra.Command, flag DurationFlag) time.Duration {
+	return getDurationFlagValue(cmd.Flags(), flag)
+}
+
 // GetIntPersistentFlagValue get the int value for the given IntFlag from the persistent
 // flags of the cobra command.
 func GetIntPersistentFlagValue(cmd *cobra.Command, flag IntFlag) int {
@@ -153,6 +160,15 @@ func getIntSliceFlagValue(fs *pflag.FlagSet, flag IntSliceFlag) []int {
 	if err != nil {
 		handleParseError(err)
 		return nil
+	}
+	return val
+}
+
+func getDurationFlagValue(fs *pflag.FlagSet, flag DurationFlag) time.Duration {
+	val, err := fs.GetDuration(flag.Name)
+	if err != nil {
+		handleParseError(err)
+		return 0
 	}
 	return val
 }
