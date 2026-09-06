@@ -36,6 +36,8 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		DiscConcurrency:                 nodeconfig.DefaultP2PConcurrency,
 		MaxConnsPerIP:                   nodeconfig.DefaultMaxConnPerIP,
 		DisablePrivateIPScan:            false,
+		PeerScoreRetention:              nodeconfig.DefaultPeerScoreRetention,
+		PeerMinScore:                    nodeconfig.DefaultPeerMinScore,
 		MaxPeers:                        nodeconfig.DefaultMaxPeers,
 		ConnManagerLowWatermark:         nodeconfig.DefaultConnManagerLowWatermark,
 		ConnManagerHighWatermark:        nodeconfig.DefaultConnManagerHighWatermark,
