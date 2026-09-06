@@ -83,6 +83,22 @@ type PeerScores struct {
 	ReqResp ReqRespScores `json:"reqResp"`
 }
 
+const (
+	// Req/resp contribution weights for the combined peer score.
+	peerScoreValidResponseWeight    = 1.0
+	peerScoreErrorResponsePenalty   = 1.0
+	peerScoreRejectedPayloadPenalty = 2.0
+)
+
+// ComputePeerScore returns the combined peer score used by gating and metrics.
+// It combines gossip score and req/resp behavior with explicit penalties.
+func ComputePeerScore(scores PeerScores) float64 {
+	return scores.Gossip.Total +
+		(scores.ReqResp.ValidResponses * peerScoreValidResponseWeight) -
+		(scores.ReqResp.ErrorResponses * peerScoreErrorResponsePenalty) -
+		(scores.ReqResp.RejectedPayloads * peerScoreRejectedPayloadPenalty)
+}
+
 // ScoreDatastore defines a type-safe API for getting and setting libp2p peer score information
 type ScoreDatastore interface {
 	// GetPeerScores returns the current scores for the specified peer
