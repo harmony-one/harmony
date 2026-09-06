@@ -344,7 +344,8 @@ func (consensus *Consensus) parseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage,
 		copy(pbftMsg.SenderPubkeys[0].Bytes[:], consensusMsg.SenderPubkey[:])
 	} else {
 		// else, it should be a multi-key message where the bitmap is populated
-		pubKeys, err := consensus.multiSigBitmap.GetSignedPubKeysFromBitmap(pbftMsg.SenderPubkeyBitmap)
+		members := consensus.decider.Participants()
+		pubKeys, err := bls_cosi.NewMask(members).GetSignedPubKeysFromBitmap(pbftMsg.SenderPubkeyBitmap)
 		if err != nil {
 			return nil, err
 		}
